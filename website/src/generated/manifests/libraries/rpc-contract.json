@@ -478,7 +478,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本包 source 为 `@migaia/rpc/contract`，常量 RPC_CONTRACT_SOURCE，code 来自 RpcContractErrorCode："
+                "text": "本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode："
               },
               {
                 "type": "table",
@@ -1690,7 +1690,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Contract errors use source @migaia/rpc/contract, exported as RPC_CONTRACT_SOURCE, and RpcContractErrorCode."
+                  "text": "Contract errors retain the semantic source `@migaia/rpc/contract`, exported as `RPC_CONTRACT_SOURCE`, and use RpcContractErrorCode for the code."
                 },
                 {
                   "type": "table",
@@ -1730,11 +1730,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The bridge source is @migaia/rpc/bridge/jsonrpc, exported as JSONRPC_BRIDGE_ERROR_SOURCE. JsonRpcBridgeErrorCode contains JSONRPC_FRAME_INVALID, JSONRPC_EXTENSION_MISSING, JSONRPC_PROFILE_INVALID, JSONRPC_UNSUPPORTED_MODE, and JSONRPC_HANDSHAKE_TIMEOUT for framing, extensions, profile, mode, and handshake timing. Do not classify bridge errors as the contract source."
+                  "text": "The bridge source is `@migaia/rpc/bridge/jsonrpc`, exported as JSONRPC_BRIDGE_ERROR_SOURCE. JsonRpcBridgeErrorCode contains JSONRPC_FRAME_INVALID, JSONRPC_EXTENSION_MISSING, JSONRPC_PROFILE_INVALID, JSONRPC_UNSUPPORTED_MODE, and JSONRPC_HANDSHAKE_TIMEOUT for framing, extensions, profile, mode, and handshake timing. Do not classify bridge errors as the contract source."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Other layers use @migaia/rpc/core (RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode), @migaia/rpc/remote (RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode), @migaia/rpc/process (RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode), and @migaia/rpc/threads (RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode). Branch on source/code; message is presentation text rather than retry policy."
+                  "text": "Other layers use `@migaia/rpc/core` (RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode), `@migaia/rpc/remote` (RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode), `@migaia/rpc/process` (RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode), and `@migaia/rpc/threads` (RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode). Branch on source/code; message is presentation text rather than retry policy."
                 },
                 {
                   "type": "code",
@@ -8530,6 +8530,57 @@
                   "text": "test 的现有脚本包含 coverage；结果仅以实际执行为准。独立协议实现应以发布常量、schema 和 normalizer 的边界为依据；只需要调用远端方法时，使用上层 RPC 包。"
                 }
               ]
+            },
+            {
+              "id": "错误身份与维护",
+              "heading": "错误身份与维护",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode："
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "原生类型与含义"],
+                  "rows": [
+                    [
+                      "CALLBACK_FAILED",
+                      "默认 Error，原生回调失败保留其类；warn/schedule/cancel 等未分类回调失败，原错或 cause 保留"
+                    ],
+                    ["INVALID_DESCRIPTOR", "TypeError；描述符身份或配置非法"],
+                    ["INVALID_ENVELOPE", "TypeError；信封或 portable 业务值非法"],
+                    ["INVALID_STREAM", "TypeError；流字段、序号、额度或值非法"],
+                    ["INVALID_FRAME", "RangeError；帧语法、空负载或物理批次非法"],
+                    ["FRAME_LIMIT_EXCEEDED", "RangeError；帧或重组预算超限"],
+                    ["FRAME_ASSEMBLY_EXPIRED", "RangeError；分片未在预算内组齐"],
+                    ["INVALID_WIRE_ERROR", "TypeError；错误树非法，可能带 pointer/violation/cause"],
+                    ["HANDSHAKE_INVALID", "TypeError；握手编码、JSON 或字段非法"],
+                    ["HANDSHAKE_INCOMPATIBLE", "Error；版本、codec 或所需能力不兼容"],
+                    ["HANDSHAKE_REJECTED", "Error；对端拒绝，检查受控 cause"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "形状失败保留对应原生类；可写回调错误原位附码且不改 stack，不可写或非 Error 值经 cause，完整外包 source/code 保留原 owner。fatal UTF-8 decoder 失败在 HANDSHAKE_INVALID/INVALID_FRAME 的 cause 中保留。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "JSON-RPC 桥身份为 `@migaia/rpc/bridge/jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "其他层的 source 分别是 rpc-core 的 `@migaia/rpc/core`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `@migaia/rpc/remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `@migaia/rpc/process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `@migaia/rpc/threads`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm --filter @migaia/rpc-contract run fmt\npnpm --filter @migaia/rpc-contract run lint\npnpm --filter @migaia/rpc-contract run typecheck\npnpm --filter @migaia/rpc-contract run typecheck:test\npnpm --filter @migaia/rpc-contract run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "test 的现有脚本包含 coverage；结果仅以实际执行为准。独立协议实现应以发布常量、schema 和 normalizer 的边界为依据；只需要调用远端方法时，使用上层 RPC 包。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -8704,6 +8755,57 @@
                 {
                   "type": "paragraph",
                   "text": "本包 source 为 `@migaia/rpc/contract`，常量 RPC_CONTRACT_SOURCE，code 来自 RpcContractErrorCode："
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "原生类型与含义"],
+                  "rows": [
+                    [
+                      "CALLBACK_FAILED",
+                      "默认 Error，原生回调失败保留其类；warn/schedule/cancel 等未分类回调失败，原错或 cause 保留"
+                    ],
+                    ["INVALID_DESCRIPTOR", "TypeError；描述符身份或配置非法"],
+                    ["INVALID_ENVELOPE", "TypeError；信封或 portable 业务值非法"],
+                    ["INVALID_STREAM", "TypeError；流字段、序号、额度或值非法"],
+                    ["INVALID_FRAME", "RangeError；帧语法、空负载或物理批次非法"],
+                    ["FRAME_LIMIT_EXCEEDED", "RangeError；帧或重组预算超限"],
+                    ["FRAME_ASSEMBLY_EXPIRED", "RangeError；分片未在预算内组齐"],
+                    ["INVALID_WIRE_ERROR", "TypeError；错误树非法，可能带 pointer/violation/cause"],
+                    ["HANDSHAKE_INVALID", "TypeError；握手编码、JSON 或字段非法"],
+                    ["HANDSHAKE_INCOMPATIBLE", "Error；版本、codec 或所需能力不兼容"],
+                    ["HANDSHAKE_REJECTED", "Error；对端拒绝，检查受控 cause"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "形状失败保留对应原生类；可写回调错误原位附码且不改 stack，不可写或非 Error 值经 cause，完整外包 source/code 保留原 owner。fatal UTF-8 decoder 失败在 HANDSHAKE_INVALID/INVALID_FRAME 的 cause 中保留。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "JSON-RPC 桥身份为 `@migaia/rpc/bridge/jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "其他层的 source 分别是 rpc-core 的 `@migaia/rpc/core`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `@migaia/rpc/remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `@migaia/rpc/process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `@migaia/rpc/threads`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm --filter @migaia/rpc-contract run fmt\npnpm --filter @migaia/rpc-contract run lint\npnpm --filter @migaia/rpc-contract run typecheck\npnpm --filter @migaia/rpc-contract run typecheck:test\npnpm --filter @migaia/rpc-contract run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "test 的现有脚本包含 coverage；结果仅以实际执行为准。独立协议实现应以发布常量、schema 和 normalizer 的边界为依据；只需要调用远端方法时，使用上层 RPC 包。"
+                }
+              ]
+            },
+            {
+              "id": "错误身份与维护",
+              "heading": "错误身份与维护",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode："
                 },
                 {
                   "type": "table",
@@ -12096,6 +12198,57 @@
                   "text": "test 的现有脚本包含 coverage；结果仅以实际执行为准。独立协议实现应以发布常量、schema 和 normalizer 的边界为依据；只需要调用远端方法时，使用上层 RPC 包。"
                 }
               ]
+            },
+            {
+              "id": "错误身份与维护",
+              "heading": "错误身份与维护",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode："
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "原生类型与含义"],
+                  "rows": [
+                    [
+                      "CALLBACK_FAILED",
+                      "默认 Error，原生回调失败保留其类；warn/schedule/cancel 等未分类回调失败，原错或 cause 保留"
+                    ],
+                    ["INVALID_DESCRIPTOR", "TypeError；描述符身份或配置非法"],
+                    ["INVALID_ENVELOPE", "TypeError；信封或 portable 业务值非法"],
+                    ["INVALID_STREAM", "TypeError；流字段、序号、额度或值非法"],
+                    ["INVALID_FRAME", "RangeError；帧语法、空负载或物理批次非法"],
+                    ["FRAME_LIMIT_EXCEEDED", "RangeError；帧或重组预算超限"],
+                    ["FRAME_ASSEMBLY_EXPIRED", "RangeError；分片未在预算内组齐"],
+                    ["INVALID_WIRE_ERROR", "TypeError；错误树非法，可能带 pointer/violation/cause"],
+                    ["HANDSHAKE_INVALID", "TypeError；握手编码、JSON 或字段非法"],
+                    ["HANDSHAKE_INCOMPATIBLE", "Error；版本、codec 或所需能力不兼容"],
+                    ["HANDSHAKE_REJECTED", "Error；对端拒绝，检查受控 cause"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "形状失败保留对应原生类；可写回调错误原位附码且不改 stack，不可写或非 Error 值经 cause，完整外包 source/code 保留原 owner。fatal UTF-8 decoder 失败在 HANDSHAKE_INVALID/INVALID_FRAME 的 cause 中保留。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "JSON-RPC 桥身份为 `@migaia/rpc/bridge/jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "其他层的 source 分别是 rpc-core 的 `@migaia/rpc/core`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `@migaia/rpc/remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `@migaia/rpc/process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `@migaia/rpc/threads`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm --filter @migaia/rpc-contract run fmt\npnpm --filter @migaia/rpc-contract run lint\npnpm --filter @migaia/rpc-contract run typecheck\npnpm --filter @migaia/rpc-contract run typecheck:test\npnpm --filter @migaia/rpc-contract run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "test 的现有脚本包含 coverage；结果仅以实际执行为准。独立协议实现应以发布常量、schema 和 normalizer 的边界为依据；只需要调用远端方法时，使用上层 RPC 包。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -12216,6 +12369,57 @@
                 {
                   "type": "paragraph",
                   "text": "本包 source 为 `@migaia/rpc/contract`，常量 RPC_CONTRACT_SOURCE，code 来自 RpcContractErrorCode："
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "原生类型与含义"],
+                  "rows": [
+                    [
+                      "CALLBACK_FAILED",
+                      "默认 Error，原生回调失败保留其类；warn/schedule/cancel 等未分类回调失败，原错或 cause 保留"
+                    ],
+                    ["INVALID_DESCRIPTOR", "TypeError；描述符身份或配置非法"],
+                    ["INVALID_ENVELOPE", "TypeError；信封或 portable 业务值非法"],
+                    ["INVALID_STREAM", "TypeError；流字段、序号、额度或值非法"],
+                    ["INVALID_FRAME", "RangeError；帧语法、空负载或物理批次非法"],
+                    ["FRAME_LIMIT_EXCEEDED", "RangeError；帧或重组预算超限"],
+                    ["FRAME_ASSEMBLY_EXPIRED", "RangeError；分片未在预算内组齐"],
+                    ["INVALID_WIRE_ERROR", "TypeError；错误树非法，可能带 pointer/violation/cause"],
+                    ["HANDSHAKE_INVALID", "TypeError；握手编码、JSON 或字段非法"],
+                    ["HANDSHAKE_INCOMPATIBLE", "Error；版本、codec 或所需能力不兼容"],
+                    ["HANDSHAKE_REJECTED", "Error；对端拒绝，检查受控 cause"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "形状失败保留对应原生类；可写回调错误原位附码且不改 stack，不可写或非 Error 值经 cause，完整外包 source/code 保留原 owner。fatal UTF-8 decoder 失败在 HANDSHAKE_INVALID/INVALID_FRAME 的 cause 中保留。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "JSON-RPC 桥身份为 `@migaia/rpc/bridge/jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "其他层的 source 分别是 rpc-core 的 `@migaia/rpc/core`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `@migaia/rpc/remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `@migaia/rpc/process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `@migaia/rpc/threads`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm --filter @migaia/rpc-contract run fmt\npnpm --filter @migaia/rpc-contract run lint\npnpm --filter @migaia/rpc-contract run typecheck\npnpm --filter @migaia/rpc-contract run typecheck:test\npnpm --filter @migaia/rpc-contract run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "test 的现有脚本包含 coverage；结果仅以实际执行为准。独立协议实现应以发布常量、schema 和 normalizer 的边界为依据；只需要调用远端方法时，使用上层 RPC 包。"
+                }
+              ]
+            },
+            {
+              "id": "错误身份与维护",
+              "heading": "错误身份与维护",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode："
                 },
                 {
                   "type": "table",

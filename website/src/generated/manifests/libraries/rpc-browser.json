@@ -448,8 +448,12 @@
                 "text": "Window、SharedWorker、ServiceWorker、BroadcastChannel、RTC 都借用原生载体，Endpoint.dispose 与 Peer.close 释放订阅，创建者仍负责 close。WebTransport 只有其取得的 reader/writer 随 transport 释放。正常退订幂等；原生 remover 失败可能抛错并保留该登记，调用原 disposer 可再次尝试。不要声称所有清理都不失败。"
               },
               {
+                "type": "paragraph",
+                "text": "表中的 `source` 标识浏览器错误的归属；本包公开 API 的导入路径是 `@migaia/rpc-browser`。"
+              },
+              {
                 "type": "table",
-                "headers": ["本包 code（source=@migaia/rpc/browser）", "触发与处理"],
+                "headers": ["本包 code（source=`@migaia/rpc/browser`）", "触发与处理"],
                 "rows": [
                   ["WINDOW_ORIGIN_REQUIRED", "Window Peer 缺少非空 origin；填写明确对端源"],
                   ["RTC_CHANNEL_UNRELIABLE", "Peer 的频道不是可靠有序；改用受支持配置"],
@@ -1628,8 +1632,12 @@
                   "text": "Window, SharedWorker, ServiceWorker, BroadcastChannel, and RTC borrow their native carriers. Endpoint.dispose and Peer.close release subscriptions while the creator retains physical close ownership. WebTransport releases only its acquired reader/writer. Normal unsubscribe is idempotent. Native remover failure may throw while retaining the registration, allowing the original disposer to retry; cleanup is not guaranteed to be infallible."
                 },
                 {
+                  "type": "paragraph",
+                  "text": "The table uses `source` to identify browser errors. Import this module’s public APIs from `@migaia/rpc-browser`."
+                },
+                {
                   "type": "table",
-                  "headers": ["module code, source=@migaia/rpc/browser", "Trigger and response"],
+                  "headers": ["module code, source=`@migaia/rpc/browser`", "Trigger and response"],
                   "rows": [
                     [
                       "WINDOW_ORIGIN_REQUIRED",

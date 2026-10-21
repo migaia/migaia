@@ -564,11 +564,15 @@
                 "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
               },
               {
+                "type": "paragraph",
+                "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+              },
+              {
                 "type": "table",
                 "headers": ["source", "常量 / 表"],
                 "rows": [
-                  ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
-                  ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                  ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                 ]
               },
               {
@@ -2115,11 +2119,15 @@
                   "text": "Errors retain native type, message, stack, and cause. Public shapes use IRpcError, IRpcPlatformValue, and IRpcTransportTopologyValue. Branch on source/code rather than message. Remote source/code is diagnostic data, not local authority."
                 },
                 {
+                  "type": "paragraph",
+                  "text": "The `source` values below identify errors; they are not import paths. Import Core APIs from `@migaia/rpc-core` and Remote APIs from `@migaia/rpc-core/remote`."
+                },
+                {
                   "type": "table",
                   "headers": ["source", "Constant / code table"],
                   "rows": [
-                    ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
-                    ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -3657,6 +3665,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 200,
@@ -3812,6 +3908,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -5303,6 +5487,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -7978,6 +8250,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -12935,6 +13295,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -13030,6 +13478,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -13263,6 +13799,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -13358,6 +13982,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -13657,6 +14369,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -14581,6 +15381,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -14697,6 +15585,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -14904,6 +15880,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -15351,6 +16415,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -15645,6 +16797,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -15820,6 +17060,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -27495,7 +28823,7 @@
           "declarationLine": 13,
           "source": "packages/rpc-core/dist/remote/runtime-api/managed-peer.d.ts",
           "purpose": "Creates a Peer facade on the original managed binding and generation holder, retaining restart and native execution ownership.",
-          "core": "options: Peer options plus keyFactory, retryPort and callDeadlineCapMs used by managed proxy dispatch.\nbinding: Actual IRemoteBinding supplied by the platform owner.\nbindEndpoint: Optional canonical callback receiving the actual channel and assembled endpoint, returning the endpoint to retain.\npreparation: Original adapter preparation ports and signals; ordinary applications must not forge Host or provider admission provenance.\nbeforeRelease: Optional async native drain before generation endpoint cleanup; rejection remains observable.\nexecution: Original supervisor carrying execution authority, supplied only by its real native owner.\nPromise of managed IRuntimePeer; close continues channel, owned binding and carrier-listener release even after an earlier cleanup failure. One failure retains identity; multiple failures retain their complete cause/errors graph. Async source wrappers need not return the identical Promise.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\nAttach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nauthentication.encrypt: Outbound sync/async encryption runs after the endpoint wraps its encoded value with replay metadata and before signing. Throw/rejection normally becomes AUTHENTICATION_FAILED with its cause.\nauthentication.encrypt.value: Replay-bound authentication envelope produced by the endpoint, including its encoded payload; not the bare application payload.\nauthentication.encrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nEncrypted value or its Promise, passed unchanged into sign.\nLeave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.\nauthentication.decrypt: Inbound sync/async decryption runs on the value recovered by verify. The endpoint then validates the recovered authentication envelope and replay binding.\nauthentication.decrypt.value: Verified protected value returned by verify.\nauthentication.decrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nRecovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.\nOmit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.\nauthentication.sign: Outbound sync/async signing runs after optional encryption and returns the complete protected frame representation. Signing and verification are required even without encryption.\nauthentication.sign.value: Encrypted value when encrypt exists, otherwise the replay-bound authentication envelope.\nauthentication.sign.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nSigned representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.\nThere is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.\nauthentication.verify: Inbound sync/async verification receives the protected frame and must recover its authenticated inner value; returning a boolean is not a verification verdict protocol.\nauthentication.verify.value: Protected value received at the authentication pipeline edge.\nauthentication.verify.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nAuthenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.\nThere is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.\nauthentication.encodedType: Declared protected-output domain must match the next physical pipeline edge. Encrypt/decrypt and sign/verify are complete pairs, at least signing is required, and encryption additionally requires signing.\nany: do not impose a declared protected-output value category.\nLeave the declared output domain unconstrained; transforms may still change representation.\nDeclare that the protected output is text for the subsequent pipeline edge.\nDeclare that the protected output is a byte array for the subsequent pipeline edge.\nspawn: Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.\nspawn.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nPromise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.\nOmitted or supplied: the actual binding remains the channel acquisition owner.\nDo not set spawn to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nconnect: Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.\nconnect.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nDo not set connect to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nlisten: Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.\nlisten.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nDo not set listen to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\ncallDeadlineCapMs: Optional positive finite platform ceiling on a logical call deadline, in milliseconds.\nOmitted: no additional platform deadline ceiling.",
+          "core": "options: Peer options plus keyFactory, retryPort and callDeadlineCapMs used by managed proxy dispatch.\nbinding: Actual IRemoteBinding supplied by the platform owner.\nbindEndpoint: Optional canonical callback receiving the actual channel and assembled endpoint, returning the endpoint to retain.\npreparation: Original adapter preparation ports and signals; ordinary applications must not forge Host or provider admission provenance.\nbeforeRelease: Optional async native drain before generation endpoint cleanup; rejection remains observable.\nexecution: Original supervisor carrying execution authority, supplied only by its real native owner.\nPromise of managed IRuntimePeer; close continues channel, owned binding and carrier-listener release even after an earlier cleanup failure. One failure retains identity; multiple failures retain their complete cause/errors graph. Async source wrappers need not return the identical Promise.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\nAttach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nauthentication.encrypt: Outbound sync/async encryption runs after the endpoint wraps its encoded value with replay metadata and before signing. Throw/rejection normally becomes AUTHENTICATION_FAILED with its cause.\nauthentication.encrypt.value: Replay-bound authentication envelope produced by the endpoint, including its encoded payload; not the bare application payload.\nauthentication.encrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nEncrypted value or its Promise, passed unchanged into sign.\nLeave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.\nauthentication.decrypt: Inbound sync/async decryption runs on the value recovered by verify. The endpoint then validates the recovered authentication envelope and replay binding.\nauthentication.decrypt.value: Verified protected value returned by verify.\nauthentication.decrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nRecovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.\nOmit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.\nauthentication.sign: Outbound sync/async signing runs after optional encryption and returns the complete protected frame representation. Signing and verification are required even without encryption.\nauthentication.sign.value: Encrypted value when encrypt exists, otherwise the replay-bound authentication envelope.\nauthentication.sign.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nSigned representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.\nThere is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.\nauthentication.verify: Inbound sync/async verification receives the protected frame and must recover its authenticated inner value; returning a boolean is not a verification verdict protocol.\nauthentication.verify.value: Protected value received at the authentication pipeline edge.\nauthentication.verify.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nAuthenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.\nThere is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.\nauthentication.encodedType: Declared protected-output domain must match the next physical pipeline edge. Encrypt/decrypt and sign/verify are complete pairs, at least signing is required, and encryption additionally requires signing.\nany: do not impose a declared protected-output value category.\nLeave the declared output domain unconstrained; transforms may still change representation.\nDeclare that the protected output is text for the subsequent pipeline edge.\nDeclare that the protected output is a byte array for the subsequent pipeline edge.\nspawn: The inherited `spawn` callback is unused by this managed factory, which obtains its channel from binding.openChannel.\nspawn.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nPromise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.\nOmitting or supplying `spawn` leaves channel acquisition with the binding.\nDo not set spawn to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nconnect: The inherited `connect` callback is unused by this managed factory, which obtains its channel from binding.openChannel.\nconnect.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nOmitting or supplying `connect` leaves channel acquisition with the binding.\nDo not set connect to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nlisten: The inherited `listen` callback is unused by this managed factory, which obtains its channel from binding.openChannel.\nlisten.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nOmitting or supplying `listen` leaves channel acquisition with the binding.\nDo not set listen to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\ncallDeadlineCapMs: Optional positive finite platform ceiling on a logical call deadline, in milliseconds.\nOmitted: no additional platform deadline ceiling.",
           "advanced": "",
           "parameters": [
             "options: IRuntimePeerOptions & Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>",
@@ -27609,7 +28937,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "options: Peer options plus keyFactory, retryPort and callDeadlineCapMs used by managed proxy dispatch.\nbinding: Actual IRemoteBinding supplied by the platform owner.\nbindEndpoint: Optional canonical callback receiving the actual channel and assembled endpoint, returning the endpoint to retain.\npreparation: Original adapter preparation ports and signals; ordinary applications must not forge Host or provider admission provenance.\nbeforeRelease: Optional async native drain before generation endpoint cleanup; rejection remains observable.\nexecution: Original supervisor carrying execution authority, supplied only by its real native owner.\nPromise of managed IRuntimePeer; close continues channel, owned binding and carrier-listener release even after an earlier cleanup failure. One failure retains identity; multiple failures retain their complete cause/errors graph. Async source wrappers need not return the identical Promise.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\nAttach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nauthentication.encrypt: Outbound sync/async encryption runs after the endpoint wraps its encoded value with replay metadata and before signing. Throw/rejection normally becomes AUTHENTICATION_FAILED with its cause.\nauthentication.encrypt.value: Replay-bound authentication envelope produced by the endpoint, including its encoded payload; not the bare application payload.\nauthentication.encrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nEncrypted value or its Promise, passed unchanged into sign.\nLeave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.\nauthentication.decrypt: Inbound sync/async decryption runs on the value recovered by verify. The endpoint then validates the recovered authentication envelope and replay binding.\nauthentication.decrypt.value: Verified protected value returned by verify.\nauthentication.decrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nRecovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.\nOmit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.\nauthentication.sign: Outbound sync/async signing runs after optional encryption and returns the complete protected frame representation. Signing and verification are required even without encryption.\nauthentication.sign.value: Encrypted value when encrypt exists, otherwise the replay-bound authentication envelope.\nauthentication.sign.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nSigned representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.\nThere is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.\nauthentication.verify: Inbound sync/async verification receives the protected frame and must recover its authenticated inner value; returning a boolean is not a verification verdict protocol.\nauthentication.verify.value: Protected value received at the authentication pipeline edge.\nauthentication.verify.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nAuthenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.\nThere is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.\nauthentication.encodedType: Declared protected-output domain must match the next physical pipeline edge. Encrypt/decrypt and sign/verify are complete pairs, at least signing is required, and encryption additionally requires signing.\nany: do not impose a declared protected-output value category.\nLeave the declared output domain unconstrained; transforms may still change representation.\nDeclare that the protected output is text for the subsequent pipeline edge.\nDeclare that the protected output is a byte array for the subsequent pipeline edge.\nspawn: Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.\nspawn.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nPromise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.\nOmitted or supplied: the actual binding remains the channel acquisition owner.\nDo not set spawn to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nconnect: Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.\nconnect.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nDo not set connect to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nlisten: Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.\nlisten.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nDo not set listen to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\ncallDeadlineCapMs: Optional positive finite platform ceiling on a logical call deadline, in milliseconds.\nOmitted: no additional platform deadline ceiling."
+              "content": "options: Peer options plus keyFactory, retryPort and callDeadlineCapMs used by managed proxy dispatch.\nbinding: Actual IRemoteBinding supplied by the platform owner.\nbindEndpoint: Optional canonical callback receiving the actual channel and assembled endpoint, returning the endpoint to retain.\npreparation: Original adapter preparation ports and signals; ordinary applications must not forge Host or provider admission provenance.\nbeforeRelease: Optional async native drain before generation endpoint cleanup; rejection remains observable.\nexecution: Original supervisor carrying execution authority, supplied only by its real native owner.\nPromise of managed IRuntimePeer; close continues channel, owned binding and carrier-listener release even after an earlier cleanup failure. One failure retains identity; multiple failures retain their complete cause/errors graph. Async source wrappers need not return the identical Promise.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\nAttach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nauthentication.encrypt: Outbound sync/async encryption runs after the endpoint wraps its encoded value with replay metadata and before signing. Throw/rejection normally becomes AUTHENTICATION_FAILED with its cause.\nauthentication.encrypt.value: Replay-bound authentication envelope produced by the endpoint, including its encoded payload; not the bare application payload.\nauthentication.encrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nEncrypted value or its Promise, passed unchanged into sign.\nLeave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.\nauthentication.decrypt: Inbound sync/async decryption runs on the value recovered by verify. The endpoint then validates the recovered authentication envelope and replay binding.\nauthentication.decrypt.value: Verified protected value returned by verify.\nauthentication.decrypt.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nRecovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.\nOmit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.\nauthentication.sign: Outbound sync/async signing runs after optional encryption and returns the complete protected frame representation. Signing and verification are required even without encryption.\nauthentication.sign.value: Encrypted value when encrypt exists, otherwise the replay-bound authentication envelope.\nauthentication.sign.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nSigned representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.\nThere is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.\nauthentication.verify: Inbound sync/async verification receives the protected frame and must recover its authenticated inner value; returning a boolean is not a verification verdict protocol.\nauthentication.verify.value: Protected value received at the authentication pipeline edge.\nauthentication.verify.context: IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.\nAuthenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.\nThere is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.\nauthentication.encodedType: Declared protected-output domain must match the next physical pipeline edge. Encrypt/decrypt and sign/verify are complete pairs, at least signing is required, and encryption additionally requires signing.\nany: do not impose a declared protected-output value category.\nLeave the declared output domain unconstrained; transforms may still change representation.\nDeclare that the protected output is text for the subsequent pipeline edge.\nDeclare that the protected output is a byte array for the subsequent pipeline edge.\nspawn: The inherited `spawn` callback is unused by this managed factory, which obtains its channel from binding.openChannel.\nspawn.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nPromise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.\nOmitting or supplying `spawn` leaves channel acquisition with the binding.\nDo not set spawn to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nconnect: The inherited `connect` callback is unused by this managed factory, which obtains its channel from binding.openChannel.\nconnect.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nOmitting or supplying `connect` leaves channel acquisition with the binding.\nDo not set connect to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\nlisten: The inherited `listen` callback is unused by this managed factory, which obtains its channel from binding.openChannel.\nlisten.context: IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.\nOmitting or supplying `listen` leaves channel acquisition with the binding.\nDo not set listen to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.\ncallDeadlineCapMs: Optional positive finite platform ceiling on a logical call deadline, in milliseconds.\nOmitted: no additional platform deadline ceiling."
             },
             {
               "id": "advanced-usage",
@@ -36699,6 +38027,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -36835,6 +38251,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -38992,6 +40496,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -39200,6 +40792,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -39749,6 +41429,94 @@
                   "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
                 }
               ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
             }
           ],
           "usageScore": 0,
@@ -40032,6 +41800,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {
@@ -41111,6 +42967,94 @@
                   "rows": [
                     ["@migaia/rpc/core", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
                     ["@migaia/rpc/remote", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Core code", "处理含义"],
+                  "rows": [
+                    [
+                      "DEADLINE_EXCEEDED / CANCELLED",
+                      "TimeoutError / AbortError；结果可能未知，查账而非盲重试"
+                    ],
+                    ["OVERLOADED", "准入拒绝，具体原因看提供方 onRejected"],
+                    ["TRANSPORT", "载体失败，已送达与否需对账"],
+                    [
+                      "PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED",
+                      "路径缺失、重复登记、未结算"
+                    ],
+                    ["PROVIDER_CONTEXT_EXPIRED", "过期 context 结算返回 ok:false"],
+                    ["PAYLOAD_INVALID / SCHEMA_INVALID", "值域、尺寸、二进制或 schema 错误"],
+                    ["CONTRACT_INVALID / PROTOCOL_INVALID", "方法/模式/键或协议消息非法"],
+                    ["CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT", "能力未协商或归属/实例有歧义"],
+                    ["INVALID_CONFIG", "配置非法，含不适用的 transfer"],
+                    ["TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE", "无目标或同名实例不唯一"],
+                    ["ENDPOINT_DISPOSED", "实例终结，需新建"],
+                    ["AUTHENTICATION_FAILED", "认证失败，先修会话/凭据"],
+                    ["STREAM_RESULT_UNKNOWN", "已交付项以外的流结果未知"],
+                    ["IDEMPOTENCY_RESULT_UNAVAILABLE", "业务已执行，结果未保留，不换键重执行"],
+                    [
+                      "PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED",
+                      "目标代次不符/退役，转发调用可能已执行"
+                    ],
+                    ["FORWARD_LOOP / FORWARD_HOP_LIMIT", "环路或超过三跳"],
+                    ["MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING", "组装重复或缺失"],
+                    ["CHUNK_INVALID", "分片重组失败"],
+                    [
+                      "PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED",
+                      "属性访问或转字符串失败，保留原因"
+                    ],
+                    [
+                      "CALLBACK_FAILED",
+                      "冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列"
+                    ],
+                    ["INTERNAL", "内部失败，不默认重试"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Remote code", "处理含义"],
+                  "rows": [
+                    ["REMOTE_START_FAILED", "来源/握手失败，检查 cause"],
+                    ["REMOTE_CLOSED", "连接/代次已关，不自动转投同名后继"],
+                    ["REMOTE_RESULT_UNKNOWN", "业务可能已执行，outcome 或对账"],
+                    ["REMOTE_CONTRACT_INVALID", "目录或契约非法"],
+                    ["REMOTE_HOST_NOT_ADOPTED", "先完成对应 hostUse"],
+                    ["RUNTIME_EVENT_OVERFLOW", "超过 100 条积压，查当前状态后重订阅"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。"
+                }
+              ]
+            },
+            {
+              "id": "错误与归因",
+              "heading": "错误与归因",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["source", "常量 / 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode"],
+                    ["`@migaia/rpc/remote`", "RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode"]
                   ]
                 },
                 {

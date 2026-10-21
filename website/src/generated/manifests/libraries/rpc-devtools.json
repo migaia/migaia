@@ -452,7 +452,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "错误 source 是 RPC_DEVTOOLS_SOURCE（@migaia/rpc/devtools），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。"
+                "text": "错误 source 是 RPC_DEVTOOLS_SOURCE（`@migaia/rpc/devtools`），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。"
               },
               {
                 "type": "table",
@@ -1608,7 +1608,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "RPC_DEVTOOLS_SOURCE is @migaia/rpc/devtools; use RpcDevtoolsErrorCode with source rather than matching messages."
+                  "text": "RPC_DEVTOOLS_SOURCE is `@migaia/rpc/devtools`; use RpcDevtoolsErrorCode with source rather than matching messages."
                 },
                 {
                   "type": "table",
@@ -5073,6 +5073,48 @@
                   "code": "pnpm run fmt\npnpm run lint\npnpm run typecheck\npnpm run typecheck:test\npnpm run test\npnpm run build"
                 }
               ]
+            },
+            {
+              "id": "错误身份与开发命令",
+              "heading": "错误身份与开发命令",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误 source 是 RPC_DEVTOOLS_SOURCE（`@migaia/rpc/devtools`），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "场景"],
+                  "rows": [
+                    ["INVALID_OPTION", "配置或查询参数超出支持域，修正输入"],
+                    ["CLOSED", "已关闭的 collector/hub 操作，创建新的 owner"],
+                    [
+                      "RECORD_ACTIVE / RECORD_NOT_ACTIVE",
+                      "重复开始，或没有对应活动 recording 可停止"
+                    ],
+                    [
+                      "RECORD_FORMAT_INVALID",
+                      "NDJSON/header/事件/bytes/error 格式无效，查看 cause"
+                    ],
+                    ["REDACT_FAILED", "脱敏回调失败，报告原因并丢弃内容"],
+                    ["TARGET_DUPLICATE / TARGET_UNKNOWN", "重复登记名称，或操作从未登记的目标"],
+                    ["TARGET_RELEASE_FAILED", "Hub 释放 watch 汇总失败，查看 cause/errors"],
+                    [
+                      "SERVICE_RESULT_INVALID",
+                      "service 结果无法转成可传输表示，查看 cause 或关闭内容暴露"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包在原生错误上附加身份，不替换 stack/cause。Client 运行失败保持原身份，target 状态不覆盖错误。以下是现有包脚本，列出不代表文档编辑独立运行，也不把基准当成已测性能结论："
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm run fmt\npnpm run lint\npnpm run typecheck\npnpm run typecheck:test\npnpm run test\npnpm run build"
+                }
+              ]
             }
           ],
           "usageScore": 6,
@@ -5238,6 +5280,48 @@
                 {
                   "type": "paragraph",
                   "text": "错误 source 是 RPC_DEVTOOLS_SOURCE（@migaia/rpc/devtools），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "场景"],
+                  "rows": [
+                    ["INVALID_OPTION", "配置或查询参数超出支持域，修正输入"],
+                    ["CLOSED", "已关闭的 collector/hub 操作，创建新的 owner"],
+                    [
+                      "RECORD_ACTIVE / RECORD_NOT_ACTIVE",
+                      "重复开始，或没有对应活动 recording 可停止"
+                    ],
+                    [
+                      "RECORD_FORMAT_INVALID",
+                      "NDJSON/header/事件/bytes/error 格式无效，查看 cause"
+                    ],
+                    ["REDACT_FAILED", "脱敏回调失败，报告原因并丢弃内容"],
+                    ["TARGET_DUPLICATE / TARGET_UNKNOWN", "重复登记名称，或操作从未登记的目标"],
+                    ["TARGET_RELEASE_FAILED", "Hub 释放 watch 汇总失败，查看 cause/errors"],
+                    [
+                      "SERVICE_RESULT_INVALID",
+                      "service 结果无法转成可传输表示，查看 cause 或关闭内容暴露"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包在原生错误上附加身份，不替换 stack/cause。Client 运行失败保持原身份，target 状态不覆盖错误。以下是现有包脚本，列出不代表文档编辑独立运行，也不把基准当成已测性能结论："
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm run fmt\npnpm run lint\npnpm run typecheck\npnpm run typecheck:test\npnpm run test\npnpm run build"
+                }
+              ]
+            },
+            {
+              "id": "错误身份与开发命令",
+              "heading": "错误身份与开发命令",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误 source 是 RPC_DEVTOOLS_SOURCE（`@migaia/rpc/devtools`），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。"
                 },
                 {
                   "type": "table",

@@ -221,9 +221,12 @@
                   ],
                   [
                     "`set(key, value, ctx?)`",
-                    "value 为字符串，ctx 使用 IWriteOptions，返回 `Promise<void>`。"
+                    "`set` 将字符串 value 写入指定 key，ctx 使用 IWriteOptions；返回用于等待这次写入的 `Promise<void>`。"
                   ],
-                  ["`remove(key, ctx?)`", "返回 `Promise<void>`。"],
+                  [
+                    "`remove(key, ctx?)`",
+                    "`remove` 删除字符串值通道中的指定 key，返回用于等待这次删除的 `Promise<void>`。"
+                  ],
                   ["`has(key, ctx?)`", "返回 `Promise<boolean>`。"],
                   ["`keys(ctx?)`", "返回 `Promise<string[]>`。"],
                   ["`clearValues(ctx?)`", "只清字符串值通道，返回 `Promise<void>`。"],
@@ -343,9 +346,12 @@
                   ["`iteration`", "必填 boolean，是否有迭代能力。"],
                   [
                     "`secondaryIndexes`",
-                    "新描述符为 boolean；旧描述符可省略，快照规范化为 false。"
+                    "secondaryIndexes 为 boolean，表示后端是否提供逻辑二级索引操作；旧描述符省略该字段时，快照把 secondaryIndexes 设为 false。"
                   ],
-                  ["`changeFeed`", "新描述符为 boolean；旧描述符可省略，快照规范化为 false。"],
+                  [
+                    "`changeFeed`",
+                    "changeFeed 为 boolean，表示后端是否发送提交后的失效通知；旧描述符省略该字段时，快照把 changeFeed 设为 false。"
+                  ],
                   [
                     "`maxValueBytes`",
                     "非负安全整数或 undefined，表示近似单值字节上限；undefined 表示没有这种单值限制声明，仍可能受总配额限制。"
@@ -1536,9 +1542,12 @@
                     ],
                     [
                       "`set(key, value, ctx?)`",
-                      "Writes a string value; ctx is IWriteOptions. Returns `Promise<void>`."
+                      "`set` writes the string value using IWriteOptions and returns `Promise<void>` for that write."
                     ],
-                    ["`remove(key, ctx?)`", "Returns `Promise<void>`."],
+                    [
+                      "`remove(key, ctx?)`",
+                      "`remove` deletes the named string-channel entry and returns `Promise<void>` for that deletion."
+                    ],
                     ["`has(key, ctx?)`", "Returns `Promise<boolean>`."],
                     ["`keys(ctx?)`", "Returns `Promise<string[]>`."],
                     [
@@ -1674,11 +1683,11 @@
                     ["`iteration`", "Required boolean: iteration is available."],
                     [
                       "`secondaryIndexes`",
-                      "Boolean in current descriptors; legacy omission normalizes to false in the snapshot."
+                      "secondaryIndexes is a boolean indicating logical secondary-index support; the snapshot sets an omitted legacy secondaryIndexes field to false."
                     ],
                     [
                       "`changeFeed`",
-                      "Boolean in current descriptors; legacy omission normalizes to false in the snapshot."
+                      "changeFeed is a boolean indicating post-commit invalidation notifications; the snapshot sets an omitted legacy changeFeed field to false."
                     ],
                     [
                       "`maxValueBytes`",
@@ -5019,7 +5028,7 @@
           "declarationLine": 6,
           "source": "packages/storage-contract/dist/operation-context.d.ts",
           "purpose": "Frozen operation fields returned by `snapshotOperationContext()`, optionally including a validated conflict policy and preserving snapshot identity on readmission.",
-          "core": "signal: Structural `IAbortSignal` from the caller’s controller or parent operation. Cancellation-aware implementations stop waiting with `ABORTED`; this type alone does not interrupt a physical commit.\nOmitted: no external cancellation signal is requested.\ntimeoutMs: Caller-selected nonnegative safe integer milliseconds. A backend may compose it with signal so the first cancellation wins; the contract package only validates this field.\nOmitted: no per-operation timeout is requested.\npageSize: Caller-selected iterator page size, an integer from 1 through 4096; actual page acquisition belongs to the selected backend.\nOmitted: leave page size to the backend implementation.\nconflictPolicy: Caller-selected `IConflictPolicy` deciding whether an existing key is a conflict or an intentional replacement.\nOmitted: snapshot retains undefined; the writing backend applies its normal conflict default.",
+          "core": "signal: Structural `IAbortSignal` from the caller’s controller or parent operation. Cancellation-aware implementations stop waiting with `ABORTED`; this type alone does not interrupt a physical commit.\nOmitted: no external cancellation signal is requested.\ntimeoutMs: Caller-selected nonnegative safe integer milliseconds. A backend may compose it with signal so the first cancellation wins; the contract package only validates this field.\nOmitted: no per-operation timeout is requested.\npageSize: Caller-selected iterator page size, an integer from 1 through 4096; actual page acquisition belongs to the selected backend.\nOmitted: leave page size to the backend implementation.\nconflictPolicy: The conflict policy captured in this snapshot, preserving the caller’s choice between rejecting an existing key and allowing replacement.\nOmitted: snapshot retains undefined; the writing backend applies its normal conflict default.",
           "advanced": "Capture getters before an asynchronous backend starts acquiring resources or scheduling waits.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -5072,7 +5081,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "signal: Structural `IAbortSignal` from the caller’s controller or parent operation. Cancellation-aware implementations stop waiting with `ABORTED`; this type alone does not interrupt a physical commit.\nOmitted: no external cancellation signal is requested.\ntimeoutMs: Caller-selected nonnegative safe integer milliseconds. A backend may compose it with signal so the first cancellation wins; the contract package only validates this field.\nOmitted: no per-operation timeout is requested.\npageSize: Caller-selected iterator page size, an integer from 1 through 4096; actual page acquisition belongs to the selected backend.\nOmitted: leave page size to the backend implementation.\nconflictPolicy: Caller-selected `IConflictPolicy` deciding whether an existing key is a conflict or an intentional replacement.\nOmitted: snapshot retains undefined; the writing backend applies its normal conflict default."
+              "content": "signal: Structural `IAbortSignal` from the caller’s controller or parent operation. Cancellation-aware implementations stop waiting with `ABORTED`; this type alone does not interrupt a physical commit.\nOmitted: no external cancellation signal is requested.\ntimeoutMs: Caller-selected nonnegative safe integer milliseconds. A backend may compose it with signal so the first cancellation wins; the contract package only validates this field.\nOmitted: no per-operation timeout is requested.\npageSize: Caller-selected iterator page size, an integer from 1 through 4096; actual page acquisition belongs to the selected backend.\nOmitted: leave page size to the backend implementation.\nconflictPolicy: The conflict policy captured in this snapshot, preserving the caller’s choice between rejecting an existing key and allowing replacement.\nOmitted: snapshot retains undefined; the writing backend applies its normal conflict default."
             },
             {
               "id": "advanced-usage",

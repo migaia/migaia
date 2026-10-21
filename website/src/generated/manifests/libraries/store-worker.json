@@ -290,7 +290,10 @@
                 "type": "table",
                 "headers": ["成员", "生命周期"],
                 "rows": [
-                  ["disposed", "close / dispose 后立即为 true。"],
+                  [
+                    "disposed",
+                    "`adapter.disposed` 在 `adapter.close()` 或 `adapter.dispose()` 开始时同步变为 `true`，表示该适配器已停止接纳请求。"
+                  ],
                   [
                     "close()",
                     "无参数，同步幂等标记不可用；新 request 拒绝 ADAPTER_DISPOSED，不释放 Endpoint。"
@@ -341,7 +344,10 @@
                     "pendingCount",
                     "已接纳、正在等待 Endpoint 初始化或交付消息的数量，不代表 provider compute 已完成。"
                   ],
-                  ["disposed", "close / dispose 后立即为 true。"],
+                  [
+                    "disposed",
+                    "`handler.disposed` 在 `handler.close()` 或 `handler.dispose()` 开始时同步变为 `true`，表示该处理器不再接收消息。"
+                  ],
                   ["close()", "同步幂等停止接纳，不执行 Endpoint 或用户清理。"],
                   [
                     "dispose()",
@@ -1498,7 +1504,10 @@
                   "type": "table",
                   "headers": ["Member", "Lifetime"],
                   "rows": [
-                    ["disposed", "True immediately after close / dispose."],
+                    [
+                      "disposed",
+                      "`adapter.disposed` becomes `true` synchronously when `adapter.close()` or `adapter.dispose()` starts, marking this adapter closed to new requests."
+                    ],
                     [
                       "close()",
                       "No arguments; synchronous and idempotent retirement. New requests reject ADAPTER_DISPOSED, but it does not release the Endpoint."
@@ -1549,7 +1558,10 @@
                       "pendingCount",
                       "Admitted messages awaiting initialization or delivery, not completed provider computations."
                     ],
-                    ["disposed", "True immediately after close / dispose."],
+                    [
+                      "disposed",
+                      "`handler.disposed` becomes `true` synchronously when `handler.close()` or `handler.dispose()` starts, marking this handler closed to new messages."
+                    ],
                     [
                       "close()",
                       "Synchronously and idempotently retires admission without Endpoint or user cleanup."

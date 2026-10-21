@@ -299,7 +299,7 @@
                   ["`hub.apps`", "已连接应用的名字，按连接顺序。"],
                   [
                     "`hub.dispose()`",
-                    "断开所有应用并释放 hub；之后可以再次 `createMicroHub`。重复调用返回同一个 Promise。"
+                    "`hub.dispose()` 断开所有应用并返回等待应用卸载及宿主清理完成的 `Promise<void>`；同一 hub 的后续释放调用复用这次释放的 Promise，之后可以再次 `createMicroHub`。"
                   ]
                 ]
               },
@@ -363,7 +363,7 @@
                   ],
                   [
                     "`disconnect()`",
-                    "同步释放所有订阅、handler、所有权，再从 plugin-host 卸载。重复调用返回同一个 Promise。"
+                    "应用的 `disconnect()` 先同步释放该应用的订阅、handler 和所有权，再从 plugin-host 卸载该应用；返回的 `Promise<void>` 用于等待这次卸载，同一句柄的后续断开调用复用它。"
                   ]
                 ]
               },
@@ -919,7 +919,7 @@
                     ["`hub.apps`", "Names of the connected apps, in connection order."],
                     [
                       "`hub.dispose()`",
-                      "Disconnects every app and releases the hub; `createMicroHub` can be called again afterwards. Repeated calls return the same Promise."
+                      "`hub.dispose()` disconnects every app and returns `Promise<void>` for app unloading and hub cleanup; later disposal calls on that hub reuse its disposal Promise. `createMicroHub` can be called again afterwards."
                     ]
                   ]
                 },
@@ -1001,7 +1001,7 @@
                     ],
                     [
                       "`disconnect()`",
-                      "Synchronously releases every subscription, handler and ownership, then unloads the app from plugin-host. Repeated calls return the same Promise."
+                      "The app's `disconnect()` synchronously releases its subscriptions, handlers and ownership, then returns `Promise<void>` for unloading its plugin from plugin-host; later disconnection calls on that app reuse this unloading Promise."
                     ]
                   ]
                 },
@@ -1532,7 +1532,7 @@
           "declarationLine": 10,
           "source": "packages/micro-hub/dist/errors.d.ts",
           "purpose": "Creates an `Error` tagged with this package's `source` and a `MicroHubErrorCode`. Meant for capability plugins that report failures the same way the hub does.",
-          "core": "code: A value of `MicroHubErrorCode`; it becomes `error.code`.\nmessage: The message, normally taken from `MicroHubErrorText` so the wording matches the hub's own errors.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `Error` with `source` and `code`; its stack is the call site.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`.",
+          "core": "code: A value of `MicroHubErrorCode`; it becomes `error.code`.\nmessage: The message, normally taken from `MicroHubErrorText` so the wording matches the hub's own errors.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `Error` with `source` and `code`; its stack is the call site.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`.\nPass the caught failure when adding a hub error code to it, so callers can inspect the original error by identity.",
           "advanced": "",
           "parameters": [
             "code: IMicroHubErrorCode",
@@ -1613,7 +1613,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "code: A value of `MicroHubErrorCode`; it becomes `error.code`.\nmessage: The message, normally taken from `MicroHubErrorText` so the wording matches the hub's own errors.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `Error` with `source` and `code`; its stack is the call site.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`."
+              "content": "code: A value of `MicroHubErrorCode`; it becomes `error.code`.\nmessage: The message, normally taken from `MicroHubErrorText` so the wording matches the hub's own errors.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `Error` with `source` and `code`; its stack is the call site.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`.\nPass the caught failure when adding a hub error code to it, so callers can inspect the original error by identity."
             },
             {
               "id": "advanced-usage",
@@ -1651,7 +1651,7 @@
           "declarationLine": 12,
           "source": "packages/micro-hub/dist/errors.d.ts",
           "purpose": "Same as `createMicroHubError` but creates a `TypeError`, for invalid arguments; callers that branch on the native type keep working.",
-          "core": "code: A value of `MicroHubErrorCode`, usually `INVALID_OPTION`.\nmessage: The message, normally taken from `MicroHubErrorText`.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `TypeError` with `source` and `code`.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`.",
+          "core": "code: A value of `MicroHubErrorCode`, usually `INVALID_OPTION`.\nmessage: The message, normally taken from `MicroHubErrorText`.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `TypeError` with `source` and `code`.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`.\nPass the caught validation failure when callers need both the native TypeError and its original cause.",
           "advanced": "",
           "parameters": [
             "code: IMicroHubErrorCode",
@@ -1732,7 +1732,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "code: A value of `MicroHubErrorCode`, usually `INVALID_OPTION`.\nmessage: The message, normally taken from `MicroHubErrorText`.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `TypeError` with `source` and `code`.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`."
+              "content": "code: A value of `MicroHubErrorCode`, usually `INVALID_OPTION`.\nmessage: The message, normally taken from `MicroHubErrorText`.\noptions: Optional `{ cause }`; the original error stays reachable through `error.cause`.\nA native `TypeError` with `source` and `code`.\ncause: The original error this one wraps; it stays reachable through `error.cause`, so the first failure is never lost.\nNot set: the error has no `cause`.\nPass the caught validation failure when callers need both the native TypeError and its original cause."
             },
             {
               "id": "advanced-usage",

@@ -619,8 +619,12 @@
                 "text": "业务 error 使用 JSON-RPC error.code/message/data.migaiaWireError，wire 至少 source/code/name/message/stack，可选 cause/errors，不能在接收侧重造 stack。JSON-RPC 整数 code 可用 -32700 解析、-32600 请求、-32601 方法、-32602 参数、-32603 内部、-32000 业务；诊断语义仍用 wire source/code。Contract 的 toJsonRpcError/fromJsonRpcError 与 encodeJsonRpcFrame/createJsonRpcFrameDecoder 复用同一表示，不另建协议。"
               },
               {
+                "type": "paragraph",
+                "text": "下表的 `source` 是保留的错误身份，由 `@migaia/rpc-contract` 定义，供 Process 的 JSON-RPC 字节连接报告失败；它不是包的导入路径。"
+              },
+              {
                 "type": "table",
-                "headers": ["JSON-RPC code（source=@migaia/rpc/bridge/jsonrpc）", "场景"],
+                "headers": ["JSON-RPC code（source=`@migaia/rpc/bridge/jsonrpc`）", "场景"],
                 "rows": [
                   ["JSONRPC_FRAME_INVALID", "非法头部、编码、JSON 或半帧关闭，连接终止"],
                   ["JSONRPC_EXTENSION_MISSING", "hello 缺必需能力或四个扩展方法"],
@@ -641,7 +645,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本包 source 为 RPC_PROCESS_ERROR_SOURCE（@migaia/rpc/process）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。"
+                "text": "本包 source 为 RPC_PROCESS_ERROR_SOURCE（`@migaia/rpc/process`）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。"
               },
               {
                 "type": "table",
@@ -2178,8 +2182,12 @@
                   "text": "Business failures use JSON-RPC error.code/message/data.migaiaWireError, with source/code/name/message/stack and optional cause/errors. Never replace the recorded stack at the receiver. Integer JSON-RPC codes include -32700 parse, -32600 request, -32601 method, -32602 parameters, -32603 internal, and -32000 business. Semantic diagnostics still use wire source/code. Reuse Contract toJsonRpcError/fromJsonRpcError and encodeJsonRpcFrame/createJsonRpcFrameDecoder rather than another protocol implementation."
                 },
                 {
+                  "type": "paragraph",
+                  "text": "The table retains the error identity defined by `@migaia/rpc-contract` for Process JSON-RPC byte connections. Its `source` is not a module import path."
+                },
+                {
                   "type": "table",
-                  "headers": ["Bridge code, source=@migaia/rpc/bridge/jsonrpc", "Trigger"],
+                  "headers": ["Bridge code, source=`@migaia/rpc/bridge/jsonrpc`", "Trigger"],
                   "rows": [
                     [
                       "JSONRPC_FRAME_INVALID",
@@ -2212,7 +2220,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "RPC_PROCESS_ERROR_SOURCE is @migaia/rpc/process. Native synchronous spawn and Unix listener preparation/bind errors receive semantic identity on the original object, retaining native type, stack, and other OS fields while replacing errno code with the semantic code. Wrappers retain originals through cause. Do not control behavior by matching messages."
+                  "text": "RPC_PROCESS_ERROR_SOURCE is `@migaia/rpc/process`. Native synchronous spawn and Unix listener preparation/bind errors receive semantic identity on the original object, retaining native type, stack, and other OS fields while replacing errno code with the semantic code. Wrappers retain originals through cause. Do not control behavior by matching messages."
                 },
                 {
                   "type": "table",
@@ -9736,7 +9744,7 @@
           "signature": "export type IProcessResilience = Readonly<{ /** Derive a shared replay store/scope by principal and frozen per-connection provider limits. */ sessionOptions(identity: IProcessSessionIdentity): Readonly<{ idempotency: IRpcIdempotencyConfig; limits: IRpcProviderLimits; }>; /** Bind authenticated reverse registration; adopted leases transfer out of listener ownership. */ listenRegistrations(options: IProcessRegistrationListenOptions): Promise<IProcessRegistrationListener>; /** * Attach one unique nonempty name and its borrowed supervisor; invalid bindings reject * synchronously. */ attachRegistration(name: string, binding: IProcessRegistrationBinding, liquidation: IProcessLiquidationOwner): IProcessRegistration; /** Return a stable guard that rejects terminal or liquidated registrations before remote dispatch. */ callGuard(name: string): IRemoteCallGuard; /** * Read active or retained committed-liquidation diagnostics; unknown and normally closed names * return undefined. */ inspect(id: string): IProcessResilienceSnapshot | undefined; /** * Observe terminal entries; any fulfilled observer handles the report, while rejected observers * are reported. */ onTerminal(listener: (snapshot: IProcessResilienceSnapshot) => void | Promise<void>): () => void; /** * Share one release Promise for listeners/registrations; aggregate failures as * PROCESS_CHANNEL_CLOSED. */ close(): Promise<void>; }>;",
           "declarationLine": 172,
           "source": "packages/rpc-process/dist/process/resilience/types.d.ts",
-          "purpose": "Governance owner returned by `createProcessResilience()`. Directly install `@migaia/utils` and, for the second example, `@migaia/supervision`. The required `scheduler` is the borrowed `systemScheduler`; required `report(error)` collects original diagnostics. `sessionOptions` receives `connectionId`, `sessionId`, verified `principalId`, and optional `processId` (default `undefined`); these labels do not authenticate a connection. Its scope callback accepts admission `token` and `senderId` but derives this scope from the principal. The second example gives the real supervisor an `id`, a native launcher (default options `{}`), a `{ kind: 'process', maxUnits: 1 }` budget, and an explicit shell-free spec: `command`, `args`, `env.inherit/set`, and required stdio fields: stdin is channel or ignore, stdout is channel/drain/ignore, and stderr is drain or ignore. `restart.mode: 'never'` overrides `'on-failure'`; its full domain is `'never' | 'on-failure' | 'always'`. `isolation: 'best-effort'` overrides `'required'` and reports unsupported guarantees. `health: 'none'` adds no ping. The binding projects the original supervisor methods; the standalone owner's `release` disposes that supervisor only if liquidation occurs. `guard.beforeDispatch` receives method, request mode and the real generation; it checks this registration, not a business operation. One fulfilled `onTerminal` callback handles that diagnostic; ordinary governance close does not dispose the supervisor.",
+          "purpose": "Governance owner returned by `createProcessResilience()`. The [terminal-child case](/en/docs/rpc-process/api/createProcessResilience#rpc-process-index--createProcessResilience--case-2) shows how to attach the original supervisor and release its resources separately; the factory example introduces the required dependencies and policies.",
           "core": "sessionOptions: Builds result-deduplication settings and call limits for one accepted session. Result deduplication lets retries of an identified operation reuse its stored outcome. Pass the session identity received by listenRegistrations; its listener example below shows how to obtain that identity.\nsessionOptions.identity: `{ connectionId, sessionId, principalId, processId? }`: accepted connection labels; principalId must be a nonempty verified principal. processId defaults to undefined. This method derives options and does not authenticate. The returned scope accepts { token, senderId }, but partitions by principalId under this governor.\n`{ idempotency, limits }`.\nlistenRegistrations: Accepts registrations of remote processes on an address.\nlistenRegistrations.options: `IProcessRegistrationListenOptions`.\nA listener with `address` and `close()`.\nattachRegistration: Registers a supervised process with this failure-management object. The supervisor starts and restarts the process; this registration adds reporting and eventual removal if recovery fails. Supply the binding and cleanup owner shown in the complete usage example above.\nattachRegistration.name: Registration name, the plugin `name`.\nattachRegistration.binding: `ownership` is spawn-owned or connection-borrowed; `health` is ping, custom or none; both are required. supervisor supplies restart(), inspect(), dispose() and onTerminal(listener). The example forwards methods to the original process supervisor.\nattachRegistration.liquidation: Required owner union: standalone-host supplies release(): Promise<void>; proxy-plugin supplies the same registration name and actual Host with unUse. It runs on liquidation, not ordinary registration.close().\nAn `IProcessRegistration`.\ncallGuard: Returns a stable check for this registration: terminal state refuses new calls, and liquidation keeps refusing them through the retained diagnostic record. Run guard.beforeDispatch() before each dispatch; bypassing it skips this check. Terminal is not permanent disposal and can still admit an explicit restart.\ncallGuard.name: Registration name. Invoke `beforeDispatch({ method, mode, generation })` before work: method is the remote path, generation is the actual supervisor generation, and mode is request, one-way, generator, async-generator or host-control; the example uses request.\nA remote call guard.\ninspect: Reads the current state of one registration by id. Use it when an application needs a point-in-time view without retaining the registration object. It returns undefined for an unknown id. The example above compares this view with registration.inspect().\ninspect.id: Registration id.\nAn `IProcessResilienceSnapshot`, or `undefined`.\nonTerminal: Subscribes to terminal entries reported by the actual supervisor and receives the registration snapshot. This observes the current terminal state rather than declaring the process permanently unrecoverable. The returned function removes this observer; call it during cleanup.\nonTerminal.listener: Receives a registration snapshot and returns void or Promise<void>; one fulfilled handler marks this report handled and stops subsequent ticks. Rejection is reported. The returned unsubscribe is separate from closing governance.\nAn unsubscribe function.\nclose: Stops this failure-management object, closes listeners it owns and detaches its registrations. It does not own all resources involved in a connection: the accepting application still closes accepted endpoints and sessions, while the code that started execution still disposes its supervisor. The final cleanup block above shows these separate operations.\nResolves after owned governance resources close; it does not dispose caller-owned endpoints or supervisors.",
           "advanced": "Share one set of limits across several process plugins of a host.",
           "parameters": ["This type declaration has no parameters."],
@@ -9870,7 +9878,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Governance owner returned by `createProcessResilience()`. Directly install `@migaia/utils` and, for the second example, `@migaia/supervision`. The required `scheduler` is the borrowed `systemScheduler`; required `report(error)` collects original diagnostics. `sessionOptions` receives `connectionId`, `sessionId`, verified `principalId`, and optional `processId` (default `undefined`); these labels do not authenticate a connection. Its scope callback accepts admission `token` and `senderId` but derives this scope from the principal. The second example gives the real supervisor an `id`, a native launcher (default options `{}`), a `{ kind: 'process', maxUnits: 1 }` budget, and an explicit shell-free spec: `command`, `args`, `env.inherit/set`, and required stdio fields: stdin is channel or ignore, stdout is channel/drain/ignore, and stderr is drain or ignore. `restart.mode: 'never'` overrides `'on-failure'`; its full domain is `'never' | 'on-failure' | 'always'`. `isolation: 'best-effort'` overrides `'required'` and reports unsupported guarantees. `health: 'none'` adds no ping. The binding projects the original supervisor methods; the standalone owner's `release` disposes that supervisor only if liquidation occurs. `guard.beforeDispatch` receives method, request mode and the real generation; it checks this registration, not a business operation. One fulfilled `onTerminal` callback handles that diagnostic; ordinary governance close does not dispose the supervisor."
+              "content": "Governance owner returned by `createProcessResilience()`. The [terminal-child case](/en/docs/rpc-process/api/createProcessResilience#rpc-process-index--createProcessResilience--case-2) shows how to attach the original supervisor and release its resources separately; the factory example introduces the required dependencies and policies."
             },
             {
               "id": "getting-started",
@@ -14524,6 +14532,69 @@
                 {
                   "type": "paragraph",
                   "text": "本包 source 为 RPC_PROCESS_ERROR_SOURCE（@migaia/rpc/process）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Process code", "场景"],
+                  "rows": [
+                    [
+                      "PROCESS_HANDSHAKE_TIMEOUT / PROCESS_CHANNEL_AUTH_REJECTED",
+                      "握手未完成 / 凭据拒绝，修正来源和认证"
+                    ],
+                    [
+                      "PROCESS_CHANNEL_CLOSED",
+                      "已关闭或资源/close 观察者清理失败，查 cause/errors"
+                    ],
+                    [
+                      "PROCESS_CHANNEL_CONNECT_FAILED / PROCESS_CHANNEL_LISTEN_FAILED",
+                      "拨号/启动或监听准备/bind失败"
+                    ],
+                    [
+                      "PROCESS_PLUGIN_INVALID_OPTION / PROCESS_HOST_INVALID_OPTION",
+                      "来源、插件或 Host 配置不合法"
+                    ],
+                    ["PROCESS_HOST_CLOSED", "facade 已开始释放，需新 owner"],
+                    [
+                      "PROCESS_RESILIENCE_INVALID_OPTION / PROCESS_CONNECTION_LIMIT",
+                      "治理配置非法 / 接入、速率、payload 提供前拒绝"
+                    ],
+                    [
+                      "PROCESS_INSTANCE_UNHEALTHY / PROCESS_HEALTH_PING_FAILED",
+                      "共享实例显式健康隔离 / native ping 失败"
+                    ],
+                    ["PROCESS_TERMINAL_CALL / PROCESS_LIQUIDATED", "终态拒新调用 / 已清算不能重启"],
+                    [
+                      "PROCESS_USAGE_SAMPLE_FAILED",
+                      "原生 CPU/内存采样失败，显示 unavailable，不改变进程生命周期"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Core 调用错误包括 DEADLINE_EXCEEDED/TimeoutError、CANCELLED/AbortError、OVERLOADED、PROVIDER_NOT_FOUND、TRANSPORT，Remote/PluginHost/Supervision 包装保持各自 source。业务原生 RangeError 等经 wire 还原原类型/message/stack/cause，不假装成 Process 主机错误。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "自动来源失败先确认确由库 launcher 启动；握手超时确认先消费 bootstrap、stdin 正在读取、stdout 仅协议；socket 检查回环/权限/token。notify 只证明发送；大文件用业务分片/stream 或传约定路径由对端读取。Node 孙进程与强制终止限制、其它宿主权限/能力应按实际平台验证。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "现有包脚本如下，列出不代表文档编辑独立运行；本包原 test 保留 coverage 配置，未把基准或多宿主支持文字冒充本轮执行证据。"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm run fmt\npnpm run lint\npnpm run typecheck\npnpm run typecheck:test\npnpm run test\npnpm run build"
+                }
+              ]
+            },
+            {
+              "id": "错误与排查",
+              "heading": "错误与排查",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本包 source 为 RPC_PROCESS_ERROR_SOURCE（`@migaia/rpc/process`）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。"
                 },
                 {
                   "type": "table",
