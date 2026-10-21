@@ -15,1024 +15,1062 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Short type doc for type-only aliases. */
 const alias = (en: string, zh: string): ITypeDoc => ({ summary: t(en, zh), members: {} })
 
-/** Executed configuration examples shared by APIs with the same option contract. */
+/** Reader scenarios shared by APIs with the same option contract. */
 const utilsOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   utf8: [
     {
-      title: t('Reject a damaged import', '拒绝损坏的导入文本'),
+      title: t('Reject a damaged import', '拒绝损坏的导入文件'),
       problem: t(
-        'An imported byte sequence must be valid UTF-8. Replacement mode would hide the malformed byte behind a replacement character.',
-        '导入文件要求字节符合 UTF-8 编码。默认替换模式会把坏字节变成替换字符，读者可能察觉不到损坏。'
+        'A spreadsheet importer must reject damaged text before saving rows. The default decoder replaces bad bytes, which can hide damaged cell values. Set fatal to stop the import.',
+        '表格导入不能把损坏文本保存成数据行。默认解码会替换坏字节，单元格的损坏可能被忽略。设置 fatal 后停止这次导入。'
       ),
       example: `import { decodeUtf8 } from '@migaia/utils/bytes'
-try { decodeUtf8(new Uint8Array([0xff]), { fatal: true }) }
-catch (error) { console.log(Reflect.get(error as object, 'code')) }`,
+
+try {
+  const text = decodeUtf8(await readUploadedBytes(), { fatal: true })
+  await importRows(text)
+} catch (error) {
+  showImportError(error)
+}`,
       result: t(
-        'The invalid byte throws INVALID_ENCODING instead of returning text.',
-        '坏字节会抛出 INVALID_ENCODING，不会返回看似可用的文本。'
+        'Damaged text reaches the import error screen instead of being saved as rows.',
+        '损坏文本会显示导入错误，不会保存成数据行。'
       ),
       covers: ['fatal']
     },
     {
-      title: t('Keep a readable preview', '保留可读的预览'),
+      title: t('Preview a partially damaged log', '预览部分损坏的日志'),
       problem: t(
-        'A diagnostic preview should show the readable part of damaged input. Fatal mode would reject the entire preview.',
-        '诊断预览希望保留损坏输入中仍可读的部分。严格模式会拒绝整段预览。'
+        'A support tool should show the readable parts of a damaged log. Strict decoding would hide the whole file; fatal: false keeps the readable text.',
+        '客服工具需要查看损坏日志中仍可读的内容。严格解码会拒绝整个文件；fatal: false 保留可读部分。'
       ),
       example: `import { decodeUtf8 } from '@migaia/utils/bytes'
-console.log(decodeUtf8(new Uint8Array([65, 0xff, 66]), { fatal: false }))`,
+
+const preview = decodeUtf8(new Uint8Array([65, 0xff, 66]), { fatal: false })
+renderLogPreview(preview)`,
       result: t(
-        'The preview is A�B; the invalid byte is replaced.',
-        '预览输出 A�B，坏字节所在位置显示替换字符。'
+        'The log preview shows A�B, with a replacement character at the damaged byte.',
+        '日志预览显示 A�B，坏字节的位置显示替换字符。'
       ),
       covers: ['fatal']
     }
   ],
   own: [
     {
-      title: t('Bound portable settings', '限制可移植配置的规模'),
+      title: t('Accept bounded dashboard settings', '接收有规模限制的面板配置'),
       problem: t(
-        'Settings copied from an input form need a small depth limit. The package defaults allow a much larger graph.',
-        '表单提供的配置只需要很浅的层级。本包默认允许的图规模较大，因此在接收时收紧限制。'
+        'A dashboard accepts nested settings from an editor. Its settings need only four levels; the larger default limit would also admit deeply nested input.',
+        '面板接收编辑器提交的嵌套配置，业务只需要四层。默认上限较大，会接收没有必要的深层输入。'
       ),
       example: `import { ownConfig, ConfigProfile } from '@migaia/utils/config'
-const source = { server: { port: 8080 } }
-const owned = ownConfig(source, { profile: ConfigProfile.data, limits: { maxDepth: 4 } })
-source.server.port = 9000
-console.log(owned.server.port)`,
+
+const settings = ownConfig(editorSettings, {
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
+})
+applyDashboardSettings(settings)`,
       result: t(
-        'The owned port stays 8080 after the caller changes the source.',
-        '调用方改动输入后，接管的配置仍保留端口 8080。'
+        'Accepted settings have an independent snapshot; overly deep input is rejected at this boundary.',
+        '接收的配置成为独立快照；层级过深的输入在此处被拒绝。'
       ),
       covers: ['profile', 'limits']
     },
     {
-      title: t('Keep a local callback', '保存进程内回调'),
+      title: t('Keep local toolbar actions', '保存工具栏的本地操作'),
       problem: t(
-        'An in-process component config contains a callback. The default data profile rejects functions.',
-        '进程内组件的配置包含回调函数。默认 data 档位不接受函数，需要明确选择 richRuntime。'
+        'A toolbar configuration includes an application callback. The default data profile rejects functions; richRuntime admits this local configuration.',
+        '工具栏配置包含应用回调。默认 data 档位拒绝函数；richRuntime 允许这份进程内配置。'
       ),
       example: `import { ownConfig, ConfigProfile } from '@migaia/utils/config'
-const config = ownConfig({ label: () => 'ready' }, { profile: ConfigProfile.richRuntime })
-console.log(config.label())`,
+
+const toolbar = ownConfig({ onSave: queueDocumentSave }, {
+  profile: ConfigProfile.richRuntime
+})
+registerSaveAction(toolbar.onSave)`,
       result: t(
-        'The copied configuration can call label and prints ready.',
-        '接管后的配置可调用 label，输出 ready。'
+        'The toolbar can register the supplied save action from its owned configuration.',
+        '工具栏可从自己持有的配置中登记保存操作。'
       ),
       covers: ['profile']
     }
   ],
   patch: [
     {
-      title: t('Choose identity for an empty patch', '决定空补丁是否复用身份'),
+      title: t('Notify a view after an empty refresh', '空刷新也通知依赖对象身份的视图'),
       problem: t(
-        'A consumer uses root identity to detect updates. Empty patches normally reuse the root, while a forced copy gives it a fresh identity.',
-        '消费方通过根对象身份判断更新。空补丁默认复用根对象，需要新身份时才关闭复用。'
+        'A settings view refreshes when it receives a new root object. An empty patch normally keeps the old identity; disabling reuse gives this refresh a new snapshot.',
+        '设置视图收到新的根对象时才刷新。空补丁默认保留旧身份；关闭复用后，这次刷新会提供新快照。'
       ),
       example: `import { ownConfig, patchConfig, ConfigProfile } from '@migaia/utils/config'
-const base = ownConfig({ port: 8080 })
-const reused = patchConfig(base, {}, { reuseUnchangedRoot: true })
-const copied = patchConfig(base, {}, {
-  reuseUnchangedRoot: false, profile: ConfigProfile.data, limits: { maxDepth: 8 }
+
+const current = ownConfig({ port: 8080 })
+const refreshed = patchConfig(current, {}, {
+  reuseUnchangedRoot: false,
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
 })
-console.log(reused === base, copied === base, copied.port)`,
+renderSettings(refreshed)`,
       result: t(
-        'The identities compare true and false; the copied port remains 8080.',
-        '两次身份比较分别为 true 和 false；复制后的端口仍为 8080。'
+        'The view receives a fresh settings object while the port remains 8080.',
+        '视图收到新的设置对象，端口值仍为 8080。'
       ),
       covers: ['reuseUnchangedRoot', 'profile', 'limits']
     },
     {
-      title: t('Patch callback settings in place of the old snapshot', '派生新的回调配置'),
+      title: t('Replace a local menu action', '替换菜单的本地操作'),
       problem: t(
-        'A runtime config already permits functions. A patch must retain that profile; switching to data would conflict with the base.',
-        '已有运行时配置允许函数。补丁必须保持相同档位，切换到 data 会与原配置冲突。'
+        'A menu snapshot already contains callbacks. Its patch must use the same richRuntime profile; the data profile cannot accept those functions.',
+        '菜单快照已经包含回调。补丁需要继续使用 richRuntime；data 档位不能接收这些函数。'
       ),
       example: `import { ownConfig, patchConfig, ConfigProfile } from '@migaia/utils/config'
-const base = ownConfig<{ label: () => string }>({ label: () => 'old' }, { profile: ConfigProfile.richRuntime })
-const next = patchConfig(base, { label: () => 'new' }, { profile: ConfigProfile.richRuntime })
-console.log(base.label(), next.label())`,
+
+const profile = ConfigProfile.richRuntime
+const current = ownConfig({ onOpen: openRecentDocument }, { profile })
+const next = patchConfig(current, { onOpen: openDocumentPicker }, { profile })
+registerOpenAction(next.onOpen)`,
       result: t(
-        'The old snapshot prints old and the new snapshot prints new.',
-        '旧快照仍输出 old，新快照输出 new。'
+        'The new menu opens the document picker; the previous snapshot retains its original action.',
+        '新菜单打开文件选择器，旧快照仍保留原来的操作。'
       ),
       covers: ['profile']
     }
   ],
   combine: [
     {
-      title: t('Append only one configured list', '只追加指定路径的列表'),
+      title: t('Append navigation without merging tags', '追加导航但替换标签'),
       problem: t(
-        'Most arrays should replace earlier settings, but navigation entries should accumulate. A single global array policy cannot express both.',
-        '大部分数组应替换旧配置，导航列表却需要累积。只用全局数组策略无法同时表达两种行为。'
+        'An extension adds menu entries but replaces search tags. A global array rule alone cannot express both, so the menu path gets its own rule.',
+        '扩展要追加菜单项，却要替换搜索标签。单一数组策略无法同时表达两者，因此为 menu 路径单独设置规则。'
       ),
       example: `import { ownConfig, combineConfig, ConfigProfile } from '@migaia/utils/config'
-const next = combineConfig([
+
+const settings = combineConfig([
   ownConfig({ menu: ['home'], tags: ['old'] }),
   ownConfig({ menu: ['settings'], tags: ['new'] })
 ], {
   strategies: { array: 'replace' },
   pathRules: [{ prefix: ['menu'], strategies: { array: 'concat' } }],
-  profile: ConfigProfile.data, limits: { maxDepth: 8 }
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
 })
-console.log(next.menu, next.tags)`,
+renderNavigation(settings.menu)
+updateSearchTags(settings.tags)`,
       result: t(
-        'menu contains home and settings; tags contains only new.',
-        'menu 保留 home 和 settings，tags 只保留 new。'
+        'Navigation contains home and settings; search uses only the new tags.',
+        '导航同时包含 home 和 settings；搜索只使用新标签。'
       ),
       covers: ['strategies', 'pathRules', 'profile', 'limits']
     },
     {
-      title: t('Resolve a protected setting explicitly', '明确保留受保护的配置'),
+      title: t('Protect the deployment port', '保护部署端口'),
       problem: t(
-        'A user override must not change the deployment port. The normal right-side winner would replace it.',
-        '用户覆盖配置不能改变部署端口。默认采用右侧值会让覆盖配置替换端口，需要在冲突时保留左侧。'
+        'User settings may replace local actions but must not change the deployment port. The default right-side winner would also replace that port.',
+        '用户配置可以替换本地操作，但不能改变部署端口。默认使用右侧值，也会把这个端口覆盖。'
       ),
       example: `import { ownConfig, combineConfig, ConfigProfile } from '@migaia/utils/config'
+
 const profile = ConfigProfile.richRuntime
-const next = combineConfig([
-  ownConfig({ port: 8080, label: () => 'base' }, { profile }),
-  ownConfig({ port: 9000, label: () => 'user' }, { profile })
+const settings = combineConfig([
+  ownConfig({ port: 8080, onReady: showDashboard }, { profile }),
+  ownConfig({ port: 9000, onReady: showWelcome }, { profile })
 ], {
   profile,
   onConflict: ({ path }) => path[0] === 'port' ? { kind: 'left' } : { kind: 'right' }
 })
-console.log(next.port, (next.label as () => string)())`,
+startDashboard(settings)`,
       result: t(
-        'The port stays 8080 while the new callback returns user.',
-        '端口仍为 8080，其余冲突采用右侧值，回调输出 user。'
+        'The dashboard keeps port 8080 and uses the user-selected welcome action.',
+        '面板保留端口 8080，并采用用户选择的欢迎操作。'
       ),
       covers: ['profile', 'onConflict']
     }
   ],
   owner: [
     {
-      title: t('Reject an invalid live update', '拒绝不合法的在线更新'),
+      title: t('Validate a port before applying it', '应用前校验端口'),
       problem: t(
-        'A live port setting must stay positive. Without a validator, a structurally valid negative number would be committed.',
-        '运行中的端口配置必须为正数。负数仍符合数据结构要求，没有校验函数就会被提交。'
+        'An administrator edits a live service port. A negative number is valid data but invalid for this service; validate prevents it from replacing the active setting.',
+        '管理员在线修改服务端口。负数符合数据结构，却不是可用端口；validate 阻止它替换当前设置。'
       ),
       example: `import { ConfigOwner, ConfigProfile } from '@migaia/utils/config'
-const config = new ConfigOwner({ port: 8080 }, {
-  validate: (view) => view.port > 0,
-  profile: ConfigProfile.data, limits: { maxDepth: 4 }
+
+const settings = new ConfigOwner({ port: 8080 }, {
+  validate: (next) => next.port > 0,
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
 })
-try { config.set('port', -1) }
-catch (error) { console.log(Reflect.get(error as object, 'code')) }
-console.log(config.get('port'))`,
+try {
+  settings.set('port', submittedPort)
+} catch (error) {
+  showSettingsError(error)
+}`,
       result: t(
-        'The update fails with CONFIG_VALIDATION_FAILED and the port remains 8080.',
-        '更新以 CONFIG_VALIDATION_FAILED 失败，当前端口仍为 8080。'
+        'An invalid port leaves the active port unchanged and displays a settings error.',
+        '非法端口不会改变当前端口，页面会显示设置错误。'
       ),
       covers: ['validate', 'profile', 'limits']
     },
     {
-      title: t('Collect a failed watcher', '收集监听器失败'),
+      title: t('Keep toolbar failures observable', '把工具栏更新失败送入监控'),
       problem: t(
-        'One listener can fail while another still needs the update. The default reporter would rethrow that failure on a microtask.',
-        '一个监听器失败时，其他监听器仍需要收到更新。默认报告器会在微任务中重新抛错，这里改为收集诊断。'
+        'A toolbar observes live action settings. If rendering fails, the default reporter rethrows later; an application reporter sends that failure to monitoring.',
+        '工具栏监听操作配置的在线更新。渲染失败时，默认报告器稍后重新抛错；应用报告器把该失败交给监控。'
       ),
       example: `import { ConfigOwner, ConfigProfile } from '@migaia/utils/config'
-const failures: unknown[] = []
-const config = new ConfigOwner<{ label: () => string }>({ label: () => 'old' }, {
-  profile: ConfigProfile.richRuntime, report: (error) => { failures.push(error) }
+
+const settings = new ConfigOwner({ onSave: queueDocumentSave }, {
+  profile: ConfigProfile.richRuntime,
+  report: reportToMonitoring
 })
-config.watch(() => { throw new Error('view failed') })
-config.watch((next) => { console.log(next.label()) })
-config.set('label', () => 'new')
-console.log(failures.length)`,
+const stop = settings.watch(renderToolbar)
+settings.set('onSave', queueDocumentCopySave)
+stop()`,
       result: t(
-        'The second listener prints new and the reporter records one failure.',
-        '第二个监听器输出 new，报告器记录一条失败。'
+        'The toolbar receives the replacement save action; any watcher failure reaches monitoring.',
+        '工具栏收到新的保存操作；监听器失败时，监控会收到错误。'
       ),
       covers: ['profile', 'report']
     }
   ],
   normalize: [
     {
-      title: t('Drop an obsolete wire field visibly', '明确丢弃过期传输字段'),
+      title: t('Read error reports during a format migration', '格式迁移时接收旧错误报告'),
       problem: t(
-        'An older sender adds a field outside the receiving whitelist. The default policy rejects the tree; ignore mode permits a deliberate migration with diagnostics.',
-        '旧发送方带上了接收白名单以外的字段。默认策略会拒绝错误树，迁移期间可明确丢弃并记录字段名。'
+        'A support console receives error reports with obsolete fields. The default reject policy blocks the report; ignore drops those fields and records their names for migration work.',
+        '支持控制台会收到带过期字段的错误报告。默认 reject 会拒绝整份报告；ignore 丢弃这些字段，并记录名称供迁移排查。'
       ),
-      example: `import { serializeErrorChain, normalizeSerializedErrorChain, deserializeErrorChain } from '@migaia/utils/error'
-const wire = { ...serializeErrorChain(new Error('offline')), legacy: 1 }
-const discarded: string[] = []
-const options = { unknownFields: 'ignore' as const,
-  onUnknownField: (pointer: string, field: string) => { discarded.push(pointer + '/' + field) } }
-const normalized = normalizeSerializedErrorChain(wire, {}, options)
-const restored = deserializeErrorChain(wire, {}, options)
-console.log(Object.hasOwn(normalized, 'legacy'), restored.message, discarded)`,
+      example: `import { normalizeSerializedErrorChain } from '@migaia/utils/error'
+
+const error = normalizeSerializedErrorChain(receivedError, {}, {
+  unknownFields: 'ignore',
+  onUnknownField: (pointer, field) => recordDroppedField(pointer, field)
+})
+renderErrorReport(error)`,
       result: t(
-        'legacy is absent, the restored message is offline, and each call reports /legacy.',
-        '结果不含 legacy，还原后的消息为 offline；两次调用各报告一次 /legacy。'
+        'The console displays the supported error fields and records each discarded field.',
+        '控制台展示受支持的错误字段，并记录每个被丢弃的字段。'
       ),
       covers: ['unknownFields', 'onUnknownField']
     },
     {
-      title: t('Reject an unexpected sender field', '拒绝发送方的意外字段'),
+      title: t('Stop accepting an unexpected error format', '拒绝意外变化的错误格式'),
       problem: t(
-        'A strict boundary must stop on new fields instead of silently accepting a changed payload shape.',
-        '严格边界需要及时发现发送结构变化，不能默默接受新增字段，因此显式保持拒绝策略。'
+        'A service boundary must detect changes in a sender format. Keeping unknownFields at reject stops the payload instead of silently discarding new data.',
+        '服务边界需要发现发送格式的变化。把 unknownFields 设为 reject，可拒绝这份数据，避免悄悄丢弃新字段。'
       ),
-      example: `import { serializeErrorChain, normalizeSerializedErrorChain, deserializeErrorChain } from '@migaia/utils/error'
-const wire = { ...serializeErrorChain(new Error('offline')), legacy: 1 }
-let notifications = 0
-for (const receive of [normalizeSerializedErrorChain, deserializeErrorChain]) {
-  try { receive(wire, {}, { unknownFields: 'reject', onUnknownField: () => { notifications++ } }) }
-  catch (error) { console.log(error instanceof Error) }
-}
-console.log(notifications)`,
+      example: `import { deserializeErrorChain } from '@migaia/utils/error'
+
+try {
+  const error = deserializeErrorChain(receivedError, {}, { unknownFields: 'reject' })
+  showRemoteFailure(error)
+} catch (error) {
+  reportInvalidPayload(error)
+}`,
       result: t(
-        'Both calls reject; the ignore-only callback is never called.',
-        '两个接收函数均拒绝输入；只供丢弃模式使用的回调不会被调用。'
+        'Unexpected fields reach the invalid-payload handler before a remote error is displayed.',
+        '意外字段会进入非法数据处理流程，不会作为正常远程错误展示。'
       ),
-      covers: ['unknownFields', 'onUnknownField']
+      covers: ['unknownFields']
     }
   ],
   chainReport: [
     {
-      title: t('Retain diagnostics from an unreadable cause', '保留无法读取原因的诊断'),
+      title: t('Upload a readable portion of a plugin error', '上传插件错误中可读取的部分'),
       problem: t(
-        'An error supplied by another component has a throwing cause getter. Without report, inspecting the chain throws a violation.',
-        '其他组件提供的错误对象在读取 cause 时抛错。不设置 report，检查错误链本身就会抛出违规错误。'
+        'A plugin can supply an error whose properties fail to read. Without report, that read failure stops serialization; a reporter preserves diagnostics while serialization continues.',
+        '插件提供的错误可能有无法读取的属性。未设置 report 时，读取失败会停止序列化；设置报告器后仍可采集其余诊断。'
       ),
-      example: `import { serializeErrorChain, reachErrorChain } from '@migaia/utils/error'
-const failure = new Error('cause getter failed')
-const input = Object.defineProperty(new Error('request failed'), 'cause', { get() { throw failure } })
-const reports: string[] = []
-const options = { report: (event: { field: string; error: unknown }) => {
-  if (event.error === failure) reports.push(event.field)
-} }
-const wire = serializeErrorChain(input, {}, options)
-const links = [...reachErrorChain(input, {}, options)]
-console.log(wire.truncated, links.length, reports)`,
+      example: `import { serializeErrorChain } from '@migaia/utils/error'
+
+const error = serializeErrorChain(pluginFailure, {}, {
+  report: ({ pointer, field, error }) => reportErrorReadFailure(pointer, field, error)
+})
+await uploadErrorReport(error)`,
       result: t(
-        'The wire tree is marked truncated, the walk retains the root, and both calls report cause.',
-        '传输树标为截断，遍历仍保留根错误，两个函数都报告 cause 读取失败。'
+        'The upload retains the readable error data; property-read failures are also reported.',
+        '上传内容保留可读取的错误数据，属性读取失败也会单独上报。'
       ),
       covers: ['report']
     },
     {
-      title: t('Keep normal errors free of reports', '正常错误链无需报告'),
+      title: t('Show a partial failure chain', '展示仍可读取的失败原因链'),
       problem: t(
-        'A shared reporter should record input-read failures only. An ordinary cause chain should still serialize and walk normally.',
-        '共用报告器只应记录输入读取失败。普通的原因链仍应正常序列化和遍历，不产生诊断。'
+        'A support panel should still show the root failure when a deeper cause cannot be read. A reporter allows the walk to retain readable entries.',
+        '支持面板需要在深层 cause 无法读取时仍展示根失败。报告器让遍历保留已经读到的条目。'
       ),
-      example: `import { serializeErrorChain, reachErrorChain } from '@migaia/utils/error'
-const input = new Error('request failed', { cause: new Error('offline') })
-const reports: unknown[] = []
-const options = { report: (event: unknown) => { reports.push(event) } }
-console.log(serializeErrorChain(input, {}, options).cause?.message)
-console.log([...reachErrorChain(input, {}, options)].length, reports.length)`,
+      example: `import { reachErrorChain } from '@migaia/utils/error'
+
+const chain = [...reachErrorChain(pluginFailure, {}, {
+  report: ({ error }) => reportToMonitoring(error)
+})]
+renderFailureChain(chain)`,
       result: t(
-        'The cause message is offline; the walk has two links and no report.',
-        '原因消息为 offline，遍历得到两层错误，报告数为零。'
+        'The panel shows the available chain and monitoring receives the property-read failure.',
+        '面板展示可读取的原因链，监控收到属性读取失败。'
       ),
       covers: ['report']
     }
   ],
   identify: [
     {
-      title: t('Wrap a dependency failure with an application message', '给依赖失败添加业务消息'),
+      title: t('Explain an order-loading failure', '说明订单加载失败'),
       problem: t(
-        'The application needs its own error code and display message while retaining the original failure for diagnosis.',
-        '应用需要自己的错误码和展示消息，同时仍要保留依赖抛出的原始失败以便诊断。'
+        'An order page needs an application message while support still needs the network failure. Setting message and cause keeps both at the boundary.',
+        '订单页需要业务提示，排查时仍要查看网络失败。设置 message 与 cause，可以同时保留两者。'
       ),
       example: `import { IdentifyError } from '@migaia/utils/error'
-const cause = new Error('socket closed')
-const error = new IdentifyError({ source: '@app/orders', code: 'LOAD_FAILED' }, {
-  message: 'Orders could not be loaded', cause
-})
-console.log(error.message, error.cause === cause, error.native() === cause)`,
+
+try {
+  renderOrders(await fetchOrders())
+} catch (cause) {
+  const error = new IdentifyError({ source: '@app/orders', code: 'LOAD_FAILED' }, {
+    message: 'Orders could not be loaded',
+    cause
+  })
+  showOrderError(error.message)
+  reportToMonitoring(error)
+}`,
       result: t(
-        'The chosen message is kept, and cause and native both reach the original error.',
-        '消息采用指定文本，cause 和 native 均指向原始错误。'
+        'The page explains that orders could not load; monitoring can follow cause to the original failure.',
+        '页面提示订单加载失败，监控可沿 cause 找到原始失败。'
       ),
       covers: ['message', 'cause']
     },
     {
-      title: t('Preserve a non-error rejection', '保留非错误拒绝值'),
+      title: t('Keep an unavailable response for diagnosis', '保留不可用服务的响应'),
       problem: t(
-        'A dependency rejects with a record. A concrete message makes the boundary failure readable without losing that record.',
-        '依赖用普通记录拒绝。指定消息可让边界错误可读，同时把原记录留在 cause 上。'
+        'An inventory service rejects with a status record rather than an Error. Give the application a readable message and preserve that record on cause.',
+        '库存服务可能用状态记录而非 Error 拒绝。应用需要可读提示，同时在 cause 上保留这份记录。'
       ),
       example: `import { IdentifyError } from '@migaia/utils/error'
-const cause = { status: 503 }
-const error = new IdentifyError({ source: '@app/orders', code: 'UNAVAILABLE' }, {
-  message: 'Service unavailable', cause
+
+const error = new IdentifyError({ source: '@app/inventory', code: 'UNAVAILABLE' }, {
+  message: 'Inventory unavailable',
+  cause: { status: 503 }
 })
-console.log(error.message, error.cause === cause, error.native().cause === cause)`,
+showInventoryError(error.message)
+reportToMonitoring(error)`,
       result: t(
-        'Both the identified error and its native wrapper retain the original record.',
-        '带身份的错误与 native 包装错误都保留同一份原始记录。'
+        'The page shows Inventory unavailable, and the diagnostic record retains status 503.',
+        '页面显示 Inventory unavailable，诊断记录仍保留状态 503。'
       ),
       covers: ['message', 'cause']
     }
   ],
   utilsError: [
     {
-      title: t('Preserve a native cause', '保留原生错误原因'),
+      title: t('Keep the failure behind a settings read', '保留配置读取背后的失败'),
       problem: t(
-        'A package-specific subclass needs to keep its original failure. Dropping cause would hide the failure chain.',
-        '工具错误的具体子类需要保存原始失败，省略 cause 会丢失用于排查的原因链。'
+        'A utility extension supplies its own read failure. Omitting cause loses the dependency failure that support needs to diagnose the operation.',
+        '工具扩展提供自己的读取错误。省略 cause 会丢失依赖失败，使排查时无法看到具体原因。'
       ),
       example: `import { UtilsError, UtilsErrorCode } from '@migaia/utils/error'
-class ReadFailure extends UtilsError {
-  constructor(cause: unknown) { super(UtilsErrorCode.invalidArgument, 'Cannot read settings', { cause }) }
+
+class SettingsReadError extends UtilsError {
+  constructor(cause: unknown) {
+    super(UtilsErrorCode.invalidArgument, 'Cannot read settings', { cause })
+  }
 }
-const cause = new Error('permission denied')
-const error = new ReadFailure(cause)
-console.log(error instanceof UtilsError, error.cause === cause)`,
+try {
+  applySettings(await readSettings())
+} catch (cause) {
+  reportToMonitoring(new SettingsReadError(cause))
+}`,
       result: t(
-        'The subclass is a UtilsError and retains the exact cause value.',
-        '子类可用 UtilsError 识别，且 cause 保留传入值的身份。'
+        'The settings-read report retains the dependency failure as its cause.',
+        '配置读取报告保留依赖失败作为 cause。'
       ),
       covers: ['cause']
     },
     {
-      title: t('Preserve a structured cause', '保留结构化失败原因'),
+      title: t('Keep a rejected import record', '保留被拒绝的导入记录'),
       problem: t(
-        'A package-specific subclass needs to keep its original failure. Dropping cause would hide the failure chain.',
-        '工具错误的具体子类需要保存原始失败，省略 cause 会丢失用于排查的原因链。'
+        'A utility extension receives an import rejection with a file name. The cause option preserves that data alongside a readable error.',
+        '工具扩展收到的导入拒绝包含文件名。cause 选项将这份数据与可读错误一起保留。'
       ),
       example: `import { UtilsError, UtilsErrorCode } from '@migaia/utils/error'
-class ReadFailure extends UtilsError {
-  constructor(cause: unknown) { super(UtilsErrorCode.invalidArgument, 'Cannot read settings', { cause }) }
+
+class ImportError extends UtilsError {
+  constructor(cause: unknown) {
+    super(UtilsErrorCode.invalidArgument, 'Import could not be read', { cause })
+  }
 }
-const cause = { operation: 'read' }
-const error = new ReadFailure(cause)
-console.log(error instanceof UtilsError, error.cause === cause)`,
+reportToMonitoring(new ImportError({ file: 'prices.csv', operation: 'decode' }))`,
       result: t(
-        'The subclass is a UtilsError and retains the exact cause value.',
-        '子类可用 UtilsError 识别，且 cause 保留传入值的身份。'
+        'The import report keeps the affected file name and failed operation.',
+        '导入报告保留出错文件名及失败操作。'
       ),
       covers: ['cause']
     }
   ],
   toError: [
     {
-      title: t('Give a record rejection a readable message', '为记录拒绝值提供可读消息'),
+      title: t('Give unknown inventory failures a readable message', '为未知库存失败提供可读消息'),
       problem: t(
-        'A rejected record has no useful message. The default generic message does not explain this application operation.',
-        '拒绝值是普通记录，没有可读消息。默认通用消息无法说明当前业务操作，需要调用方补充。'
+        'An inventory dependency can reject with plain data. The generic fallback does not name the failed operation; message supplies the context.',
+        '库存依赖可能用普通数据拒绝。默认兜底消息不能说明失败操作；message 补充该上下文。'
       ),
       example: `import { toError } from '@migaia/utils/error'
-const value = { status: 503 }
-const error = toError(value, { message: 'Inventory unavailable' })
-console.log(error.message, error.cause === value)`,
+
+try {
+  renderInventory(await fetchInventory())
+} catch (value) {
+  const error = toError(value, { message: 'Inventory unavailable' })
+  showInventoryError(error.message)
+  reportToMonitoring(error)
+}`,
       result: t(
-        'The wrapper prints Inventory unavailable and retains the record on cause.',
-        '包装错误使用 Inventory unavailable 消息，cause 保留原记录。'
+        'A non-error rejection becomes a readable failure whose cause still contains the rejected value.',
+        '非错误拒绝值成为可读错误，cause 仍保留原拒绝值。'
       ),
       covers: ['message']
     },
     {
-      title: t('Keep an existing error intact', '保留已有错误本身'),
+      title: t('Keep useful messages from a file reader', '保留文件读取器已有的错误消息'),
       problem: t(
-        'A shared boundary also receives real errors. Its fallback message must not replace an existing error object.',
-        '共用边界也会收到真正的错误对象。兜底消息不应替换已有错误，这个选项只影响需要包装的值。'
+        'A shared upload handler receives native errors as well as plain rejections. Its fallback message should describe only values that need wrapping.',
+        '共用上传处理器既接收原生错误，也接收普通拒绝值。兜底消息只需要用于必须包装的值。'
       ),
       example: `import { toError } from '@migaia/utils/error'
-const original = new Error('offline')
-const error = toError(original, { message: 'Fallback message' })
-console.log(error === original, error.message)`,
+
+try {
+  await uploadDocument()
+} catch (value) {
+  showUploadError(toError(value, { message: 'Upload failed' }))
+}`,
       result: t(
-        'The original object is returned and its message stays offline.',
-        '返回的仍是原对象，消息仍为 offline。'
+        'Existing errors keep their own message and identity; plain values receive the Upload failed fallback.',
+        '已有错误保留自己的消息与身份，普通值使用 Upload failed 兜底提示。'
       ),
       covers: ['message']
     }
   ],
   walk: [
     {
-      title: t('Limit a short diagnostic view', '限制简短诊断的展开深度'),
+      title: t('Keep the support panel compact', '限制支持面板的展开深度'),
       problem: t(
-        'A compact error panel only needs the top two levels. The default depth can include a much longer chain.',
-        '紧凑错误面板只展示前两层。默认深度允许展开更长原因链，需要为这个视图单独收紧。'
+        'A compact support panel shows a failure and its immediate cause. The default depth can expand a much longer chain; maxDepth limits this view.',
+        '紧凑支持面板只展示失败及直接原因。默认深度可展开更长原因链；maxDepth 限制这个视图。'
       ),
       example: `import { walkErrorCauses } from '@migaia/utils/error'
-const error = new Error('request', { cause: new Error('network', { cause: 'offline' }) })
-console.log(walkErrorCauses(error, { maxDepth: 1 }).length)`,
+
+const failure = new Error('Request failed', {
+  cause: new Error('Network failed', { cause: 'offline' })
+})
+renderFailureChain(walkErrorCauses(failure, { maxDepth: 1 }))`,
       result: t(
-        'Depth zero and one are included, so the result has two links.',
-        '结果包含深度零和一，共两层，不会继续展开 offline。'
+        'The panel shows Request failed and Network failed without expanding offline.',
+        '面板展示 Request failed 和 Network failed，不再展开 offline。'
       ),
       covers: ['maxDepth']
     },
     {
-      title: t('Inspect only an aggregate root', '只查看聚合错误根对象'),
+      title: t('Keep aggregate details out of a banner', '不在错误横幅展开全部细节'),
       problem: t(
-        'A summary counter should not expand every member of an aggregate. A zero depth includes the root only.',
-        '摘要计数不需要展开聚合错误的所有成员。最大深度设为零，就只保留根对象。'
+        'A notification banner needs the summary of a failed batch. A zero depth keeps the aggregate root without expanding every failed item.',
+        '通知横幅只需要失败批次的摘要。最大深度为零时保留聚合根错误，不展开每个失败项。'
       ),
       example: `import { walkErrorCauses } from '@migaia/utils/error'
-const root = new AggregateError([new Error('left'), new Error('right')], 'Both failed')
-console.log(walkErrorCauses(root, { maxDepth: 0 })[0] === root)
-console.log(walkErrorCauses(root, { maxDepth: 1 }).length)`,
+
+const failure = new AggregateError(importFailures, 'Import failed')
+renderFailureBanner(walkErrorCauses(failure, { maxDepth: 0 }))`,
       result: t(
-        'The zero-depth result is the root; depth one includes all three errors.',
-        '零深度返回根对象；深度一包含根和两个成员，共三个错误。'
+        'The banner receives only the Import failed summary.',
+        '横幅只接收 Import failed 摘要。'
       ),
       covers: ['maxDepth']
     }
   ],
   number: [
     {
-      title: t('Format an invoice consistently', '统一账单数字的格式'),
+      title: t('Format invoice amounts consistently', '统一账单金额格式'),
       problem: t(
-        'An invoice must use one locale and precision policy. Depending on the host locale can change separators and decimal places.',
-        '账单需要固定地区与精度。依赖宿主默认地区，分隔符和小数位可能随环境变化。'
+        'An invoice must use the same separators and precision on every host. Explicit locales and format avoid relying on the host default.',
+        '账单在不同宿主上需要相同的分隔符与精度。明确 locales 和 format，可避免依赖宿主默认值。'
       ),
-      example: `import { createNumberFormatter, formatNumber, formatCurrency } from '@migaia/utils/number'
-const options = { locales: 'en-US', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } }
-console.log(createNumberFormatter(options)(1234.5))
-console.log(formatNumber(1234.5, options))
-console.log(formatCurrency(1234.5, 'USD', options))`,
+      example: `import { createNumberFormatter, formatCurrency } from '@migaia/utils/number'
+
+const options = {
+  locales: 'en-US',
+  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+}
+const formatAmount = createNumberFormatter(options)
+renderInvoiceAmount(formatAmount(1234.5))
+renderInvoiceTotal(formatCurrency(1234.5, 'USD', options))`,
       result: t(
-        'Both general formatters print 1,234.50; the currency formatter prints $1,234.50.',
-        '两个通用格式器均输出 1,234.50，金额格式输出 $1,234.50。'
+        'The invoice shows 1,234.50 for the amount and $1,234.50 for its USD total.',
+        '账单数额显示为 1,234.50，美元合计显示为 $1,234.50。'
       ),
       covers: ['locales', 'format']
     },
     {
-      title: t('Format dashboard measurements', '格式化面板指标'),
+      title: t('Show a dashboard conversion rate', '展示面板转化率'),
       problem: t(
-        'A dashboard mixes ratios, counts and large quantities. The helper chooses the display style while explicit precision keeps rows consistent.',
-        '面板同时展示比例、数量和较大数值。辅助函数选择展示样式，显式精度使同类数据保持一致。'
+        'A dashboard shows conversion rates to one decimal place. Explicit precision keeps rows consistent instead of using the formatter default.',
+        '面板的转化率需要一位小数。明确精度可让各行一致，避免沿用格式器默认值。'
       ),
-      example: `import { formatPercent, formatInteger, formatCompactNumber } from '@migaia/utils/number'
-console.log(formatPercent(0.125, { locales: 'en-US', format: { maximumFractionDigits: 1 } }))
-console.log(formatInteger(1234.5, { locales: 'en-US', format: { useGrouping: false } }))
-console.log(formatCompactNumber(1200, { locales: 'en-US', format: { maximumFractionDigits: 1 } }))`,
-      result: t(
-        'The values display as 12.5%, 1235 and 1.2K.',
-        '三项分别显示为 12.5%、1235 和 1.2K。'
-      ),
+      example: `import { formatPercent } from '@migaia/utils/number'
+
+const label = formatPercent(0.125, {
+  locales: 'en-US',
+  format: { maximumFractionDigits: 1 }
+})
+renderConversionRate(label)`,
+      result: t('The conversion-rate label reads 12.5%.', '转化率标签显示 12.5%。'),
       covers: ['locales', 'format']
     }
   ],
   path: [
     {
-      title: t('Tell absent, blocked and failed reads apart', '区分缺失、阻断和读取失败'),
+      title: t('Explain why imported profile data is unavailable', '说明导入资料为何不可读'),
       problem: t(
-        'Imported profile data can omit a field, contain a null parent or throw in a getter. Returning undefined alone cannot explain all three cases.',
-        '导入资料可能缺字段、在父级遇到 null，也可能在取值函数中抛错。仅凭 undefined 无法区分这些情况。'
+        'Imported profiles can omit a name, have no parent record, or fail in a getter. Returning undefined alone cannot explain these cases to support.',
+        '导入资料可能缺少姓名、没有父记录，或者在取值函数中失败。只返回 undefined，支持人员无法区分原因。'
       ),
       example: `import { createPathAccessor } from '@migaia/utils/object-path'
-type IProfile = { name?: string; user: { name: string } | null; balance: number }
-const failure = new Error('balance offline')
-const events: string[] = []
-const profile = createPathAccessor<IProfile>({ user: null, get balance(): number { throw failure } }, {
-  ifMissing: (probe) => { events.push('missing:' + String(probe.failedKey)) },
-  ifBlocked: (probe) => { events.push('blocked:' + String(probe.failedKey)) },
-  ifFailed: (probe) => { events.push('failed:' + String(probe.failedKey)) }
+
+type IProfile = { user: { name?: string } | null }
+const profile = createPathAccessor<IProfile>(importedProfile, {
+  ifMissing: (probe) => showMissingField(probe.originKey),
+  ifBlocked: (probe) => showUnavailableSection(probe.originKey),
+  ifFailed: (probe) => reportToMonitoring(probe.error)
 })
-console.log(profile.get('name'), profile.get('user.name'))
-try { profile.get('balance') } catch (error) { console.log(error === failure) }
-console.log(events)`,
+renderProfileName(profile.get('user.name'))`,
       result: t(
-        'The two unavailable reads return undefined, the getter failure is rethrown, and each hook records its distinct reason.',
-        '缺失和阻断读取均返回 undefined，取值失败仍原样抛出；三个回调各自记录不同原因。'
+        'The application can distinguish a missing field from an unavailable section and report a failing getter.',
+        '应用可区分缺失字段与不可用分区，并上报取值函数的失败。'
       ),
       covers: ['ifMissing', 'ifBlocked', 'ifFailed']
     },
     {
-      title: t('Normalize values at the accessor boundary', '在访问边界整理字段值'),
+      title: t('Normalize a profile name at the boundary', '在访问边界整理姓名'),
       problem: t(
-        'A form should store trimmed names and display them in upper case. Without hooks, get and set use the supplied strings unchanged.',
-        '表单保存姓名前要去掉空格，展示时要转成大写。不设置回调，读写都会原样使用字符串。'
+        'A profile form should trim names before saving and display them in capitals. Without hooks, both reads and writes use the supplied text unchanged.',
+        '资料表单需要在保存前去掉姓名首尾空格，展示时转成大写。没有回调时，读写都会原样使用文本。'
       ),
       example: `import { createPathAccessor } from '@migaia/utils/object-path'
-const profile = createPathAccessor<{ name: string }>({ name: 'Ada' }, {
+
+const profile = createPathAccessor({ name: 'Ada' }, {
   onSet: (event) => { event.replace(event.value.trim()) },
   onGet: (event) => { event.replace(event.value.toUpperCase()) }
 })
 profile.set('name', ' Grace ')
-console.log(profile.value.name, profile.get('name'))`,
+renderProfileName(profile.get('name'))`,
       result: t(
-        'The stored name is Grace and the displayed value is GRACE.',
-        '实际保存 Grace，读取展示值为 GRACE，展示转换不改保存值。'
+        'The stored name is Grace, while the form displays GRACE.',
+        '实际保存的姓名为 Grace，表单展示 GRACE。'
       ),
       covers: ['onGet', 'onSet']
     }
   ],
   abortSignal: [
     {
-      title: t('Merge cancellation with a named deadline', '合并取消信号与明确的截止原因'),
+      title: t('Give a preview request its own deadline', '为预览请求设置独立截止时间'),
       problem: t(
-        'An adapter needs caller cancellation and a local deadline. A named timeout reason lets downstream code identify which budget expired.',
-        '适配器同时需要调用方取消和本地截止时间。自定义超时原因让下游知道是哪项预算耗尽。'
+        'A preview belongs to a view but must also stop after two seconds. A combined signal carries either cancellation, with a named reason for its own deadline.',
+        '预览属于一个视图，也必须在两秒后停止。合并信号同时处理两种取消，并为自己的截止时间提供明确原因。'
       ),
       example: `import { createAbortTimeoutSignal } from '@migaia/utils/promise'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const controller = new AbortController()
-const reason = new Error('Preview deadline')
-const merged = createAbortTimeoutSignal({ signal: controller.signal, timeoutMs: 20,
-  scheduler, timeoutReason: () => reason, report: console.error })
-scheduler.advance(20)
-console.log(merged.signal?.aborted, merged.signal?.reason === reason)
-merged.dispose()`,
+
+const deadline = createAbortTimeoutSignal({
+  signal: viewSignal,
+  timeoutMs: 2000,
+  scheduler: previewScheduler,
+  timeoutReason: () => new Error('Preview deadline exceeded'),
+  report: reportToMonitoring
+})
+try {
+  renderPreview(await fetchPreview({ signal: deadline.signal }))
+} finally {
+  deadline.dispose()
+}`,
       result: t(
-        'After 20 ms the merged signal is aborted with the exact supplied reason.',
-        '推进 20 毫秒后，合并信号中止，reason 就是传入的错误对象。'
+        'The preview stops when its view closes or its deadline expires; timer cleanup remains observable.',
+        '视图关闭或预览超时都会停止请求；定时器清理失败仍可上报。'
       ),
       covers: ['signal', 'timeoutMs', 'scheduler', 'timeoutReason', 'report']
     },
     {
-      title: t('Observe a timer cleanup failure', '观察定时器清理失败'),
+      title: t('Release a completed export deadline', '导出完成后释放截止计时器'),
       problem: t(
-        'A host timer adapter can fail while cancelling a task. The custom reporter keeps that cleanup failure visible without throwing it from dispose.',
-        '宿主定时器适配器可能在取消任务时失败。自定义报告器保留清理诊断，dispose 不会把该失败直接抛给调用方。'
+        'A desktop export uses the application scheduler. Once export finishes, its pending deadline should be released; report preserves any timer cleanup failure.',
+        '桌面导出使用应用调度器。导出结束后应释放尚未到期的计时器；report 保留定时器清理失败。'
       ),
       example: `import { createAbortTimeoutSignal } from '@migaia/utils/promise'
-const failure = new Error('timer cancellation failed')
-const failures: unknown[] = []
-const merged = createAbortTimeoutSignal({ timeoutMs: 100,
-  scheduler: { now: () => 0, schedule: () => ({ cancel: () => { throw failure } }) },
-  timeoutReason: () => 'deadline', report: (error) => { failures.push(error) }
+
+const deadline = createAbortTimeoutSignal({
+  timeoutMs: 30000,
+  scheduler: exportScheduler,
+  timeoutReason: () => new Error('Export deadline exceeded'),
+  report: reportToMonitoring
 })
-merged.dispose()
-console.log(failures[0] === failure, merged.signal?.aborted)`,
+try {
+  await exportDocument({ signal: deadline.signal })
+} finally {
+  deadline.dispose()
+}`,
       result: t(
-        'The reporter receives the cancellation failure and the signal stays un-aborted.',
-        '报告器收到原始取消失败，信号没有中止，因为定时回调并未执行。'
+        'A completed export leaves no pending deadline; cleanup failures reach monitoring.',
+        '导出完成后不再保留截止任务；清理失败会交给监控。'
       ),
       covers: ['timeoutMs', 'scheduler', 'timeoutReason', 'report']
     }
   ],
   limiter: [
     {
-      title: t('Serialize queued writes', '按提交顺序串行写入'),
+      title: t('Serialize document writes', '串行保存文档'),
       problem: t(
-        'A storage connection accepts one operation at a time. The queue needs concurrency one so a later write cannot start early.',
-        '一个存储连接同一时间只接受一个操作。并发数设为一后，后续写入会等待当前操作结束。'
+        'A document connection accepts only one write at a time. Set concurrency to one so a later save waits for the previous save.',
+        '文档连接同一时间只接受一次写入。将 concurrency 设为一，后一次保存会等待前一次结束。'
       ),
       example: `import { createConcurrencyLimiter } from '@migaia/utils/promise'
-const order: string[] = []
-const queue = createConcurrencyLimiter({ concurrency: 1, report: console.error })
-await Promise.all(['first', 'second'].map((value) => queue.run(async () => {
-  order.push(value)
-  await Promise.resolve()
-})))
-await queue.whenIdle()
-console.log(order, queue.activeCount, queue.pendingCount)
-await queue.dispose()`,
+
+const saves = createConcurrencyLimiter({
+  concurrency: 1,
+  report: reportToMonitoring
+})
+await Promise.all(documents.map((document) => saves.run(() => saveDocument(document))))
+await saves.dispose()`,
       result: t(
-        'Writes start first then second; both queue counts are zero when idle.',
-        '写入按 first、second 开始，空闲后活动数与排队数均为零。'
+        'Documents save one at a time; a signal-cleanup failure is sent to monitoring.',
+        '文档逐个保存，信号清理失败会交给监控。'
       ),
       covers: ['concurrency', 'report']
     },
     {
-      title: t('Collect signal cleanup diagnostics', '收集信号清理诊断'),
+      title: t('Bound thumbnail downloads', '限制缩略图下载并发'),
       problem: t(
-        'A structural host signal may fail during listener removal. The task may still run, so the reporter must preserve that separate cleanup error.',
-        '结构化宿主信号可能在移除监听器时失败。任务仍可执行，因此应通过报告器保存这条独立的清理错误。'
+        'A gallery should not start every thumbnail request at once. A limit of four keeps only four tasks active while the remaining requests wait.',
+        '图库不应同时发起所有缩略图请求。上限为四时，只有四项任务可运行，其余请求排队。'
       ),
       example: `import { createConcurrencyLimiter } from '@migaia/utils/promise'
-const failure = new Error('listener removal failed')
-const reports: unknown[] = []
-const queue = createConcurrencyLimiter({ concurrency: 2, report: (error) => { reports.push(error) } })
-const signal = { aborted: false, addEventListener: () => {}, removeEventListener: () => { throw failure } }
-console.log(await queue.run(() => 42, { signal }), reports[0] === failure)
-await queue.dispose()`,
+
+const downloads = createConcurrencyLimiter({ concurrency: 4, report: reportToMonitoring })
+try {
+  const thumbnails = await Promise.all(imageIds.map((id) =>
+    downloads.run(() => fetchThumbnail(id), { signal: gallerySignal })
+  ))
+  renderGallery(thumbnails)
+} finally {
+  await downloads.dispose()
+}`,
       result: t(
-        'The task returns 42 and the reporter retains the original removal failure.',
-        '任务返回 42，报告器仍保留原始监听器移除失败。'
+        'The gallery loads thumbnails with bounded concurrency and retains cleanup diagnostics.',
+        '图库在限定并发下加载缩略图，并保留清理诊断。'
       ),
       covers: ['concurrency', 'report']
     }
   ],
   race: [
     {
-      title: t('Cancel when the view or session ends', '视图或会话结束时取消'),
+      title: t('Cancel a price request when either owner ends', '任一所有者结束时取消价格请求'),
       problem: t(
-        'A request belongs to both a view and a session. Either owner should cancel it; a late dependency failure still needs a diagnostic sink.',
-        '请求同时属于一个视图和一个会话，任意一方结束都应取消。依赖迟到的失败仍需保留诊断。'
+        'A price request belongs to a view and a session. Either should stop waiting; if the dependency fails later, report keeps the failure visible.',
+        '价格请求同时属于视图和会话。任一方结束都应停止等待；依赖稍后失败时，report 仍保留该失败。'
       ),
-      example: `import { raceWithAbort, deferred } from '@migaia/utils/promise'
-const view = new AbortController()
-const session = new AbortController()
-const dependency = deferred<number>()
-const reports: unknown[] = []
-const result = raceWithAbort(() => dependency.promise, {
-  signals: [view.signal, session.signal], cleanupPolicy: 'reject',
-  report: (error) => { reports.push(error) }
-}).catch((error: unknown) => error)
-session.abort('session ended')
-const error = await result
-dependency.reject(new Error('late dependency failure'))
-await Promise.resolve()
-console.log(Reflect.get(error as object, 'code'), reports.length)`,
+      example: `import { raceWithAbort } from '@migaia/utils/promise'
+
+const prices = await raceWithAbort(() => fetchPrices(), {
+  signals: [viewSignal, sessionSignal],
+  cleanupPolicy: 'reject',
+  report: reportToMonitoring
+})
+renderPrices(prices)`,
       result: t(
-        'The wrapper returns an ABORTED error and the late failure is reported once.',
-        '包装调用返回 ABORTED 错误，依赖迟到的失败另报告一次。'
+        'Leaving the view or ending the session cancels the wait; later dependency failures reach monitoring.',
+        '离开视图或结束会话都会取消等待，依赖迟到的失败会交给监控。'
       ),
       covers: ['signals', 'cleanupPolicy', 'report']
     },
     {
-      title: t(
-        'Keep a successful result when listener cleanup fails',
-        '监听清理失败时保留成功结果'
-      ),
+      title: t('Keep a completed report despite cleanup failure', '清理失败时保留已完成的报表'),
       problem: t(
-        'A borrowed host signal can fail to remove a listener after work succeeds. Report mode preserves the successful result while recording cleanup.',
-        '借用的宿主信号可能在工作成功后无法移除监听器。报告模式保留成功结果，同时记录清理失败。'
+        'A report download should remain usable if its host signal fails to remove a listener. The report cleanup policy keeps the result and sends that cleanup error to monitoring.',
+        '报表已经下载成功时，宿主信号移除监听器失败不应丢掉报表。report 清理策略保留结果，并把清理失败交给监控。'
       ),
       example: `import { raceWithAbort } from '@migaia/utils/promise'
-const failure = new Error('listener removal failed')
-const reports: unknown[] = []
-const signal = { aborted: false, addEventListener: () => {}, removeEventListener: () => { throw failure } }
-const result = await raceWithAbort(() => 42, { signal, cleanupPolicy: 'report',
-  report: (error) => { reports.push(error) } })
-console.log(result, reports[0] === failure)`,
+
+const report = await raceWithAbort(() => downloadReport(), {
+  signal: reportSignal,
+  cleanupPolicy: 'report',
+  report: reportToMonitoring
+})
+openReport(report)`,
       result: t(
-        'The call returns 42 and the reporter receives the cleanup error.',
-        '调用仍返回 42，报告器收到原始清理错误。'
+        'A successful report can open even when listener cleanup fails; monitoring still receives the failure.',
+        '监听器清理失败时，成功下载的报表仍可打开；监控仍会收到失败。'
       ),
       covers: ['signal', 'cleanupPolicy', 'report']
     }
   ],
   sleep: [
     {
-      title: t('Drive a cancellable delay with an explicit clock', '用明确时钟驱动可取消等待'),
+      title: t('Delay a refresh without losing its owner', '延后刷新并保留取消能力'),
       problem: t(
-        'A delayed refresh should use the component clock and stay alive until it completes. Injecting a manual scheduler makes that timing visible.',
-        '延迟刷新要使用组件时钟，且在完成前保持进程存活。注入手动调度器可直接展示等待何时结束。'
+        'A status page pauses before refreshing. The application scheduler should own that delay, and closing the page should cancel it.',
+        '状态页在刷新前等待片刻。该等待应由应用调度器管理，关闭页面时也能取消。'
       ),
       example: `import { sleep } from '@migaia/utils/promise'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const controller = new AbortController()
-let completed = false
-const wait = sleep(20, { signal: controller.signal, scheduler, unref: false }).then(() => { completed = true })
-console.log(completed)
-scheduler.advance(20)
-await wait
-console.log(completed)`,
+
+await sleep(1000, {
+  signal: pageSignal,
+  scheduler: refreshScheduler,
+  unref: false
+})
+renderStatus(await fetchStatus())`,
       result: t(
-        'completed is false before advancing and true after the 20 ms delay.',
-        '推进时钟前 completed 为 false，等待 20 毫秒后变为 true。'
+        'The page refreshes after the delay; closing it cancels the pending wait.',
+        '等待结束后页面刷新，关闭页面会取消尚未结束的等待。'
       ),
       covers: ['signal', 'scheduler', 'unref']
     },
     {
-      title: t('Stop a background delay from either owner', '任一所有者结束就停止后台等待'),
+      title: t('Let a background reminder stop with either owner', '任一所有者结束时停止后台提醒'),
       problem: t(
-        'A background refresh belongs to a view and a session. It should stop on either signal and should not keep a Node process alive.',
-        '后台刷新同时属于视图和会话，任一信号中止都应停止等待，也无需单独阻止 Node 进程退出。'
+        'A background reminder belongs to a window and a session. It should stop with either owner and should not keep a Node process alive on its own.',
+        '后台提醒属于窗口和会话。任一所有者结束都应停止等待，它也不应单独阻止 Node 进程退出。'
       ),
       example: `import { sleep } from '@migaia/utils/promise'
-const view = new AbortController()
-const session = new AbortController()
-const wait = sleep(1000, { signals: [view.signal, session.signal], unref: true }).catch((error: unknown) => error)
-view.abort('view closed')
-const error = await wait
-console.log(Reflect.get(error as object, 'code'), Reflect.get(error as object, 'cause'))`,
+
+await sleep(30000, { signals: [windowSignal, sessionSignal], unref: true })
+showReminder()`,
       result: t(
-        'The wait rejects with ABORTED and retains view closed as its cause.',
-        '等待以 ABORTED 拒绝，cause 保留 view closed。'
+        'The reminder appears only if both owners remain active until the delay completes.',
+        '只有两个所有者在等待结束时都仍有效，提醒才会出现。'
       ),
       covers: ['signals', 'unref']
     }
   ],
   timeout: [
     {
-      title: t('Choose whether a zero budget starts work', '决定零预算是否启动操作'),
+      title: t('Skip an export when its budget is exhausted', '预算耗尽时跳过导出'),
       problem: t(
-        'A zero budget normally skips the lazy operation. Explicit start mode allows immediate completion but still arms a zero-delay deadline.',
-        '零预算默认跳过惰性操作。显式 start 允许立即完成的工作启动，但仍会安排零延迟截止任务。'
+        'An export may reach the queue with no remaining budget. Skip mode avoids starting a lazy operation that cannot finish within its budget.',
+        '导出排到队首时可能已没有剩余预算。skip 模式避免启动已经没有等待预算的惰性操作。'
       ),
       example: `import { withTimeout } from '@migaia/utils/promise'
-let calls = 0
-try { await withTimeout(() => { calls++; return 1 }, { timeoutMs: 0, zeroTimeoutBehavior: 'skip' }) } catch {}
-const value = await withTimeout(() => { calls++; return 42 }, { timeoutMs: 0, zeroTimeoutBehavior: 'start' })
-console.log(calls, value)`,
+
+try {
+  const file = await withTimeout(() => buildExport(), {
+    timeoutMs: remainingMs,
+    zeroTimeoutBehavior: 'skip'
+  })
+  offerDownload(file)
+} catch (error) {
+  showExportError(error)
+}`,
       result: t(
-        'Only the start call runs, so calls is one and its immediate value is 42.',
-        '只有 start 调用执行，calls 为一，立即返回的值为 42。'
+        'When remainingMs is zero, the export error is shown without starting buildExport.',
+        'remainingMs 为零时显示导出错误，不启动 buildExport。'
       ),
       covers: ['timeoutMs', 'zeroTimeoutBehavior']
     },
     {
-      title: t('Report work that fails after its deadline', '报告截止之后才失败的工作'),
+      title: t('Bound a legacy price request', '限制旧价格接口的等待时间'),
       problem: t(
-        'A dependency cannot observe cancellation. Deadline-only mode bounds the wait; a reporter preserves its later rejection.',
-        '依赖无法观察取消。仅截止模式限制调用方等待时间，报告器则保存依赖之后才产生的拒绝。'
+        'A legacy price client cannot observe a cancellation signal. Deadline-only mode bounds the wait, while report preserves a failure that arrives afterward.',
+        '旧价格客户端无法观察取消信号。仅截止模式限制等待时间，report 则保留截止之后才到达的失败。'
       ),
-      example: `import { withTimeout, deferred } from '@migaia/utils/promise'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const controller = new AbortController()
-const dependency = deferred<number>()
-const reports: unknown[] = []
-const wait = withTimeout(() => dependency.promise, {
-  timeoutMs: 10, signal: controller.signal, scheduler, unref: true,
-  cooperativeCancellation: false, report: (error) => { reports.push(error) }
-}).catch((error: unknown) => error)
-scheduler.advance(10)
-const error = await wait
-dependency.reject(new Error('late failure'))
-await Promise.resolve()
-console.log(Reflect.get(error as object, 'code'), reports.length)`,
+      example: `import { withTimeout } from '@migaia/utils/promise'
+
+const prices = await withTimeout(() => fetchLegacyPrices(), {
+  timeoutMs: 2000,
+  signal: viewSignal,
+  scheduler: requestScheduler,
+  unref: true,
+  cooperativeCancellation: false,
+  report: reportToMonitoring
+})
+renderPrices(prices)`,
       result: t(
-        'The wait returns DEADLINE_EXCEEDED and the later failure is reported once.',
-        '等待返回 DEADLINE_EXCEEDED，之后的依赖失败另报告一次。'
+        'The view stops waiting after two seconds or cancellation; later failures still reach monitoring.',
+        '两秒到期或视图取消后停止等待；迟到失败仍会交给监控。'
       ),
       covers: ['timeoutMs', 'signal', 'scheduler', 'unref', 'cooperativeCancellation', 'report']
     },
     {
-      title: t(
-        'Forward either owner cancellation to cooperative work',
-        '把任一所有者取消传给可配合的工作'
-      ),
+      title: t('Pass cancellation into a price request', '把取消传入价格请求'),
       problem: t(
-        'An operation can stop itself through the signal it receives. Both the view and session should be able to trigger it.',
-        '操作能够通过收到的信号自行停止。视图和会话都应有权取消这项工作，因此传入两个信号。'
+        'A price client accepts a signal and can stop its own work. Cooperative cancellation passes the merged view and session cancellation into that request.',
+        '价格客户端支持 signal，能够自行停止工作。协作取消把视图和会话的合并取消传入该请求。'
       ),
       example: `import { withTimeout } from '@migaia/utils/promise'
-const view = new AbortController()
-const session = new AbortController()
-let workSignal: AbortSignal | undefined
-const wait = withTimeout(({ signal }) => {
-  workSignal = signal
-  return new Promise<number>((_resolve, reject) => signal.addEventListener('abort', () => { reject(signal.reason) }, { once: true }))
-}, { timeoutMs: 1000, signals: [view.signal, session.signal], cooperativeCancellation: true, unref: false })
-  .catch((error: unknown) => error)
-view.abort('view closed')
-const error = await wait
-console.log(workSignal?.aborted, Reflect.get(error as object, 'code'))`,
+
+const prices = await withTimeout(({ signal }) => fetchPrices({ signal }), {
+  timeoutMs: 2000,
+  signals: [viewSignal, sessionSignal],
+  cooperativeCancellation: true,
+  unref: false
+})
+renderPrices(prices)`,
       result: t(
-        'The work signal aborts and the wrapper rejects with ABORTED; the exact cancellation acknowledgment needs no late-failure report.',
-        '工作信号中止，包装调用以 ABORTED 拒绝；工作原样确认取消原因，不会产生迟到失败报告。'
+        'The request receives cancellation when either owner ends or the deadline expires.',
+        '任一所有者结束或截止时间到期时，请求会收到取消信号。'
       ),
       covers: ['timeoutMs', 'signals', 'cooperativeCancellation', 'unref']
     }
   ],
   debounce: [
     {
-      title: t('Deliver the latest value at the trailing edge', '在窗口末端交付最新值'),
+      title: t('Search after typing pauses', '输入停顿后再搜索'),
       problem: t(
-        'Rapid UI updates need one final value instead of every intermediate value. An explicit trailing-only policy avoids an immediate leading call.',
-        '快速界面更新只需要最后一个值。明确关闭开头执行、启用末端执行，可避免第一次调用立即交付。'
+        'A search box should send the latest query after typing pauses. Trailing-only execution avoids sending the first partial query immediately.',
+        '搜索框应在输入停顿后发送最新查询。只在末端执行，可避免立即发送第一个不完整查询。'
       ),
       example: `import { debounce } from '@migaia/utils/scheduler'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const values: number[] = []
-const update = debounce((value: number) => { values.push(value) }, 10, {
-  leading: false, trailing: true, scheduler
+
+const search = debounce(searchProducts, 300, {
+  leading: false,
+  trailing: true,
+  scheduler: searchScheduler
 })
-update(1)
-update(2)
-scheduler.advance(10)
-console.log(values)
-update.cancel()`,
+onSearchInput(search)
+onSearchClosed(() => search.cancel())`,
       result: t(
-        'Only the latest value, 2, is delivered after ten milliseconds.',
-        '推进十毫秒后，只交付最新值 2，中间值不会执行。'
+        'Search receives the latest query after a 300 ms pause.',
+        '输入停顿 300 毫秒后，搜索接收最新查询。'
       ),
       covers: ['leading', 'trailing', 'scheduler']
     },
     {
-      title: t('Bound and cancel a continuous stream', '约束并取消持续输入'),
+      title: t('Save a draft during continuous typing', '持续输入期间也保存草稿'),
       problem: t(
-        'A continuous stream must remain cancellable when its view closes. Explicit edge policy controls immediate delivery; later calls after abort are ignored.',
-        '持续输入必须在视图关闭时可取消。明确的窗口两端策略控制是否立即交付，中止后的新调用也会被忽略。'
+        'Continuous typing can postpone a trailing save forever. maxWait bounds that wait, and the document signal cancels pending saves when it closes.',
+        '持续输入可能让末端保存一直推迟。maxWait 限制最长等待，文档关闭时由信号取消待执行保存。'
       ),
       example: `import { debounce } from '@migaia/utils/scheduler'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const controller = new AbortController()
-const values: number[] = []
-const update = debounce((value: number) => { values.push(value) }, 10, {
-  leading: true, trailing: true, maxWait: 25, signal: controller.signal, scheduler
+
+const save = debounce(saveDraft, 500, {
+  leading: true,
+  trailing: true,
+  maxWait: 5000,
+  signal: documentSignal,
+  scheduler: draftScheduler
 })
-update(1)
-for (const value of [2, 3, 4]) { scheduler.advance(8); update(value) }
-scheduler.advance(1)
-controller.abort()
-update(5)
-scheduler.advance(30)
-console.log(values, update.pending())`,
+onDraftChanged(save)`,
       result: t(
-        'The leading value 1 runs immediately; maxWait delivers 4 at 25 ms despite continued input. Abort drops the remaining wait and ignores 5.',
-        '开头的值 1 立即执行；持续输入期间，maxWait 在 25 毫秒时交付 4。中止后取消剩余等待，并忽略 5。'
+        'The first edit saves immediately; further edits save within five seconds even during continuous typing.',
+        '首次编辑立即保存；持续输入期间，后续编辑也会在五秒内保存。'
       ),
-      covers: ['leading', 'trailing', 'signal', 'scheduler', 'maxWait']
+      covers: ['leading', 'trailing', 'maxWait', 'signal', 'scheduler']
     }
   ],
   throttle: [
     {
-      title: t('Deliver the latest value at the trailing edge', '在窗口末端交付最新值'),
+      title: t('Update a scroll indicator at a steady pace', '限制滚动指示器更新频率'),
       problem: t(
-        'Rapid UI updates need one final value instead of every intermediate value. An explicit trailing-only policy avoids an immediate leading call.',
-        '快速界面更新只需要最后一个值。明确关闭开头执行、启用末端执行，可避免第一次调用立即交付。'
+        'A scroll indicator needs the newest position without rendering every event. Trailing execution delivers the latest position at the end of each active window.',
+        '滚动指示器需要最新位置，却不必为每个事件渲染。末端执行在每个活动窗口结束时交付最新位置。'
       ),
       example: `import { throttle } from '@migaia/utils/scheduler'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const values: number[] = []
-const update = throttle((value: number) => { values.push(value) }, 10, {
-  leading: false, trailing: true, scheduler
+
+const update = throttle(renderScrollPosition, 100, {
+  leading: false,
+  trailing: true,
+  scheduler: scrollScheduler
 })
-update(1)
-update(2)
-scheduler.advance(10)
-console.log(values)
-update.cancel()`,
+onScrollPosition(update)
+onPageClosed(() => update.cancel())`,
       result: t(
-        'Only the latest value, 2, is delivered after ten milliseconds.',
-        '推进十毫秒后，只交付最新值 2，中间值不会执行。'
+        'The indicator uses the latest position from each 100 ms activity window.',
+        '指示器使用每个 100 毫秒活动窗口中的最新位置。'
       ),
       covers: ['leading', 'trailing', 'scheduler']
     },
     {
-      title: t('Deliver once and cancel the window', '立即交付一次并取消窗口'),
+      title: t('Stop queued saves when a document closes', '文档关闭后停止待执行保存'),
       problem: t(
-        'A continuous stream must remain cancellable when its view closes. Explicit edge policy controls immediate delivery; later calls after abort are ignored.',
-        '持续输入必须在视图关闭时可取消。明确的窗口两端策略控制是否立即交付，中止后的新调用也会被忽略。'
+        'A document saves immediately on the first edit and keeps the latest edit for the end of the window. Passing its signal cancels that pending save when the document closes.',
+        '文档首次编辑时立即保存，后续编辑在窗口末端交付最新值。传入文档信号，可在关闭时取消尚未执行的保存。'
       ),
       example: `import { throttle } from '@migaia/utils/scheduler'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const controller = new AbortController()
-const values: number[] = []
-const update = throttle((value: number) => { values.push(value) }, 10, {
-  leading: true, trailing: false, signal: controller.signal, scheduler
+
+const save = throttle(saveDocument, 1000, {
+  leading: true,
+  trailing: true,
+  signal: documentSignal,
+  scheduler: saveScheduler
 })
-update(1)
-update(2)
-controller.abort()
-update(3)
-scheduler.advance(30)
-console.log(values, update.pending())`,
+onDocumentChanged(save)`,
       result: t(
-        'Only the immediate value 1 is delivered; cancellation leaves no pending invocation.',
-        '只交付立即执行的值 1，取消后没有待执行调用。'
+        'The first edit saves immediately; closing the document drops a pending trailing save and ignores later calls.',
+        '首次编辑立即保存，文档关闭后取消待执行的末端保存，并忽略后续调用。'
       ),
       covers: ['leading', 'trailing', 'signal', 'scheduler']
     }
   ],
   repeat: [
     {
-      title: t('Run a bounded initial refresh', '执行有次数上限的初始刷新'),
+      title: t('Warm a status view with a bounded refresh', '有限次数刷新初始状态'),
       problem: t(
-        'A view wants its first refresh immediately and exactly two iterations. The defaults wait one interval and repeat without a count limit.',
-        '视图希望立即刷新，并且总共只运行两轮。默认先等待一个间隔，而且没有次数上限。'
+        'A status view needs an immediate refresh and one follow-up. Defaults wait before the first run and repeat without a count limit.',
+        '状态视图需要立即刷新，再跟进一次。默认先等待一个间隔，而且不限制执行次数。'
       ),
       example: `import { repeat } from '@migaia/utils/scheduler'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const controller = new AbortController()
-const seen: number[] = []
-const loop = repeat(({ iteration }) => { seen.push(iteration) }, 10, {
-  immediate: true, maxIterations: 2, onError: 'continue', signal: controller.signal, scheduler
+
+const refresh = repeat(refreshStatus, 1000, {
+  immediate: true,
+  maxIterations: 2,
+  onError: 'continue',
+  signal: pageSignal,
+  scheduler: refreshScheduler
 })
-scheduler.advance(0)
-scheduler.advance(10)
-await loop.done
-console.log(seen, loop.running)`,
+await refresh.done`,
       result: t(
-        'Iterations zero and one run, then done resolves and running becomes false.',
-        '轮次零和一执行后，done 完成，running 变为 false。'
+        'The view attempts two refreshes, starting immediately, then stops its refresh loop.',
+        '视图从立即刷新开始，尝试两轮后停止刷新循环。'
       ),
       covers: ['immediate', 'maxIterations', 'onError', 'signal', 'scheduler']
     },
     {
-      title: t('Stop polling on the first failure', '首次失败就停止轮询'),
+      title: t('Stop polling after a failed refresh', '刷新失败后停止轮询'),
       problem: t(
-        'A failed authentication refresh must stop further polling. Explicit stop mode rejects done with the original failure.',
-        '认证刷新失败后不应继续轮询。明确使用 stop 模式，done 会以原始失败拒绝。'
+        'An authenticated status view must stop polling after refresh fails. onError: stop rejects done so the page can show the failure.',
+        '需要认证的状态视图在刷新失败后应停止轮询。onError: stop 让 done 拒绝，页面可据此展示失败。'
       ),
       example: `import { repeat } from '@migaia/utils/scheduler'
-import { createManualScheduler } from '@migaia/utils/testing'
-const scheduler = createManualScheduler()
-const failure = new Error('refresh failed')
-const loop = repeat(() => { throw failure }, 10, { immediate: false, onError: 'stop', scheduler })
-const result = loop.done.catch((error: unknown) => error)
-scheduler.advance(10)
-console.log(await result === failure, loop.running)`,
+
+const refresh = repeat(refreshStatus, 5000, {
+  immediate: false,
+  onError: 'stop',
+  scheduler: refreshScheduler
+})
+try {
+  await refresh.done
+} catch (error) {
+  showRefreshError(error)
+}`,
       result: t(
-        'done rejects with the same failure and the loop is no longer running.',
-        'done 保留同一个原始失败，循环不再运行，也不会启动下一轮。'
+        'A failed refresh stops later polls and displays the original failure.',
+        '一次刷新失败后不再发起后续轮询，并展示原始失败。'
       ),
       covers: ['immediate', 'onError', 'scheduler']
     }
   ],
   timeSlice: [
     {
-      title: t('Share one budget across import transformations', '为导入转换共用时间片预算'),
+      title: t('Keep an import responsive', '分片导入以保持界面响应'),
       problem: t(
-        'A large import must give the host a chance between batches and show progress. Explicit strategy and clock make the slice boundaries reproducible.',
-        '大批导入需要在批次之间让出宿主，并展示进度。明确策略和时钟后，可直接观察每片处理了多少数据。'
+        'A large row import needs to update progress and give the host time between batches. A small budget and the application clock bound each slice.',
+        '大批数据行导入需要更新进度，并在批次之间给宿主执行机会。较小预算与应用时钟共同限制每个时间片。'
       ),
-      example: `import { timeSlice, timeSliceMap, timeSliceReduce } from '@migaia/utils/scheduler'
-let now = 0
-const progress: number[] = []
-const options = { budget: 2, strategy: ['timeout'] as const,
-  clock: { now: () => now }, onProgress: ({ processed }: { processed: number }) => { progress.push(processed) } }
-const report = await timeSlice([1, 2, 3], () => { now++ }, options)
-const mapped = await timeSliceMap([1, 2], (value) => { now++; return value * 2 }, options)
-const sum = await timeSliceReduce([1, 2], (total, value) => { now++; return total + value }, 0, options)
-console.log(report.processed, report.slices, mapped, sum, progress.at(-1))`,
+      example: `import { timeSlice } from '@migaia/utils/scheduler'
+
+await timeSlice(importRowsSource, importRow, {
+  budget: 8,
+  strategy: ['timeout'],
+  clock: { now: () => performance.now() },
+  onProgress: ({ processed }) => renderImportProgress(processed)
+})`,
       result: t(
-        'The first run handles three items in two slices; mapping gives [2, 4], reduction gives 3 and the final progress is 2.',
-        '首次处理三项并使用两个时间片；映射结果为 [2, 4]，归约结果为 3，最后进度为 2。'
+        'The import reports processed rows and yields between slices instead of occupying one long loop.',
+        '导入按已处理行数更新进度，并在时间片之间让出宿主，避免单次长循环。'
       ),
       covers: ['budget', 'strategy', 'clock', 'clock.now', 'onProgress']
     },
     {
-      title: t('Stop each transformation at the next item', '在下一项开始前停止转换'),
+      title: t('Cancel a derived import', '取消正在派生的数据导入'),
       problem: t(
-        'A cancelled import should not keep processing its remaining items. Each helper accepts the same signal boundary.',
-        '导入取消后不应继续处理剩余项。三个辅助函数共用同样的信号边界，会在下一项开始前停止。'
+        'A user may close the import panel while rows are being converted. Passing the panel signal stops processing at the next item boundary.',
+        '数据行转换期间，用户可能关闭导入面板。传入面板信号可在下一项开始前停止处理。'
       ),
-      example: `import { timeSlice, timeSliceMap, timeSliceReduce } from '@migaia/utils/scheduler'
-const controller = new AbortController()
-controller.abort('import cancelled')
-const options = { signal: controller.signal, strategy: 'timeout' as const }
-for (const task of [
-  () => timeSlice([1, 2], () => {}, options),
-  () => timeSliceMap([1, 2], (value) => value * 2, options),
-  () => timeSliceReduce([1, 2], (sum, value) => sum + value, 0, options)
-]) {
-  try { await task() } catch (error) { console.log(Reflect.get(error as object, 'code')) }
-}`,
+      example: `import { timeSliceMap } from '@migaia/utils/scheduler'
+
+const rows = await timeSliceMap(importRowsSource, convertImportRow, {
+  signal: importSignal,
+  strategy: 'timeout'
+})
+renderImportedRows(rows)`,
       result: t(
-        'All three helpers reject with ABORTED before processing an item.',
-        '三个函数均在处理数据前以 ABORTED 拒绝，不会产生部分转换结果。'
+        'Closing the panel cancels conversion before another item starts.',
+        '面板关闭后，不会再开始转换下一项。'
       ),
       covers: ['signal', 'strategy']
     }
   ],
   yield: [
     {
-      title: t('Yield while the import is still active', '导入仍有效时让出宿主'),
+      title: t('Keep a long import cancellable', '长导入让出宿主时仍支持取消'),
       problem: t(
-        'A long loop should yield without losing its owner cancellation. Supplying the active signal lets cancellation stop the pending yield.',
-        '长循环需要让出宿主，同时保留所有者的取消能力。传入有效信号后，等待期间仍可取消。'
+        'An import loop must leave time for host tasks between rows. The import signal also needs to cancel a pending yield.',
+        '导入循环需要在数据行之间给宿主任务执行机会。导入信号也需要能取消尚未完成的让出操作。'
       ),
       example: `import { yieldToHost } from '@migaia/utils/scheduler'
-const controller = new AbortController()
-await yieldToHost('timeout', { signal: controller.signal })
-console.log('resumed')`,
+
+for (const row of importRowsSource) {
+  await yieldToHost('timeout', { signal: importSignal })
+  importRow(row)
+}`,
       result: t(
-        'The timeout task completes and execution prints resumed.',
-        '让出到计时任务后继续执行，输出 resumed。'
+        'Host tasks can run between rows; cancellation prevents the next row from being imported.',
+        '宿主任务可在数据行之间执行；取消后不会继续导入下一行。'
       ),
       covers: ['signal']
     },
     {
-      title: t('Do not resume a cancelled loop', '取消后不再恢复循环'),
+      title: t('Stop a cancelled preview loop', '取消后停止预览循环'),
       problem: t(
-        'An owner may close before the next yield starts. Passing its aborted signal rejects instead of resuming the work.',
-        '所有者可能在下一次让出开始前关闭。传入已中止信号后会拒绝，不会继续恢复业务循环。'
+        'A preview owns a cancellation signal. Checking it at each yield prevents a closed preview from resuming its work.',
+        '预览持有自己的取消信号。每次让出时传入该信号，可阻止已关闭的预览恢复工作。'
       ),
       example: `import { yieldToHost } from '@migaia/utils/scheduler'
-const controller = new AbortController()
-controller.abort('closed')
-try { await yieldToHost('timeout', { signal: controller.signal }) }
-catch (error) { console.log(Reflect.get(error as object, 'code')) }`,
+
+try {
+  await yieldToHost('timeout', { signal: previewSignal })
+  renderPreviewFrame()
+} catch (error) {
+  handlePreviewCancellation(error)
+}`,
       result: t(
-        'The yield rejects with ABORTED.',
-        '让出操作以 ABORTED 拒绝，调用方可结束已取消的循环。'
+        'A cancelled yield enters the cancellation handler instead of rendering another frame.',
+        '让出期间取消会进入取消处理流程，不会再渲染一帧。'
       ),
       covers: ['signal']
     }
   ],
   format: [
     {
-      title: t('Use an existing template delimiter', '沿用已有模板分隔符'),
+      title: t('Preview an unfinished saved template', '预览尚未填写完整的模板'),
       problem: t(
-        'A saved template uses double brackets and keeps unfinished fields visible. Empty nullish values should not print implementation words.',
-        '已保存的模板使用双中括号，并希望保留未填写字段。空值则应显示为空，不应把 null 或 undefined 展示给用户。'
+        'Saved mail templates use double brackets. Missing fields should remain visible for editing, while present null values should appear blank.',
+        '保存的邮件模板使用双中括号。缺失字段需要保留供编辑识别，已存在的 null 则应显示为空白。'
       ),
       example: `import { format } from '@migaia/utils/string'
-console.log(format('[[name]] / [[note]] / [[missing]]', { name: 'Ada', note: null }, {
-  placeholder: { open: '[[', close: ']]' }, missing: 'preserve', nullish: 'empty'
-}))`,
+
+const preview = format('[[name]] / [[note]] / [[missing]]', {
+  name: 'Ada', note: null
+}, {
+  placeholder: { open: '[[', close: ']]' },
+  missing: 'preserve',
+  nullish: 'empty'
+})
+renderMailPreview(preview)`,
       result: t(
-        'The result is Ada /  / [[missing]]; the absent field stays visible.',
-        '结果为 Ada /  / [[missing]]，缺失字段仍保留原占位符。'
+        'The preview shows Ada /  / [[missing]], keeping the unfinished field visible.',
+        '预览显示 Ada /  / [[missing]]，未完成字段仍清晰可见。'
       ),
       covers: ['placeholder', 'missing', 'nullish']
     },
     {
-      title: t('Separate strict validation from an empty display', '区分严格校验与空白展示'),
+      title: t('Reject incomplete published messages', '拒绝发布缺字段的消息'),
       problem: t(
-        'A publish step must reject missing fields, while an optional preview may blank them. A diagnostic view can explicitly stringify a present null.',
-        '发布时必须拒绝缺字段，预览则可把缺字段留空。诊断视图需要观察实际空值时，可以明确显示 null。'
+        'A publish step must not send an unfinished message. missing: throw stops publication, while nullish: empty blanks optional fields that are present.',
+        '发布步骤不能发送未完成的消息。missing: throw 阻止缺字段发布；nullish: empty 将已存在的可选空值留空。'
       ),
       example: `import { format } from '@migaia/utils/string'
-console.log(format('{name}:{note}', { note: null }, { missing: 'empty', nullish: 'stringify' }))
-try { format('{name}', {}, { missing: 'throw' }) }
-catch (error) { console.log(Reflect.get(error as object, 'code')) }`,
+
+try {
+  const message = format('{name}: {note}', recipient, {
+    missing: 'throw',
+    nullish: 'empty'
+  })
+  await publishMessage(message)
+} catch (error) {
+  showTemplateError(error)
+}`,
       result: t(
-        'The preview prints :null; the strict call throws FORMAT_VALUE_MISSING.',
-        '预览输出 :null，严格调用抛出 FORMAT_VALUE_MISSING。'
+        'A missing recipient field shows a template error and prevents publishing.',
+        '收件人字段缺失时显示模板错误，不会发布消息。'
       ),
       covers: ['missing', 'nullish']
     }
