@@ -11,7 +11,9 @@
     "rust/Cargo.toml",
     "rust/Cargo.lock",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -22,7 +24,7 @@
     }
   },
   "scripts": {
-    "fmt": "oxfmt README.md USEGUIDE.md scripts test tsconfig.test.json",
+    "fmt": "oxfmt README.md README.en.md USEGUIDE.md USEGUIDE.en.md scripts test tsconfig.test.json",
     "lint": "cargo clippy --manifest-path rust/Cargo.toml --all-targets && oxlint scripts test",
     "build": "node ../../scripts/dist-stamp.mjs clean && cd rust && wasm-pack build --target web --release --out-dir ../src && cd .. && node scripts/finalize-glue.ts && node ../../scripts/dist-stamp.mjs write",
     "test:rust": "cd rust && cargo test",
