@@ -1,6 +1,6 @@
 {
   "name": "@migaia/wasm",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "files": [
     "src/wasm_provider.js",
