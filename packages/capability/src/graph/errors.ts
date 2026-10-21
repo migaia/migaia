@@ -7,8 +7,11 @@ export const CAPABILITY_GRAPH_SOURCE = '@migaia/capability/graph'
 
 /** Graph error shape exposed at the public boundary. */
 export type ICapabilityGraphError = Error & {
+  /** Stable graph package identity, separate from the capability Host source. */
   readonly source: typeof CAPABILITY_GRAPH_SOURCE
+  /** Public graph failure category; the original failure remains on this error or its cause chain. */
   readonly code: ICapabilityGraphErrorCode
+  /** Optional frozen diagnostic record, such as node IDs or a closed cycle path. */
   readonly detail?: Readonly<Record<string, unknown>>
 }
 

@@ -39,7 +39,12 @@ export {
 export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js'
 export { CAPABILITY_SOURCE } from './errors.js'
 
+/**
+ * Activated resource whose release is owned by the host, including results that arrive after
+ * cancellation.
+ */
 export type ICapabilityHandle = {
+  /** Releases this activation; the host captures this method once and waits for returned cleanup. */
   dispose(): void | PromiseLike<void>
 }
 
@@ -52,23 +57,36 @@ export type ICapabilityHandle = {
  */
 export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState]
 
+/** Settled activation outcome; ordinary activation failure is data rather than a rejected operation. */
 export type ICapabilityEnableResult =
+  /** A current handle is available through the host. */
   | { readonly status: typeof CapabilityEnableStatus.enabled }
+  /** The flag denies activation, including a pending activation revoked by that flag. */
   | { readonly status: typeof CapabilityEnableStatus.gated }
+  /** Disable, disposal, or a newer generation superseded this activation. */
   | { readonly status: typeof CapabilityEnableStatus.cancelled }
+  /** Activation or handle admission failed; error retains the original failure. */
   | { readonly status: typeof CapabilityEnableStatus.failed; readonly error: unknown }
 
+/**
+ * Named activation recipe captured at registration without starting or importing its
+ * implementation.
+ */
 export type ICapabilityDefinition<Context, Handle extends ICapabilityHandle = ICapabilityHandle> = {
+  /** Unique, nonblank registration name; spelling is retained rather than trimmed. */
   readonly name: string
   /**
    * Activates this capability.
    *
    * Async activation supports loading enhancements such as persistence on demand. Dynamic imports
-   * keep the disabled capability's chunk out of the initial bundle.
+   * keep the disabled capability's chunk out of the initial bundle. Receives the host's original
+   * context reference and must return a handle with a callable dispose method. A rejected start or
+   * invalid handle becomes a failed enable result; a late valid handle is released, not adopted.
    */
   activate(context: Context): Handle | Promise<Handle>
 }
 
+/** Initial allowlist and optional diagnostic sink, read once when the host is created. */
 export type ICapabilityHostOptions = {
   /**
    * Initial flag snapshot. The gate denies activation by default. Only own data properties whose
@@ -81,54 +99,66 @@ export type ICapabilityHostOptions = {
    */
   readonly flags?: Readonly<Record<string, boolean>>
   /**
-   * Reports activation or release failures. Reporter failures preserve gate state and `error(name)`
-   * diagnostics.
+   * Reports activation or release failures; omitted by default. Reporter failures preserve gate
+   * state and error(name) diagnostics and reach the shared terminal reporting channel.
    */
   readonly onError?: (name: string, error: unknown) => void
 }
 
+/** Independent flag and resource owner; read-only diagnostics remain available after disposal. */
 export type ICapabilityHost<Context> = {
-  /** Registers a capability. Duplicate names are programming errors. */
+  /**
+   * Captures a name and activation function without activating. Duplicate names, malformed recipes,
+   * disposed hosts, and synchronous lifecycle reentry fail with the corresponding host code.
+   */
   register<Handle extends ICapabilityHandle>(
     definition: ICapabilityDefinition<Context, Handle>
   ): void
+  /** Fresh registration-order name array; it is a snapshot, not the mutable registry. */
   readonly names: readonly string[]
+  /** Reads current lifecycle state; an unknown name throws NOT_REGISTERED, even after disposal. */
   state(name: string): ICapabilityState
-  /** Returns the enabled capability's handle, or `undefined` when it is not enabled. */
+  /** Returns the enabled handle or undefined; unknown names throw NOT_REGISTERED. */
   handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined
   /**
-   * Returns the last activation or release failure. Successful restart or reconfiguration clears
-   * it.
+   * Returns the retained activation or release failure, or undefined. Starting a new attempt or
+   * deactivating clears the prior diagnostic; unknown names throw NOT_REGISTERED.
    */
   error(name: string): unknown
   /**
    * Updates one flag. Disabling synchronously invalidates pending activation and releases the
-   * handle. Enabling does not activate.
+   * handle. Enabling does not activate. A name may be configured before it is registered; the
+   * setter does not wait for asynchronous cleanup.
    */
   setFlag(name: string, enabled: boolean): void
   /**
    * Atomically replaces all flags. Missing capabilities are denied, so removed keys cannot retain
-   * an earlier `true` value.
+   * an earlier true value. An unreadable snapshot gates every entry before INVALID_OPTION is
+   * thrown. Accessor flags are not evaluated, and this setter does not await cleanup.
    */
   setFlags(flags: Readonly<Record<string, boolean>>): void
   /**
    * Activates the capability and returns its structured activation outcome.
    *
-   * Concurrent calls share one activation, so `activate` runs once. A false flag returns `{ status:
-   * 'gated' }` without activating the capability.
+   * Concurrent in-flight calls share the exact Promise and one activation. A denied flag resolves
+   * gated without activation; an already enabled entry resolves enabled. Activation failures
+   * resolve failed, while unknown names, disposed hosts, and transition reentry reject.
    */
   enable(name: string): Promise<ICapabilityEnableResult>
   /**
-   * Disables the capability and releases its handle. Returns whether an enabled capability was
-   * disabled.
+   * Synchronously invalidates activation and releases the current handle, then waits for this
+   * entry's in-flight activation and cleanup, including late results. Resolves true only if the
+   * entry was on; pending activation cancellation returns false. Cleanup failures are reported.
    */
   disable(name: string): Promise<boolean>
   /**
-   * Disables all capabilities in LIFO order and makes the host unusable. The first call returns the
-   * sole completion Promise. Later calls fail immediately with `HOST_TRANSITIONING` until that
-   * Promise settles. After completion, repeated calls return the original Promise by identity.
+   * Makes the host terminal and releases handles in reverse activation-completion order, then waits
+   * for every in-flight activation and release. Cleanup failures are reported without stopping
+   * other releases. Later calls fail with HOST_TRANSITIONING until the first completion Promise
+   * settles; after completion they return that original Promise by identity.
    */
   dispose(): Promise<void>
+  /** Becomes true synchronously when final disposal begins, before pending cleanup settles. */
   readonly disposed: boolean
 }
 
@@ -152,6 +182,12 @@ type IEntry<Context> = {
   readonly generationController: IGenerationController
 }
 
+/**
+ * Creates an isolated, runtime-neutral capability gate for the supplied context reference. Options
+ * default to an empty record, with every capability denied until explicitly allowed. Registration
+ * does not activate; use enable, disable, and final dispose to own resources. Invalid options or
+ * failed option reads throw INVALID_OPTION before a host is returned.
+ */
 export function createCapabilityHost<Context>(
   context: Context,
   options: ICapabilityHostOptions = {}
