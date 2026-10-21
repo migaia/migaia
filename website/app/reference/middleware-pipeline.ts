@@ -28,44 +28,35 @@ const pipelineScenarios = [
 /** End-to-end example of a pipeline instance. */
 const pipelineExample = middlewarePipelineCases.createPipeline[2].example
 
-/** Async stages can wrap downstream work before and after the awaited next call. */
+/** Async middleware keeps the saving indicator visible until downstream completes. */
 const pipelineModeExample = `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
-const order: string[] = []
-await pipeline.run([async (value, next) => {
-  order.push('before')
-  await next(value + 1)
-  order.push('after')
-}], 1, (value) => { order.push(String(value)) })
-console.log(order)`
+const pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })
+await pipeline.run([async (documentId, next) => {
+  showSavingIndicator()
+  try {
+    await next(documentId)
+  } finally {
+    hideSavingIndicator()
+  }
+}], documentId, async (id) => {
+  await saveDocument(id)
+})`
 
-/** Host closure and cancellation stop work at the runner's public boundaries. */
+/** Editor lifetime stops later publish steps and reaches cancellable application I/O. */
 const pipelineLifecycleExample = `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-let closing = false
-const controller = new AbortController()
-const pipeline = createPipeline<number>({
-  mode: MiddlewarePipelineMode.sync,
-  signal: controller.signal,
-  assertActive: () => {
-    if (closing) throw new Error('host closed')
-  }
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.async,
+  signal: editor.signal,
+  assertActive: () => editor.assertActive()
 })
-pipeline.run([(value, next) => { next(value + 1) }], 1, (value) => { console.log(value) })
-closing = true
-try {
-  pipeline.run([], 1, (value) => { console.log(value) })
-} catch (error) {
-  console.log((error as Error).message)
-}
-closing = false
-controller.abort(new Error('request cancelled'))
-try {
-  pipeline.run([], 1, (value) => { console.log(value) })
-} catch (error) {
-  console.log((error as Error).message)
-}`
+await pipeline.run([async (documentId, next, context) => {
+  await uploadAttachments(documentId, context?.signal)
+  await next(documentId)
+}], documentId, async (id) => {
+  await publishDocument(id)
+})`
 
 /** Reference of `@migaia/middleware-pipeline`. */
 export const middlewarePipelineReference: ILibraryReference = {
@@ -266,26 +257,26 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
         {
           title: t('Wrap an asynchronous operation', '包裹一次异步操作'),
           problem: t(
-            'A request logger must run after the request finishes. Sync mode starts downstream only after the stage returns. Async mode lets the stage await next(), then finish its own work.',
-            '请求日志需要在请求完成后记录。同步模式会等步骤返回后才开始下游。异步模式允许步骤等待 next()，再完成自己的工作。'
+            'A document editor must keep its saving indicator visible until the save finishes. In sync mode, downstream starts only after the stage returns. Async mode lets the outer stage await `next()` and hide the indicator after the save settles.',
+            '文档编辑器需要在保存期间一直显示提示。同步模式会等步骤返回后才开始下游。异步模式允许外层步骤等待 `next()`，保存结束后再隐藏提示。'
           ),
           example: pipelineModeExample,
           result: t(
-            "The order is ['before', '2', 'after']; the outer stage finishes after done().",
-            "输出顺序为 ['before', '2', 'after']；外层步骤在 done() 之后结束。"
+            'The saving indicator stays visible while `saveDocument()` runs and is hidden when it settles.',
+            '`saveDocument()` 执行期间显示保存提示，结束后再隐藏。'
           ),
           covers: ['mode']
         },
         {
           title: t('Stop work when the host closes', '宿主关闭时停止执行'),
           problem: t(
-            'A reusable runner does not know when its host closes or a request is cancelled. assertActive rejects work after closure, and signal gives every run a shared cancellation source. Without either, the runner continues normally.',
-            '可复用执行器不知道宿主何时关闭，也不知道请求是否取消。assertActive 在关闭后拒绝执行，signal 为每次运行提供共同的取消来源。不设置这两项时，执行器继续正常运行。'
+            'An editor can close while attachments upload. Without lifecycle options, the runner may continue to the publish step. `signal` reaches the cancellable upload, and `assertActive` asks the editor to reject work after closure before a later stage starts.',
+            '附件上传时，编辑器可能已经关闭。不设置生命周期选项，执行器仍可能继续发布。`signal` 传给支持取消的上传函数，`assertActive` 让编辑器在关闭后拒绝工作，阻止后续步骤开始。'
           ),
           example: pipelineLifecycleExample,
           result: t(
-            'The first run prints 2. Later runs print host closed and request cancelled instead of calling done().',
-            '第一次输出 2；后两次分别输出 host closed 和 request cancelled，不调用 done()。'
+            'Closing the editor cancels cooperative uploads and stops the pipeline from starting a later publish step.',
+            '关闭编辑器后，配合信号的上传会取消，执行器不会再启动后续发布步骤。'
           ),
           covers: ['signal', 'assertActive']
         }
@@ -316,14 +307,13 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
           ),
           example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({
-  mode: MiddlewarePipelineMode.sync,
-  onViolation: (kind) => { console.log(kind) }
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.async,
+  onViolation: (kind) => reportToMonitoring('document-stage-next', { kind })
 })
-pipeline.run([(value, next) => {
-  next(value + 1)
-  next(value + 2)
-}], 1, console.log)`
+await pipeline.run(editorStages, documentId, async (id) => {
+  await saveDocument(id)
+})`
         },
         assertActive: {
           summary: t(
@@ -357,12 +347,20 @@ pipeline.run([(value, next) => {
             '`MiddlewarePipelineGeneratorSignals`，即导出的三个 `GENERATOR_*` symbol。'
           ),
           example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-const signals = { undefined: Symbol('undefined'), halt: Symbol('halt'), continue: Symbol('continue') }
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator, signals })
-const increment = pipeline.lift((value, next) => { next(value + 1) }, MiddlewarePipelineMode.sync)
-const halt = pipeline.lift(() => {}, MiddlewarePipelineMode.sync)
-pipeline.run([increment], 1, (value) => { console.log(value) })
-pipeline.run([halt], 1, () => { console.log('not reached') })`
+
+const signals = {
+  undefined: Symbol('empty-result'),
+  halt: Symbol('skip-import'),
+  continue: Symbol('continue-import')
+}
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.generator,
+  signals
+})
+pipeline.run([function* (text) {
+  if (!text.trim()) return signals.halt
+  return text.trim()
+}], uploadedText, importDocument)`
         },
         combineStageAndDownstreamError: {
           summary: t(
@@ -379,21 +377,21 @@ pipeline.run([halt], 1, () => { console.log('not reached') })`
           ),
           example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const stageError = new Error('logging failed')
-const requestError = new Error('request failed')
-const pipeline = createPipeline<number>({
+const pipeline = createPipeline<string>({
   mode: MiddlewarePipelineMode.async,
   combineStageAndDownstreamError: (stage, downstream) =>
-    new AggregateError([stage, downstream], 'request and logging failed')
+    new AggregateError([stage, downstream], 'Publishing and upload cleanup failed')
 })
 try {
-  await pipeline.run([async (value, next) => {
-    await next(value).catch(() => {})
-    throw stageError
-  }], 1, () => { throw requestError })
+  await pipeline.run([async (id, next) => {
+    try {
+      await next(id)
+    } finally {
+      await closeUploadSession(id)
+    }
+  }], documentId, publishDocument)
 } catch (error) {
-  const combined = error as AggregateError
-  console.log(combined.message, combined.errors[0] === stageError, combined.errors[1] === requestError)
+  reportToMonitoring(error)
 }`
         }
       }
