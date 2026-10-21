@@ -2,14 +2,22 @@ import { EventSubscriberErrorCode } from './error-code.js'
 import { createEventTypeError, eventErrorText } from './errors.js'
 import { isRecord } from './internal/record.js'
 
-/** Stable preset names shared by Channel and Hub style projections. */
+/**
+ * Naming presets for Channel and Hub. Aliases reference canonical methods without adding another
+ * dispatcher; omit style or select subscribe-publish to keep only the default surface.
+ */
 export const EventApiStyle = {
+  /** Default subscribe/publish/unsubscribe names, with no extra alias properties. */
   subscribePublish: 'subscribe-publish',
+  /** Adds on/emit on the event source and on/off on its subscription handles. */
   onEmit: 'on-emit',
+  /** Adds on/trigger on the event source and on/off on its subscription handles. */
   onTrigger: 'on-trigger',
+  /** Adds listen/fire on the event source and listen/unlisten on its handles. */
   listenFire: 'listen-fire'
 } as const
 
+/** Supported built-in naming preset values; runtime constants and type share the same name. */
 export type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle]
 
 type IEventApiReservedName =
@@ -56,22 +64,32 @@ const eventApiReservedNames = new Set<IEventApiReservedName>([
   'constructor'
 ])
 
+/**
+ * Custom names for the same subscribe/publish/unsubscribe operations. Names must be nonempty,
+ * distinct, and cannot shadow other canonical operations or prototype keys. Invalid names throw
+ * INVALID_OPTIONS during construction. Preserve literal names for precise alias type inference.
+ */
 export type IEventApiStyleNames<
   TSubscribe extends string = string,
   TPublish extends string = string,
   TUnsubscribe extends string = string
 > = {
+  /** Required subscription alias on the event source and on every chain handle. */
   readonly subscribe: TSubscribe
+  /** Required publication alias on the event source. */
   readonly publish: TPublish
+  /** Handle cancellation alias; defaults to the canonical unsubscribe name when omitted. */
   readonly unsubscribe?: TUnsubscribe
 }
 
+/** Built-in naming preset or custom operation names; neither changes event dispatch semantics. */
 export type IEventApiStyle = EventApiStyle | IEventApiStyleNames
 
 type IEventApiForbiddenSubscribeName = Exclude<IEventApiReservedName, 'subscribe'>
 type IEventApiForbiddenPublishName = Exclude<IEventApiReservedName, 'publish'>
 type IEventApiForbiddenUnsubscribeName = Exclude<IEventApiReservedName, 'unsubscribe'>
 
+/** Rejects known invalid literal styles while retaining runtime validation for wider string names. */
 export type IEventApiStyleOption<S extends IEventApiStyle | undefined> = S extends undefined
   ? undefined
   : S extends EventApiStyle
@@ -99,6 +117,10 @@ export type IEventApiStyleOption<S extends IEventApiStyle | undefined> = S exten
             : never
       : never
 
+/**
+ * Resolves literal style names for type projections; wider custom strings cannot produce precise
+ * aliases.
+ */
 export type IEventApiStyleMethodNames<S extends IEventApiStyle | undefined> =
   S extends EventApiStyle
     ? (typeof eventApiStyleNames)[S]

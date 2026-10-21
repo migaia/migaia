@@ -10,7 +10,9 @@
     "dist/*.d.ts",
     "dist/*.d.ts.map",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -27,7 +29,7 @@
     }
   },
   "scripts": {
-    "fmt": "oxfmt src test",
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md",
     "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",

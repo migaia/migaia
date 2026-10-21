@@ -1,674 +1,427 @@
 # `@migaia/event-subscriber` 使用指南
 
-本指南逐个模块覆盖公开运行时 API、直接配置所需的关键类型、边界行为与错误码。只服务于泛型推导的 type-only 投影类型以发布的 `.d.ts` 和编辑器提示为准；包的定位、适用/不适用场景与安装方式见 [README](./README.md)。
+[English](./USEGUIDE.en.md)
 
-## 目录
+先按场景查找，再读完整契约。安装包后，每个运行示例都能单独保存为 `.ts` 文件，用 Node 24 直接运行；代码与对应网站场景一致。包的选用依据见 [README](./README.md)。
 
-- [Channel 模块](#channel-模块)：`createEventChannel`、`IEventChannel`、`IEventContext`、API style
-- [订阅 Helper 模块](#helper-模块)：`subscribeOnce`、`subscribeUntil`、`subscribeSubscriber`
-- [异步调用模块](#async-模块)：`invokeParallel`/`invokeParallelSettled`、`invokeSerial`/`invokeSerialSettled`、`invokeTask`/`invokeTaskSettled`
-- [Hub 模块](#hub-模块)：`createEventHub`
-- [订阅句柄](#订阅句柄)：`IEventChannelSubscription`、`IEventHubSubscription`
-- [错误码](#错误码)：`EventSubscriberErrorCode`（19 个码）逐条语义
-- [诊断消息](#诊断消息)：内部稳定文本与公开使用边界
-- [状态常量](#状态常量)：`EventSubscriberState`
-- [高阶组合示例](#高阶组合示例)
-- [排查与构建门禁](#排查与构建门禁)
+## 按场景查找
 
----
+| 你遇到的问题                   | API                     | 看这一节                                    |
+| ------------------------------ | ----------------------- | ------------------------------------------- |
+| 让嵌套通知等当前这一轮交付完成 | `createEventChannel`    | [完整示例](#让嵌套通知等当前这一轮交付完成) |
+| 修改订阅时不打乱当前交付       | `createEventChannel`    | [完整示例](#修改订阅时不打乱当前交付)       |
+| 离开页面时一起退订多个事件     | `createEventHub`        | [完整示例](#离开页面时一起退订多个事件)     |
+| 页面取消后不再接收更新         | `subscribeUntil`        | [完整示例](#页面取消后不再接收更新)         |
+| 一个监听者失败时仍保留其他结果 | `invokeParallelSettled` | [完整示例](#一个监听者失败时仍保留其他结果) |
+| 前一个处理者结束后再运行下一个 | `invokeSerial`          | [完整示例](#前一个处理者结束后再运行下一个) |
+| 执行前拒绝重复登记的命令目标   | `invokeTask`            | [完整示例](#执行前拒绝重复登记的命令目标)   |
 
-<a id="channel-模块"></a>
+## 让嵌套通知等当前这一轮交付完成
 
-## Channel 模块
+处理更新的监听者又发布一次更新，其余监听者还没有收到第一条。手写递归回调会让页面先看到新事件，又被旧事件覆盖。排队交付（`queued`）策略先完成当前这一轮的登记快照，再交付嵌套的值；两轮都在同一次同步 `publish` 调用内完成。
 
-```ts
-import {
-  createEventChannel,
-  type ICanonicalEventChannel,
-  type IEventChannel,
-  type IEventChannelLike,
-  type IEventChannelOptions,
-  type IEventContext,
-  type IEventListener,
-  type IFilteredEventChannel,
-  type IUnsubscribe
-} from '@migaia/event-subscriber'
-```
+```ts doc-test=run
+import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 
-提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。
-
-### `createEventChannel`
-
-```ts
-import type { IEventChannelOptions, IEventApiStyleNames, IEventApiStyle } from '@migaia/event-subscriber'
-
-// 默认 style 的调用形状；自定义 style 泛型用法见下节。
-function createEventChannel<T, R = void, const V = undefined>(
-  options?: IEventChannelOptions<T, undefined, V>
-): ICanonicalEventChannel<T, R, undefined, V>
-
-// 使用公开 IEventChannelOptions<T, S, V>，不要复制内部准入条件类型。
-// dispatchPolicy/admissionPolicy/removalPolicy 分别是 IEventDispatchPolicy、
-// IEventAdmissionPolicy、IEventRemovalPolicy；style/valueConfig 由 S/V 精确约束。
-
-// IEventReport<T, V>、IEventApiStyleNames 和 IEventApiStyle 均使用包的公开声明。
-```
-
-创建一个事件 channel（O(1) 链表存储登记）：
-
-```ts
-const channel = createEventChannel<{ readonly text: string }>()
-const unsubscribe = channel.subscribe((event) => console.log(event.value.text))
-channel.publish({ text: 'ready' })
-unsubscribe()
-```
-
-类型参数：`T`（payload 类型）、`R`（listener 结果类型，默认 `void`）。`options.report`：处理 `publish()` 之后**迟到**的 Promise/thenable rejection（同步 listener 失败不走这里，会在 `publish()` 遍历完成后聚合抛出）；`options.terminalReport`：`report` 缺失、抛错，或其返回的 thenable reject 时的兜底诊断出口；`report`/`terminalReport` 提供但不是函数抛 `INVALID_REPORTER`；`options` 本身不是普通对象（`null`/数组/非对象）抛 `INVALID_OPTIONS`。若 `report`/`terminalReport`（包括其返回的 Promise）都失败或缺失，最终会尝试 `runtime.reportError`（如全局 `reportError` 钩子）→ `console.error` → 通过 queueMicrotask 排入微任务重新抛出；没有该能力时同步抛出，逐级降级，绝不静默吞掉。
-
-`dispatchPolicy` 默认是 `EventDispatchPolicy.recursive`，保持 canonical channel 的同步 nested publish trace。需要当前 snapshot 完成后再交付重入值的消费者必须显式传入 `EventDispatchPolicy.queued`；该 opt-in 不改变其他消费者的默认行为。
-
-`admissionPolicy` 默认是 `EventAdmissionPolicy.multiple`。显式传 `EventAdmissionPolicy.unique` 后，同一个 listener 函数在这个 channel 内只占一份 registration；重复订阅返回的 handle 解除现有那一份。多个 handle 解除同一份时只有首次生效；`clear()` 或退订后重新订阅产生新一代，旧 handle 不会误删它。重复订阅的 `taskId` 必须与现有项相同（包括两者均未提供），否则在修改状态前抛带 `INVALID_OPTIONS` 的 `TypeError`。Hub 和 `subscribeOnce` 等以 wrapper 注册的 helper 不按原始 listener 函数去重；同步 listener throw 仍由 `publish()` 聚合为 `PUBLISH_FAILED`。
-
-`publishBudget` 默认 `100_000`，必须是正安全整数。它限制一次顶层同步发布事务内实际调用的 listener 总数（包括 nested publish 展开的调用）；预算耗尽时停止继续展开，并以 `PUBLISH_FAILED` 抛出且在 `error.detail` 中记录已处理数量，避免递归或重入发布无限占用线程。
-
-`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。
-
-`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。
-
-`valueConfig` 在 channel 构造时固定读取路径与可选 alias，把 payload 中的稳定路径投影到每次 listener 收到的 event context；它不保存、转换或重放 payload。需要按路径读取并保留完整原始 `event.value` 时使用，配置与失败语义见[静态 value path alias](#6-静态-value-path-alias)。
-
-`ICanonicalEventChannel<T, R>` 上的成员：
-
-```ts
-type IEventChannel<T, R = void> = {
-  subscribe(
-    listener: IEventListener<T, R>,
-    options?: { readonly taskId?: string }
-  ): IEventChannelSubscription<T, R>
-  publish(value: T): void
-  filterTaskId(taskId: string): IFilteredEventChannel<T, R>
-  clear(): void
-  readonly size: number
-}
-```
-
-- `subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的[订阅句柄](#订阅句柄)（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。缺省 `multiple` 下相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）；显式 `unique` 的行为见上。
-- channel 本身没有 `subscribeOnce`/`subscribeUntil` 方法；一次性或带 signal 的订阅用下方 [Helper 模块](#helper-模块)的同名独立函数，第一个参数传 channel。
-- `publish(value)` —— 按注册顺序（快照）同步调用全部 listener，**不等待**返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener **同步抛出**的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable **迟到 reject**（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。
-- `filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给[异步发布](#async-模块) helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。
-- `clear()` —— 清空全部 registration，**不**执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。
-- `size: number`（只读）—— 当前 active registration 数量。
-
-### API style
-
-style 是构造阶段的一次性命名投影。四个 preset 映射如下：
-
-`EventApiStyle` 导出这四个稳定 preset 值；配置、持久化或跨模块比较时优先引用 `EventApiStyle.onTrigger` 等常量成员，不要散写字符串。直接在对象字面量中传字符串仍受同一校验。
-
-| preset              | subscribe alias | publish alias | cancellation alias |
-| ------------------- | --------------- | ------------- | ------------------ |
-| `subscribe-publish` | `subscribe`     | `publish`     | `unsubscribe`      |
-| `on-emit`           | `on`            | `emit`        | `off`              |
-| `on-trigger`        | `on`            | `trigger`     | `off`              |
-| `listen-fire`       | `listen`        | `fire`        | `unlisten`         |
-
-自定义对象的方向固定为 `{ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' }`，其中 `unsubscribe` 可省略并回退为 canonical `unsubscribe`。Channel 泛型顺序是 `<T, R, S>`，Hub 是 `<C, S>`；显式提供 payload/event map 后，custom style 必须显式提供对应的 `S`，不会依赖 partial generic inference。预声明对象推荐 `as const satisfies IEventApiStyleNames`，也可以使用 TypeScript 的 `as const`；widened 为普通 `string` 的对象不会产生任意字符串 index signature，因此不能据此声称存在精确 alias。
-
-```ts
-import { createEventChannel, type IEventApiStyleNames } from '@migaia/event-subscriber'
-
-const events = createEventChannel<number>({ style: 'on-trigger' })
-const off = events.on((event) => console.log(event.value))
-events.trigger(1)
-off.off()
-
-const style = {
-  subscribe: 'observe',
-  publish: 'dispatch',
-  unsubscribe: 'dispose'
-} as const satisfies IEventApiStyleNames
-const custom = createEventChannel<number, void, typeof style>({ style })
-const customHandle = custom.observe((event) => console.log(event.value))
-custom.dispatch(1)
-customHandle.dispose()
-```
-
-第一段中，`on()` 创建一条独立 registration，返回值 `off` 只控制这次订阅；`trigger(1)` 同步把 `1` 交给当前监听器；`off.off()` 后再次发布不会再调用它。第二段只是把这三个动作改名为 `observe()`、`dispatch()`、`dispose()`。preset 和自定义 style 都不改变交付顺序、错误处理或资源所有权，也不会增加 queue、drain、backpressure 或跨进程传输能力。
-
-例如，`createEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } })` 会被 TypeScript 拒绝；请写成 `createEventChannel<number, void, typeof style>({ style })`，或直接在第三个泛型中给出 custom style。Hub 同理使用第二个泛型。
-
-canonical `subscribe`、`publish`、helpers、subscription handle、`unsubscribe`、`clear` 和 `size` 永远保留。handle 的 subscribe alias 返回同一 handle，cancellation alias 与 handle 自身同一引用；所有 alias 都是不可枚举、不可写、不可配置 own data property。它不会改变 listener 顺序、重入、错误、taskId 或生命周期。非法 style（空名、重复名、跨语义/保留名、非字符串或未知 preset）在构造时抛 `INVALID_OPTIONS`，getter 抛出的原始对象保留在 `cause`。
-
-### `IEventContext<T>`
-
-```ts
-type IEventContext<T> = {
-  readonly value: T
-  readonly aborted: boolean
-  readonly abortReason: unknown
-  readonly taskId: string | undefined
-  abort(reason?: unknown): void
-  setTaskId(taskId: string | undefined): void
-}
-```
-
-每次调用 listener 时传入的活对象：`value` 是本次发布的 payload；`aborted`/`abortReason` 是该 registration 的活状态；`abort(reason?)` 撤销当前 registration 并令其退订（幂等，对已非活跃的 registration 调用是空操作）；`setTaskId(taskId)` 修改该 registration 的 task 标签，**只影响之后的快照**（当前正在进行的这次 `publish()` 已经取好的快照不受影响）。
-
----
-
-<a id="helper-模块"></a>
-
-## 订阅 Helper 模块
-
-```ts
-import {
-  subscribeOnce,
-  subscribeUntil,
-  subscribeSubscriber,
-  type IEventSubscriber
-} from '@migaia/event-subscriber/subscriber'
-```
-
-这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身**不读取 style 配置**：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled 链式 handle 时，使用 channel.subscribe()；独立 helper 统一返回 canonical IUnsubscribe。
-
-### `subscribeOnce`
-
-```ts
-function subscribeOnce<T, R>(
-  channel: IEventChannelLike<T, R>,
-  listener: IEventListener<T, R>,
-  options?: { readonly taskId?: string }
-): IUnsubscribe
-```
-
-只执行一次，调用 listener **之前**先退订：
-
-```ts
-subscribeOnce(channel, (event) => console.log('only once', event.value))
-```
-
-`channel`、`listener` 均必填；`options.taskId` 可选。因为退订发生在调用 listener 之前，listener 内的同步重入、`throw`、返回 rejected Promise 都不会导致第二次执行。若传入的 `channel` 不满足结构契约（无 `subscribe` 方法、或 `subscribe()` 同步交付了一个不返回函数的取消句柄）抛 `INVALID_CHANNEL`；返回值 `IUnsubscribe` 可重复调用，幂等。
-
-### `subscribeUntil`
-
-```ts
-function subscribeUntil<T, R>(
-  channel: IEventChannelLike<T, R>,
-  signal: IAbortSignal,
-  listener: IEventListener<T, R>,
-  options?: { readonly taskId?: string }
-): IUnsubscribe
-
-type IAbortSignal = {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-}
-```
-
-`signal` 中止时自动退订：
-
-```ts
-const controller = new AbortController()
-subscribeUntil(channel, controller.signal, (event) => consume(event.value))
-controller.abort('owner closed')
-```
-
-`channel`、`signal`、`listener` 均必填；`options.taskId` 可选。`signal` 结构上兼容标准 `AbortSignal`（原生 `AbortSignal` 可直接传入）。已 `aborted` 的 signal 在默认 `throwOnAborted: false` 时返回 no-op unsubscribe，不创建 registration；canonical channel 设置 `throwOnAborted: true` 时同步抛 `ABORTED` TypeError。`abort()` 只撤销 registration，**不会中断已经开始执行**的 listener。`signal` 不满足结构契约（缺 `addEventListener`/`removeEventListener`，或 `aborted` 不是布尔值）抛 `INVALID_SIGNAL`；`listener` 非函数抛 `INVALID_LISTENER`。返回的 `IUnsubscribe` 可重复调用，幂等。
-
-### `subscribeSubscriber`
-
-```ts
-function subscribeSubscriber<T, R>(
-  channel: IEventChannelLike<T, R>,
-  subscriber: IEventSubscriber<T, R>
-): IUnsubscribe
-
-type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }
-```
-
-用对象而非函数订阅，保留 `this`：
-
-```ts
-import { createEventChannel } from '@migaia/event-subscriber'
-import { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'
-
-class Counter implements IEventSubscriber<number> {
-  total = 0
-  handle(event: { readonly value: number }) {
-    this.total += event.value
-  }
-}
-const channel = createEventChannel<number>()
-subscribeSubscriber(channel, new Counter())
-```
-
-`channel`、`subscriber` 均必填，`subscriber` 必须是携带可调用 `handle` 方法的对象。`subscriber` 非对象或缺少可调用 `handle` 抛 `INVALID_SUBSCRIBER`。返回 `IUnsubscribe`。
-
-旧草案曾提供 `abstract class EventSubscriber`，要求子类声明静态 `EVENT_NAME`，并实现 `onCall()`。当前版本已经明确移除该设计：它会让 payload 同时受 class 的 `EVENT_NAME` 与容器 key 两套信息约束，而 TypeScript 也不能强制子类实现 abstract static 字段。
-
-因此当前的 `IEventSubscriber` 只要求一个 `handle(event)` 方法；`Counter` 不声明 `EVENT_NAME`（也不是 `EVENTNAME`）。`subscribeSubscriber(channel, subscriber)` 通过 `channel` 确定事件来源。需要在同一个容器中按名字路由多种事件时，使用 `createEventHub<{ count: number }>()`，并调用 `hub.subscribe('count', listener)`：名称属于 Hub 的订阅 key，不属于 subscriber class。
-
----
-
-<a id="async-模块"></a>
-
-## 异步发布模块
-
-```ts
-import {
-  invokeParallel,
-  invokeParallelSettled,
-  invokeSerial,
-  invokeSerialSettled,
-  invokeTask,
-  invokeTaskSettled,
-  withSnapshotEntries,
-  type IListenerResult
-} from '@migaia/event-subscriber'
-```
-
-均只接受由 `createEventChannel()` 产出的 canonical channel 或其 `filterTaskId()` view（内部通过 `WeakMap` 校验运行时身份）——伪造对象或另一份物理包副本创建的 channel 会得到 `INVALID_CHANNEL`。
-
-```ts
-type IListenerResult<R> =
-  | { readonly status: 'fulfilled'; readonly value: Awaited<R> }
-  | { readonly status: 'rejected'; readonly reason: unknown }
-```
-
-### `withSnapshotEntries`
-
-高级集成入口：读取一次不可变 listener 快照并把 `IEventInvocation[]` 交给 visitor。每个 invocation 的 `invoke()` 最多调用一次；visitor 同步返回或返回的 Promise settle 后，所有 invocation 都会关闭，再次调用抛 `INVOCATION_CLOSED`。visitor 抛出或 reject 时以 `VISITOR_FAILED` 标识；可附码的原生错误保留实例/stack，冲突或不可变错误以 cause 保留原值，同时仍会关闭全部 invocation。普通并行、串行或按 task 调用应优先使用下方 `invoke*` helper。
-
-### `invokeEachLive`
-
-更底层的同步遍历入口：在本次访问期间新追加的订阅者也可被当前访问看到，每个注册最多访问一次；visitor 必须同步完成。即使 visitor 抛错，内部遍历状态也会释放，错误以 `VISITOR_FAILED` 标识；可附码的原生实例保持身份，冲突或不可变错误通过 cause 保留。该 API 只适合需要 append-live 语义的框架集成；普通发布必须优先使用快照型 `invoke*` helper，避免一次发布的目标集合随回调副作用变化。
-
-### `invokeParallelSettled` / `invokeParallel`
-
-```ts
-function invokeParallelSettled<T, R>(
-  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
-  value: T
-): Promise<readonly IListenerResult<R>[]>
-function invokeParallel<T, R>(
-  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
-  value: T
-): Promise<readonly Awaited<R>[]>
-```
-
-`invokeParallelSettled`：全部 listener **立即启动**，等待全部 settle，从不 reject：
-
-```ts
-const results = await invokeParallelSettled(channel, payload)
-// [{ status: 'fulfilled', value }, { status: 'rejected', reason }, ...]
-```
-
-结果按注册顺序排列，不按完成时间排序。`invokeParallel` 语义相同，但任一失败时整体以携带 `PUBLISH_FAILED` 码的 `AggregateError` reject（仍会等待全部目标执行完，不会提前放弃未完成的 listener）。目标快照在任何异步等待开始**之前**同步取好，保证与其它 helper 一致的"选择先于执行"语义。
-
-### `invokeSerialSettled` / `invokeSerial`
-
-```ts
-function invokeSerialSettled<T, R>(
-  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
-  value: T
-): Promise<readonly IListenerResult<R>[]>
-function invokeSerial<T, R>(
-  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
-  value: T
-): Promise<readonly Awaited<R>[]>
-```
-
-`invokeSerialSettled`：前一个 listener settle 后才启动下一个：
-
-```ts
-const results = await invokeSerialSettled(channel, payload)
-```
-
-注意：**不是 waterfall**——每个 listener 收到的都是同一个 `payload`，前一个的返回值不会传给下一个；需要值变换见 `@migaia/middleware-pipeline`。`invokeSerial` 是它的 throwing 版本，语义与 `invokeParallel` 对 `invokeParallelSettled` 的关系相同。
-
-### `invokeTaskSettled` / `invokeTask`
-
-```ts
-function invokeTaskSettled<T, R>(
-  channel: ICanonicalEventChannel<T, R>,
-  taskId: string,
-  value: T
-): Promise<IListenerResult<R>>
-function invokeTask<T, R>(
-  channel: ICanonicalEventChannel<T, R>,
-  taskId: string,
-  value: T
-): Promise<Awaited<R>>
-```
-
-精确选择唯一一个 `taskId` 并等待其结算，不调用 `report`：
-
-```ts
-import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'
-
-type IEmailJob = { readonly recipient: string; readonly template: 'welcome' }
-type IEmailReceipt = { readonly messageId: string }
-
-const tasks = createEventChannel<IEmailJob, IEmailReceipt>()
-tasks.subscribe(
-  async ({ value: job }) => {
-    const response = await fetch('/api/email', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(job)
-    })
-    return response.json() as Promise<IEmailReceipt>
-  },
-  { taskId: 'email' }
-)
-
-const job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }
-const result = await invokeTaskSettled(tasks, 'email', job)
-// result 是 { status: 'fulfilled', value: { messageId } }
-// 或 { status: 'rejected', reason }
-```
-
-`tasks` 是这个示例自己创建的 canonical event channel，不是库内置变量。`tasks.subscribe(..., { taskId: 'email' })` 把唯一标识绑在这条 registration 上；`invokeTaskSettled(tasks, 'email', job)` 用相同标识选择它，并把 `job` 作为 `event.value` 传入。这样调用者既能检查成功返回的 `messageId`，也能在 `rejected` 分支读取原始失败原因。
-
-入口快照匹配数为 0 时**同步**抛 `TASK_NOT_FOUND`；匹配数大于 1 时**同步**抛 `TASK_NOT_UNIQUE`（错误对象携带可枚举的 `taskId`/`matchCount` 字段）；选择动作发生在任何 listener 调用之前。`invokeTask` 是 throwing 版本：listener 失败时以携带 `PUBLISH_FAILED` 码的 `AggregateError`（内含单个原始失败）reject。
-
----
-
-<a id="hub-模块"></a>
-
-## Hub 模块
-
-```ts
-import {
-  createEventHub,
-  type IEventHub,
-  type IEventHubOptions,
-  type IEventMap,
-  type IEventHubReport
-} from '@migaia/event-subscriber'
-```
-
-### `createEventHub`
-
-```ts
-import type { IEventHubOptions, IEventHubReport } from '@migaia/event-subscriber'
-
-// 默认 style；自定义 style 的 S 使用下一节描述的显式泛型。
-function createEventHub<C extends IEventMap, const V = undefined>(
-  options?: IEventHubOptions<C, undefined, V>
-): IEventHub<C, undefined, V>
-
-// 完整选项类型为 IEventHubOptions<C, S, V>。report 使用 IEventHubReport<C, V>，
-// 按 key 关联 payload/context；style/valueConfig 分别由 S/V 约束。
-```
-
-多事件类型的按 key 懒创建路由（每个 key 首次被 `subscribe()` 时才内部创建一个 canonical channel；未订阅 key 的 `publish()` 为 no-op）：
-
-```ts
-type IEvents = { ready: { readonly at: number }; warning: { readonly message: string } }
-const hub = createEventHub<IEvents>()
-const stop = hub.subscribe('warning', (event) => console.warn(event.value.message))
-hub.publish('warning', { message: 'cache is stale' })
-```
-
-`options.report`：失败对象额外携带 `key`（标识来自哪个事件类型）；`options.terminalReport`：同 Channel 模块的兜底诊断出口。校验规则与 `createEventChannel` 一致（`INVALID_OPTIONS`/`INVALID_REPORTER`）。
-
-`IEventHub<C>` 上的方法：
-
-```ts
-type IEventHub<C extends IEventMap> = {
-  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>
-  publish<K extends keyof C>(key: K, value: C[K]): void
-  clear(key?: keyof C): void
-  size(key?: keyof C): number
-}
-```
-
-`createEventHub<IEvents>({ style: 'on-emit' })` 同样提供 `hub.on` 与 `hub.emit`。它们分别与 `hub.subscribe`、`hub.publish` 同引用；key/payload 推导、lazy channel、registration accounting、stale unsubscribe 和 clear 语义仍由 canonical Hub owner 执行。自定义 Hub style 的泛型形状与 Channel 相同。
-
-- `subscribe(key, listener)` —— `key` 必须是 `string`/`number`/`symbol`（否则抛 `INVALID_EVENT_KEY`），`listener` 必须是函数（否则抛 `INVALID_LISTENER`）。返回值同样是可链式扩展的[订阅句柄](#订阅句柄)。**Hub listener 返回类型固定为 `void`/`PromiseLike<void>`，不做 async 结果聚合**；需要结果时应为该事件单独用 `createEventChannel<T, R>()` 创建带 `R` 的 channel。
-- `publish(key, value)` —— 该 `key` 尚未创建过 channel（从未被订阅过）时是 no-op，不会报错。
-- `clear(key?)` —— 传 `key` 只清该 key 下的全部 registration（并移除该 key 对应的空 channel）；不传清空全部 key。
-- `size(key?)` —— 传 `key` 返回该 key 当前的 registration 数（未创建过返回 `0`）；不传返回全部 key 的 registration 总数（内部 O(1) 维护的计数器，不遍历）。
-
----
-
-<a id="订阅句柄"></a>
-
-## 订阅句柄
-
-```ts
-import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber'
-```
-
-`channel.subscribe()`/`hub.subscribe()` 返回的都是一个**可直接调用**的函数，同时携带链式扩展能力：
-
-```ts
-const channelHandle = channel.subscribe(onReady)
-channelHandle.subscribe(onWarning, { taskId: 'audit' })
-channelHandle.unsubscribe() // same function identity; releases whole chain
-
-const styledHandle = styledChannel.on(onReady).on(onWarning)
-styledHandle.on === styledHandle.subscribe // true
-styledHandle.off === styledHandle.unsubscribe // true
-styledHandle.off() // releases the whole styled chain
-
-const hubHandle = hub.subscribe('ready', onReady)
-// 有限字面量 key map 在同一条链上禁止重复 key；要用同一个 key 订阅两次，另起一个新的 hub.subscribe()
-hubHandle.subscribe('warning', onWarning)
-
-const maybeKey: keyof IEvents = getRuntimeKey()
-const dynamicHandle = hub.subscribe(maybeKey, onReady)
-dynamicHandle.subscribe(maybeKey, onReady) // key 类型被拓宽为运行时值：允许同 key fan-out，编译期不做重复声明检查
-
-const owned = channel.subscribe(onReady)
-try {
-  owned.subscribe(getPossiblyInvalidListener())
-} catch {
-  owned.unsubscribe() // 链式扩展不是事务性的：扩展失败，之前已经注册成功的那一条仍然有效、仍归 owned 所有
-}
-```
-
-`IEventChannelSubscription<T, R>`/`IEventHubSubscription<C, UsedKeys>` 是公开的 channel/hub 句柄形态。有限字面量 map 的同一 chain 会在类型层排除已用 key；`Record<string, Payload>` 等宽 key 无法静态区分运行时字符串，因此同 key 继续合法并保持 fan-out。
-
-For hub chains, finite literal maps reject a repeated key on this chain; a widened key: runtime fan-out remains valid. Chain extension is non-transactional; earlier registration stays owned by the handle if a later extension fails.
-
-行为要点：
-
-- 调用 handle 本身（或其 `.unsubscribe`）会按**逆序**释放整条链上通过 `.subscribe()` 追加的全部订阅，然后释放最初那一个；整个链条只会真正执行一次（幂等，二次调用是空操作）。
-- 链已关闭（已调用过 `unsubscribe`）后再调用 `.subscribe()` 追加新订阅，抛 `SUBSCRIPTION_CLOSED`。
-- `handle.unsubscribe` 是只读属性（`writable: false, configurable: false`），值就是 `handle` 自身，可读性别名而非另一个函数。
-- styled handle 的 subscribe alias（如 `.on`/`.observe`）与 `.subscribe` 同引用；cancellation alias（如 `.off`/`.dispose`/`.unlisten`）与 handle 自身同引用，均为不可枚举、不可写、不可配置属性。
-
-```ts
-const handle = channel.subscribe(onReady).subscribe(onWarning, { taskId: 'audit' })
-handle() // 或 handle.unsubscribe()：逆序退订 onWarning、再退订 onReady
-handle.subscribe(onOther) // 抛 SUBSCRIPTION_CLOSED，链已关闭
-```
-
----
-
-<a id="错误码"></a>
-
-## 错误码
-
-```ts
-import {
-  EventSubscriberErrorCode,
-  EVENT_SUBSCRIBER_SOURCE,
-  type IEventSubscriberErrorCode
-} from '@migaia/event-subscriber'
-```
-
-稳定错误码表，**19 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；有原始失败时，聚合 errors/cause 保留它；仅预算耗尽时 errors 可以为空。
-
-| `EventSubscriberErrorCode` 键        | 码值                                    | 触发条件                                                                                                                                                 |
-| ------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invalidListener`                    | `INVALID_LISTENER`                      | 传入的 listener 不是函数                                                                                                                                 |
-| `invalidReporter`                    | `INVALID_REPORTER`                      | `report`/`terminalReport` 提供了但不是函数                                                                                                               |
-| `invalidChannel`                     | `INVALID_CHANNEL`                       | Helper 收到结构非法或非 canonical 的 channel（缺 `subscribe`，或异步发布 helper 收到非 `createEventChannel()` 产出的对象）                               |
-| `invalidSignal`                      | `INVALID_SIGNAL`                        | `subscribeUntil` 的 `signal` 结构非法，或其 abort 回调/清理过程本身失败                                                                                  |
-| `invalidSubscriber`                  | `INVALID_SUBSCRIBER`                    | `subscribeSubscriber` 收到的对象缺少可调用的 `handle()`                                                                                                  |
-| `invalidEventKey`                    | `INVALID_EVENT_KEY`                     | Hub 的 `key` 不是 `string`/`number`/`symbol`                                                                                                             |
-| `taskNotFound`                       | `TASK_NOT_FOUND`                        | `invokeTask`/`invokeTaskSettled` 按 `taskId` 精确选择时匹配到 0 个 registration                                                                          |
-| `taskNotUnique`                      | `TASK_NOT_UNIQUE`                       | 同上，匹配到多于 1 个 registration（错误携带 `taskId`/`matchCount`）                                                                                     |
-| `invalidTaskId`                      | `INVALID_TASK_ID`                       | 传入的 `taskId` 为空或不是字符串                                                                                                                         |
-| `invalidOptions`                     | `INVALID_OPTIONS`                       | 公开 options 对象或字段结构非法                                                                                                                          |
-| `aborted`                            | `ABORTED`                               | 设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`                                                                 |
-| `publishFailed`                      | `PUBLISH_FAILED`                        | listener 失败或预算耗尽仍有目标未交付（`publish()`/`invokeParallel`/`invokeSerial`/`invokeTask` 的抛出通道）                                  |
-| `visitorFailed` | `VISITOR_FAILED` | snapshot/live visitor 同步抛错或 snapshot visitor 异步拒绝；可附码 native 保留身份，否则 cause 保留原值 |
-| `valueProjectionFailed`              | `VALUE_PROJECTION_FAILED`               | listener 的 value alias 路径缺失、被阻断或 getter 抛错                                                                                                   |
-| `unhandledListenerFailure`           | `UNHANDLED_LISTENER_FAILURE`            | fire-and-forget 的迟到 listener 失败在 `report` 处理失败或缺失后，到达终端诊断通道                                                                       |
-| `subscriptionClosed`                 | `SUBSCRIPTION_CLOSED`                   | 订阅句柄链已关闭后又调用其 `.subscribe()` 追加新订阅                                                                                                     |
-| `subscriptionHandleProjectionFailed` | `SUBSCRIPTION_HANDLE_PROJECTION_FAILED` | handle alias descriptor projection fails after registration; the first registration is rolled back and the original projection failure remains reachable |
-| `invocationClosed`                   | `INVOCATION_CLOSED`                     | 已完成或已调用过的捕获 invocation 被再次调用                                                                                                             |
-| `subscriptionDisposeFailed`          | `SUBSCRIPTION_DISPOSE_FAILED`           | 关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误                                                                       |
-
-调用方应始终以 `error.code === EventSubscriberErrorCode.xxx` 判别，不要硬编码码值字符串。
-
----
-
-<a id="诊断消息"></a>
-
-## 诊断消息
-
-`EventSubscriberErrorText` 是包内维护错误文案的唯一来源，但**不是公开导出**，业务代码不能从 `@migaia/event-subscriber` 导入它。生产代码应按上方公开的 `error.source` 与 `error.code` 分支；测试若要锁定面向用户的文案，可以直接断言实际抛出错误的 `message`，不要依赖内部源码路径。
-
-内部文本与 19 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`visitorFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`、`subscriptionDisposeFailed`。
-
----
-
-<a id="状态常量"></a>
-
-## 状态常量
-
-```ts
-import { EventSubscriberState } from '@migaia/event-subscriber'
-```
-
-协议常量，无调用参数：
-
-```ts
-EventSubscriberState.abort // 'abort' —— IAbortSignal 的事件类型
-EventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值
-EventSubscriberState.rejected // 'rejected'
-```
-
----
-
-<a id="高阶组合示例"></a>
-
-## 高阶组合示例
-
-### 1. 按 `taskId` 定向到唯一订阅者并等待结果
-
-```ts
-import { createEventChannel, invokeTask } from '@migaia/event-subscriber'
-
-const jobs = createEventChannel<string, string>()
-jobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' })
-jobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' })
-
-const emailResult = await invokeTask(jobs, 'email', 'created')
-```
-
-### 2. 并行结算 + 集中上报未处理的迟到失败
-
-```ts
-import { createEventChannel, invokeParallelSettled } from '@migaia/event-subscriber'
-
-const checks = createEventChannel<string, boolean>({
-  terminalReport: (diagnostic) => emergencySink.capture(diagnostic)
+const updates = createEventChannel<number>({ dispatchPolicy: EventDispatchPolicy.queued })
+updates.subscribe(({ value }) => {
+  console.log('记录:', value)
+  if (value === 1) updates.publish(2)
 })
-checks.subscribe(async (event) => event.value.length > 0)
-checks.subscribe(async (event) => event.value.startsWith('usr_'))
-
-const results = await invokeParallelSettled(checks, 'usr_42')
+updates.subscribe(({ value }) => {
+  console.log('展示:', value)
+})
+updates.publish(1)
+updates.clear()
 ```
 
-### 3. `subscribeUntil` + `AbortController` 管理订阅生命周期
+输出：
 
-```ts
+```text
+记录: 1
+展示: 1
+记录: 2
+展示: 2
+```
+
+依次输出 `记录: 1`、`展示: 1`、`记录: 2`、`展示: 2`。嵌套事件没有插入当前这一轮。默认策略是 `recursive`，排队交付需要显式选择 `queued`。
+
+## 修改订阅时不打乱当前交付
+
+交付事件时，一个监听者移除另一条订阅，又登记新的监听者。直接遍历可变回调数组容易漏掉原有接收者，或让新订阅意外收到当前事件。`publish` 先取得一份登记快照：增删作用于后续发布，当前快照仍按登记顺序执行。
+
+```ts doc-test=run
+import { createEventChannel } from '@migaia/event-subscriber'
+
+const updates = createEventChannel<number>()
+const calls: string[] = []
+let stopSecond = () => {}
+updates.subscribe(({ value }) => {
+  calls.push(`首位 ${value}`)
+  if (value === 1) {
+    stopSecond()
+    updates.subscribe(({ value }) => {
+      calls.push(`新增 ${value}`)
+    })
+  }
+})
+stopSecond = updates.subscribe(({ value }) => {
+  calls.push(`次位 ${value}`)
+})
+updates.publish(1)
+updates.publish(2)
+console.log(calls.join(' | '))
+updates.clear()
+```
+
+输出：
+
+```text
+首位 1 | 次位 1 | 首位 2 | 新增 2
+```
+
+输出 `首位 1 | 次位 1 | 首位 2 | 新增 2`。退订没有让次位监听者漏掉第一轮；新登记从第二次发布才开始收到事件。
+
+## 离开页面时一起退订多个事件
+
+页面同时监听保存和关闭事件，清理时漏掉一个事件名，旧页面就会继续收到更新。带事件映射类型的 hub 为不同事件保留各自的参数类型；把页面的登记串在同一条订阅链上，一个句柄就能按相反顺序全部退订。
+
+```ts doc-test=run
+import { createEventHub } from '@migaia/event-subscriber'
+
+type IAppEvents = { saved: { id: string }; closed: string }
+const events = createEventHub<IAppEvents>()
+const page = events
+  .subscribe('saved', ({ value }) => {
+    console.log('已保存:', value.id)
+  })
+  .subscribe('closed', ({ value }) => {
+    console.log('已关闭:', value)
+  })
+events.publish('saved', { id: 'order-1' })
+events.publish('closed', '详情页')
+page()
+events.publish('saved', { id: 'order-2' })
+console.log('剩余订阅:', events.size())
+```
+
+输出：
+
+```text
+已保存: order-1
+已关闭: 详情页
+剩余订阅: 0
+```
+
+依次输出 `已保存: order-1`、`已关闭: 详情页`、`剩余订阅: 0`。页面清理后的发布没有输出；一个句柄移除了整条链上的登记。
+
+## 页面取消后不再接收更新
+
+组件用一个 `AbortController` 管理操作，离开页面时却漏掉了事件订阅。手写取消监听既要退订事件，也要清理取消监听本身。`subscribeUntil` 把登记绑定到信号，同时返回可重复调用的手动退订函数，供提前清理。
+
+```ts doc-test=run
 import { createEventChannel } from '@migaia/event-subscriber'
 import { subscribeUntil } from '@migaia/event-subscriber/subscriber'
 
-const controller = new AbortController()
-const channel = createEventChannel<number>()
-subscribeUntil(channel, controller.signal, (event) => consume(event.value))
-// 组件卸载 / 请求结束时统一中止
-controller.abort('scope closed')
-```
-
-### 4. 用 Hub 统一路由多种事件并集中上报
-
-```ts
-import { createEventHub } from '@migaia/event-subscriber'
-
-type IAppEvents = { ready: { readonly at: number }; warning: { readonly message: string } }
-
-const events = createEventHub<IAppEvents>({
-  report: ({ key, event, error }) => monitoring.capture(error, { key, payload: event.value })
+const updates = createEventChannel<string>()
+const page = new AbortController()
+const stop = subscribeUntil(updates, page.signal, ({ value }) => {
+  console.log('展示:', value)
 })
-
-events.subscribe('warning', (event) => console.warn(event.value.message))
-events.publish('warning', { message: 'cache is stale' })
+updates.publish('已保存')
+page.abort()
+updates.publish('不会显示')
+stop()
+console.log('剩余订阅:', updates.size)
 ```
 
-### 5. 对象订阅者 + 串行结算，保证副作用按序执行
+输出：
 
-```ts
+```text
+展示: 已保存
+剩余订阅: 0
+```
+
+输出 `展示: 已保存`，然后是 `剩余订阅: 0`。取消移除了后续交付；之后再调用 `stop` 没有副作用。已经执行中的监听者不会被打断；传入已取消的信号时，默认不建立登记。
+
+## 一个监听者失败时仍保留其他结果
+
+导出操作同时向多个处理者索取结果。只处理一个整体拒绝时，成功返回的数据容易被一起丢掉。`invokeParallelSettled` 立即启动快照里的监听者，按登记顺序保留每个成功值或原始失败原因；传入非法 `channel` 的准入错误仍会同步抛出。
+
+```ts doc-test=run
+import {
+  createEventChannel,
+  invokeParallelSettled,
+  EventSubscriberState
+} from '@migaia/event-subscriber'
+
+const checks = createEventChannel<number, number>()
+checks.subscribe(async ({ value }) => {
+  await Promise.resolve()
+  return value * 2
+})
+checks.subscribe(() => {
+  throw new Error('远端暂不可用')
+})
+const results = await invokeParallelSettled(checks, 3)
+for (const result of results) {
+  if (result.status === EventSubscriberState.fulfilled) console.log('成功:', result.value)
+  else console.log('失败:', (result.reason as Error).message)
+}
+checks.clear()
+```
+
+输出：
+
+```text
+成功: 6
+失败: 远端暂不可用
+```
+
+输出 `成功: 6`，然后是 `失败: 远端暂不可用`。第二个监听者先失败，但结果数组仍按登记顺序排列，成功值没有丢失。
+
+## 前一个处理者结束后再运行下一个
+
+前一个异步写入尚未完成，通知就开始发送了，因为 `publish` 不等待监听者返回的 `Promise`。`invokeSerial` 等一个快照监听者结束后才启动下一个；它们都收到同一个输入，不会接收前一个的返回值。示例用日志模拟写入和通知。
+
+```ts doc-test=run
 import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'
-import { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'
 
-const pipeline = createEventChannel<string, void>()
-subscribeSubscriber(pipeline, {
-  handle: async (event) => writeAuditLog(event.value)
+const steps = createEventChannel<string, string>()
+steps.subscribe(async ({ value }) => {
+  console.log('写入:', value)
+  await Promise.resolve()
+  console.log('写入完成')
+  return '已写入'
 })
-subscribeSubscriber(pipeline, {
-  handle: async (event) => notifyDownstream(event.value)
+steps.subscribe(({ value }) => {
+  console.log('通知:', value)
+  return '已通知'
 })
-
-await invokeSerial(pipeline, 'order-created')
+console.log('结果:', (await invokeSerial(steps, 'order-1')).join(','))
+steps.clear()
 ```
 
-### 6. 静态 value path alias
+输出：
 
-`createEventChannel` 的第四泛型 `V`、`createEventHub` 的第三泛型 `V` 表示静态 `valueConfig`。调用方应使用 `as const` 或显式 `V` 保留 literal path 与 alias；alias 没有 `resource` 等保留名称，只需避开 context 成员和危险 prototype key。
-
-```ts
-type IEvent = { readonly data: { readonly id: number } }
-const valueConfig = { readPath: 'data.id', alias: 'resource' } as const
-const channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })
-channel.subscribe((event) => {
-  event.value // 原始 published value
-  event.resource // number | undefined
-  event.abort() // 原有 context controls 保留
-})
+```text
+写入: order-1
+写入完成
+通知: order-1
+结果: 已写入,已通知
 ```
 
-每次 publish/invoke 对 active path 只 probe 一次，所有目标 context 都取得同一 projected identity；alias 是 enumerable、non-writable、non-configurable own data property。空字符串或 trim 后为空的 `readPath` 静默禁用 projection，不读取 alias、不 parse、不 probe、不 report。missing、blocked 和 getter failure 会进入既有 report/terminal 链并携带 `VALUE_PROJECTION_FAILED`；listener 仍调用且 alias 为 `undefined`，但存在的 `undefined` leaf 是成功。函数 selector、transform、operator、fallback 与 lazy per-listener projection 不属于本版契约。
+依次输出 `写入: order-1`、`写入完成`、`通知: order-1`、`结果: 已写入,已通知`。这只控制顺序，不是事务：某个监听者失败不会跳过后续监听者，全部执行后才汇总失败。
 
----
+## 执行前拒绝重复登记的命令目标
 
-<a id="排查与构建门禁"></a>
+命令本来只应调用一个保存处理者，重复挂载却登记了两次，导致重复写入。`invokeTask` 在执行任何监听者之前按 `taskId` 选择唯一登记：名称不存在时同步抛 `TASK_NOT_FOUND`，重复匹配时同步抛 `TASK_NOT_UNIQUE`，此次不会调用任何处理者，其他任务名也不会被执行。
 
-## 排查与构建门禁
+```ts doc-test=run
+import { createEventChannel, invokeTask, type IEventContext } from '@migaia/event-subscriber'
 
-- **`publish()`/`invokeParallel`/`invokeSerial`/`invokeTask` 抛 `PUBLISH_FAILED`**：一个或多个 listener 失败；展开 `error.errors` 逐条处理原始失败原因，`error.cause` 恒为其中第一个。
-- **迟到的 Promise rejection 没有触发 `PUBLISH_FAILED`**：符合预期——`publish()` 只同步收集 listener 的同步抛出；listener 返回的 thenable 在 `publish()` 返回之后才 reject 属于"迟到失败"，走 `options.report`/`terminalReport` 通道，不会让 `publish()` 反过来变成异步的。
-- **`invokeTask`/`invokeTaskSettled` 抛 `TASK_NOT_FOUND`/`TASK_NOT_UNIQUE`**：目标 `taskId` 在选择那一刻没有恰好一个匹配的 registration；检查该 `taskId` 是否已退订，或是否有多个 listener 意外使用了同一个 `taskId`。
-- **`subscribeOnce`/`subscribeUntil`/`subscribeSubscriber` 抛 `INVALID_CHANNEL`**：传入的 channel 不满足结构契约，或异步发布 helper 收到了非 `createEventChannel()` 产出（或跨包物理副本）的对象；确认使用同一份包实例创建的 channel。
-- **订阅句柄 `.subscribe()` 抛 `SUBSCRIPTION_CLOSED`**：该链已经调用过 `unsubscribe()`；关闭后的链不可再扩展，需要新建订阅。
-- **需要保存当前值、replay、跨 Worker/网络传输**：`@migaia/event-subscriber` 刻意不提供，应分别参考 `@migaia/reactive`（响应式状态）、`@migaia/middleware-pipeline`（waterfall/`next()`/短路）、`@migaia/lifecycle`/`@migaia/resource`（资源生命周期宿主）、`@migaia/rpc-core`（跨进程传输）。
+const tasks = createEventChannel<number, number>()
+let calls = 0
+const save = ({ value }: IEventContext<number>) => {
+  calls += 1
+  return value + 1
+}
+tasks.subscribe(save, { taskId: 'save' })
+tasks.subscribe(({ value }) => value * 10, { taskId: 'preview' })
+console.log('保存结果:', await invokeTask(tasks, 'save', 2))
+tasks.subscribe(save, { taskId: 'save' })
+try {
+  await invokeTask(tasks, 'save', 2)
+} catch (error) {
+  console.log('重复目标:', (error as Error & { code?: string }).code)
+}
+console.log('保存调用次数:', calls)
+tasks.clear()
+```
+
+输出：
+
+```text
+保存结果: 3
+重复目标: TASK_NOT_UNIQUE
+保存调用次数: 1
+```
+
+依次输出 `保存结果: 3`、`重复目标: TASK_NOT_UNIQUE`、`保存调用次数: 1`。第二次选择不唯一时没有再次保存。被选中的监听者失败时，以 `PUBLISH_FAILED` 拒绝并保留原始错误。
+
+## 公开入口与边界
+
+根入口 `@migaia/event-subscriber` 提供 channel、Hub、调用工具、常量与公开类型。子入口 `@migaia/event-subscriber/subscriber` 提供 `subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` 和对应订阅类型。运行时只依赖 `@migaia/utils`，不依赖 DOM 或 Node；包标记为 `sideEffects: false`。
+
+channel（事件通道）只分发当前发布的事件，不保存当前值，也不重放历史。registration（订阅登记）是一次订阅及其取消句柄。snapshot（快照）是一次发布开始时固定的目标列表。需要当前值或派生依赖时使用 `@migaia/reactive`；需要前一步结果传给下一步的中间件时使用 `@migaia/middleware-pipeline`；资源释放、队列和背压由 `@migaia/lifecycle` 或 `@migaia/resource` 负责；跨 Worker、窗口或网络的消息由 `@migaia/rpc-core` 负责。
+
+## 创建 channel 与完整参数
+
+`createEventChannel<T, R, S, V>(options?)` 创建一个通道。`T` 是发布值类型，`R` 是监听器结果类型，默认 `void`；`S` 是命名风格，`V` 是静态值路径配置，两者默认 `undefined`。公开选项类型为 `IEventChannelOptions<T, S, V>`。只服务于类型推导的投影类型，以发布的声明和编辑器提示为准。
+
+| 选项              | 默认值                                | 含义和所有取值                                                                                                                                                                        |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `report`          | `undefined`                           | 接收 `{ event, error }`。主要处理同步 `publish()` 返回后的监听器拒绝，也接收值路径诊断；可以同步返回或返回 Promise。缺省时进入终端诊断。同步监听器抛错由 `publish()` 聚合，不交给它。 |
+| `terminalReport`  | `undefined`                           | 接收诊断错误；`report` 缺失、抛错或异步拒绝时使用。可以同步返回或返回 Promise，失败会继续交给宿主诊断。                                                                               |
+| `dispatchPolicy`  | `'recursive'`                         | `'recursive'` 立即递归交付监听器内部的新发布；`'queued'` 等当前快照全部调用后再交付重入值。对应常量为 `EventDispatchPolicy.recursive`、`queued`。                                     |
+| `admissionPolicy` | `'multiple'`                          | `'multiple'` 每次订阅创建独立登记；`'unique'` 按同一监听器函数的身份只保留一份登记。对应 `EventAdmissionPolicy.multiple`、`unique`。                                                  |
+| `removalPolicy`   | `'handle'`                            | `'handle'` 只解除当前句柄拥有的登记；`'listener-all'` 解除同一监听器函数在该通道上的全部登记。对应 `EventRemovalPolicy.handle`、`listenerAll`。                                       |
+| `publishBudget`   | `100_000`                             | 一次顶层同步发布及其嵌套发布最多调用多少个监听器，必须是正安全整数。耗尽后停止展开，抛 `PUBLISH_FAILED`；`error.detail` 记录已处理数和剩余预算。                                      |
+| `throwOnAborted`  | `false`                               | `false` 时，`subscribeUntil` 使用已取消信号不会登记，返回空操作取消函数；`true` 时同步抛 `ABORTED` 的 `TypeError`。                                                                   |
+| `style`           | `undefined`，即 `'subscribe-publish'` | 仅给已有操作增加方法别名。四个预设与自定义字段见下文，不改变派发或取消语义。                                                                                                          |
+| `valueConfig`     | `undefined`                           | 未配置时不增加值别名。配置固定的 `readPath`、`alias` 字段，规则见“静态值路径”。                                                                                                       |
+
+`options` 必须是对象，不能为 `null` 或数组；非法选项为 `INVALID_OPTIONS`。`report` 或 `terminalReport` 提供后必须可调用，否则为 `INVALID_REPORTER`。读取选项的 getter 抛错时，原始失败保留在错误链上。
+
+### 通道方法与事件上下文
+
+| 成员                            | 调用后的结果                                                                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subscribe(listener, options?)` | 按登记顺序添加监听器，返回可调用、可链式扩展的句柄。`listener(event)` 接收下面的上下文，返回 `R` 或 PromiseLike。监听器必须是函数。                                    |
+| `subscribe.options.taskId`      | 默认 `undefined`，不设置任务标签。提供时必须是非空字符串；该值由订阅调用者命名，用于之后的任务选择。                                                                   |
+| `publish(value)`                | 同步按入口快照调用目标，不等待 Promise，也不返回监听器结果。快照内的监听器即使中途被退订或 `clear()`，仍收到本轮；新订阅留到之后的快照。                               |
+| `filterTaskId(taskId)`          | `taskId` 为订阅时设置的非空标签。返回只读选择视图 `IFilteredEventChannel`，交给并行、串行或 visitor 工具；视图没有订阅或发布方法，之后每次调用都会重新选择当前匹配项。 |
+| `clear()`                       | 删除全部活动登记，不执行监听器内部的用户清理函数；默认 `removalPolicy: 'handle'` 下，旧取消句柄不会移除之后的新登记。                                                  |
+| `size`                          | 只读的当前活动登记数。空通道发布无操作，异步多目标调用得到空数组。                                                                                                     |
+
+`unique` 模式下，重复订阅同一个监听器会得到控制同一代登记的句柄；只有首次取消生效。重复订阅的 `taskId` 必须与已有值相同，包括两次都省略，否则修改状态前抛 `INVALID_OPTIONS`。`clear()` 或退订后重新订阅会创建新一代；`unique` 的句柄绑定原登记代，所以旧句柄不会取消新登记。Hub 和包装监听器的独立 helper 不按原始监听器身份去重。缺省 `multiple` 与 `removalPolicy: 'handle'` 组合下，每次登记可以分别取消。
+
+不要把这种隔离套用于 `admissionPolicy: 'multiple'` 与 `removalPolicy: 'listener-all'` 的组合：尚未调用的旧句柄会按监听器函数身份移除当前全部匹配登记。即使先 `clear()`、再用同一个函数创建新登记，该旧句柄仍会移除它们。需要旧句柄与新登记隔离时，保留默认的 `handle` 移除策略；`unique` 则另有上述登记代绑定保证。
+
+| `IEventContext<T>` 成员  | 含义                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| `value`                  | 本次发布的原始值，保持对象身份。                                                   |
+| `aborted`、`abortReason` | 所属登记的实时取消状态与原因；进行中的回调也能读到更新。                           |
+| `taskId`                 | 发布入口快照中的任务标签，不随当前轮的改标签操作变化。                             |
+| `abort(reason?)`         | 取消当前登记，原因默认 `undefined`。幂等；已经非活动时无操作，不中断已开始的回调。 |
+| `setTaskId(taskId)`      | 接收非空字符串或 `undefined`；后者清除标签。只影响之后的快照，登记非活动时无操作。 |
+
+### 命名风格与订阅链
+
+`EventApiStyle` 导出四个预设：`subscribePublish`、`onEmit`、`onTrigger`、`listenFire`。需要跨模块比较或保存配置时使用这些常量。
+
+| 预设值              | 订阅        | 发布      | 取消          |
+| ------------------- | ----------- | --------- | ------------- |
+| `subscribe-publish` | `subscribe` | `publish` | `unsubscribe` |
+| `on-emit`           | `on`        | `emit`    | `off`         |
+| `on-trigger`        | `on`        | `trigger` | `off`         |
+| `listen-fire`       | `listen`    | `fire`    | `unlisten`    |
+
+自定义 `style` 是从语义到名字的对象，例如 `{ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' }`。`style.subscribe` 和 `style.publish` 必填；`style.unsubscribe` 省略时为 `'unsubscribe'`。名字必须是非空字符串、彼此不同，不能占用另一语义的名字、`subscribeOnce`、`subscribeUntil`、`filterTaskId`、`clear`、`size` 或 `__proto__`、`prototype`、`constructor`。非法配置在构造时抛 `INVALID_OPTIONS`。
+
+保留字面量配置可用 `as const satisfies IEventApiStyleNames`。显式给出 payload 类型后，自定义 channel style 也要在第三泛型 `S` 中提供；Hub 在第二泛型提供。宽化成普通 `string` 的对象不会产生任意方法名的索引签名。预设字面量有对应的推导重载。
+
+canonical（固定的原名）方法始终存在；别名与原名指向同一函数，不创建另一个派发器。默认风格不增加别名属性；额外别名是不可枚举、不可写、不可配置的自有数据属性。style 不增加 `flush`、队列、排空、背压或跨进程能力。
+
+`channel.subscribe()` 返回 `IEventChannelSubscription`，`hub.subscribe()` 返回 `IEventHubSubscription`。句柄本身可调用，`handle.unsubscribe === handle`；链式 `handle.subscribe(...)` 返回同一条链，风格的订阅别名与取消别名也保持函数身份。取消按追加顺序的逆序执行整条链，只真正执行一次。单个释放失败原样抛出；多个失败合为 `SUBSCRIPTION_DISPOSE_FAILED`，`AggregateError.errors` 保留执行顺序。关闭后追加订阅抛 `SUBSCRIPTION_CLOSED`。
+
+链式扩展不是事务：后一次订阅失败时，前面成功的登记仍归原句柄所有，需要调用该句柄清理。第一条登记之后的句柄别名投影失败，则回滚该登记并以 `SUBSCRIPTION_HANDLE_PROJECTION_FAILED` 保留原始失败。有限字面量事件表在同一条 Hub 链上排除已经使用的 key；同 key 的另一条独立链仍可订阅。宽 key、索引签名或运行时联合 key 保留动态广播。
+
+## 独立订阅 helper
+
+这些函数从 `@migaia/event-subscriber/subscriber` 导入，只要求结构兼容的 `channel.subscribe(listener, options?)`，不要求包内工厂身份。`subscribe` 必须返回函数，不能在安装尚未结束时同步交付事件；非法结构为 `INVALID_CHANNEL`。helper 保留对象方法的接收者。
+
+| API                                                   | 参数与行为                                                                                                                                            |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subscribeOnce(channel, listener, options?)`          | 必填通道与函数；`options.taskId` 默认 `undefined`。第一次交付前先退订，所以同步重入、同步抛错或异步拒绝不会执行第二次。                               |
+| `subscribeUntil(channel, signal, listener, options?)` | 必填通道、信号与函数；`options.taskId` 默认 `undefined`。信号取消时自动退订，手动退订也移除信号监听。取消不会中断已经开始的业务回调。                 |
+| `subscribeSubscriber(channel, subscriber)`            | `subscriber` 必须是带可调用 `handle(event)` 的对象。`handle` 接收事件上下文，返回结果或 PromiseLike，并保留 `this`。缺少方法为 `INVALID_SUBSCRIBER`。 |
+
+返回值都是同步、幂等的 `IUnsubscribe`，不附加命名风格的 `off`、`dispose`、`unlisten` 或链式扩展。要使用带风格的订阅链，直接调用 channel 的订阅方法。
+
+`subscribeUntil` 接受原生 `AbortSignal`，也接受具有布尔 `aborted`、可选 `reason`、可调用 `addEventListener` 与 `removeEventListener` 的兼容对象；事件类型固定为 `'abort'`。非法信号为 `INVALID_SIGNAL`。已取消信号默认不创建登记；只有 canonical channel 显式设置 `throwOnAborted: true` 时抛 `ABORTED`。
+
+对象订阅者只需实现 `IEventSubscriber.handle(event)`。旧草案的抽象 `EventSubscriber`、静态 `EVENT_NAME`（也不是 `EVENTNAME`）与 `onCall()` 不属于当前公开契约：事件来源由传入的通道决定，多事件名称由 Hub 的订阅 key 决定，不重复保存在 class 中。
+
+## 等待异步监听器
+
+所有 `invoke*` 先同步固定目标快照，再开始等待。它们只接受同一份物理包实例创建的 canonical channel，或允许的 `filterTaskId()` 视图；伪造对象、Hub 或另一份包副本创建的通道为 `INVALID_CHANNEL`。参数 `value` 是本次交给每个监听器的值，无额外选项。
+
+| API                                         | 调度与返回值                                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `invokeParallelSettled(channel, value)`     | 立即启动全部目标，等待全部结束，按登记顺序返回 `IListenerResult<R>[]`，与完成先后无关。监听器抛错和拒绝成为结果项。 |
+| `invokeParallel(channel, value)`            | 调度相同；全部成功返回结果值数组，任一监听器失败则等全部结束后以 `PUBLISH_FAILED` 的 `AggregateError` 拒绝。        |
+| `invokeSerialSettled(channel, value)`       | 前一个目标结束后才启动下一个，失败后仍继续；返回按登记顺序的结算结果。                                              |
+| `invokeSerial(channel, value)`              | 调度相同；失败后仍执行后面的目标，最后聚合抛出失败，全部成功返回结果值数组。                                        |
+| `invokeTaskSettled(channel, taskId, value)` | 只接收 canonical channel；先精确选择一个任务，返回它的成功或失败结果。                                              |
+| `invokeTask(channel, taskId, value)`        | 精确选择相同；成功返回值，监听器失败以含一个原始失败的 `PUBLISH_FAILED` 拒绝。                                      |
+
+结算项为 `{ status: 'fulfilled', value: Awaited<R> }` 或 `{ status: 'rejected', reason: unknown }`。常量 `EventSubscriberState.fulfilled`、`rejected` 用于判断结果，`EventSubscriberState.abort` 是信号事件名。settled 只把监听器失败变成结果，不把非法通道或任务选择错误变成结果。
+
+串行调用不是 waterfall：所有目标收到同一个原始值，前一个返回值不会传给下一个。异步工具通过返回值交付监听器失败，不再把同一个失败送给 `report`；值路径诊断仍遵循独立的诊断规则。
+
+`taskId` 来自订阅时的 `options.taskId` 或之后的 `event.setTaskId()`，必须是非空字符串。入口匹配数为零时同步抛 `TASK_NOT_FOUND`；多于一个时同步抛 `TASK_NOT_UNIQUE`，都发生在任何目标被执行前。错误上有可枚举的 `taskId` 与 `matchCount`。任务不是全局注册表，标签只在传入通道内选择。
+
+### 高级 visitor
+
+`withSnapshotEntries(channel, value, visitor)` 把本轮不可变 `IEventInvocation[]` 交给 visitor，由集成方决定调用顺序。`entry.taskId` 是快照标签，`entry.invoke()` 返回监听器原始结果或 PromiseLike，每个 entry 只准调用一次。visitor 可以同步返回或返回 Promise；它结束或拒绝后，全部 entry 关闭，之后调用抛 `INVOCATION_CLOSED`。visitor 同步抛出或异步拒绝以 `VISITOR_FAILED` 标识；可附码的原生错误保留身份和 stack，其余原值通过 `cause` 保留，entry 仍会关闭。
+
+`invokeEachLive(channel, value, visitor)` 每次把一个 invocation 交给同步 visitor。在访问期间新追加的订阅也可以被本轮看到，每个登记最多访问一次。visitor 必须同步完成，抛错时内部遍历状态仍会释放，失败以 `VISITOR_FAILED` 标识。它只用于确实需要遍历期间看到新订阅的框架集成；普通业务优先选快照型工具。
+
+## 多事件 Hub
+
+`createEventHub<C, S, V>(options?)` 用事件表 `C` 关联 key 和 payload。options 只接受 `report`、`terminalReport`、`style`、`valueConfig`，默认值与含义同 channel；`report` 的参数额外带本次发布的 `key`。Hub listener 返回 `void` 或 `PromiseLike<void>`，不聚合结果；需要结果的事件另建 `createEventChannel<T, R>()`。
+
+| 成员                       | 行为                                                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `subscribe(key, listener)` | key 是事件表中的字符串、数字或 symbol，listener 必须是函数。首次订阅该 key 时才创建内部 channel；返回可调用的订阅链。 |
+| `publish(key, value)`      | 只向该 key 分发对应类型的值；从未订阅或已经没有登记的 key 无操作，不会创建 channel。                                  |
+| `clear(key?)`              | 指定 key 清除该事件所有登记并移除空 channel；省略时清除全部事件。                                                     |
+| `size(key?)`               | 指定 key 返回该事件的活动登记数，不存在为零；省略返回总数。总数由计数器维护，不遍历所有 key。                         |
+
+非法 key 为 `INVALID_EVENT_KEY`，非法 listener 为 `INVALID_LISTENER`。旧句柄不会取消 `clear()` 后新创建的同名事件登记。Hub 内部固定使用 `recursive`、`multiple`、`handle`、`100_000` 调用预算与非严格的已取消准入；不暴露内部 channel，也不接受单通道策略选项。需要自选这些策略时使用 channel。`EventRemovalPolicy.listenerAll` 适用于复用相同函数身份的整体注销，例如 logger hook 的注销路径。
+
+## 静态值路径
+
+`valueConfig` 在构造时固定路径，把原始 payload 中的一个值附加到上下文，同时保留原始 `event.value` 和所有控制方法。它不保存、转换或重放事件。
+
+| 字段                   | 含义                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `valueConfig.readPath` | 静态路径，类型为 `IObjectPath<T>` 或空字符串。空字符串或仅空白禁用整个投影；不读取 alias，不解析、不探测、不报告。             |
+| `valueConfig.alias`    | 活动路径需要非空、无首尾空白的名字；不能与上下文成员或 `__proto__`、`prototype`、`constructor` 冲突。`resource` 不是保留名称。 |
+
+用 `as const` 或显式的 `V` 保留路径与 alias 字面量；channel 的 `V` 是第四泛型，Hub 的是第三泛型。每轮发布或调用只探测路径一次，全部目标得到同一个投影值身份。alias 为可枚举、不可写、不可配置的自有数据属性。
+
+路径缺失、被阻断或 getter 抛错时，报告 `VALUE_PROJECTION_FAILED`；监听器仍调用，alias 为 `undefined`。实际存在且值为 `undefined` 的叶节点成功，不报告失败。原始 getter 错误保留在原因链中。没有目标时不探测路径。这里不支持函数 selector、transform、operator、fallback 或每个监听器再懒求值一次。
+
+## 错误与诊断
+
+`publish()` 收集全部同步监听器失败后抛带 `PUBLISH_FAILED` 的 `AggregateError`；监听器返回的 Promise 在它返回后拒绝，则交给 `report`。同步发布不会因为迟到失败变成可等待的调用。
+
+`report` 不存在或失败时，先尝试 `terminalReport`，再依次尝试宿主 `reportError`、`console.error`、排入微任务抛出；宿主不能排入微任务时同步抛出。报告函数本身的失败也保留在诊断错误链上，不静默丢弃。
+
+包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'@migaia/event-subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。
+
+| 错误码成员                           | 码值                                    | 触发条件                                                      |
+| ------------------------------------ | --------------------------------------- | ------------------------------------------------------------- |
+| `invalidListener`                    | `INVALID_LISTENER`                      | 监听器不是函数。                                              |
+| `invalidReporter`                    | `INVALID_REPORTER`                      | report 或 terminalReport 不可调用。                           |
+| `invalidChannel`                     | `INVALID_CHANNEL`                       | helper 的结构源无效，或调用工具收到非同包 canonical 通道。    |
+| `invalidSignal`                      | `INVALID_SIGNAL`                        | 信号结构无效，或信号回调、清理失败。                          |
+| `aborted`                            | `ABORTED`                               | 严格准入的通道收到已取消信号。                                |
+| `invalidSubscriber`                  | `INVALID_SUBSCRIBER`                    | 对象订阅者没有可调用的 handle。                               |
+| `invalidEventKey`                    | `INVALID_EVENT_KEY`                     | Hub key 不是字符串、数字或 symbol。                           |
+| `taskNotFound`                       | `TASK_NOT_FOUND`                        | 任务标签匹配零个登记。                                        |
+| `taskNotUnique`                      | `TASK_NOT_UNIQUE`                       | 任务标签匹配多个登记，错误带匹配数量。                        |
+| `invalidTaskId`                      | `INVALID_TASK_ID`                       | 任务标签不是非空字符串。                                      |
+| `invalidOptions`                     | `INVALID_OPTIONS`                       | 选项、策略、命名风格或路径配置非法。                          |
+| `publishFailed`                      | `PUBLISH_FAILED`                        | 监听器失败，或同步调用预算耗尽仍有目标未交付。                |
+| `visitorFailed`                      | `VISITOR_FAILED`                        | snapshot 或 live visitor 抛错，或 snapshot visitor 异步拒绝。 |
+| `valueProjectionFailed`              | `VALUE_PROJECTION_FAILED`               | 活动值路径缺失、被阻断或 getter 失败。                        |
+| `unhandledListenerFailure`           | `UNHANDLED_LISTENER_FAILURE`            | 迟到监听器失败到达终端诊断。                                  |
+| `subscriptionClosed`                 | `SUBSCRIPTION_CLOSED`                   | 已关闭的订阅链再次追加订阅。                                  |
+| `subscriptionHandleProjectionFailed` | `SUBSCRIPTION_HANDLE_PROJECTION_FAILED` | 登记后句柄别名投影失败；该登记回滚，原始失败保留。            |
+| `invocationClosed`                   | `INVOCATION_CLOSED`                     | 捕获的 invocation 已执行过或已经关闭。                        |
+| `subscriptionDisposeFailed`          | `SUBSCRIPTION_DISPOSE_FAILED`           | 关闭链时多个释放失败；全部仍会尝试执行。                      |
+
+## 排查与构建
+
+`PUBLISH_FAILED` 时展开 `error.errors`，查看原始监听器失败；只有同步预算耗尽时可以没有监听器错误。任务选择失败时检查标签与登记寿命，不要把多目标当成“任选一个”。已关闭链需要新建订阅。Promise 失败只出现在 report 而不从 `publish()` 抛出时，先确认是否属于同步返回后的拒绝。
 
 ```bash
-pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
+pnpm run fmt
+pnpm run lint
+pnpm run typecheck
+pnpm run typecheck:test
+pnpm run test
 ```
-
-### 固定 Hub 策略与 channel 移除策略
-
-Hub 的内部 channel 固定使用 recursive 派发、multiple 准入、handle 移除、每次 publish 100000 listener 调用预算及非严格 aborted 准入；它不暴露内部 channel，也不接受单 channel 的策略配置。需要选择 dispatchPolicy、admissionPolicy、publishBudget 或 throwOnAborted 时，直接创建 channel。
-
-`EventRemovalPolicy.handle` 仅释放当前 registration；`EventRemovalPolicy.listenerAll` 释放相同 listener identity 的全部登记。logger hook 会复用同一 hook 对应的 listener，所以 listenerAll 在真实 hook 注销路径生效。

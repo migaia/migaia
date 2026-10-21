@@ -62,7 +62,14 @@ const targetSnapshots = <T, R, V>(
   return { capability, snapshots: capability.snapshot(taskId) }
 }
 
-/** Runs all listener calls immediately, then waits for all settlements in registration order. */
+/**
+ * Starts every selected listener immediately and waits for all results in registration order. Use
+ * when independent listeners may overlap and every success/failure must be inspected. Accepts this
+ * package instance's canonical channel or a filterTaskId view; other sources throw INVALID_CHANNEL
+ * synchronously. Targets are captured before any await, and an empty target list resolves to [].
+ * Listener throws/rejections become rejected result entries rather than rejecting the returned
+ * promise or calling the listener reporter. Value-projection diagnostics still report.
+ */
 export const invokeParallelSettled = <T, R, V = undefined>(
   channel: IAsyncChannel<T, R, V>,
   value: T
@@ -82,7 +89,15 @@ export const invokeParallelSettled = <T, R, V = undefined>(
   return Promise.all(pending)
 }
 
-/** Runs one listener only after the previous listener has settled. */
+/**
+ * Runs captured listeners one at a time, starting the next only after the previous one settles. Use
+ * for ordered side effects while collecting every outcome. A failed listener does not skip later
+ * listeners; each receives the same value, not its predecessor's result.
+ *
+ * Accepts this package instance's canonical channel or task-filter view; invalid sources throw
+ * INVALID_CHANNEL synchronously. Empty channels resolve to []. Results retain registration order
+ * and original failure reasons; listener failures do not call report. Projection diagnostics do.
+ */
 export const invokeSerialSettled = <T, R, V = undefined>(
   channel: IAsyncChannel<T, R, V>,
   value: T
@@ -132,13 +147,25 @@ const throwOnFailures = <R>(results: readonly IListenerResult<R>[]): readonly Aw
   )
 }
 
-/** Parallel throwing publish; no listener failure is reported twice. */
+/**
+ * Starts every selected listener in parallel and resolves to their values in registration order.
+ * Waits for every listener even if one fails, then rejects with a PUBLISH_FAILED AggregateError
+ * containing all original failures. Use invokeParallelSettled to inspect mixed outcomes instead.
+ * Listener failures do not call report; invalid channel identities throw INVALID_CHANNEL
+ * synchronously before a promise is returned. An empty target list resolves to [].
+ */
 export const invokeParallel = <T, R, V = undefined>(
   channel: IAsyncChannel<T, R, V>,
   value: T
 ): Promise<readonly Awaited<R>[]> => invokeParallelSettled(channel, value).then(throwOnFailures)
 
-/** Serial throwing publish; all listeners still run before failure is returned. */
+/**
+ * Awaits listeners in registration order and resolves to their ordered values. All selected
+ * listeners still run after a failure; after the last settlement, any failures reject as
+ * PUBLISH_FAILED with their original values on AggregateError.errors and the first on cause. Every
+ * listener receives the same payload. Invalid channels throw INVALID_CHANNEL synchronously; an
+ * empty target list resolves to []. Listener failures use this result path rather than report.
+ */
 export const invokeSerial = <T, R, V = undefined>(
   channel: IAsyncChannel<T, R, V>,
   value: T
@@ -168,7 +195,16 @@ const selectTask = <T, R, V = undefined>(
   return { snapshot: snapshots[0], capability }
 }
 
-/** Strict single-task settled publish; selection errors are synchronous throws. */
+/**
+ * Selects exactly one current taskId registration and returns its settled listener outcome. Use
+ * when a named local handler must return a result without broadcasting to other tasks. Only this
+ * package instance's canonical channel is accepted; task-filter views are not inputs.
+ *
+ * Selection completes synchronously before any listener runs. Empty/non-string ids throw
+ * INVALID_TASK_ID, unknown channels throw INVALID_CHANNEL, and zero/multiple matches throw
+ * TASK_NOT_FOUND/TASK_NOT_UNIQUE with taskId and matchCount fields. A selected listener's throw or
+ * rejection resolves as a rejected result, without calling report for that listener failure.
+ */
 export const invokeTaskSettled = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V>,
   taskId: string,
@@ -191,7 +227,13 @@ export const invokeTaskSettled = <T, R, V = undefined>(
   })
 }
 
-/** Strict single-task throwing publish; selection errors are synchronous throws. */
+/**
+ * Selects exactly one task registration and resolves to its awaited listener result. Requires the
+ * canonical channel and a nonempty taskId. Selection failures throw synchronously with
+ * INVALID_CHANNEL, INVALID_TASK_ID, TASK_NOT_FOUND, or TASK_NOT_UNIQUE before listener entry. A
+ * selected listener failure rejects as a PUBLISH_FAILED AggregateError retaining the original
+ * failure on errors and cause. Use invokeTaskSettled when failure should be returned as data.
+ */
 export const invokeTask = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V>,
   taskId: string,

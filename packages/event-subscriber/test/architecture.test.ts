@@ -83,11 +83,12 @@ describe('runtime-neutral boundary', () => {
     const useguide = readFileSync(resolve(packageRoot, 'USEGUIDE.md'), 'utf8')
     const contractRows = [
       [readme, 'subscribe(listener, options?: { taskId?: string }): subscription'],
-      [readme, '动态 key 允许运行时 fan-out；finite key 链禁止重复 key'],
-      [useguide, 'channelHandle.unsubscribe() // same function identity; releases whole chain'],
-      [useguide, 'finite literal maps reject a repeated key on this chain'],
-      [useguide, 'widened key: runtime fan-out'],
-      [useguide, 'extension is non-transactional; earlier registration'],
+      [readme, '动态事件名可在运行时广播；有限字面量事件表的同一条链禁止重复事件名'],
+      [useguide, 'handle.unsubscribe === handle'],
+      [useguide, '取消按追加顺序的逆序执行整条链，只真正执行一次'],
+      [useguide, '有限字面量事件表在同一条 Hub 链上排除已经使用的 key'],
+      [useguide, '宽 key、索引签名或运行时联合 key 保留动态广播'],
+      [useguide, '链式扩展不是事务：后一次订阅失败时，前面成功的登记仍归原句柄所有'],
       [useguide, 'SUBSCRIPTION_CLOSED']
     ] as const
     for (const [text, clause] of contractRows) expect(text).toContain(clause)
