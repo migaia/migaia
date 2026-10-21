@@ -2082,6 +2082,7 @@ function ClassMemberReference({
   api,
   bases = [],
   documented,
+  explainedMembers,
   eyebrow,
   heading,
   id,
@@ -2104,6 +2105,8 @@ function ClassMemberReference({
    * the declaration) still renders, so no maintained explanation is dropped from the page.
    */
   readonly documented?: Readonly<Record<string, ILocalizedMemberDoc>>
+  /** An earlier options row can own an identical member contract without repeating its prose. */
+  readonly explainedMembers?: ReadonlyMap<string, readonly [ILocalizedMemberDoc, string]>
   /** Type articles supply a member label; runtime articles retain the instance capability label. */
   readonly eyebrow?: React.ReactNode
   /** Section heading; defaults to the generic instance API title. */
@@ -2137,6 +2140,14 @@ function ClassMemberReference({
   const label = (en: string, zh: string) => (locale === 'zh' ? zh : en)
   /** Static and instance groups; empty when the surface has only instance members. */
   const groups = classMemberGroups(members)
+  /** Reuse only the complete same-field contract, so distinct member semantics remain visible. */
+  const explainedHref = (name: string, doc: ILocalizedMemberDoc | undefined) => {
+    /** Earlier authored contract and its existing field anchor. */
+    const earlier = explainedMembers?.get(name)
+    return doc && earlier && JSON.stringify(doc) === JSON.stringify(earlier[0])
+      ? earlier[1]
+      : undefined
+  }
   return (
     <section className="section-block compact api-class-members" id={sectionId}>
       <p className="eyebrow">
@@ -2205,14 +2216,16 @@ function ClassMemberReference({
             {group.entries.map(({ member, index }) => {
               /** Reference doc for this member; overloads share it. */
               const doc = memberDoc?.(member.name) ?? guide?.members[member.name]
-              /** Usage notes and the snippet render once, on the first overload within the group. */
+              /** Same-named static and instance overloads share their authored usage explanation. */
               const firstOverload =
-                group.entries.find((candidate) => candidate.member.name === member.name)?.index ===
-                index
+                members.findIndex((entry) => entry.name === member.name) === index
+              /** Options and returned members can point at the same package-owned contract. */
+              const earlierHref = explainedHref(member.name, doc)
               /** Reference text, or the declaration comment only outside audited libraries. */
-              const description = firstOverload
-                ? (doc?.summary ?? (strict ? undefined : (member.description ?? undefined)))
-                : undefined
+              const description =
+                firstOverload && !earlierHref
+                  ? (doc?.summary ?? (strict ? undefined : (member.description ?? undefined)))
+                  : undefined
               return (
                 <section
                   className="option-entry class-member-entry"
@@ -2238,30 +2251,39 @@ function ClassMemberReference({
                   {description ? (
                     <ReferenceParagraphs library={api.library} locale={locale} text={description} />
                   ) : null}
+                  {earlierHref ? (
+                    <p>
+                      <a href={earlierHref}>{label('Option reference', '选项说明')}</a>
+                    </p>
+                  ) : null}
                   <CodeBlock
                     code={withoutDocComments(member.signature)}
                     signature
                     label={label(`${member.name} signature`, `${member.name} 签名`)}
                     locale={locale}
                   />
-                  <ReferenceMemberDetails
-                    api={api}
-                    doc={doc}
-                    libraryApis={libraryApis}
-                    locale={locale}
-                    method={member.kind === 'method'}
-                    name={member.name}
-                    parameters={member.parameterDetails}
-                    parameterTypeDoc={parameterTypeDoc}
-                    resultType={member.returns}
-                    shownExample={guide?.example}
-                    showUsage={firstOverload}
-                  />
-                  {firstOverload ? (
+                  {!earlierHref ? (
+                    <ReferenceMemberDetails
+                      api={api}
+                      doc={doc}
+                      libraryApis={libraryApis}
+                      locale={locale}
+                      method={member.kind === 'method'}
+                      name={member.name}
+                      parameters={member.parameterDetails}
+                      parameterTypeDoc={parameterTypeDoc}
+                      resultType={member.returns}
+                      shownExample={guide?.example}
+                      showUsage={firstOverload}
+                    />
+                  ) : null}
+                  {firstOverload && !earlierHref ? (
                     <NestedFieldDocs
                       entries={nestedDocs?.(member.name) ?? []}
+                      idPrefix={`${sectionId}--${optionAnchor(member.name)}`}
                       library={api.library}
                       locale={locale}
+                      parentDoc={doc}
                       symbols={api.symbols}
                     />
                   ) : null}
@@ -2272,34 +2294,49 @@ function ClassMemberReference({
         </Fragment>
       ))}
       <div className="option-reference class-member-reference">
-        {documentedOnly.map(([name, doc]) => (
-          <section
-            className="option-entry class-member-entry"
-            id={`${sectionId}--documented-${optionAnchor(name)}`}
-            key={name}
-          >
-            <div className="option-heading">
-              <h3>
-                <code>{name}</code>
-              </h3>
-            </div>
-            <ReferenceParagraphs library={api.library} locale={locale} text={doc.summary} />
-            <ReferenceMemberDetails
-              api={api}
-              doc={doc}
-              libraryApis={libraryApis}
-              locale={locale}
-              name={name}
-              parameterTypeDoc={parameterTypeDoc}
-            />
-            <NestedFieldDocs
-              entries={nestedDocs?.(name) ?? []}
-              library={api.library}
-              locale={locale}
-              symbols={api.symbols}
-            />
-          </section>
-        ))}
+        {documentedOnly.map(([name, doc]) => {
+          /** A documented-only inherited member can still share the earlier options contract. */
+          const earlierHref = explainedHref(name, doc)
+          return (
+            <section
+              className="option-entry class-member-entry"
+              id={`${sectionId}--documented-${optionAnchor(name)}`}
+              key={name}
+            >
+              <div className="option-heading">
+                <h3>
+                  <code>{name}</code>
+                </h3>
+              </div>
+              {earlierHref ? (
+                <p>
+                  <a href={earlierHref}>{label('Option reference', '选项说明')}</a>
+                </p>
+              ) : (
+                <>
+                  <ReferenceParagraphs library={api.library} locale={locale} text={doc.summary} />
+                  <ReferenceMemberDetails
+                    api={api}
+                    doc={doc}
+                    libraryApis={libraryApis}
+                    locale={locale}
+                    name={name}
+                    parameterTypeDoc={parameterTypeDoc}
+                    shownExample={guide?.example}
+                  />
+                  <NestedFieldDocs
+                    entries={nestedDocs?.(name) ?? []}
+                    idPrefix={`${sectionId}--${optionAnchor(name)}`}
+                    library={api.library}
+                    locale={locale}
+                    parentDoc={doc}
+                    symbols={api.symbols}
+                  />
+                </>
+              )}
+            </section>
+          )
+        })}
       </div>
     </section>
   )
@@ -2371,17 +2408,30 @@ function ParameterTypeFields({
  */
 function NestedFieldDocs({
   entries,
+  idPrefix,
   library,
   locale,
+  parentDoc,
   symbols
 }: {
   readonly entries: readonly (readonly [string, ILocalizedMemberDoc])[]
+  readonly idPrefix: string
   readonly library: string
   readonly locale: ILocale
+  /** The enclosing field already displays shared defaults and usage rules. */
+  readonly parentDoc?: ILocalizedMemberDoc
   /** Module declarations used to resolve constant-backed values to their literals. */
   readonly symbols: readonly IApiSymbol[]
 }) {
   if (entries.length === 0) return null
+  /** A callback parameter with the same name and full contract is explained once per field group. */
+  const parameterOwners = new Map<string, string>()
+  for (const [path, fieldDoc] of entries)
+    for (const [name, text] of Object.entries(fieldDoc.params)) {
+      /** Name and text together distinguish unrelated arguments that happen to use one name. */
+      const key = JSON.stringify([name, text])
+      if (!parameterOwners.has(key)) parameterOwners.set(key, path)
+    }
   return (
     <div className="nested-field-docs">
       <p className="eyebrow">{locale === 'zh' ? '嵌套字段' : 'Nested fields'}</p>
@@ -2393,13 +2443,27 @@ function NestedFieldDocs({
             <InlineText library={library} locale={locale} text={fieldDoc.summary} />
             {Object.keys(fieldDoc.params).length > 0 ? (
               <ul>
-                {Object.entries(fieldDoc.params).map(([param, text]) => (
-                  <li key={param}>
-                    <code>{param}</code>
-                    {' — '}
-                    <InlineText library={library} locale={locale} text={text} />
-                  </li>
-                ))}
+                {Object.entries(fieldDoc.params).map(([param, text]) => {
+                  /** First callback that owns this shared parameter explanation. */
+                  const owner = parameterOwners.get(JSON.stringify([param, text]))!
+                  /** Each instance surface supplies a distinct prefix for the shared anchor. */
+                  const anchor = `${idPrefix}--${optionAnchor(owner)}--${optionAnchor(param)}`
+                  return (
+                    <li id={owner === path ? anchor : undefined} key={param}>
+                      <code>{param}</code>
+                      {' — '}
+                      {owner === path ? (
+                        <InlineText library={library} locale={locale} text={text} />
+                      ) : (
+                        <a href={`#${anchor}`}>
+                          <code>
+                            {owner}.{param}
+                          </code>
+                        </a>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             ) : null}
             {fieldDoc.returns ? (
@@ -2408,7 +2472,7 @@ function NestedFieldDocs({
                 <InlineText library={library} locale={locale} text={fieldDoc.returns} />
               </div>
             ) : null}
-            {fieldDoc.default ? (
+            {fieldDoc.default && fieldDoc.default !== parentDoc?.default ? (
               <div>
                 {locale === 'zh' ? '默认：' : 'Default: '}
                 <InlineText library={library} locale={locale} text={fieldDoc.default} />
@@ -2422,11 +2486,15 @@ function NestedFieldDocs({
                 values={fieldDoc.values}
               />
             ) : null}
-            {fieldDoc.whenToUse ? (
-              <div>
-                {locale === 'zh' ? '何时使用：' : 'When to use: '}
-                <InlineText library={library} locale={locale} text={fieldDoc.whenToUse} />
-              </div>
+            {fieldDoc.whenToUse && fieldDoc.whenToUse !== parentDoc?.whenToUse ? (
+              <dl className="option-meta">
+                <div>
+                  <dt>{locale === 'zh' ? '何时使用' : 'When to use'}</dt>
+                  <dd>
+                    <InlineText library={library} locale={locale} text={fieldDoc.whenToUse} />
+                  </dd>
+                </div>
+              </dl>
             ) : null}
             {fieldDoc.example ? (
               <CodeBlock
@@ -2526,9 +2594,10 @@ function ReferenceMemberDetails({
   readonly showUsage?: boolean
 }) {
   /** Declared names keep their order; authored callback arguments remain visible without types. */
-  const parameterNames = Array.from(
-    new Set([...parameters.map((parameter) => parameter.name), ...Object.keys(doc?.params ?? {})])
-  )
+  const parameterNames =
+    method || parameters.length > 0
+      ? parameters.map((parameter) => parameter.name)
+      : Object.keys(doc?.params ?? {})
   /** Localized labels shared by every member-contract panel. */
   const label = (en: string, zh: string) => (locale === 'zh' ? zh : en)
   return (
@@ -3244,6 +3313,23 @@ function SingleApiReference({
   const unlistedOptions = Object.entries(symbolDoc?.options ?? {}).filter(
     ([name]) => !options.some((field) => fieldIdentity(field.name) === fieldIdentity(name))
   )
+  /** Same-named returned fields reuse a complete options contract only when every detail matches. */
+  const explainedMembers = new Map<string, readonly [ILocalizedMemberDoc, string]>([
+    ...options.flatMap((field) =>
+      field.referenceDoc
+        ? [
+            [
+              fieldIdentity(field.name),
+              [field.referenceDoc, `#${symbol.fragment}--option-${optionAnchor(field.name)}`]
+            ] as const
+          ]
+        : []
+    ),
+    ...unlistedOptions.map(
+      ([name, doc]) =>
+        [fieldIdentity(name), [doc, `#${symbol.fragment}--option-${optionAnchor(name)}`]] as const
+    )
+  ])
   /** Omit the default column when the content supplies no defaults for this API. */
   const hasDefaults = options.some((option) => option.defaultValue?.trim() || option.defaultText)
   /** Only explicit package errors belong in the reference; generator placeholders are omitted. */
@@ -3676,6 +3762,7 @@ function SingleApiReference({
         <ClassMemberReference
           api={api}
           bases={ownSurface.bases}
+          explainedMembers={explainedMembers}
           libraryApis={libraryApis}
           locale={locale}
           guide={ownGuide}
@@ -3691,6 +3778,7 @@ function SingleApiReference({
         <ClassMemberReference
           api={api}
           bases={surface.bases}
+          explainedMembers={explainedMembers}
           heading={
             <>
               {locale === 'zh' ? '返回的实例：' : 'Returned instance: '}
