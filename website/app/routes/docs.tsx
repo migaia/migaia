@@ -1354,7 +1354,11 @@ function referenceSections(
     return [
       'overview',
       ...(symbolDoc.example ? ['quick-start'] : []),
-      ...(symbolDoc.cases.length > 0 ? ['cases'] : []),
+      // A first case that repeats the minimal example renders inside the quick-start section.
+      ...(symbolDoc.cases.length >
+      (symbolDoc.example && symbolDoc.cases[0]?.example === symbolDoc.example ? 1 : 0)
+        ? ['cases']
+        : []),
       ...(Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns ? ['contract'] : []),
       ...(constantMembers(symbol).length > 0 || hasValueGuide ? ['values'] : []),
       ...(symbol.configuration.length > 0 || Object.keys(symbolDoc.options).length > 0
@@ -3026,6 +3030,16 @@ function SingleApiReference({
   const quickExample = rawQuickExample
     ? exampleWithPrimaryImport(rawQuickExample, api, symbol)
     : undefined
+  /**
+   * Case pages often reuse their first case as the minimal example. That case then renders once,
+   * inside the minimal example section, instead of repeating its prose under the cases heading.
+   */
+  const leadCase =
+    quickExample && symbolDoc?.cases[0]?.example === symbolDoc?.example
+      ? symbolDoc?.cases[0]
+      : undefined
+  /** Cases still listed under the cases heading after the lead case moved up. */
+  const remainingCases = (symbolDoc?.cases ?? []).slice(leadCase ? 1 : 0)
   /** Root option aliases refer to the same documented field, not a second option. */
   const fieldIdentity = (name: string) => name.replace(/^options\./, '')
   /** Maintained options fill only fields absent from the extracted declaration. */
@@ -3234,15 +3248,26 @@ function SingleApiReference({
           id={`${symbol.fragment}--quick-start`}
         >
           <h2>{locale === 'zh' ? '最小示例' : 'Minimal example'}</h2>
-          {symbolDoc?.exampleIntro ? (
+          {leadCase ? (
+            // The first case already is the minimal example; it renders here once with its anchor.
+            <div className="reference-case" id={`${symbol.fragment}--case-1`}>
+              <h3>
+                <InlineText library={library.slug} locale={locale} text={leadCase.title} />
+              </h3>
+              <ReferenceParagraphs library={library.slug} locale={locale} text={leadCase.problem} />
+              <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
+              <ReferenceParagraphs library={library.slug} locale={locale} text={leadCase.result} />
+            </div>
+          ) : null}
+          {!leadCase && symbolDoc?.exampleIntro ? (
             <ReferenceParagraphs
               library={library.slug}
               locale={locale}
               text={symbolDoc.exampleIntro}
             />
           ) : null}
-          <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
-          {symbolDoc?.exampleResult ? (
+          {leadCase ? null : <CodeBlock code={quickExample} label={symbol.name} locale={locale} />}
+          {!leadCase && symbolDoc?.exampleResult ? (
             <ReferenceParagraphs
               library={library.slug}
               locale={locale}
@@ -3251,14 +3276,14 @@ function SingleApiReference({
           ) : null}
         </section>
       ) : null}
-      {symbolDoc && symbolDoc.cases.length > 0 ? (
+      {remainingCases.length > 0 ? (
         <section className="section-block compact" id={`${symbol.fragment}--cases`}>
           <h2>{locale === 'zh' ? '它解决的问题' : 'Problems it solves'}</h2>
-          {symbolDoc.cases.map((item, index) => (
+          {remainingCases.map((item, index) => (
             // Numbered anchors let landing-page pain and highlight links open the exact case.
             <div
               className="reference-case"
-              id={`${symbol.fragment}--case-${index + 1}`}
+              id={`${symbol.fragment}--case-${index + 1 + (leadCase ? 1 : 0)}`}
               key={item.title}
             >
               <h3>
