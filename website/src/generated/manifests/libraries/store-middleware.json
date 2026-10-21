@@ -2910,7 +2910,7 @@
           "name": "bindStoreMiddleware",
           "kind": "function",
           "signature": "export declare function bindStoreMiddleware<S extends Record<string, unknown>>(store: IReactiveStore<S>, options: IStoreMiddlewareBindingOptions): IStoreMiddlewareBinding<S>;",
-          "declarationLine": 129,
+          "declarationLine": 54,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Binds state subscriptions and Runtime action traces from an existing Store into a new host. Pair with createMutationPolicy when strict writes are required, passing the exact same object to Store construction and this binding. Disposal detaches observers without disposing the Store.",
           "core": "store: Existing IReactiveStore<S> from @migaia/store-light createStore; its runtime, plain snapshots, hydrate and subscriptions are reused.\nThe same canonical frozen managed IStoreMiddlewareBinding with original store reference, live revision and fluent returns retaining store/domain members. Partial subscription failure rolls back; secondary rollback failures produce CLEANUP_FAILED aggregate with original primary first.\nexecution: Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.\nexecution.mutationTimeoutMs: Required nonnegative finite milliseconds or false, with no default. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.\nexecution.pipelineDrainTimeoutMs: Required nonnegative finite milliseconds or false; no default. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.\nmutationPolicy: Exact caller policy object or a newly created off policy; share the same policy with the Store when enforcing actions-only writes.\n`createMutationPolicy('off')`; strict binding must explicitly share the Store policy.\nactionPrefix: Application string prefix for forwarded Runtime action names; state subscriptions are not filtered by it.\n`undefined`: no prefix filter; all action traces are forwarded.\nclone: Synchronous callback receiving the Store plain record on initial capture, reads and state changes. Return a snapshot record; throw aborts that capture and no async result is awaited.\nclone.state: Fresh plain record supplied by store.$plain().\nRecord snapshot; independence depends on this chosen clone implementation.\n`state => ClonePolicy.diagnostic(state)`, retaining unsupported subtree references when necessary.",
@@ -3088,7 +3088,7 @@
           "name": "createMutationPolicy",
           "kind": "function",
           "signature": "export declare function createMutationPolicy(mode?: IMutationPolicyMode): MutationPolicy;",
-          "declarationLine": 30,
+          "declarationLine": 13,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Creates a synchronous nestable mutation guard. To enforce Store writes, supply the same object to createStore and bindStoreMiddleware; a separate policy object cannot see another policy action depth.",
           "core": "mode: `off` admits writes; `actions-only` requires nonzero synchronous action depth. Omitted: `off`.\nMutationPolicy instance with insideAction, assertMutationAllowed and runInAction; no disposal is required.",
@@ -3168,7 +3168,7 @@
           "name": "createReduxDevToolsAdapter",
           "kind": "function",
           "signature": "export declare function createReduxDevToolsAdapter<S>(connection: IReduxDevToolsConnection<S>, runtime?: IRuntime): IDevToolsAdapter<S>;",
-          "declarationLine": 155,
+          "declarationLine": 79,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Wraps an existing extension-shaped connection as a domain adapter. Converts DISPATCH COMMIT to commit, JUMP_TO_STATE/JUMP_TO_ACTION/ROLLBACK to jump, and RESET to reset; missing state is ignored; invalid JSON is skipped and reported as DEVTOOLS_MESSAGE_INVALID through the selected Runtime. Pair with createStoreMiddlewareHost through connectDevTools.",
           "core": "connection: Caller-owned IReduxDevToolsConnection with synchronous init/send and subscribe returning a disposer; this adapter never opens or closes a browser extension connection.\nruntime: Optional IRuntime from createRuntime or the Store runtime; receives invalid Redux JSON reports. Omitted: getDefaultRuntime().\nIDevToolsAdapter forwarding initialization and event labels; its subscription disposer comes from the original connection.",
@@ -3256,7 +3256,7 @@
           "name": "createStoreMiddlewareAggregateError",
           "kind": "function",
           "signature": "export declare function createStoreMiddlewareAggregateError(code: IStoreMiddlewareErrorCode, errors: readonly unknown[], message: string): AggregateError;",
-          "declarationLine": 16,
+          "declarationLine": 10,
           "source": "packages/store-middleware/dist/errors.d.ts",
           "purpose": "Constructs a tagged native AggregateError retaining every original cleanup failure in errors; it does not replace member failures or assign a separate cause.",
           "core": "code: Code from StoreMiddlewareErrorCode, typically cleanupFailed for binding rollback.\nerrors: Readonly caller list of original failures; put the original primary first when adding rollback failures.\nmessage: Caller-owned diagnostic text for the aggregate failure.\nNative AggregateError with original failure values reachable through errors.",
@@ -3412,7 +3412,7 @@
           "name": "createStoreMiddlewareError",
           "kind": "function",
           "signature": "export declare function createStoreMiddlewareError(code: IStoreMiddlewareErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
-          "declarationLine": 9,
+          "declarationLine": 6,
           "source": "packages/store-middleware/dist/errors.d.ts",
           "purpose": "Constructs a native Error tagged with STORE_MIDDLEWARE_SOURCE and the chosen code, retaining stack and optional original cause without replacing native error behavior.",
           "core": "code: Semantic code selected from StoreMiddlewareErrorCode.\nmessage: Caller-owned diagnostic message describing the concrete failure.\nTagged native Error for the caller to return or throw.\ncause: Original caller-supplied thrown value retained by native cause identity.\nOmitted; no supplied cause is attached.",
@@ -3584,7 +3584,7 @@
           "name": "createStoreMiddlewareHost",
           "kind": "function",
           "signature": "export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;",
-          "declarationLine": 85,
+          "declarationLine": 36,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Composes a frozen store event host through external defineHost, not class inheritance. The caller owns state access and optional application; this host owns plugin lifecycle and binding cleanup. Pipeline mode is always sync.",
           "core": "The canonical frozen managed IStoreMiddlewareHost with domain members, live getters and fluent returns retaining this same handle; dispose returns structured cleanup results. Invalid host options use INVALID_OPTION and delegated lifecycle failures retain plugin-host identity.\nidentity: Readable host name `{ name }`; a unique id is added by the runtime.\nOmitted; identity.name defaults to DEFAULT and the runtime issues a unique id.\nidentity.name: Readable host name used in errors and diagnostics.\nOmission uses DEFAULT as the name. The generated id combines that name with a sequence number, allowing diagnostics to distinguish host instances.\nexecution.mutationTimeoutMs: Required nonnegative finite milliseconds or false, with no default. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.\nexecution.pipelineDrainTimeoutMs: Required nonnegative finite milliseconds or false; no default. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.\nexecution: Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.\npipeline: External pipeline options are captured once, including a non-enumerable pipeline getter, and excluded from the remaining option spread; mode is overwritten with sync before host construction.\nA sync pipeline is installed even when this option is omitted.\ndiagnostic: Receives notable events that are not errors (`PIPELINE_NEXT_LATE`, `EXTENSION_NON_ENUMERABLE_IGNORED`, rollback failures, queue waits) as `(message, code?, error?)`. Its own failures never affect the host.\nNot set: diagnostics are dropped.\nonDiagnosticFailure: Receives the error when `diagnostic` itself throws or rejects.\nNot set: the failure goes to `globalThis.reportError` when it exists.\nscheduler: Clock and timers for queue and disposal timeouts; inject a manual scheduler in tests.\nThe system scheduler.\nqueueAdmissionTimeoutMs: How long a change may wait in the FIFO queue. A number rejects waiting work with `MUTATION_QUEUE_TIMEOUT` (running work is not interrupted); `false` disables queue timers and diagnostics.\nNot set: long waits are only reported through `diagnostic`, never rejected.\nqueueAdmissionDiagnosticMs: Wait time after which a queued change is reported through `diagnostic` (only when `queueAdmissionTimeoutMs` is not set); `false` disables it.\n`1000` milliseconds.\ndisposeStepTimeoutMs: Maximum wait for one cleanup step (a stage disposer, a plugin `dispose`, a resource). A timed-out step is recorded as `DISPOSE_STEP_TIMEOUT` and cleanup continues; `false` waits forever.\n`5000` milliseconds per step.\nruntime: External IRuntime supplied at construction or obtained from the bound Store.\ngetState: Required synchronous zero-argument getter invoked when plugins or adapters need state. Return S; throws propagate through the invoking API.\nCurrent S; getter failures propagate and snapshot independence follows the caller clone policy.\napplyState: Optional synchronous callback receiving a replacement state from jump/reset. Return nothing; callback throws propagate through command delivery.\napplyState.state: Replacement S supplied by a normalized jump/reset command or a domain caller.\nNo result; missing applyState throws DEVTOOLS_CAPABILITY and caller failures propagate.\nAbsent; applying a DevTools state command throws DEVTOOLS_CAPABILITY.\nmutationPolicy: Exact caller policy object or a newly created off policy; share the same policy with the Store when enforcing actions-only writes.\n`createMutationPolicy('off')`: a new permissive policy.\npipeline.mode: Always overwritten with sync by the Store host constructor.\nsync, regardless of caller omission or another supplied mode.\nStore middleware executes synchronously; async and generator stage registration is unavailable.",
@@ -3677,7 +3677,7 @@
               "name": "mutationPolicy",
               "type": "MutationPolicy",
               "optional": true,
-              "description": "Exact policy shared with guarded stores/collections; defaults to a new off policy."
+              "description": ""
             },
             {
               "name": "identity",
@@ -3790,8 +3790,8 @@
               "name": "mutationPolicy",
               "type": "MutationPolicy",
               "optional": true,
-              "description": "Exact policy shared with guarded stores/collections; defaults to a new off policy.",
-              "descriptionEn": "Exact policy shared with guarded stores/collections; defaults to a new off policy.",
+              "description": "Exact host policy, defaulting to a new off policy; attach the same policy to the Store separately.",
+              "descriptionEn": "Exact host policy, defaulting to a new off policy; attach the same policy to the Store separately.",
               "descriptionZh": ""
             },
             {
@@ -3904,8 +3904,8 @@
         {
           "name": "IDevToolsAdapter",
           "kind": "type",
-          "signature": "export type IDevToolsAdapter<S> = { /** Initialize from current state at installation and again for commit commands. */ init(state: S): void; /** Receive an event and current host state at this stage's position in the flat pipeline. */ send(event: IMiddlewareEvent<S>, state: S): void; /** Register normalized commands and synchronously return the disposer owned by plugin cleanup. */ subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };",
-          "declarationLine": 118,
+          "signature": "export type IDevToolsAdapter<S> = { init(state: S): void; send(event: IMiddlewareEvent<S>, state: S): void; subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };",
+          "declarationLine": 61,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Caller-owned domain adapter consumed by connectDevTools; has synchronous initialization/event forwarding and optional normalized command subscription.",
           "core": "init: Initializes or commits current state in the external diagnostic target.\ninit.state: Current S supplied by host getState at installation or commit.\nNo result; throws follow plugin installation or command callback handling.\nsend: Sends one event and current state within its stage after recording next(event), before downstream middleware executes.\nsend.event: Delivered host domain event, retaining original error and metadata references.\nsend.state: Current snapshot read inside the sending stage before downstream processing.\nNo result is awaited; throws follow the invoking emission boundary.\nsubscribe: Optional synchronous registration of a normalized command listener; the host registers its returned cleanup with plugin disposal.\nsubscribe.listener: Synchronous command callback receiving commit, jump or reset from the adapter; no result is used, and command failures follow the connection delivery path.\nExternal no-argument IDisposer removing the command subscription.\nAbsent; the host installs a no-op cleanup and receives no commands.",
@@ -3922,7 +3922,7 @@
               "kind": "method",
               "optional": false,
               "signature": "init(state: S): void;",
-              "description": "Initialize from current state at installation and again for commit commands.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "state",
@@ -3937,7 +3937,7 @@
               "kind": "method",
               "optional": false,
               "signature": "send(event: IMiddlewareEvent<S>, state: S): void;",
-              "description": "Receive an event and current host state at this stage's position in the flat pipeline.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "event",
@@ -3957,7 +3957,7 @@
               "kind": "method",
               "optional": true,
               "signature": "subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;",
-              "description": "Register normalized commands and synchronously return the disposer owned by plugin cleanup.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "listener",
@@ -3971,7 +3971,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDevToolsAdapter<S> = { /** Initialize from current state at installation and again for commit commands. */ init(state: S): void; /** Receive an event and current host state at this stage's position in the flat pipeline. */ send(event: IMiddlewareEvent<S>, state: S): void; /** Register normalized commands and synchronously return the disposer owned by plugin cleanup. */ subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };"
+            "export type IDevToolsAdapter<S> = { init(state: S): void; send(event: IMiddlewareEvent<S>, state: S): void; subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4010,7 +4010,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IDevToolsAdapter:export type IDevToolsAdapter<S> = { /** Initialize from current state at installation and again for commit commands. */ init(state: S): void; /** Receive an event and current host state at this stage's position in the flat pipeline. */ send(event: IMiddlewareEvent<S>, state: S): void; /** Register normalized commands and synchronously return the disposer owned by plugin cleanup. */ subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IDevToolsAdapter:export type IDevToolsAdapter<S> = { init(state: S): void; send(event: IMiddlewareEvent<S>, state: S): void; subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -4019,8 +4019,8 @@
         {
           "name": "IDevToolsCommand",
           "kind": "type",
-          "signature": "export type IDevToolsCommand<S> = { /** Apply a selected historical state through runAction. */ readonly type: typeof MiddlewareCommandType.jump; /** Parsed or adapter-provided state; no schema validation is implied. */ readonly state: S; } | { /** Apply the adapter's reset state through runAction. */ readonly type: typeof MiddlewareCommandType.reset; /** Adapter-provided replacement state, not an implicit initial-state cache. */ readonly state: S; } | { /** Reinitialize the adapter with current host state, without applying a new state. */ readonly type: typeof MiddlewareCommandType.commit; };",
-          "declarationLine": 103,
+          "signature": "export type IDevToolsCommand<S> = { readonly type: typeof MiddlewareCommandType.jump; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.reset; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.commit; };",
+          "declarationLine": 52,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Normalized adapter command union: commit has no replacement state, while jump and reset carry the supplied state to apply inside an action.",
           "core": "type: Normalized command from the adapter, selecting reinitialization or state application.\nstate: Replacement S only on jump/reset, parsed by the Redux adapter or supplied by a custom adapter.",
@@ -4037,7 +4037,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareCommandType.jump;",
-              "description": "Apply a selected historical state through runAction.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareCommandType.jump"
             },
@@ -4046,7 +4046,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly state: S;",
-              "description": "Parsed or adapter-provided state; no schema validation is implied.",
+              "description": null,
               "parameterDetails": [],
               "returns": "S"
             },
@@ -4055,7 +4055,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareCommandType.reset;",
-              "description": "Apply the adapter's reset state through runAction.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareCommandType.reset"
             },
@@ -4064,7 +4064,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly state: S;",
-              "description": "Adapter-provided replacement state, not an implicit initial-state cache.",
+              "description": null,
               "parameterDetails": [],
               "returns": "S"
             },
@@ -4073,7 +4073,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareCommandType.commit;",
-              "description": "Reinitialize the adapter with current host state, without applying a new state.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareCommandType.commit"
             }
@@ -4081,7 +4081,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDevToolsCommand<S> = { /** Apply a selected historical state through runAction. */ readonly type: typeof MiddlewareCommandType.jump; /** Parsed or adapter-provided state; no schema validation is implied. */ readonly state: S; } | { /** Apply the adapter's reset state through runAction. */ readonly type: typeof MiddlewareCommandType.reset; /** Adapter-provided replacement state, not an implicit initial-state cache. */ readonly state: S; } | { /** Reinitialize the adapter with current host state, without applying a new state. */ readonly type: typeof MiddlewareCommandType.commit; };"
+            "export type IDevToolsCommand<S> = { readonly type: typeof MiddlewareCommandType.jump; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.reset; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.commit; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4120,7 +4120,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IDevToolsCommand:export type IDevToolsCommand<S> = { /** Apply a selected historical state through runAction. */ readonly type: typeof MiddlewareCommandType.jump; /** Parsed or adapter-provided state; no schema validation is implied. */ readonly state: S; } | { /** Apply the adapter's reset state through runAction. */ readonly type: typeof MiddlewareCommandType.reset; /** Adapter-provided replacement state, not an implicit initial-state cache. */ readonly state: S; } | { /** Reinitialize the adapter with current host state, without applying a new state. */ readonly type: typeof MiddlewareCommandType.commit; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IDevToolsCommand:export type IDevToolsCommand<S> = { readonly type: typeof MiddlewareCommandType.jump; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.reset; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.commit; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4129,8 +4129,8 @@
         {
           "name": "IMiddlewareActionEvent",
           "kind": "type",
-          "signature": "export type IMiddlewareActionEvent = { /** Identifies an action notification rather than a state or error event. */ readonly type: typeof MiddlewareEventType.action; /** The synchronous action is about to run; no duration is available yet. */ readonly phase: typeof MiddlewareEventPhase.start; /** Caller action label, reused by its corresponding end/error notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Optional caller metadata retained by reference, without cloning or runtime freezing. */ readonly metadata?: Readonly<Record<string, unknown>>; } | { /** Identifies an action notification. */ readonly type: typeof MiddlewareEventType.action; /** The callback returned, even if that return value is a still-pending Promise. */ readonly phase: typeof MiddlewareEventPhase.end; /** Same caller label as the action's start notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Elapsed synchronous action time; not the settlement time of a returned Promise. */ readonly durationMs: number; /** Optional caller metadata, retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; } | { /** Identifies an action notification. */ readonly type: typeof MiddlewareEventType.action; /** The synchronous callback threw; asynchronous rejections are not captured here. */ readonly phase: typeof MiddlewareEventPhase.error; /** Same caller label as the action's start notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Elapsed synchronous time before the failure. */ readonly durationMs: number; /** Failure rethrown by the action boundary, retaining its original identity or cause. */ readonly error: unknown; /** Optional caller metadata, retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };",
-          "declarationLine": 32,
+          "signature": "export type IMiddlewareActionEvent = { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.start; readonly name: string; readonly timestamp: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.end; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.error; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };",
+          "declarationLine": 14,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Action trace discriminated by start/end/error; start lacks duration and original error, end adds duration, error adds both duration and the original thrown value.",
           "core": "type: Discriminates action trace, state observation or diagnostic error; generated by host domain methods or the Store binding.\nphase: Action uses start/end/error; diagnostic error events instead carry a caller diagnostic phase string.\nname: Application action or state-event name, supplied to runAction/recordState or forwarded from the original Runtime trace.\ntimestamp: Wall-clock milliseconds from Date.now for host-generated events, or original Runtime trace timestamp when forwarded.\ndurationMs: Elapsed synchronous action duration on end/error variants, measured with performance.now where available and otherwise Date.now.\nerror: Original thrown business or diagnostic value, kept by identity on action-error or diagnostic-error variants.\nmetadata: Optional caller-owned diagnostic record retained without deep copy.\nOmitted when no metadata is supplied.",
@@ -4147,7 +4147,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareEventType.action;",
-              "description": "Identifies an action notification rather than a state or error event.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventType.action"
             },
@@ -4156,7 +4156,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly phase: typeof MiddlewareEventPhase.start;",
-              "description": "The synchronous action is about to run; no duration is available yet.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventPhase.start"
             },
@@ -4165,7 +4165,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly name: string;",
-              "description": "Caller action label, reused by its corresponding end/error notification.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4174,7 +4174,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly timestamp: number;",
-              "description": "Wall-clock milliseconds at notification creation.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4183,7 +4183,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly metadata?: Readonly<Record<string, unknown>>;",
-              "description": "Optional caller metadata retained by reference, without cloning or runtime freezing.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Readonly<Record<string, unknown>>"
             },
@@ -4192,7 +4192,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareEventType.action;",
-              "description": "Identifies an action notification.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventType.action"
             },
@@ -4201,7 +4201,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly phase: typeof MiddlewareEventPhase.end;",
-              "description": "The callback returned, even if that return value is a still-pending Promise.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventPhase.end"
             },
@@ -4210,7 +4210,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly name: string;",
-              "description": "Same caller label as the action's start notification.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4219,7 +4219,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly timestamp: number;",
-              "description": "Wall-clock milliseconds at notification creation.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4228,7 +4228,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly durationMs: number;",
-              "description": "Elapsed synchronous action time; not the settlement time of a returned Promise.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4237,7 +4237,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly metadata?: Readonly<Record<string, unknown>>;",
-              "description": "Optional caller metadata, retained by reference.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Readonly<Record<string, unknown>>"
             },
@@ -4246,7 +4246,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareEventType.action;",
-              "description": "Identifies an action notification.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventType.action"
             },
@@ -4255,7 +4255,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly phase: typeof MiddlewareEventPhase.error;",
-              "description": "The synchronous callback threw; asynchronous rejections are not captured here.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventPhase.error"
             },
@@ -4264,7 +4264,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly name: string;",
-              "description": "Same caller label as the action's start notification.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4273,7 +4273,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly timestamp: number;",
-              "description": "Wall-clock milliseconds at notification creation.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4282,7 +4282,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly durationMs: number;",
-              "description": "Elapsed synchronous time before the failure.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4291,7 +4291,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: unknown;",
-              "description": "Failure rethrown by the action boundary, retaining its original identity or cause.",
+              "description": null,
               "parameterDetails": [],
               "returns": "unknown"
             },
@@ -4300,7 +4300,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly metadata?: Readonly<Record<string, unknown>>;",
-              "description": "Optional caller metadata, retained by reference.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Readonly<Record<string, unknown>>"
             }
@@ -4308,7 +4308,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewareActionEvent = { /** Identifies an action notification rather than a state or error event. */ readonly type: typeof MiddlewareEventType.action; /** The synchronous action is about to run; no duration is available yet. */ readonly phase: typeof MiddlewareEventPhase.start; /** Caller action label, reused by its corresponding end/error notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Optional caller metadata retained by reference, without cloning or runtime freezing. */ readonly metadata?: Readonly<Record<string, unknown>>; } | { /** Identifies an action notification. */ readonly type: typeof MiddlewareEventType.action; /** The callback returned, even if that return value is a still-pending Promise. */ readonly phase: typeof MiddlewareEventPhase.end; /** Same caller label as the action's start notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Elapsed synchronous action time; not the settlement time of a returned Promise. */ readonly durationMs: number; /** Optional caller metadata, retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; } | { /** Identifies an action notification. */ readonly type: typeof MiddlewareEventType.action; /** The synchronous callback threw; asynchronous rejections are not captured here. */ readonly phase: typeof MiddlewareEventPhase.error; /** Same caller label as the action's start notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Elapsed synchronous time before the failure. */ readonly durationMs: number; /** Failure rethrown by the action boundary, retaining its original identity or cause. */ readonly error: unknown; /** Optional caller metadata, retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };"
+            "export type IMiddlewareActionEvent = { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.start; readonly name: string; readonly timestamp: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.end; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.error; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4347,7 +4347,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IMiddlewareActionEvent:export type IMiddlewareActionEvent = { /** Identifies an action notification rather than a state or error event. */ readonly type: typeof MiddlewareEventType.action; /** The synchronous action is about to run; no duration is available yet. */ readonly phase: typeof MiddlewareEventPhase.start; /** Caller action label, reused by its corresponding end/error notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Optional caller metadata retained by reference, without cloning or runtime freezing. */ readonly metadata?: Readonly<Record<string, unknown>>; } | { /** Identifies an action notification. */ readonly type: typeof MiddlewareEventType.action; /** The callback returned, even if that return value is a still-pending Promise. */ readonly phase: typeof MiddlewareEventPhase.end; /** Same caller label as the action's start notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Elapsed synchronous action time; not the settlement time of a returned Promise. */ readonly durationMs: number; /** Optional caller metadata, retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; } | { /** Identifies an action notification. */ readonly type: typeof MiddlewareEventType.action; /** The synchronous callback threw; asynchronous rejections are not captured here. */ readonly phase: typeof MiddlewareEventPhase.error; /** Same caller label as the action's start notification. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Elapsed synchronous time before the failure. */ readonly durationMs: number; /** Failure rethrown by the action boundary, retaining its original identity or cause. */ readonly error: unknown; /** Optional caller metadata, retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IMiddlewareActionEvent:export type IMiddlewareActionEvent = { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.start; readonly name: string; readonly timestamp: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.end; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.error; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4357,7 +4357,7 @@
           "name": "IMiddlewareCommandType",
           "kind": "type",
           "signature": "export type IMiddlewareCommandType = (typeof MiddlewareCommandType)[keyof typeof MiddlewareCommandType];",
-          "declarationLine": 31,
+          "declarationLine": 20,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Value union of normalized commit, jump and reset diagnostic commands.",
           "core": "Value union of normalized commit, jump and reset diagnostic commands.",
@@ -4421,8 +4421,8 @@
         {
           "name": "IMiddlewareErrorEvent",
           "kind": "type",
-          "signature": "export type IMiddlewareErrorEvent = { /** Selects the standalone error event variant. */ readonly type: typeof MiddlewareEventType.error; /** Producer-selected diagnostic phase, without a fixed literal vocabulary. */ readonly phase: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Original reported value; recordError does not clone it. */ readonly error: unknown; /** Optional producer metadata retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };",
-          "declarationLine": 88,
+          "signature": "export type IMiddlewareErrorEvent = { readonly type: typeof MiddlewareEventType.error; readonly phase: string; readonly timestamp: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };",
+          "declarationLine": 44,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Diagnostic error event with caller phase and original failure, separate from an action-error phase.",
           "core": "type: Discriminates action trace, state observation or diagnostic error; generated by host domain methods or the Store binding.\nphase: Action uses start/end/error; diagnostic error events instead carry a caller diagnostic phase string.\ntimestamp: Wall-clock milliseconds from Date.now for host-generated events, or original Runtime trace timestamp when forwarded.\nerror: Original thrown business or diagnostic value, kept by identity on action-error or diagnostic-error variants.\nmetadata: Optional caller-owned diagnostic record retained without deep copy.\nOmitted when no metadata is supplied.",
@@ -4439,7 +4439,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareEventType.error;",
-              "description": "Selects the standalone error event variant.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventType.error"
             },
@@ -4448,7 +4448,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly phase: string;",
-              "description": "Producer-selected diagnostic phase, without a fixed literal vocabulary.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4457,7 +4457,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly timestamp: number;",
-              "description": "Wall-clock milliseconds at notification creation.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4466,7 +4466,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: unknown;",
-              "description": "Original reported value; recordError does not clone it.",
+              "description": null,
               "parameterDetails": [],
               "returns": "unknown"
             },
@@ -4475,7 +4475,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly metadata?: Readonly<Record<string, unknown>>;",
-              "description": "Optional producer metadata retained by reference.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Readonly<Record<string, unknown>>"
             }
@@ -4483,7 +4483,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewareErrorEvent = { /** Selects the standalone error event variant. */ readonly type: typeof MiddlewareEventType.error; /** Producer-selected diagnostic phase, without a fixed literal vocabulary. */ readonly phase: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Original reported value; recordError does not clone it. */ readonly error: unknown; /** Optional producer metadata retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };"
+            "export type IMiddlewareErrorEvent = { readonly type: typeof MiddlewareEventType.error; readonly phase: string; readonly timestamp: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4522,7 +4522,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IMiddlewareErrorEvent:export type IMiddlewareErrorEvent = { /** Selects the standalone error event variant. */ readonly type: typeof MiddlewareEventType.error; /** Producer-selected diagnostic phase, without a fixed literal vocabulary. */ readonly phase: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Original reported value; recordError does not clone it. */ readonly error: unknown; /** Optional producer metadata retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IMiddlewareErrorEvent:export type IMiddlewareErrorEvent = { readonly type: typeof MiddlewareEventType.error; readonly phase: string; readonly timestamp: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4532,7 +4532,7 @@
           "name": "IMiddlewareEvent",
           "kind": "type",
           "signature": "export type IMiddlewareEvent<S> = IMiddlewareActionEvent | IMiddlewareStateEvent<S> | IMiddlewareErrorEvent;",
-          "declarationLine": 101,
+          "declarationLine": 51,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Union of action, state and diagnostic-error domain events; inspect type then the relevant variant fields rather than assuming every event contains state or duration.",
           "core": "type: Discriminates action trace, state observation or diagnostic error; generated by host domain methods or the Store binding.\nphase: Action uses start/end/error; diagnostic error events instead carry a caller diagnostic phase string.\nname: Application action or state-event name, supplied to runAction/recordState or forwarded from the original Runtime trace.\ntimestamp: Wall-clock milliseconds from Date.now for host-generated events, or original Runtime trace timestamp when forwarded.\ndurationMs: Elapsed synchronous action duration on end/error variants, measured with performance.now where available and otherwise Date.now.\nerror: Original thrown business or diagnostic value, kept by identity on action-error or diagnostic-error variants.\nprevious: Caller-supplied previous state snapshot; binding snapshot independence depends on the selected clone policy.\nnext: Caller-supplied next state snapshot, or one produced by binding after Store change.\nmetadata: Optional caller-owned diagnostic record retained without deep copy.\nOmitted when no metadata is supplied.",
@@ -4596,7 +4596,7 @@
           "name": "IMiddlewareEventPhase",
           "kind": "type",
           "signature": "export type IMiddlewareEventPhase = (typeof MiddlewareEventPhase)[keyof typeof MiddlewareEventPhase];",
-          "declarationLine": 33,
+          "declarationLine": 21,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Value union of synchronous action start, end and error phases; diagnostic phases remain caller-defined strings.",
           "core": "Value union of synchronous action start, end and error phases; diagnostic phases remain caller-defined strings.",
@@ -4661,7 +4661,7 @@
           "name": "IMiddlewareEventType",
           "kind": "type",
           "signature": "export type IMiddlewareEventType = (typeof MiddlewareEventType)[keyof typeof MiddlewareEventType];",
-          "declarationLine": 29,
+          "declarationLine": 19,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Value union of canonical action, state and error domain event discriminants.",
           "core": "Value union of canonical action, state and error domain event discriminants.",
@@ -4725,8 +4725,8 @@
         {
           "name": "IMiddlewareStateEvent",
           "kind": "type",
-          "signature": "export type IMiddlewareStateEvent<S> = { /** Selects the state-change event variant. */ readonly type: typeof MiddlewareEventType.state; /** Producer-selected change label, such as the binding's store:update. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Previous value supplied by the producer; not automatically copied by recordState. */ readonly previous: S; /** Next value supplied by the producer; not automatically copied by recordState. */ readonly next: S; /** Optional producer metadata retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };",
-          "declarationLine": 73,
+          "signature": "export type IMiddlewareStateEvent<S> = { readonly type: typeof MiddlewareEventType.state; readonly name: string; readonly timestamp: number; readonly previous: S; readonly next: S; readonly metadata?: Readonly<Record<string, unknown>>; };",
+          "declarationLine": 36,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "State observation with caller-owned previous/next snapshots; emitting it never applies the state itself.",
           "core": "type: Discriminates action trace, state observation or diagnostic error; generated by host domain methods or the Store binding.\nname: Application action or state-event name, supplied to runAction/recordState or forwarded from the original Runtime trace.\ntimestamp: Wall-clock milliseconds from Date.now for host-generated events, or original Runtime trace timestamp when forwarded.\nprevious: Caller-supplied previous state snapshot; binding snapshot independence depends on the selected clone policy.\nnext: Caller-supplied next state snapshot, or one produced by binding after Store change.\nmetadata: Optional caller-owned diagnostic record retained without deep copy.\nOmitted when no metadata is supplied.",
@@ -4743,7 +4743,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly type: typeof MiddlewareEventType.state;",
-              "description": "Selects the state-change event variant.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof MiddlewareEventType.state"
             },
@@ -4752,7 +4752,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly name: string;",
-              "description": "Producer-selected change label, such as the binding's store:update.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4761,7 +4761,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly timestamp: number;",
-              "description": "Wall-clock milliseconds at notification creation.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -4770,7 +4770,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly previous: S;",
-              "description": "Previous value supplied by the producer; not automatically copied by recordState.",
+              "description": null,
               "parameterDetails": [],
               "returns": "S"
             },
@@ -4779,7 +4779,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly next: S;",
-              "description": "Next value supplied by the producer; not automatically copied by recordState.",
+              "description": null,
               "parameterDetails": [],
               "returns": "S"
             },
@@ -4788,7 +4788,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly metadata?: Readonly<Record<string, unknown>>;",
-              "description": "Optional producer metadata retained by reference.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Readonly<Record<string, unknown>>"
             }
@@ -4796,7 +4796,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewareStateEvent<S> = { /** Selects the state-change event variant. */ readonly type: typeof MiddlewareEventType.state; /** Producer-selected change label, such as the binding's store:update. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Previous value supplied by the producer; not automatically copied by recordState. */ readonly previous: S; /** Next value supplied by the producer; not automatically copied by recordState. */ readonly next: S; /** Optional producer metadata retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };"
+            "export type IMiddlewareStateEvent<S> = { readonly type: typeof MiddlewareEventType.state; readonly name: string; readonly timestamp: number; readonly previous: S; readonly next: S; readonly metadata?: Readonly<Record<string, unknown>>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4835,7 +4835,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IMiddlewareStateEvent:export type IMiddlewareStateEvent<S> = { /** Selects the state-change event variant. */ readonly type: typeof MiddlewareEventType.state; /** Producer-selected change label, such as the binding's store:update. */ readonly name: string; /** Wall-clock milliseconds at notification creation. */ readonly timestamp: number; /** Previous value supplied by the producer; not automatically copied by recordState. */ readonly previous: S; /** Next value supplied by the producer; not automatically copied by recordState. */ readonly next: S; /** Optional producer metadata retained by reference. */ readonly metadata?: Readonly<Record<string, unknown>>; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IMiddlewareStateEvent:export type IMiddlewareStateEvent<S> = { readonly type: typeof MiddlewareEventType.state; readonly name: string; readonly timestamp: number; readonly previous: S; readonly next: S; readonly metadata?: Readonly<Record<string, unknown>>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4907,7 +4907,7 @@
           "name": "IReduxDevToolsCommand",
           "kind": "type",
           "signature": "export type IReduxDevToolsCommand = (typeof ReduxDevToolsCommand)[keyof typeof ReduxDevToolsCommand];",
-          "declarationLine": 17,
+          "declarationLine": 11,
           "source": "packages/store-middleware/dist/devtools-constants.d.ts",
           "purpose": "Value union of the six canonical ReduxDevToolsCommand wire strings, separate from normalized commit/jump/reset middleware commands.",
           "core": "Value union of the six canonical ReduxDevToolsCommand wire strings, separate from normalized commit/jump/reset middleware commands.",
@@ -4971,8 +4971,8 @@
         {
           "name": "IReduxDevToolsConnection",
           "kind": "type",
-          "signature": "export type IReduxDevToolsConnection<S> = { /** Initialize or recommit the current state. */ init(state: S): void; /** Receive a generated action label/event object and current state. */ send(action: unknown, state: S): void; /** Register wire messages and return the exact cleanup function to pass through to consumers. */ subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };",
-          "declarationLine": 139,
+          "signature": "export type IReduxDevToolsConnection<S> = { init(state: S): void; send(action: unknown, state: S): void; subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };",
+          "declarationLine": 73,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Caller-provided structural extension connection; this package adapts its messages and labels without acquiring the browser extension itself.",
           "core": "init: Connection callback receiving current state at adapter initialization or commit.\ninit.state: Current state supplied by the host domain getter.\nNo result; connection failure propagates to its invoking adapter call.\nsend: Connection callback receiving an action object containing a stable label and original event, plus current state.\nsend.action: Adapter-created { type, event }; action labels include name:phase, state name or error:phase.\nsend.state: Current host snapshot supplied during the sending stage before downstream processing.\nNo result; original connection throws propagate.\nsubscribe: Registers a synchronous raw extension-message callback and returns connection-owned cleanup.\nsubscribe.listener: Synchronous callback receiving IReduxDevToolsMessage from the connection; the adapter ignores unrelated messages, reports malformed state JSON through its Runtime, and does not await return values.\nNo-argument IDisposer supplied by the connection to remove its listener.",
@@ -4989,7 +4989,7 @@
               "kind": "method",
               "optional": false,
               "signature": "init(state: S): void;",
-              "description": "Initialize or recommit the current state.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "state",
@@ -5004,7 +5004,7 @@
               "kind": "method",
               "optional": false,
               "signature": "send(action: unknown, state: S): void;",
-              "description": "Receive a generated action label/event object and current state.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "action",
@@ -5024,7 +5024,7 @@
               "kind": "method",
               "optional": false,
               "signature": "subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer;",
-              "description": "Register wire messages and return the exact cleanup function to pass through to consumers.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "listener",
@@ -5038,7 +5038,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IReduxDevToolsConnection<S> = { /** Initialize or recommit the current state. */ init(state: S): void; /** Receive a generated action label/event object and current state. */ send(action: unknown, state: S): void; /** Register wire messages and return the exact cleanup function to pass through to consumers. */ subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };"
+            "export type IReduxDevToolsConnection<S> = { init(state: S): void; send(action: unknown, state: S): void; subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5077,7 +5077,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IReduxDevToolsConnection:export type IReduxDevToolsConnection<S> = { /** Initialize or recommit the current state. */ init(state: S): void; /** Receive a generated action label/event object and current state. */ send(action: unknown, state: S): void; /** Register wire messages and return the exact cleanup function to pass through to consumers. */ subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IReduxDevToolsConnection:export type IReduxDevToolsConnection<S> = { init(state: S): void; send(action: unknown, state: S): void; subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -5086,8 +5086,8 @@
         {
           "name": "IReduxDevToolsMessage",
           "kind": "type",
-          "signature": "export type IReduxDevToolsMessage = { /** Messages other than DISPATCH are ignored. */ readonly type?: string; /** Optional command envelope; absent or unknown command types are ignored. */ readonly payload?: { /** COMMIT, JUMP_TO_STATE, JUMP_TO_ACTION, ROLLBACK or RESET. */ readonly type?: string; }; /** JSON text required for state commands; COMMIT does not parse or require it. */ readonly state?: string; };",
-          "declarationLine": 127,
+          "signature": "export type IReduxDevToolsMessage = { readonly type?: string; readonly payload?: { readonly type?: string; }; readonly state?: string; };",
+          "declarationLine": 66,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Optional raw extension fields; only DISPATCH with supported payload commands is handled, and stateful commands require parseable JSON state.",
           "core": "type: Raw message discriminator; DISPATCH is handled and all other strings are ignored.\nAbsent, causing the message to be ignored.\npayload: Optional nested command selector; unknown or missing command types are ignored.\nAbsent; no normalized command is emitted.\npayload.type: COMMIT reinitializes, JUMP_TO_STATE/JUMP_TO_ACTION/ROLLBACK become jump, RESET becomes reset; other strings are ignored.\nReinitialize the adapter with current state without applying replacement state.\nApply a supplied historical state inside a host action.\nApply a supplied reset state inside a host action.\nstate: JSON state text supplied by the extension; parse failure reports DEVTOOLS_MESSAGE_INVALID with original SyntaxError through the adapter Runtime and skips this command; valid parsed S is passed to jump/reset.\nAbsent; stateful commands are ignored while commit still works.",
@@ -5104,7 +5104,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly type?: string;",
-              "description": "Messages other than DISPATCH are ignored.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -5112,17 +5112,17 @@
               "name": "payload",
               "kind": "property",
               "optional": true,
-              "signature": "readonly payload?: { /** COMMIT, JUMP_TO_STATE, JUMP_TO_ACTION, ROLLBACK or RESET. */ readonly type?: string; };",
-              "description": "Optional command envelope; absent or unknown command types are ignored.",
+              "signature": "readonly payload?: { readonly type?: string; };",
+              "description": null,
               "parameterDetails": [],
-              "returns": "{ /** COMMIT, JUMP_TO_STATE, JUMP_TO_ACTION, ROLLBACK or RESET. */ readonly type?: string; }"
+              "returns": "{ readonly type?: string; }"
             },
             {
               "name": "state",
               "kind": "property",
               "optional": true,
               "signature": "readonly state?: string;",
-              "description": "JSON text required for state commands; COMMIT does not parse or require it.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             }
@@ -5130,7 +5130,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IReduxDevToolsMessage = { /** Messages other than DISPATCH are ignored. */ readonly type?: string; /** Optional command envelope; absent or unknown command types are ignored. */ readonly payload?: { /** COMMIT, JUMP_TO_STATE, JUMP_TO_ACTION, ROLLBACK or RESET. */ readonly type?: string; }; /** JSON text required for state commands; COMMIT does not parse or require it. */ readonly state?: string; };"
+            "export type IReduxDevToolsMessage = { readonly type?: string; readonly payload?: { readonly type?: string; }; readonly state?: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5169,7 +5169,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:IReduxDevToolsMessage:export type IReduxDevToolsMessage = { /** Messages other than DISPATCH are ignored. */ readonly type?: string; /** Optional command envelope; absent or unknown command types are ignored. */ readonly payload?: { /** COMMIT, JUMP_TO_STATE, JUMP_TO_ACTION, ROLLBACK or RESET. */ readonly type?: string; }; /** JSON text required for state commands; COMMIT does not parse or require it. */ readonly state?: string; };",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:IReduxDevToolsMessage:export type IReduxDevToolsMessage = { readonly type?: string; readonly payload?: { readonly type?: string; }; readonly state?: string; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -5179,7 +5179,7 @@
           "name": "IStoreMiddlewareBinding",
           "kind": "type",
           "signature": "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;",
-          "declarationLine": 119,
+          "declarationLine": 51,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Canonical frozen managed handle returned by bindStoreMiddleware, carrying all host capabilities plus the original light Store reference. Live revision/getters and fluent return identity preserve every Store member. Releasing this binding leaves the Store alive.",
           "core": "identity: Immutable host identity `{ name, id }`: `name` from the `identity` option, `id` unique per host; used in errors and diagnostics.\nplugin: Enable/disable controls: `plugin.disable(name)` hides a plugin (extensions, Features, stages) without releasing resources, `plugin.enable(name)` restores it in place, `plugin.disabled()` lists disabled names.\npipelineMode: Always sync: store event host construction overrides any supplied pipeline mode.\nrevision: Live revision getter from the same canonical managed host; plugin commits update it without replacing the Store domain or fluent handle identity.\nconfig: Per-plugin configuration store. `config.get(\"plugin.key\")` reads a frozen snapshot (unknown paths return `undefined`); `config.update(name, recipe)` merges a patch copy-on-write and commits only after the plugin `update` hook succeeds.\nuseSync: Installs synchronously and returns handles in input order. A declared setup immediately throws SETUP_REQUIRES_ASYNC_INSTALL. A thenable install result rejects as PLUGIN_INSTALL_FAILED with INSTALL_RESULT_THENABLE on cause; its later rejection is reported through the diagnostic third argument, not inserted retroactively into the immediate cause chain.\nuseSync.plugins: Plugin definitions with synchronous install.\nThe handle tuple in input order.\nBuilding a host that must be usable right after construction.\nuse: Installs one or more plugins as one batch, in Feature dependency order (argument order does not matter). Either every plugin is published or the batch is rolled back in reverse order.\nuse.plugins: Definitions from `definePlugin()` or plugin factories such as `level()`. Names must be unique and must not contain `.`.\nA Promise of the handle tuple in input order. Install failures reject with `PLUGIN_INSTALL_FAILED` (original error on `cause`, `detail.failedName`); missing providers throw `PREREQUISITE_*` directly.\nPlugins with async `setup` or `install`, or plugins added at runtime.\nunUse: Removes a plugin: runs its `beforeRelease`, waits for running pipelines, withdraws extensions, Features and stages, then runs its disposers and releases resources in reverse order.\nunUse.name: Name of the installed plugin.\nunUse.options: `policy`: what happens to plugins that require it (`reject` default, `cascade`, `suspend`); `dryRun: true` returns the plan without changing anything.\n{ ok: true, affected }, or { ok: false, errors, affected } after cleanup failure or PIPELINE_DRAIN_TIMEOUT. Ordinary unUse continues bounded cleanup after a drain timeout, records/reports that failure and adds no physicalCompletion protocol. dryRun:true returns IPluginDependencyPlan.\nactivate: Installs a plugin that was registered with `activation: \"lazy\"`, first activating any lazy providers it requires. Concurrent calls share one Promise; a failure leaves it registered so it can be retried.\nactivate.name: Name of the lazy plugin.\nThe handle of the activated plugin; the original install error on failure.\nDefer expensive plugins until the first request needs them.\nreplace: Hot-swaps a plugin: installs `next` first (the old one keeps serving if that fails), then rebinds dependents that implement `onDependencyReplaced` and restarts the others; the old generation is disposed after its running pipelines drain.\nreplace.name: Name of the installed plugin.\nreplace.next: New definition with the same name (otherwise `REPLACE_NAME_MISMATCH`).\nThe handle of the new generation. Old extracted extension functions throw `REGISTRATION_REVOKED`; a failed dependent restart throws `DEPENDENT_RESTART_FAILED` after the replacement took effect.\nrunPipeline: Runs `value` through host and plugin stages and calls `done` with the final value. Only the holder of a `defineHost()` handle can call it (subclasses use the protected method), so the domain decides when the pipeline runs.\nrunPipeline.value: Input value.\nrunPipeline.done: Final callback; not called when a stage stops the value.\n`void` in sync modes, a Promise in async modes; host disposal aborts the run with `HOST_DISPOSING`.\ndispose: Stops host admission, runs binding disposers in reverse order, then delegates plugin lifecycle cleanup. Every disposer is attempted and binding errors precede plugin errors.\nShared Promise<IPluginHostDisposalResult> with logicalTerminal, cleanupComplete and cleanupErrors. Binding throws are reported in this result; unfinished physical cleanup remains reachable through physicalCompletion.\nusePipeline: Adds a synchronous processing function to the host pipeline. Receive the current value and call next(newValue) to continue with a value for the next function. Omitting next() stops processing. The host adapts this synchronous function to its selected mode, so this registration method works in every host mode.\nusePipeline.stage: Sync stage; call `next(value)` to continue, omit it to stop the value.\nThe host itself, so calls can be chained.\nuseAsyncPipeline: Registers a step that can await other work before or after the next event-processing step. This requires async mode. Store event hosts process events synchronously, so this call throws PIPELINE_MODE_MISMATCH, meaning the requested step does not match the host mode. Use usePipeline for synchronous steps.\nuseAsyncPipeline.stage: `async (value, next) => { await next(value) }`; code after `await next()` runs after downstream.\nThe host itself.\nuseGeneratorPipeline: Registers a generator function that uses yield to supply a processed value. That form runs only in generator or async-generator mode. On a Store event host, registration throws PIPELINE_MODE_MISMATCH because its event pipeline accepts synchronous next-style steps only. To transform an event here, register usePipeline and pass the resulting event to next before the callback returns.\nuseGeneratorPipeline.stage: `function* (value)`; return a value or a `GENERATOR_*` signal.\nuseAsyncGeneratorPipeline: Registers a function that combines awaited work with values supplied through yield. Only async-generator mode can execute that combination. Store event hosts cannot await yielded results, so this registration fails with PIPELINE_MODE_MISMATCH, the error for an incompatible step mode. Complete asynchronous preparation before emitting the store event, then use usePipeline for the remaining synchronous handling.\nuseAsyncGeneratorPipeline.stage: `async function* (value)`; drained completely before the next stage.\nmutationPolicy: Exact caller policy object or a newly created off policy; share the same policy with the Store when enforcing actions-only writes.\nemit: Synchronously runs an event through the host pipeline. Missing continuation reports MIDDLEWARE_NOT_CHAINED; other pipeline failures may propagate from this public method.\nemit.event: IMiddlewareEvent from host domain methods, Store trace binding or explicit caller construction using the event constants.\nNo result after synchronous delivery; this is the direct emission boundary rather than isolated business-action observation.\nrunAction: Emits isolated start, runs fn inside mutation policy and Runtime batch, then emits isolated end or error. Synchronous business failures retain native identity or remain reachable through cause/errors under the policy callback contract; observer failures are reported.\nrunAction.name: Application-selected action label propagated to all three action phases.\nrunAction.fn: Synchronous no-argument business callback; return T or throw. Promises are returned without awaiting, so async continuations and rejections are outside action scope.\nrunAction.metadata: Optional caller diagnostic record; defaults to absent and retains its reference.\nExact fn return or policy-classified synchronous failure; foreign Reactive/pipeline errors keep their package identity. Action duration covers synchronous execution only.\nrecordState: Emits an isolated state observation without changing Store state. Middleware failures are reported rather than reaching the business caller.\nrecordState.name: Application-selected state observation label.\nrecordState.previous: Previous snapshot owned by the caller or binding clone policy.\nrecordState.next: Next snapshot owned by the caller or binding clone policy.\nrecordState.metadata: Optional diagnostic record, absent by default and retained by reference.\nNo result after isolated observation; state application is a separate capability.\nrecordError: Emits one isolated diagnostic-error event. Reentrant calls while handling an error report directly to Runtime without starting another middleware pipeline.\nrecordError.phase: Caller diagnostic phase identifying the failed subsystem or operation.\nrecordError.error: Original diagnostic failure value retained by identity.\nrecordError.metadata: Optional caller metadata; defaults to absent and is not cloned.\nNo result; observation failures are routed to Runtime.\nconnectDevTools: Installs a plugin that initializes an adapter, sends events after recording sync continuation and before downstream execution and subscribes to normalized commands. Pair with createReduxDevToolsAdapter when using a Redux extension-shaped connection.\nconnectDevTools.adapter: IDevToolsAdapter from createReduxDevToolsAdapter or caller implementation; init/send are required and subscribe is optional.\nconnectDevTools.name: Optional unique plugin name chosen by the application; defaults to store-devtools.\nPromise<void> after plugin installation. Invalid adapter uses INVALID_OPTION; install failures retain plugin-host semantics; jump/reset without applyState uses DEVTOOLS_CAPABILITY.\nattachBindingDisposer: While open, registers synchronous cleanup in reverse order before delegated plugin-host disposal. Once closing starts, registration invokes the disposer immediately; a synchronous failure propagates with CALLBACK_FAILED identity or preserves its foreign owner.\nattachBindingDisposer.disposer: Caller-owned IDisposer accepting no arguments and returning nothing; throws are collected into structured disposal cleanupErrors.\nNo result; an open host retains cleanup until disposal, while a closing host finishes it before this call returns.\nstore: Exact IReactiveStore originally supplied to bindStoreMiddleware; lifecycle ownership remains with the caller.",
@@ -5242,8 +5242,8 @@
         {
           "name": "IStoreMiddlewareBindingOptions",
           "kind": "type",
-          "signature": "export type IStoreMiddlewareBindingOptions = { /** Required explicit PluginHost mutation/drain budgets; false opts out of that deadline. */ readonly execution: IPluginHostOptions['execution']; /** * Exact host policy, defaulting to a new off policy; attach the same policy to the Store * separately. */ readonly mutationPolicy?: MutationPolicy; /** * Optional action-trace name prefix; omitted or empty accepts all action names, not state * filtering. */ readonly actionPrefix?: string; /** * Synchronous snapshot producer, default ClonePolicy.diagnostic. Used at binding and each state * observation/read; custom callback failures follow the invoking Store or construction boundary. */ readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
-          "declarationLine": 96,
+          "signature": "export type IStoreMiddlewareBindingOptions = { readonly execution: IPluginHostOptions['execution']; readonly mutationPolicy?: MutationPolicy; readonly actionPrefix?: string; readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
+          "declarationLine": 45,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Required external execution budgets plus optional policy sharing, action-prefix filtering and snapshot cloning for a Store binding.",
           "core": "execution: Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.\nexecution.mutationTimeoutMs: Required nonnegative finite milliseconds or false, with no default. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.\nexecution.pipelineDrainTimeoutMs: Required nonnegative finite milliseconds or false; no default. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.\nmutationPolicy: Exact caller policy object or a newly created off policy; share the same policy with the Store when enforcing actions-only writes.\n`createMutationPolicy('off')`; strict binding must explicitly share the Store policy.\nactionPrefix: Application string prefix for forwarded Runtime action names; state subscriptions are not filtered by it.\n`undefined`: no prefix filter; all action traces are forwarded.\nclone: Synchronous callback receiving the Store plain record on initial capture, reads and state changes. Return a snapshot record; throw aborts that capture and no async result is awaited.\nclone.state: Fresh plain record supplied by store.$plain().\nRecord snapshot; independence depends on this chosen clone implementation.\n`state => ClonePolicy.diagnostic(state)`, retaining unsupported subtree references when necessary.",
@@ -5260,7 +5260,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly execution: IPluginHostOptions['execution'];",
-              "description": "Required explicit PluginHost mutation/drain budgets; false opts out of that deadline.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IPluginHostOptions['execution']"
             },
@@ -5269,7 +5269,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly mutationPolicy?: MutationPolicy;",
-              "description": "Exact host policy, defaulting to a new off policy; attach the same policy to the Store separately.",
+              "description": null,
               "parameterDetails": [],
               "returns": "MutationPolicy"
             },
@@ -5278,7 +5278,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly actionPrefix?: string;",
-              "description": "Optional action-trace name prefix; omitted or empty accepts all action names, not state filtering.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -5287,7 +5287,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;",
-              "description": "Synchronous snapshot producer, default ClonePolicy.diagnostic. Used at binding and each state observation/read; custom callback failures follow the invoking Store or construction boundary.",
+              "description": null,
               "parameterDetails": [],
               "returns": "(state: Record<string, unknown>) => Record<string, unknown>"
             }
@@ -5295,7 +5295,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreMiddlewareBindingOptions = { /** Required explicit PluginHost mutation/drain budgets; false opts out of that deadline. */ readonly execution: IPluginHostOptions['execution']; /** * Exact host policy, defaulting to a new off policy; attach the same policy to the Store * separately. */ readonly mutationPolicy?: MutationPolicy; /** * Optional action-trace name prefix; omitted or empty accepts all action names, not state * filtering. */ readonly actionPrefix?: string; /** * Synchronous snapshot producer, default ClonePolicy.diagnostic. Used at binding and each state * observation/read; custom callback failures follow the invoking Store or construction boundary. */ readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };"
+            "export type IStoreMiddlewareBindingOptions = { readonly execution: IPluginHostOptions['execution']; readonly mutationPolicy?: MutationPolicy; readonly actionPrefix?: string; readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5334,7 +5334,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareBindingOptions:export type IStoreMiddlewareBindingOptions = { /** Required explicit PluginHost mutation/drain budgets; false opts out of that deadline. */ readonly execution: IPluginHostOptions['execution']; /** * Exact host policy, defaulting to a new off policy; attach the same policy to the Store * separately. */ readonly mutationPolicy?: MutationPolicy; /** * Optional action-trace name prefix; omitted or empty accepts all action names, not state * filtering. */ readonly actionPrefix?: string; /** * Synchronous snapshot producer, default ClonePolicy.diagnostic. Used at binding and each state * observation/read; custom callback failures follow the invoking Store or construction boundary. */ readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareBindingOptions:export type IStoreMiddlewareBindingOptions = { readonly execution: IPluginHostOptions['execution']; readonly mutationPolicy?: MutationPolicy; readonly actionPrefix?: string; readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -5343,8 +5343,8 @@
         {
           "name": "IStoreMiddlewareCore",
           "kind": "type",
-          "signature": "export type IStoreMiddlewareCore<S> = { /** Borrowed Runtime used for action batches and diagnostic reporting. */ readonly runtime: IRuntime; /** Read state through the host's producer; copying is determined by that producer. */ getState(): S; /** Apply supplied state, or throw DEVTOOLS_CAPABILITY when the host omitted applyState. */ applyState(state: S): void; /** Report through the borrowed Runtime with the supplied diagnostic phase. */ reportError(error: unknown, phase: string): void; };",
-          "declarationLine": 6,
+          "signature": "export type IStoreMiddlewareCore<S> = { readonly runtime: IRuntime; getState(): S; applyState(state: S): void; reportError(error: unknown, phase: string): void; };",
+          "declarationLine": 5,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Store-specific plugin core issued at install time, combined with external IPluginHostCore; runtime/state/error capabilities stay owned by the state host.",
           "core": "runtime: External IRuntime supplied at construction or obtained from the bound Store.\ngetState: Synchronously asks the caller-owned getter for the current state snapshot.\nCurrent S; getter failures propagate and snapshot independence follows the caller clone policy.\napplyState: Synchronously delegates a state replacement to the caller-provided capability; does not implement storage itself.\napplyState.state: Replacement S supplied by a normalized jump/reset command or a domain caller.\nNo result; missing applyState throws DEVTOOLS_CAPABILITY and caller failures propagate.\nreportError: Routes an original observation failure to the Runtime reporter with its supplied phase.\nreportError.error: Original failure supplied by a plugin or domain caller.\nreportError.phase: Runtime diagnostic phase chosen by the caller for this failure.\nNo result; reporter containment belongs to the supplied Runtime.",
@@ -5361,7 +5361,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly runtime: IRuntime;",
-              "description": "Borrowed Runtime used for action batches and diagnostic reporting.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -5370,7 +5370,7 @@
               "kind": "method",
               "optional": false,
               "signature": "getState(): S;",
-              "description": "Read state through the host's producer; copying is determined by that producer.",
+              "description": null,
               "parameterDetails": [],
               "returns": "S"
             },
@@ -5379,7 +5379,7 @@
               "kind": "method",
               "optional": false,
               "signature": "applyState(state: S): void;",
-              "description": "Apply supplied state, or throw DEVTOOLS_CAPABILITY when the host omitted applyState.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "state",
@@ -5394,7 +5394,7 @@
               "kind": "method",
               "optional": false,
               "signature": "reportError(error: unknown, phase: string): void;",
-              "description": "Report through the borrowed Runtime with the supplied diagnostic phase.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "error",
@@ -5413,7 +5413,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreMiddlewareCore<S> = { /** Borrowed Runtime used for action batches and diagnostic reporting. */ readonly runtime: IRuntime; /** Read state through the host's producer; copying is determined by that producer. */ getState(): S; /** Apply supplied state, or throw DEVTOOLS_CAPABILITY when the host omitted applyState. */ applyState(state: S): void; /** Report through the borrowed Runtime with the supplied diagnostic phase. */ reportError(error: unknown, phase: string): void; };"
+            "export type IStoreMiddlewareCore<S> = { readonly runtime: IRuntime; getState(): S; applyState(state: S): void; reportError(error: unknown, phase: string): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5452,7 +5452,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareCore:export type IStoreMiddlewareCore<S> = { /** Borrowed Runtime used for action batches and diagnostic reporting. */ readonly runtime: IRuntime; /** Read state through the host's producer; copying is determined by that producer. */ getState(): S; /** Apply supplied state, or throw DEVTOOLS_CAPABILITY when the host omitted applyState. */ applyState(state: S): void; /** Report through the borrowed Runtime with the supplied diagnostic phase. */ reportError(error: unknown, phase: string): void; };",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareCore:export type IStoreMiddlewareCore<S> = { readonly runtime: IRuntime; getState(): S; applyState(state: S): void; reportError(error: unknown, phase: string): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5462,7 +5462,7 @@
           "name": "IStoreMiddlewareErrorCode",
           "kind": "type",
           "signature": "export type IStoreMiddlewareErrorCode = (typeof StoreMiddlewareErrorCode)[keyof typeof StoreMiddlewareErrorCode];",
-          "declarationLine": 68,
+          "declarationLine": 67,
           "source": "packages/store-middleware/dist/error-code.d.ts",
           "purpose": "Value union of StoreMiddlewareErrorCode, classified together with STORE_MIDDLEWARE_SOURCE while retaining original causes.",
           "core": "Value union of StoreMiddlewareErrorCode, classified together with STORE_MIDDLEWARE_SOURCE while retaining original causes.",
@@ -5581,7 +5581,7 @@
           "name": "IStoreMiddlewareHost",
           "kind": "type",
           "signature": "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [], IStoreMiddlewareSurface<S>>;",
-          "declarationLine": 78,
+          "declarationLine": 34,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "The object returned by createStoreMiddlewareHost for sending store events and managing their plugins. It combines store event methods with [Plugin Host’s IHostHandle](/en/docs/plugin-host/api/IHostHandle) methods for installing and removing plugins, changing configuration, and closing the host. The returned object is frozen, so you cannot add or replace its properties. Its event pipeline, the sequence of steps that handles each event, always runs synchronously.",
           "core": "identity: Immutable host identity `{ name, id }`: `name` from the `identity` option, `id` unique per host; used in errors and diagnostics.\nplugin: Enable/disable controls: `plugin.disable(name)` hides a plugin (extensions, Features, stages) without releasing resources, `plugin.enable(name)` restores it in place, `plugin.disabled()` lists disabled names.\npipelineMode: Always sync: store event host construction overrides any supplied pipeline mode.\nrevision: Live revision getter from the same canonical managed host; plugin commits update it without replacing the Store domain or fluent handle identity.\nconfig: Per-plugin configuration store. `config.get(\"plugin.key\")` reads a frozen snapshot (unknown paths return `undefined`); `config.update(name, recipe)` merges a patch copy-on-write and commits only after the plugin `update` hook succeeds.\nuseSync: Installs synchronously and returns handles in input order. A declared setup immediately throws SETUP_REQUIRES_ASYNC_INSTALL. A thenable install result rejects as PLUGIN_INSTALL_FAILED with INSTALL_RESULT_THENABLE on cause; its later rejection is reported through the diagnostic third argument, not inserted retroactively into the immediate cause chain.\nuseSync.plugins: Plugin definitions with synchronous install.\nThe handle tuple in input order.\nBuilding a host that must be usable right after construction.\nuse: Installs one or more plugins as one batch, in Feature dependency order (argument order does not matter). Either every plugin is published or the batch is rolled back in reverse order.\nuse.plugins: Definitions from `definePlugin()` or plugin factories such as `level()`. Names must be unique and must not contain `.`.\nA Promise of the handle tuple in input order. Install failures reject with `PLUGIN_INSTALL_FAILED` (original error on `cause`, `detail.failedName`); missing providers throw `PREREQUISITE_*` directly.\nPlugins with async `setup` or `install`, or plugins added at runtime.\nunUse: Removes a plugin: runs its `beforeRelease`, waits for running pipelines, withdraws extensions, Features and stages, then runs its disposers and releases resources in reverse order.\nunUse.name: Name of the installed plugin.\nunUse.options: `policy`: what happens to plugins that require it (`reject` default, `cascade`, `suspend`); `dryRun: true` returns the plan without changing anything.\n{ ok: true, affected }, or { ok: false, errors, affected } after cleanup failure or PIPELINE_DRAIN_TIMEOUT. Ordinary unUse continues bounded cleanup after a drain timeout, records/reports that failure and adds no physicalCompletion protocol. dryRun:true returns IPluginDependencyPlan.\nactivate: Installs a plugin that was registered with `activation: \"lazy\"`, first activating any lazy providers it requires. Concurrent calls share one Promise; a failure leaves it registered so it can be retried.\nactivate.name: Name of the lazy plugin.\nThe handle of the activated plugin; the original install error on failure.\nDefer expensive plugins until the first request needs them.\nreplace: Hot-swaps a plugin: installs `next` first (the old one keeps serving if that fails), then rebinds dependents that implement `onDependencyReplaced` and restarts the others; the old generation is disposed after its running pipelines drain.\nreplace.name: Name of the installed plugin.\nreplace.next: New definition with the same name (otherwise `REPLACE_NAME_MISMATCH`).\nThe handle of the new generation. Old extracted extension functions throw `REGISTRATION_REVOKED`; a failed dependent restart throws `DEPENDENT_RESTART_FAILED` after the replacement took effect.\nrunPipeline: Runs `value` through host and plugin stages and calls `done` with the final value. Only the holder of a `defineHost()` handle can call it (subclasses use the protected method), so the domain decides when the pipeline runs.\nrunPipeline.value: Input value.\nrunPipeline.done: Final callback; not called when a stage stops the value.\n`void` in sync modes, a Promise in async modes; host disposal aborts the run with `HOST_DISPOSING`.\ndispose: Stops host admission, runs binding disposers in reverse order, then delegates plugin lifecycle cleanup. Every disposer is attempted and binding errors precede plugin errors.\nShared Promise<IPluginHostDisposalResult> with logicalTerminal, cleanupComplete and cleanupErrors. Binding throws are reported in this result; unfinished physical cleanup remains reachable through physicalCompletion.\nusePipeline: Adds a synchronous processing function to the host pipeline. Receive the current value and call next(newValue) to continue with a value for the next function. Omitting next() stops processing. The host adapts this synchronous function to its selected mode, so this registration method works in every host mode.\nusePipeline.stage: Sync stage; call `next(value)` to continue, omit it to stop the value.\nThe host itself, so calls can be chained.\nuseAsyncPipeline: Registers a step that can await other work before or after the next event-processing step. This requires async mode. Store event hosts process events synchronously, so this call throws PIPELINE_MODE_MISMATCH, meaning the requested step does not match the host mode. Use usePipeline for synchronous steps.\nuseAsyncPipeline.stage: `async (value, next) => { await next(value) }`; code after `await next()` runs after downstream.\nThe host itself.\nuseGeneratorPipeline: Registers a generator function that uses yield to supply a processed value. That form runs only in generator or async-generator mode. On a Store event host, registration throws PIPELINE_MODE_MISMATCH because its event pipeline accepts synchronous next-style steps only. To transform an event here, register usePipeline and pass the resulting event to next before the callback returns.\nuseGeneratorPipeline.stage: `function* (value)`; return a value or a `GENERATOR_*` signal.\nuseAsyncGeneratorPipeline: Registers a function that combines awaited work with values supplied through yield. Only async-generator mode can execute that combination. Store event hosts cannot await yielded results, so this registration fails with PIPELINE_MODE_MISMATCH, the error for an incompatible step mode. Complete asynchronous preparation before emitting the store event, then use usePipeline for the remaining synchronous handling.\nuseAsyncGeneratorPipeline.stage: `async function* (value)`; drained completely before the next stage.\nmutationPolicy: Exact caller policy object or a newly created off policy; share the same policy with the Store when enforcing actions-only writes.\nemit: Synchronously runs an event through the host pipeline. Missing continuation reports MIDDLEWARE_NOT_CHAINED; other pipeline failures may propagate from this public method.\nemit.event: IMiddlewareEvent from host domain methods, Store trace binding or explicit caller construction using the event constants.\nNo result after synchronous delivery; this is the direct emission boundary rather than isolated business-action observation.\nrunAction: Emits isolated start, runs fn inside mutation policy and Runtime batch, then emits isolated end or error. Synchronous business failures retain native identity or remain reachable through cause/errors under the policy callback contract; observer failures are reported.\nrunAction.name: Application-selected action label propagated to all three action phases.\nrunAction.fn: Synchronous no-argument business callback; return T or throw. Promises are returned without awaiting, so async continuations and rejections are outside action scope.\nrunAction.metadata: Optional caller diagnostic record; defaults to absent and retains its reference.\nExact fn return or policy-classified synchronous failure; foreign Reactive/pipeline errors keep their package identity. Action duration covers synchronous execution only.\nrecordState: Emits an isolated state observation without changing Store state. Middleware failures are reported rather than reaching the business caller.\nrecordState.name: Application-selected state observation label.\nrecordState.previous: Previous snapshot owned by the caller or binding clone policy.\nrecordState.next: Next snapshot owned by the caller or binding clone policy.\nrecordState.metadata: Optional diagnostic record, absent by default and retained by reference.\nNo result after isolated observation; state application is a separate capability.\nrecordError: Emits one isolated diagnostic-error event. Reentrant calls while handling an error report directly to Runtime without starting another middleware pipeline.\nrecordError.phase: Caller diagnostic phase identifying the failed subsystem or operation.\nrecordError.error: Original diagnostic failure value retained by identity.\nrecordError.metadata: Optional caller metadata; defaults to absent and is not cloned.\nNo result; observation failures are routed to Runtime.\nconnectDevTools: Installs a plugin that initializes an adapter, sends events after recording sync continuation and before downstream execution and subscribes to normalized commands. Pair with createReduxDevToolsAdapter when using a Redux extension-shaped connection.\nconnectDevTools.adapter: IDevToolsAdapter from createReduxDevToolsAdapter or caller implementation; init/send are required and subscribe is optional.\nconnectDevTools.name: Optional unique plugin name chosen by the application; defaults to store-devtools.\nPromise<void> after plugin installation. Invalid adapter uses INVALID_OPTION; install failures retain plugin-host semantics; jump/reset without applyState uses DEVTOOLS_CAPABILITY.\nattachBindingDisposer: While open, registers synchronous cleanup in reverse order before delegated plugin-host disposal. Once closing starts, registration invokes the disposer immediately; a synchronous failure propagates with CALLBACK_FAILED identity or preserves its foreign owner.\nattachBindingDisposer.disposer: Caller-owned IDisposer accepting no arguments and returning nothing; throws are collected into structured disposal cleanupErrors.\nNo result; an open host retains cleanup until disposal, while a closing host finishes it before this call returns.",
@@ -5644,8 +5644,8 @@
         {
           "name": "IStoreMiddlewareHostOptions",
           "kind": "type",
-          "signature": "export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { /** Required borrowed Runtime; disposing this host does not dispose the Runtime. */ readonly runtime: IRuntime; /** Required synchronous producer used by plugins and DevTools; no automatic clone is added here. */ readonly getState: () => S; /** * Optional synchronous state writer; omission rejects DevTools jump/reset with * DEVTOOLS_CAPABILITY. */ readonly applyState?: (state: S) => void; /** Exact policy shared with guarded stores/collections; defaults to a new off policy. */ readonly mutationPolicy?: MutationPolicy; };",
-          "declarationLine": 22,
+          "signature": "export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { readonly runtime: IRuntime; readonly getState: () => S; readonly applyState?: (state: S) => void; readonly mutationPolicy?: MutationPolicy; };",
+          "declarationLine": 12,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "External IPluginHostOptions plus Store state capabilities; execution budgets remain required and the pipeline mode is forced sync during option snapshotting.",
           "core": "identity: Readable host name `{ name }`; a unique id is added by the runtime.\nOmitted; identity.name defaults to DEFAULT and the runtime issues a unique id.\nidentity.name: Readable host name used in errors and diagnostics.\nOmission uses DEFAULT as the name. The generated id combines that name with a sequence number, allowing diagnostics to distinguish host instances.\nexecution.mutationTimeoutMs: Required nonnegative finite milliseconds or false, with no default. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.\nexecution.pipelineDrainTimeoutMs: Required nonnegative finite milliseconds or false; no default. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.\nexecution: Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.\npipeline: External pipeline options are captured once, including a non-enumerable pipeline getter, and excluded from the remaining option spread; mode is overwritten with sync before host construction.\nA sync pipeline is installed even when this option is omitted.\ndiagnostic: Receives notable events that are not errors (`PIPELINE_NEXT_LATE`, `EXTENSION_NON_ENUMERABLE_IGNORED`, rollback failures, queue waits) as `(message, code?, error?)`. Its own failures never affect the host.\nNot set: diagnostics are dropped.\nonDiagnosticFailure: Receives the error when `diagnostic` itself throws or rejects.\nNot set: the failure goes to `globalThis.reportError` when it exists.\nscheduler: Clock and timers for queue and disposal timeouts; inject a manual scheduler in tests.\nThe system scheduler.\nqueueAdmissionTimeoutMs: How long a change may wait in the FIFO queue. A number rejects waiting work with `MUTATION_QUEUE_TIMEOUT` (running work is not interrupted); `false` disables queue timers and diagnostics.\nNot set: long waits are only reported through `diagnostic`, never rejected.\nqueueAdmissionDiagnosticMs: Wait time after which a queued change is reported through `diagnostic` (only when `queueAdmissionTimeoutMs` is not set); `false` disables it.\n`1000` milliseconds.\ndisposeStepTimeoutMs: Maximum wait for one cleanup step (a stage disposer, a plugin `dispose`, a resource). A timed-out step is recorded as `DISPOSE_STEP_TIMEOUT` and cleanup continues; `false` waits forever.\n`5000` milliseconds per step.\nruntime: External IRuntime supplied at construction or obtained from the bound Store.\ngetState: Required synchronous zero-argument getter invoked when plugins or adapters need state. Return S; throws propagate through the invoking API.\nCurrent S; getter failures propagate and snapshot independence follows the caller clone policy.\napplyState: Optional synchronous callback receiving a replacement state from jump/reset. Return nothing; callback throws propagate through command delivery.\napplyState.state: Replacement S supplied by a normalized jump/reset command or a domain caller.\nNo result; missing applyState throws DEVTOOLS_CAPABILITY and caller failures propagate.\nAbsent; applying a DevTools state command throws DEVTOOLS_CAPABILITY.\nmutationPolicy: Exact caller policy object or a newly created off policy; share the same policy with the Store when enforcing actions-only writes.\n`createMutationPolicy('off')`: a new permissive policy.\npipeline.mode: Always overwritten with sync by the Store host constructor.\nsync, regardless of caller omission or another supplied mode.\nStore middleware executes synchronously; async and generator stage registration is unavailable.",
@@ -5662,7 +5662,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly runtime: IRuntime;",
-              "description": "Required borrowed Runtime; disposing this host does not dispose the Runtime.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -5671,7 +5671,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly getState: () => S;",
-              "description": "Required synchronous producer used by plugins and DevTools; no automatic clone is added here.",
+              "description": null,
               "parameterDetails": [],
               "returns": "() => S"
             },
@@ -5680,7 +5680,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly applyState?: (state: S) => void;",
-              "description": "Optional synchronous state writer; omission rejects DevTools jump/reset with DEVTOOLS_CAPABILITY.",
+              "description": null,
               "parameterDetails": [],
               "returns": "(state: S) => void"
             },
@@ -5689,7 +5689,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly mutationPolicy?: MutationPolicy;",
-              "description": "Exact policy shared with guarded stores/collections; defaults to a new off policy.",
+              "description": null,
               "parameterDetails": [],
               "returns": "MutationPolicy"
             }
@@ -5697,7 +5697,7 @@
           "composes": ["IPluginHostOptions"],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { /** Required borrowed Runtime; disposing this host does not dispose the Runtime. */ readonly runtime: IRuntime; /** Required synchronous producer used by plugins and DevTools; no automatic clone is added here. */ readonly getState: () => S; /** * Optional synchronous state writer; omission rejects DevTools jump/reset with * DEVTOOLS_CAPABILITY. */ readonly applyState?: (state: S) => void; /** Exact policy shared with guarded stores/collections; defaults to a new off policy. */ readonly mutationPolicy?: MutationPolicy; };"
+            "export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { readonly runtime: IRuntime; readonly getState: () => S; readonly applyState?: (state: S) => void; readonly mutationPolicy?: MutationPolicy; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5736,7 +5736,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareHostOptions:export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { /** Required borrowed Runtime; disposing this host does not dispose the Runtime. */ readonly runtime: IRuntime; /** Required synchronous producer used by plugins and DevTools; no automatic clone is added here. */ readonly getState: () => S; /** * Optional synchronous state writer; omission rejects DevTools jump/reset with * DEVTOOLS_CAPABILITY. */ readonly applyState?: (state: S) => void; /** Exact policy shared with guarded stores/collections; defaults to a new off policy. */ readonly mutationPolicy?: MutationPolicy; };",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareHostOptions:export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { readonly runtime: IRuntime; readonly getState: () => S; readonly applyState?: (state: S) => void; readonly mutationPolicy?: MutationPolicy; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5746,7 +5746,7 @@
           "name": "IStoreMiddlewarePlugin",
           "kind": "type",
           "signature": "export type IStoreMiddlewarePlugin<S, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends Record<string, unknown> = Record<string, unknown>, TShared extends object = Record<string, never>> = IPlugin<IStoreMiddlewareCore<S> & import('@migaia/plugin-host').IPluginHostCore<IMiddlewareEvent<S>>, TExt, TConfig, TShared>;",
-          "declarationLine": 17,
+          "declarationLine": 11,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "External IPlugin specialized with Store core and IMiddlewareEvent. Name/install/dependencies/setup/dispose/config semantics belong to @migaia/plugin-host; install receives the store core plus plugin pipeline/lifecycle capabilities and returns the external plugin install result.",
           "core": "External IPlugin specialized with Store core and IMiddlewareEvent. Name/install/dependencies/setup/dispose/config semantics belong to @migaia/plugin-host; install receives the store core plus plugin pipeline/lifecycle capabilities and returns the external plugin install result.",
@@ -5812,7 +5812,7 @@
           "name": "loggerMiddleware",
           "kind": "function",
           "signature": "export declare function loggerMiddleware<S = any>(sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void): IStoreMiddlewarePlugin<S>;",
-          "declarationLine": 94,
+          "declarationLine": 44,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Creates a logging plugin named store-logger. Install it on a host from createStoreMiddlewareHost with host.use; creating the plugin alone prints nothing. For each event, the plugin first passes the event on with next(event), then gives the event and the current state to its sink. The sink still runs before the next plugin handles the event. The logger never relies on the shape of your state, so it installs into a host of any state type without a type argument.",
           "core": "sink: Optional synchronous (event, state) callback; event is the delivered middleware event and state is core.getState() inside this stage before downstream executes. Defaults to console.log with the stable prefix; no return is used or awaited and throws follow pipeline handling.\nIStoreMiddlewarePlugin named store-logger, affecting existing pipeline behavior without adding methods.\nInstalled using host.use, the fixed store-logger plugin logs each event after recording continuation and before downstream processing, without adding extension methods.",
@@ -5895,8 +5895,8 @@
         {
           "name": "MiddlewareCommandType",
           "kind": "const",
-          "signature": "export declare const MiddlewareCommandType: { /** Reinitialize DevTools with current state without applying replacement state. */ readonly commit: 'commit'; /** Apply the supplied historical state through a host action. */ readonly jump: 'jump'; /** Apply the supplied reset state through a host action. */ readonly reset: 'reset'; };",
-          "declarationLine": 11,
+          "signature": "export declare const MiddlewareCommandType: { readonly commit: 'commit'; readonly jump: 'jump'; readonly reset: 'reset'; };",
+          "declarationLine": 8,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Normalized DevTools commands commit, jump and reset; the adapter maps extension messages to these values before host state application.",
           "core": "commit: Reinitialize the adapter with current state without applying replacement state.\njump: Apply a supplied historical state inside a host action.\nreset: Apply a supplied reset state inside a host action.",
@@ -5913,7 +5913,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly commit: 'commit';",
-              "description": "Reinitialize DevTools with current state without applying replacement state.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'commit'"
             },
@@ -5922,7 +5922,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly jump: 'jump';",
-              "description": "Apply the supplied historical state through a host action.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'jump'"
             },
@@ -5931,7 +5931,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly reset: 'reset';",
-              "description": "Apply the supplied reset state through a host action.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'reset'"
             }
@@ -5940,7 +5940,7 @@
           "aliasOf": "MiddlewareCommandType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewareCommandType: { /** Reinitialize DevTools with current state without applying replacement state. */ readonly commit: 'commit'; /** Apply the supplied historical state through a host action. */ readonly jump: 'jump'; /** Apply the supplied reset state through a host action. */ readonly reset: 'reset'; };"
+            "export declare const MiddlewareCommandType: { readonly commit: 'commit'; readonly jump: 'jump'; readonly reset: 'reset'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5979,7 +5979,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareCommandType:export declare const MiddlewareCommandType: { /** Reinitialize DevTools with current state without applying replacement state. */ readonly commit: 'commit'; /** Apply the supplied historical state through a host action. */ readonly jump: 'jump'; /** Apply the supplied reset state through a host action. */ readonly reset: 'reset'; };",
+          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareCommandType:export declare const MiddlewareCommandType: { readonly commit: 'commit'; readonly jump: 'jump'; readonly reset: 'reset'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -5988,8 +5988,8 @@
         {
           "name": "MiddlewareEventPhase",
           "kind": "const",
-          "signature": "export declare const MiddlewareEventPhase: { /** The synchronous action callback has not run yet. */ readonly start: 'start'; /** The callback returned; any returned Promise may still be pending. */ readonly end: 'end'; /** The synchronous callback threw. */ readonly error: 'error'; };",
-          "declarationLine": 20,
+          "signature": "export declare const MiddlewareEventPhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; };",
+          "declarationLine": 14,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Canonical synchronous action phases start, end and error; diagnostic error events use separate caller phase strings.",
           "core": "start: Emitted before synchronous business callback execution.\nend: Emitted after synchronous callback return, including its synchronous duration.\nerror: Emitted after synchronous callback throw, retaining original error and elapsed duration.",
@@ -6006,7 +6006,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly start: 'start';",
-              "description": "The synchronous action callback has not run yet.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'start'"
             },
@@ -6015,7 +6015,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly end: 'end';",
-              "description": "The callback returned; any returned Promise may still be pending.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'end'"
             },
@@ -6024,7 +6024,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: 'error';",
-              "description": "The synchronous callback threw.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'error'"
             }
@@ -6033,7 +6033,7 @@
           "aliasOf": "MiddlewareEventPhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewareEventPhase: { /** The synchronous action callback has not run yet. */ readonly start: 'start'; /** The callback returned; any returned Promise may still be pending. */ readonly end: 'end'; /** The synchronous callback threw. */ readonly error: 'error'; };"
+            "export declare const MiddlewareEventPhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6072,7 +6072,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventPhase:export declare const MiddlewareEventPhase: { /** The synchronous action callback has not run yet. */ readonly start: 'start'; /** The callback returned; any returned Promise may still be pending. */ readonly end: 'end'; /** The synchronous callback threw. */ readonly error: 'error'; };",
+          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventPhase:export declare const MiddlewareEventPhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -6081,7 +6081,7 @@
         {
           "name": "MiddlewareEventType",
           "kind": "const",
-          "signature": "export declare const MiddlewareEventType: { /** Synchronous action scope start/end/error notifications. */ readonly action: 'action'; /** Producer-supplied before/after state notification. */ readonly state: 'state'; /** Standalone diagnostic event, distinct from an action's error phase. */ readonly error: 'error'; };",
+          "signature": "export declare const MiddlewareEventType: { readonly action: 'action'; readonly state: 'state'; readonly error: 'error'; };",
           "declarationLine": 2,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Canonical action, state and error domain event discriminants emitted by Store hosts and bindings; use them for plugin event selection.",
@@ -6099,7 +6099,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly action: 'action';",
-              "description": "Synchronous action scope start/end/error notifications.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'action'"
             },
@@ -6108,7 +6108,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly state: 'state';",
-              "description": "Producer-supplied before/after state notification.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'state'"
             },
@@ -6117,7 +6117,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: 'error';",
-              "description": "Standalone diagnostic event, distinct from an action's error phase.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'error'"
             }
@@ -6126,7 +6126,7 @@
           "aliasOf": "MiddlewareEventType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewareEventType: { /** Synchronous action scope start/end/error notifications. */ readonly action: 'action'; /** Producer-supplied before/after state notification. */ readonly state: 'state'; /** Standalone diagnostic event, distinct from an action's error phase. */ readonly error: 'error'; };"
+            "export declare const MiddlewareEventType: { readonly action: 'action'; readonly state: 'state'; readonly error: 'error'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6165,7 +6165,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventType:export declare const MiddlewareEventType: { /** Synchronous action scope start/end/error notifications. */ readonly action: 'action'; /** Producer-supplied before/after state notification. */ readonly state: 'state'; /** Standalone diagnostic event, distinct from an action's error phase. */ readonly error: 'error'; };",
+          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventType:export declare const MiddlewareEventType: { readonly action: 'action'; readonly state: 'state'; readonly error: 'error'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -6174,8 +6174,8 @@
         {
           "name": "MutationPolicy",
           "kind": "class",
-          "signature": "export declare class MutationPolicy implements IMutationGuard { #private; /** Select off for unrestricted admission, or actions-only to require a current action scope. */ constructor(mode?: IMutationPolicyMode); /** Whether at least one synchronous runInAction call is currently on this policy's stack. */ get insideAction(): boolean; /** * Check write permission using mutation as the default diagnostic label. In actions-only mode, * throws ACTION_SCOPE_REQUIRED outside a scope; this check performs no write itself. */ assertMutationAllowed(operation?: string): void; /** * Invoke fn in a nestable synchronous scope and return its exact result, restoring depth even on * failure. A returned Promise is not awaited and its continuation runs outside this scope. * Synchronous failures preserve existing identities or receive CALLBACK_FAILED with their cause. */ runInAction<T>(fn: () => T): T; }",
-          "declarationLine": 11,
+          "signature": "export declare class MutationPolicy implements IMutationGuard { #private; constructor(mode?: IMutationPolicyMode); get insideAction(): boolean; assertMutationAllowed(operation?: string): void; runInAction<T>(fn: () => T): T; }",
+          "declarationLine": 6,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "Class behind createMutationPolicy. Constructor accepts optional off or actions-only mode, default off; nested synchronous action depth is restored in finally and never extends across awaited continuations.",
           "core": "mode: Optional `IMutationPolicyMode`: `off` is the default and admits writes; `actions-only` checks synchronous action depth.\nNew MutationPolicy with independent synchronous action depth, initially zero; no resource cleanup is required and the caller must share this exact guard with protected stores.\ninsideAction: Whether synchronous nested action depth is currently greater than zero.\nassertMutationAllowed: Checks current action depth only when mode is actions-only. It is a guard called by a Store, not a subscription or automatic instrumentation hook.\nassertMutationAllowed.operation: Optional caller diagnostic label, default mutation, describing the blocked write.\nNo result on admission; actions-only outside action scope throws ACTION_SCOPE_REQUIRED. Off always admits supported writes.\nrunInAction: Raises action depth for synchronous fn execution, supports nesting, and restores depth in finally even on throw. Async continuations run after scope exit.\nrunInAction.fn: Synchronous no-argument callback supplied by the caller; return any T, or throw the original business failure.\nExact fn result. A mutable native uncoded callback error keeps its object/type/stack and receives CALLBACK_FAILED; frozen or non-Error values remain reachable through cause/errors. Foreign coded failures keep their owner. Returned promises are not awaited and do not extend action scope.",
@@ -6200,7 +6200,7 @@
               "kind": "get",
               "optional": false,
               "signature": "get insideAction(): boolean;",
-              "description": "Whether at least one synchronous runInAction call is currently on this policy's stack.",
+              "description": null,
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -6209,7 +6209,7 @@
               "kind": "method",
               "optional": false,
               "signature": "assertMutationAllowed(operation?: string): void;",
-              "description": "Check write permission using mutation as the default diagnostic label. In actions-only mode, throws ACTION_SCOPE_REQUIRED outside a scope; this check performs no write itself.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "operation",
@@ -6224,7 +6224,7 @@
               "kind": "method",
               "optional": false,
               "signature": "runInAction<T>(fn: () => T): T;",
-              "description": "Invoke fn in a nestable synchronous scope and return its exact result, restoring depth even on failure. A returned Promise is not awaited and its continuation runs outside this scope. Synchronous failures preserve existing identities or receive CALLBACK_FAILED with their cause.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "fn",
@@ -6238,7 +6238,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class MutationPolicy implements IMutationGuard { #private; /** Select off for unrestricted admission, or actions-only to require a current action scope. */ constructor(mode?: IMutationPolicyMode); /** Whether at least one synchronous runInAction call is currently on this policy's stack. */ get insideAction(): boolean; /** * Check write permission using mutation as the default diagnostic label. In actions-only mode, * throws ACTION_SCOPE_REQUIRED outside a scope; this check performs no write itself. */ assertMutationAllowed(operation?: string): void; /** * Invoke fn in a nestable synchronous scope and return its exact result, restoring depth even on * failure. A returned Promise is not awaited and its continuation runs outside this scope. * Synchronous failures preserve existing identities or receive CALLBACK_FAILED with their cause. */ runInAction<T>(fn: () => T): T; }"
+            "export declare class MutationPolicy implements IMutationGuard { #private; constructor(mode?: IMutationPolicyMode); get insideAction(): boolean; assertMutationAllowed(operation?: string): void; runInAction<T>(fn: () => T): T; }"
           ],
           "overloadParameterDetails": [
             [
@@ -6285,7 +6285,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/middleware.d.ts:MutationPolicy:export declare class MutationPolicy implements IMutationGuard { #private; /** Select off for unrestricted admission, or actions-only to require a current action scope. */ constructor(mode?: IMutationPolicyMode); /** Whether at least one synchronous runInAction call is currently on this policy's stack. */ get insideAction(): boolean; /** * Check write permission using mutation as the default diagnostic label. In actions-only mode, * throws ACTION_SCOPE_REQUIRED outside a scope; this check performs no write itself. */ assertMutationAllowed(operation?: string): void; /** * Invoke fn in a nestable synchronous scope and return its exact result, restoring depth even on * failure. A returned Promise is not awaited and its continuation runs outside this scope. * Synchronous failures preserve existing identities or receive CALLBACK_FAILED with their cause. */ runInAction<T>(fn: () => T): T; }",
+          "identity": "packages/store-middleware/dist/middleware.d.ts:MutationPolicy:export declare class MutationPolicy implements IMutationGuard { #private; constructor(mode?: IMutationPolicyMode); get insideAction(): boolean; assertMutationAllowed(operation?: string): void; runInAction<T>(fn: () => T): T; }",
           "guidance": [],
           "usageScore": 72,
           "configuration": [],
@@ -6294,7 +6294,7 @@
         {
           "name": "ReduxDevToolsCommand",
           "kind": "const",
-          "signature": "export declare const ReduxDevToolsCommand: { /** Outer message category whose payload contains a state or commit command. */ readonly dispatch: 'DISPATCH'; /** Reinitialize the adapter from current state, without JSON parsing. */ readonly commit: 'COMMIT'; /** Parse the supplied historical state and normalize to a jump command. */ readonly jumpToState: 'JUMP_TO_STATE'; /** Parse an action's historical state and normalize to a jump command. */ readonly jumpToAction: 'JUMP_TO_ACTION'; /** Parse rollback state and normalize to jump; this does not undo arbitrary effects. */ readonly rollback: 'ROLLBACK'; /** Parse the supplied state and normalize to reset. */ readonly reset: 'RESET'; };",
+          "signature": "export declare const ReduxDevToolsCommand: { readonly dispatch: 'DISPATCH'; readonly commit: 'COMMIT'; readonly jumpToState: 'JUMP_TO_STATE'; readonly jumpToAction: 'JUMP_TO_ACTION'; readonly rollback: 'ROLLBACK'; readonly reset: 'RESET'; };",
           "declarationLine": 2,
           "source": "packages/store-middleware/dist/devtools-constants.d.ts",
           "purpose": "Canonical Redux extension wire vocabulary consumed by createReduxDevToolsAdapter and custom bridges. This owner replaces StoreDevtoolsCommand imports from store-devtools; normalized domain commands still use MiddlewareCommandType.",
@@ -6312,7 +6312,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly dispatch: 'DISPATCH';",
-              "description": "Outer message category whose payload contains a state or commit command.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'DISPATCH'"
             },
@@ -6321,7 +6321,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly commit: 'COMMIT';",
-              "description": "Reinitialize the adapter from current state, without JSON parsing.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'COMMIT'"
             },
@@ -6330,7 +6330,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly jumpToState: 'JUMP_TO_STATE';",
-              "description": "Parse the supplied historical state and normalize to a jump command.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'JUMP_TO_STATE'"
             },
@@ -6339,7 +6339,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly jumpToAction: 'JUMP_TO_ACTION';",
-              "description": "Parse an action's historical state and normalize to a jump command.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'JUMP_TO_ACTION'"
             },
@@ -6348,7 +6348,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly rollback: 'ROLLBACK';",
-              "description": "Parse rollback state and normalize to jump; this does not undo arbitrary effects.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'ROLLBACK'"
             },
@@ -6357,7 +6357,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly reset: 'RESET';",
-              "description": "Parse the supplied state and normalize to reset.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'RESET'"
             }
@@ -6366,7 +6366,7 @@
           "aliasOf": "ReduxDevToolsCommand",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReduxDevToolsCommand: { /** Outer message category whose payload contains a state or commit command. */ readonly dispatch: 'DISPATCH'; /** Reinitialize the adapter from current state, without JSON parsing. */ readonly commit: 'COMMIT'; /** Parse the supplied historical state and normalize to a jump command. */ readonly jumpToState: 'JUMP_TO_STATE'; /** Parse an action's historical state and normalize to a jump command. */ readonly jumpToAction: 'JUMP_TO_ACTION'; /** Parse rollback state and normalize to jump; this does not undo arbitrary effects. */ readonly rollback: 'ROLLBACK'; /** Parse the supplied state and normalize to reset. */ readonly reset: 'RESET'; };"
+            "export declare const ReduxDevToolsCommand: { readonly dispatch: 'DISPATCH'; readonly commit: 'COMMIT'; readonly jumpToState: 'JUMP_TO_STATE'; readonly jumpToAction: 'JUMP_TO_ACTION'; readonly rollback: 'ROLLBACK'; readonly reset: 'RESET'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6405,7 +6405,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/devtools-constants.d.ts:ReduxDevToolsCommand:export declare const ReduxDevToolsCommand: { /** Outer message category whose payload contains a state or commit command. */ readonly dispatch: 'DISPATCH'; /** Reinitialize the adapter from current state, without JSON parsing. */ readonly commit: 'COMMIT'; /** Parse the supplied historical state and normalize to a jump command. */ readonly jumpToState: 'JUMP_TO_STATE'; /** Parse an action's historical state and normalize to a jump command. */ readonly jumpToAction: 'JUMP_TO_ACTION'; /** Parse rollback state and normalize to jump; this does not undo arbitrary effects. */ readonly rollback: 'ROLLBACK'; /** Parse the supplied state and normalize to reset. */ readonly reset: 'RESET'; };",
+          "identity": "packages/store-middleware/dist/devtools-constants.d.ts:ReduxDevToolsCommand:export declare const ReduxDevToolsCommand: { readonly dispatch: 'DISPATCH'; readonly commit: 'COMMIT'; readonly jumpToState: 'JUMP_TO_STATE'; readonly jumpToAction: 'JUMP_TO_ACTION'; readonly rollback: 'ROLLBACK'; readonly reset: 'RESET'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -6532,8 +6532,8 @@
         {
           "name": "StoreMiddlewareErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A mutation guard check runs outside this policy's synchronous action scope in actions-only * mode. Share the policy with the guarded writer and enter runInAction, or select off mode when * action-scoped writes are not required. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action, initial binding clone or binding disposer callback fails without another * module identity. Native mutable errors retain their object/type/stack; fallback cause/errors * retain the original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding setup failed and rollback also threw. Inspect AggregateError.errors for the original * setup failure followed by cleanup failures. Normal host disposal instead returns its structured * cleanup result and retains binding failures in cleanupErrors. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
-          "declarationLine": 9,
+          "signature": "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action or binding disposer callback fails without another module identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
+          "declarationLine": 10,
           "source": "packages/store-middleware/dist/error-code.d.ts",
           "purpose": "Stable package codes for invalid host input, action guards, missing pipeline continuation, cloning capabilities, DevTools application and binding cleanup.",
           "core": "invalidOption: Host options are not objects, or a DevTools adapter lacks callable init/send or supplies non-callable subscribe; inspect cause for failed access.\ncallbackFailed: A synchronous action or binding disposer fails without another package identity; mutable native errors retain identity and other values remain reachable through cause/errors.\ndevtoolsMessageInvalid: A supported Redux state command has invalid JSON; report its SyntaxError through the selected Runtime and skip only that command.\nmiddlewareNotChained: A middleware omits continuation; reported to Runtime without undoing an already completed business write.\nactionScopeRequired: Actions-only mutation guard detects a direct write outside synchronous action scope.\ncloneUnsupported: Independent immutable cloning cannot preserve a supported input subtree; inspect original cause or choose an aliasing policy.\ndevtoolsCapability: A jump or reset needs applyState but the host was created without it.\nenvUnsupported: Immutable cloning requires a missing host structuredClone capability.\ncleanupFailed: Binding startup rollback cleanup failed; aggregate errors retain primary failure first.",
@@ -6568,7 +6568,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED';",
-              "description": "A mutation guard check runs outside this policy's synchronous action scope in actions-only * mode. Share the policy with the guarded writer and enter runInAction, or select off mode when * action-scoped writes are not required.",
+              "description": "A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode.",
               "parameterDetails": [],
               "returns": "'ACTION_SCOPE_REQUIRED'"
             },
@@ -6586,7 +6586,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly callbackFailed: 'CALLBACK_FAILED';",
-              "description": "A synchronous action, initial binding clone or binding disposer callback fails without another * package identity. Native mutable errors retain their object/type/stack; fallback cause/errors * retain the original. The action scope still exits and each binding cleanup is attempted once.",
+              "description": "A synchronous action or binding disposer callback fails without another package identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once.",
               "parameterDetails": [],
               "returns": "'CALLBACK_FAILED'"
             },
@@ -6622,7 +6622,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly cleanupFailed: 'CLEANUP_FAILED';",
-              "description": "Binding setup failed and rollback also threw. Inspect AggregateError.errors for the original * setup failure followed by cleanup failures. Normal host disposal instead returns its structured * cleanup result and retains binding failures in cleanupErrors.",
+              "description": "Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal.",
               "parameterDetails": [],
               "returns": "'CLEANUP_FAILED'"
             }
@@ -6631,7 +6631,7 @@
           "aliasOf": "StoreMiddlewareErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A mutation guard check runs outside this policy's synchronous action scope in actions-only * mode. Share the policy with the guarded writer and enter runInAction, or select off mode when * action-scoped writes are not required. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action, initial binding clone or binding disposer callback fails without another * module identity. Native mutable errors retain their object/type/stack; fallback cause/errors * retain the original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding setup failed and rollback also threw. Inspect AggregateError.errors for the original * setup failure followed by cleanup failures. Normal host disposal instead returns its structured * cleanup result and retains binding failures in cleanupErrors. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };"
+            "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action or binding disposer callback fails without another module identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6670,7 +6670,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/error-code.d.ts:StoreMiddlewareErrorCode:export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A mutation guard check runs outside this policy's synchronous action scope in actions-only * mode. Share the policy with the guarded writer and enter runInAction, or select off mode when * action-scoped writes are not required. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action, initial binding clone or binding disposer callback fails without another * package identity. Native mutable errors retain their object/type/stack; fallback cause/errors * retain the original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding setup failed and rollback also threw. Inspect AggregateError.errors for the original * setup failure followed by cleanup failures. Normal host disposal instead returns its structured * cleanup result and retains binding failures in cleanupErrors. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
+          "identity": "packages/store-middleware/dist/error-code.d.ts:StoreMiddlewareErrorCode:export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action or binding disposer callback fails without another package identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "guidance": [
             {
               "id": "清理与错误身份",
@@ -6752,8 +6752,8 @@
         {
           "name": "ClonePolicy",
           "kind": "const",
-          "signature": "export declare const ClonePolicy: { /** Independent admitted data copy or a classified failure; does not freeze the result. */ readonly immutable: typeof immutableSnapshotClone; /** Exact input identity, with no copying or freezing. */ readonly opaque: typeof opaqueReferenceClone; /** Best-effort diagnostic copy that may retain unsupported subtrees by reference. */ readonly diagnostic: typeof diagnosticClone; };",
-          "declarationLine": 38,
+          "signature": "export declare const ClonePolicy: { readonly immutable: typeof immutableSnapshotClone; readonly opaque: typeof opaqueReferenceClone; readonly diagnostic: typeof diagnosticClone; };",
+          "declarationLine": 41,
           "source": "packages/store-middleware/dist/tolerant-clone.d.ts",
           "purpose": "Groups three existing operation functions: immutable(value) requires independence or throws, opaque(value) returns identical input, diagnostic(value) permits unsupported subtree aliases. These are executable functions rather than mode strings.",
           "core": "Groups three existing operation functions: immutable(value) requires independence or throws, opaque(value) returns identical input, diagnostic(value) permits unsupported subtree aliases. These are executable functions rather than mode strings.",
@@ -6772,7 +6772,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly immutable: typeof immutableSnapshotClone;",
-              "description": "Independent admitted data copy or a classified failure; does not freeze the result.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof immutableSnapshotClone"
             },
@@ -6781,7 +6781,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly opaque: typeof opaqueReferenceClone;",
-              "description": "Exact input identity, with no copying or freezing.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof opaqueReferenceClone"
             },
@@ -6790,7 +6790,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly diagnostic: typeof diagnosticClone;",
-              "description": "Best-effort diagnostic copy that may retain unsupported subtrees by reference.",
+              "description": null,
               "parameterDetails": [],
               "returns": "typeof diagnosticClone"
             }
@@ -6798,7 +6798,7 @@
           "composes": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": [
-            "export declare const ClonePolicy: { /** Independent admitted data copy or a classified failure; does not freeze the result. */ readonly immutable: typeof immutableSnapshotClone; /** Exact input identity, with no copying or freezing. */ readonly opaque: typeof opaqueReferenceClone; /** Best-effort diagnostic copy that may retain unsupported subtrees by reference. */ readonly diagnostic: typeof diagnosticClone; };"
+            "export declare const ClonePolicy: { readonly immutable: typeof immutableSnapshotClone; readonly opaque: typeof opaqueReferenceClone; readonly diagnostic: typeof diagnosticClone; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6837,7 +6837,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/tolerant-clone.d.ts:ClonePolicy:export declare const ClonePolicy: { /** Independent admitted data copy or a classified failure; does not freeze the result. */ readonly immutable: typeof immutableSnapshotClone; /** Exact input identity, with no copying or freezing. */ readonly opaque: typeof opaqueReferenceClone; /** Best-effort diagnostic copy that may retain unsupported subtrees by reference. */ readonly diagnostic: typeof diagnosticClone; };",
+          "identity": "packages/store-middleware/dist/tolerant-clone.d.ts:ClonePolicy:export declare const ClonePolicy: { readonly immutable: typeof immutableSnapshotClone; readonly opaque: typeof opaqueReferenceClone; readonly diagnostic: typeof diagnosticClone; };",
           "guidance": [],
           "usageScore": 56,
           "configuration": [],
@@ -6847,7 +6847,7 @@
           "name": "diagnosticClone",
           "kind": "function",
           "signature": "export declare function diagnosticClone<T>(value: T): T;",
-          "declarationLine": 36,
+          "declarationLine": 40,
           "source": "packages/store-middleware/dist/tolerant-clone.d.ts",
           "purpose": "Uses structuredDiagnosticSnapshot for best-effort diagnostics: prefer native cloning, otherwise recursively copies arrays, records and supported Date/RegExp/Map/Set or buffer subtrees while retaining unsupported classes/functions by reference. It does not promise full independence.",
           "core": "value: Caller state or diagnostic value to snapshot without rejecting merely because a subtree is uncloneable.\nBest-effort T with cloneable parts copied and unsupported references retained; ordinary uncloneable content does not throw.",
@@ -6987,7 +6987,7 @@
           "name": "immutableSnapshotClone",
           "kind": "function",
           "signature": "export declare function immutableSnapshotClone<T>(value: T): T;",
-          "declarationLine": 27,
+          "declarationLine": 24,
           "source": "packages/store-middleware/dist/tolerant-clone.d.ts",
           "purpose": "Admits a strict data-only graph, then delegates independent copying to Utils immutableSnapshot. Supports ordinary/null-prototype records, ordinary arrays, current-realm native Map/Set/Date/RegExp/ArrayBuffer and standard TypedArray/DataView backed by non-shared ArrayBuffer. Rejects custom classes, built-in subclasses and accessors before invoking getters. This narrows former class/getter behavior; migrate unsupported values to data or choose diagnostic/opaque. Missing structuredClone maps to ENV_UNSUPPORTED; clone failures map to CLONE_UNSUPPORTED with the complete Utils error on cause and native failure below it.",
           "core": "value: Caller-owned value requiring independent snapshot storage.\nIndependent T or a coded native Error; never silently substitutes an aliased subtree for required independence.",
@@ -7063,7 +7063,7 @@
           "name": "opaqueReferenceClone",
           "kind": "function",
           "signature": "export declare function opaqueReferenceClone<T>(value: T): T;",
-          "declarationLine": 29,
+          "declarationLine": 26,
           "source": "packages/store-middleware/dist/tolerant-clone.d.ts",
           "purpose": "Explicitly opts out of copying and returns the original value through the shared identitySnapshot implementation. This is appropriate only when the caller accepts live aliasing.",
           "core": "value: Caller value whose original reference should be retained.\nExactly the input value and identity; subsequent mutation can affect every holder.",

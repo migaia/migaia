@@ -3363,6 +3363,36 @@
       "library": "resource"
     },
     {
+      "path": "/en/docs/resource/cancellation-and-retry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/suspense-and-ssr",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/troubleshooting",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
       "path": "/en/docs/rpc-browser",
       "locale": "en",
       "domain": "docs",
@@ -15693,6 +15723,294 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/scheduler/ITimeSliceReport",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/IWallClock",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/asyncTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/coalesce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/debounce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/deferTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/isAsyncTaskSupported",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/repeat",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/resolveAsyncTaskStrategy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/systemScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/systemWallClock",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/throttle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/timeSlice",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/timeSliceMap",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/timeSliceReduce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/yieldToHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/IFormatOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/IFormatPlaceholder",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/IStringConversion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/format",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/tryString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing/IManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing/createManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing/IDiscriminatedByField",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing/IDiscriminatedByPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing/IUrlLike",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/IPrimitive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isBlankString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isEmptyValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isNullish",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isPrimitive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isSafeIntegerValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes-and-text",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/collector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/configuration-ownership",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/deadlines-and-abort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error-identity-and-causes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function-and-value-guards",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/immutable-objects-and-paths",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/retry-and-concurrency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/strings-and-numbers",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/type-utilities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/wasm",
       "locale": "en",
       "domain": "docs",
@@ -19047,36 +19365,6 @@
       "library": "reactive"
     },
     {
-      "path": "/en/docs/resource/cancellation-and-retry",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/getting-started",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/readme",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/suspense-and-ssr",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/troubleshooting",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
       "path": "/zh/docs/resource",
       "locale": "zh",
       "domain": "docs",
@@ -19168,6 +19456,66 @@
     },
     {
       "path": "/zh/docs/resource/api/Resource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceFetchStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/createResource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/caching-and-refresh",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/cancellation-and-retry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/suspense-and-ssr",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "resource"
@@ -30363,294 +30711,6 @@
       "library": "tray"
     },
     {
-      "path": "/en/docs/utils/api/scheduler/ITimeSliceReport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/IWallClock",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/asyncTask",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/coalesce",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/debounce",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/deferTask",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/isAsyncTaskSupported",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/repeat",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/resolveAsyncTaskStrategy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/systemScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/systemWallClock",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/throttle",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/timeSlice",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/timeSliceMap",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/timeSliceReduce",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/yieldToHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/IFormatOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/IFormatPlaceholder",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/IStringConversion",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/format",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/tryString",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/testing",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/testing/IManualScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/testing/createManualScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing/IDiscriminatedByField",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing/IDiscriminatedByPath",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing/IUrlLike",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/IPrimitive",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isBlankString",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isEmptyValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isNullish",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isPrimitive",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isSafeIntegerValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/bytes-and-text",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/collector",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/configuration-ownership",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/deadlines-and-abort",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/error-identity-and-causes",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/function-and-value-guards",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/getting-started",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/immutable-objects-and-paths",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/readme",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/retry-and-concurrency",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/strings-and-numbers",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/type-utilities",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/zh/docs/utils",
       "locale": "zh",
       "domain": "docs",
@@ -31503,132 +31563,6 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/wasm",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/ConversionResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/InitInput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/InitOutput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/SyncInitInput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/__wbg_init",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/alloc_bytes",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/byte_len_of",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/dealloc_bytes",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/initSync",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/json_to_msgpack",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/msgpack_to_json",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/ptr_of",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/arena-memory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/conversion-boundaries",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/getting-started",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/initialization-and-hosts",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/ownership-and-cleanup",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/readme",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/troubleshooting",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
       "path": "/zh/docs/utils/api/object/identitySnapshot",
       "locale": "zh",
       "domain": "docs",
@@ -32205,64 +32139,130 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/resource/api/ResourceErrorCode",
+      "path": "/zh/docs/wasm",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/api/ResourceFetchStatus",
+      "path": "/zh/docs/wasm/api",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/api/ResourceStatus",
+      "path": "/zh/docs/wasm/api/ConversionResult",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/api/createResource",
+      "path": "/zh/docs/wasm/api/InitInput",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/caching-and-refresh",
+      "path": "/zh/docs/wasm/api/InitOutput",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/cancellation-and-retry",
+      "path": "/zh/docs/wasm/api/SyncInitInput",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/getting-started",
+      "path": "/zh/docs/wasm/api/__wbg_init",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/readme",
+      "path": "/zh/docs/wasm/api/alloc_bytes",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/suspense-and-ssr",
+      "path": "/zh/docs/wasm/api/byte_len_of",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/troubleshooting",
+      "path": "/zh/docs/wasm/api/dealloc_bytes",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/initSync",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/json_to_msgpack",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/msgpack_to_json",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/ptr_of",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/arena-memory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/conversion-boundaries",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/initialization-and-hosts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/ownership-and-cleanup",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
     }
   ]
 }

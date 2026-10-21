@@ -62427,7 +62427,11 @@
                       "flush() / clear()",
                       "无参数，返回 `Promise<void>`，具体串行与删除规则见后文。"
                     ],
-                    ["disposed / dispose()", "live 布尔 getter / 同步幂等释放。"]
+                    ["disposed / dispose()", "live 布尔 getter / 同步幂等释放。"],
+                    [
+                      "disposeAsync()",
+                      "同步停止后等待已接纳的写入/删除及最终防抖写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。"
+                    ]
                   ]
                 },
                 {
@@ -63144,7 +63148,11 @@
                       "flush() / clear()",
                       "无参数，返回 `Promise<void>`，具体串行与删除规则见后文。"
                     ],
-                    ["disposed / dispose()", "live 布尔 getter / 同步幂等释放。"]
+                    ["disposed / dispose()", "live 布尔 getter / 同步幂等释放。"],
+                    [
+                      "disposeAsync()",
+                      "同步停止后等待已接纳的写入/删除及最终防抖写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。"
+                    ]
                   ]
                 },
                 {
@@ -63756,6 +63764,10 @@
                       [
                         "disposed / dispose()",
                         "Live boolean getter / synchronous idempotent release."
+                      ],
+                      [
+                        "disposeAsync()",
+                        "Stops synchronously, then awaits admitted writes/removals and the final debounce write; final-write failures stay on writeError; existing flush/clear keep their outcomes."
                       ]
                     ]
                   },
@@ -64507,6 +64519,10 @@
                       [
                         "disposed / dispose()",
                         "Live boolean getter / synchronous idempotent release."
+                      ],
+                      [
+                        "disposeAsync()",
+                        "Stops synchronously, then awaits admitted writes/removals and the final debounce write; final-write failures stay on writeError; existing flush/clear keep their outcomes."
                       ]
                     ]
                   },

@@ -2109,7 +2109,7 @@
           "name": "createProcessPool",
           "kind": "function",
           "signature": "export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
-          "declarationLine": 25,
+          "declarationLine": 5,
           "source": "packages/rpc-pool/dist/index.d.ts",
           "purpose": "Creates independent Process Peers and applies pool-owned client-slot scheduling. Every member receives the original spawn source and probe; native Process runtime, wire format, permissions and restart budget remain unchanged. The spawned program uses createProcessPeer to provide its methods.",
           "core": "Promise<IProcessPool<TRemote>> preserving Process public call-option types, including no native transfer lists. Invalid pool input uses INVALID_OPTIONS and original acquisition errors pass through; caller owns explicit pool close.\nsize: Required positive integer target count selected by the caller. Initial construction acquires that many independent public Peers before exposing the pool.\nmaxQueue: Nonnegative integer bound on FIFO waiters, excluding operations already assigned to members. Zero rejects immediately when every slot is busy.\n256 waiting operations; overflow rejects QUEUE_FULL without calling a Peer.\nidleTimeoutMs: Finite positive idle duration no greater than 2147483647 milliseconds. Retires genuinely idle members through their original close; future demand recreates missing target capacity.\nundefined, disabling pool-owned idle retirement; native Peer supervision remains unchanged.\nscheduler: IScheduler from @migaia/utils/scheduler or a compatible injected scheduler, controlling only pool idle timers and their optional unref.\nsystemScheduler from @migaia/utils/scheduler; Peer restart and deadline policy stays with each original spawn source.\nspawn: Required NonNullable<IRuntimeProcessPeerOptions[spawn]> from @migaia/rpc-process: true for the guarded current entry, path, URL or original process source configuration. The program provides methods through createProcessPeer and the pool forwards the exact source unchanged.\nprobe: One IRpcProbe or readonly probe array from @migaia/rpc-core/probe, for example from createRpcDevtools. The exact same handle is forwarded to every public member factory; use event endpointId to distinguish members.\nundefined; no pool-added source probe is passed to member factories.",
@@ -2191,31 +2191,31 @@
               "name": "probe",
               "type": "IRuntimeProcessPeerOptions['probe']",
               "optional": true,
-              "description": "Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer."
+              "description": "Every member receives the same source probe without cloning its handle."
             },
             {
               "name": "size",
               "type": "number",
               "optional": false,
-              "description": "Required positive integer target; initial creation waits for this many independent Peers."
+              "description": ""
             },
             {
               "name": "maxQueue",
               "type": "number",
               "optional": true,
-              "description": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue."
+              "description": ""
             },
             {
               "name": "idleTimeoutMs",
               "type": "number",
               "optional": true,
-              "description": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory."
+              "description": ""
             },
             {
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline."
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy."
             }
           ],
           "identity": "packages/rpc-pool/dist/index.d.ts:createProcessPool:export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
@@ -2276,7 +2276,7 @@
               "type": "IRuntimeProcessPeerOptions['probe']",
               "optional": true,
               "description": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。",
-              "descriptionEn": "Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer.",
+              "descriptionEn": "Every member receives the same source probe without cloning its handle.",
               "descriptionZh": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。"
             },
             {
@@ -2284,7 +2284,7 @@
               "type": "number",
               "optional": false,
               "description": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。",
-              "descriptionEn": "Required positive integer target; initial creation waits for this many independent Peers.",
+              "descriptionEn": "",
               "descriptionZh": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。"
             },
             {
@@ -2292,7 +2292,7 @@
               "type": "number",
               "optional": true,
               "description": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。",
-              "descriptionEn": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue.",
+              "descriptionEn": "",
               "descriptionZh": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。"
             },
             {
@@ -2300,7 +2300,7 @@
               "type": "number",
               "optional": true,
               "description": "idleTimeoutMs — undefined，不做闲置回收；配置时为有限正数且不大于 2147483647 毫秒，允许小数。",
-              "descriptionEn": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory.",
+              "descriptionEn": "",
               "descriptionZh": "idleTimeoutMs — undefined，不做闲置回收；配置时为有限正数且不大于 2147483647 毫秒，允许小数。"
             },
             {
@@ -2308,7 +2308,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。",
-              "descriptionEn": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline.",
+              "descriptionEn": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
               "descriptionZh": "`spawn: true` 重跑当前入口，`isProcessChild()` 在子进程中建立带 `provide.double` 和 `provide.identity` 的真实 Peer。`size: 2` 是必填目标容量；`double(21)` 返回 `42`，两次 `identity()` 核对不同 PID。没有提供 `probe`、闲置回收或调用选项；`maxQueue` 默认 `256`、scheduler 默认 `systemScheduler`。Process 选项保留原 Peer 类型，不接受 Thread 转移列表。"
             }
           ],
@@ -2318,7 +2318,7 @@
           "name": "createThreadPool",
           "kind": "function",
           "signature": "export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
-          "declarationLine": 13,
+          "declarationLine": 3,
           "source": "packages/rpc-pool/dist/index.d.ts",
           "purpose": "Creates independent Thread Peers and schedules one client operation per member. The exact spawn source and probe pass to each original public factory; communication, handshake, transfer and restart remain Thread-owned. Pair the spawned entry with createThreadPeer to provide its methods.",
           "core": "Promise<IThreadPool<TRemote>> after all initial members are ready. Invalid pool input uses INVALID_OPTIONS; original factory failures preserve their identity, and partial acquisition closes successful members before rejecting. Caller must close the pool.\nsize: Required positive integer target count selected by the caller. Initial construction acquires that many independent public Peers before exposing the pool.\nmaxQueue: Nonnegative integer bound on FIFO waiters, excluding operations already assigned to members. Zero rejects immediately when every slot is busy.\n256 waiting operations; overflow rejects QUEUE_FULL without calling a Peer.\nidleTimeoutMs: Finite positive idle duration no greater than 2147483647 milliseconds. Retires genuinely idle members through their original close; future demand recreates missing target capacity.\nundefined, disabling pool-owned idle retirement; native Peer supervision remains unchanged.\nscheduler: IScheduler from @migaia/utils/scheduler or a compatible injected scheduler, controlling only pool idle timers and their optional unref.\nsystemScheduler from @migaia/utils/scheduler; Peer restart and deadline policy stays with each original spawn source.\nspawn: Required NonNullable<IRuntimeThreadPeerOptions[spawn]> from @migaia/rpc-threads: true for the guarded current entry, path, URL or original Thread spawn configuration. The spawned entry provides methods through createThreadPeer; every member receives this exact source.\nprobe: One IRpcProbe or readonly probe array from @migaia/rpc-core/probe, for example from createRpcDevtools. The exact same handle is forwarded to every public member factory; use event endpointId to distinguish members.\nundefined; no pool-added source probe is passed to member factories.",
@@ -2395,37 +2395,37 @@
               "name": "spawn",
               "type": "NonNullable<IRuntimeThreadPeerOptions['spawn']>",
               "optional": false,
-              "description": "Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads."
+              "description": ""
             },
             {
               "name": "probe",
               "type": "IRuntimeThreadPeerOptions['probe']",
               "optional": true,
-              "description": "Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer."
+              "description": "Every member receives the same source probe without cloning its handle."
             },
             {
               "name": "size",
               "type": "number",
               "optional": false,
-              "description": "Required positive integer target; initial creation waits for this many independent Peers."
+              "description": ""
             },
             {
               "name": "maxQueue",
               "type": "number",
               "optional": true,
-              "description": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue."
+              "description": ""
             },
             {
               "name": "idleTimeoutMs",
               "type": "number",
               "optional": true,
-              "description": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory."
+              "description": ""
             },
             {
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline."
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy."
             }
           ],
           "identity": "packages/rpc-pool/dist/index.d.ts:createThreadPool:export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
@@ -2478,7 +2478,7 @@
               "type": "NonNullable<IRuntimeThreadPeerOptions['spawn']>",
               "optional": false,
               "description": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。",
-              "descriptionEn": "Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads.",
+              "descriptionEn": "",
               "descriptionZh": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。"
             },
             {
@@ -2486,7 +2486,7 @@
               "type": "IRuntimeThreadPeerOptions['probe']",
               "optional": true,
               "description": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。",
-              "descriptionEn": "Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer.",
+              "descriptionEn": "Every member receives the same source probe without cloning its handle.",
               "descriptionZh": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。"
             },
             {
@@ -2494,7 +2494,7 @@
               "type": "number",
               "optional": false,
               "description": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。",
-              "descriptionEn": "Required positive integer target; initial creation waits for this many independent Peers.",
+              "descriptionEn": "",
               "descriptionZh": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。"
             },
             {
@@ -2502,7 +2502,7 @@
               "type": "number",
               "optional": true,
               "description": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。",
-              "descriptionEn": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue.",
+              "descriptionEn": "",
               "descriptionZh": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。"
             },
             {
@@ -2510,7 +2510,7 @@
               "type": "number",
               "optional": true,
               "description": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。",
-              "descriptionEn": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory.",
+              "descriptionEn": "",
               "descriptionZh": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。"
             },
             {
@@ -2518,7 +2518,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。",
-              "descriptionEn": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline.",
+              "descriptionEn": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
               "descriptionZh": "`spawn: true` 必填并重跑当前入口；`await isThreadChild()` 先区分子线程，再由 `createThreadPeer({ provide: ... })` 安装无参数的 `identity` 方法。`size: 2` 创建两个成员；省略的 `maxQueue` 为 `256`、`idleTimeoutMs` 为 `undefined`、`scheduler` 为 `systemScheduler`、`probe` 为 `undefined`。`pool.request('identity')` 没有业务载荷或额外调用选项，依次读取可核对空闲轮转。`IWorkerApi` 仅给调用端提供静态方法类型。"
             }
           ],
@@ -2528,7 +2528,7 @@
           "name": "IProcessPool",
           "kind": "type",
           "signature": "export type IProcessPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createProcessPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
-          "declarationLine": 57,
+          "declarationLine": 22,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Caller-owned pool returned by createProcessPool. Preserves Process request, notify and stream types with no native transfer list, adding the same pool-owned lifecycle controls as Thread pools.",
           "core": "request: Schedules one original Process Peer request. Queue waiting does not start the native deadline; the occupied slot is released only when the original result promise settles. Pool scheduling never retries a failed business call.\nrequest.method: Dotted method path declared by the spawned Process provide API and checked against TRemote.\nrequest.args: Original payload and Process call options from the application, including signal, timeoutMs and idempotencyKey. Process public types prohibit native transfer lists; the pool preserves that prohibition.\nPromise of the original typed result after queued dispatch. Pool-owned admission may reject POOL_CLOSED, QUEUE_FULL or queued CALL_ABORTED; native and Peer errors keep original identity and source/code.\nnotify: Schedules one original Process Peer notification and holds its client slot until the send promise settles; no business response is awaited.\nnotify.method: One-way method route supplied by the spawned Process provide API.\nnotify.args: Original application payload and Process options, retaining caller cancellation and the prohibition on native transfer lists.\nPromise<void> from the original send boundary after pool scheduling; pool queue failures use its own codes and original send failures pass through.\nstream: Creates a lazy Process stream iterator, admitting work only at first next(). The slot remains owned until the original stream finishes or termination is forwarded; never starting it does not block pool close.\nstream.method: Iterator method path provided by the spawned Process program and checked against TRemote.\nstream.args: Original payload and Process stream options from the application, including signal; native transfer lists remain unsupported.\nOriginal typed async iterator semantics behind pool admission. next() yields or rejects unchanged; return(value) and throw(error) forward original termination when available and release the slot exactly once.\nstats: Returns the current pool client-slot and FIFO snapshot, including during or after close. This does not measure provider concurrency or native worker load.\nFrozen IRpcPoolStats with target size, acquired member count, actual dispatched in-flight slots, queued waiters and pool state.\nresize: Serializes target-size changes in call order. Expansion acquires a transactional batch; shrink retires idle members first and waits for busy retired members to finish their accepted operations.\nresize.size: New positive integer target selected by the caller; it replaces the construction target after this resize is admitted.\nPromise<void> after acquisition or retirement. Invalid size uses INVALID_OPTIONS; closure uses POOL_CLOSED. Expansion failure restores the previous target and retains the original factory failure.\nChange capacity on an existing pool. This complete Node 24 example uses a guarded Thread entry with spawn true and required size 1; maxQueue defaults to 256, idleTimeoutMs to undefined and scheduler to systemScheduler. Each resize argument is the new required positive integer target.\nclose: Stops new admission, drains accepted queue entries and operations, then closes every owned member once. Long streams must end, return, throw or be cancelled to release their slot before drain can finish.\nThe same Promise<void> on repeated calls. Resolves after all member closes, or rejects with CLOSE_FAILED AggregateError retaining every original close failure and the first cause.",
@@ -2545,7 +2545,7 @@
               "kind": "method",
               "optional": false,
               "signature": "request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>;",
-              "description": "Request one declared scalar method with its inferred payload/result types.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "method",
@@ -2566,7 +2566,7 @@
               "kind": "method",
               "optional": false,
               "signature": "notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>;",
-              "description": "Notify a declared scalar method; successful sending is not a remote completion * acknowledgement.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "method",
@@ -2587,7 +2587,7 @@
               "kind": "method",
               "optional": false,
               "signature": "stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>;",
-              "description": "Iterate one declared generator method; yielded values keep the original inferred type.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "method",
@@ -2656,8 +2656,8 @@
         {
           "name": "IProcessPoolOptions",
           "kind": "type",
-          "signature": "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ /** * Required original Process spawn source; command/path/URL/true/config rules remain with * rpc-process. */ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;",
-          "declarationLine": 85,
+          "signature": "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;",
+          "declarationLine": 38,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Required original Process spawn source and common pool limits. Original runtime, permissions, JSON-RPC bindings and restart policy stay owned by @migaia/rpc-process.",
           "core": "size: Required positive integer target count selected by the caller. Initial construction acquires that many independent public Peers before exposing the pool.\nmaxQueue: Nonnegative integer bound on FIFO waiters, excluding operations already assigned to members. Zero rejects immediately when every slot is busy.\n256 waiting operations; overflow rejects QUEUE_FULL without calling a Peer.\nidleTimeoutMs: Finite positive idle duration no greater than 2147483647 milliseconds. Retires genuinely idle members through their original close; future demand recreates missing target capacity.\nundefined, disabling pool-owned idle retirement; native Peer supervision remains unchanged.\nscheduler: IScheduler from @migaia/utils/scheduler or a compatible injected scheduler, controlling only pool idle timers and their optional unref.\nsystemScheduler from @migaia/utils/scheduler; Peer restart and deadline policy stays with each original spawn source.\nspawn: Required NonNullable<IRuntimeProcessPeerOptions[spawn]> from @migaia/rpc-process: true for the guarded current entry, path, URL or original process source configuration. The program provides methods through createProcessPeer and the pool forwards the exact source unchanged.\nprobe: One IRpcProbe or readonly probe array from @migaia/rpc-core/probe, for example from createRpcDevtools. The exact same handle is forwarded to every public member factory; use event endpointId to distinguish members.\nundefined; no pool-added source probe is passed to member factories.",
@@ -2674,7 +2674,7 @@
               "kind": "property",
               "optional": false,
               "signature": "spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>;",
-              "description": "Required original Process spawn source; command/path/URL/true/config rules remain with rpc-process.",
+              "description": null,
               "parameterDetails": [],
               "returns": "NonNullable<IRuntimeProcessPeerOptions['spawn']>"
             },
@@ -2683,7 +2683,7 @@
               "kind": "property",
               "optional": true,
               "signature": "probe?: IRuntimeProcessPeerOptions['probe'];",
-              "description": "Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer.",
+              "description": "Every member receives the same source probe without cloning its handle.",
               "parameterDetails": [],
               "returns": "IRuntimeProcessPeerOptions['probe']"
             },
@@ -2692,7 +2692,7 @@
               "kind": "property",
               "optional": false,
               "signature": "size: number;",
-              "description": "Required positive integer target; initial creation waits for this many independent Peers.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -2701,7 +2701,7 @@
               "kind": "property",
               "optional": true,
               "signature": "maxQueue?: number;",
-              "description": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -2710,7 +2710,7 @@
               "kind": "property",
               "optional": true,
               "signature": "idleTimeoutMs?: number;",
-              "description": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -2719,7 +2719,7 @@
               "kind": "property",
               "optional": true,
               "signature": "scheduler?: IScheduler;",
-              "description": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline.",
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
               "parameterDetails": [],
               "returns": "IScheduler"
             }
@@ -2728,7 +2728,7 @@
           "aliasOf": "IProcessPoolOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ /** * Required original Process spawn source; command/path/URL/true/config rules remain with * rpc-process. */ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;"
+            "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2767,7 +2767,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/types.d.ts:IProcessPoolOptions:export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ /** * Required original Process spawn source; command/path/URL/true/config rules remain with * rpc-process. */ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;",
+          "identity": "packages/rpc-pool/dist/types.d.ts:IProcessPoolOptions:export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2776,8 +2776,8 @@
         {
           "name": "IRpcPoolControls",
           "kind": "type",
-          "signature": "export type IRpcPoolControls = Readonly<{ /** * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes * capacity. */ stats(): IRpcPoolStats; /** * Queues a positive-integer target change in call order. Shrink prefers idle members and waits * for occupied retirees without interrupting their calls; expansion acquires only the missing * members. Factory/cleanup failures reject, and failed expansion restores the old target while * still open. Closing pools reject resize with POOL_CLOSED. */ resize(size: number): Promise<void>; /** * Synchronously enters closing, rejects new admission and drains already accepted operations and * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member * closes are attempted; retained close failures reject as CLOSE_FAILED AggregateError with * original errors and the first retained failure on cause, even though state has become closed. */ close(): Promise<void>; }>;",
-          "declarationLine": 22,
+          "signature": "export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;",
+          "declarationLine": 14,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Pool-owned control surface shared by Thread and Process pools; owns only the public Peers acquired by the corresponding pool factory.",
           "core": "stats: Returns the current pool client-slot and FIFO snapshot, including during or after close. This does not measure provider concurrency or native worker load.\nFrozen IRpcPoolStats with target size, acquired member count, actual dispatched in-flight slots, queued waiters and pool state.\nresize: Serializes target-size changes in call order. Expansion acquires a transactional batch; shrink retires idle members first and waits for busy retired members to finish their accepted operations.\nresize.size: New positive integer target selected by the caller; it replaces the construction target after this resize is admitted.\nPromise<void> after acquisition or retirement. Invalid size uses INVALID_OPTIONS; closure uses POOL_CLOSED. Expansion failure restores the previous target and retains the original factory failure.\nChange capacity on an existing pool. This complete Node 24 example uses a guarded Thread entry with spawn true and required size 1; maxQueue defaults to 256, idleTimeoutMs to undefined and scheduler to systemScheduler. Each resize argument is the new required positive integer target.\nclose: Stops new admission, drains accepted queue entries and operations, then closes every owned member once. Long streams must end, return, throw or be cancelled to release their slot before drain can finish.\nThe same Promise<void> on repeated calls. Resolves after all member closes, or rejects with CLOSE_FAILED AggregateError retaining every original close failure and the first cause.",
@@ -2794,7 +2794,7 @@
               "kind": "method",
               "optional": false,
               "signature": "stats(): IRpcPoolStats;",
-              "description": "Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes capacity.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IRpcPoolStats"
             },
@@ -2803,7 +2803,7 @@
               "kind": "method",
               "optional": false,
               "signature": "resize(size: number): Promise<void>;",
-              "description": "Queues a positive-integer target change in call order. Shrink prefers idle members and waits for occupied retirees without interrupting their calls; expansion acquires only the missing members. Factory/cleanup failures reject, and failed expansion restores the old target while still open. Closing pools reject resize with POOL_CLOSED.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "size",
@@ -2818,7 +2818,7 @@
               "kind": "method",
               "optional": false,
               "signature": "close(): Promise<void>;",
-              "description": "Synchronously enters closing, rejects new admission and drains already accepted operations and acquisitions before closing owned Peers. Streams must finish/return/throw or settle their cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member closes are attempted; retained close failures reject as CLOSE_FAILED AggregateError with original errors and the first retained failure on cause, even though state has become closed.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Promise<void>"
             }
@@ -2827,7 +2827,7 @@
           "aliasOf": "IRpcPoolControls",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcPoolControls = Readonly<{ /** * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes * capacity. */ stats(): IRpcPoolStats; /** * Queues a positive-integer target change in call order. Shrink prefers idle members and waits * for occupied retirees without interrupting their calls; expansion acquires only the missing * members. Factory/cleanup failures reject, and failed expansion restores the old target while * still open. Closing pools reject resize with POOL_CLOSED. */ resize(size: number): Promise<void>; /** * Synchronously enters closing, rejects new admission and drains already accepted operations and * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member * closes are attempted; retained close failures reject as CLOSE_FAILED AggregateError with * original errors and the first retained failure on cause, even though state has become closed. */ close(): Promise<void>; }>;"
+            "export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2866,7 +2866,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/types.d.ts:IRpcPoolControls:export type IRpcPoolControls = Readonly<{ /** * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes * capacity. */ stats(): IRpcPoolStats; /** * Queues a positive-integer target change in call order. Shrink prefers idle members and waits * for occupied retirees without interrupting their calls; expansion acquires only the missing * members. Factory/cleanup failures reject, and failed expansion restores the old target while * still open. Closing pools reject resize with POOL_CLOSED. */ resize(size: number): Promise<void>; /** * Synchronously enters closing, rejects new admission and drains already accepted operations and * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member * closes are attempted; retained close failures reject as CLOSE_FAILED AggregateError with * original errors and the first retained failure on cause, even though state has become closed. */ close(): Promise<void>; }>;",
+          "identity": "packages/rpc-pool/dist/types.d.ts:IRpcPoolControls:export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -2876,7 +2876,7 @@
           "name": "IRpcPoolErrorCode",
           "kind": "type",
           "signature": "export type IRpcPoolErrorCode = (typeof RpcPoolErrorCode)[keyof typeof RpcPoolErrorCode];",
-          "declarationLine": 26,
+          "declarationLine": 16,
           "source": "packages/rpc-pool/dist/error-code.d.ts",
           "purpose": "Value union of RpcPoolErrorCode; only failures owned by pool scheduling use this union, while original Peer errors retain external contracts.",
           "core": "Value union of RpcPoolErrorCode; only failures owned by pool scheduling use this union, while original Peer errors retain external contracts.",
@@ -2976,7 +2976,7 @@
         {
           "name": "IRpcPoolStats",
           "kind": "type",
-          "signature": "export type IRpcPoolStats = Readonly<{ /** Requested capacity, retained after idle retirement and changed only by resize. */ targetSize: number; /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */ memberCount: number; /** * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider * concurrency. */ inFlight: number; /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */ queued: number; /** Pool admission/drain phase, independent of native generation or supervision state. */ state: RpcPoolState; }>;",
+          "signature": "export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;",
           "declarationLine": 6,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Frozen pool scheduling snapshot, independent of provider concurrency and per-Peer native readiness or restart states. Available even after pool closure.",
@@ -2994,7 +2994,7 @@
               "kind": "property",
               "optional": false,
               "signature": "targetSize: number;",
-              "description": "Requested capacity, retained after idle retirement and changed only by resize.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3003,7 +3003,7 @@
               "kind": "property",
               "optional": false,
               "signature": "memberCount: number;",
-              "description": "Acquired Peers still held, including retiring/closing members until their cleanup settles.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3012,7 +3012,7 @@
               "kind": "property",
               "optional": false,
               "signature": "inFlight: number;",
-              "description": "Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider concurrency.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3021,7 +3021,7 @@
               "kind": "property",
               "optional": false,
               "signature": "queued: number;",
-              "description": "Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3030,7 +3030,7 @@
               "kind": "property",
               "optional": false,
               "signature": "state: RpcPoolState;",
-              "description": "Pool admission/drain phase, independent of native generation or supervision state.",
+              "description": null,
               "parameterDetails": [],
               "returns": "RpcPoolState"
             }
@@ -3039,7 +3039,7 @@
           "aliasOf": "IRpcPoolStats",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcPoolStats = Readonly<{ /** Requested capacity, retained after idle retirement and changed only by resize. */ targetSize: number; /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */ memberCount: number; /** * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider * concurrency. */ inFlight: number; /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */ queued: number; /** Pool admission/drain phase, independent of native generation or supervision state. */ state: RpcPoolState; }>;"
+            "export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3078,7 +3078,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/types.d.ts:IRpcPoolStats:export type IRpcPoolStats = Readonly<{ /** Requested capacity, retained after idle retirement and changed only by resize. */ targetSize: number; /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */ memberCount: number; /** * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider * concurrency. */ inFlight: number; /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */ queued: number; /** Pool admission/drain phase, independent of native generation or supervision state. */ state: RpcPoolState; }>;",
+          "identity": "packages/rpc-pool/dist/types.d.ts:IRpcPoolStats:export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3088,7 +3088,7 @@
           "name": "IThreadPool",
           "kind": "type",
           "signature": "export type IThreadPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createThreadPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
-          "declarationLine": 50,
+          "declarationLine": 20,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Caller-owned pool returned by createThreadPool. It preserves the original Thread request, notify and stream type contracts and adds pool-owned stats, resize and idempotent close. Original native supervision remains outside this package.",
           "core": "request: Schedules one original Thread Peer request in a single member slot. If busy it waits in the bounded FIFO; the slot remains occupied until the original result promise settles. Peer failures pass through unchanged and are never replayed.\nrequest.method: Dotted method path declared by the spawned Thread program provide API and checked against TRemote.\nrequest.args: Original optional payload and Thread call options, including signal, timeoutMs, idempotencyKey and supported transfer list. Values come from the application; timeouts start at Peer dispatch, not while waiting in the pool.\nPromise of the original typed result after queued dispatch. Pool-owned admission may reject POOL_CLOSED, QUEUE_FULL or queued CALL_ABORTED; native and Peer errors keep original identity and source/code.\nnotify: Schedules one original Thread Peer notification; a slot is released when its send promise settles, without waiting for a remote business result.\nnotify.method: Method path in the spawned Thread provide API that accepts a one-way call.\nnotify.args: Original application payload and Thread call options forwarded intact, including a caller signal and supported native transfer semantics.\nPromise<void> from the original send boundary after pool scheduling; pool queue failures use its own codes and original send failures pass through.\nstream: Returns a lazy iterator; the first next() admits a pool operation, not the stream() call. One member slot stays occupied until done, return or throw. Early termination before dispatch removes only its own waiter.\nstream.method: Iterator-returning method path provided by the spawned Thread program and checked against TRemote.\nstream.args: Original payload and Thread stream options, including caller signal and supported transfer data. The exact arguments reach one selected public Peer.\nOriginal typed async iterator semantics behind pool admission. next() yields or rejects unchanged; return(value) and throw(error) forward original termination when available and release the slot exactly once.\nstats: Returns the current pool client-slot and FIFO snapshot, including during or after close. This does not measure provider concurrency or native worker load.\nFrozen IRpcPoolStats with target size, acquired member count, actual dispatched in-flight slots, queued waiters and pool state.\nresize: Serializes target-size changes in call order. Expansion acquires a transactional batch; shrink retires idle members first and waits for busy retired members to finish their accepted operations.\nresize.size: New positive integer target selected by the caller; it replaces the construction target after this resize is admitted.\nPromise<void> after acquisition or retirement. Invalid size uses INVALID_OPTIONS; closure uses POOL_CLOSED. Expansion failure restores the previous target and retains the original factory failure.\nChange capacity on an existing pool. This complete Node 24 example uses a guarded Thread entry with spawn true and required size 1; maxQueue defaults to 256, idleTimeoutMs to undefined and scheduler to systemScheduler. Each resize argument is the new required positive integer target.\nclose: Stops new admission, drains accepted queue entries and operations, then closes every owned member once. Long streams must end, return, throw or be cancelled to release their slot before drain can finish.\nThe same Promise<void> on repeated calls. Resolves after all member closes, or rejects with CLOSE_FAILED AggregateError retaining every original close failure and the first cause.",
@@ -3105,7 +3105,7 @@
               "kind": "method",
               "optional": false,
               "signature": "request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>;",
-              "description": "Request one declared scalar method with its inferred payload/result types.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "method",
@@ -3126,7 +3126,7 @@
               "kind": "method",
               "optional": false,
               "signature": "notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>;",
-              "description": "Notify a declared scalar method; successful sending is not a remote completion * acknowledgement.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "method",
@@ -3147,7 +3147,7 @@
               "kind": "method",
               "optional": false,
               "signature": "stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>;",
-              "description": "Iterate one declared generator method; yielded values keep the original inferred type.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "method",
@@ -3216,8 +3216,8 @@
         {
           "name": "IThreadPoolOptions",
           "kind": "type",
-          "signature": "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ /** Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads. */ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;",
-          "declarationLine": 78,
+          "signature": "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;",
+          "declarationLine": 32,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Required original Thread spawn source and pool scheduling limits. The pool does not clone the source or rewrite its child runtime, transfer or supervision policy.",
           "core": "size: Required positive integer target count selected by the caller. Initial construction acquires that many independent public Peers before exposing the pool.\nmaxQueue: Nonnegative integer bound on FIFO waiters, excluding operations already assigned to members. Zero rejects immediately when every slot is busy.\n256 waiting operations; overflow rejects QUEUE_FULL without calling a Peer.\nidleTimeoutMs: Finite positive idle duration no greater than 2147483647 milliseconds. Retires genuinely idle members through their original close; future demand recreates missing target capacity.\nundefined, disabling pool-owned idle retirement; native Peer supervision remains unchanged.\nscheduler: IScheduler from @migaia/utils/scheduler or a compatible injected scheduler, controlling only pool idle timers and their optional unref.\nsystemScheduler from @migaia/utils/scheduler; Peer restart and deadline policy stays with each original spawn source.\nspawn: Required NonNullable<IRuntimeThreadPeerOptions[spawn]> from @migaia/rpc-threads: true for the guarded current entry, path, URL or original Thread spawn configuration. The spawned entry provides methods through createThreadPeer; every member receives this exact source.\nprobe: One IRpcProbe or readonly probe array from @migaia/rpc-core/probe, for example from createRpcDevtools. The exact same handle is forwarded to every public member factory; use event endpointId to distinguish members.\nundefined; no pool-added source probe is passed to member factories.",
@@ -3234,7 +3234,7 @@
               "kind": "property",
               "optional": false,
               "signature": "spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>;",
-              "description": "Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads.",
+              "description": null,
               "parameterDetails": [],
               "returns": "NonNullable<IRuntimeThreadPeerOptions['spawn']>"
             },
@@ -3243,7 +3243,7 @@
               "kind": "property",
               "optional": true,
               "signature": "probe?: IRuntimeThreadPeerOptions['probe'];",
-              "description": "Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer.",
+              "description": "Every member receives the same source probe without cloning its handle.",
               "parameterDetails": [],
               "returns": "IRuntimeThreadPeerOptions['probe']"
             },
@@ -3252,7 +3252,7 @@
               "kind": "property",
               "optional": false,
               "signature": "size: number;",
-              "description": "Required positive integer target; initial creation waits for this many independent Peers.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3261,7 +3261,7 @@
               "kind": "property",
               "optional": true,
               "signature": "maxQueue?: number;",
-              "description": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3270,7 +3270,7 @@
               "kind": "property",
               "optional": true,
               "signature": "idleTimeoutMs?: number;",
-              "description": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3279,7 +3279,7 @@
               "kind": "property",
               "optional": true,
               "signature": "scheduler?: IScheduler;",
-              "description": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline.",
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
               "parameterDetails": [],
               "returns": "IScheduler"
             }
@@ -3288,7 +3288,7 @@
           "aliasOf": "IThreadPoolOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ /** Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads. */ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;"
+            "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3327,7 +3327,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/types.d.ts:IThreadPoolOptions:export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ /** Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads. */ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;",
+          "identity": "packages/rpc-pool/dist/types.d.ts:IThreadPoolOptions:export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3441,7 +3441,7 @@
         {
           "name": "RpcPoolErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** Closing/closed admission rejects new calls, first stream next or resize; create another pool. */ readonly poolClosed: 'POOL_CLOSED'; /** * All available slots are reserved and the bounded FIFO is full; the new call never reaches a * Peer. */ readonly queueFull: 'QUEUE_FULL'; /** * Queued cancellation removes only its FIFO entry; a native AbortError retains the signal reason * on cause. */ readonly callAborted: 'CALL_ABORTED'; /** * Final close attempted all members but retained one or more close failures, including earlier * retirement failures. Inspect AggregateError.errors/cause; the pool is terminal, not reopened. */ readonly closeFailed: 'CLOSE_FAILED'; };",
+          "signature": "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: 'POOL_CLOSED'; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: 'QUEUE_FULL'; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: 'CALL_ABORTED'; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: 'CLOSE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-pool/dist/error-code.d.ts",
           "purpose": "Stable pool-owned semantic codes for invalid configuration, closed admission, queue overflow, queued abort and aggregated member cleanup. Native error classes and original causes remain intact.",
@@ -3468,7 +3468,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly poolClosed: 'POOL_CLOSED';",
-              "description": "Closing/closed admission rejects new calls, first stream next or resize; create another pool.",
+              "description": "A closing pool rejects new work while draining operations already accepted.",
               "parameterDetails": [],
               "returns": "'POOL_CLOSED'"
             },
@@ -3477,7 +3477,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly queueFull: 'QUEUE_FULL';",
-              "description": "All available slots are reserved and the bounded FIFO is full; the new call never reaches a * Peer.",
+              "description": "A full bounded FIFO rejects the new operation without calling a Peer.",
               "parameterDetails": [],
               "returns": "'QUEUE_FULL'"
             },
@@ -3486,7 +3486,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly callAborted: 'CALL_ABORTED';",
-              "description": "Queued cancellation removes only its FIFO entry; a native AbortError retains the signal reason * on cause.",
+              "description": "Cancellation removes only an operation still waiting in the pool FIFO.",
               "parameterDetails": [],
               "returns": "'CALL_ABORTED'"
             },
@@ -3495,7 +3495,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly closeFailed: 'CLOSE_FAILED';",
-              "description": "Final close attempted all members but retained one or more close failures, including earlier * retirement failures. Inspect AggregateError.errors/cause; the pool is terminal, not reopened.",
+              "description": "All member closes were attempted and their original failures are collected.",
               "parameterDetails": [],
               "returns": "'CLOSE_FAILED'"
             }
@@ -3504,7 +3504,7 @@
           "aliasOf": "RpcPoolErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** Closing/closed admission rejects new calls, first stream next or resize; create another pool. */ readonly poolClosed: 'POOL_CLOSED'; /** * All available slots are reserved and the bounded FIFO is full; the new call never reaches a * Peer. */ readonly queueFull: 'QUEUE_FULL'; /** * Queued cancellation removes only its FIFO entry; a native AbortError retains the signal reason * on cause. */ readonly callAborted: 'CALL_ABORTED'; /** * Final close attempted all members but retained one or more close failures, including earlier * retirement failures. Inspect AggregateError.errors/cause; the pool is terminal, not reopened. */ readonly closeFailed: 'CLOSE_FAILED'; };"
+            "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: 'POOL_CLOSED'; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: 'QUEUE_FULL'; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: 'CALL_ABORTED'; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: 'CLOSE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3543,7 +3543,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/error-code.d.ts:RpcPoolErrorCode:export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** Closing/closed admission rejects new calls, first stream next or resize; create another pool. */ readonly poolClosed: 'POOL_CLOSED'; /** * All available slots are reserved and the bounded FIFO is full; the new call never reaches a * Peer. */ readonly queueFull: 'QUEUE_FULL'; /** * Queued cancellation removes only its FIFO entry; a native AbortError retains the signal reason * on cause. */ readonly callAborted: 'CALL_ABORTED'; /** * Final close attempted all members but retained one or more close failures, including earlier * retirement failures. Inspect AggregateError.errors/cause; the pool is terminal, not reopened. */ readonly closeFailed: 'CLOSE_FAILED'; };",
+          "identity": "packages/rpc-pool/dist/error-code.d.ts:RpcPoolErrorCode:export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: 'POOL_CLOSED'; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: 'QUEUE_FULL'; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: 'CALL_ABORTED'; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: 'CLOSE_FAILED'; };",
           "guidance": [
             {
               "id": "错误与支持环境",
@@ -3588,7 +3588,7 @@
         {
           "name": "RpcPoolState",
           "kind": "const",
-          "signature": "export declare const RpcPoolState: { /** New calls and resizes may be admitted; member availability is tracked separately. */ readonly open: 'open'; /** New admission is fenced while accepted operations and member cleanup drain. */ readonly closing: 'closing'; /** Member cleanup has completed, including completion that rejects with retained failures. */ readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "signature": "export declare const RpcPoolState: { readonly open: 'open'; readonly closing: 'closing'; readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
           "declarationLine": 15,
           "source": "packages/rpc-pool/dist/text.d.ts",
           "purpose": "Client scheduling lifecycle reported by stats(): open accepts work, closing drains accepted operations, closed records completed member cleanup attempts. It does not describe individual native supervisor generations.",
@@ -3606,7 +3606,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly open: 'open';",
-              "description": "New calls and resizes may be admitted; member availability is tracked separately.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'open'"
             },
@@ -3615,7 +3615,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly closing: 'closing';",
-              "description": "New admission is fenced while accepted operations and member cleanup drain.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'closing'"
             },
@@ -3624,7 +3624,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly closed: 'closed';",
-              "description": "Member cleanup has completed, including completion that rejects with retained failures.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'closed'"
             }
@@ -3633,7 +3633,7 @@
           "aliasOf": "RpcPoolState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcPoolState: { /** New calls and resizes may be admitted; member availability is tracked separately. */ readonly open: 'open'; /** New admission is fenced while accepted operations and member cleanup drain. */ readonly closing: 'closing'; /** Member cleanup has completed, including completion that rejects with retained failures. */ readonly closed: 'closed'; };",
+            "export declare const RpcPoolState: { readonly open: 'open'; readonly closing: 'closing'; readonly closed: 'closed'; };",
             "export type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];"
           ],
           "overloadParameterDetails": [[], []],
@@ -3673,7 +3673,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/text.d.ts:RpcPoolState:export declare const RpcPoolState: { /** New calls and resizes may be admitted; member availability is tracked separately. */ readonly open: 'open'; /** New admission is fenced while accepted operations and member cleanup drain. */ readonly closing: 'closing'; /** Member cleanup has completed, including completion that rejects with retained failures. */ readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "identity": "packages/rpc-pool/dist/text.d.ts:RpcPoolState:export declare const RpcPoolState: { readonly open: 'open'; readonly closing: 'closing'; readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
