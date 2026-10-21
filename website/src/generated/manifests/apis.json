@@ -8930,7 +8930,7 @@
           "name": "createEventChannel",
           "kind": "function",
           "signature": "export declare function createEventChannel<\n  T,\n  R,\n  const S extends IEventApiStyle | undefined,\n  const V = undefined,\n>(\n  options: S extends IEventApiStyle\n    ? IStyledEventChannelOptions<T, S, V>\n    : IEventChannelOptions<T, undefined, V>,\n): ICanonicalEventChannel<T, R, S, V> &\n  (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>);\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: IEventChannelOptions<T, undefined, V>,\n): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'subscribe-publish';\n  },\n): ICanonicalEventChannel<T, R>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'on-emit';\n  },\n): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'on-trigger';\n  },\n): ICanonicalEventChannel<T, R, 'on-trigger', V> &\n  IStyledEventChannel<T, R, 'on-trigger', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'listen-fire';\n  },\n): ICanonicalEventChannel<T, R, 'listen-fire', V> &\n  IStyledEventChannel<T, R, 'listen-fire', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options?: IEventChannelOptions<T, undefined, V>,\n): ICanonicalEventChannel<T, R, undefined, V>;",
-          "declarationLine": 86,
+          "declarationLine": 92,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Creates one in-process, synchronous event channel: an ordered list of listener registrations. `publish()` delivers a value to a snapshot of the current listeners; the `invoke*` functions use the same registrations when the publisher needs listener results. Options select how re-entrant publishes are ordered, whether duplicate listeners are merged, how much one publish may fan out, and optional method aliases.",
           "core": "options: Channel options; every field is optional. See the options table.\nThe channel (`ICanonicalEventChannel`). With a `style` option it also has the alias methods of that style. Malformed options throw `INVALID_OPTIONS`; non-callable report/terminalReport uses `INVALID_REPORTER`, before construction.\nreport: Receives listener failures that happen after `publish()` has already returned: a Promise or thenable returned by a listener that rejects later, and value-path projection failures. Synchronous listener throws are not reported here; `publish()` throws them as `PUBLISH_FAILED`.\nNot set: late failures go to `terminalReport`, then to the host error reporter.\nSet a reporter when listeners return promises, such as saving a job. It receives late rejections and projection failures; synchronous throws still leave publish() as PUBLISH_FAILED. Without it, terminalReport handles these diagnostics.\nterminalReport: Last diagnostic exit: receives a late failure when `report` is missing, throws, or returns a rejected thenable. It never changes publish results.\nNot set: the failure is passed to the host `reportError` with code `UNHANDLED_LISTENER_FAILURE`.\nUse a separate final sink when the main reporter can fail, for example when telemetry is offline. It receives failures missed by report; without it, the host diagnostic fallback receives them. It does not change publish() results.\ndispatchPolicy: Decides what happens when a listener calls `publish()` while a publish is still running.\n`EventDispatchPolicy.recursive`: the inner value is delivered immediately, before the outer publish continues.\nUse queued when listeners publish follow-up events and every listener must finish the current value first. recursive delivers the nested value immediately. Omitting it selects recursive.\nadmissionPolicy: Decides whether subscribing the same listener function more than once creates separate registrations or reuses one.\n`EventAdmissionPolicy.multiple`: every subscribe call creates its own registration.\nUse unique when repeated setup calls must reuse the same listener and task label. multiple gives each call an independent registration and is the default. Different task labels are not merged.\nremovalPolicy: Decides how many registrations a subscription handle removes when it is called.\n`handle`: the handle removes only the registration it created.\nUse listener-all when releasing one handle must also remove other registrations of that function. handle removes only its own registration and is the default. This matters when admissionPolicy is multiple.\npublishBudget: Maximum number of listener calls in one top-level synchronous publish, including calls caused by nested publishes. When the budget runs out the channel stops delivering and throws `PUBLISH_FAILED` when snapshot targets or nested values remain, with `processed` and `remaining` in `error.detail`, which stops runaway recursive publishing. Must be a positive safe integer.\n`100_000` listener calls per top-level publish.\nthrowOnAborted: Decides what `subscribeUntil(channel, signal, listener)` does when `signal` is already aborted: return a no-op unsubscribe without registering, or throw.\n`false`: no registration is made and a function that does nothing is returned.\nSilently skip the registration.\nThrow a `TypeError` with code `ABORTED`; use it when subscribing with a cancelled signal is a caller bug.\nUse true when subscribing after cancellation is a caller error: subscribeUntil throws ABORTED. false and omission return a no-op handle without registering. Neither choice interrupts an already-running listener.\nstyle: Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects, forwarding subscription delivery options unchanged. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior. Older examples may call defineEventApiStyle; that helper has been removed. Write custom names directly as an object and use the type check above to validate its fields while keeping the exact alias names for checking later method calls.\n`subscribe-publish`: no aliases are added.\nDefault names only.\nAdds `on`, `emit`, and `off` on handles.\nAdds `on`, `trigger`, and `off` on handles.\nAdds `listen`, `fire`, and `unlisten` on handles.\nChoose the names your integration already uses: on-emit adds on/emit/off, on-trigger adds on/trigger/off, and listen-fire adds listen/fire/unlisten. A custom map supplies your own names. Omit it or use subscribe-publish for canonical names only; every choice preserves delivery and cancellation behavior.\nvalueConfig: Reads one fixed path of each published payload and attaches the result to context delivery under `alias`, so context listeners can read `event.<alias>` while `event.value` stays the original payload. Value delivery receives the original payload without adding an alias. The path is read once per publish. A missing, blocked or throwing path leaves the context alias `undefined` and reports `VALUE_PROJECTION_FAILED` through `report`; all listeners still run. An empty `readPath` disables it.\nNot set: the context has no alias.",
@@ -10554,7 +10554,7 @@
           "name": "ICanonicalEventChannel",
           "kind": "type",
           "signature": "export type ICanonicalEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IEventChannel<T, R, S, V> & { readonly [canonicalChannelBrand]: true };",
-          "declarationLine": 245,
+          "declarationLine": 262,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "A channel created by `createEventChannel()`. It has all `IEventChannel` methods plus a brand that the `invoke*` functions check, so only real channels (not look-alike objects) can be invoked.",
           "core": "A channel created by `createEventChannel()`. It has all `IEventChannel` methods plus a brand that the `invoke*` functions check, so only real channels (not look-alike objects) can be invoked.",
@@ -10684,7 +10684,7 @@
           "name": "IEventApiStyle",
           "kind": "type",
           "signature": "export type IEventApiStyle = EventApiStyle | IEventApiStyleNames;",
-          "declarationLine": 55,
+          "declarationLine": 56,
           "source": "packages/event-subscriber/dist/style.d.ts",
           "purpose": "What the `style` option accepts: a preset name from `EventApiStyle` or a custom name map.",
           "core": "What the `style` option accepts: a preset name from `EventApiStyle` or a custom name map.",
@@ -10790,7 +10790,7 @@
           "name": "IEventApiStyleNames",
           "kind": "type",
           "signature": "export type IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string,\n> = {\n  /** Required subscription alias on the event source and on every chain handle. */ readonly subscribe: TSubscribe;\n  /** Required publication alias on the event source. */ readonly publish: TPublish;\n  /** Handle cancellation alias; defaults to the canonical unsubscribe name when omitted. */ readonly unsubscribe?: TUnsubscribe;\n};",
-          "declarationLine": 46,
+          "declarationLine": 47,
           "source": "packages/event-subscriber/dist/style.d.ts",
           "purpose": "A custom alias name map for the `style` option, checked with `as const satisfies IEventApiStyleNames`.",
           "core": "subscribe: Alias name added next to `subscribe`, for example `observe`.\npublish: Alias name added next to `publish`, for example `dispatch`.\nunsubscribe: Alias name added on subscription handles; optional.",
@@ -10924,7 +10924,7 @@
           "name": "IEventChannel",
           "kind": "type",
           "signature": "export type IEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  /** Registers a context listener by default, or an explicit value listener, with its chain owner. */ subscribe(\n    listener: IEventValueListener<T, R>,\n    options: IEventValueSubscribeOptions,\n  ): IEventChannelSubscription<T, R, S, V>;\n  /** Context listeners retain registration controls and the channel's configured value projection. */ subscribe(\n    listener: IEventListener<T, R, V>,\n    options?: IEventContextSubscribeOptions,\n  ): IEventChannelSubscription<T, R, S, V>;\n  /** * Delivers synchronously without waiting for listener promises; synchronous failures aggregate as * PUBLISH_FAILED. */ publish(\n    value: T,\n  ): void;\n  /** * Creates an opaque task filter for invoke helpers. Empty or non-string task ids throw * INVALID_TASK_ID. */ filterTaskId(\n    taskId: string,\n  ): IFilteredEventChannel<T, R, V>;\n  /** * Removes all registrations without calling listeners or user cleanup; current dispatch snapshots * survive. */ clear(): void;\n  /** * Number of active registrations, including independent duplicates under the default admission * policy. */ readonly size: number;\n};",
-          "declarationLine": 200,
+          "declarationLine": 215,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "The methods of every channel: subscribe, publish, select by task, clear, and count registrations. `createEventChannel()` returns this surface (as `ICanonicalEventChannel`).",
           "core": "subscribe: Registers `listener` and returns a subscription handle. Calling the handle (or `handle.unsubscribe()`) removes the registration; `handle.subscribe(...)` adds another registration to the same chain, and releasing the chain removes all of them in reverse order.\nsubscribe.listener: Function called with the event context by default (`event.value`, `event.abort()`, `event.taskId`), or the original payload when `delivery: EventDelivery.value` is explicit. Its return value is collected by the `invoke*` helpers in either mode.\nsubscribe.options: `taskId` optionally gives this registration a non-empty name for `filterTaskId()` and `invokeTask()`, including value delivery. `delivery` defaults to `EventDelivery.context`; explicit `EventDelivery.value` selects a payload listener. Options type: `IEventSubscribeOptions`.\nA callable, idempotent handle. Extending a handle after it was released throws `SUBSCRIPTION_CLOSED`.\nLong-lived listeners. For one delivery use `subscribeOnce`; for a listener tied to an AbortSignal use `subscribeUntil`.\npublish: Delivers `value` synchronously to the current listener snapshot in registration order, within `publishBudget`. Promises returned by listeners are not awaited; their later rejections go to `report`. A listener that publishes again is delivered recursively by default, or after the snapshot when `dispatchPolicy` is `queued`.\npublish.value: Payload delivered as `event.value` in context mode, or directly in value mode, with its original identity.\nNothing. Ordinary synchronous listener failures are collected and thrown together as an `AggregateError` with code `PUBLISH_FAILED` after the snapshot completes. If `publishBudget` is exhausted, delivery stops early and throws `PUBLISH_FAILED`; some listeners may not have run.\nNotifications where the publisher does not need listener results. To wait for results use `invokeParallel`, `invokeSerial` or `invokeTask`.\nfilterTaskId: Creates a read-only view that selects only registrations whose `taskId` equals `taskId`. The view cannot subscribe or publish; pass it to an `invoke*` helper.\nfilterTaskId.taskId: The name given at subscription: `channel.subscribe(listener, { taskId })`.\nAn `IFilteredEventChannel` view. Selection happens when a helper runs, so later registrations with the same taskId are included.\nSeveral registrations share one taskId and all of them must run. When exactly one must match, call `invokeTask`, which rejects zero or several matches.\nclear: Removes every current registration without calling listeners. With the default `removalPolicy: \"handle\"`, old handles cannot remove later registrations. With `removalPolicy: \"listener-all\"` and multiple admission, an unused old handle can still remove current registrations of the same listener after clear; unique admission keeps handles bound to their original registration.\nNothing; after the call `size` is `0`.\nThe owner of the channel shuts down. A single consumer should call its own handle instead.\nsize: Number of active registrations right now. Duplicate subscriptions of one listener count separately unless `admissionPolicy` is `unique`.",
@@ -11119,7 +11119,7 @@
           "name": "IEventChannelOptions",
           "kind": "type",
           "signature": "export type IEventChannelOptions<\n  T,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  /** * Optional reporter for late publish rejections and projection diagnostics; not synchronous * listener throws. */ readonly report?: (\n    failure: IEventReport<T, V>,\n  ) => void | PromiseLike<void>;\n  /** Optional fallback when report is absent or fails; a failing/missing sink uses host diagnostics. */ readonly terminalReport?: (\n    error: unknown,\n  ) => void | PromiseLike<void>;\n  /** Recursive (default) delivers nested values immediately; queued waits for the current snapshot. */ readonly dispatchPolicy?: IEventDispatchPolicy;\n  /** * Multiple (default) owns each subscription separately; unique shares one registration per * listener identity. */ readonly admissionPolicy?: IEventAdmissionPolicy;\n  /** * Handle (default) releases one registration; listener-all releases every registration of the * same function. */ readonly removalPolicy?: IEventRemovalPolicy;\n  /** * Positive safe-integer listener-call limit per top-level synchronous publish; defaults to * 100_000. */ readonly publishBudget?: number;\n  /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default false returns a callable no-op unsubscribe without invoking listeners. */ readonly throwOnAborted?: boolean;\n  /** Naming preset or custom names; defaults to subscribe-publish, without adding default aliases. */ readonly style?: IEventApiStyleOption<S>;\n  /** * Optional static path/alias for listener contexts. Omitted or blank paths leave projection * disabled. */ readonly valueConfig?: IValidatedEventValueConfig<\n    T,\n    V\n  >;\n};",
-          "declarationLine": 328,
+          "declarationLine": 347,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Options of `createEventChannel()`. All fields are optional and fixed at creation.",
           "core": "report: Receives listener failures that happen after `publish()` has already returned: a Promise or thenable returned by a listener that rejects later, and value-path projection failures. Synchronous listener throws are not reported here; `publish()` throws them as `PUBLISH_FAILED`.\nNot set: late failures go to `terminalReport`, then to the host error reporter.\nSet a reporter when listeners return promises, such as saving a job. It receives late rejections and projection failures; synchronous throws still leave publish() as PUBLISH_FAILED. Without it, terminalReport handles these diagnostics.\nterminalReport: Last diagnostic exit: receives a late failure when `report` is missing, throws, or returns a rejected thenable. It never changes publish results.\nNot set: the failure is passed to the host `reportError` with code `UNHANDLED_LISTENER_FAILURE`.\nUse a separate final sink when the main reporter can fail, for example when telemetry is offline. It receives failures missed by report; without it, the host diagnostic fallback receives them. It does not change publish() results.\ndispatchPolicy: Decides what happens when a listener calls `publish()` while a publish is still running.\n`EventDispatchPolicy.recursive`: the inner value is delivered immediately, before the outer publish continues.\nUse queued when listeners publish follow-up events and every listener must finish the current value first. recursive delivers the nested value immediately. Omitting it selects recursive.\nadmissionPolicy: Decides whether subscribing the same listener function more than once creates separate registrations or reuses one.\n`EventAdmissionPolicy.multiple`: every subscribe call creates its own registration.\nUse unique when repeated setup calls must reuse the same listener and task label. multiple gives each call an independent registration and is the default. Different task labels are not merged.\nremovalPolicy: Decides how many registrations a subscription handle removes when it is called.\n`handle`: the handle removes only the registration it created.\nUse listener-all when releasing one handle must also remove other registrations of that function. handle removes only its own registration and is the default. This matters when admissionPolicy is multiple.\npublishBudget: Maximum number of listener calls in one top-level synchronous publish, including calls caused by nested publishes. When the budget runs out the channel stops delivering and throws `PUBLISH_FAILED` when snapshot targets or nested values remain, with `processed` and `remaining` in `error.detail`, which stops runaway recursive publishing. Must be a positive safe integer.\n`100_000` listener calls per top-level publish.\nthrowOnAborted: Decides what `subscribeUntil(channel, signal, listener)` does when `signal` is already aborted: return a no-op unsubscribe without registering, or throw.\n`false`: no registration is made and a function that does nothing is returned.\nSilently skip the registration.\nThrow a `TypeError` with code `ABORTED`; use it when subscribing with a cancelled signal is a caller bug.\nUse true when subscribing after cancellation is a caller error: subscribeUntil throws ABORTED. false and omission return a no-op handle without registering. Neither choice interrupts an already-running listener.\nstyle: Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects, forwarding subscription delivery options unchanged. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior. Older examples may call defineEventApiStyle; that helper has been removed. Write custom names directly as an object and use the type check above to validate its fields while keeping the exact alias names for checking later method calls.\n`subscribe-publish`: no aliases are added.\nDefault names only.\nAdds `on`, `emit`, and `off` on handles.\nAdds `on`, `trigger`, and `off` on handles.\nAdds `listen`, `fire`, and `unlisten` on handles.\nChoose the names your integration already uses: on-emit adds on/emit/off, on-trigger adds on/trigger/off, and listen-fire adds listen/fire/unlisten. A custom map supplies your own names. Omit it or use subscribe-publish for canonical names only; every choice preserves delivery and cancellation behavior.\nvalueConfig: Reads one fixed path of each published payload and attaches the result to context delivery under `alias`, so context listeners can read `event.<alias>` while `event.value` stays the original payload. Value delivery receives the original payload without adding an alias. The path is read once per publish. A missing, blocked or throwing path leaves the context alias `undefined` and reports `VALUE_PROJECTION_FAILED` through `report`; all listeners still run. An empty `readPath` disables it.\nNot set: the context has no alias.",
@@ -11266,7 +11266,7 @@
           "name": "IEventChannelSubscription",
           "kind": "type",
           "signature": "export type IEventChannelSubscription<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IUnsubscribe & {\n  /** The handle itself, exposed as an immutable cancellation alias. */ readonly unsubscribe: IEventChannelSubscription<\n    T,\n    R,\n    S,\n    V\n  >;\n  /** Adds a context or value listener to this chain and returns the same handle. */ readonly subscribe: IEventSubscribe<\n    T,\n    R,\n    V,\n    IEventChannelSubscription<T, R, S, V>\n  >;\n} & IEventChannelSubscriptionStyleProjection<T, R, S, V>;",
-          "declarationLine": 54,
+          "declarationLine": 60,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "The handle returned by `channel.subscribe()`. Call it to unsubscribe; `handle.unsubscribe` is the same function; `handle.subscribe(...)` adds another registration to the same chain, and one call releases the whole chain in reverse order.",
           "core": "unsubscribe: The handle itself, exposed under a readable name, so `handle.unsubscribe()` and `handle()` do the same thing.\nsubscribe: Adds another registration on the same channel to this chain and returns the extended handle; releasing the chain removes all of its registrations in reverse order. It accepts the same `taskId` and delivery options as `channel.subscribe`. After the chain was released it throws `SUBSCRIPTION_CLOSED`.",
@@ -11456,7 +11456,7 @@
           "name": "IEventHub",
           "kind": "type",
           "signature": "export type IEventHub<\n  C extends IEventMap,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  /** * Registers a listener for one key and returns a callable chain owner; invalid keys/listeners * throw. */ subscribe<\n    K extends keyof C,\n  >(\n    key: K,\n    listener: IEventValueListener<C[K]>,\n    options: Pick<IEventValueSubscribeOptions, 'delivery'>,\n  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>;\n  /** Keeps the existing key-specific context contract when payload-only delivery is not selected. */ subscribe<\n    K extends keyof C,\n  >(\n    key: K,\n    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>,\n    options?: Pick<IEventContextSubscribeOptions, 'delivery'>,\n  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>;\n  /** Publishes synchronously for this key. A valid key with no listeners is a no-op. */ publish<\n    K extends keyof C,\n  >(\n    key: K,\n    value: C[K],\n  ): void;\n  /** Clears one key, or all keys when omitted, without invoking user cleanup. */ clear(\n    key?: keyof C,\n  ): void;\n  /** Active registration count for one key, or the total in constant time when key is omitted. */ size(\n    key?: keyof C,\n  ): number;\n};",
-          "declarationLine": 286,
+          "declarationLine": 303,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "A router of named events created by `createEventHub()`. Each event name owns a channel created on first use; `publish` reaches only the listeners of that name.",
           "core": "subscribe: Registers `listener` for one event name. The channel of that name is created on first use. The returned handle can be called to unsubscribe, and `handle.subscribe(otherKey, listener)` adds another event to the same chain.\nsubscribe.key: Event name from the event map `C`.\nsubscribe.listener: Receives that key’s context by default, or its original payload when explicit value delivery is selected; Hub listeners return no result.\nsubscribe.options: Optional third argument: only `delivery`, defaulting to `EventDelivery.context`; `EventDelivery.value` passes the payload directly. Hub subscriptions accept no `taskId`.\nA chainable `IEventHubSubscription`; releasing it removes every registration of the chain in reverse order.\npublish: Delivers `value` synchronously to the listeners of `key`. Publishing a key that nobody subscribed does nothing.\npublish.key: Event name.\npublish.value: Payload whose type is fixed by `C[key]`.\nNothing. Synchronous listener failures are thrown together as `PUBLISH_FAILED`, as with a channel.\nNotifications. A hub does not collect listener results; create a dedicated `createEventChannel<T, R>()` when results matter.\nclear: Removes the registrations of one event name and drops its channel, or of every event name when called without an argument.\nclear.key: Event name to clear; omit to clear all.\nNothing.\nsize: Counts registrations of one event name, or of all names when called without an argument. The total is kept in O(1).\nsize.key: Event name to count; omit for the total.\nThe number of active registrations.",
@@ -11663,7 +11663,7 @@
           "name": "IEventHubOptions",
           "kind": "type",
           "signature": "export type IEventHubOptions<\n  C extends IEventMap,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  /** * Optional late-rejection/projection reporter. Missing or failed reporting falls through to * terminalReport. */ readonly report?: (\n    failure: IEventHubReport<C, V>,\n  ) => void | PromiseLike<void>;\n  /** Optional final diagnostic sink. Its absence or failure uses the host diagnostic fallback chain. */ readonly terminalReport?: (\n    error: unknown,\n  ) => void | PromiseLike<void>;\n  /** Naming preset or custom names; defaults to subscribe-publish and preserves canonical methods. */ readonly style?: IEventApiStyleOption<S>;\n  /** * Optional static path/alias applied to each payload without changing event.value. No projection * by default. */ readonly valueConfig?: IValidatedEventValueConfig<\n    C[keyof C],\n    V\n  >;\n};",
-          "declarationLine": 266,
+          "declarationLine": 283,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Options of `createEventHub()`. Dispatch, admission, removal, budget and aborted-signal behaviour are fixed for hubs; only reporting, method aliases and the value alias can be set.",
           "core": "report: Receives listener failures that happen after `publish()` has already returned: a Promise or thenable returned by a listener that rejects later, together with the event `key`, and value-path projection failures. Synchronous listener throws are not reported here; `publish()` throws them as `PUBLISH_FAILED`.\nNot set: late failures go to `terminalReport`, then to the host error reporter.\nSet a reporter when listeners return promises, such as saving a job. It receives late rejections and projection failures; synchronous throws still leave publish() as PUBLISH_FAILED. Without it, terminalReport handles these diagnostics.\nterminalReport: Last diagnostic exit: receives a late failure when `report` is missing, throws, or returns a rejected thenable. It never changes publish results.\nNot set: the failure is passed to the host `reportError` with code `UNHANDLED_LISTENER_FAILURE`.\nUse a separate final sink when the main reporter can fail, for example when telemetry is offline. It receives failures missed by report; without it, the host diagnostic fallback receives them. It does not change publish() results.\nstyle: Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects, forwarding subscription delivery options unchanged. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior. Older examples may call defineEventApiStyle; that helper has been removed. Write custom names directly as an object and use the type check above to validate its fields while keeping the exact alias names for checking later method calls.\n`subscribe-publish`: no aliases are added.\nDefault names only.\nAdds `on`, `emit`, and `off` on handles.\nAdds `on`, `trigger`, and `off` on handles.\nAdds `listen`, `fire`, and `unlisten` on handles.\nChoose the names your integration already uses: on-emit adds on/emit/off, on-trigger adds on/trigger/off, and listen-fire adds listen/fire/unlisten. A custom map supplies your own names. Omit it or use subscribe-publish for canonical names only; every choice preserves delivery and cancellation behavior.\nvalueConfig: Reads one fixed path of each published payload and attaches the result to context delivery under `alias`, so context listeners can read `event.<alias>` while `event.value` stays the original payload. Value delivery receives the original payload without adding an alias. The path is read once per publish. A missing, blocked or throwing path leaves the context alias `undefined` and reports `VALUE_PROJECTION_FAILED` through `report`; all listeners still run. An empty `readPath` disables it.\nNot set: the context has no alias.",
@@ -11765,7 +11765,7 @@
           "name": "IEventHubReport",
           "kind": "type",
           "signature": "export type IEventHubReport<C extends IEventMap, V = undefined> = {\n  [K in keyof C]: {\n    /** Hub key whose dispatch produced this diagnostic. */ readonly key: K;\n    /** Context for the payload type associated with this key. */ readonly event: IProjectedEventContext<\n      C[K],\n      IEventValueForKey<C[K], V>\n    >;\n    /** Original late rejection or a coded payload-path diagnostic. */ readonly error: unknown;\n  };\n}[keyof C];",
-          "declarationLine": 251,
+          "declarationLine": 268,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "What a hub `report` receives: like `IEventReport`, plus the event `key` that failed.",
           "core": "What a hub `report` receives: like `IEventReport`, plus the event `key` that failed.",
@@ -11830,7 +11830,7 @@
           "name": "IEventHubSubscription",
           "kind": "type",
           "signature": "export type IEventHubSubscription<\n  C extends IEventMap,\n  UsedKeys = never,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IUnsubscribe & {\n  /** The handle itself. Calling either form closes the entire chain idempotently. */ readonly unsubscribe: IEventHubSubscription<\n    C,\n    UsedKeys,\n    S,\n    V\n  >;\n  /** Adds an available event key and listener, returning this same owner; a closed chain throws. */ subscribe<\n    K extends IEventHubAvailableKey<C, UsedKeys>,\n  >(\n    key: K,\n    listener: IEventValueListener<C[K]>,\n    options: Pick<IEventValueSubscribeOptions, 'delivery'>,\n  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>;\n  /** Retains context controls and key-specific projection when value delivery is not selected. */ subscribe<\n    K extends IEventHubAvailableKey<C, UsedKeys>,\n  >(\n    key: K,\n    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>,\n    options?: Pick<IEventContextSubscribeOptions, 'delivery'>,\n  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>;\n} & IEventHubSubscriptionStyleProjection<C, UsedKeys, S, V>;",
-          "declarationLine": 65,
+          "declarationLine": 71,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "The handle returned by `hub.subscribe()`. Call it to unsubscribe, or call `handle.subscribe(key, listener)` to add another event to the same chain.",
           "core": "unsubscribe: The handle itself under a readable name; releases the whole chain.\nsubscribe: Adds a registration for another event name to the same chain; the optional third argument selects context or value delivery, as on `hub.subscribe`, without a task label. In a chain with a finite event map, the same name cannot be added twice (checked by the type system).\nsubscribe.key: Another event name from the event map; a finite map rejects names already in this chain.\nsubscribe.listener: Receives that event’s context by default, or its original payload with value delivery.\nsubscribe.options: Optional; only `delivery`, defaulting to `EventDelivery.context`.\nThe extended handle; calling it releases every registration of the chain in reverse order.",
@@ -11998,7 +11998,7 @@
           "name": "IEventInvocation",
           "kind": "type",
           "signature": "export type IEventInvocation<R> = {\n  /** Task label captured when this invocation entry is created. */ readonly taskId:\n    | string\n    | undefined;\n  /** Calls the captured listener with this dispatch's context and returns its raw result. */ invoke():\n    | R\n    | PromiseLike<R>;\n};",
-          "declarationLine": 120,
+          "declarationLine": 133,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "One registration handed to a `withSnapshotEntries` or `invokeEachLive` visitor. It exposes the task name and a way to run the listener, but not the listener itself.",
           "core": "taskId: Task name of the registration, or `undefined`.\ninvoke: Runs the listener once with the published value.\nThe listener result. A second call, or a call after the visitor finished, throws `INVOCATION_CLOSED`.",
@@ -12082,7 +12082,7 @@
           "name": "IEventInvocationVisitor",
           "kind": "type",
           "signature": "export type IEventInvocationVisitor<R> = (\n  entries: readonly IEventInvocation<R>[],\n) => void | PromiseLike<void>;",
-          "declarationLine": 130,
+          "declarationLine": 143,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Callback of `withSnapshotEntries`: receives the invocation array and may return a Promise.",
           "core": "Callback of `withSnapshotEntries`: receives the invocation array and may return a Promise.",
@@ -12147,7 +12147,7 @@
           "name": "IEventMap",
           "kind": "type",
           "signature": "export type IEventMap = object;",
-          "declarationLine": 249,
+          "declarationLine": 266,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Event map type of a hub: an object type whose keys are event names and whose values are payload types.",
           "core": "Event map type of a hub: an object type whose keys are event names and whose values are payload types.",
@@ -12275,7 +12275,7 @@
           "name": "IEventReport",
           "kind": "type",
           "signature": "export type IEventReport<T, V = undefined> = {\n  /** Delivered context, including its original payload and optional projected alias. */ readonly event: IProjectedEventContext<\n    T,\n    V\n  >;\n  /** Original listener rejection, or a coded VALUE_PROJECTION_FAILED diagnostic. */ readonly error: unknown;\n};",
-          "declarationLine": 150,
+          "declarationLine": 163,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "What `report` receives for one late listener failure of a channel.",
           "core": "event: The event context of the delivery that failed, including `value` and `taskId`.\nerror: The rejection reason or projection error.",
@@ -12592,7 +12592,7 @@
           "name": "IFilteredEventChannel",
           "kind": "type",
           "signature": "export type IFilteredEventChannel<T, R = void, V = undefined> = {\n  readonly [filteredChannelBrand]: {\n    readonly value: T;\n    readonly result: R;\n    readonly config: V;\n  };\n};",
-          "declarationLine": 234,
+          "declarationLine": 251,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "The read-only view returned by `filterTaskId()`. It has no methods; pass it to `invokeParallel`, `invokeSerial` and their settled variants.",
           "core": "The read-only view returned by `filterTaskId()`. It has no methods; pass it to `invokeParallel`, `invokeSerial` and their settled variants.",
@@ -12657,7 +12657,7 @@
           "name": "IListenerResult",
           "kind": "type",
           "signature": "export type IListenerResult<R> =\n  | {\n      readonly status: typeof EventSubscriberState.fulfilled;\n      readonly value: Awaited<R>;\n    }\n  | { readonly status: typeof EventSubscriberState.rejected; readonly reason: unknown };",
-          "declarationLine": 157,
+          "declarationLine": 170,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "One listener outcome in settled results: `{ status: \"fulfilled\", value }` or `{ status: \"rejected\", reason }`.",
           "core": "status: Discriminant from `EventSubscriberState`: fulfilled carries a value, while rejected carries the original reason.\nThe listener completed successfully; read its awaited value.\nThe listener threw or rejected; inspect its original reason.\nvalue: Awaited listener return present only in the fulfilled branch; its position follows registration order.\nreason: Exact thrown or rejected value present only in the rejected branch, without message-only replacement.",
@@ -12759,7 +12759,7 @@
           "name": "invokeEachLive",
           "kind": "const",
           "signature": "export declare const invokeEachLive: <T, R, V = undefined>(\n  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,\n  value: T,\n  visitor: (invocation: IEventInvocation<R>) => void,\n) => void;",
-          "declarationLine": 63,
+          "declarationLine": 69,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Low-level synchronous traversal for framework integrations: hands admitted registrations to `visitor` as invocations, each at most once. Appended registrations may join while no registration has been removed or cleared during the traversal. After a removal or clear, later appends are no longer admitted, but already admitted pending entries are still visited. The visitor must finish synchronously. A visitor failure receives `VISITOR_FAILED`; native identity is retained where possible, otherwise the original, including undefined, remains on `cause`. Ordinary publishing should use the snapshot-based `invoke*` functions, whose target set cannot change while they run.",
           "core": "channel: A channel created by `createEventChannel()`, or a `filterTaskId()` view of it. Other objects, or channels from another copy of the package, throw `INVALID_CHANNEL`.\nvalue: Payload passed to every selected listener as `event.value`.\nvisitor: Called once per registration with an invocation object; call `invocation.invoke()` to run that listener.",
@@ -12824,7 +12824,7 @@
           "name": "invokeParallel",
           "kind": "const",
           "signature": "export declare const invokeParallel: <T, R, V = undefined>(\n  channel: IAsyncChannel<T, R, V>,\n  value: T,\n) => Promise<readonly Awaited<R>[]>;",
-          "declarationLine": 29,
+          "declarationLine": 30,
           "source": "packages/event-subscriber/dist/async.d.ts",
           "purpose": "Publishes `value` and waits for every listener: all listeners start immediately, and the Promise resolves with their results in registration order. If any listener fails it still waits for all of them, then rejects with an `AggregateError` (`PUBLISH_FAILED`).",
           "core": "channel: A channel created by `createEventChannel()`, or a `filterTaskId()` view of it. Other objects, or channels from another copy of the package, throw `INVALID_CHANNEL`.\nvalue: Payload passed to every selected listener as `event.value`.\nResolves with each listener result in registration order; rejects with `PUBLISH_FAILED` when any failed.",
@@ -12889,7 +12889,7 @@
           "name": "invokeParallelSettled",
           "kind": "const",
           "signature": "export declare const invokeParallelSettled: <T, R, V = undefined>(\n  channel: IAsyncChannel<T, R, V>,\n  value: T,\n) => Promise<readonly IListenerResult<R>[]>;",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/event-subscriber/dist/async.d.ts",
           "purpose": "Starts listeners in parallel and collects their successes and failures as `{ status, value }` or `{ status, reason }`, in registration order. Listener failures do not reject the returned Promise. Invalid channel admission still throws synchronously before a Promise is returned.",
           "core": "channel: A channel created by `createEventChannel()`, or a `filterTaskId()` view of it. Other objects, or channels from another copy of the package, throw `INVALID_CHANNEL`.\nvalue: Payload passed to every selected listener as `event.value`.\nAn array of `IListenerResult` in registration order, not completion order. Invalid channel input throws synchronously with `INVALID_CHANNEL`.",
@@ -12956,7 +12956,7 @@
           "name": "invokeSerial",
           "kind": "const",
           "signature": "export declare const invokeSerial: <T, R, V = undefined>(\n  channel: IAsyncChannel<T, R, V>,\n  value: T,\n) => Promise<readonly Awaited<R>[]>;",
-          "declarationLine": 37,
+          "declarationLine": 38,
           "source": "packages/event-subscriber/dist/async.d.ts",
           "purpose": "Publishes `value` to one listener at a time: the next listener starts only after the previous one settled. Every listener receives the same `value` (results are not chained). Rejects with `PUBLISH_FAILED` after all listeners ran if any failed.",
           "core": "channel: A channel created by `createEventChannel()`, or a `filterTaskId()` view of it. Other objects, or channels from another copy of the package, throw `INVALID_CHANNEL`.\nvalue: Payload passed to every selected listener as `event.value`.\nResolves with the results in registration order; rejects with `PUBLISH_FAILED` when any failed.",
@@ -13023,7 +13023,7 @@
           "name": "invokeSerialSettled",
           "kind": "const",
           "signature": "export declare const invokeSerialSettled: <T, R, V = undefined>(\n  channel: IAsyncChannel<T, R, V>,\n  value: T,\n) => Promise<readonly IListenerResult<R>[]>;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/event-subscriber/dist/async.d.ts",
           "purpose": "Runs listeners serially and resolves with one success or failure entry for each. Listener failures are collected; invalid channel admission still throws synchronously before a Promise is returned.",
           "core": "channel: A channel created by `createEventChannel()`, or a `filterTaskId()` view of it. Other objects, or channels from another copy of the package, throw `INVALID_CHANNEL`.\nvalue: Payload passed to every selected listener as `event.value`.\nAn array of `IListenerResult` in registration order.",
@@ -13088,7 +13088,7 @@
           "name": "invokeTask",
           "kind": "const",
           "signature": "export declare const invokeTask: <T, R, V = undefined>(\n  channel: ICanonicalEventChannel<T, R, undefined, V>,\n  taskId: string,\n  value: T,\n) => Promise<Awaited<R>>;",
-          "declarationLine": 56,
+          "declarationLine": 57,
           "source": "packages/event-subscriber/dist/async.d.ts",
           "purpose": "Calls exactly one registration selected by `taskId` and waits for its result. Selection happens before any listener runs: no match throws `TASK_NOT_FOUND`, several matches throw `TASK_NOT_UNIQUE` (with `taskId` and `matchCount` on the error). A failing listener rejects with `PUBLISH_FAILED`.",
           "core": "channel: A channel created by `createEventChannel()`.\ntaskId: Name given at `subscribe(listener, { taskId })`.\nvalue: Payload passed to every selected listener as `event.value`.\nResolves with the listener result; rejects with `PUBLISH_FAILED` when it fails.",
@@ -13156,7 +13156,7 @@
           "name": "invokeTaskSettled",
           "kind": "const",
           "signature": "export declare const invokeTaskSettled: <T, R, V = undefined>(\n  channel: ICanonicalEventChannel<T, R, undefined, V>,\n  taskId: string,\n  value: T,\n) => Promise<IListenerResult<R>>;",
-          "declarationLine": 48,
+          "declarationLine": 49,
           "source": "packages/event-subscriber/dist/async.d.ts",
           "purpose": "Like `invokeTask`, but a failing listener resolves as `{ status: \"rejected\", reason }` instead of rejecting. Selection errors still throw synchronously.",
           "core": "channel: A channel created by `createEventChannel()`.\ntaskId: Name of the single registration to call, given at `subscribe(listener, { taskId })`.\nvalue: Payload passed to every selected listener as `event.value`.\nOne `IListenerResult`.",
@@ -13221,7 +13221,7 @@
           "name": "IStyledEventChannel",
           "kind": "type",
           "signature": "export type IStyledEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IEventChannel<T, R, S, V> & IEventChannelStyleProjection<T, R, S, V>;",
-          "declarationLine": 227,
+          "declarationLine": 242,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "A channel created with the `style` option: `IEventChannel` plus alias methods named by the style (for example `on` and `emit`). Subscribe aliases retain the same context/value overloads and options.",
           "core": "A channel created with the `style` option: `IEventChannel` plus alias methods named by the style (for example `on` and `emit`). Subscribe aliases retain the same context/value overloads and options.",
@@ -13286,7 +13286,7 @@
           "name": "IStyledEventHub",
           "kind": "type",
           "signature": "export type IStyledEventHub<\n  C extends IEventMap,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IEventHub<C, S, V> & IEventHubStyleProjection<C, S, V>;",
-          "declarationLine": 323,
+          "declarationLine": 342,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "The hub returned by `createEventHub()`: `IEventHub` plus the alias methods of its `style`, if any.",
           "core": "subscribe: Registers `listener` for one event name. The channel of that name is created on first use. The returned handle can be called to unsubscribe, and `handle.subscribe(otherKey, listener)` adds another event to the same chain.\nsubscribe.key: Event name from the event map `C`.\nsubscribe.listener: Receives that key’s context by default, or its original payload when explicit value delivery is selected; Hub listeners return no result.\nsubscribe.options: Optional third argument: only `delivery`, defaulting to `EventDelivery.context`; `EventDelivery.value` passes the payload directly. Hub subscriptions accept no `taskId`.\nA chainable `IEventHubSubscription`; releasing it removes every registration of the chain in reverse order.\npublish: Delivers `value` synchronously to the listeners of `key`. Publishing a key that nobody subscribed does nothing.\npublish.key: Event name.\npublish.value: Payload whose type is fixed by `C[key]`.\nNothing. Synchronous listener failures are thrown together as `PUBLISH_FAILED`, as with a channel.\nNotifications. A hub does not collect listener results; create a dedicated `createEventChannel<T, R>()` when results matter.\nclear: Removes the registrations of one event name and drops its channel, or of every event name when called without an argument.\nclear.key: Event name to clear; omit to clear all.\nNothing.\nsize: Counts registrations of one event name, or of all names when called without an argument. The total is kept in O(1).\nsize.key: Event name to count; omit for the total.\nThe number of active registrations.",
@@ -13351,7 +13351,7 @@
           "name": "withSnapshotEntries",
           "kind": "const",
           "signature": "export declare const withSnapshotEntries: <T, R, V = undefined>(\n  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,\n  value: T,\n  visitor: IEventInvocationVisitor<R>,\n) => void | Promise<void>;",
-          "declarationLine": 51,
+          "declarationLine": 57,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Advanced integration: takes one immutable snapshot of the selected registrations and passes them to `visitor` as invocation objects, so the caller decides when and in which order to run each. Each invocation runs at most once; when the visitor returns (or its Promise settles) all invocations close and calling them throws `INVOCATION_CLOSED`.",
           "core": "channel: A channel created by `createEventChannel()`, or a `filterTaskId()` view of it. Other objects, or channels from another copy of the package, throw `INVALID_CHANNEL`.\nvalue: Payload passed to every selected listener as `event.value`.\nvisitor: Receives the invocation array; may be async.\nWhatever settles the visitor: `void`, or a Promise when the visitor is async. After invocations close, visitor throws and rejections receive `VISITOR_FAILED`: writable native errors keep type, identity and stack; conflicting, immutable or primitive failures remain on `cause`, including explicit undefined.",
@@ -13486,7 +13486,7 @@
           "name": "IEventChannelLike",
           "kind": "type",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = {\n  /** Registers the selected listener argument mode and forwards its optional task label. */ subscribe(\n    listener: IEventValueListener<T, R>,\n    options: IEventValueSubscribeOptions,\n  ): IUnsubscribe;\n  /** Omitted or explicit context delivery preserves the structural source's context contract. */ subscribe(\n    listener: IEventListener<T, R, V>,\n    options?: IEventContextSubscribeOptions,\n  ): IUnsubscribe;\n};",
-          "declarationLine": 169,
+          "declarationLine": 182,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Any object the subscription helpers accept: it only needs `subscribe(listener, options)` returning an unsubscribe function.",
           "core": "subscribe: Registers a listener and returns an unsubscribe function.\nsubscribe.listener: The listener to register.\nsubscribe.options: `taskId` and delivery for the registration; explicit `EventDelivery.value` selects the payload overload. Once/until helpers use only the context overload and taskId.\nA function that removes the registration.",
@@ -13592,7 +13592,7 @@
           "name": "IEventContext",
           "kind": "type",
           "signature": "export type IEventContext<T> = {\n  /** * Original payload passed to publish or an invocation helper; no cloning or transformation * occurs. */ readonly value: T;\n  /** Live cancellation state; it can change while this listener is running. */ readonly aborted: boolean;\n  /** Reason recorded by event.abort or an abort-linked helper; initially undefined. */ readonly abortReason: unknown;\n  /** Task label captured for this dispatch; later retagging does not rewrite it. */ readonly taskId:\n    | string\n    | undefined;\n  /** Marks this live registration aborted and unsubscribes it. It does not interrupt running code. */ abort(\n    reason?: unknown,\n  ): void;\n  /** * Changes future task selection, or clears the label with undefined. Inactive registrations * ignore it. */ setTaskId(\n    taskId: string | undefined,\n  ): void;\n};",
-          "declarationLine": 82,
+          "declarationLine": 93,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "The object received by default or explicit context listeners. It carries the payload and lets the listener cancel its own registration or rename its task for later deliveries. Value listeners receive only the original payload.",
           "core": "value: The payload passed to `publish()` for this delivery, unchanged.\naborted: Live abort flag set by `abort()` or linked-signal cancellation; normal unsubscription removes the registration without setting it.\nabortReason: The reason passed to `abort()`; `undefined` until then.\ntaskId: Task label captured for this dispatch snapshot; `setTaskId()` changes only later deliveries.\nabort: Removes this registration so later publishes no longer call the listener; the current call continues.\nabort.reason: Optional reason stored in `abortReason`.\nNothing; `aborted` becomes `true`.\nsetTaskId: Renames the registration for later snapshots; the snapshot being delivered is not affected.\nsetTaskId.taskId: New name chosen by the listener (it replaces the name set at `subscribe(listener, { taskId })`), or `undefined` to remove it.\nNothing.",
@@ -13726,7 +13726,7 @@
           "name": "IEventListener",
           "kind": "type",
           "signature": "export type IEventListener<T, R = void, V = undefined> = (\n  event: IProjectedEventContext<T, V>,\n) => R | PromiseLike<R>;",
-          "declarationLine": 135,
+          "declarationLine": 148,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "A context listener function: receives the event context and may return a result or a Promise. Used when delivery is omitted or `EventDelivery.context`.",
           "core": "A context listener function: receives the event context and may return a result or a Promise. Used when delivery is omitted or `EventDelivery.context`.",
@@ -13791,7 +13791,7 @@
           "name": "IEventSubscriber",
           "kind": "type",
           "signature": "export type IEventSubscriber<T, R = void> = {\n  /** * Handles each delivered context. Its return or failure follows the source channel's dispatch * policy. */ handle(\n    event: IEventContext<T>,\n  ): R | PromiseLike<R>;\n};",
-          "declarationLine": 142,
+          "declarationLine": 155,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Object form of a listener for `subscribeSubscriber`: `handle(event)` is called with `this` bound to the object.",
           "core": "handle: Called once per delivery with `this` bound to the subscriber object.\nhandle.event: The event context of this delivery.\nThe listener result, or a Promise of it.",
@@ -13935,7 +13935,7 @@
           "name": "subscribeOnce",
           "kind": "const",
           "signature": "export declare const subscribeOnce: <T, R, V = undefined>(\n  channel: IEventChannelLike<T, R, V>,\n  listener: IEventListener<T, R, V>,\n  options?: { readonly taskId?: string },\n) => IUnsubscribe;",
-          "declarationLine": 139,
+          "declarationLine": 145,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Subscribes a listener that runs at most once: the registration is removed before the listener is called, so a re-entrant publish, a throw or a rejection cannot call it a second time.",
           "core": "channel: Any object with `subscribe(listener, options)`.\nlistener: The one-shot context listener; value delivery is not supported by this helper.\noptions: `taskId` for the registration.\nAn unsubscribe function; calling it before delivery cancels the listener.\ntaskId: Caller-assigned non-empty registration name, selected later by `filterTaskId()` or `invokeTask()`.\nNot set: the registration has no task name.",
@@ -14057,7 +14057,7 @@
           "name": "subscribeSubscriber",
           "kind": "const",
           "signature": "export declare const subscribeSubscriber: <T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: { readonly handle?: unknown },\n) => IUnsubscribe;",
-          "declarationLine": 126,
+          "declarationLine": 132,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Subscribes an object instead of a function: the channel calls `subscriber.handle(event)` with `this` bound to the object, so class instances can keep state. Which event it receives is decided by the channel, not by the object.",
           "core": "channel: Any object with `subscribe(listener, options)`.\nsubscriber: Object with a callable `handle(event)`; otherwise `INVALID_SUBSCRIBER` is thrown.\nAn unsubscribe function.",
@@ -14122,7 +14122,7 @@
           "name": "subscribeUntil",
           "kind": "const",
           "signature": "export declare const subscribeUntil: <T, R, V = undefined>(\n  channel: IEventChannelLike<T, R, V>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R, V>,\n  options?: { readonly taskId?: string },\n) => IUnsubscribe;",
-          "declarationLine": 154,
+          "declarationLine": 160,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Subscribes a listener that is removed automatically when `signal` aborts. Aborting only stops future deliveries; a listener that is already running is not interrupted. With an already-aborted signal no registration is made (or `ABORTED` is thrown when the channel has `throwOnAborted: true`).",
           "core": "channel: Any object with `subscribe(listener, options)`.\nsignal: `AbortSignal` (or a compatible object) whose abort removes the registration.\nlistener: The context listener; value delivery is not supported by this helper.\noptions: `taskId` for the registration.\nAn idempotent synchronous unsubscribe function. Pre-aborted defaults to a no-op with no registration or Promise; strict `throwOnAborted: true` synchronously throws TypeError/`ABORTED`. Projected aliases remain available alongside live abort controls.\ntaskId: Caller-assigned non-empty registration name, selected later by `filterTaskId()` or `invokeTask()`.\nNot set: the registration has no task name.",
@@ -31861,6 +31861,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "需要按错误分支时，比较 `error.source === MICRO_HUB_SOURCE` 和 `error.code`，不要匹配消息文字。`MicroHubErrorText` 导出全部消息文字，测试或日志需要核对原文时引用它。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "listener 和订阅回调抛出的错误不会打断其它 listener，也不会抛给 emit 方，而是交给 `createMicroHub({ report })`（默认 `globalThis.reportError`）。"
                 }
               ]
@@ -35302,8 +35306,27 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/errors.d.ts:MICRO_HUB_SOURCE:export declare const MICRO_HUB_SOURCE = \"@migaia/micro-hub\";",
-          "guidance": [],
-          "usageScore": 0,
+          "guidance": [
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有错误带 `source: '@migaia/micro-hub'` 和 `code`（`MicroHubErrorCode`）：`HUB_ALREADY_CREATED`、`HUB_NOT_CREATED`、`APP_ALREADY_CONNECTED`、`APP_DISCONNECTED`、`PLUGIN_MISSING`、`CONTRACT_VERSION_MISMATCH`、`CONTRACT_OWNED`、`WRITE_DENIED`、`EMIT_DENIED`、`COMMAND_ASYNC`、`HANDLER_DUPLICATED`、`OWNER_ABSENT`、`OWNER_TIMEOUT`、`OWNER_GONE`、`INVALID_OPTION`。每个码的触发条件与处理方式见 USEGUIDE。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "需要按错误分支时，比较 `error.source === MICRO_HUB_SOURCE` 和 `error.code`，不要匹配消息文字。`MicroHubErrorText` 导出全部消息文字，测试或日志需要核对原文时引用它。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "listener 和订阅回调抛出的错误不会打断其它 listener，也不会抛给 emit 方，而是交给 `createMicroHub({ report })`（默认 `globalThis.reportError`）。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 2,
           "configuration": [],
           "fragment": "micro-hub-index--MICRO_HUB_SOURCE"
         },
@@ -35406,7 +35429,7 @@
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/text.d.ts:MicroCapability:export declare const MicroCapability: { readonly events: 'events'; readonly state: 'state'; readonly persist: 'persist'; readonly resource: 'resource'; };\nexport type MicroCapability = keyof typeof MicroCapability;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "micro-hub-index--MicroCapability"
         },
@@ -35614,6 +35637,10 @@
                 {
                   "type": "paragraph",
                   "text": "所有错误带 `source: '@migaia/micro-hub'` 和 `code`（`MicroHubErrorCode`）：`HUB_ALREADY_CREATED`、`HUB_NOT_CREATED`、`APP_ALREADY_CONNECTED`、`APP_DISCONNECTED`、`PLUGIN_MISSING`、`CONTRACT_VERSION_MISMATCH`、`CONTRACT_OWNED`、`WRITE_DENIED`、`EMIT_DENIED`、`COMMAND_ASYNC`、`HANDLER_DUPLICATED`、`OWNER_ABSENT`、`OWNER_TIMEOUT`、`OWNER_GONE`、`INVALID_OPTION`。每个码的触发条件与处理方式见 USEGUIDE。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "需要按错误分支时，比较 `error.source === MICRO_HUB_SOURCE` 和 `error.code`，不要匹配消息文字。`MicroHubErrorText` 导出全部消息文字，测试或日志需要核对原文时引用它。"
                 },
                 {
                   "type": "paragraph",
@@ -35858,8 +35885,27 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/error-text.d.ts:MicroHubErrorText:export declare const MicroHubErrorText: { /** Paired with `HUB_ALREADY_CREATED`; tells the caller which API child apps should use. */ readonly hubAlreadyCreated: '[micro-hub] a hub already exists in this realm; child apps call getMicroHub(), or dispose the existing hub first'; /** Paired with `HUB_NOT_CREATED`; names the load-order fix. */ readonly hubNotCreated: '[micro-hub] no hub exists yet; call createMicroHub() in the shell before any app connects'; /** Paired with `APP_ALREADY_CONNECTED`. */ readonly appAlreadyConnected: (name: string) => string; /** Paired with `APP_DISCONNECTED`. */ readonly appDisconnected: (name: string) => string; /** Paired with `PLUGIN_MISSING` when a contract section needs an absent capability. */ readonly pluginMissing: (capability: string, contract: string) => string; /** Paired with `PLUGIN_MISSING` when a capability plugin depends on another one. */ readonly pluginRequires: (capability: string, required: string) => string; /** Paired with `CONTRACT_VERSION_MISMATCH`. */ readonly contractVersionMismatch: (contract: string, registered: number, given: number) => string; /** Paired with `CONTRACT_OWNED`. */ readonly contractOwned: (contract: string, owner: string) => string; /** Paired with `WRITE_DENIED`. */ readonly writeDenied: (contract: string, app: string) => string; /** Paired with `EMIT_DENIED`. */ readonly emitDenied: (contract: string, app: string) => string; /** Paired with `COMMAND_ASYNC`. */ readonly commandAsync: (contract: string, command: string) => string; /** Paired with `HANDLER_DUPLICATED`. */ readonly handlerDuplicated: (contract: string, member: string) => string; /** Paired with `OWNER_ABSENT`. */ readonly ownerAbsent: (contract: string, member: string) => string; /** Paired with `OWNER_TIMEOUT`. */ readonly ownerTimeout: (contract: string, member: string, ms: number) => string; /** Paired with `OWNER_GONE`. */ readonly ownerGone: (contract: string, member: string) => string; /** Paired with `INVALID_OPTION` for names. */ readonly invalidName: (kind: string, name: unknown) => string; /** Paired with `INVALID_OPTION` for contract versions. */ readonly invalidVersion: (contract: string) => string; /** Paired with `INVALID_OPTION` for an unknown member or patch field. */ readonly unknownMember: (contract: string, member: string) => string; /** Paired with `INVALID_OPTION` for an invalid section entry. */ readonly invalidSection: (contract: string, section: string, member: string) => string; };",
-          "guidance": [],
-          "usageScore": 0,
+          "guidance": [
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有错误带 `source: '@migaia/micro-hub'` 和 `code`（`MicroHubErrorCode`）：`HUB_ALREADY_CREATED`、`HUB_NOT_CREATED`、`APP_ALREADY_CONNECTED`、`APP_DISCONNECTED`、`PLUGIN_MISSING`、`CONTRACT_VERSION_MISMATCH`、`CONTRACT_OWNED`、`WRITE_DENIED`、`EMIT_DENIED`、`COMMAND_ASYNC`、`HANDLER_DUPLICATED`、`OWNER_ABSENT`、`OWNER_TIMEOUT`、`OWNER_GONE`、`INVALID_OPTION`。每个码的触发条件与处理方式见 USEGUIDE。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "需要按错误分支时，比较 `error.source === MICRO_HUB_SOURCE` 和 `error.code`，不要匹配消息文字。`MicroHubErrorText` 导出全部消息文字，测试或日志需要核对原文时引用它。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "listener 和订阅回调抛出的错误不会打断其它 listener，也不会抛给 emit 方，而是交给 `createMicroHub({ report })`（默认 `globalThis.reportError`）。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 10,
           "configuration": [],
           "fragment": "micro-hub-index--MicroHubErrorText"
         },
@@ -35877,7 +35923,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for MicroResourceStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MicroResourceStatus.",
-          "examples": [],
+          "examples": [
+            "import { MicroResourceStatus } from '@migaia/micro-hub'\n\nconst { status, data } = view.resources.profile.state.get()\nif (status === MicroResourceStatus.success) render(data)"
+          ],
           "members": [
             {
               "name": "idle",
@@ -35971,7 +36019,7 @@
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/types.d.ts:MicroResourceStatus:export declare const MicroResourceStatus: { readonly idle: 'idle'; readonly pending: 'pending'; readonly success: 'success'; readonly error: 'error'; readonly cancelled: 'cancelled'; };\nexport type MicroResourceStatus = keyof typeof MicroResourceStatus;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 22,
           "configuration": [],
           "fragment": "micro-hub-index--MicroResourceStatus"
         },
@@ -36101,7 +36149,7 @@
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/contract.d.ts:resource:export declare const resource: <T>() => IResourceMarker<T>;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "micro-hub-index--resource"
         }
@@ -36207,7 +36255,7 @@
           ],
           "identity": "packages/micro-hub/dist/events/index.d.ts:events:export declare function events(options?: IEventsOptions): IMicroPlugin;",
           "guidance": [],
-          "usageScore": 50,
+          "usageScore": 54,
           "configuration": [
             {
               "name": "publishBudget",
@@ -36500,7 +36548,7 @@
           ],
           "identity": "packages/micro-hub/dist/persist/index.d.ts:persist:export declare function persist(options: IPersistOptions): IMicroPlugin;",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 50,
           "configuration": [
             {
               "name": "store",
@@ -36606,7 +36654,7 @@
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/resource/index.d.ts:resources:export declare function resources(): IMicroPlugin;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "micro-hub-resource--resources"
         }
@@ -36875,7 +36923,7 @@
           "declaredConfiguration": [],
           "identity": "packages/micro-hub/dist/state/index.d.ts:state:export declare function state(): IMicroPlugin;",
           "guidance": [],
-          "usageScore": 66,
+          "usageScore": 84,
           "configuration": [],
           "fragment": "micro-hub-state--state"
         },
@@ -150428,7 +150476,7 @@
           "name": "createWebThreadChannelFactory",
           "kind": "function",
           "signature": "export declare function createWebThreadChannelFactory(\n  options: IThreadChannelOptions,\n): IThreadChannelFactory<IWebThreadHandle>;",
-          "declarationLine": 50,
+          "declarationLine": 53,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Creates the channel factory paired with `createWebThreadLauncher()`.",
           "core": "options: `{ scheduler, capabilities? }`; use the source scheduler. Capabilities narrow the actual launch offer, and Core retains the peer acknowledgement.\nA channel factory with `open(handle, signal)`.\nscheduler: Clock and timers, shared with the source.\ncapabilities: Local capability proposal; extensions wait for the other side acknowledgement.\nNot set: fixed basic profile, synchronous.",
@@ -150537,7 +150585,7 @@
           "name": "createWebThreadLauncher",
           "kind": "function",
           "signature": "export declare function createWebThreadLauncher(\n  options: IWebThreadLauncherOptions,\n): IThreadLauncher<IAdapterWebThreadHandle>;",
-          "declarationLine": 43,
+          "declarationLine": 46,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Creates a Web Worker launcher with your own `Worker` constructor (polyfill or restricted environment); for adapter authors.",
           "core": "options: `{ Worker, report, runtimeApi? }`: your `Worker` constructor and the error reporter; see `IWebThreadLauncherOptions`.\nAn `IThreadLauncher` whose handles open channels with `open(signal, options)`. Construction or initial send failure removes acquired listeners and requests termination; original native failures remain reachable, without claiming native exit confirmation.\nWorker: `Worker` constructor to use.\nThe global `Worker`.\nInject the actual module Worker constructor when the host does not expose it globally or an application supplies its own runtime. Omission reads global Worker only when launch starts; this does not add exit observation.\nreport: Receives launcher background errors.\nreport.error: The failure.\nNothing.\nAlways supply the native launcher diagnostic sink. It receives background Worker errors; there is no default callback. The owner must still close the peer and request Worker termination.\nruntimeApi: Runtime API context provided by Core; set by the source automatically.\nNot set.",
@@ -153277,7 +153325,7 @@
           "name": "isThreadChild",
           "kind": "function",
           "signature": "export declare function isThreadChild(): Promise<boolean>;",
-          "declarationLine": 20,
+          "declarationLine": 14,
           "source": "packages/rpc-threads/dist/threads/child.d.ts",
           "purpose": "Tells whether the current module runs inside a Worker started by this library, so one file can branch between parent and Worker for `spawn: true`.",
           "core": "Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.",
@@ -154274,7 +154322,7 @@
         {
           "name": "IWebThreadHandle",
           "kind": "type",
-          "signature": "export type IWebThreadHandle = IThreadHandle &\n  Readonly<{\n    /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort;\n    /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<\n      void | readonly string[]\n    >;\n  }>;",
+          "signature": "export type IWebThreadHandle = IThreadHandle &\n  Readonly<{\n    /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort;\n    /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<\n      void | readonly string[]\n    >;\n  }>;",
           "declarationLine": 7,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Handle of a launched Web Worker.",
@@ -154292,7 +154340,7 @@
               "kind": "property",
               "optional": false,
               "signature": "port: IThreadWebPort;",
-              "description": "Actual EventTarget message port; it does not supply an actual-exit receipt.",
+              "description": "Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt.",
               "parameterDetails": [],
               "returns": "IThreadWebPort"
             },
@@ -154310,7 +154358,7 @@
           "aliasOf": "IWebThreadHandle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;"
+            "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -154349,7 +154397,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
+          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -154457,7 +154505,7 @@
         {
           "name": "IWebThreadWorker",
           "kind": "type",
-          "signature": "export type IWebThreadWorker = IThreadWebPort & {\n  /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void;\n};",
+          "signature": "export type IWebThreadWorker = IThreadWebPort & {\n  /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void;\n};",
           "declarationLine": 19,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Web Worker shape created by a custom constructor.",
@@ -154475,7 +154523,7 @@
               "kind": "method",
               "optional": false,
               "signature": "terminate(): void;",
-              "description": "Request termination; this EventTarget API supplies no independently observable actual exit.",
+              "description": "Request termination; only Bun follows it with a `close` event carrying the exit code.",
               "parameterDetails": [],
               "returns": "void"
             }
@@ -154484,7 +154532,7 @@
           "aliasOf": "IWebThreadWorker",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };"
+            "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -154523,7 +154571,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadWorker:export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };",
+          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadWorker:export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

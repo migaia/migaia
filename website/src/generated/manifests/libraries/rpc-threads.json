@@ -248,7 +248,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
               }
             ]
           },
@@ -474,8 +474,8 @@
                   ],
                   [
                     "Bun",
-                    "node 子入口的两个工厂",
-                    "termination / exit-observation enforced；heap-limit unsupported。"
+                    "根入口的两个 Web 工厂",
+                    "termination / exit-observation enforced，原生 Worker 的 close 事件结算 exited；heap-limit unsupported。"
                   ],
                   [
                     "Deno、浏览器、Electron renderer",
@@ -507,7 +507,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
+                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node Worker 与 Bun 1.4.3 原生 Worker 已有业务与关闭运行证据；这些结果不证明浏览器、Deno 或 Electron 的权限与退出能力。"
               }
             ]
           },
@@ -994,7 +994,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
               }
             ]
           },
@@ -1220,8 +1220,8 @@
                   ],
                   [
                     "Bun",
-                    "node 子入口的两个工厂",
-                    "termination / exit-observation enforced；heap-limit unsupported。"
+                    "根入口的两个 Web 工厂",
+                    "termination / exit-observation enforced，原生 Worker 的 close 事件结算 exited；heap-limit unsupported。"
                   ],
                   [
                     "Deno、浏览器、Electron renderer",
@@ -1253,7 +1253,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
+                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node Worker 与 Bun 1.4.3 原生 Worker 已有业务与关闭运行证据；这些结果不证明浏览器、Deno 或 Electron 的权限与退出能力。"
               }
             ]
           },
@@ -1598,7 +1598,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                  "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                 }
               ]
             },
@@ -1839,8 +1839,8 @@
                     ],
                     [
                       "Bun",
-                      "The two node-entry factories",
-                      "termination and exit-observation are enforced; heap-limit remains unsupported."
+                      "The root Web factories",
+                      "termination and exit-observation are enforced; the native Worker close event settles exited. heap-limit remains unsupported."
                     ],
                     [
                       "Deno, browsers, Electron renderer",
@@ -1872,7 +1872,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
+                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. Node Workers and Bun 1.4.3 native Workers have business and shutdown evidence; these results do not establish browser, Deno, or Electron permissions and exit capabilities."
                 }
               ]
             },
@@ -2365,7 +2365,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                  "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                 }
               ]
             },
@@ -2606,8 +2606,8 @@
                     ],
                     [
                       "Bun",
-                      "The two node-entry factories",
-                      "termination and exit-observation are enforced; heap-limit remains unsupported."
+                      "The root Web factories",
+                      "termination and exit-observation are enforced; the native Worker close event settles exited. heap-limit remains unsupported."
                     ],
                     [
                       "Deno, browsers, Electron renderer",
@@ -2639,7 +2639,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
+                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. Node Workers and Bun 1.4.3 native Workers have business and shutdown evidence; these results do not establish browser, Deno, or Electron permissions and exit capabilities."
                 }
               ]
             },
@@ -4251,7 +4251,7 @@
           "name": "createWebThreadChannelFactory",
           "kind": "function",
           "signature": "export declare function createWebThreadChannelFactory(options: IThreadChannelOptions): IThreadChannelFactory<IWebThreadHandle>;",
-          "declarationLine": 50,
+          "declarationLine": 53,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Creates the channel factory paired with `createWebThreadLauncher()`.",
           "core": "options: `{ scheduler, capabilities? }`; use the source scheduler. Capabilities narrow the actual launch offer, and Core retains the peer acknowledgement.\nA channel factory with `open(handle, signal)`.\nscheduler: Clock and timers, shared with the source.\ncapabilities: Local capability proposal; extensions wait for the other side acknowledgement.\nNot set: fixed basic profile, synchronous.",
@@ -4360,7 +4360,7 @@
           "name": "createWebThreadLauncher",
           "kind": "function",
           "signature": "export declare function createWebThreadLauncher(options: IWebThreadLauncherOptions): IThreadLauncher<IAdapterWebThreadHandle>;",
-          "declarationLine": 43,
+          "declarationLine": 46,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Creates a Web Worker launcher with your own `Worker` constructor (polyfill or restricted environment); for adapter authors.",
           "core": "options: `{ Worker, report, runtimeApi? }`: your `Worker` constructor and the error reporter; see `IWebThreadLauncherOptions`.\nAn `IThreadLauncher` whose handles open channels with `open(signal, options)`. Construction or initial send failure removes acquired listeners and requests termination; original native failures remain reachable, without claiming native exit confirmation.\nWorker: `Worker` constructor to use.\nThe global `Worker`.\nInject the actual module Worker constructor when the host does not expose it globally or an application supplies its own runtime. Omission reads global Worker only when launch starts; this does not add exit observation.\nreport: Receives launcher background errors.\nreport.error: The failure.\nNothing.\nAlways supply the native launcher diagnostic sink. It receives background Worker errors; there is no default callback. The owner must still close the peer and request Worker termination.\nruntimeApi: Runtime API context provided by Core; set by the source automatically.\nNot set.",
@@ -7100,7 +7100,7 @@
           "name": "isThreadChild",
           "kind": "function",
           "signature": "export declare function isThreadChild(): Promise<boolean>;",
-          "declarationLine": 20,
+          "declarationLine": 14,
           "source": "packages/rpc-threads/dist/threads/child.d.ts",
           "purpose": "Tells whether the current module runs inside a Worker started by this library, so one file can branch between parent and Worker for `spawn: true`.",
           "core": "Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.",
@@ -8097,7 +8097,7 @@
         {
           "name": "IWebThreadHandle",
           "kind": "type",
-          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
+          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
           "declarationLine": 7,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Handle of a launched Web Worker.",
@@ -8115,7 +8115,7 @@
               "kind": "property",
               "optional": false,
               "signature": "port: IThreadWebPort;",
-              "description": "Actual EventTarget message port; it does not supply an actual-exit receipt.",
+              "description": "Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt.",
               "parameterDetails": [],
               "returns": "IThreadWebPort"
             },
@@ -8133,7 +8133,7 @@
           "aliasOf": "IWebThreadHandle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;"
+            "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8172,7 +8172,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
+          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -8280,7 +8280,7 @@
         {
           "name": "IWebThreadWorker",
           "kind": "type",
-          "signature": "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };",
+          "signature": "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };",
           "declarationLine": 19,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Web Worker shape created by a custom constructor.",
@@ -8298,7 +8298,7 @@
               "kind": "method",
               "optional": false,
               "signature": "terminate(): void;",
-              "description": "Request termination; this EventTarget API supplies no independently observable actual exit.",
+              "description": "Request termination; only Bun follows it with a `close` event carrying the exit code.",
               "parameterDetails": [],
               "returns": "void"
             }
@@ -8307,7 +8307,7 @@
           "aliasOf": "IWebThreadWorker",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };"
+            "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8346,7 +8346,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadWorker:export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };",
+          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadWorker:export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
