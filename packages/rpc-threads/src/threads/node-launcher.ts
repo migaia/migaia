@@ -2,7 +2,9 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IThreadHandle, IThreadLauncher, IThreadUsage } from '@migaia/supervision/threads'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, RpcThreadErrorCode } from '../error-code.js'
-import type { IThreadRuntimeResource } from './runtime-types.js'
+import type { IThreadNativeWorker, IThreadRuntimeResource } from './runtime-types.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-core'
+import { identifyRpcBoundaryFailure } from '@migaia/rpc-core/transport-kit'
 import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import {
   createEventEmitterMessageResource,
@@ -27,11 +29,19 @@ import { absoluteThreadEntry, portableThreadSpec } from './error.js'
 import type { IThreadChannelFactory, IThreadChannelOptions } from './types.js'
 
 /** A public handle owns execution and messaging; startup records remain package-private. */
-export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike }>
+export type INodeThreadHandle = IThreadHandle &
+  Readonly<{
+    /** Native messaging surface; channel cleanup and supervisor termination retain separate owners. */
+    port: INodeMessagePortLike
+  }>
 
 /** The constructed handle's ordinary operation opens its own generation without exposing handoff. */
 export type IAdapterNodeThreadHandle = INodeThreadHandle &
   Readonly<{
+    /**
+     * Open the exact launcher's generation under cancellation; copied handles gain no startup
+     * state.
+     */
     open(signal: IAbortSignal, options: IThreadChannelOptions): Promise<IRuntimePeerSourceResult>
   }>
 
@@ -47,10 +57,21 @@ const nodePreparations = new WeakMap<
 /** Native IDs may recycle; this sequence gives each handle a permanent adapter identity. */
 let sequence = 0
 
-/** Launch Node Workers with immediate error/exit listeners and true two-phase termination. */
+/**
+ * Create a lazy Node-compatible launcher using the caller's actual runtime resource. Each launch
+ * snapshots portable data, requires an absolute entry, then constructs a Worker with immediate
+ * error/exit observers. terminate requests at most once; exited settles only on native exit,
+ * keeping the original Worker failure and heap-limit classification. Sampling is optional/cold and
+ * reports THREAD_USAGE_SAMPLE_FAILED without changing execution state. Factory options default to
+ * {}.
+ */
 export function createAdapterNodeThreadLauncher(
   runtime: IThreadRuntimeResource,
   options: Readonly<{
+    /**
+     * Optional explicit bootstrap context; the actual held supervisor launch proposal takes
+     * precedence.
+     */
     runtimeApi?: IRuntimePeerSourceContext
     /** Omission retains native inheritance; short different entries supply filtered runtime flags. */
     execArgv?: readonly string[]
@@ -88,15 +109,24 @@ export function createAdapterNodeThreadLauncher(
         ...(bootstrap ? { runtimeApi: bootstrap } : {}),
         ...(spec.data === undefined ? {} : { data: spec.data })
       }
-      /** Error and exit hooks attach in this same synchronous construction segment. */
-      const worker = new Worker(absoluteThreadEntry(spec.entry, true), {
-        name: spec.name,
-        workerData: initialMessage,
-        ...(configuredExecArgv ? { execArgv: [...configuredExecArgv] } : {}),
-        ...(spec.limits?.heapBytes === undefined
-          ? {}
-          : { resourceLimits: { maxOldGenerationSizeMb: spec.limits.heapBytes / 1024 / 1024 } })
-      })
+      /** A successful native construction owns the Worker before listeners attach below. */
+      let worker: IThreadNativeWorker
+      try {
+        worker = new Worker(absoluteThreadEntry(spec.entry, true), {
+          name: spec.name,
+          workerData: initialMessage,
+          ...(configuredExecArgv ? { execArgv: [...configuredExecArgv] } : {}),
+          ...(spec.limits?.heapBytes === undefined
+            ? {}
+            : { resourceLimits: { maxOldGenerationSizeMb: spec.limits.heapBytes / 1024 / 1024 } })
+        })
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.invalidConfig,
+          ThreadErrorText.workerOptionsInvalid
+        )
+      }
       /** Retain the original runtime failure until its corresponding actual exit. */
       let failure: unknown
       /** Native failures settle only the opt-in incomplete preparation owner. */
@@ -261,8 +291,10 @@ async function openNodeThreadHandle(
 }
 
 /**
- * Construct the complete channel factory; arbitrary handles cannot supply private startup
- * authority.
+ * Build a factory with required scheduler and optional local capability restriction. Exact launcher
+ * handles retain their preparation and actual ACK; custom raw-port handles use the fixed borrowed
+ * channel path and cannot mint private startup facts. Pre-cancelled opens reject the original abort
+ * reason; failed opening of a genuine launched handle requests its release/termination.
  */
 export function createAdapterNodeThreadChannelFactory(
   options: IThreadChannelOptions

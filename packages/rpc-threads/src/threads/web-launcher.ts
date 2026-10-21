@@ -31,12 +31,15 @@ import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } fro
 /** Web handles expose preparation but never counterfeit an unsupported actual-exit receipt. */
 export type IWebThreadHandle = IThreadHandle &
   Readonly<{
+    /** Actual EventTarget message port; it does not supply an actual-exit receipt. */
     port: IThreadWebPort
+    /** Original readiness/control Promise; resolves only after the corresponding child ACK. */
     prepared: Promise<void | readonly string[]>
   }>
 /** Whole opening retains the original public prepared Promise without exposing receive handoff. */
 export type IAdapterWebThreadHandle = IWebThreadHandle &
   Readonly<{
+    /** Await this handle's preparation and open its channel under the current cancellation signal. */
     open(signal: IAbortSignal, options: IThreadChannelOptions): Promise<IRuntimePeerSourceResult>
   }>
 
@@ -50,17 +53,30 @@ const webPreparations = new WeakMap<
 >()
 
 /** Structural constructors admit actual runtime Workers and controlled adapter fixtures. */
-export type IWebThreadWorker = IThreadWebPort & { terminate(): void }
+export type IWebThreadWorker = IThreadWebPort & {
+  /** Request termination; this EventTarget API supplies no independently observable actual exit. */
+  terminate(): void
+}
 /** Platform runtime injection does not strengthen unsupported lifecycle capabilities. */
 export type IWebThreadLauncherOptions = Readonly<{
+  /** Optional actual Worker constructor; omission reads the host's global Worker when launch starts. */
   Worker?: new (entry: string | URL, options: { type: 'module'; name?: string }) => IWebThreadWorker
+  /** Required native error sink; reporter failures remain observable through the host route. */
   report(error: unknown): void
+  /** Optional explicit runtime bootstrap, overridden by an actual held supervisor launch proposal. */
   runtimeApi?: IRuntimePeerSourceContext
 }>
 /** Local fingerprint distinguishes Web workers without a numeric runtime identifier. */
 let sequence = 0
 
-/** Web termination cannot prove execution stopped; supervision retains abandoned leases. */
+/**
+ * Create a module-Worker launcher with required report and optional constructor/runtime context. It
+ * validates portable data/absolute URL before acquisition and waits for child preparation when
+ * opening a channel. termination, exit-observation and heap-limit remain unsupported: terminate()
+ * is not an exit receipt, exited stays pending, and supervision may retain an abandoned lease.
+ * Failure after acquisition attempts every owned listener/resource/Worker cleanup and retains the
+ * original primary together with secondary cleanup errors.
+ */
 export function createAdapterWebThreadLauncher(
   options: IWebThreadLauncherOptions
 ): IThreadLauncher<IAdapterWebThreadHandle> {
@@ -256,7 +272,12 @@ async function openWebThreadHandle(
   }
 }
 
-/** Build the complete EventTarget channel factory without publishing bootstrap callbacks. */
+/**
+ * Build the matching Web factory using a required shared scheduler and optional capability policy.
+ * open waits for the handle's original preparation, rejects cancellation with its original reason,
+ * and opens the actual launcher resource when present; a copied/raw handle gains no private trust.
+ * Worker termination remains owned by its supervisor rather than borrowed transport close.
+ */
 export function createAdapterWebThreadChannelFactory(
   options: IThreadChannelOptions
 ): IThreadChannelFactory<IWebThreadHandle> {

@@ -6,4 +6,5 @@ export const RpcThreadErrorCode = {
   /** Native Worker sampling failed; retain its cause and display unavailable. */
   usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'
 } as const
+/** The Thread owner's diagnostic codes; RPC and supervision failures retain their own sources. */
 export type IRpcThreadErrorCode = (typeof RpcThreadErrorCode)[keyof typeof RpcThreadErrorCode]

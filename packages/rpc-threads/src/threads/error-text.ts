@@ -2,6 +2,8 @@ import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 
 /** Stable configuration diagnostics shared by facade and launcher admission. */
 export const ThreadErrorText = {
+  /** Native Worker construction rejected launch options before acquiring a Worker. */
+  workerOptionsInvalid: 'Thread Worker options are invalid',
   /** The default Web-thread health check requires the negotiated native ping operation. */
   healthPingUnavailable:
     'Thread default health requires negotiated ping; supply custom health when ping is disabled',

@@ -8,8 +8,13 @@ import { invalidThreadConfig } from './error.js'
 import { ThreadErrorText } from './error-text.js'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 
-/** Private addressing is separate from portable business data and carries no RPC handshake. */
-export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortableValue }>
+/** Launcher addressing is separate from portable business initialization data. */
+export type IThreadBootstrapData = Readonly<{
+  /** Launcher-selected route identity; a valid data wrapper alone does not prove runtime trust. */
+  peerId: string
+  /** Optional normalized portable business data, without the private runtime bootstrap wrapper. */
+  data?: IRpcPortableValue
+}>
 
 /** A library launcher supplies exact safe addresses; the native Worker supplies physical provenance. */
 export type IThreadRuntimeBootstrap = Readonly<{
@@ -85,7 +90,11 @@ export function readThreadRuntimeAcknowledgement(value: unknown): readonly strin
   return parsed.value
 }
 
-/** Read Node workerData or Web bootstrap without leaking its wrapper into business configuration. */
+/**
+ * Validate Node workerData or a Web initial message using Contract's closed bootstrap grammar.
+ * Return only peerId and optional portable data, not executable ports or runtime trust. Invalid
+ * bootstrap/data throws Core INVALID_CONFIG with a field diagnostic before service preparation.
+ */
 export function readThreadBootstrap(value: unknown): IThreadBootstrapData {
   /** Address/data admission delegates to the same single grammar used by Core resource capture. */
   const parsed = rpcMessageCapabilityControl.readData(value)
@@ -93,7 +102,12 @@ export function readThreadBootstrap(value: unknown): IThreadBootstrapData {
   return parsed.value
 }
 
-/** Consume data and address, remove the listener, prepare the service, then acknowledge readiness. */
+/**
+ * Wait for the first matching Web bootstrap, remove this listener, then await prepare(data, peerId)
+ * before posting readiness ACK. Unrelated messages are ignored. Validation, prepare, or ACK-post
+ * failure rejects this Promise and no success ACK is sent. This helper installs no timeout and does
+ * not terminate the borrowed Worker/port; its launcher/supervisor owns that lifetime.
+ */
 export function receiveThreadData(
   port: IThreadWebPort,
   prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void

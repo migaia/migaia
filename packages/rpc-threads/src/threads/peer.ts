@@ -10,7 +10,14 @@ import { expandThreadSpawn, isShortThreadSpawn } from './short-spawn.js'
 import { captureThreadTask } from './adapter.js'
 import { defaultRpcReporter } from '@migaia/rpc-core'
 
-/** Create one owned or borrowed Worker Peer; entry shorthand uses the existing deployment path. */
+/**
+ * Open one Worker Peer from an owned spawn, borrowed source, or the current child's real bootstrap.
+ * Await isThreadChild before self-spawning so the full entry does not recursively create Workers.
+ * Closing an owned source drains under its supervisor budget and requests termination; borrowed
+ * MessagePorts remain physically caller-owned. Invalid entries/data reject before Worker creation;
+ * Core owns request deadlines, cancellation, authentication, and negotiated binary/transfer
+ * support.
+ */
 export function createThreadPeer<TRemote = Record<never, never>>(
   options: IRuntimeThreadPeerOptions,
   runtime?: IThreadRuntimeResource

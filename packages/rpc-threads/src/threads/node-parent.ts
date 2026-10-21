@@ -5,7 +5,11 @@ import {
 import type { IThreadChannelOptions } from './types.js'
 import type { IThreadParentPort } from './runtime-types.js'
 
-/** Borrow the actual parent message resource without installing listeners before first opening. */
+/**
+ * Retain an actual parent message port without installing a reader at construction. This advanced
+ * adapter operation borrows the physical port; it does not authenticate arbitrary workerData or own
+ * parent-thread termination.
+ */
 export class AdapterNodeThreadParentChannel {
   /** Core alone retains raw I/O and constructs the exact channel and replay facts. */
   readonly #resource: IAdapterMessageResource
@@ -15,7 +19,12 @@ export class AdapterNodeThreadParentChannel {
     this.#resource = createEventEmitterMessageResource(native)
   }
 
-  /** Borrow this held parent resource through the synchronous fixed Thread profile. */
+  /**
+   * Open the fixed profile synchronously with a routing peerId and required borrowed scheduler.
+   * Optional capabilities only select that fixed profile; this method performs no runtime ACK or
+   * child discovery. The returned channel detaches its own listeners on close, leaving physical
+   * parent-port closure to the caller.
+   */
   open(peerId: string, options: IThreadChannelOptions) {
     return this.#resource.openStatic({
       peerId,

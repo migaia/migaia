@@ -46,7 +46,9 @@ export function threadChildResource(port: IThreadWebPort): IAdapterMessageResour
 /**
  * Read the library launcher's existing bootstrap in the actual child runtime. Await this guard
  * before self-spawning: a Web child must first receive its parent's initial message. This
- * identifies a branch only; Core still performs the original capability admission.
+ * identifies a branch only; Core still performs the original capability admission. Node checks the
+ * actual parentPort/workerData; a main thread returns false. Web capture may reject invalid or
+ * missing bootstrap rather than granting an unrelated Worker a library-child identity.
  */
 export async function isThreadChild(): Promise<boolean> {
   /** Web bootstrap remains buffered by the same held resource later used by createThreadPeer. */
