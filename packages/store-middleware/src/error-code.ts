@@ -1,9 +1,8 @@
 /**
  * Declares the public error codes for `@migaia/store-middleware` in one place.
  *
- * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/store-middleware'`. Throw sites use these constants instead of
- * inline literals.
+ * Pair these codes with source `@migaia/store-middleware`; identified upstream failures retain
+ * their actual package owner. Throw sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -22,9 +21,9 @@ export const StoreMiddlewareErrorCode = {
   middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED',
 
   /**
-   * A store field is written directly outside a store method in `actions-only` mode.
-   *
-   * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode.
+   * A mutation guard check runs outside this policy's synchronous action scope in actions-only
+   * mode. Share the policy with the guarded writer and enter runInAction, or select off mode when
+   * action-scoped writes are not required.
    */
   actionScopeRequired: 'ACTION_SCOPE_REQUIRED',
 
@@ -38,9 +37,9 @@ export const StoreMiddlewareErrorCode = {
   cloneUnsupported: 'CLONE_UNSUPPORTED',
 
   /**
-   * A synchronous action or binding disposer callback fails without another package identity.
-   * Native mutable errors retain their object/type/stack; fallback cause/errors retain the
-   * original. The action scope still exits and each binding cleanup is attempted once.
+   * A synchronous action, initial binding clone or binding disposer callback fails without another
+   * package identity. Native mutable errors retain their object/type/stack; fallback cause/errors
+   * retain the original. The action scope still exits and each binding cleanup is attempted once.
    */
   callbackFailed: 'CALLBACK_FAILED',
 
@@ -66,11 +65,13 @@ export const StoreMiddlewareErrorCode = {
   envUnsupported: 'ENV_UNSUPPORTED',
 
   /**
-   * Binding or host cleanup failed after all cleanup actions were attempted. The caller must
-   * inspect `errors[]` and treat the host as terminal.
+   * Binding setup failed and rollback also threw. Inspect AggregateError.errors for the original
+   * setup failure followed by cleanup failures. Normal host disposal instead returns its structured
+   * cleanup result and retains binding failures in cleanupErrors.
    */
   cleanupFailed: 'CLEANUP_FAILED'
 } as const
 
+/** Public union of package-owned failure values for constructing or inspecting boundary errors. */
 export type IStoreMiddlewareErrorCode =
   (typeof StoreMiddlewareErrorCode)[keyof typeof StoreMiddlewareErrorCode]

@@ -36,13 +36,19 @@ function reportMiddlewareFailure(
   runtime.reportError(error, { phase })
 }
 
+/** Store-domain services injected into plugins, alongside the canonical PluginHost core. */
 export type IStoreMiddlewareCore<S> = {
+  /** Borrowed Runtime used for action batches and diagnostic reporting. */
   readonly runtime: IRuntime
+  /** Read state through the host's producer; copying is determined by that producer. */
   getState(): S
+  /** Apply supplied state, or throw DEVTOOLS_CAPABILITY when the host omitted applyState. */
   applyState(state: S): void
+  /** Report through the borrowed Runtime with the supplied diagnostic phase. */
   reportError(error: unknown, phase: string): void
 }
 
+/** Native PluginHost plugin specialized to Store events and the Store-domain core. */
 export type IStoreMiddlewarePlugin<
   S,
   TExt extends Record<string, unknown> = Record<string, never>,
@@ -55,10 +61,21 @@ export type IStoreMiddlewarePlugin<
   TShared
 >
 
+/**
+ * Required Runtime/state producer plus canonical PluginHost options, including explicit execution
+ * budgets. Pipeline options are captured once and their mode is forced to sync.
+ */
 export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
+  /** Required borrowed Runtime; disposing this host does not dispose the Runtime. */
   readonly runtime: IRuntime
+  /** Required synchronous producer used by plugins and DevTools; no automatic clone is added here. */
   readonly getState: () => S
+  /**
+   * Optional synchronous state writer; omission rejects DevTools jump/reset with
+   * DEVTOOLS_CAPABILITY.
+   */
   readonly applyState?: (state: S) => void
+  /** Exact policy shared with guarded stores/collections; defaults to a new off policy. */
   readonly mutationPolicy?: MutationPolicy
 }
 
@@ -111,20 +128,47 @@ function snapshotHostOptions<T>(
  */
 /** Domain members installed into the canonical plugin-host handle before it freezes. */
 type IStoreMiddlewareSurface<S> = Readonly<{
+  /** Exact selected policy; registering it on a host does not attach it to arbitrary data writes. */
   readonly mutationPolicy: MutationPolicy
+  /**
+   * Run the sync pipeline directly. An unchained event reports MIDDLEWARE_NOT_CHAINED; pipeline
+   * failures can throw to this direct caller.
+   */
   emit(event: IMiddlewareEvent<S>): void
+  /**
+   * Emit start, execute fn in one synchronous action/batch, then emit end or error. Event delivery
+   * failures are reported without replacing the business result. A returned Promise is not awaited;
+   * the action ends on return and writes already performed are not rolled back on failure.
+   */
   runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T
+  /** Emit supplied previous/next references without cloning; pipeline failures are reported. */
   recordState(
     name: string,
     previous: S,
     next: S,
     metadata?: Readonly<Record<string, unknown>>
   ): void
+  /** Emit a diagnostic event; nested recordError bypasses the pipeline and reports to Runtime. */
   recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void
+  /**
+   * Await installation of an adapter plugin named store-devtools by default. Port init/send and
+   * subscribe callbacks are synchronous, not awaited; their subscription disposer belongs to that
+   * plugin. Invalid port shape rejects INVALID_OPTION; installation failures follow PluginHost.
+   */
   connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>
+  /**
+   * Register synchronous cleanup, run LIFO before plugins. After cleanup admission closes, invoke
+   * new disposers immediately. Return Promises are not awaited; synchronous failures are classified
+   * and collected during disposal, or thrown for a late registration.
+   */
   attachBindingDisposer(disposer: IDisposer): void
 }>
 
+/**
+ * Canonical managed, frozen PluginHost handle with Store-domain methods. Disposal is single-flight
+ * and returns the PluginHost cleanup result, including binding failures in cleanupErrors; it owns
+ * neither the supplied Runtime nor arbitrary state returned by getState.
+ */
 export type IStoreMiddlewareHost<S> = IHostHandle<
   IStoreMiddlewareCore<S>,
   IMiddlewareEvent<S>,
@@ -132,7 +176,12 @@ export type IStoreMiddlewareHost<S> = IHostHandle<
   IStoreMiddlewareSurface<S>
 >
 
-/** Creates one managed frozen handle with the Store domain and canonical host methods. */
+/**
+ * Create the managed frozen host synchronously; await use() separately to install plugins. Event
+ * processing is always sync, with a flat next(event) handoff rather than downstream onion calls.
+ * Options/read failures reject construction as INVALID_OPTION; canonical host option failures keep
+ * their owner. Binding cleanup is synchronous LIFO before awaited plugin disposal.
+ */
 export function createStoreMiddlewareHost<S>(
   options: IStoreMiddlewareHostOptions<S>
 ): IStoreMiddlewareHost<S> {
@@ -365,11 +414,12 @@ function createStoreMiddlewareHostCore<S>(
 }
 
 /**
- * Creates the built-in logging plugin. Each event is passed to the next stage first, then `sink`
- * receives that event and the state read after it; the default sink prints both with the log
- * prefix. The logger never reads a specific state shape, so `S` defaults to `any`: the plugin
- * installs into a host of any state type without a type argument. Pass `S` explicitly only to pin
- * the plugin to one host's state type.
+ * Creates the built-in store-logger plugin. It records next(event), then invokes sink with the
+ * event and current state before the following stage executes in this flat sync pipeline. The
+ * default sink prints both with the log prefix. Sink return Promises are not awaited. The logger
+ * never reads a specific state shape, so `S` defaults to `any`: the plugin installs into a host of
+ * any state type without a type argument. Pass `S` explicitly only to pin the plugin to one host's
+ * state type.
  */
 export function loggerMiddleware<S = any>(
   sink: (event: IMiddlewareEvent<unknown>, state: unknown) => void = (event, state) => {
@@ -388,13 +438,31 @@ export function loggerMiddleware<S = any>(
   }
 }
 
+/** Binding-specific options; Store/Runtime and state application are taken from the supplied Store. */
 export type IStoreMiddlewareBindingOptions = {
+  /** Required explicit PluginHost mutation/drain budgets; false opts out of that deadline. */
   readonly execution: IPluginHostOptions['execution']
+  /**
+   * Exact host policy, defaulting to a new off policy; attach the same policy to the Store
+   * separately.
+   */
   readonly mutationPolicy?: MutationPolicy
+  /**
+   * Optional action-trace name prefix; omitted or empty accepts all action names, not state
+   * filtering.
+   */
   readonly actionPrefix?: string
+  /**
+   * Synchronous snapshot producer, default ClonePolicy.diagnostic. Used at binding and each state
+   * observation/read; custom callback failures follow the invoking Store or construction boundary.
+   */
   readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>
 }
 
+/**
+ * Managed host plus the exact borrowed Store reference; disposal releases binding subscriptions and
+ * installed host plugins without disposing the Store or its Runtime.
+ */
 export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<
   IStoreMiddlewareCore<Record<string, unknown>>,
   IMiddlewareEvent<Record<string, unknown>>,
@@ -402,12 +470,26 @@ export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHa
   IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S> }
 >
 
+/**
+ * Bind an existing Store's state subscription and Runtime action trace to one middleware host.
+ * Clone the initial previous state immediately; subsequent observations emit store:update and
+ * advance that snapshot. Setup failure attempts both acquired unsubscribers and host cleanup,
+ * retaining setup/cleanup failures. Disposal detaches subscriptions but leaves Store and Runtime
+ * usable; it does not retrofit mutation guarding onto an unguarded Store.
+ */
 export function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
   options: IStoreMiddlewareBindingOptions
 ): IStoreMiddlewareBinding<S> {
+  /** Select the application's synchronous snapshot function or the diagnostic default once. */
   const clone = options.clone ?? ((state) => ClonePolicy.diagnostic(state))
-  let previous = clone(store.$plain())
+  /** Establish the first snapshot before acquiring subscriptions, retaining callback failures. */
+  let previous: Record<string, unknown>
+  try {
+    previous = clone(store.$plain())
+  } catch (error) {
+    throw identifyMiddlewareFailure(error)
+  }
   const host = createStoreMiddlewareHostCore<Record<string, unknown>>(
     {
       execution: options.execution,
