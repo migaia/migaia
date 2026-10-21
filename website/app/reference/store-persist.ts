@@ -60,357 +60,288 @@ const lightExample = storePersistCases.persist![0]!.example
 const indexedExample = storePersistCases.persistCollection![0]!.example
 /** One writable definition gets one archive and one independent handle. */
 const keyedExample = storePersistCases.persistKeyed![0]!.example
-/** Configuration cases run against the built persistence engine and each public adapter. */
+/** Reader scenarios borrow the application state, storage and timing owners. */
 const persistOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   IPersistUnitOptions: [
     {
-      title: {
-        en: 'Upgrade an archive while keeping session state',
-        zh: '升级存档并保留会话状态'
-      },
-      problem: {
-        en: 'An archive uses schema version 1, while the application now writes version 2 and keeps temporary fields only in memory. Without migrate a version mismatch fails hydration. partialize selects stored fields; merge adds restored fields to the current state. key is application-owned, storage and runtime are borrowed, and codec handles the complete version/state envelope.',
-        zh: '存档使用第 1 版结构，而应用现在写入第 2 版，并把临时字段留在内存。省略 migrate 时版本不匹配会恢复失败。partialize 选择保存字段，merge 把恢复字段合入当前状态。key 由应用指定，storage 和 runtime 由调用方持有，codec 处理完整版本与状态信封。'
-      },
-      example: `import { createRuntime } from '@migaia/reactive'
-import { persistUnit, type IPersistUnit } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'The editor must restore its saved state before showing the form. Select an application archive key and borrow its existing storage; the codec reads and writes the complete archive envelope.',
+        '编辑器显示表单前需要恢复保存状态。选择应用存档键并借用现有存储，编解码器负责读写完整存档信封。'
+      ),
+      example: `import { persistUnit } from '@migaia/store-persist'
 import { defaultJsonCodec } from '@migaia/store-persist'
 
-const storage = memoryStorageHost()
-type IState = { count: number; temporary?: string }
-let state: IState = { count: 0, temporary: 'session-only' }
-let notify = () => {}
-const unit: IPersistUnit<IState> = {
-  snapshot: () => ({ ...state }),
-  restore: (next) => { state = next },
-  subscribe: (listener) => { notify = listener; return () => { notify = () => {} } }
-}
-const runtime = createRuntime()
-await storage.set('draft', await defaultJsonCodec.encode({ version: 1, state: { count: 2 } }) as string)
-const handle = persistUnit(unit, {
-  key: 'draft', runtime, storage, codec: defaultJsonCodec, version: 2,
-  migrate: (saved, fromVersion) => ({ ...saved, count: saved.count + fromVersion }),
-  partialize: (current) => ({ count: current.count }),
+const handle = persistUnit(draftUnit, {
+  key: 'editor-draft',
+  runtime: draftRuntime,
+  storage: applicationStorage,
+  codec: defaultJsonCodec
+})
+await handle.ready
+renderDraft(draftUnit.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The saved state is restored before rendering; closing the editor waits for persistence cleanup.',
+        '保存状态在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['key', 'storage', 'codec', 'runtime']
+    },
+    {
+      title: t('Upgrade saved data without saving session state', '升级保存数据并排除会话状态'),
+      problem: t(
+        'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
+        '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
+      ),
+      example: `import { persistUnit } from '@migaia/store-persist'
+
+const handle = persistUnit(draftUnit, {
+  ...draftArchiveOptions,
+  version: 2,
+  migrate: (saved, fromVersion) => upgradeDraft(saved, fromVersion),
+  partialize: (state) => ({ text: state.text }),
   merge: (saved, current) => ({ ...current, ...saved })
 })
 await handle.ready
-console.log(state.count, state.temporary)
-await handle.flush()
-const archive = await defaultJsonCodec.decode(await storage.get('draft')) as { version: number; state: IState }
-console.log(archive.version, Object.hasOwn(archive.state, 'temporary'))
-await handle.disposeAsync()
-console.log(handle.disposed)
-storage.dispose()`,
-      result: {
-        en: 'It prints 3 session-only, then 2 false. The counter is migrated, the new archive omits temporary, and the final true confirms disposal.',
-        zh: '先输出 3 session-only，再输出 2 false。计数完成迁移，新存档不含 temporary，最后的 true 表示句柄已释放。'
-      },
-      covers: ['key', 'runtime', 'storage', 'codec', 'version', 'migrate', 'partialize', 'merge']
+renderDraft(draftUnit.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
+        '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
+      ),
+      covers: ['version', 'partialize', 'migrate', 'merge']
     },
     {
-      title: {
-        en: 'Coalesce typing without postponing every save',
-        zh: '合并连续输入并限制保存推迟'
-      },
-      problem: {
-        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
-        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
-      },
-      example: `import { createManualScheduler } from '@migaia/utils/testing'
-import { createRuntime } from '@migaia/reactive'
-import { persistUnit, type IPersistUnit } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { defaultJsonCodec } from '@migaia/store-persist'
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persistUnit } from '@migaia/store-persist'
 
-const storage = memoryStorageHost()
-type IState = { count: number; temporary?: string }
-let state: IState = { count: 0, temporary: 'session-only' }
-let notify = () => {}
-const unit: IPersistUnit<IState> = {
-  snapshot: () => ({ ...state }),
-  restore: (next) => { state = next },
-  subscribe: (listener) => { notify = listener; return () => { notify = () => {} } }
-}
-const runtime = createRuntime()
-const scheduler = createManualScheduler()
-const handle = persistUnit(unit, { key: 'timed', runtime, storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+const handle = persistUnit(draftUnit, {
+  ...draftArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
 await handle.ready
-state.count = 1
-notify()
-scheduler.advance(50)
-state.count = 2
-notify()
-scheduler.advance(50)
-state.count = 3
-notify()
-scheduler.advance(49)
-console.log((await storage.get('timed')) == null)
-scheduler.advance(1)
-await new Promise((resolve) => setTimeout(resolve, 0))
-const archive = await defaultJsonCodec.decode(await storage.get('timed')) as { state: { count: number } | Map<string, number> }
-console.log((archive.state as { count: number }).count)
-await handle.disposeAsync()
-storage.dispose()`,
-      result: {
-        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
-        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
-      },
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
       covers: ['debounceMs', 'maxWaitMs', 'scheduler']
     }
   ],
   IPersistOptions: [
     {
-      title: {
-        en: 'Save preferences without session-only fields',
-        zh: '保存偏好并排除会话字段'
-      },
-      problem: {
-        en: 'Saved preferences need a version upgrade, but temporary UI state must survive only in memory. migrate converts the old archive and partialize selects the next write. The adapter uses the Store runtime and its hydration method, so it exposes no custom merge option.',
-        zh: '保存的偏好需要升级版本，但临时界面状态只应留在内存。migrate 转换旧存档，partialize 选择下一次保存的字段。适配器使用原状态容器的运行时与恢复方法，因此不提供自定义 merge 选项。'
-      },
-      example: `import { createStore } from '@migaia/store-light'
-import { persist } from '@migaia/store-persist/light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'The editor must restore its saved state before showing the form. Select an application archive key and borrow its existing storage; the codec reads and writes the complete archive envelope.',
+        '编辑器显示表单前需要恢复保存状态。选择应用存档键并借用现有存储，编解码器负责读写完整存档信封。'
+      ),
+      example: `import { persist } from '@migaia/store-persist/light'
 import { defaultJsonCodec } from '@migaia/store-persist'
 
-const storage = memoryStorageHost()
-await storage.set('draft', await defaultJsonCodec.encode({ version: 1, state: { count: 2 } }) as string)
-const store = createStore({ count: 0, temporary: 'session-only' })
-const handle = persist(store, {
-  key: 'draft', storage, codec: defaultJsonCodec, version: 2,
-  migrate: (saved, fromVersion) => ({ count: Number(saved.count) + fromVersion }),
-  partialize: (state) => ({ count: state.count })
+const handle = persist(draftStore, {
+  key: 'editor-draft',
+  storage: applicationStorage,
+  codec: defaultJsonCodec
 })
 await handle.ready
-console.log(store.count, store.temporary)
-await handle.flush()
-const archive = await defaultJsonCodec.decode(await storage.get('draft')) as { version: number; state: Record<string, unknown> }
-console.log(archive.version, Object.hasOwn(archive.state, 'temporary'))
-await handle.disposeAsync()
-console.log(handle.disposed)
-await store.$dispose()
-storage.dispose()`,
-      result: {
-        en: 'The counter is 3, the session field remains in memory, and the version-2 archive omits it. The final true confirms handle disposal.',
-        zh: '计数变为 3，会话字段保留在内存，第 2 版存档不包含它。最后的 true 表示句柄已释放。'
-      },
-      covers: ['key', 'storage', 'codec', 'version', 'migrate', 'partialize']
+renderDraft(draftStore.$plain())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The saved state is restored before rendering; closing the editor waits for persistence cleanup.',
+        '保存状态在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['key', 'storage', 'codec']
     },
     {
-      title: {
-        en: 'Coalesce typing without postponing every save',
-        zh: '合并连续输入并限制保存推迟'
-      },
-      problem: {
-        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
-        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
-      },
-      example: `import { createManualScheduler } from '@migaia/utils/testing'
-import { createStore } from '@migaia/store-light'
-import { persist } from '@migaia/store-persist/light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { defaultJsonCodec } from '@migaia/store-persist'
+      title: t('Upgrade saved data without saving session state', '升级保存数据并排除会话状态'),
+      problem: t(
+        'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
+        '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
+      ),
+      example: `import { persist } from '@migaia/store-persist/light'
 
-const storage = memoryStorageHost()
-const store = createStore({ count: 0 })
-const runtime = store.$runtime
-const scheduler = createManualScheduler()
-const handle = persist(store, { key: 'timed', storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+const handle = persist(draftStore, {
+  ...draftArchiveOptions,
+  version: 2,
+  migrate: (saved, fromVersion) => upgradeDraft(saved, fromVersion),
+  partialize: (state) => ({ text: state.text })
+})
 await handle.ready
-store.count = 1
-runtime.flush()
-scheduler.advance(50)
-store.count = 2
-runtime.flush()
-scheduler.advance(50)
-store.count = 3
-runtime.flush()
-scheduler.advance(49)
-console.log((await storage.get('timed')) == null)
-scheduler.advance(1)
-await new Promise((resolve) => setTimeout(resolve, 0))
-const archive = await defaultJsonCodec.decode(await storage.get('timed')) as { state: { count: number } | Map<string, number> }
-console.log((archive.state as { count: number }).count)
-await handle.disposeAsync()
-await store.$dispose()
-storage.dispose()`,
-      result: {
-        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
-        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
-      },
+renderDraft(draftStore.$plain())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
+        '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
+      ),
+      covers: ['version', 'partialize', 'migrate']
+    },
+    {
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persist } from '@migaia/store-persist/light'
+
+const handle = persist(draftStore, {
+  ...draftArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
+await handle.ready
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
       covers: ['debounceMs', 'maxWaitMs', 'scheduler']
     }
   ],
   IPersistCollectionOptions: [
     {
-      title: {
-        en: 'Keep local Map entries when restoring an archive',
-        zh: '恢复存档时保留本地 Map 条目'
-      },
-      problem: {
-        en: 'Default Map restoration replaces the whole collection. A cart also has a local-only entry that must survive restoration but must not be stored. migrate upgrades saved quantities, merge retains current entries, and partialize leaves the local entry out of the archive. The codec preserves real Map values.',
-        zh: 'Map 默认恢复会替换整个集合。购物车还包含只在本地存在的条目，恢复时应保留，保存时应排除。migrate 升级已保存数量，merge 保留当前条目，partialize 从存档中排除本地条目。编解码器保留真正的 Map。'
-      },
-      example: `import { ObservableMap } from '@migaia/store-indexed'
-import { persistCollection } from '@migaia/store-persist/indexed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'The editor must restore its saved state before showing the form. Select an application archive key and borrow its existing storage; the codec reads and writes the complete archive envelope.',
+        '编辑器显示表单前需要恢复保存状态。选择应用存档键并借用现有存储，编解码器负责读写完整存档信封。'
+      ),
+      example: `import { persistCollection } from '@migaia/store-persist/indexed'
 import { defaultJsonCodec } from '@migaia/store-persist'
 
-const storage = memoryStorageHost()
-await storage.set('cart', await defaultJsonCodec.encode({ version: 1, state: new Map([['book', 2]]) }) as string)
-const cart = new ObservableMap<string, number>([['local', 99]])
-const handle = persistCollection(cart, {
-  key: 'cart', storage, codec: defaultJsonCodec, version: 2,
-  migrate: (saved, fromVersion) => new Map([...saved].map(([key, value]) => [key, value + fromVersion] as const)),
-  partialize: (state) => new Map([...state].filter(([key]) => key !== 'local')),
-  merge: (saved, current) => new Map([...current, ...(saved instanceof Map ? saved : [])])
+const handle = persistCollection(cartRows, {
+  key: 'cart',
+  storage: applicationStorage,
+  codec: defaultJsonCodec
 })
 await handle.ready
-console.log(cart.get('book'), cart.get('local'))
-await handle.flush()
-const archive = await defaultJsonCodec.decode(await storage.get('cart')) as { version: number; state: Map<string, number> }
-console.log(archive.version, archive.state.has('local'))
-await handle.disposeAsync()
-console.log(handle.disposed)
-cart.dispose()
-storage.dispose()`,
-      result: {
-        en: 'It prints 3 99, then 2 false: book is upgraded, local survives in memory, and the new archive omits local. The final true confirms disposal.',
-        zh: '先输出 3 99，再输出 2 false：book 完成升级，local 留在内存，新存档不含 local。最后的 true 表示已释放。'
-      },
-      covers: ['key', 'storage', 'codec', 'version', 'migrate', 'partialize', 'merge']
+renderCart(cartRows.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The saved state is restored before rendering; closing the editor waits for persistence cleanup.',
+        '保存状态在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['key', 'storage', 'codec']
     },
     {
-      title: {
-        en: 'Coalesce typing without postponing every save',
-        zh: '合并连续输入并限制保存推迟'
-      },
-      problem: {
-        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
-        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
-      },
-      example: `import { createManualScheduler } from '@migaia/utils/testing'
-import { ObservableMap } from '@migaia/store-indexed'
-import { persistCollection } from '@migaia/store-persist/indexed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { defaultJsonCodec } from '@migaia/store-persist'
+      title: t('Upgrade saved data without saving session state', '升级保存数据并排除会话状态'),
+      problem: t(
+        'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
+        '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
+      ),
+      example: `import { persistCollection } from '@migaia/store-persist/indexed'
 
-const storage = memoryStorageHost()
-const cart = new ObservableMap<string, number>()
-const runtime = cart.runtime
-const scheduler = createManualScheduler()
-const handle = persistCollection(cart, { key: 'timed', storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+const handle = persistCollection(cartRows, {
+  ...cartArchiveOptions,
+  version: 2,
+  migrate: (saved, fromVersion) => upgradeCartRows(saved, fromVersion),
+  partialize: (rows) => selectSavedCartRows(rows),
+  merge: (saved, current) => mergeCartRows(saved, current)
+})
 await handle.ready
-cart.set('book', 1)
-runtime.flush()
-scheduler.advance(50)
-cart.set('book', 2)
-runtime.flush()
-scheduler.advance(50)
-cart.set('book', 3)
-runtime.flush()
-scheduler.advance(49)
-console.log((await storage.get('timed')) == null)
-scheduler.advance(1)
-await new Promise((resolve) => setTimeout(resolve, 0))
-const archive = await defaultJsonCodec.decode(await storage.get('timed')) as { state: { count: number } | Map<string, number> }
-console.log((archive.state as Map<string, number>).get('book'))
-await handle.disposeAsync()
-cart.dispose()
-storage.dispose()`,
-      result: {
-        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
-        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
-      },
+renderCart(cartRows.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
+        '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
+      ),
+      covers: ['version', 'partialize', 'migrate', 'merge']
+    },
+    {
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persistCollection } from '@migaia/store-persist/indexed'
+
+const handle = persistCollection(cartRows, {
+  ...cartArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
+await handle.ready
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
       covers: ['debounceMs', 'maxWaitMs', 'scheduler']
     }
   ],
   IPersistKeyedOptions: [
     {
-      title: {
-        en: 'Archive one named draft without its session fields',
-        zh: '保存具名草稿并排除会话字段'
-      },
-      problem: {
-        en: 'One writable definition needs its own archive. namespace and the explicit id form drafts:alice; neither comes from the definition itself. partialize selects stored fields and merge preserves current session fields. This adapter does not offer migration, so the archive version must match.',
-        zh: '一个可写定义需要独立存档。namespace 和显式 id 组成 drafts:alice，两者都不是从定义中取得。partialize 选择保存字段，merge 保留当前会话字段。此适配器不提供迁移，因此存档版本必须匹配。'
-      },
-      example: `import { createRuntime } from '@migaia/reactive'
-import { createAtomStore, atomDef } from '@migaia/store-keyed'
-import { persistKeyed } from '@migaia/store-persist/keyed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'One user draft needs its own archive namespace and id. Borrow the existing storage and codec so this handle owns persistence without owning the application store.',
+        '用户草稿需要独立的存档命名空间与标识。借用现有存储及编解码器，让句柄持有持久化过程，不取得应用状态容器的所有权。'
+      ),
+      example: `import { persistKeyed } from '@migaia/store-persist/keyed'
 import { defaultJsonCodec } from '@migaia/store-persist'
 
-const storage = memoryStorageHost()
-type IState = { count: number; temporary?: string }
-await storage.set('drafts:alice', await defaultJsonCodec.encode({ version: 0, state: { count: 2 } }) as string)
-const atoms = createAtomStore(createRuntime())
-const draft = atomDef<IState>({ count: 0, temporary: 'session-only' })
-const handle = persistKeyed(atoms, draft, 'alice', {
-  namespace: 'drafts', storage, codec: defaultJsonCodec, version: 0,
-  partialize: (state) => ({ count: state.count }),
+const handle = persistKeyed(draftAtoms, draftDefinition, userId, {
+  namespace: 'editor-drafts',
+  storage: applicationStorage,
+  codec: defaultJsonCodec
+})
+await handle.ready
+renderDraft(draftAtoms.peek(draftDefinition))
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The selected user draft is restored before rendering; closing the editor waits for persistence cleanup.',
+        '所选用户草稿在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['namespace', 'storage', 'codec']
+    },
+    {
+      title: t('Keep session fields out of the archive', '不把会话字段写入存档'),
+      problem: t(
+        'The editor keeps selection state only for this session. Select only text for writes and merge a matching version-two archive into current state. This adapter has no migration callback, so the saved version must already match.',
+        '编辑器只在当前会话保留选择状态。写入时只选择正文，再把版本匹配的第二版存档合入当前状态。此适配器没有迁移回调，保存版本必须事先匹配。'
+      ),
+      example: `import { persistKeyed } from '@migaia/store-persist/keyed'
+
+const handle = persistKeyed(draftAtoms, draftDefinition, userId, {
+  ...draftArchiveOptions,
+  version: 2,
+  partialize: (state) => ({ text: state.text }),
   merge: (saved, current) => ({ ...current, ...saved })
 })
 await handle.ready
-console.log(atoms.peek(draft).count, atoms.peek(draft).temporary)
-await handle.flush()
-const archive = await defaultJsonCodec.decode(await storage.get('drafts:alice')) as { state: IState }
-console.log(Object.hasOwn(archive.state, 'temporary'))
-await handle.disposeAsync()
-console.log(handle.disposed)
-atoms.dispose()
-storage.dispose()`,
-      result: {
-        en: 'It prints 2 session-only, then false: the archived counter is restored while the session field remains local. The final true confirms handle disposal.',
-        zh: '先输出 2 session-only，再输出 false：计数从存档恢复，会话字段仍只在本地。最后的 true 表示句柄已释放。'
-      },
-      covers: ['namespace', 'storage', 'codec', 'version', 'partialize', 'merge']
+renderDraft(draftAtoms.peek(draftDefinition))
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Restored text joins the current session state, while later writes omit session-only fields.',
+        '恢复的正文合入当前会话状态，后续写入不包含会话字段。'
+      ),
+      covers: ['version', 'partialize', 'merge']
     },
     {
-      title: {
-        en: 'Coalesce typing without postponing every save',
-        zh: '合并连续输入并限制保存推迟'
-      },
-      problem: {
-        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
-        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
-      },
-      example: `import { createManualScheduler } from '@migaia/utils/testing'
-import { createRuntime } from '@migaia/reactive'
-import { createAtomStore, atomDef } from '@migaia/store-keyed'
-import { persistKeyed } from '@migaia/store-persist/keyed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { defaultJsonCodec } from '@migaia/store-persist'
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persistKeyed } from '@migaia/store-persist/keyed'
 
-const storage = memoryStorageHost()
-const runtime = createRuntime()
-const atoms = createAtomStore(runtime)
-const draft = atomDef({ count: 0 })
-const scheduler = createManualScheduler()
-const handle = persistKeyed(atoms, draft, 'alice', { namespace: 'timed', storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+const handle = persistKeyed(draftAtoms, draftDefinition, userId, {
+  ...draftArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
 await handle.ready
-atoms.set(draft, { count: 1 })
-runtime.flush()
-scheduler.advance(50)
-atoms.set(draft, { count: 2 })
-runtime.flush()
-scheduler.advance(50)
-atoms.set(draft, { count: 3 })
-runtime.flush()
-scheduler.advance(49)
-console.log((await storage.get('timed:alice')) == null)
-scheduler.advance(1)
-await new Promise((resolve) => setTimeout(resolve, 0))
-const archive = await defaultJsonCodec.decode(await storage.get('timed:alice')) as { state: { count: number } | Map<string, number> }
-console.log((archive.state as { count: number }).count)
-await handle.disposeAsync()
-atoms.dispose()
-storage.dispose()`,
-      result: {
-        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
-        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
-      },
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
       covers: ['debounceMs', 'maxWaitMs', 'scheduler']
     }
   ]
@@ -451,7 +382,7 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
       'Set it when stored schema versions differ. The callback receives the saved state and its version and must return the current shape synchronously. Without it a mismatch fails; returning a Promise also fails hydration.',
       '存档版本与当前结构不同时设置。回调接收保存状态及其版本，必须同步返回当前形状。省略时版本不匹配会失败，返回 Promise 也会使恢复失败。'
     ),
-    example: persistOptionCases.IPersistUnitOptions![0]!.example,
+    example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
       'Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.',
       '版本不一致时同步调用，接收解码后的保存状态与存档版本；抛错或返回可等待对象会使水合失败。'
@@ -480,7 +411,7 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
       'Use it to keep session-only or derived fields out of storage. It selects each write without changing live memory. Omission stores the complete snapshot. The callback must return synchronously.',
       '需要从存档排除会话或派生字段时设置。它为每次写入选择内容，不改变内存。省略时保存完整快照，回调必须同步返回。'
     ),
-    example: persistOptionCases.IPersistUnitOptions![0]!.example,
+    example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
       'Synchronous callback before each write, receiving the latest unit snapshot and selecting its persisted portion. Throws and thenables become write failures.',
       '每次写入前同步调用，接收最新单元快照并选择需要保存的部分；抛错与可等待结果成为写入失败。'
@@ -502,7 +433,7 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
       'Set it when archived partial state needs shape-specific reconciliation with live state. Return a complete synchronous state. Default plain-object merging preserves edits since attachment; non-object shapes are replaced by the archive.',
       '保存的部分状态需要按形状与内存协调时设置。必须同步返回完整状态。默认普通对象合并保留接入后发生的修改，其它形状使用存档整体替换。'
     ),
-    example: persistOptionCases.IPersistUnitOptions![0]!.example,
+    example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
       'Synchronous hydration callback receiving persisted partial state and the latest current state; return the complete state to restore. Throws or thenables fail hydration.',
       '同步水合回调接收保存的部分状态与最新当前状态，返回需要恢复的完整状态；抛错或可等待结果使水合失败。'
@@ -559,24 +490,24 @@ const collectionOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(Object.entries(unitOptions).filter(([name]) => name !== 'runtime')),
   migrate: {
     ...unitOptions.migrate!,
-    example: persistOptionCases.IPersistCollectionOptions![0]!.example
+    example: persistOptionCases.IPersistCollectionOptions![1]!.example
   },
   partialize: {
     ...unitOptions.partialize!,
-    example: persistOptionCases.IPersistCollectionOptions![0]!.example
+    example: persistOptionCases.IPersistCollectionOptions![1]!.example
   },
   merge: {
     ...unitOptions.merge!,
-    example: persistOptionCases.IPersistCollectionOptions![0]!.example
+    example: persistOptionCases.IPersistCollectionOptions![1]!.example
   }
 }
 /** Light wrappers expose neither a runtime override nor a custom merge. */
 const lightOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(Object.entries(collectionOptions).filter(([name]) => name !== 'merge')),
-  migrate: { ...unitOptions.migrate!, example: persistOptionCases.IPersistOptions![0]!.example },
+  migrate: { ...unitOptions.migrate!, example: persistOptionCases.IPersistOptions![1]!.example },
   partialize: {
     ...unitOptions.partialize!,
-    example: persistOptionCases.IPersistOptions![0]!.example
+    example: persistOptionCases.IPersistOptions![1]!.example
   }
 }
 /** Keyed options use namespace instead of an archive key and expose no migration callback. */
@@ -584,7 +515,7 @@ const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(
     Object.entries(collectionOptions).filter(([name]) => name !== 'key' && name !== 'migrate')
   ),
-  merge: { ...unitOptions.merge!, example: persistOptionCases.IPersistKeyedOptions![0]!.example },
+  merge: { ...unitOptions.merge!, example: persistOptionCases.IPersistKeyedOptions![1]!.example },
   namespace: {
     summary: t(
       'Required application-selected string prefix; the full key is namespace followed by a colon and the caller id. Missing or nonstring values throw INVALID_OPTION at runtime; clearFamily filters that exact prefix.',
@@ -593,7 +524,7 @@ const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   },
   partialize: {
     ...unitOptions.partialize!,
-    example: persistOptionCases.IPersistKeyedOptions![0]!.example,
+    example: persistOptionCases.IPersistKeyedOptions![1]!.example,
     params: {
       value: t(
         'Latest value peeked from the writable definition in AtomStore.',
@@ -730,34 +661,52 @@ const handleType = {
   example: lightExample,
   members: handleMembers
 }
-/** Native failures and structured inputs remain reachable through cause. */
+/** Decoder failures and rejected records retain application context. */
 const persistErrorOptionCases = (name: string, envelope = false): readonly IOptionCaseDoc[] => [
   {
-    title: t('Keep the original decoder failure', '保留原始解码失败'),
+    title: t('Explain why a saved draft cannot be decoded', '说明保存草稿为何无法解码'),
     problem: t(
-      'Adding archive context with only a new message loses the original error and stack. Supply cause to preserve that exact object.',
-      '只用新消息添加存档上下文会丢失原始错误及堆栈。提供 cause 可以保留同一个错误对象。'
+      'The editor needs a short restore message, while support needs the decoder failure. Preserve that failure on cause instead of replacing it with a new message.',
+      '编辑器需要简短的恢复提示，支持人员仍需要解码器的失败。用 cause 保留它，不要只用新消息替换。'
     ),
-    example: `import { ${name}, StorePersistErrorCode } from '@migaia/store-persist'
-const cause = new SyntaxError('invalid archive')
-const error = ${envelope ? 'new ' : ''}${name}(${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid, '}'archive rejected', { cause })
-console.log(error.cause === cause)`,
-    result: t('The identity check prints true.', '身份比较输出 true。'),
+    example: `import { ${name}${envelope ? '' : ', StorePersistErrorCode'} } from '@migaia/store-persist'
+
+try {
+  await decodeSavedDraft(upload)
+} catch (cause) {
+  const error = ${envelope ? 'new ' : ''}${name}(
+    ${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid,\n    '}'Saved draft could not be decoded',
+    { cause }
+  )
+  showDraftError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The editor explains the restore failure; monitoring can follow cause to the original decoder failure.',
+      '编辑器显示恢复失败，监控可沿 cause 找到原始解码失败。'
+    ),
     covers: ['cause']
   },
   {
-    title: t('Keep the rejected archive description', '保留被拒绝的存档描述'),
+    title: t('Keep the rejected draft details', '保留被拒绝的草稿详情'),
     problem: t(
-      'A loader can describe a rejected input with a record rather than an Error. Passing the record as cause keeps its fields available; omission attaches no cause.',
-      '加载器可能用记录对象描述被拒绝的输入，而不是提供 Error。把记录作为 cause 可保留其字段；省略时不附加原因。'
+      'An archive validator returns a record identifying a rejected field. Keeping it as cause lets support inspect the key and submitted version while the page shows a short message.',
+      '存档校验器用记录指出被拒绝字段。把记录放入 cause，页面可显示简短提示，支持人员仍能查看键与提交版本。'
     ),
-    example: `import { ${name}, StorePersistErrorCode } from '@migaia/store-persist'
-const cause = { key: 'draft', version: -1 }
-const error = ${envelope ? 'new ' : ''}${name}(${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid, '}'archive rejected', { cause })
-console.log(error.cause === cause)`,
+    example: `import { ${name}${envelope ? '' : ', StorePersistErrorCode'} } from '@migaia/store-persist'
+
+const rejection = validateSavedDraft(upload)
+if (rejection) {
+  const error = ${envelope ? 'new ' : ''}${name}(
+    ${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid,\n    '}'Saved draft rejected',
+    { cause: rejection }
+  )
+  showDraftError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'The original record remains on error.cause and the comparison prints true.',
-      '原始记录保留在 error.cause 上，比较输出 true。'
+      'The page displays a draft error and monitoring retains the complete rejected-input record.',
+      '页面显示草稿错误，监控中保留完整的拒绝输入记录。'
     ),
     covers: ['cause']
   }
