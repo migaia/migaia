@@ -19,7 +19,7 @@ describe('Tray business topics', () => {
         expect.objectContaining({ code: 'TRAY_VALUE_NOT_PORTABLE' })
       )
       /** Child admission uses the same actual owner exported to its per-init Tray Feature. */
-      const ownerUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
+      const ownerUrl = new URL('../../src/hosts/child/topics.ts', import.meta.url).href
       /** Invalid topics and payloads must reject before a relay operation is attempted. */
       const request = vi.fn()
       /** Only the existing consumed RPC request is observed; no native lifecycle is fabricated. */
@@ -129,7 +129,7 @@ describe('Tray business topics', () => {
 
   it('first concurrent child listeners share registration and last off is idempotent', async () => {
     /** Internal child owner uses the same outlet request boundary as genuine native fixtures. */
-    const ownerUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
+    const ownerUrl = new URL('../../src/hosts/child/topics.ts', import.meta.url).href
     /**
      * Direct owner construction permits the required held relay response without another public
      * seam.
@@ -185,7 +185,7 @@ describe('Tray business topics', () => {
 
   it('failed relay subscribe rolls back listeners and retains the original failure', async () => {
     /** The required relay rejection is injected at the existing consumed outlet boundary. */
-    const ownerUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
+    const ownerUrl = new URL('../../src/hosts/child/topics.ts', import.meta.url).href
     /** Fixture errors retain native identity for the failed-subscribe contract. */
     const textUrl = new URL('./fixtures/fixture-text.mjs', import.meta.url).href
     /** Actual child topic owner and existing fixture diagnostic constructor are used directly. */
@@ -229,9 +229,9 @@ describe('Tray business topics', () => {
      * Existing private registry factory exposes the genuine accepted sender identity for this
      * oracle.
      */
-    const registryUrl = new URL('../../dist/hosts/parent/registry.js', import.meta.url).href
+    const registryUrl = new URL('../../src/hosts/parent/registry.ts', import.meta.url).href
     /** Existing topic factory retains its real generation membership owner. */
-    const topicsUrl = new URL('../../dist/hosts/parent/topics.js', import.meta.url).href
+    const topicsUrl = new URL('../../src/hosts/parent/topics.ts', import.meta.url).href
     /** Spies observe canonical factory results without manufacturing lifecycle or sender state. */
     const registrySpy = vi.spyOn(await import(registryUrl), 'createRegistry')
     /** Stale relay operations are driven directly at the consumed owner after a real restart. */
@@ -318,9 +318,9 @@ describe('Tray business topics', () => {
 
   it('contains delivery send rejection on parent and handler failure on genuine child', async () => {
     /** Existing outlet selector permits transport failure injection without a new seam. */
-    const runtimeUrl = new URL('../../dist/hosts/runtime.js', import.meta.url).href
+    const runtimeUrl = new URL('../../src/hosts/runtime.ts', import.meta.url).href
     /** Existing child topic factory supplies the deliver handler used by the genuine dispatcher. */
-    const childUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
+    const childUrl = new URL('../../src/hosts/child/topics.ts', import.meta.url).href
     /** Fixture diagnostic contract creates classified original send and handler failures. */
     const textUrl = new URL('./fixtures/fixture-text.mjs', import.meta.url).href
     /** Original selectors and owner constructors remain the normal production path. */

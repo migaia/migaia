@@ -9,8 +9,8 @@ import {
   RpcProbeStage,
   type IRpcProbeEventView
 } from '@migaia/rpc-core/probe'
-import { createRpcDevtools } from '@migaia/rpc-devtools'
-import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'
+import { createRpcDevtools } from '../../src/index.js'
+import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '../../src/contract/index.js'
 import { createPeerPair } from '@migaia/rpc-core/testing'
 import type { IRpcContext } from '@migaia/rpc-core'
 import { RpcEnvelopeKind, RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'

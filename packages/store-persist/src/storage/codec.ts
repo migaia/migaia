@@ -170,13 +170,25 @@ export async function readEnvelope(
 }
 
 /**
- * Delegates removal of one key to borrowed storage with the supplied context/signal. Resolves after
- * storage.remove settles, propagating its failure; does not change any in-memory unit.
+ * Removes one archive from the codec's channel and preserves backend failures unchanged; does not
+ * change any in-memory unit. A binary codec selects byte removal; missing byte deletion rejects
+ * with the existing BACKEND_CAPABILITY TypeError.
  */
 export async function removeEnvelope(
   storage: IPersistStorage,
   key: string,
-  ctx: { signal?: IAbortSignal }
+  ctx: { signal?: IAbortSignal },
+  codec: ICodec = defaultJsonCodec
 ): Promise<void> {
+  if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
+    if (typeof storage.removeBytes !== 'function') {
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.backendCapability,
+        StorePersistErrorText.binaryRemoval
+      )
+    }
+    await storage.removeBytes(key, ctx)
+    return
+  }
   await storage.remove(key, ctx)
 }

@@ -181,6 +181,8 @@ The general "release a group of resources together" container (formerly `Scope` 
 
 ### Multiple copies and the extension entry
 
+The extension entry's `claimOwnership`, `ownerOf` and `assertOwnedBy` apply one ownership contract to plain objects and function objects: a registered function reports its original Runtime, a cross-Runtime check throws `CROSS_RUNTIME`, and a brand from another module copy throws `COPY_CONFLICT`.
+
 Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When upgrading, keep every reactive copy in one process on the same version: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks.
 
 `@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must create nothing at import time. It creates the shared default Runtime on its first call and returns exactly the same object as the root entry's `defaultRuntime`; importing the root `defaultRuntime` still creates it at import time. `ReactiveErrorPhase` can also be imported from the extension entry and is the same object as the root export.

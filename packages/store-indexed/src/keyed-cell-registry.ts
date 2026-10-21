@@ -14,9 +14,6 @@ export class KeyedCellRegistry<K, C> {
   delete(key: K): boolean {
     return this.#cells.delete(key)
   }
-  has(key: K): boolean {
-    return this.#cells.has(key)
-  }
   get size(): number {
     return this.#cells.size
   }
@@ -25,12 +22,6 @@ export class KeyedCellRegistry<K, C> {
   }
   keys(): IterableIterator<K> {
     return this.#cells.keys()
-  }
-  values(): IterableIterator<C> {
-    return this.#cells.values()
-  }
-  [Symbol.iterator](): IterableIterator<[K, C]> {
-    return this.#cells.entries()
   }
   clear(): void {
     this.#cells.clear()

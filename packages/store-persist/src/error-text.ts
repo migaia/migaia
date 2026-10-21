@@ -6,6 +6,8 @@ export const StorePersistErrorText = {
   jsonPayload: '[store] json codec expects a string payload',
   binaryBackend:
     '[store] binary codec output requires a storage-web store with getBytes/setBytes (an IRecordStore-capable backend)',
+  /** Clear must reject incomplete byte adapters instead of silently deleting the text channel. */
+  binaryRemoval: '[store] binary archive removal requires a storage backend with removeBytes',
   structuredOutput: (name: string): string =>
     `[store] codec "${name}" produces structured output, which this storage adapter shape does not support`,
   binaryUint8: (name: string): string =>

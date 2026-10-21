@@ -276,6 +276,10 @@
             "blocks": [
               {
                 "type": "paragraph",
+                "text": "扩展入口的 `claimOwnership`、`ownerOf`、`assertOwnedBy` 对普通对象和函数对象使用同一归属契约：已登记的函数可以查到原 Runtime，跨 Runtime 校验抛 `CROSS_RUNTIME`，另一模块副本的品牌抛 `COPY_CONFLICT`。"
+              },
+              {
+                "type": "paragraph",
                 "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。升级时请让同一进程中的 reactive 副本保持同一版本：旧的 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数，也不会识别对方的归属标记。"
               },
               {
@@ -841,8 +845,8 @@
               {
                 "type": "list",
                 "items": [
-                  "`claimOwnership(value: object, runtime: IRuntime): void` —— 登记归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一对象重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。",
-                  "`ownerOf(value: unknown): IRuntime | undefined` —— 查归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。",
+                  "`claimOwnership(value: object, runtime: IRuntime): void` —— 登记普通对象或函数对象的归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一引用重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。",
+                  "`ownerOf(value: unknown): IRuntime | undefined` —— 查普通对象或函数对象的归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。",
                   "`assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：普通未登记值放行，foreign copy 品牌先拒绝（第三方可以把普通值注册进 Registry，不涉及图）；只有登记过且归属不符才抛 `CROSS_RUNTIME`。",
                   "`assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void` —— 内核图边界使用的严格断言：未登记直接抛 `NOT_RUNTIME_OWNED`；登记了但不属于当前 `runtime` 抛 `CROSS_RUNTIME`。"
                 ]
@@ -965,7 +969,7 @@
                   [
                     "`crossRuntime`",
                     "`CROSS_RUNTIME`",
-                    "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                    "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                   ],
                   [
                     "`notRuntimeOwned`",
@@ -975,12 +979,12 @@
                   [
                     "`ownershipConflict`",
                     "`OWNERSHIP_CONFLICT`",
-                    "同一个节点对象被重复登记到不同的 `Runtime`"
+                    "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                   ],
                   [
                     "`copyConflict`",
                     "`COPY_CONFLICT`",
-                    "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                    "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                   ],
                   ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                   [
@@ -1484,6 +1488,10 @@
               "id": "multiple-copies-and-the-extension-entry",
               "heading": "Multiple copies and the extension entry",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The extension entry's `claimOwnership`, `ownerOf` and `assertOwnedBy` apply one ownership contract to plain objects and function objects: a registered function reports its original Runtime, a cross-Runtime check throws `CROSS_RUNTIME`, and a brand from another module copy throws `COPY_CONFLICT`."
+                },
                 {
                   "type": "paragraph",
                   "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When upgrading, keep every reactive copy in one process on the same version: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks."
@@ -2519,7 +2527,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -2529,12 +2537,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -2764,7 +2772,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -2774,12 +2782,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -3684,7 +3692,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -3694,12 +3702,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -3864,7 +3872,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -3874,12 +3882,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -5274,7 +5282,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -5284,12 +5292,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -5814,7 +5822,7 @@
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/ownership.d.ts:assertOwnedBy:export declare function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void;",
           "guidance": [],
-          "usageScore": 22,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "reactive-extension--assertOwnedBy"
         },
@@ -6004,7 +6012,7 @@
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/ownership.d.ts:claimOwnership:export declare function claimOwnership(value: object, runtime: IRuntime): void;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "reactive-extension--claimOwnership"
         },
@@ -7414,7 +7422,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -7424,12 +7432,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -7654,7 +7662,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -7664,12 +7672,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -8468,7 +8476,7 @@
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/ownership.d.ts:ownerOf:export declare function ownerOf(value: unknown): IRuntime | undefined;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "reactive-extension--ownerOf"
         },

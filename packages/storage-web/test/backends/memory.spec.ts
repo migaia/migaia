@@ -58,6 +58,7 @@ describe('memoryStorageHost', () => {
       () => store.remove(invalidKey),
       () => store.has(invalidKey),
       () => store.getBytes(invalidKey),
+      () => store.removeBytes(invalidKey),
       () => store.setBytes(invalidKey, new Uint8Array([1]))
     ])
       await expect(invoke()).rejects.toMatchObject({

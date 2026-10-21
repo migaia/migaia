@@ -9,7 +9,7 @@ import {
   RPC_DEVTOOLS_SOURCE,
   type IRpcDevtoolsRecord,
   type IRpcDevtoolsRecordEvent
-} from '@migaia/rpc-devtools/contract'
+} from '../../src/contract/index.js'
 
 /** Uses native coded errors so stack/cause preservation is checked independently of the codec. */
 function codedError(error: Error, code: string): Error {

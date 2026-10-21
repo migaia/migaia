@@ -149,6 +149,32 @@ describe('systemScheduler monotonic clock and host capability failures', () => {
 })
 
 describe('systemScheduler timers, segments, unref and cancellation', () => {
+  it('keeps later deadlines intact after cancelling an earlier task on a derived receiver', () => {
+    /** Endpoint time ports derive this exact receiver after canonical scheduler enablement. */
+    const scheduler = Object.create(systemScheduler) as IScheduler
+    /** Native callbacks observe the same monotonic host clock as logical deadline admission. */
+    let now = 0
+    vi.stubGlobal('performance', { now: () => now })
+    /** The established native timer fixture controls wakeups without inspecting scheduler state. */
+    const { timers } = stubRecordingTimers()
+    /** Only uncancelled callbacks may appear, and none may run before its absolute deadline. */
+    const trace: string[] = []
+    /** The earlier native wakeup remains valid even after its original logical task is cancelled. */
+    const earlier = scheduler.schedule(() => trace.push('cancelled'), 10)
+    scheduler.schedule(() => trace.push('later'), 20)
+    earlier.cancel()
+    earlier.cancel()
+    expect(timers).toHaveLength(1)
+    now = 10
+    timers[0]!.callback()
+    expect(trace).toEqual([])
+    expect(timers).toHaveLength(2)
+    expect(timers[1]!.delayMs).toBe(10)
+    now = 20
+    timers[1]!.callback()
+    expect(trace).toEqual(['later'])
+  })
+
   it('segments delays above the host maximum and runs the callback once', () => {
     vi.useFakeTimers()
     const callback = vi.fn()

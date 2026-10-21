@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- `@migaia/storage-contract` requires `IRecordStore.removeBytes(key, ctx?)`.
+  Custom L1 backends must delete only that byte entry, succeed idempotently
+  when it is absent, and preserve text and records. `isRecordStore()` and
+  `asRecordStore()` reject complete L1 implementations missing this method.
+  L0 clients and the built-in `@migaia/storage-web` backends need no migration.
+
 - Capability topology readers no longer expose `metrics()` or
   `ITopologyIndexMetrics`. Dynamic mutation results no longer contain `metrics`
   or export `IGraphTraversalMetrics`. Use `affected`, `topologyChanged` and
@@ -40,6 +46,16 @@
   had no runtime effect; the package continues to own its English error text.
 
 ### Behavior
+
+- `@migaia/reactive` ownership queries accept registered function references.
+  `ownerOf()` returns their runtime instead of `undefined`, and `assertOwnedBy()`
+  rejects a different runtime with the existing `CROSS_RUNTIME` error.
+
+- `@migaia/store-persist` binary `clear()` removes the byte archive instead
+  of leaving it behind after text-only removal. Backends without `removeBytes`
+  reject with the existing `BACKEND_CAPABILITY` TypeError. `removeEnvelope()`
+  accepts an optional fourth `codec` argument; three-argument text calls retain
+  their behavior.
 
 - Plugin-host rejects synchronous hook calls to `activate()` before returning a shared
   activation Promise. Outside callers still share that Promise while a hook is pending.

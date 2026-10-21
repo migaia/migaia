@@ -662,6 +662,7 @@ describe('indexedDbHost backend', () => {
       () => store.remove(invalidKey),
       () => store.has(invalidKey),
       () => store.getBytes(invalidKey),
+      () => store.removeBytes(invalidKey),
       () => store.setBytes(invalidKey, new Uint8Array([1])),
       () => store.metadata!.get(invalidKey),
       () => store.metadata!.set(invalidKey, 'value'),

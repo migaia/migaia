@@ -16463,6 +16463,10 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "扩展入口的 `claimOwnership`、`ownerOf`、`assertOwnedBy` 对普通对象和函数对象使用同一归属契约：已登记的函数可以查到原 Runtime，跨 Runtime 校验抛 `CROSS_RUNTIME`，另一模块副本的品牌抛 `COPY_CONFLICT`。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。升级时请让同一进程中的 reactive 副本保持同一版本：旧的 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数，也不会识别对方的归属标记。"
                 },
                 {
@@ -17028,8 +17032,8 @@
                 {
                   "type": "list",
                   "items": [
-                    "`claimOwnership(value: object, runtime: IRuntime): void` —— 登记归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一对象重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。",
-                    "`ownerOf(value: unknown): IRuntime | undefined` —— 查归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。",
+                    "`claimOwnership(value: object, runtime: IRuntime): void` —— 登记普通对象或函数对象的归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一引用重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。",
+                    "`ownerOf(value: unknown): IRuntime | undefined` —— 查普通对象或函数对象的归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。",
                     "`assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：普通未登记值放行，foreign copy 品牌先拒绝（第三方可以把普通值注册进 Registry，不涉及图）；只有登记过且归属不符才抛 `CROSS_RUNTIME`。",
                     "`assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void` —— 内核图边界使用的严格断言：未登记直接抛 `NOT_RUNTIME_OWNED`；登记了但不属于当前 `runtime` 抛 `CROSS_RUNTIME`。"
                   ]
@@ -17152,7 +17156,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -17162,12 +17166,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -17671,6 +17675,10 @@
                 "id": "multiple-copies-and-the-extension-entry",
                 "heading": "Multiple copies and the extension entry",
                 "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "The extension entry's `claimOwnership`, `ownerOf` and `assertOwnedBy` apply one ownership contract to plain objects and function objects: a registered function reports its original Runtime, a cross-Runtime check throws `CROSS_RUNTIME`, and a brand from another module copy throws `COPY_CONFLICT`."
+                  },
                   {
                     "type": "paragraph",
                     "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When upgrading, keep every reactive copy in one process on the same version: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks."
@@ -42428,6 +42436,10 @@
                       "`setBytes(key, value, ctx?)`",
                       "value 为 Uint8Array，ctx 为 IWriteOptions，返回 `Promise<void>`。"
                     ],
+                    [
+                      "`removeBytes(key, ctx?)`",
+                      "只删除字节通道里的这个键，文本和记录通道不受影响；键不存在时直接成功，所以重复删除是幂等的。L1 必需方法。"
+                    ],
                     ["`clearBytes(ctx?)`", "清字节通道。"],
                     [
                       "`getRecord(key, ctx?)`",
@@ -43096,6 +43108,10 @@
                       "`setBytes(key, value, ctx?)`",
                       "value 为 Uint8Array，ctx 为 IWriteOptions，返回 `Promise<void>`。"
                     ],
+                    [
+                      "`removeBytes(key, ctx?)`",
+                      "只删除字节通道里的这个键，文本和记录通道不受影响；键不存在时直接成功，所以重复删除是幂等的。L1 必需方法。"
+                    ],
                     ["`clearBytes(ctx?)`", "清字节通道。"],
                     [
                       "`getRecord(key, ctx?)`",
@@ -43759,6 +43775,10 @@
                       [
                         "`setBytes(key, value, ctx?)`",
                         "value is Uint8Array, ctx is IWriteOptions; returns `Promise<void>`."
+                      ],
+                      [
+                        "`removeBytes(key, ctx?)`",
+                        "Deletes only this key from the byte channel, leaving text and records alone; a missing key succeeds, so repeated deletion is idempotent. Required L1 method."
                       ],
                       ["`clearBytes(ctx?)`", "Clears the byte channel."],
                       [
@@ -44470,6 +44490,10 @@
                       [
                         "`setBytes(key, value, ctx?)`",
                         "value is Uint8Array, ctx is IWriteOptions; returns `Promise<void>`."
+                      ],
+                      [
+                        "`removeBytes(key, ctx?)`",
+                        "Deletes only this key from the byte channel, leaving text and records alone; a missing key succeeds, so repeated deletion is idempotent. Required L1 method."
                       ],
                       ["`clearBytes(ctx?)`", "Clears the byte channel."],
                       [
@@ -45193,7 +45217,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "L1 增加 getBytes/setBytes/clearBytes、getRecord/putRecord/deleteRecord/clearRecords、iterateRecords 与 transaction；bytes 不存在为 null，record 不存在为 undefined。putRecord(value, key?, ctx?) 省略 key 会生成键并返回实际 IStorageKey。metadata 是可选附加通道，只有 IndexedDB 提供 get/set/delete；memory 和 KV-only 无跨调用迁移检查点。"
+                  "text": "L1 增加 getBytes/setBytes/removeBytes/clearBytes、getRecord/putRecord/deleteRecord/clearRecords、iterateRecords 与 transaction；bytes 不存在为 null，record 不存在为 undefined。putRecord(value, key?, ctx?) 省略 key 会生成键并返回实际 IStorageKey。metadata 是可选附加通道，只有 IndexedDB 提供 get/set/delete；memory 和 KV-only 无跨调用迁移检查点。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`removeBytes(key, ctx?)` 只删除字节通道里的这个键，键不存在时成功；IndexedDB 在事务提交后才完成，只有确实删掉了已有字节才发布变更。`remove` 只删值通道，`deleteRecord` 只删记录通道，都不影响其他通道。"
                 },
                 {
                   "type": "paragraph",
@@ -46064,7 +46092,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "L1 增加 getBytes/setBytes/clearBytes、getRecord/putRecord/deleteRecord/clearRecords、iterateRecords 与 transaction；bytes 不存在为 null，record 不存在为 undefined。putRecord(value, key?, ctx?) 省略 key 会生成键并返回实际 IStorageKey。metadata 是可选附加通道，只有 IndexedDB 提供 get/set/delete；memory 和 KV-only 无跨调用迁移检查点。"
+                  "text": "L1 增加 getBytes/setBytes/removeBytes/clearBytes、getRecord/putRecord/deleteRecord/clearRecords、iterateRecords 与 transaction；bytes 不存在为 null，record 不存在为 undefined。putRecord(value, key?, ctx?) 省略 key 会生成键并返回实际 IStorageKey。metadata 是可选附加通道，只有 IndexedDB 提供 get/set/delete；memory 和 KV-only 无跨调用迁移检查点。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`removeBytes(key, ctx?)` 只删除字节通道里的这个键，键不存在时成功；IndexedDB 在事务提交后才完成，只有确实删掉了已有字节才发布变更。`remove` 只删值通道，`deleteRecord` 只删记录通道，都不影响其他通道。"
                 },
                 {
                   "type": "paragraph",
@@ -46812,7 +46844,11 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The record layer (L1) adds getBytes/setBytes/clearBytes, getRecord/putRecord/deleteRecord/clearRecords, iterateRecords, and transaction. Missing bytes return null and missing records undefined. putRecord(value,key?,ctx?) generates a key when omitted and returns the actual IStorageKey. metadata is optional get/set/delete support present only in IndexedDB; memory and value-only stores cannot persist cross-call migration checkpoints."
+                    "text": "The record layer (L1) adds getBytes/setBytes/removeBytes/clearBytes, getRecord/putRecord/deleteRecord/clearRecords, iterateRecords, and transaction. Missing bytes return null and missing records undefined. putRecord(value,key?,ctx?) generates a key when omitted and returns the actual IStorageKey. metadata is optional get/set/delete support present only in IndexedDB; memory and value-only stores cannot persist cross-call migration checkpoints."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`removeBytes(key, ctx?)` deletes only this key from the byte channel and succeeds when it is missing; IndexedDB resolves after the transaction commits and publishes a change only when existing bytes were actually removed. `remove` deletes only the value channel and `deleteRecord` only the record channel; neither touches the other channels."
                   },
                   {
                     "type": "paragraph",
@@ -47726,7 +47762,11 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The record layer (L1) adds getBytes/setBytes/clearBytes, getRecord/putRecord/deleteRecord/clearRecords, iterateRecords, and transaction. Missing bytes return null and missing records undefined. putRecord(value,key?,ctx?) generates a key when omitted and returns the actual IStorageKey. metadata is optional get/set/delete support present only in IndexedDB; memory and value-only stores cannot persist cross-call migration checkpoints."
+                    "text": "The record layer (L1) adds getBytes/setBytes/removeBytes/clearBytes, getRecord/putRecord/deleteRecord/clearRecords, iterateRecords, and transaction. Missing bytes return null and missing records undefined. putRecord(value,key?,ctx?) generates a key when omitted and returns the actual IStorageKey. metadata is optional get/set/delete support present only in IndexedDB; memory and value-only stores cannot persist cross-call migration checkpoints."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`removeBytes(key, ctx?)` deletes only this key from the byte channel and succeeds when it is missing; IndexedDB resolves after the transaction commits and publishes a change only when existing bytes were actually removed. `remove` deletes only the value channel and `deleteRecord` only the record channel; neither touches the other channels."
                   },
                   {
                     "type": "paragraph",
@@ -62417,7 +62457,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes 来自 IRecordStore，不是 IKeyValueStore 本身。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。"
+                  "text": "IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes / removeBytes 来自 IRecordStore，不是 IKeyValueStore 本身。binary codec 的 clear() 用 removeBytes 只删除这个 byte key，不清空其他 byte key 或 text/record 通道；声明 binary 却缺少 removeBytes 时，clear 以 BACKEND_CAPABILITY 的 TypeError 拒绝，不回落到 text 删除。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。"
                 },
                 {
                   "type": "table",
@@ -62436,7 +62476,10 @@
                       "readEnvelope(storage, key, codec, ctx)",
                       "binary 且 capabilities.binary 为真时走 getBytes，再 codec.decode；缺方法为 BACKEND_CAPABILITY，binary 能力为假则 CODEC_OUTPUT_MISMATCH。非 binary 走 get + decode。不存在时返回 undefined。"
                     ],
-                    ["removeEnvelope(storage, key, ctx)", "await storage.remove，不改变内存状态。"]
+                    [
+                      "removeEnvelope(storage, key, ctx, codec?)",
+                      "按 codec 选择通道删除单个存档：默认 text 走 storage.remove；binary codec 且后端声明 binary 时走 removeBytes，缺少时抛 BACKEND_CAPABILITY 的 TypeError。不改变内存状态。"
+                    ]
                   ]
                 },
                 {
@@ -63131,7 +63174,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes 来自 IRecordStore，不是 IKeyValueStore 本身。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。"
+                  "text": "IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes / removeBytes 来自 IRecordStore，不是 IKeyValueStore 本身。binary codec 的 clear() 用 removeBytes 只删除这个 byte key，不清空其他 byte key 或 text/record 通道；声明 binary 却缺少 removeBytes 时，clear 以 BACKEND_CAPABILITY 的 TypeError 拒绝，不回落到 text 删除。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。"
                 },
                 {
                   "type": "table",
@@ -63150,7 +63193,10 @@
                       "readEnvelope(storage, key, codec, ctx)",
                       "binary 且 capabilities.binary 为真时走 getBytes，再 codec.decode；缺方法为 BACKEND_CAPABILITY，binary 能力为假则 CODEC_OUTPUT_MISMATCH。非 binary 走 get + decode。不存在时返回 undefined。"
                     ],
-                    ["removeEnvelope(storage, key, ctx)", "await storage.remove，不改变内存状态。"]
+                    [
+                      "removeEnvelope(storage, key, ctx, codec?)",
+                      "按 codec 选择通道删除单个存档：默认 text 走 storage.remove；binary codec 且后端声明 binary 时走 removeBytes，缺少时抛 BACKEND_CAPABILITY 的 TypeError。不改变内存状态。"
+                    ]
                   ]
                 },
                 {
@@ -63740,7 +63786,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "IPersistStorage is an internal minimal projection rather than a named module-entry export: capabilities, get, set, remove, and keys come from IKeyValueStore. It requires no backend, has, clearValues, clearAll, or dispose. Optional getBytes / setBytes come from IRecordStore, not IKeyValueStore itself. Backend and codec exceptions retain their own public identities and causes rather than all becoming local-source errors."
+                    "text": "IPersistStorage is an internal minimal projection rather than a named module-entry export: capabilities, get, set, remove, and keys come from IKeyValueStore. It requires no backend, has, clearValues, clearAll, or dispose. Optional getBytes / setBytes / removeBytes come from IRecordStore, not IKeyValueStore itself. With a binary codec, clear() uses removeBytes to delete only that byte key, leaving other byte keys and the text/record channels alone; a binary-capable backend without removeBytes makes clear reject with a BACKEND_CAPABILITY TypeError instead of falling back to text removal. Backend and codec exceptions retain their own public identities and causes rather than all becoming local-source errors."
                   },
                   {
                     "type": "table",
@@ -63763,8 +63809,8 @@
                         "Binary with true capability uses getBytes then codec.decode; missing byte methods produce BACKEND_CAPABILITY, while false binary capability produces CODEC_OUTPUT_MISMATCH. Non-binary reads use get + decode. Missing values return undefined."
                       ],
                       [
-                        "removeEnvelope(storage, key, ctx)",
-                        "Awaits storage.remove without changing business memory."
+                        "removeEnvelope(storage, key, ctx, codec?)",
+                        "Removes one archive through the codec-selected channel: text uses storage.remove by default; a binary codec on a binary-capable backend uses removeBytes and throws a BACKEND_CAPABILITY TypeError when it is missing. Business memory is unchanged."
                       ]
                     ]
                   },
@@ -64491,7 +64537,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "IPersistStorage is an internal minimal projection rather than a named module-entry export: capabilities, get, set, remove, and keys come from IKeyValueStore. It requires no backend, has, clearValues, clearAll, or dispose. Optional getBytes / setBytes come from IRecordStore, not IKeyValueStore itself. Backend and codec exceptions retain their own public identities and causes rather than all becoming local-source errors."
+                    "text": "IPersistStorage is an internal minimal projection rather than a named module-entry export: capabilities, get, set, remove, and keys come from IKeyValueStore. It requires no backend, has, clearValues, clearAll, or dispose. Optional getBytes / setBytes / removeBytes come from IRecordStore, not IKeyValueStore itself. With a binary codec, clear() uses removeBytes to delete only that byte key, leaving other byte keys and the text/record channels alone; a binary-capable backend without removeBytes makes clear reject with a BACKEND_CAPABILITY TypeError instead of falling back to text removal. Backend and codec exceptions retain their own public identities and causes rather than all becoming local-source errors."
                   },
                   {
                     "type": "table",
@@ -64514,8 +64560,8 @@
                         "Binary with true capability uses getBytes then codec.decode; missing byte methods produce BACKEND_CAPABILITY, while false binary capability produces CODEC_OUTPUT_MISMATCH. Non-binary reads use get + decode. Missing values return undefined."
                       ],
                       [
-                        "removeEnvelope(storage, key, ctx)",
-                        "Awaits storage.remove without changing business memory."
+                        "removeEnvelope(storage, key, ctx, codec?)",
+                        "Removes one archive through the codec-selected channel: text uses storage.remove by default; a binary codec on a binary-capable backend uses removeBytes and throws a BACKEND_CAPABILITY TypeError when it is missing. Business memory is unchanged."
                       ]
                     ]
                   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { createRpcDevtools } from '../../src/index.js'
 import { collectorView } from './fixture.js'
 
 describe('collector bounded interning', () => {

@@ -25,7 +25,8 @@ export const StorePersistErrorCode = {
   codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH',
 
   /**
-   * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them.
+   * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires
+   * `removeBytes`, but the storage backend lacks the required operation.
    *
    * Use a record-capable backend such as memory or IndexedDB, or use a text codec.
    */

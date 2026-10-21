@@ -263,6 +263,7 @@ L0 指所有后端提供的字符串键值通道；L1 指额外提供字节、�
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `getBytes(key, ctx?)`                           | `Promise<Uint8Array \| null>`；缺失为 null。                                                                                                                |
 | `setBytes(key, value, ctx?)`                    | value 为 Uint8Array，ctx 为 IWriteOptions，返回 `Promise<void>`。                                                                                           |
+| `removeBytes(key, ctx?)`                        | 只删除字节通道里的这个键，文本和记录通道不受影响；键不存在时直接成功，所以重复删除是幂等的。L1 必需方法。                                                   |
 | `clearBytes(ctx?)`                              | 清字节通道。                                                                                                                                                |
 | `getRecord(key, ctx?)`                          | `Promise<TValue \| undefined>`；缺失为 undefined。                                                                                                          |
 | `putRecord(value, key?, ctx?)`                  | `Promise<IStorageKey>`；省略 key 由后端生成并返回，ctx 为 IWriteOptions。                                                                                   |

@@ -308,6 +308,18 @@ const recordMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     example: `await records.setBytes('image', new Uint8Array([1, 2]), { conflictPolicy: 'replace' })`
   },
+  removeBytes: {
+    summary: t(
+      'Deletes only this key from the byte channel, leaving text values and records alone. A missing key succeeds without change, so repeated deletion is idempotent; asynchronous backends resolve after the deletion commits.',
+      '只删除字节通道里的这个键，文本值和记录不受影响。键不存在时直接成功、不做修改，所以重复删除是幂等的；异步后端在删除提交后才完成。'
+    ),
+    params: { key: stringKeyParam, ctx: contextParam },
+    returns: t(
+      'A `Promise<void>` settling once the byte entry is gone or was already missing.',
+      '字节条目删除完成或本来就不存在时结算的 `Promise<void>`。'
+    ),
+    example: `await records.removeBytes('image')`
+  },
   clearBytes: {
     summary: t(
       'Clears the backend’s byte channel without selecting the separate record or text channels.',

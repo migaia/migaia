@@ -568,8 +568,8 @@ import {
 
 「某节点属于哪个 `Runtime`」的登记与断言，供在本包之上构建 Store/集合/资源类库的作者使用。
 
-- `claimOwnership(value: object, runtime: IRuntime): void` —— 登记归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一对象重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。
-- `ownerOf(value: unknown): IRuntime | undefined` —— 查归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。
+- `claimOwnership(value: object, runtime: IRuntime): void` —— 登记普通对象或函数对象的归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一引用重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。
+- `ownerOf(value: unknown): IRuntime | undefined` —— 查普通对象或函数对象的归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。
 - `assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：普通未登记值放行，foreign copy 品牌先拒绝（第三方可以把普通值注册进 Registry，不涉及图）；只有**登记过且归属不符**才抛 `CROSS_RUNTIME`。
 - `assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void` —— 内核图边界使用的严格断言：未登记直接抛 `NOT_RUNTIME_OWNED`；登记了但不属于当前 `runtime` 抛 `CROSS_RUNTIME`。
 
@@ -670,10 +670,10 @@ import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 | `callbackFailed` | `CALLBACK_FAILED` | 未分类 action/batch/untracked/tracked derivation callback 失败；native 尽量原位附码，primitive（含 undefined）/不可变 native 原错保留 cause，已有 semantic identity 不变；非 Error 对象 throw 保留控制身份，供 Resource/Suspense owner 单次准入 |
 | `nodeDisposed`         | `NODE_DISPOSED`         | 在已 dispose 的 `Signal`/`Computed`/自定义 Source 上调用读取或写入方法                                                                         |
 | `circularDependency`   | `CIRCULAR_DEPENDENCY`   | 求值 `Computed` 时检测到它（直接或间接）读取了自己正在求值的结果                                                                               |
-| `crossRuntime`         | `CROSS_RUNTIME`         | 一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验                                                            |
+| `crossRuntime`         | `CROSS_RUNTIME`         | 一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验                                                            |
 | `notRuntimeOwned`      | `NOT_RUNTIME_OWNED`     | 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记                                                                                |
-| `ownershipConflict`    | `OWNERSHIP_CONFLICT`    | 同一个节点对象被重复登记到不同的 `Runtime`                                                                                                     |
-| `copyConflict`         | `COPY_CONFLICT`         | 检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一                                                                |
+| `ownershipConflict`    | `OWNERSHIP_CONFLICT`    | 同一个对象或函数引用被重复登记到不同的 `Runtime`                                                                                                     |
+| `copyConflict`         | `COPY_CONFLICT`         | 检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一                                                                |
 | `brandCorrupted`       | `BRAND_CORRUPTED`       | 跨副本诊断品牌被发现处于非预期形状                                                                                                             |
 | `versionExhausted`     | `VERSION_EXHAUSTED`     | 单调版本时钟达到配置上限（默认 `Number.MAX_SAFE_INTEGER`）后再次申请新版本号                                                                   |
 | `flushLoop`            | `FLUSH_LOOP`            | 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）                                                                                          |

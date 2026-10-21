@@ -361,7 +361,9 @@ SSR、Node 或不含 DOM 类型的消费者使用 memory 子路径。浏览器�
 
 L0 方法为 get/set/remove/has/keys/clearValues/clearAll/dispose；get 不存在为 null，set 只接受 string，不隐式转换，remove 不存在幂等。clearValues 只清值通道，clearAll 清该 store 所拥有的全部通道/命名空间，不清别人的空间。同步后端的 sync 提供 get/set/remove/has/keys/clearValues，不提供同步 clearAll/dispose。
 
-L1 增加 getBytes/setBytes/clearBytes、getRecord/putRecord/deleteRecord/clearRecords、iterateRecords 与 transaction；bytes 不存在为 null，record 不存在为 undefined。putRecord(value, key?, ctx?) 省略 key 会生成键并返回实际 IStorageKey。metadata 是可选附加通道，只有 IndexedDB 提供 get/set/delete；memory 和 KV-only 无跨调用迁移检查点。
+L1 增加 getBytes/setBytes/removeBytes/clearBytes、getRecord/putRecord/deleteRecord/clearRecords、iterateRecords 与 transaction；bytes 不存在为 null，record 不存在为 undefined。putRecord(value, key?, ctx?) 省略 key 会生成键并返回实际 IStorageKey。metadata 是可选附加通道，只有 IndexedDB 提供 get/set/delete；memory 和 KV-only 无跨调用迁移检查点。
+
+`removeBytes(key, ctx?)` 只删除字节通道里的这个键，键不存在时成功；IndexedDB 在事务提交后才完成，只有确实删掉了已有字节才发布变更。`remove` 只删值通道，`deleteRecord` 只删记录通道，都不影响其他通道。
 
 IOperationContext 的 signal、timeoutMs、pageSize 均可省略。signal 默认 undefined，timeoutMs 默认 undefined，不主动设期限；timeoutMs 须为非负安全整数，pageSize 须为 1..4096 的整数，IndexedDB 游标实际默认 128。取消/超时先触发者结束等待为契约级 ABORTED；已进入原子提交的写入不伪报回滚。迭代的一个 deadline 覆盖整个生命周期，不是每页重置。同步写 options 只接受 conflictPolicy，不接受非 undefined signal/timeoutMs；Cookie 另有 expires/maxAge。
 

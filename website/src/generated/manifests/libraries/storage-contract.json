@@ -249,6 +249,10 @@
                     "`setBytes(key, value, ctx?)`",
                     "value 为 Uint8Array，ctx 为 IWriteOptions，返回 `Promise<void>`。"
                   ],
+                  [
+                    "`removeBytes(key, ctx?)`",
+                    "只删除字节通道里的这个键，文本和记录通道不受影响；键不存在时直接成功，所以重复删除是幂等的。L1 必需方法。"
+                  ],
                   ["`clearBytes(ctx?)`", "清字节通道。"],
                   [
                     "`getRecord(key, ctx?)`",
@@ -914,6 +918,10 @@
                     "`setBytes(key, value, ctx?)`",
                     "value 为 Uint8Array，ctx 为 IWriteOptions，返回 `Promise<void>`。"
                   ],
+                  [
+                    "`removeBytes(key, ctx?)`",
+                    "只删除字节通道里的这个键，文本和记录通道不受影响；键不存在时直接成功，所以重复删除是幂等的。L1 必需方法。"
+                  ],
                   ["`clearBytes(ctx?)`", "清字节通道。"],
                   [
                     "`getRecord(key, ctx?)`",
@@ -1571,6 +1579,10 @@
                     [
                       "`setBytes(key, value, ctx?)`",
                       "value is Uint8Array, ctx is IWriteOptions; returns `Promise<void>`."
+                    ],
+                    [
+                      "`removeBytes(key, ctx?)`",
+                      "Deletes only this key from the byte channel, leaving text and records alone; a missing key succeeds, so repeated deletion is idempotent. Required L1 method."
                     ],
                     ["`clearBytes(ctx?)`", "Clears the byte channel."],
                     [
@@ -2283,6 +2295,10 @@
                       "`setBytes(key, value, ctx?)`",
                       "value is Uint8Array, ctx is IWriteOptions; returns `Promise<void>`."
                     ],
+                    [
+                      "`removeBytes(key, ctx?)`",
+                      "Deletes only this key from the byte channel, leaving text and records alone; a missing key succeeds, so repeated deletion is idempotent. Required L1 method."
+                    ],
                     ["`clearBytes(ctx?)`", "Clears the byte channel."],
                     [
                       "`getRecord(key, ctx?)`",
@@ -2752,7 +2768,7 @@
           "name": "asRecordStore",
           "kind": "const",
           "signature": "export declare const asRecordStore: <T = unknown>(store: IKeyValueStore) => IRecordStore<T>;",
-          "declarationLine": 177,
+          "declarationLine": 182,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks a supplied L0 store for the full record, binary, transaction and iteration surface. Returns the original object after capability narrowing, and fails explicitly instead of constructing a backend or silently falling back.",
           "core": "store: Existing application-supplied `IKeyValueStore`, obtained from a concrete backend package.\nThe exact store as `IRecordStore<T>`; insufficient shape or capabilities throws `UNSUPPORTED_CAPABILITY`. An original reflection or accessor failure remains reachable through `cause`.",
@@ -4609,7 +4625,7 @@
           "name": "IKeyValueStoreAdmission",
           "kind": "type",
           "signature": "export type IKeyValueStoreAdmission = { /** Discriminates a complete base shape from failed admission. */ readonly valid: true; /** Original provider object, without cloning or proxying its operations. */ readonly store: IKeyValueStore; /** Backend label captured during this inspection. */ readonly backend: IBackendKind; /** Independent descriptor captured once, including normalized legacy capability flags. */ readonly capabilities: IStorageCapabilities; /** Original dispose method; its receiver is supplied separately for lifecycle integration. */ readonly dispose: () => Promise<void>; /** Original object that owns the captured dispose method. */ readonly receiver: object; } | { /** Failed shape admission, without throwing a reflected provider failure. */ readonly valid: false; /** Exact accessor/reflection failure, or undefined for an ordinary shape mismatch. */ readonly cause: unknown; };",
-          "declarationLine": 116,
+          "declarationLine": 121,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Discriminated single-read store admission returned by `snapshotKeyValueStoreDetailed()`, retaining either source facts or the exact failure.",
           "core": "valid: Admission discriminant: true carries the captured store facts, false carries the original observed failure.\nThe inspected base store shape and capabilities were accepted.\nThe candidate shape failed admission without invoking storage operations.\nstore: Exact original backend object supplied to admission; no method facade or store clone is created.\nbackend: Implementation family declared by the backend; use capabilities rather than this label to choose optional operations.\nLocal browser key-value storage whose data normally survives browsing sessions.\nSession-scoped browser key-value storage with the host’s session lifetime.\nCookie storage subject to document visibility, scope and small value limits.\nStructured browser database backend; inspect capability flags before using record extensions.\nIn-process memory implementation whose data lifetime is owned by the concrete backend.\ncapabilities: Backend-supplied `IStorageCapabilities` describing callable channels and their limits; admission snapshots these facts once.\ndispose: Raw dispose function captured from the candidate exactly once; invoke it with the separately retained receiver.\nBackend-owned cleanup promise; the original receiver must remain attached at invocation.\nreceiver: Exact candidate object retained to invoke the captured disposer with its original receiver semantics.\ncause: Exact observed reflection or getter failure for invalid admission, or undefined when rejection was a plain shape mismatch.",
@@ -5603,7 +5619,7 @@
         {
           "name": "IRecordStore",
           "kind": "type",
-          "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
           "declarationLine": 64,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Base store plus independent byte and structured-record channels, bounded iteration and backend-owned transactional callbacks.",
@@ -5656,6 +5672,26 @@
                 {
                   "name": "ctx",
                   "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "removeBytes",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeBytes(key: string, ctx?: IOperationContext): Promise<void>;",
+              "description": "Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed without mutation; asynchronous backends resolve only after the deletion commits.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
                   "optional": true
                 }
               ],
@@ -5825,7 +5861,7 @@
           "aliasOf": "IRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
+            "export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5864,7 +5900,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
           "guidance": [],
           "usageScore": 22,
           "configuration": [],
@@ -6251,7 +6287,7 @@
           "name": "isKeyValueStore",
           "kind": "const",
           "signature": "export declare const isKeyValueStore: (store: unknown) => store is IKeyValueStore;",
-          "declarationLine": 170,
+          "declarationLine": 175,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks an unknown object’s backend name, capability descriptor and every L0 callable method without invoking a storage operation. Accessor failures become an invalid result rather than escaping the predicate.",
           "core": "store: Unknown candidate from application injection or an extension boundary.\nTrue when the inspected shape is a valid `IKeyValueStore`, otherwise false; this is shape admission, not behavioral verification.",
@@ -6316,7 +6352,7 @@
           "name": "isRecordStore",
           "kind": "const",
           "signature": "export declare const isRecordStore: (store: IKeyValueStore) => store is IRecordStore;",
-          "declarationLine": 179,
+          "declarationLine": 184,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks the complete record-store method set and required record, binary, transaction and iteration flags. Missing capability or a throwing accessor returns false without performing storage I/O.",
           "core": "store: Existing `IKeyValueStore` from the caller’s concrete backend.\nA boolean type guard narrowing to `IRecordStore` on success.",
@@ -8052,7 +8088,7 @@
           "name": "snapshotKeyValueStore",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStore: (store: unknown) => { readonly store: IKeyValueStore; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; } | undefined;",
-          "declarationLine": 149,
+          "declarationLine": 154,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Reads the L0 boundary once and returns the original store with captured backend and normalized capabilities. The returned wrapper is ordinary data, while store behavior remains owned by the original object.",
           "core": "store: Unknown candidate supplied by the application’s backend factory or plugin.\n`{ store, backend, capabilities }` on valid admission, otherwise undefined; captured capabilities are a fresh plain snapshot.",
@@ -8117,7 +8153,7 @@
           "name": "snapshotKeyValueStoreDetailed",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStoreDetailed: (store: unknown) => IKeyValueStoreAdmission;",
-          "declarationLine": 143,
+          "declarationLine": 148,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Performs one L0 admission while retaining the exact reflection or accessor failure for its owning boundary. A valid result also captures the raw disposer and its original receiver so later cleanup need not reread mutable accessors.",
           "core": "store: Unknown application-injected store candidate whose public fields are inspected once.\nAn `IKeyValueStoreAdmission`; invalid plain shapes carry undefined cause, while observed reflection or getter failures retain their exact thrown value.",
@@ -8330,7 +8366,7 @@
           "name": "snapshotRecordStore",
           "kind": "const",
           "signature": "export declare const snapshotRecordStore: <T = unknown>(store: unknown) => { readonly store: IRecordStore<T>; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; } | undefined;",
-          "declarationLine": 160,
+          "declarationLine": 165,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Captures the complete L1 shape and required capabilities once, returning the original record store and normalized facts. It neither clones records nor wraps backend methods.",
           "core": "store: Unknown existing store supplied by the caller; the record capability set must be complete.\n`{ store: IRecordStore<T>, backend, capabilities }` or undefined on missing shape, capability or failed access.",

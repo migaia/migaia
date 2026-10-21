@@ -7,7 +7,7 @@ describe('Tray child topology', () => {
     'runtime %i rejects foreign first init before any business or outlet access',
     async (index) => {
       /** This dispatcher owner is the same implementation used by the real native cases below. */
-      const dispatcherUrl = new URL('../../dist/hosts/child/dispatch.js', import.meta.url).href
+      const dispatcherUrl = new URL('../../src/hosts/child/dispatch.ts', import.meta.url).href
       /** Runtime declarations remain genuine branded host values. */
       const api = await fixture()
       /** PluginHost owns Feature activation and the dispatcher registration. */
@@ -38,7 +38,7 @@ describe('Tray child topology', () => {
   it.each([0, 1, 2])(
     'runtime %i connects once, validates init and guards double/foreign init and exposure',
     async (index) => {
-      /** Fixture declarations and parent assembly share the built host brand. */
+      /** Fixture declarations and parent assembly share the source host brand. */
       const api = await fixture()
       /** One host declaration owns exactly one runtime family connection. */
       const definition = api.hosts[index]

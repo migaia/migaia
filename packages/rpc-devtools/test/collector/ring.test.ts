@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { RpcProbeStage } from '@migaia/rpc-core/probe'
-import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '@migaia/rpc-devtools'
+import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 describe('collector ingestion and ring', () => {

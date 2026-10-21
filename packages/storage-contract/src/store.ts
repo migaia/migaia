@@ -84,6 +84,11 @@ export type IRecordStore<TValue = unknown> = IKeyValueStore & {
    * contract.
    */
   setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>
+  /**
+   * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed
+   * without mutation; asynchronous backends resolve only after the deletion commits.
+   */
+  removeBytes(key: string, ctx?: IOperationContext): Promise<void>
   /** Clears the byte channel without clearing string values or records. */
   clearBytes(ctx?: IOperationContext): Promise<void>
   /** Reads a structured record by storage key, resolving to undefined when missing. */
@@ -188,6 +193,7 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
         ...[
           'getBytes',
           'setBytes',
+          'removeBytes',
           'clearBytes',
           'getRecord',
           'putRecord',

@@ -18,8 +18,8 @@ import { ReactiveErrorText } from '../error-text.js'
 const OWNERS = new WeakMap<object, IRuntime>()
 
 /**
- * Registers ownership. Assigning one object to different runtimes is a programming error because it
- * would belong to two graphs.
+ * Registers ownership for object references, including functions. Assigning one reference to
+ * different runtimes is a programming error because it would belong to two graphs.
  */
 export function claimOwnership(value: object, runtime: IRuntime): void {
   const existing = OWNERS.get(value)
@@ -34,14 +34,14 @@ export function claimOwnership(value: object, runtime: IRuntime): void {
 }
 
 /**
- * Returns ownership, or `undefined` for an unregistered value. Callers can distinguish no graph
- * ownership from incorrect ownership.
+ * Returns ownership for objects and functions, or `undefined` for an unregistered value. Callers
+ * can distinguish no graph ownership from incorrect ownership.
  */
 export function ownerOf(value: unknown): IRuntime | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return undefined
   const owner = OWNERS.get(value)
   if (owner) return owner
-  if (typeof value === 'object' && value !== null) assertNoForeignOwnershipBrand(value)
+  assertNoForeignOwnershipBrand(value)
   return undefined
 }
 

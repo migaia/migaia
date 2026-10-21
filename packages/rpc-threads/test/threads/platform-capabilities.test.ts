@@ -1,5 +1,6 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { RpcControl, RpcEnvelopeKind } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { createThreadPeer } from '../../src/threads/peer.js'
@@ -104,6 +105,46 @@ describe('platform capability admission', () => {
       termination: 'unsupported',
       'exit-observation': 'unsupported'
     })
+  })
+  it('uses the default RPC ping health policy when a launcher does not promise exit observation', async () => {
+    /** The supervised Peer and its default health check share the caller's controlled clock. */
+    const scheduler = createManualScheduler()
+    /** The existing fixture still launches a real native Worker and owns its real exit. */
+    const fixture = nativeFixture({ scheduler })
+    /** A caller may declare fewer guarantees than its underlying native implementation provides. */
+    const launcher = {
+      ...fixture.launcher,
+      capabilities: { ...fixture.launcher.capabilities, 'exit-observation': 'unsupported' as const }
+    }
+    /** Standalone source Peers use the same supported default health path documented for Web. */
+    const peer = await createThreadPeer<{ 'p.read'(value: string): string }>({
+      self: { name: 'health-parent', instanceId: 'health-parent' },
+      spawn: {
+        ...fixture.spawn,
+        launcher,
+        supervisor: { ...fixture.spawn.supervisor, isolation: 'best-effort' }
+      },
+      report: (error) => fixture.reported.push(error)
+    })
+    try {
+      expect(await peer.request('p.read', 'before health')).toBe('before health')
+      scheduler.advance(5000)
+      await expect
+        .poll(() =>
+          fixture.frames.some(
+            ({ message }) =>
+              message.kind === RpcEnvelopeKind.variation &&
+              message.data?.route?.variation === RpcControl.ping
+          )
+        )
+        .toBe(true)
+      expect(await peer.request('p.read', 'after health')).toBe('after health')
+      expect(fixture.handles).toHaveLength(1)
+    } finally {
+      await peer.close()
+      await fixture.close()
+    }
+    expect(fixture.budget.inUse).toBe(0)
   })
   it.each([false, true])('real Worker ping health with missing server ping=%s', async (noPing) => {
     const scheduler = createManualScheduler()

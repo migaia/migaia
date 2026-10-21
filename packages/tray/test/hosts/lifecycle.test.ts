@@ -10,7 +10,7 @@ describe('Tray lifecycle management', () => {
        * Existing internal registry owner supplies the real queue and record, without new production
        * instrumentation.
        */
-      const registryUrl = new URL('../../dist/hosts/parent/registry.js', import.meta.url).href
+      const registryUrl = new URL('../../src/hosts/parent/registry.ts', import.meta.url).href
       /** The spy observes the original factory result and never substitutes its behavior. */
       const registryOwner = await import(registryUrl)
       /** Genuine canonical registry object is captured only for the required queue-race oracle. */
@@ -522,7 +522,7 @@ describe('Tray lifecycle management', () => {
 
   it('drops a deferred old exit snapshot after a newer process replace commits', async () => {
     /** Tray's existing accessor reads the actual RPC outlet without creating another facade owner. */
-    const runtimeUrl = new URL('../../dist/hosts/runtime.js', import.meta.url).href
+    const runtimeUrl = new URL('../../src/hosts/runtime.ts', import.meta.url).href
     /** This exact package module is also consumed by the parent registry. */
     const owner = await import(runtimeUrl)
     /** Original accessor remains the sole runtime-family selector. */

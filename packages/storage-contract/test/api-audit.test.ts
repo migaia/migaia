@@ -33,6 +33,7 @@ const makeStore = (): contract.IRecordStore => ({
     return null
   },
   async setBytes() {},
+  async removeBytes() {},
   async clearBytes() {},
   async getRecord() {
     return undefined
@@ -57,6 +58,44 @@ const makeStore = (): contract.IRecordStore => ({
 })
 
 describe('storage-contract audit boundary regressions', () => {
+  it('requires per-key byte deletion only when admitting the complete record surface', () => {
+    /** A base text store remains valid when its optional L1 surface is incomplete. */
+    const store = makeStore()
+    Object.defineProperty(store, 'removeBytes', { value: undefined })
+    expect(contract.isKeyValueStore(store)).toBe(true)
+    expect(contract.isRecordStore(store)).toBe(false)
+    expect(contract.snapshotRecordStore(store)).toBeUndefined()
+    expect(() => contract.asRecordStore(store)).toThrowError(
+      expect.objectContaining({
+        source: contract.STORAGE_CONTRACT_SOURCE,
+        code: contract.StorageContractErrorCode.unsupported
+      })
+    )
+  })
+
+  it('reads a byte-deletion getter once and retains its original admission failure', () => {
+    /** Admission may inspect a JavaScript accessor but must not read it twice. */
+    const store = makeStore()
+    /** The original accessor failure remains reachable from the public unsupported error. */
+    const cause = new Error('byte deletion getter failed')
+    /** Re-reading would expose a different caller-controlled descriptor state. */
+    let reads = 0
+    Object.defineProperty(store, 'removeBytes', {
+      get() {
+        reads++
+        throw cause
+      }
+    })
+    expect(() => contract.asRecordStore(store)).toThrowError(
+      expect.objectContaining({
+        source: contract.STORAGE_CONTRACT_SOURCE,
+        code: contract.StorageContractErrorCode.unsupported,
+        cause
+      })
+    )
+    expect(reads).toBe(1)
+  })
+
   it('keeps revoked proxies within nonthrowing admission results', () => {
     /** Revocation makes Array.isArray throw before any property getter runs. */
     const revoked = Proxy.revocable({}, {})

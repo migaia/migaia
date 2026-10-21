@@ -232,7 +232,7 @@ defaultJsonCodec.encode 失败抛 ENCODE_FAILED TypeError，原因为 cause；de
 
 ### 存储投影与 codec 选路
 
-IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes 来自 IRecordStore，不是 IKeyValueStore 本身。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。
+IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes / removeBytes 来自 IRecordStore，不是 IKeyValueStore 本身。binary codec 的 clear() 用 removeBytes 只删除这个 byte key，不清空其他 byte key 或 text/record 通道；声明 binary 却缺少 removeBytes 时，clear 以 BACKEND_CAPABILITY 的 TypeError 拒绝，不回落到 text 删除。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。
 
 | 工具                                           | 选路与失败                                                                                                                                                                                  |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -240,7 +240,7 @@ IPersistStorage 是内部最小类型投影，不作为包入口具名导出：c
 | binary 写入                                    | capabilities.binary 为真时要求两个字节方法，缺失为 BACKEND_CAPABILITY；编码值必须是 Uint8Array，否则 CODEC_OUTPUT_MISMATCH。                                                                |
 | 其余写入分支                                   | 编码值必须为 string，交 storage.set；不自动 base64 降级。                                                                                                                                   |
 | readEnvelope(storage, key, codec, ctx)         | binary 且 capabilities.binary 为真时走 getBytes，再 codec.decode；缺方法为 BACKEND_CAPABILITY，binary 能力为假则 CODEC_OUTPUT_MISMATCH。非 binary 走 get + decode。不存在时返回 undefined。 |
-| removeEnvelope(storage, key, ctx)              | await storage.remove，不改变内存状态。                                                                                                                                                      |
+| removeEnvelope(storage, key, ctx, codec?)      | 按 codec 选择通道删除单个存档：默认 text 走 storage.remove；binary codec 且后端声明 binary 时走 removeBytes，缺少时抛 BACKEND_CAPABILITY 的 TypeError。不改变内存状态。                     |
 
 二进制写入按真实 Uint8Array brand 判断，支持其他 realm 的 intrinsic / 子类，不接受只是包装了 Uint8Array 的 Proxy 冒充。仅有 text 后端却配置 binary 时应选合适后端或 text codec；不要认为有某个方法或一个 output 字符串就建立全部后端能力。
 

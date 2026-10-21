@@ -79,8 +79,9 @@ export type IPersistHandle = {
    */
   flush(): Promise<void>
   /**
-   * Cancels debounce and queues archive removal after initial hydration and earlier writes. Does
-   * not reset memory or disable future writes; hydration/removal failures reject.
+   * Cancels debounce and queues removal of the codec's archive channel after initial hydration and
+   * earlier writes. Does not reset live state or disable future writes; hydration/removal failures
+   * reject, and disposal rejects with `AbortError`.
    */
   clear(): Promise<void>
   /** Terminal marker set synchronously by dispose, including while adapter work is still pending. */
@@ -155,8 +156,10 @@ export type IPersistStorage = Pick<
   readonly getBytes?: IRecordStore['getBytes']
   /** Optional byte write paired with getBytes; text-only storage need not implement either method. */
   readonly setBytes?: IRecordStore['setBytes']
+  /** Binary archive clearing uses the canonical per-key byte deletion operation. */
+  readonly removeBytes?: IRecordStore['removeBytes']
 }
 
-/** Provides byte storage capabilities after the binary branch applies its internal guard. */
+/** Provides byte read/write capabilities after the binary branch applies its internal guard. */
 export type IPersistByteStorage = IPersistStorage &
   Required<Pick<IPersistStorage, 'getBytes' | 'setBytes'>>
