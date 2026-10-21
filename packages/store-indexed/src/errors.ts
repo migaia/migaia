@@ -3,14 +3,17 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreIndexedErrorCode, type IStoreIndexedErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/** Source attached to package-owned failures; already identified callback failures keep their owner. */
 export const STORE_INDEXED_SOURCE = '@migaia/store-indexed'
 
 function tagStoreIndexedError<E extends Error>(error: E, code: IStoreIndexedErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_INDEXED_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Create an Error for an extension boundary with the supplied code/message and package source. An
+ * own cause option is retained even when undefined; the new error keeps its constructor stack.
+ */
 export function createStoreIndexedError(
   code: IStoreIndexedErrorCode,
   message: string,
@@ -23,7 +26,10 @@ export function createStoreIndexedError(
   return tagStoreIndexedError(error, code)
 }
 
-/** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
+/**
+ * Create a RangeError with the supplied code/message and package source, preserving its native
+ * type.
+ */
 export function createStoreIndexedRangeError(
   code: IStoreIndexedErrorCode,
   message: string
@@ -31,7 +37,10 @@ export function createStoreIndexedRangeError(
   return tagStoreIndexedError(new RangeError(message), code)
 }
 
-/** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
+/**
+ * Create a TypeError with the supplied code/message and package source, preserving its native type.
+ * A defined cause is retained by reference; an omitted or undefined cause option is not installed.
+ */
 export function createStoreIndexedTypeError(
   code: IStoreIndexedErrorCode,
   message: string,

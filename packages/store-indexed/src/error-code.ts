@@ -1,8 +1,7 @@
 /**
- * Owns the error-code declarations for `@migaia/store-indexed`. Under
- * `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is
- * always `'@migaia/store-indexed'`. Throw sites reference these constants instead of inline
- * literals. Code values are public API. Renaming a code is a breaking change.
+ * Public failure classifications for collection admission, use and synchronous callbacks. Pair each
+ * code with source `@migaia/store-indexed`; callback errors already owned by another package retain
+ * that package's identity. Code values are public API.
  */
 export const StoreIndexedErrorCode = {
   /**
@@ -43,5 +42,6 @@ export const StoreIndexedErrorCode = {
   crossRuntime: 'CROSS_RUNTIME'
 } as const
 
+/** Public union of package-owned failure code values, for inspecting or constructing errors. */
 export type IStoreIndexedErrorCode =
   (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]
