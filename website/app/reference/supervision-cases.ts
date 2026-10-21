@@ -1,4 +1,4 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -682,5 +682,656 @@ budget.close()`
         '输出 `空闲进程: 1`，然后是 `start(): ready | 剩余空闲进程: 0`。\n\n监督器直接取用了预热好的进程，没有现起新进程。'
       )
     }
+  ]
+}
+
+/** Complete cooperative task shared by the common policy examples. */
+const cooperativeOptions = (
+  settings: string,
+  before = '',
+  after = ''
+): string => `import { createUnitBudget } from '@migaia/supervision'
+import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+${before}
+const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+const supervisor = createCoroutineSupervisor<{ ping(): string }>({
+  id: 'formatter', budget,
+  spec: { task: ({ signal, expose }) => new Promise<void>((resolve) => {
+    expose({ ping: () => 'pong' })
+    signal.addEventListener('abort', () => resolve(), { once: true })
+  }) },
+  ${settings}
+})
+${
+  after ||
+  `console.log((await supervisor.start()).state)
+await supervisor.dispose()
+console.log(budget.inUse)`
+}
+budget.close()`
+
+/** Shared fields use the same policy in the core and all profile constructors. */
+export const supervisionOptionExamples = {
+  ready: cooperativeOptions(`report: console.error,
+  ready: async (handle, signal) => {
+    if (signal.aborted) throw signal.reason
+    const service = await handle.exposed
+    if (service.ping() !== 'pong') throw new Error('handshake failed')
+  },
+  startupTimeoutMs: 1000,
+  scheduler: systemScheduler`),
+  stop: cooperativeOptions(
+    `report: (error) => { errors.push(error) },
+  stop: {
+    beforeTerminate: async (handle, signal, remainingMs) => {
+      if (signal.aborted) throw signal.reason
+      console.log((await handle.exposed).ping(), remainingMs() > 0)
+      throw drainFailure
+    },
+    drainTimeoutMs: 100, exitTimeoutMs: 100, reapTimeoutMs: 100
+  }`,
+    `const errors: unknown[] = []
+const drainFailure = new Error('flush failed')`,
+    `await supervisor.start()
+await supervisor.stop()
+console.log(errors.includes(drainFailure), budget.inUse)
+await supervisor.dispose()`
+  ),
+  restart: `import { createUnitBudget } from '@migaia/supervision'
+import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+let launches = 0
+const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+const supervisor = createCoroutineSupervisor<{ version: number }>({
+  id: 'retry-formatter', budget, report: console.error,
+  spec: { task: async ({ expose, signal }) => {
+    if (++launches === 1) throw new Error('dependency warming up')
+    expose({ version: launches })
+    await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
+  } },
+  ready: (handle) => handle.exposed.then(() => undefined),
+  restart: { mode: 'on-failure', initialDelayMs: 5, factor: 2, maxDelayMs: 20, maxRestarts: 2, windowMs: 1000 }
+})
+console.log((await supervisor.start()).state, launches)
+await supervisor.dispose()
+budget.close()`,
+  terminal: `import { createUnitBudget } from '@migaia/supervision'
+import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+for (const mode of ['stay', 'cooldown'] as const) {
+  let launches = 0
+  const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+  const supervisor = createCoroutineSupervisor<{ ok: boolean }>({
+    id: mode, budget, report: () => {},
+    spec: { task: async ({ expose, signal }) => {
+      if (++launches === 1) throw new Error('dependency unavailable')
+      expose({ ok: true })
+      await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
+    } },
+    ready: (handle) => handle.exposed.then(() => undefined),
+    restart: { maxRestarts: 0 },
+    terminalPolicy: mode === 'stay' ? { mode: 'stay' } : { mode: 'cooldown', afterMs: 10 }
+  })
+  console.log(mode, (await supervisor.start()).state)
+  if (mode === 'cooldown') {
+    for (let attempt = 0; supervisor.state !== 'ready' && attempt < 100; attempt++)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    console.log(supervisor.state, launches)
+  }
+  await supervisor.dispose()
+  budget.close()
+}`,
+  health: cooperativeOptions(
+    `report: () => {}, restart: { mode: 'never' },
+  health: {
+    check: async (handle, signal) => {
+      if (signal.aborted) throw signal.reason
+      await handle.exposed
+      checks += 1
+      throw new Error('service stopped responding')
+    },
+    intervalMs: 5, timeoutMs: 20, failureThreshold: 2
+  }`,
+    'let checks = 0',
+    `const failed = new Promise<string>((resolve) => supervisor.subscribe((event) => {
+  if (event.type === 'exit') resolve(event.reason)
+}))
+await supervisor.start()
+console.log(await failed, checks)
+await supervisor.dispose()
+console.log(budget.inUse)`
+  ),
+  isolation: cooperativeOptions(
+    `report: () => {}, requires: ['fault-isolation'], isolation: 'best-effort'`,
+    '',
+    `await supervisor.start()
+console.log(supervisor.inspect().degraded.includes('fault-isolation'))
+await supervisor.dispose()`
+  ),
+  heartbeat: cooperativeOptions(
+    `report: () => {}, restart: { mode: 'never' },
+  heartbeat: { timeoutMs: 10, intervalMs: 5, failureThreshold: 2 }`,
+    '',
+    `const failed = new Promise<string>((resolve) => supervisor.subscribe((event) => {
+  if (event.type === 'exit') resolve(event.reason)
+}))
+await supervisor.start()
+console.log(await failed)
+await supervisor.dispose()
+console.log(budget.inUse)`
+  ),
+  budgetQueue: `import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+const parent = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+const budget = createUnitBudget({
+  kind: 'coroutine', maxUnits: 1, parent, overflow: 'queue',
+  queueTimeoutMs: 10, launchRate: false, scheduler: systemScheduler
+})
+const first = await budget.acquire()
+const waiting = await budget.acquire()
+console.log(waiting.kind === 'rejected' && waiting.reason, budget.inUse, parent.inUse)
+if (first.kind === 'granted') first.lease.release()
+console.log(budget.inUse, parent.inUse)
+budget.close()
+parent.close()`,
+  budgetRate: `import { createUnitBudget } from '@migaia/supervision'
+
+for (const launchRate of [false, { max: 1, windowMs: 1000 }] as const) {
+  const budget = createUnitBudget({ kind: 'process', maxUnits: 1, overflow: 'reject', launchRate })
+  const first = budget.tryAcquire()
+  const full = budget.tryAcquire()
+  if (first.kind === 'granted') first.lease.release()
+  const next = budget.tryAcquire()
+  console.log(full.kind === 'rejected' && full.reason,
+    next.kind === 'granted' ? 'granted' : next.reason)
+  if (next.kind === 'granted') next.lease.release()
+  budget.close()
+}`,
+  custom: `import { createSupervisor, createUnitBudget, type IUnitHandle, type IUnitProfile, type IUnitLauncher } from '@migaia/supervision'
+
+type Handle = IUnitHandle<{ ok: boolean }> & { stop(): void }
+const launcher: IUnitLauncher<{ label: string }, Handle> = {
+  capabilities: { termination: 'cooperative' },
+  async launch(spec) {
+    let stop!: () => void
+    const exited = new Promise<{ ok: boolean }>((resolve) => { stop = () => resolve({ ok: true }) })
+    return { identity: { fingerprint: spec.label }, exited, stop }
+  }
+}
+const profile: IUnitProfile<{ label: string }, Handle, { ok: boolean }> = {
+  kind: 'in-process', gracefulTermination: false,
+  requirements: () => ['termination'],
+  validateSpec(spec) { if (!spec.label) throw new TypeError('label required') },
+  terminate: (handle) => handle.stop(),
+  classifyExit: (status) => ({ reason: status.ok ? 'exited' : 'crashed' })
+}
+const budget = createUnitBudget({ kind: 'in-process', maxUnits: 1 })
+let attached = 0
+const supervisor = createSupervisor({
+  id: 'custom-service', launcher, profile, spec: { label: 'formatter-v1' }, budget,
+  report: () => {}, isolation: 'best-effort',
+  hooks: {
+    afterLaunch: async () => { attached += 1 },
+    inspectUnit: (handle) => ({ fingerprint: handle.identity.fingerprint })
+  }
+})
+console.log((await supervisor.start()).state, attached)
+await supervisor.dispose()
+console.log(budget.inUse)
+budget.close()`,
+  processOutput: `import { createUnitBudget } from '@migaia/supervision'
+import { createProcessSupervisor, type IProcessLauncher, type IProcessSpec } from '@migaia/supervision/process'
+
+declare const launcher: IProcessLauncher
+const spec: IProcessSpec = {
+  command: process.execPath, args: ['-e', 'process.stdout.write("abcdef"); setInterval(() => {}, 1000)'],
+  env: { inherit: [], set: {} }, stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }
+}
+let observe!: () => void
+const outputSeen = new Promise<void>((resolve) => { observe = resolve })
+const chunks: Uint8Array[] = []
+const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
+const supervisor = createProcessSupervisor({
+  id: 'renderer', launcher, spec, budget, report: console.error,
+  output: { tailBytes: 3, onChunk: (stream, bytes) => {
+    if (stream === 'stdout') { chunks.push(bytes); observe() }
+  } }
+})
+await supervisor.start()
+await outputSeen
+console.log(new TextDecoder().decode(supervisor.inspect().unit?.stdoutTail as Uint8Array), chunks.length > 0)
+await supervisor.dispose()
+console.log(budget.inUse)
+budget.close()`,
+  processUsage: `import { createUnitBudget } from '@migaia/supervision'
+import { createProcessSupervisor, type IProcessLauncher, type IProcessSpec } from '@migaia/supervision/process'
+
+declare const launcher: IProcessLauncher
+const spec: IProcessSpec = {
+  command: process.execPath, args: ['-e', 'setInterval(() => {}, 1000)'],
+  env: { inherit: [], set: {} }, stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' },
+  limits: { memoryBytes: 1 }
+}
+const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
+const supervisor = createProcessSupervisor({
+  id: 'memory-monitor', launcher, spec, budget, report: () => {},
+  restart: { mode: 'never' }, usage: { intervalMs: 10, failureThreshold: 2 }
+})
+const failed = new Promise<string>((resolve) => supervisor.subscribe((event) => {
+  if (event.type === 'exit') resolve(event.reason)
+}))
+await supervisor.start()
+console.log(await failed)
+await supervisor.dispose()
+console.log(budget.inUse)
+budget.close()`,
+  prewarm: `import { createUnitBudget } from '@migaia/supervision'
+import { createPrewarmPool, createProcessSupervisor, type IProcessLauncher, type IProcessRecord, type IProcessRegistry, type IProcessSpec } from '@migaia/supervision/process'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+declare const launcher: IProcessLauncher
+const spec: IProcessSpec = {
+  command: process.execPath, args: ['-e', 'setInterval(() => {}, 1000)'],
+  env: { inherit: [], set: {} }, stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' },
+  limits: { memoryBytes: 1024 * 1024 * 1024 }
+}
+const records = new Map<string, IProcessRecord>()
+const port: IProcessRegistry = {
+  async add(record) { records.set(record.id, record) },
+  async remove(id) { records.delete(id) },
+  async list(namespace) { return [...records.values()].filter((record) => record.namespace === namespace) }
+}
+const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
+const options = {
+  id: 'renderer', launcher, spec, budget, report: console.error,
+  isolation: 'required' as const, requires: ['termination'],
+  registry: { port, namespace: 'preview' }, wallClock: { timestamp: () => 1234 },
+  usage: { intervalMs: 10, failureThreshold: 2 }, startupTimeoutMs: 1000, scheduler: systemScheduler
+}
+const pool = createPrewarmPool({ ...options, size: 1, idleTimeoutMs: 1000, exitTimeoutMs: 100, reapTimeoutMs: 100 })
+for (let attempt = 0; pool.idle === 0 && attempt < 100; attempt++)
+  await new Promise((resolve) => setTimeout(resolve, 5))
+console.log(pool.idle, records.size, [...records.values()][0]?.launchedAt)
+const supervisor = createProcessSupervisor({ ...options, prewarm: pool })
+console.log((await supervisor.start()).state, records.size, budget.inUse)
+await supervisor.dispose()
+await pool.dispose()
+console.log(records.size, budget.inUse)
+budget.close()`,
+  prewarmDisabled: `import { createUnitBudget } from '@migaia/supervision'
+import { createPrewarmPool, type IProcessLauncher, type IProcessSpec } from '@migaia/supervision/process'
+
+declare const launcher: IProcessLauncher
+const spec: IProcessSpec = {
+  command: process.execPath, args: [], env: { inherit: [], set: {} },
+  stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }
+}
+const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
+const pool = createPrewarmPool({ id: 'disabled', launcher, spec, budget, size: 0, report: console.error })
+console.log(pool.idle, budget.inUse)
+await pool.dispose()
+budget.close()`,
+  thread: `import { createUnitBudget } from '@migaia/supervision'
+import { createThreadSupervisor, type IThreadLauncher } from '@migaia/supervision/threads'
+
+declare const launcher: IThreadLauncher
+const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
+const supervisor = createThreadSupervisor({
+  id: 'image-worker', launcher, spec: { entry: './worker.ts', data: { quality: 80 } }, budget,
+  report: console.error, requires: ['termination'], isolation: 'required'
+})
+console.log((await supervisor.start()).state, budget.inUse)
+await supervisor.dispose()
+console.log(budget.inUse)
+budget.close()`,
+  threadHealth: `import { createUnitBudget } from '@migaia/supervision'
+import { createThreadSupervisor, type IThreadLauncher, type IThreadHandle } from '@migaia/supervision/threads'
+
+type WorkerHandle = IThreadHandle & { ping(): Promise<string> }
+declare const launcher: IThreadLauncher<WorkerHandle>
+const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
+let checks = 0
+const supervisor = createThreadSupervisor({
+  id: 'worker-handshake', launcher, spec: { entry: './worker.ts' }, budget, report: console.error,
+  ready: async (handle) => { if (await handle.ping() !== 'pong') throw new Error('worker not ready') },
+  startupTimeoutMs: 1000,
+  health: { check: async (handle) => {
+    if (await handle.ping() !== 'pong') throw new Error('worker unavailable')
+    checks += 1
+  }, intervalMs: 5, timeoutMs: 100, failureThreshold: 2 }
+})
+await supervisor.start()
+for (let attempt = 0; checks === 0 && attempt < 100; attempt++)
+  await new Promise((resolve) => setTimeout(resolve, 5))
+console.log(supervisor.state, checks > 0)
+await supervisor.dispose()
+budget.close()`,
+  guard: `import { createParentLossGuard } from '@migaia/supervision/process'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+let cleaned = 0
+let finish!: (code: number) => void
+const completed = new Promise<number>((resolve) => { finish = resolve })
+const guard = createParentLossGuard({
+  shutdown: async (signal) => { if (!signal.aborted) cleaned += 1 },
+  exit: (code) => { finish(code) }, report: console.error,
+  graceMs: 100, scheduler: systemScheduler
+})
+guard.trigger(new Error('parent disconnected'))
+guard.trigger()
+console.log(await completed, cleaned, guard.triggered)`,
+  guardFailure: `import { createParentLossGuard } from '@migaia/supervision/process'
+
+const failure = new Error('shutdown failed')
+const errors: unknown[] = []
+let finish!: (code: number) => void
+const completed = new Promise<number>((resolve) => { finish = resolve })
+const guard = createParentLossGuard({
+  shutdown: async () => { throw failure },
+  exit: (code) => { finish(code) }, report: (error) => { errors.push(error) }
+})
+guard.trigger()
+console.log(await completed, errors[0] === failure)`,
+  reclaim: `import { reclaimOrphanProcesses, type IProcessLauncher, type IProcessRegistry } from '@migaia/supervision/process'
+
+declare const launcher: IProcessLauncher
+declare const registry: IProcessRegistry
+const result = await reclaimOrphanProcesses({ registry, namespace: 'previous-run', launcher, report: console.error })
+console.log(result.terminated.length, result.removed.length, result.failures.length)`,
+  reclaimFailure: `import { reclaimOrphanProcesses, type IProcessLauncher, type IProcessRegistry } from '@migaia/supervision/process'
+
+declare const launcher: IProcessLauncher
+const cause = new Error('registry unavailable')
+const errors: unknown[] = []
+const registry: IProcessRegistry = {
+  async add() {}, async remove() { throw new Error('must not remove') },
+  async list() { throw cause }
+}
+const result = await reclaimOrphanProcesses({
+  registry, namespace: 'previous-run', launcher, report: (error) => { errors.push(error) }
+})
+console.log(result.terminated.length, result.removed.length, result.failures.length, errors.length)`
+}
+
+/** Each case explains one observable configuration choice. */
+const optionCase = (
+  title: IText,
+  problem: IText,
+  example: string,
+  result: IText,
+  covers: readonly string[]
+): IOptionCaseDoc => ({ title, problem, example, result, covers })
+const commonOptionCases: readonly IOptionCaseDoc[] = [
+  optionCase(
+    t('Wait for a usable service', '等到服务真正可用'),
+    t(
+      'The task publishes a service port. Launch completion alone does not check that port. The ready callback waits for exposure and checks ping; startupTimeoutMs bounds the whole attempt. The same readiness policy applies to native handles supplied by an application launcher.',
+      '任务会发布服务端口，但仅启动完成并不保证端口可用。ready 等待端口发布并检查 ping，startupTimeoutMs 限制整轮启动时间。应用启动器提供的原生句柄也使用相同的就绪策略。'
+    ),
+    supervisionOptionExamples.ready,
+    t('Prints ready, then 0 after disposal.', '输出 ready，释放后输出 0。'),
+    ['id', 'budget', 'spec', 'report', 'ready', 'startupTimeoutMs', 'scheduler']
+  ),
+  optionCase(
+    t('Drain before retiring a unit', '先排空再退役单元'),
+    t(
+      'A service must flush pending work before cancellation. Without beforeTerminate the application drain step is skipped. Here the flush fails: report receives that error and termination still releases the lease. Each stop phase has its own limit.',
+      '服务取消前需要写完待处理工作。不配置 beforeTerminate 就会跳过应用排空。本例写入失败，report 收到错误，终止仍继续并归还租约。停止过程的每个阶段都有独立时限。'
+    ),
+    supervisionOptionExamples.stop,
+    t(
+      'Prints pong true, then true 0: the drain error was reported and capacity was released.',
+      '输出 pong true，然后 true 0：排空错误已上报，容量已释放。'
+    ),
+    [
+      'report',
+      'stop',
+      'stop.beforeTerminate',
+      'stop.drainTimeoutMs',
+      'stop.exitTimeoutMs',
+      'stop.reapTimeoutMs'
+    ]
+  )
+]
+
+/** Small independent sets keep platform-specific fields beside their actual host boundary. */
+export const supervisionOptionCases = {
+  common: commonOptionCases,
+  budget: [
+    optionCase(
+      t('Share a parent capacity limit', '共用父级容量上限'),
+      t(
+        'A queue consumer needs both a local slot and a global slot. Without parent each child budget admits independently. The queued second request has a short deadline so overload returns data instead of waiting indefinitely.',
+        '队列消费者既需要本地名额，也需要全局名额。不配置 parent 时，各子预算独立准入。第二个排队请求设置较短时限，让过载以返回值结束等待。'
+      ),
+      supervisionOptionExamples.budgetQueue,
+      t(
+        'Prints queue-timeout 1 1, then 0 0 after releasing the first lease.',
+        '输出 queue-timeout 1 1，释放首个租约后输出 0 0。'
+      ),
+      ['kind', 'maxUnits', 'parent', 'overflow', 'queueTimeoutMs', 'launchRate', 'scheduler']
+    ),
+    optionCase(
+      t('Separate concurrency from launch rate', '分别限制并发与启动速率'),
+      t(
+        'Fast jobs release their slots quickly but can still restart too often. A rate window counts successful grants even after release. Setting launchRate to false removes that rate window while overflow reject still refuses a full slot.',
+        '短任务很快归还名额，却仍可能频繁启动。速率窗口会统计已归还租约的成功授予。launchRate 设为 false 会关闭速率窗口，overflow 为 reject 时容量满仍立即拒绝。'
+      ),
+      supervisionOptionExamples.budgetRate,
+      t(
+        'Prints full granted for false, then full rate-limited for the one-grant window.',
+        'false 输出 full granted，单次授予窗口输出 full rate-limited。'
+      ),
+      ['kind', 'maxUnits', 'overflow', 'launchRate', 'launchRate.max', 'launchRate.windowMs']
+    )
+  ],
+  core: [
+    ...commonOptionCases,
+    optionCase(
+      t('Supply an application execution profile', '提供应用自己的执行策略'),
+      t(
+        'A custom in-process service already owns an exit Promise and a stop operation. Supply a profile to connect those operations to supervision. Hooks attach diagnostics after launch. Cooperative termination needs explicit best-effort admission.',
+        '自定义进程内服务已经提供退出承诺与停止操作。profile 将这些操作接入监督器，hooks 在启动后附加诊断信息。协作终止需要显式接受尽力准入。'
+      ),
+      supervisionOptionExamples.custom,
+      t(
+        'Prints ready 1, then 0. The hook ran once and disposal released the slot.',
+        '输出 ready 1，然后 0。钩子运行一次，释放归还名额。'
+      ),
+      ['launcher', 'profile', 'hooks', 'spec', 'budget', 'id', 'report', 'isolation']
+    )
+  ],
+  coroutine: [
+    ...commonOptionCases,
+    optionCase(
+      t('Detect missing progress', '发现任务不再推进'),
+      t(
+        'A task can stay pending without making progress. heartbeat observes the age of the last progress signal; without it no heartbeat watchdog runs. This task never refreshes its heartbeat and is stopped after two stale observations. Do not combine heartbeat with health.',
+        '任务可能一直待定却不再推进。heartbeat 检查上次进度信号距今多久，不配置时没有心跳看门狗。本任务不更新心跳，连续两次观察到过期后停止。heartbeat 与 health 不能同时配置。'
+      ),
+      supervisionOptionExamples.heartbeat,
+      t('Prints unhealthy, then 0 after disposal.', '输出 unhealthy，释放后输出 0。'),
+      ['heartbeat', 'heartbeat.timeoutMs', 'heartbeat.intervalMs', 'heartbeat.failureThreshold']
+    )
+  ],
+  process: [
+    ...commonOptionCases,
+    optionCase(
+      t('Keep a small diagnostic output tail', '保留少量诊断输出'),
+      t(
+        'Supply an application launcher that drains real child stdout/stderr from startup. The child writes abcdef. Without output settings the tail limit is 65536 bytes and no observer runs; here each stream keeps only three bytes while onChunk observes the full drained chunk.',
+        '应用启动器从启动时就排空真实子进程的标准输出与错误输出，子进程写出 abcdef。默认每条流保留 65536 字节且没有观察回调。本例每条流只留三个字节，onChunk 仍观察完整排空字节块。'
+      ),
+      supervisionOptionExamples.processOutput,
+      t(
+        'With that launcher, prints def true, then 0 after disposal.',
+        '接入该启动器后输出 def true，释放后输出 0。'
+      ),
+      ['launcher', 'spec', 'budget', 'output', 'output.tailBytes', 'output.onChunk']
+    ),
+    optionCase(
+      t('Enforce a monitored memory limit', '通过采样执行内存限制'),
+      t(
+        'The application launcher declares memory-limit as monitored and supplies real child RSS samples. A one-byte limit is deliberately below the child usage. A successful over-limit sample stops the process immediately; failureThreshold counts rejected samples instead. Omitting usage uses a 1000 ms interval and three rejected samples.',
+        '应用启动器将 memory-limit 声明为 monitored，并提供真实子进程常驻内存样本。一字节限制刻意小于子进程用量。成功越限样本会立即停止进程，failureThreshold 统计的是采样拒绝。省略 usage 时每隔 1000 毫秒采样，连续三次拒绝才失效。'
+      ),
+      supervisionOptionExamples.processUsage,
+      t(
+        'Prints resource-violation, then 0 after disposal.',
+        '输出 resource-violation，释放后输出 0。'
+      ),
+      ['usage', 'usage.intervalMs', 'usage.failureThreshold']
+    ),
+    optionCase(
+      t('Adopt a warm process and its ownership record', '接管预热进程与所有权记录'),
+      t(
+        'A preview renderer should reuse a process before the request arrives. The pool and supervisor share the exact launcher, spec and budget objects. Matching id, registry port and namespace preserve one record during transfer. This small registry is in memory for demonstration; use durable application storage for recovery across parent runs. Without prewarm every launch is cold.',
+        '预览渲染器需要在请求到来前准备进程。池与监督器共用同一启动器、规格和预算对象。id、注册端口和命名空间一致时，接管期间只保留一条记录。演示注册表保存在内存中，跨父进程恢复应换成应用持久存储。不配置 prewarm 时每次都冷启动。'
+      ),
+      supervisionOptionExamples.prewarm,
+      t(
+        'Prints 1 1 1234, ready 1 1, then 0 0. Adoption keeps the same occupied slot and record.',
+        '输出 1 1 1234、ready 1 1，最后 0 0。接管保留同一占用名额和记录。'
+      ),
+      ['prewarm', 'registry', 'registry.port', 'registry.namespace', 'wallClock']
+    )
+  ],
+  prewarm: [
+    optionCase(
+      t('Prepare one idle renderer', '准备一个空闲渲染进程'),
+      t(
+        'The launcher supplies termination, fault isolation and monitored memory samples. Shared budget capacity counts idle processes too. Startup, idle retention and teardown limits bound different phases; scheduler controls deadlines while wallClock timestamps records. A size of one reserves one warm process for later adoption.',
+        '启动器提供终止、故障隔离与内存监测。空闲进程同样占用共享预算。启动、空闲保留和拆卸时限分别限制不同阶段，scheduler 控制截止时间，wallClock 给记录写入时间戳。size 为一时预留一个进程供后续接管。'
+      ),
+      supervisionOptionExamples.prewarm,
+      t(
+        'Prints 1 1 1234, ready 1 1, then 0 0 after both owners close.',
+        '输出 1 1 1234、ready 1 1，两方关闭后输出 0 0。'
+      ),
+      [
+        'id',
+        'launcher',
+        'spec',
+        'budget',
+        'size',
+        'report',
+        'isolation',
+        'requires',
+        'registry',
+        'registry.port',
+        'registry.namespace',
+        'usage',
+        'usage.intervalMs',
+        'usage.failureThreshold',
+        'startupTimeoutMs',
+        'idleTimeoutMs',
+        'exitTimeoutMs',
+        'reapTimeoutMs',
+        'scheduler',
+        'wallClock'
+      ]
+    ),
+    optionCase(
+      t('Disable idle capacity for a small deployment', '小规模部署关闭空闲容量'),
+      t(
+        'Keeping a pool object can simplify application wiring, but a low-traffic deployment may need no idle child. Set size to zero to launch none. Omitting size is invalid; it is a required target, not an enable flag.',
+        '应用可以保留池对象来简化接线，但低流量部署可能不需要空闲子进程。size 设为零不会启动进程。size 是必填目标数量，不能省略，也不是布尔开关。'
+      ),
+      supervisionOptionExamples.prewarmDisabled,
+      t('Prints 0 0; no idle process holds a lease.', '输出 0 0，没有空闲进程占用租约。'),
+      ['size']
+    )
+  ],
+  thread: [
+    optionCase(
+      t('Own one native worker', '持有一个原生工作线程'),
+      t(
+        'Supply an application launcher that interprets worker.ts and observes actual worker exit. It declares termination and exit-observation as enforced. Required admission checks those guarantees before starting; the thread budget remains occupied until exit.',
+        '应用启动器解释 worker.ts 并观察线程实际退出，将 termination 与 exit-observation 声明为 enforced。严格准入在启动前检查能力保证，线程实际退出前一直占用预算。'
+      ),
+      supervisionOptionExamples.thread,
+      t('Prints ready 1, then 0 after native worker exit.', '输出 ready 1，原生线程退出后输出 0。'),
+      ['id', 'launcher', 'spec', 'budget', 'report', 'requires', 'isolation']
+    ),
+    optionCase(
+      t('Check the worker service, not just worker creation', '检查线程服务是否可用'),
+      t(
+        'The application handle adds a ping request over the real worker message channel. Without ready, launch completion admits the worker immediately. The handshake delays readiness until pong; periodic health checks keep checking afterward.',
+        '应用句柄通过真实线程消息通道增加 ping 请求。不配置 ready 时，线程创建完成就会准入。握手等待 pong 后才就绪，周期健康检查随后继续检查。'
+      ),
+      supervisionOptionExamples.threadHealth,
+      t(
+        'Prints ready true after at least one health check succeeds.',
+        '至少一次健康检查成功后输出 ready true。'
+      ),
+      [
+        'ready',
+        'startupTimeoutMs',
+        'health',
+        'health.check',
+        'health.intervalMs',
+        'health.timeoutMs',
+        'health.failureThreshold'
+      ]
+    )
+  ],
+  guard: [
+    optionCase(
+      t('Clean up once after parent loss', '父进程丢失后只清理一次'),
+      t(
+        'Wire the application parent-disconnect event to trigger. The guard does not discover parent loss itself. shutdown completes within graceMs and exit receives zero. The example records that request; a child application can provide its native exit callback.',
+        '将应用的父连接断开事件接到 trigger；守卫不会自行发现父进程丢失。shutdown 在 graceMs 内完成，exit 收到零。示例记录退出请求，子进程应用可提供自己的原生退出回调。'
+      ),
+      supervisionOptionExamples.guard,
+      t(
+        'Prints 0 1 true: exit code zero, one cleanup, and triggered state.',
+        '输出 0 1 true：退出码零、一次清理、已经触发。'
+      ),
+      ['shutdown', 'exit', 'report', 'graceMs', 'scheduler']
+    ),
+    optionCase(
+      t('Report failed shutdown before forced exit', '强制退出前报告关闭失败'),
+      t(
+        'A rejected shutdown must not leave the child waiting forever. The required report callback receives the original rejection and exit receives one. Without custom graceMs the deadline is 5000 ms; expiration also requests one and aborts the shutdown signal.',
+        '关闭拒绝不能让子进程无限等待。必填 report 收到原始拒绝，exit 收到一。不自定义 graceMs 时截止为 5000 毫秒，到期也会请求一并中止关闭信号。'
+      ),
+      supervisionOptionExamples.guardFailure,
+      t(
+        'Prints 1 true: forced exit was requested and the original failure was reported.',
+        '输出 1 true：已请求强制退出，并上报原始失败。'
+      ),
+      ['shutdown', 'exit', 'report']
+    )
+  ],
+  reclaim: [
+    optionCase(
+      t('Recover only a previous owner namespace', '只恢复上个所有者的命名空间'),
+      t(
+        'Supply durable records from a previous parent and a fingerprint-aware application launcher. For one owned live child the launcher returns alive and terminates that exact child. Without matching fingerprints, a reused PID only loses its stale record. namespace limits the scan to the selected application.',
+        '提供上次父进程的持久记录及能校验指纹的应用启动器。针对一个仍存活的所属子进程，启动器返回 alive 并终止该精确实例。指纹不匹配、编号已经复用时只删旧记录。namespace 把扫描限制在指定应用内。'
+      ),
+      supervisionOptionExamples.reclaim,
+      t(
+        'For one matching live record, prints 1 1 0: one terminated child, one removed record, no failures.',
+        '只有一个匹配存活记录时输出 1 1 0：终止一个子进程、移除一条记录、没有失败。'
+      ),
+      ['registry', 'namespace', 'launcher', 'report']
+    ),
+    optionCase(
+      t('Retain records when storage cannot be read', '存储无法读取时保留记录'),
+      t(
+        'A registry outage must not trigger blind termination. A failed list operation is collected and reported; no probe, termination or removal runs. The required report callback should record the error without throwing.',
+        '注册表不可用时不能盲目终止。list 失败会被收集并上报，不会探测、终止或删除记录。必填 report 应记录错误且不抛出。'
+      ),
+      supervisionOptionExamples.reclaimFailure,
+      t(
+        'Prints 0 0 1 1: no ownership changes, one collected and reported failure.',
+        '输出 0 0 1 1：没有改变所有权，收集并上报一个失败。'
+      ),
+      ['registry', 'namespace', 'launcher', 'report']
+    )
   ]
 }
