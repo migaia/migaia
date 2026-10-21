@@ -13,7 +13,10 @@ function tagStoreWasmError<E extends Error>(error: E, code: IStoreWasmErrorCode)
   return attachErrorIdentity(error, { source: STORE_WASM_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Return a new native Error with the supplied code/message and package source, without throwing. A
+ * defined cause is retained by reference; omitted/undefined cause creates no cause property.
+ */
 export function createStoreWasmError(
   code: IStoreWasmErrorCode,
   message: string,
@@ -26,12 +29,18 @@ export function createStoreWasmError(
   return tagStoreWasmError(error, code)
 }
 
-/** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
+/**
+ * Return a native RangeError with the supplied code/message and package source, preserving its
+ * stack.
+ */
 export function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError {
   return tagStoreWasmError(new RangeError(message), code)
 }
 
-/** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
+/**
+ * Return a tagged native TypeError with its constructor-created stack. A defined cause is retained
+ * by reference; omitted/undefined cause creates no cause property. The helper does not throw it.
+ */
 export function createStoreWasmTypeError(
   code: IStoreWasmErrorCode,
   message: string,
@@ -44,7 +53,7 @@ export function createStoreWasmTypeError(
   return tagStoreWasmError(error, code)
 }
 
-/** Builds a tagged aggregate while preserving every original cleanup error by identity. */
+/** Return a native AggregateError retaining the supplied error values in order and their identity. */
 export function createStoreWasmAggregateError(
   code: IStoreWasmErrorCode,
   errors: readonly unknown[],

@@ -16,11 +16,19 @@ import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.j
 import { StoreFieldMode } from '@migaia/store-light'
 import { StoreWasmErrorText } from './error-text.js'
 
+/** Owned single-byte boolean field; the Store field owner releases its Source and native block. */
 export type IWasmBooleanField = IDisposable & {
+  /** Tracked boolean, initially false; writes require an actual boolean and skip unchanged values. */
   value: boolean
+  /** Whether the field's Source currently has observers, without establishing a dependency. */
   readonly observed: boolean
 }
 
+/**
+ * Describe a synchronous false-initialized Store field, with no factory arguments or eager
+ * allocation. Await ensureWasm before the Store creates it. Wrong value types throw INVALID_OPTION;
+ * value access after terminal, idempotent field disposal throws FIELD_DISPOSED.
+ */
 export function boolean(): IFieldBuilder<IWasmBooleanField> {
   return {
     [FIELD_BUILDER]: true,

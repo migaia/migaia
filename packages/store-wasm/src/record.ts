@@ -22,10 +22,20 @@ import { StoreWasmErrorText } from './error-text.js'
 // 固定命名字段的结构体（Elm/Haskell record，不是 TS Record<K,V>）
 type IRecordShape = Record<string, ReturnType<typeof numberBuilder>>
 
+/** Fixed named f64 properties, each with its own tracked Source and initial value 0. */
 export type IWasmRecordField<Shape extends IRecordShape> = {
   [K in keyof Shape]: number
 } & IDisposable
 
+/**
+ * Describe a fixed numeric record from an own-enumerable string-key shape of number builders. The
+ * descriptor captures keys and validates builder markers without invoking child create functions.
+ * Store creation allocates one contiguous record after ensureWasm and rejects dispose/disposed keys
+ * with RESERVED_FIELD_NAME. Property writes require numbers, use Object.is equality, and commit
+ * only that property's Source. Disposal releases Sources/block and makes property access
+ * FIELD_DISPOSED. Invalid shape/marker reads are INVALID_OPTION; the Runtime remains borrowed from
+ * the field owner.
+ */
 export function record<Shape extends IRecordShape>(
   shape: Shape
 ): IFieldBuilder<IWasmRecordField<Shape>> {

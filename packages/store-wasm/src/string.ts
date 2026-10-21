@@ -22,11 +22,21 @@ const MAX_STRING_BYTES = 0xffff_ffff - Uint32Array.BYTES_PER_ELEMENT
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
+/** Owned fixed-capacity UTF-8 field; capacity is a byte bound, not a JavaScript character count. */
 export type IWasmStringField = IDisposable & {
+  /** Tracked text, initially empty, encoded with TextEncoder and decoded with TextDecoder. */
   value: string
+  /** Whether this field's Source currently has observers, without tracking a read. */
   readonly observed: boolean
 }
 
+/**
+ * Describe a synchronous Store string field with maxBytes defaulting to 256. Capacity must be a
+ * nonnegative safe integer no larger than 0xffffffff - 4; invalid capacity throws INVALID_OPTION.
+ * Actual allocation waits for Store construction, which requires completed ensureWasm. Wrong-type
+ * or oversized UTF-8 writes reject INVALID_OPTION before changing bytes; value reads after disposal
+ * reject FIELD_DISPOSED. The fixed capacity never grows to fit a write.
+ */
 export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWasmStringField> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > MAX_STRING_BYTES) {
     throw createStoreWasmRangeError(
