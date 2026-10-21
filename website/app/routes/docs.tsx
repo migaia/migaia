@@ -1181,23 +1181,32 @@ function useScrollSpy(railRef: React.RefObject<HTMLElement | null>, resetKey?: s
       return element ? [{ element, href: `#${id}` }] : []
     })
     /** Section tops above this line count as "read"; matches the sticky header plus breathing room. */
-    const observer = new IntersectionObserver(
-      () => {
-        const line = 120
+    const line = 120
+    /** Pending animation frame of the scroll handler, so one frame recomputes at most once. */
+    let frame = 0
+    /**
+     * Recomputes on every scroll frame. An IntersectionObserver only fires when a section crosses
+     * its band, so a section taller than the viewport (an instance API list) could pass the reading
+     * line without any callback and leave the previous entry highlighted.
+     */
+    const onScroll = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
         let current: string | undefined = targets[0]?.href
         for (const target of targets)
           if (target.element.getBoundingClientRect().top <= line) current = target.href
         mark(current)
-      },
-      { rootMargin: '-96px 0px -55% 0px', threshold: [0, 1] }
-    )
-    for (const target of targets) observer.observe(target.element)
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
     /** Fragment navigation marks its own entry immediately. */
     const onHash = () => mark(window.location.hash || targets[0]?.href)
     onHash()
     window.addEventListener('hashchange', onHash)
     return () => {
-      observer.disconnect()
+      window.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(frame)
       wide.removeEventListener('change', syncDisclosure)
       window.removeEventListener('hashchange', onHash)
     }
