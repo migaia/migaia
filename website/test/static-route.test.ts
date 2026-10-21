@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { copyFor } from '../app/copy.js'
+import { LIBRARY_INDEX } from '../app/library-descriptions.js'
 
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
 const buildRoot = join(websiteRoot, 'build/client')
@@ -51,9 +52,17 @@ const LEGACY_DOCS_INDEX_REDIRECTS = new Map([
   ['/zh/docs', '/zh']
 ])
 
-/** True when an emitted HTML file is one of the legacy docs-index redirect pages. */
+/**
+ * Retired `/<locale>/<library>` URLs. They are prerendered only as redirects to the library page
+ * under `/<locale>/docs`, so they carry no page content or description.
+ */
+const LEGACY_LIBRARY_REDIRECT_PATHS = ['en', 'zh'].flatMap((locale) =>
+  LIBRARY_INDEX.map((entry) => `/${locale}/${entry.slug}`)
+)
+
+/** True when an emitted HTML file is one of the legacy redirect pages. */
 function isLegacyRedirectArtifact(file: string): boolean {
-  return [...LEGACY_DOCS_INDEX_REDIRECTS.keys()].some((path) =>
+  return [...LEGACY_DOCS_INDEX_REDIRECTS.keys(), ...LEGACY_LIBRARY_REDIRECT_PATHS].some((path) =>
     file.endsWith(`/${artifactPath(path)}`)
   )
 }
