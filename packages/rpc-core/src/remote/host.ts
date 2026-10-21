@@ -8,19 +8,26 @@ import type { IRemoteProxyOptions } from './types.js'
 
 /** Host control permits only policies whose effects can be reflected in inspect. */
 export type IRemoteHostRemovalOptions = Readonly<{
+  /** Reject dependencies by default, or suspend dependents through the existing Host removal policy. */
   policy?: 'reject' | 'suspend'
+  /** Defaults to false; true returns the removal plan without applying it. */
   dryRun?: boolean
 }>
 
 /** One remote Host connection shares the plugin proxy generation and ready gate. */
 export type IRemoteHostHandle = Readonly<{
+  /** Wait for an accepted described generation; release prevents later readiness. */
   ready(): Promise<void>
+  /** Ask the remote local resolver to install one declared plugin and return its Feature proxies. */
   use(
     name: string,
     config?: IRpcPortableValue
   ): Promise<Readonly<Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>>>
+  /** Remove an adopted remote registration or request its dry-run plan. */
   unUse(name: string, options?: IRemoteHostRemovalOptions): Promise<IRpcPortableValue>
+  /** Read the current remote catalog installation/enablement projection. */
   inspect(): Promise<IRpcPortableValue>
+  /** Share one terminal cleanup Promise; owned bindings also dispose their supervisor. */
   release(): Promise<void>
 }>
 

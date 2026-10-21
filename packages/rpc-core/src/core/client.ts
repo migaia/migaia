@@ -37,5 +37,9 @@ type IPublicCallable = {
   ): Promise<IRpcKernelSurface & IOutboundSurface & IRpcFeatureSurface<TFeatures>>
 }
 
-/** Checked public boundary delegates to the existing client runtime. */
+/**
+ * Construct an outbound client over the selected pipeline. Resolution publishes its installed
+ * Features; invalid configuration or installation rejects and rolls back acquired resources.
+ * Dispose the returned endpoint when finished.
+ */
 export const createClientEndpoint = createClientEndpointRuntime as unknown as IPublicCallable

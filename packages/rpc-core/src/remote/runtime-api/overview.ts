@@ -18,7 +18,9 @@ import {
 } from './constants.js'
 
 /** Formatting is a local cold-query option, never application or wire configuration. */
-export type IRuntimeQueryOptions = Readonly<{ format?: ISerializeTextFormat }>
+export type IRuntimeQueryOptions = Readonly<{
+  /** Omit for an object; json, yaml or toml selects text output. */ format?: ISerializeTextFormat
+}>
 /** Default queries return objects; selecting a format returns only the admitted projection. */
 export type IRuntimeQuery<T> = {
   (options?: Readonly<{ format?: undefined }>): Promise<T>
@@ -26,73 +28,117 @@ export type IRuntimeQuery<T> = {
   (options: IRuntimeQueryOptions): Promise<T | string>
 }
 /** Missing facts are explicit instead of invented zero, null or healthy values. */
-export type IRuntimeUnavailable = Readonly<{ status: 'unavailable'; reason: string }>
+export type IRuntimeUnavailable = Readonly<{
+  /** Explicit absence rather than an invented metric. */ status: 'unavailable'
+  /** Safe explanation of the missing owner fact. */ reason: string
+}>
 /** Available metrics identify their exact scope, units and local monotonic observation time. */
 export type IRuntimeMetric<T = number> = Readonly<{
+  /** Observed value in the declared units. */
   value: T
+  /** Original owner scope, such as endpoint-client or execution-unit. */
   scope: string
+  /** Explicit unit label; CPU time and utilization ratios are separate dimensions. */
   unit: string
+  /** Local monotonic time at which the original owner sampled this value. */
   observedAt: number
+  /** Clock domain used by observedAt. */
   clock: string
 }>
 /** Only inFlight has a current canonical source; absent physical counters are explicit. */
 export type IRuntimeCounters = Readonly<{
+  /** Current canonical local client work, when observable. */
   inFlight: IRuntimeMetric | IRuntimeUnavailable
+  /** Explicitly unavailable until an actual physical counter owner supplies it. */
   sent: IRuntimeUnavailable
+  /** Explicitly unavailable without an actual physical counter owner. */
   received: IRuntimeUnavailable
+  /** Explicitly unavailable without a canonical error counter owner. */
   errors: IRuntimeUnavailable
+  /** Explicitly unavailable without a genuine activity observation owner. */
   lastActiveAt: IRuntimeUnavailable
 }>
 /** Cold resource values never contain native handles, errors or an aggregate parent heap. */
 export type IRuntimeResources = Readonly<{
+  /** Native unit/process scope of these observations. */
   scope: string
+  /** Original native process id when observable. */
   pid?: number
+  /** Shared host process id for a non-isolated unit, when applicable. */
   sharedPid?: number
+  /** Original native thread id when observable. */
   threadId?: number
+  /** RSS observation only when the original sampler supplies it. */
   rssBytes?: IRuntimeMetric | IRuntimeUnavailable
+  /** Observed used heap bytes in the declared original scope. */
   heapUsedBytes?: IRuntimeMetric | IRuntimeUnavailable
+  /** Observed total heap bytes in the declared original scope. */
   heapTotalBytes?: IRuntimeMetric | IRuntimeUnavailable
+  /** Original CPU-time observation or explicit unavailable record. */
   cpu:
     | IRuntimeUnavailable
     | Readonly<{ kind: 'cpu-time'; user: IRuntimeMetric; system: IRuntimeMetric }>
+  /** Optional original event-loop activity observation; it is not CPU time. */
   elu?: Readonly<{
+    /** Event-loop utilization metric discriminator. */
     kind: 'elu'
+    /** Observed active loop time in its declared units. */
     active: IRuntimeMetric
+    /** Observed idle loop time in its declared units. */
     idle: IRuntimeMetric
+    /** Observed dimensionless event-loop utilization. */
     utilization: IRuntimeMetric
   }>
 }>
 /** Cold source metadata comes from the actual factory branch, not binding ownership. */
 export type IRuntimeConnectionOrigin = Readonly<{
+  /** Actual local spawn/connect/listen source mode. */
   kind: RuntimeSourceKind
+  /** Actual native/bootstrap connection direction. */
   direction: RuntimeConnectionDirection
 }>
 /** Safe directory metadata can survive retirement without retaining an endpoint or native handle. */
 export type IRuntimeConnectionDirectory = IRuntimeConnectionOrigin &
   Readonly<{
+    /** Compiled local method directory from this original owner. */
     localDescription: IRuntimePeerDescription
+    /** Accepted remote directory, when available. */
     description?: IRuntimePeerDescription
+    /** Actual physical carrier label. */
     carrier: string
   }>
 /** Only original registration departures enter the bounded public history. */
 export type IRuntimeRecent = Readonly<{
+  /** Original departed unit generation. */
   generation: number
+  /** Monotonic time of this owner's observation. */
   timestamp: number
+  /** Timestamp domain label. */
   clock: string
+  /** Safe lifecycle history kind. */
   kind: string
+  /** Accepted connection identity if it was available. */
   identity?: IRuntimePeerIdentity
+  /** Safe diagnostic error source, when supplied. */
   source?: string
+  /** Safe semantic error code, when supplied. */
   code?: string
 }>
 /** Connection state and unit state remain separate owner facts. */
 export type IRuntimeConnectionDetail = Readonly<{
+  /** Accepted remote identity, or an explicit unavailable record. */
   identity: IRuntimePeerIdentity | IRuntimeUnavailable
   /** Accepted remote identity is distinct from the local supervisor's physical attempt number. */
   generation: IRpcRuntimeGeneration | IRuntimeUnavailable
+  /** Actual local spawn/connect/listen source mode. */
   kind: RuntimeSourceKind
+  /** Actual connection direction, independent of ownership. */
   direction: RuntimeConnectionDirection
+  /** Actual physical carrier label. */
   carrier: string
+  /** Connection availability reported by its original owner. */
   connection: Readonly<{ status: string | IRuntimeUnavailable }>
+  /** Original execution-unit facts, or unavailable when no owned unit is observable. */
   unit:
     | IRuntimeUnavailable
     | Readonly<{
@@ -101,12 +147,19 @@ export type IRuntimeConnectionDetail = Readonly<{
         generation: number
         degraded: readonly string[]
       }>
+  /** Original health metric or unavailable; channel readiness does not imply native health. */
   health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number }>>
+  /** Original supervisor restart metric, or unavailable. */
   restartCount: IRuntimeUnavailable | IRuntimeMetric
+  /** Accepted callable method names; erased TypeScript types do not supply this list. */
   methods: readonly string[]
+  /** Canonical endpoint counters when available, with explicit absent fields. */
   counters: IRuntimeUnavailable | IRuntimeCounters
+  /** Native resource observations when connected to the original sampler; otherwise unavailable. */
   resources: IRuntimeUnavailable | IRuntimeResources
+  /** Bounded original departure history for this connection. */
   recent: readonly IRuntimeRecent[]
+  /** Safe observed native exit facts, or unavailable. */
   lastExit:
     | IRuntimeUnavailable
     | Readonly<{
@@ -120,21 +173,34 @@ export type IRuntimeConnectionDetail = Readonly<{
 }>
 /** Local detail keeps its own identity distinct from every remote execution unit. */
 export type IRuntimeDetail = Readonly<{
+  /** Safe local query identity. */
   identity: IRuntimePeerIdentity
+  /** Safe local Peer identity, separate from its remote connections. */
   self: IRuntimePeerIdentity
+  /** Callable remote route names accepted by this Peer. */
   methods: readonly string[]
+  /** Local callable method names compiled from provide. */
   provide: readonly string[]
+  /** Safe detail records from the original connection owner. */
   connections: readonly IRuntimeConnectionDetail[]
+  /** Explicitly unavailable for the local Peer view. */
   unit: IRuntimeUnavailable
+  /** Explicitly unavailable without an original local unit health owner. */
   health: IRuntimeUnavailable
+  /** Explicitly unavailable for the local Peer view. */
   restartCount: IRuntimeUnavailable
+  /** Canonical local client counters when available. */
   counters: IRuntimeUnavailable | IRuntimeCounters
+  /** Explicitly unavailable; this view does not sample an aggregate host heap. */
   resources: IRuntimeUnavailable
+  /** Bounded original departure observations. */
   recent: readonly IRuntimeRecent[]
 }>
 /** Host summaries use the canonical Host identity and genuine contributed connection records. */
 export type IRuntimeOverview = Readonly<{
+  /** Safe Host identity belonging to this overview. */
   self: IRuntimePeerIdentity
+  /** Current safe connection details contributed by genuine Host registrations. */
   connections: readonly IRuntimeConnectionDetail[]
 }>
 

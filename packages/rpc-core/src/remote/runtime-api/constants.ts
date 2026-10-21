@@ -65,9 +65,9 @@ export const RuntimeApiErrorText = {
  * grants no Host slot or native execution authority; those belong to held resources.
  */
 export const RuntimePluginKey = Object.freeze({
-  process: 'process',
-  thread: 'thread',
-  coroutine: 'coroutine'
+  /** Canonical process outlet/connection family label. */ process: 'process',
+  /** Canonical thread outlet/connection family label. */ thread: 'thread',
+  /** Canonical cooperative task connection family label. */ coroutine: 'coroutine'
 } as const)
 
 /** Direct Core Peers use this display name; it grants no remote identity or execution authority. */
@@ -78,10 +78,11 @@ export const RuntimePluginExpose = { host: 'host' } as const
 
 /** Routes describe actual installed call capabilities, never inferred handler return shapes. */
 export const RuntimeApiMode = {
-  request: 'request',
-  notify: 'notify',
-  stream: 'stream'
+  /** Scalar invocation returning an application result. */ request: 'request',
+  /** Notification whose Promise covers local sending. */ notify: 'notify',
+  /** Iterable invocation with caller-owned iteration cleanup. */ stream: 'stream'
 } as const
+/** Actual request, notify or stream route capability. */
 export type RuntimeApiMode = (typeof RuntimeApiMode)[keyof typeof RuntimeApiMode]
 
 /** Advanced declarations narrow registration; automatic methods describe installed routes. */
@@ -92,25 +93,31 @@ export const RuntimeApiModeSource = {
 export type RuntimeApiModeSource = (typeof RuntimeApiModeSource)[keyof typeof RuntimeApiModeSource]
 
 /** Source configuration and connection direction are separate local query axes. */
-export const RuntimeSourceKind = { spawn: 'spawn', connect: 'connect', listen: 'listen' } as const
+export const RuntimeSourceKind = {
+  /** Local source acquired through an owned launch operation. */ spawn: 'spawn',
+  /** Local source acquired by connecting. */ connect: 'connect',
+  /** Local source acquired by accepting connections. */ listen: 'listen'
+} as const
+/** Local source acquisition mode. */
 export type RuntimeSourceKind = (typeof RuntimeSourceKind)[keyof typeof RuntimeSourceKind]
 
 /** Automatic children report the trusted bootstrap direction, never a guessed parent role. */
 export const RuntimeConnectionDirection = {
-  spawned: 'spawned',
-  spawnedBy: 'spawned-by',
-  connect: 'connect',
-  listen: 'listen'
+  /** This owner launched the remote unit. */ spawned: 'spawned',
+  /** This owner is connected through the launching parent bootstrap. */ spawnedBy: 'spawned-by',
+  /** This side initiated a connection. */ connect: 'connect',
+  /** This side accepted a connection. */ listen: 'listen'
 } as const
+/** Actual native/bootstrap direction of this connection. */
 export type RuntimeConnectionDirection =
   (typeof RuntimeConnectionDirection)[keyof typeof RuntimeConnectionDirection]
 
 /** Query absence is explicit and portable across all supported output formats. */
 export const RuntimeQueryStatus = {
-  unavailable: 'unavailable',
-  ready: 'ready',
-  closed: 'closed',
-  departed: 'departed'
+  /** The actual owner cannot supply this fact. */ unavailable: 'unavailable',
+  /** The connection is currently accepted and usable. */ ready: 'ready',
+  /** The original owner completed terminal close. */ closed: 'closed',
+  /** The accepted connection generation left. */ departed: 'departed'
 } as const
 
 /** These reasons identify absent owner facts without exposing configuration or native errors. */
@@ -155,13 +162,14 @@ export const RuntimeMetricUnit = {
 export const RuntimeRecentKind = { departed: 'departed' } as const
 /** Passive management events come only from original lifecycle and successful liquidation facts. */
 export const RuntimeEventName = {
-  ready: 'ready',
-  exit: 'exit',
-  degraded: 'degraded',
-  restart: 'restart',
-  terminal: 'terminal',
-  liquidated: 'liquidated'
+  /** A genuine connection generation became ready. */ ready: 'ready',
+  /** An original execution unit exited. */ exit: 'exit',
+  /** The original supervisor reported degradation. */ degraded: 'degraded',
+  /** The original supervisor recorded a restart. */ restart: 'restart',
+  /** The original supervisor entered a terminal state. */ terminal: 'terminal',
+  /** Original control authority completed explicit liquidation. */ liquidated: 'liquidated'
 } as const
+/** Passive original lifecycle event name. */
 export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName]
 /** Original scheduler timestamps are monotonic milliseconds, not wall-clock epoch time. */
 export const RuntimeQueryClock = { scheduler: 'scheduler' } as const

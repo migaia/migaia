@@ -7,7 +7,9 @@ import type { INodeMessagePortLike } from '../../core/adapters/message-port.js'
 /** Raw EventEmitter messaging optionally supplies its actual reader count and close observation. */
 export type IAdapterEventEmitterMessagePort = INodeMessagePortLike &
   Readonly<{
+    /** Read the actual native message listener count for exclusive-reader admission. */
     listenerCount?(event: 'message'): number
+    /** Observe this raw port's native close event when available. */
     once?(event: 'close', listener: () => void): unknown
   }>
 
@@ -61,12 +63,17 @@ export type IAdapterMessageOpenOptions = Readonly<{
 export type IAdapterMessageResource = Readonly<{
   /** Exchange existing initial records and learn the remote address only from this held raw I/O. */
   exchangeIdentity(context: IRuntimePeerSourceContext, signal?: IAbortSignal): Promise<string>
+  /** Read one captured native initial message; bounded mode retains the existing bootstrap limits. */
   receiveInitial(initial?: IAdapterInitialMessageResource, bounded?: true): Promise<unknown>
+  /** Prepare canonical control exchange using the actual held raw message resource. */
   prepareControl(
     offer: readonly string[],
     bootstrap?: IAdapterInitialMessageResource
   ): Promise<readonly string[]>
+  /** Construct a channel for the fixed static profile using the original captured resource. */
   openStatic(options: IAdapterStaticMessageOptions): IRuntimePeerSourceResult
+  /** Negotiate actual message capability acknowledgement before publishing the channel. */
   open(options: IAdapterMessageOpenOptions): Promise<IRuntimePeerSourceResult>
+  /** Release the original receive capture, attached policy cleanup and physical lifetime. */
   close(): Promise<void>
 }>

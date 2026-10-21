@@ -31,9 +31,13 @@ export type IPeerPairOptions<
   A extends IRuntimePeerProvide,
   B extends IRuntimePeerProvide
 > = Readonly<{
+  /** First Peer's explicit local provide/method/deadline configuration. */
   a: IPeerPairSide<A>
+  /** Second Peer's explicit local provide/method/deadline configuration. */
   b: IPeerPairSide<B>
+  /** Borrowed scheduler for endpoint deadlines; omission uses the system scheduler. */
   scheduler?: IScheduler
+  /** Optional background/cleanup reporter; omission uses Core's default reporter. */
   report?: (error: unknown) => void
 }>
 

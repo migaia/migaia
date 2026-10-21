@@ -66,5 +66,9 @@ type IPublicCallable = {
   >
 }
 
-/** Checked public boundary delegates to the existing provider runtime. */
+/**
+ * Construct a provider endpoint with its required outbound closure. Initial method admission
+ * completes before resolution; duplicates or installation failures reject construction with
+ * rollback. Dispose the result to retire providers and pending work.
+ */
 export const createProviderEndpoint = createProviderEndpointRuntime as unknown as IPublicCallable

@@ -23,5 +23,6 @@ export const RpcRemoteLayerErrorCode = {
   resultUnknown: 'REMOTE_RESULT_UNKNOWN'
 } as const
 
+/** Remote registration, description and generation failure code. */
 export type IRpcRemoteLayerErrorCode =
   (typeof RpcRemoteLayerErrorCode)[keyof typeof RpcRemoteLayerErrorCode]

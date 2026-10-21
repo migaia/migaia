@@ -32,6 +32,9 @@ const pingPlugin: IRpcPlugin = Object.freeze({
 
 export type IPingMiddleware = IRpcPlugin & { readonly pingCapability: true }
 
-/** Creates the native ping enablement role; heartbeat ownership remains with control. */
+/**
+ * Enable explicit ping/pingAll controls over the endpoint control owner; no periodic heartbeat is
+ * started. The endpoint must also have the required discovery/outbound roles.
+ */
 export const ping = (): IPingMiddleware =>
   registerJsonObjectMiddleware(freezePlugin({ ...pingPlugin, pingCapability: true }))

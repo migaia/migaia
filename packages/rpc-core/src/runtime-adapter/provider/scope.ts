@@ -19,7 +19,12 @@ import { RuntimeAdapterErrorText } from '../byte/error-text.js'
 export type IRuntimeProviderScope = Readonly<{
   /** Ordinary generated address output; signing never reads caller-provided namespace data. */
   namespace: string
+  /** Original shared provider quota resource for sessions of this owner. */
   admission: IProviderAdmissionScope
+  /**
+   * Derive deduplication scope only from this actual authenticated channel and retain its selected
+   * limits.
+   */
   session(
     channel: IRemoteChannel,
     limits: IRpcProviderLimits
@@ -27,6 +32,7 @@ export type IRuntimeProviderScope = Readonly<{
     idempotency: IRpcIdempotencyConfig
     limits: IRpcProviderLimits
   }>
+  /** Clear the shared admission registry; callers close their peers before retiring the scope. */
   close(): void
 }>
 

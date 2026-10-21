@@ -32,16 +32,23 @@ export type IMessageAdapterLaunch = IAdapterLaunchHandle & Readonly<{ port: IMes
 
 /** A physical runtime supplies only raw messaging and its optional original launch operation. */
 export type IMessageAdapterOptions<TInput> = Readonly<{
+  /** Open the actual raw port; rejection leaves launch/transport rollback with the canonical owner. */
   open(input: TInput): IMessageAdapterPort | Promise<IMessageAdapterPort>
+  /** Optional native launch operation returning its original port and exit/termination lifetime. */
   launch?(input: TInput, context: IRuntimePeerSourceContext): Promise<IMessageAdapterLaunch>
 }>
 
 /** Byte authors retain physical opening; the existing Core owner performs all native wire control. */
 export type IByteAdapterOptions<TInput> = Readonly<{
+  /** Open actual ordered byte I/O for the selected deployment input. */
   open(input: TInput): IRuntimeByteIO | Promise<IRuntimeByteIO>
+  /** Optional listener-side opener; omission uses the existing open operation. */
   listen?(input: TInput): IRuntimeByteIO | Promise<IRuntimeByteIO>
+  /** Optional connection-side opener; omission uses the existing open operation. */
   dial?(input: TInput): IRuntimeByteIO | Promise<IRuntimeByteIO>
+  /** Optional adapter-owned stable errors/text used by canonical byte admission. */
   diagnostics?: IRuntimeByteDiagnostics
+  /** Optional platform/text labels; labels confer no negotiated authority. */
   presentation?: Pick<IRuntimeConnectionOptions, 'platform' | 'expectedStringText'>
 }>
 
@@ -51,16 +58,23 @@ export type IAdapterDefinitionPeerOptions<TInput> = Omit<
   'spawn' | 'connect' | 'listen'
 > &
   Readonly<{
+    /** Physical deployment input for an owned launched peer; select one source mode. */
     spawn?: TInput
+    /** Physical deployment input for a connected peer; select one source mode. */
     connect?: TInput
+    /** Physical deployment input for a listener peer; select one source mode. */
     listen?: TInput
     /** Message adapters may omit this address and learn it from the existing raw initial exchange. */
     peerId?: string
     /** Caller cancellation retires this physical opening and its original directory handshake. */
     signal?: IAbortSignal
+    /** Borrowed monotonic scheduler; defaults to the system scheduler. */
     scheduler?: IScheduler
+    /** Local handshake proposal; the actual exchange determines accepted capabilities. */
     offer?: IRpcHandshakeOffer
+    /** Responder authentication policy for the canonical byte handshake. */
     auth?: Extract<IRuntimeByteOptions, { role: 'responder' }>['auth']
+    /** Connection flow-control and diagnostic configuration. */
     ipc?: IRuntimeConnectionOptions['ipc']
     /** The canonical per-connection governor owns quotas and idle retirement. */
     governor?: IRuntimeProviderPolicy
@@ -84,6 +98,7 @@ export type IAdapterDefinition<
   TInput,
   TKey extends 'process' | 'thread' = 'process' | 'thread'
 > = Readonly<{
+  /** Construct the symmetric callable Peer and roll back acquired resources if admission fails. */
   peer<TRemote = never>(
     options: IAdapterDefinitionPeerOptions<TInput>
   ): Promise<
@@ -95,6 +110,10 @@ export type IAdapterDefinition<
           TKey
         >
   >
+  /**
+   * Create a managed Host definition; physical acquisition occurs in its normal installation
+   * transaction.
+   */
   plugin<
     TRemote = Record<never, never>,
     const TProvide extends IRuntimePeerProvide = Record<never, never>,
@@ -111,18 +130,24 @@ export type IAdapterDefinition<
 
 /** Native adapters retain complex real bindings while all final assembly uses one captured owner. */
 export type IAdapterTask<TInput> = Readonly<{
+  /** Captured canonical preparation associated with the original options identity. */
   preparation: IAdapterPeerPreparation
+  /** Original managed-binding preparation operations. */
   managed: IAdapterPeerPreparation['managed']
+  /** Original listener/session preparation operations. */
   listener: IAdapterPeerPreparation['listener']
+  /** Assemble a Peer from one actual held message resource. */
   resourcePeer(
     options: IRuntimePeerOptions,
     resource: IAdapterMessageResource
   ): Promise<IRuntimePeer>
+  /** Open and assemble the selected raw messaging source. */
   messagePeer(
     options: IRuntimePeerOptions,
     input: TInput,
     initial?: IAdapterInitialMessageResource
   ): Promise<IRuntimePeer>
+  /** Open and assemble ordered byte I/O through the canonical handshake. */
   bytePeer(
     options: IRuntimePeerOptions,
     input: TInput,

@@ -41,9 +41,13 @@ import { bindNativeReplayTransport } from '../internal/native-replay.js'
  * object with this shape works, including a real Node MessagePort at runtime.
  */
 export type INodeMessagePortLike = {
+  /** Send through the original native port, preserving the supplied transfer list. */
   postMessage(message: unknown, transferList?: readonly unknown[]): void
+  /** Attach a native message or terminal listener without replacing another subscription. */
   on(event: 'message', listener: (message: unknown) => void): unknown
+  /** Attach a native message or terminal listener without replacing another subscription. */
   on(event: 'messageerror' | 'close', listener: (error?: unknown) => void): unknown
+  /** Remove the exact native listener registered by the adapter. */
   off(event: 'message' | 'messageerror' | 'close', listener: (...args: unknown[]) => void): unknown
 }
 
@@ -51,10 +55,15 @@ export type INodeMessagePortLike = {
 export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = {
   /** A projected Browser Peer preserves its original Window/RTC/Worker physical observer. */
   observe?: IRpcTransport['observe']
+  /** Send a native message and optional transfer list through this port. */
   postMessage(message: unknown, transfer?: readonly TTransfer[]): void
+  /** Begin native queued message delivery after listeners are attached. */
   start(): void
+  /** Close the physical port when this adapter owns it. */
   close(): void
+  /** Attach one native message/error listener without replacing other subscribers. */
   addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void
+  /** Detach the exact native registration. */
   removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void
   /** Optional physical failure observation preserves an adapter's original terminal error. */
   onError?(listener: (error: unknown) => void): () => void
@@ -62,6 +71,10 @@ export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = {
 
 /** Controls whether the browser adapter is allowed to close the supplied port. */
 export type IBrowserMessagePortTransportOptions = {
+  /**
+   * Defaults to owned, which closes the port; borrowed detaches adapter listeners without physical
+   * close.
+   */
   readonly ownership?: 'owned' | 'borrowed'
 }
 
@@ -130,7 +143,11 @@ function createErrorListenerChannel() {
   }
 }
 
-/** Wraps a browser MessagePort and owns its terminal lifecycle. */
+/**
+ * Wrap a browser MessagePort with lazy receive listeners. Ownership defaults to owned; borrowed
+ * close only retires this wrapper and its listeners. Native send failures retain their original
+ * cause.
+ */
 export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(
   port: IBrowserMessagePortLike<TTransfer, TEvent>,
   options: IBrowserMessagePortTransportOptions = {}
@@ -357,8 +374,8 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
 }
 
 /**
- * Wraps a Node `worker_threads.MessagePort` (or anything with the same shape) as a web-rpc
- * transport.
+ * Wrap a borrowed Node MessagePort without owning physical close. The wrapper preserves native
+ * message/terminal listener ownership and transfer lists; native send failures retain their cause.
  */
 export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport {
   const messageListeners = createMessageListenerHub<{ data: unknown }>()

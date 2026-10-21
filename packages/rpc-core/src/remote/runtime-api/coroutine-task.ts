@@ -10,8 +10,11 @@ export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique s
 
 /** Cooperative task work shares the supervisor's original signal and heartbeat owner. */
 export type ICoroutineTaskContext = Readonly<{
+  /** Original cooperative task cancellation signal; user work must observe it. */
   signal: INativeAbortSignal
+  /** Report liveness through the existing supervisor heartbeat owner. */
   heartbeat(): void
+  /** Opaque child connection for this exact task generation. */
   connect: ICoroutineConnect
 }>
 

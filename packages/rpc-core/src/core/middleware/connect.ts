@@ -20,7 +20,11 @@ export type IConnectMiddleware<TMode extends IRpcDiscoveryMode> = IRpcPlugin & {
   readonly discoveryMode: TMode
 }
 
-/** Creates one native connect plugin with discovery and transport metadata on its descriptor. */
+/**
+ * Create connection verification and receiver selection policy. Defaults to automatic discovery and
+ * built-in direct-source checks. A custom identifier requires useBaseIdVerifyOnly:false; invalid
+ * captured configuration rejects endpoint installation.
+ */
 export const connect = <TMode extends IRpcDiscoveryMode = 'automatic'>(
   config: IConnectConfig & { readonly discoveryMode?: TMode } = {}
 ): IConnectMiddleware<TMode> => {

@@ -28,9 +28,13 @@ export type IRpcFeatureDefinition<
   TDependencies extends IFeatureRecord = Record<never, never>,
   TExpose extends object = Record<never, never>
 > = Readonly<{
+  /** Synchronous native Feature factory evaluated for this Host registration. */
   readonly install: IFeatureFactory<TExpose, TDependencies, TSurface>
+  /** Direct Feature dependencies supplied to the factory; omission means no declared edges. */
   readonly dependencies?: TDependencies
+  /** Optional exact endpoint keys this output publishes, captured before construction. */
   readonly publicKeys?: readonly (keyof TSurface & string)[]
+  /** Optional Feature-policy conflict names checked during composition admission. */
   readonly conflicts?: readonly string[]
 }>
 

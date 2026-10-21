@@ -54,8 +54,11 @@ export type IAdapterMessageListenerService = IAdapterListenerService &
 
 /** Core retains the bare/final endpoint internally across native validation and session adoption. */
 export type IAdapterListenerSession = Readonly<{
+  /** Construct the session endpoint under its original connection/scope controls. */
   prepare(): Promise<IRemoteServeEndpoint>
+  /** Attach original drain/governor operations to that prepared endpoint. */
   attach(drain: IAdapterBindingDrain, governor: IRuntimeProviderGovernor): IRemoteServeEndpoint
+  /** Finish adoption and expose the actual callable Peer/service close handle. */
   peer(): Promise<IAdapterListenerService>
 }>
 
@@ -75,6 +78,7 @@ export type IAdapterListenerPreparation = Readonly<{
     resource: IAdapterMessageResource,
     options: Readonly<{ peerId?: string; scheduler: IScheduler; signal?: IAbortSignal }>
   ): Promise<IAdapterMessageListenerService>
+  /** Prepare one accepted session using the caller's genuine shared scope and limits. */
   session(
     channel: IRemoteChannel,
     signal: IAbortSignal,
@@ -82,7 +86,9 @@ export type IAdapterListenerPreparation = Readonly<{
     limits: IRpcProviderLimits,
     customIdempotency?: IRpcIdempotencyConfig
   ): IAdapterListenerSession
+  /** Expose the listener owner's actual membership and terminal close operation. */
   open(owner: IAdapterListenerOwner): IRuntimePeer
+  /** Publish one accepted service and return its exact membership remover. */
   publish(service: IAdapterListenerService): () => void
 }>
 

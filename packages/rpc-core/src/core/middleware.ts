@@ -61,8 +61,14 @@ export type IRpcMiddlewareDescriptor<
   TPublic extends object = Record<never, never>,
   TFeatureExpose extends object = Record<never, never>
 > = Readonly<{
+  /**
+   * Optional asynchronous extension setup; resources acquired here belong to the construction
+   * scope.
+   */
   readonly install?: () => TExtension | PromiseLike<TExtension>
+  /** Optional synchronous public projection; a Promise is not an exposed surface. */
   readonly expose?: () => TPublic & (TPublic extends PromiseLike<unknown> ? never : unknown)
+  /** Optional synchronous host bridge for the declared Feature dependencies. */
   readonly featureExpose?: () => TFeatureExpose &
     (TFeatureExpose extends PromiseLike<unknown> ? never : unknown)
 }>
@@ -75,12 +81,22 @@ export type IRpcMiddlewareCore<
   TFeatures extends IFeatureRecord = Record<never, never>,
   TFeatureExpose extends object = Record<never, never>
 > = Readonly<{
+  /** Local endpoint identity captured for this registration. */
   readonly id: IRpcPluginCore['id']
+  /** Selected physical adapter; this view does not transfer resource ownership. */
   readonly transport: IRpcPluginCore['transport']
+  /** Original registration cancellation signal. */
   readonly signal: IRpcPluginCore['signal']
+  /** Publish local diagnostics through the endpoint hook owner. */
   readonly hooks: IRpcPluginCore['hooks']
+  /**
+   * Register cleanup during install; using it before the install scope exists rejects
+   * configuration.
+   */
   readonly own: IRpcPluginInstallScope['own']
+  /** Resolved outputs from the explicitly declared Feature dependencies. */
   readonly features: IFeatureOutputs<TFeatures>
+  /** Host bridge declared by this middleware for its Feature factories. */
   readonly featureExpose: TFeatureExpose
 }>
 
@@ -97,6 +113,11 @@ export function defineMiddleware<const TComponents extends object>(
       >
     >
   >
+/**
+ * Define a registration-local descriptor factory with optional direct Feature dependencies.
+ * Installation failure rolls back the original Host batch; descriptor/expose factories stay
+ * synchronous.
+ */
 export function defineMiddleware<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,

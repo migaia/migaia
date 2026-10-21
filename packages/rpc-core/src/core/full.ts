@@ -174,9 +174,18 @@ type IPublicCallable<TAdditionalSurface extends object = Record<never, never>> =
   >
 }
 
-/** Checked public boundary delegates to the original runtime without a second lifecycle path. */
+/**
+ * Construct the bidirectional provider/discovery/control preset. Resolution follows atomic
+ * middleware installation and ingress activation; failure rolls back acquired resources. Ping
+ * requires ping middleware, and dispose releases owned resources while leaving borrowed transports
+ * open.
+ */
 export const createFullEndpoint = createFullEndpointRuntime as unknown as IPublicCallable
 
-/** Creates the full endpoint preset with physical one-way delivery. */
+/**
+ * Construct the full preset plus sendOneWay. Its Promise covers physical sending rather than remote
+ * provider completion; endpoint disposal owns the same pending operations and resource cleanup as
+ * the full preset.
+ */
 export const createFullOneWayEndpoint =
   createFullOneWayEndpointRuntime as unknown as IPublicCallable<IOneWaySurface>

@@ -19,14 +19,19 @@ import type {
 
 /** Provider preset surface includes selected outbound projection plus provider registration. */
 export type IProviderSurface = IOutboundSurface & {
+  /** Subscribe to provider notifications and return the listener remover. */
   on(event: string, listener: IRpcEventListener): () => void
+  /** Retire the provider preset and release its owned endpoint resources. */
   dispose(): Promise<void>
+  /** Register a unique request method; duplicate names reject without replacing the original. */
   provide(method: string, provider: IRpcProvider): IProviderSurface
 }
 
 /** Native projection owns only provider registration; composition contributes outbound separately. */
 export type IProviderRegistrationSurface = Readonly<{
+  /** Register one unique request method and return this registration view. */
   readonly provide: (method: string, provider: IRpcProvider) => IProviderRegistrationSurface
+  /** Subscribe to notification delivery and return this exact registration's remover. */
   readonly on: (event: string, listener: IRpcEventListener) => () => void
 }>
 

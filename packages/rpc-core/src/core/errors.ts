@@ -52,17 +52,30 @@ function mintLocalRpcError<E extends Error>(error: E, code: string, family: Func
   return error
 }
 
-export type IRpcCleanupError = { readonly resource: string; readonly error: unknown }
+/** One failed resource release; the original value remains available for diagnosis. */
+export type IRpcCleanupError = {
+  /** Resource whose release failed. */
+  readonly resource: string
+  /** Original release failure. */
+  readonly error: unknown
+}
+/** Public diagnostic identity; structural matching does not grant local operation authority. */
 export type IRpcError = {
   readonly source: string
   readonly code: IRpcCoreErrorCode
   readonly cause?: unknown
 }
+/** Core failure diagnostics carrying the package source, semantic code and original cause. */
 export class RpcError extends Error implements IRpcError {
+  /** Canonical package diagnostic source. */
   readonly source: string
+  /** Semantic diagnostic code; received remote codes remain unrestricted strings. */
   readonly code: IRpcCoreErrorCode
+  /** Original failure, when one caused this diagnostic. */
   readonly cause?: unknown
+  /** Original resource release failures retained alongside the primary failure. */
   readonly cleanupErrors?: readonly IRpcCleanupError[]
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(code: IRpcCoreErrorCode, message: string, cause?: unknown) {
     super(message)
     this.name = RpcErrorFamily.rpc
@@ -75,8 +88,8 @@ export class RpcError extends Error implements IRpcError {
 /**
  * Attaches `(source, code)` to an existing error such as `TypeError` or `RangeError`. Preserves
  * `message`, `name`, `stack`, and other fields supplied by the constructor. Use it for argument
- * validation that must preserve the native error type for `instanceof TypeError` checks. See
- * `docs/contracts/error-codes.md`.
+ * validation that must preserve the native error type for `instanceof TypeError` checks. Diagnostic
+ * tagging alone grants no Core control identity.
  */
 export function tagRpcError<E extends Error>(
   error: E,
@@ -115,23 +128,32 @@ export function identifyRpcBoundaryFailure(
   }
   return new RpcError(code, message, error)
 }
+/** Schema rejection with validation detail in data. */
 export class RpcSchemaValidationError extends RpcError {
+  /** Failure-specific validation or remote application detail. */
   readonly data: unknown
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, data: unknown, cause?: unknown) {
     super(RpcCoreErrorCode.schemaInvalid, message, cause)
     this.name = RpcErrorFamily.schema
     this.data = data
   }
 }
+/** Invalid endpoint or middleware configuration. */
 export class RpcConfigurationError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.invalidConfig, message, cause)
     this.name = RpcErrorFamily.configuration
   }
 }
+/** Construction failure retaining rollback errors and any outstanding cleanup Promise. */
 export class RpcConstructionError extends RpcConfigurationError {
+  /** Original resource release failures retained alongside the primary failure. */
   readonly cleanupErrors: readonly IRpcCleanupError[]
+  /** Pending rollback settlement; await it to observe later resource release results. */
   readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(
     message: string,
     cause: unknown,
@@ -144,57 +166,81 @@ export class RpcConstructionError extends RpcConfigurationError {
     this.cleanupPromise = cleanupPromise
   }
 }
+/** Endpoint retirement failure, including secondary resource release diagnostics. */
 export class RpcLifecycleError extends RpcError {
   /** Core cleanup translation exposes secondary failures through the standard error graph. */
   declare readonly errors?: readonly unknown[]
+  /** Original resource release failures retained alongside the primary failure. */
   readonly cleanupErrors?: readonly IRpcCleanupError[]
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown, cleanupErrors?: readonly IRpcCleanupError[]) {
     super(RpcCoreErrorCode.endpointDisposed, message, cause)
     this.name = RpcErrorFamily.lifecycle
     this.cleanupErrors = cleanupErrors
   }
 }
+/** Payload encoding or portable-value failure. */
 export class RpcSerializationError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.payloadInvalid, message, cause)
     this.name = RpcErrorFamily.serialization
   }
 }
+/** Invalid protocol or envelope interpretation. */
 export class RpcProtocolError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.protocolInvalid, message, cause)
     this.name = RpcErrorFamily.protocol
   }
 }
+/** Rejected application contract or correlation. */
 export class RpcContractError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.contractInvalid, message, cause)
     this.name = RpcErrorFamily.contract
   }
 }
+/** Physical transport failure; the diagnostic alone does not establish whether remote work executed. */
 export class RpcTransportError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.transport, message, cause)
     this.name = RpcErrorFamily.transport
   }
 }
+/** Per-frame protection or verification failure. */
 export class RpcAuthenticationError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.authenticationFailed, message, cause)
     this.name = RpcErrorFamily.authentication
   }
 }
+/** Rejected chunk or reassembly input. */
 export class RpcChunkError extends RpcError {
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.chunkInvalid, message, cause)
     this.name = RpcErrorFamily.chunk
   }
 }
+/**
+ * Received application failure; its code belongs to the remote domain and grants no local retry
+ * authority.
+ */
 export class RpcRemoteError extends Error {
+  /** Canonical package diagnostic source. */
   readonly source: string
+  /** Semantic diagnostic code; received remote codes remain unrestricted strings. */
   readonly code: string
+  /** Failure-specific validation or remote application detail. */
   readonly data?: unknown
+  /** Original failure, when one caused this diagnostic. */
   readonly cause?: unknown
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(code: string, message: string, data?: unknown, cause?: unknown) {
     super(message)
     this.name = RpcErrorFamily.remote
@@ -204,8 +250,11 @@ export class RpcRemoteError extends Error {
     this.cause = cause
   }
 }
+/** Local cancellation with standard AbortError name and optional remaining construction cleanup. */
 export class RpcAbortError extends RpcError {
+  /** Pending rollback settlement; await it to observe later resource release results. */
   readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(
     message = RpcCoreErrorText.webRPCRequestCancelled,
     cleanupPromise?: Promise<readonly IRpcCleanupError[]>,
@@ -217,8 +266,14 @@ export class RpcAbortError extends RpcError {
     this.cleanupPromise = cleanupPromise
   }
 }
+/**
+ * Local deadline expiry with standard TimeoutError name and optional remaining construction
+ * cleanup.
+ */
 export class RpcTimeoutError extends RpcError {
+  /** Pending rollback settlement; await it to observe later resource release results. */
   readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>
+  /** Construct diagnostics without minting an owner-created operation identity. */
   constructor(
     message = RpcCoreErrorText.webRPCRequestDeadlineExceeded,
     cleanupPromise?: Promise<readonly IRpcCleanupError[]>
@@ -392,6 +447,10 @@ export function createRpcTimeoutError(
   return mintLocalRpcError(error, error.code, RpcTimeoutError)
 }
 
+/**
+ * Recognize an object with a readable string code; this broad diagnostic guard does not
+ * authenticate source or local origin.
+ */
 export const isRpcError = (value: unknown): value is IRpcError =>
   typeof value === 'object' && value !== null && typeof safeRead(value, 'code') === 'string'
 
