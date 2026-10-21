@@ -248,7 +248,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
               }
             ]
           },
@@ -474,8 +474,8 @@
                   ],
                   [
                     "Bun",
-                    "node 子入口的两个工厂",
-                    "termination / exit-observation enforced；heap-limit unsupported。"
+                    "根入口的两个 Web 工厂",
+                    "termination / exit-observation enforced，原生 Worker 的 close 事件结算 exited；heap-limit unsupported。"
                   ],
                   [
                     "Deno、浏览器、Electron renderer",
@@ -495,7 +495,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 原生 exited 只由真实 exit 结算；Web 的 exited 保持 pending，因此超时后可能报告 REAP_TIMEOUT 并保留 abandoned budget lease，不能提前把槽位当空闲。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
+                "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 由原生 exit、Bun 由原生 Worker close 结算 exited；Deno、浏览器和 Electron renderer 的退出观察为 unsupported，强制回收立即报告 supervision EXIT_UNOBSERVABLE 并保留 abandoned budget lease，不等待 reapTimeoutMs，也不能提前把槽位当空闲。可观察退出超时仍报告 REAP_TIMEOUT；best-effort 准入诊断 CAPABILITY_UNSUPPORTED 不变。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
               },
               {
                 "type": "paragraph",
@@ -507,7 +507,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
+                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node Worker 与 Bun 1.4.3 原生 Worker 已有业务与关闭运行证据；这些结果不证明浏览器、Deno 或 Electron 的权限与退出能力。"
               }
             ]
           },
@@ -540,6 +540,10 @@
                   [
                     "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                     "线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。"
+                  ],
+                  [
+                    "@migaia/supervision / EXIT_UNOBSERVABLE",
+                    "退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。"
                   ],
                   [
                     "@migaia/rpc/core / INVALID_CONFIG",
@@ -994,7 +998,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
               }
             ]
           },
@@ -1220,8 +1224,8 @@
                   ],
                   [
                     "Bun",
-                    "node 子入口的两个工厂",
-                    "termination / exit-observation enforced；heap-limit unsupported。"
+                    "根入口的两个 Web 工厂",
+                    "termination / exit-observation enforced，原生 Worker 的 close 事件结算 exited；heap-limit unsupported。"
                   ],
                   [
                     "Deno、浏览器、Electron renderer",
@@ -1241,7 +1245,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 原生 exited 只由真实 exit 结算；Web 的 exited 保持 pending，因此超时后可能报告 REAP_TIMEOUT 并保留 abandoned budget lease，不能提前把槽位当空闲。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
+                "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 由原生 exit、Bun 由原生 Worker close 结算 exited；Deno、浏览器和 Electron renderer 的退出观察为 unsupported，强制回收立即报告 supervision EXIT_UNOBSERVABLE 并保留 abandoned budget lease，不等待 reapTimeoutMs，也不能提前把槽位当空闲。可观察退出超时仍报告 REAP_TIMEOUT；best-effort 准入诊断 CAPABILITY_UNSUPPORTED 不变。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
               },
               {
                 "type": "paragraph",
@@ -1253,7 +1257,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
+                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node Worker 与 Bun 1.4.3 原生 Worker 已有业务与关闭运行证据；这些结果不证明浏览器、Deno 或 Electron 的权限与退出能力。"
               }
             ]
           },
@@ -1286,6 +1290,10 @@
                   [
                     "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                     "线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。"
+                  ],
+                  [
+                    "@migaia/supervision / EXIT_UNOBSERVABLE",
+                    "退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。"
                   ],
                   [
                     "@migaia/rpc/core / INVALID_CONFIG",
@@ -1598,7 +1606,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                  "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                 }
               ]
             },
@@ -1839,8 +1847,8 @@
                     ],
                     [
                       "Bun",
-                      "The two node-entry factories",
-                      "termination and exit-observation are enforced; heap-limit remains unsupported."
+                      "The root Web factories",
+                      "termination and exit-observation are enforced; the native Worker close event settles exited. heap-limit remains unsupported."
                     ],
                     [
                       "Deno, browsers, Electron renderer",
@@ -1860,7 +1868,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node exited settles only from the real exit event. Web exited remains pending, so a bounded close may report REAP_TIMEOUT and retain an abandoned budget lease instead of falsely freeing admission capacity. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
+                  "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node settles exited from native exit and Bun from native Worker close. Deno, browsers and Electron renderer declare exit observation unsupported: forced reap immediately reports supervision EXIT_UNOBSERVABLE and retains an abandoned budget lease without waiting for reapTimeoutMs or falsely freeing admission capacity. Observable exit timeouts still report REAP_TIMEOUT; best-effort admission still reports CAPABILITY_UNSUPPORTED. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
                 },
                 {
                   "type": "paragraph",
@@ -1872,7 +1880,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
+                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. Node Workers and Bun 1.4.3 native Workers have business and shutdown evidence; these results do not establish browser, Deno, or Electron permissions and exit capabilities."
                 }
               ]
             },
@@ -1905,6 +1913,10 @@
                     [
                       "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                       "Thread CPU / memory sampling failed, with cause retained; display unavailable without changing Worker lifecycle."
+                    ],
+                    [
+                      "@migaia/supervision / EXIT_UNOBSERVABLE",
+                      "Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait."
                     ],
                     [
                       "@migaia/rpc/core / INVALID_CONFIG",
@@ -2365,7 +2377,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                  "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                 }
               ]
             },
@@ -2606,8 +2618,8 @@
                     ],
                     [
                       "Bun",
-                      "The two node-entry factories",
-                      "termination and exit-observation are enforced; heap-limit remains unsupported."
+                      "The root Web factories",
+                      "termination and exit-observation are enforced; the native Worker close event settles exited. heap-limit remains unsupported."
                     ],
                     [
                       "Deno, browsers, Electron renderer",
@@ -2627,7 +2639,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node exited settles only from the real exit event. Web exited remains pending, so a bounded close may report REAP_TIMEOUT and retain an abandoned budget lease instead of falsely freeing admission capacity. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
+                  "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node settles exited from native exit and Bun from native Worker close. Deno, browsers and Electron renderer declare exit observation unsupported: forced reap immediately reports supervision EXIT_UNOBSERVABLE and retains an abandoned budget lease without waiting for reapTimeoutMs or falsely freeing admission capacity. Observable exit timeouts still report REAP_TIMEOUT; best-effort admission still reports CAPABILITY_UNSUPPORTED. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
                 },
                 {
                   "type": "paragraph",
@@ -2639,7 +2651,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
+                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. Node Workers and Bun 1.4.3 native Workers have business and shutdown evidence; these results do not establish browser, Deno, or Electron permissions and exit capabilities."
                 }
               ]
             },
@@ -2672,6 +2684,10 @@
                     [
                       "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                       "Thread CPU / memory sampling failed, with cause retained; display unavailable without changing Worker lifecycle."
+                    ],
+                    [
+                      "@migaia/supervision / EXIT_UNOBSERVABLE",
+                      "Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait."
                     ],
                     [
                       "@migaia/rpc/core / INVALID_CONFIG",
@@ -3436,7 +3452,7 @@
           "declarationLine": 12,
           "source": "packages/rpc-threads/dist/threads/peer.d.ts",
           "purpose": "Opens a Runtime Peer to a Worker. In the parent, `spawn` starts the Worker (URL, path, `true` for the current entry, or a full source). Inside a library-launched Worker, calling it without a source connects back to the parent. Resolves after handshake.",
-          "core": "options: See `IRuntimeThreadPeerOptions`: `spawn` or `connect`, `provide`, `report` (default `defaultRpcReporter`), `defaultTimeoutMs` (default `30000`), `authentication`, `providerLimits`, `self` and `probe`.\nruntime: Advanced: custom Node `worker_threads` resource; default the real module.\nAn `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Web close may report `REAP_TIMEOUT` and retain an abandoned lease because terminate has no actual-exit receipt.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse it only when the application already owns advanced endpoint assembly for the acquired channel. The callback receives the construction signal and must return a real IRemoteServeEndpoint. Failure rolls back construction; omission uses canonical assembly.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Receives background errors that no call can reject with.\n`defaultRpcReporter`.\nSet a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nUse it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Application-supplied Core source callback that opens a borrowed channel; select exactly one source.\nOmitted: no custom connection source.\nlisten: Application-supplied Core source callback accepting channel sessions; cannot be combined with another source.\nOmitted: no custom listening source.\nspawn: Worker to start: `URL`, path string (relative to the main entry directory), `true` (the current entry), `{ entry, base?, name?, data?, limits? }`, or a full source.\nNot set: inside a library Worker connects to the parent; otherwise `connect` is needed.",
+          "core": "options: See `IRuntimeThreadPeerOptions`: `spawn` or `connect`, `provide`, `report` (default `defaultRpcReporter`), `defaultTimeoutMs` (default `30000`), `authentication`, `providerLimits`, `self` and `probe`.\nruntime: Advanced: custom Node `worker_threads` resource; default the real module.\nAn `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Explicitly unsupported exit observation, including Deno and browser Web Workers, immediately reports supervision `EXIT_UNOBSERVABLE` and retains an abandoned lease without waiting for the reap window. Bun and Node keep their observable exit paths.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse it only when the application already owns advanced endpoint assembly for the acquired channel. The callback receives the construction signal and must return a real IRemoteServeEndpoint. Failure rolls back construction; omission uses canonical assembly.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Receives background errors that no call can reject with.\n`defaultRpcReporter`.\nSet a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nUse it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Application-supplied Core source callback that opens a borrowed channel; select exactly one source.\nOmitted: no custom connection source.\nlisten: Application-supplied Core source callback accepting channel sessions; cannot be combined with another source.\nOmitted: no custom listening source.\nspawn: Worker to start: `URL`, path string (relative to the main entry directory), `true` (the current entry), `{ entry, base?, name?, data?, limits? }`, or a full source.\nNot set: inside a library Worker connects to the parent; otherwise `connect` is needed.",
           "advanced": "Move CPU-heavy parsing, compression or image work off the main thread.\nCall Worker functions with types instead of hand-written `postMessage` dispatch.\nProcess isolation (crash containment, separate permissions): use `@migaia/rpc-process`.\n`SharedArrayBuffer` / `Atomics` shared memory: rejected.",
           "parameters": [
             "options: IRuntimeThreadPeerOptions",
@@ -3512,7 +3528,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "options: See `IRuntimeThreadPeerOptions`: `spawn` or `connect`, `provide`, `report` (default `defaultRpcReporter`), `defaultTimeoutMs` (default `30000`), `authentication`, `providerLimits`, `self` and `probe`.\nruntime: Advanced: custom Node `worker_threads` resource; default the real module.\nAn `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Web close may report `REAP_TIMEOUT` and retain an abandoned lease because terminate has no actual-exit receipt.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse it only when the application already owns advanced endpoint assembly for the acquired channel. The callback receives the construction signal and must return a real IRemoteServeEndpoint. Failure rolls back construction; omission uses canonical assembly.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Receives background errors that no call can reject with.\n`defaultRpcReporter`.\nSet a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nUse it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Application-supplied Core source callback that opens a borrowed channel; select exactly one source.\nOmitted: no custom connection source.\nlisten: Application-supplied Core source callback accepting channel sessions; cannot be combined with another source.\nOmitted: no custom listening source.\nspawn: Worker to start: `URL`, path string (relative to the main entry directory), `true` (the current entry), `{ entry, base?, name?, data?, limits? }`, or a full source.\nNot set: inside a library Worker connects to the parent; otherwise `connect` is needed."
+              "content": "options: See `IRuntimeThreadPeerOptions`: `spawn` or `connect`, `provide`, `report` (default `defaultRpcReporter`), `defaultTimeoutMs` (default `30000`), `authentication`, `providerLimits`, `self` and `probe`.\nruntime: Advanced: custom Node `worker_threads` resource; default the real module.\nAn `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Explicitly unsupported exit observation, including Deno and browser Web Workers, immediately reports supervision `EXIT_UNOBSERVABLE` and retains an abandoned lease without waiting for the reap window. Bun and Node keep their observable exit paths.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse it only when the application already owns advanced endpoint assembly for the acquired channel. The callback receives the construction signal and must return a real IRemoteServeEndpoint. Failure rolls back construction; omission uses canonical assembly.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nUse the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Receives background errors that no call can reject with.\n`defaultRpcReporter`.\nSet a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nUse it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Application-supplied Core source callback that opens a borrowed channel; select exactly one source.\nOmitted: no custom connection source.\nlisten: Application-supplied Core source callback accepting channel sessions; cannot be combined with another source.\nOmitted: no custom listening source.\nspawn: Worker to start: `URL`, path string (relative to the main entry directory), `true` (the current entry), `{ entry, base?, name?, data?, limits? }`, or a full source.\nNot set: inside a library Worker connects to the parent; otherwise `connect` is needed."
             },
             {
               "id": "advanced-usage",
@@ -4251,7 +4267,7 @@
           "name": "createWebThreadChannelFactory",
           "kind": "function",
           "signature": "export declare function createWebThreadChannelFactory(options: IThreadChannelOptions): IThreadChannelFactory<IWebThreadHandle>;",
-          "declarationLine": 50,
+          "declarationLine": 53,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Creates the channel factory paired with `createWebThreadLauncher()`.",
           "core": "options: `{ scheduler, capabilities? }`; use the source scheduler. Capabilities narrow the actual launch offer, and Core retains the peer acknowledgement.\nA channel factory with `open(handle, signal)`.\nscheduler: Clock and timers, shared with the source.\ncapabilities: Local capability proposal; extensions wait for the other side acknowledgement.\nNot set: fixed basic profile, synchronous.",
@@ -4360,7 +4376,7 @@
           "name": "createWebThreadLauncher",
           "kind": "function",
           "signature": "export declare function createWebThreadLauncher(options: IWebThreadLauncherOptions): IThreadLauncher<IAdapterWebThreadHandle>;",
-          "declarationLine": 43,
+          "declarationLine": 46,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Creates a Web Worker launcher with your own `Worker` constructor (polyfill or restricted environment); for adapter authors.",
           "core": "options: `{ Worker, report, runtimeApi? }`: your `Worker` constructor and the error reporter; see `IWebThreadLauncherOptions`.\nAn `IThreadLauncher` whose handles open channels with `open(signal, options)`. Construction or initial send failure removes acquired listeners and requests termination; original native failures remain reachable, without claiming native exit confirmation.\nWorker: `Worker` constructor to use.\nThe global `Worker`.\nInject the actual module Worker constructor when the host does not expose it globally or an application supplies its own runtime. Omission reads global Worker only when launch starts; this does not add exit observation.\nreport: Receives launcher background errors.\nreport.error: The failure.\nNothing.\nAlways supply the native launcher diagnostic sink. It receives background Worker errors; there is no default callback. The owner must still close the peer and request Worker termination.\nruntimeApi: Runtime API context provided by Core; set by the source automatically.\nNot set.",
@@ -7100,7 +7116,7 @@
           "name": "isThreadChild",
           "kind": "function",
           "signature": "export declare function isThreadChild(): Promise<boolean>;",
-          "declarationLine": 20,
+          "declarationLine": 14,
           "source": "packages/rpc-threads/dist/threads/child.d.ts",
           "purpose": "Tells whether the current module runs inside a Worker started by this library, so one file can branch between parent and Worker for `spawn: true`.",
           "core": "Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.",
@@ -8097,7 +8113,7 @@
         {
           "name": "IWebThreadHandle",
           "kind": "type",
-          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
+          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
           "declarationLine": 7,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Handle of a launched Web Worker.",
@@ -8115,7 +8131,7 @@
               "kind": "property",
               "optional": false,
               "signature": "port: IThreadWebPort;",
-              "description": "Actual EventTarget message port; it does not supply an actual-exit receipt.",
+              "description": "Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt.",
               "parameterDetails": [],
               "returns": "IThreadWebPort"
             },
@@ -8133,7 +8149,7 @@
           "aliasOf": "IWebThreadHandle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;"
+            "export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8172,7 +8188,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
+          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */ port: IThreadWebPort; /** Original readiness/control Promise; resolves only after the corresponding child ACK. */ prepared: Promise<void | readonly string[]>; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -8280,7 +8296,7 @@
         {
           "name": "IWebThreadWorker",
           "kind": "type",
-          "signature": "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };",
+          "signature": "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };",
           "declarationLine": 19,
           "source": "packages/rpc-threads/dist/threads/web-launcher.d.ts",
           "purpose": "Web Worker shape created by a custom constructor.",
@@ -8298,7 +8314,7 @@
               "kind": "method",
               "optional": false,
               "signature": "terminate(): void;",
-              "description": "Request termination; this EventTarget API supplies no independently observable actual exit.",
+              "description": "Request termination; only Bun follows it with a `close` event carrying the exit code.",
               "parameterDetails": [],
               "returns": "void"
             }
@@ -8307,7 +8323,7 @@
           "aliasOf": "IWebThreadWorker",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };"
+            "export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8346,7 +8362,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadWorker:export type IWebThreadWorker = IThreadWebPort & { /** Request termination; this EventTarget API supplies no independently observable actual exit. */ terminate(): void; };",
+          "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:IWebThreadWorker:export type IWebThreadWorker = IThreadWebPort & { /** Request termination; only Bun follows it with a `close` event carrying the exit code. */ terminate(): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8597,6 +8613,10 @@
                       "线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。"
                     ],
                     [
+                      "@migaia/supervision / EXIT_UNOBSERVABLE",
+                      "退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。"
+                    ],
+                    [
                       "@migaia/rpc/core / INVALID_CONFIG",
                       "入口、来源、bootstrap、能力 ACK、portable data 或配置不合法；检查字段与 cause。"
                     ],
@@ -8728,6 +8748,10 @@
                     [
                       "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                       "线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。"
+                    ],
+                    [
+                      "@migaia/supervision / EXIT_UNOBSERVABLE",
+                      "退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。"
                     ],
                     [
                       "@migaia/rpc/core / INVALID_CONFIG",

@@ -1604,8 +1604,8 @@ export const rpcThreadsReference: ILibraryReference = {
         )
       },
       returns: t(
-        'An `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Web close may report `REAP_TIMEOUT` and retain an abandoned lease because terminate has no actual-exit receipt.',
-        '返回 `IRuntimeTypedPeer<TRemote>`；关闭时按所有者预算排空，并请求终止自己拥有的 Worker。配置错误以 `INVALID_CONFIG` 拒绝；Web 线程没有实际退出回执，关闭可能报告 `REAP_TIMEOUT` 并保留已放弃租约。'
+        'An `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Explicitly unsupported exit observation, including Deno and browser Web Workers, immediately reports supervision `EXIT_UNOBSERVABLE` and retains an abandoned lease without waiting for the reap window. Bun and Node keep their observable exit paths.',
+        '返回 `IRuntimeTypedPeer<TRemote>`；关闭时按所有者预算排空，并请求终止自己拥有的 Worker。配置错误以 `INVALID_CONFIG` 拒绝；Deno、浏览器 Web Worker 等明确不支持退出观察的路径立即报告 supervision `EXIT_UNOBSERVABLE` 并保留 abandoned 租约，不等回收窗口。Bun 和 Node 的可观察退出路径保持原样。'
       ),
       example: rpcThreadsCases.createThreadPeer![0]!.example,
       scenarios: [

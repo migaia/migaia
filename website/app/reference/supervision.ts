@@ -149,8 +149,8 @@ const base: Record<string, IMemberDoc> = {
     t('`5000` milliseconds before force.', '默认强制终止前等待 `5000` 毫秒。')
   ),
   'stop.reapTimeoutMs': p(
-    'Finite nonnegative recovery wait after force; a timed-out unit keeps its lease until actual exit.',
-    '强制终止后的有限非负回收毫秒数；超时的单元仍持有租约直到实际退出。',
+    'Finite nonnegative recovery wait after force. Explicitly unsupported exit observation reports EXIT_UNOBSERVABLE immediately; abandoned leases remain held until actual exit.',
+    '强制终止后的有限非负回收毫秒数；明确不支持退出观察时立即报告 EXIT_UNOBSERVABLE，abandoned 租约仍保留直到实际退出。',
     t('`5000` milliseconds of forced recovery.', '默认强制回收等待 `5000` 毫秒。')
   ),
   health: p(
@@ -1167,8 +1167,12 @@ const errors: Record<string, IText> = {
     '`RESOURCE_LIMIT_EXCEEDED`：资源监测发现越限；检查具体限制字段。'
   ),
   reapTimeout: t(
-    '`REAP_TIMEOUT`: recovery deadline ended before actual exit; the lease remains occupied.',
-    '`REAP_TIMEOUT`：实际退出之前回收截止已到；租约继续保持占用。'
+    '`REAP_TIMEOUT`: observable exit or pending launch exceeded its recovery deadline; the lease remains occupied.',
+    '`REAP_TIMEOUT`：可观察退出或尚未完成的启动超过回收期限；租约继续保持占用。'
+  ),
+  exitUnobservable: t(
+    '`EXIT_UNOBSERVABLE`: the launcher explicitly declares exit-observation unsupported. Force reports immediately with kind, generation and capability, publishes abandoned, and retains the lease until actual exit. Choose an observable launcher when an exit receipt is required.',
+    '`EXIT_UNOBSERVABLE`：启动器明确声明 exit-observation 不支持；强制回收立即报告 kind、generation、capability 并发布 abandoned，租约保留直到实际退出。需要退出回执时更换可观察的启动器。'
   ),
   supervisionExhausted: t(
     '`SUPERVISION_EXHAUSTED`: restart window exhausted; inspect terminal error before explicit restart.',
