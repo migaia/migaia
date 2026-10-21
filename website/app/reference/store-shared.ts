@@ -6,7 +6,7 @@
  * value. Invalid construction shapes use the native RangeError helper. snapshot guarantees a
  * consistent read per cell, not a transaction across all array elements.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { storeSharedCases } from './store-shared-cases.ts'
 
 /** Builds one localized sentence pair. */
@@ -130,6 +130,99 @@ const arrayOptions: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** Both array entry points expose the same initialization and attachment options. */
+const arrayOptionCases = (name: string): readonly IOptionCaseDoc[] => {
+  const create = `${name === 'SharedInt32Array' ? 'new ' : ''}${name}`
+  return [
+    {
+      title: t('Start a counter array from saved values', '用已保存的值初始化计数数组'),
+      problem: t(
+        'A dashboard restores two counters into an array with three cells. Without `initialValues`, every new cell starts at zero. Supply the saved prefix; cells beyond that prefix keep zero.',
+        '看板需要把两个已保存的计数恢复到三个格子的数组里。不传 `initialValues` 时，新格子全部为零。传入已保存的前缀后，其余格子仍保持零。'
+      ),
+      example: `import { createRuntime } from '@migaia/reactive'
+import { ${name} } from '@migaia/store-shared'
+
+const counters = ${create}(createRuntime(), 3, { initialValues: [12, 7] })
+console.log([...counters.snapshot()])
+counters.dispose()`,
+      result: t(
+        'The snapshot prints `[12, 7, 0]`. The third cell has no supplied initial value.',
+        '快照输出 `[12, 7, 0]`。第三个格子没有提供初值。'
+      ),
+      covers: ['initialValues']
+    },
+    {
+      title: t('Attach another reader without resetting counters', '接入新读者时保留已有计数'),
+      problem: t(
+        'Another runtime needs the same counters. Omitting `buffer` creates separate storage. Pass the writer buffer with the same length to share its data; `initialValues` is ignored when attaching, so the reader cannot reset existing counters.',
+        '另一个运行时需要读取同一组计数。不传 `buffer` 会创建独立存储。传入写者的缓冲区，并使用相同长度，就能共享数据。附着时忽略 `initialValues`，不会把已有计数重置。'
+      ),
+      example: `import { createRuntime } from '@migaia/reactive'
+import { ${name} } from '@migaia/store-shared'
+
+const writer = ${create}(createRuntime(), 2, { initialValues: [4, 8] })
+const reader = ${create}(createRuntime(), 2, {
+  buffer: writer.buffer,
+  initialValues: [99, 99]
+})
+console.log([...reader.snapshot()])
+writer.set(0, 9)
+reader.sync(0)
+console.log(reader.get(0))
+reader.dispose()
+writer.dispose()`,
+      result: t(
+        'The first output is `[4, 8]`, then `9` after the write. Both wrappers read the same storage.',
+        '先输出 `[4, 8]`，写入后输出 `9`。两个包装读取的是同一块存储。'
+      ),
+      covers: ['buffer', 'initialValues']
+    }
+  ]
+}
+
+/** Error helpers retain either a native failure or an application-provided reason. */
+const errorOptionCases = (name: string, native: string): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Keep the initialization failure', '保留初始化的原始失败'),
+    problem: t(
+      'An adapter adds context to failed counter initialization. A new message alone loses the original error and stack. Pass that error as `cause` so callers can inspect the failure that led to this one.',
+      '适配器需要为计数初始化失败补充上下文。只有新消息会丢失原始错误及堆栈。把它传给 `cause`，调用方就能查看导致当前错误的原始失败。'
+    ),
+    example: `import { ${name}, StoreSharedErrorCode } from '@migaia/store-shared'
+
+const original = new Error('saved counters could not be read')
+const error = ${name}(StoreSharedErrorCode.invalidOption, 'counter initialization failed', {
+  cause: original
+})
+console.log(error instanceof ${native}, error.cause === original)`,
+    result: t(
+      'Both comparisons print `true`; the native error class and original cause are preserved.',
+      '两个比较都输出 `true`；原生错误类型及原始原因都得到保留。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep a structured input rejection', '保留结构化的输入拒绝原因'),
+    problem: t(
+      'An input loader returns a rejection record rather than an Error. Without `cause`, converting that record into a message loses its fields. The option keeps the record itself for later inspection.',
+      '输入加载器用记录对象说明拒绝原因，而不是返回 Error。只把记录转成消息会丢失其中的字段。`cause` 保留记录本身，便于稍后检查。'
+    ),
+    example: `import { ${name}, StoreSharedErrorCode } from '@migaia/store-shared'
+
+const reason = { field: 'initialValues', value: 'unknown' }
+const error = ${name}(StoreSharedErrorCode.invalidOption, 'counter input rejected', {
+  cause: reason
+})
+console.log(error.cause === reason)`,
+    result: t(
+      'The comparison prints `true`; `error.cause` still contains the original record.',
+      '比较输出 `true`；`error.cause` 仍保存原始记录。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Package failure codes preserve native class and cause identity. */
 const errorValues = {
   arrayDisposed: t(
@@ -241,6 +334,7 @@ export const storeSharedReference: ILibraryReference = {
         )
       },
       optionDocs: arrayOptions,
+      optionCases: arrayOptionCases('sharedInt32Array'),
       returns: t(
         'SharedInt32Array owned by the caller. Range errors cover invalid options/index/value or short buffers; contention is explicit. Host memory allocation limits may also throw native failures.',
         '返回调用者拥有的共享数组，范围错误覆盖非法选项、下标、值或过短缓冲区，争用显式失败，宿主内存分配限制也可抛原生失败。'
@@ -264,6 +358,7 @@ export const storeSharedReference: ILibraryReference = {
         )
       },
       optionDocs: arrayOptions,
+      optionCases: arrayOptionCases('SharedInt32Array'),
       returns: t(
         'New SharedInt32Array local wrapper with an independent observation cursor for each shared cell. Dispose it when this Runtime no longer reads it; invalid length, header or initialization rejects construction without publishing a usable wrapper.',
         '返回为每个共享格保留独立观察游标的本地数组包装，当前运行时不再读取时应销毁，无效长度、头或初始化在发布可用包装前使构造失败。'
@@ -322,6 +417,7 @@ console.log(StoreSharedErrorCode.bufferTooSmall)`
               default: t('Omitted; no supplied cause is attached.', '默认省略，不附提供的原因。')
             }
           },
+          optionCases: errorOptionCases(name!, native!),
           returns: t(
             `Tagged native ${native} for the caller to return or throw.`,
             `返回供调用者返回或抛出的带码原生 \`${native}\`。`
