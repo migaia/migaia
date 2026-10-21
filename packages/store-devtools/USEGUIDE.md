@@ -1,416 +1,478 @@
-# `@migaia/store-devtools` 使用指南
+# `@migaia/store-devtools` 使用手册
 
-本指南逐个主题列出全部导出 API 的签名、语义与用法示例。包的定位与安装方式见 [README](./README.md)。
+为已有 Store 记录本地诊断历史，并读取真实响应式依赖图。最短入口见 [README](./README.md)。
 
-## 目录
+## 按场景查找
 
-- [诊断会话模块](#诊断会话模块)
-- [依赖树模块](#依赖树模块)
-- [命令常量模块](#命令常量模块)
-- [错误模块](#错误模块)
-- [高阶组合示例](#高阶组合示例)
-- [构建门禁](#构建门禁)
+| 需要做什么                     | 怎么组合                                               | 完整示例                                      |
+| ------------------------------ | ------------------------------------------------------ | --------------------------------------------- |
+| 回放保留状态而不新增回放历史   | createStoreDevTools → retain id → jumpTo → edit        | [代码与输出](#回放保留状态而不新增回放历史)   |
+| 分别限制历史与手动动作队列     | maxHistory / maxTrace → recordAction → clear           | [代码与输出](#分别限制历史与手动动作队列)     |
+| 报告快照失败而不打断业务写入   | Runtime.onError → clone → record                       | [代码与输出](#报告快照失败而不打断业务写入)   |
+| 释放诊断会话后继续使用 Store   | dispose → read history → use Store                     | [代码与输出](#释放诊断会话后继续使用-store)   |
+| 展开共享依赖的两条路径         | Runtime.signal / computed / effect → getDependencyTree | [代码与输出](#展开共享依赖的两条路径)         |
+| 在 effect 释放后查看当前订阅者 | getObserverTree → effect.dispose → getObserverTree     | [代码与输出](#在-effect-释放后查看当前订阅者) |
 
----
+## 运行准备
 
-<a id="诊断会话模块"></a>
+每个场景是独立的 .ts 文件，可用 Node 24 在 ESM 项目中直接运行。它们只使用真实 Store、Runtime 和公开句柄，不需要浏览器扩展。
 
-## 诊断会话模块
-
-```ts
-import {
-  createStoreDevTools,
-  type IStoreDevTools,
-  type IStoreDevToolsOptions,
-  type IStoreHistoryEntry,
-  type IActionTrace
-} from '@migaia/store-devtools';
+```bash
+pnpm add @migaia/store-devtools @migaia/store-light @migaia/reactive
 ```
 
-本包不负责创建 Store：`store` 参数必须是 `@migaia/store-light` 的 `createStore()` 返回的 `IReactiveStore<S>` 实例。内部只使用该实例已有的公开面：`store.$subscribe()`、`store.$runtime.subscribeTrace()`、`store.$runtime.reportError()`、`store.$plain()`、`store.$hydrate()`——不改写、不代理 Store 的任何写入路径。
+## 回放保留状态而不新增回放历史
 
-```ts
-type IStoreDevToolsOptions = {
-  maxHistory?: number;
-  maxTrace?: number;
-  captureRuntimeTrace?: boolean;
-  now?: () => number;
-  clone?: (state: Record<string, unknown>) => Record<string, unknown>;
-};
+排查问题时，需要回到较早的 Store 状态，再从那里继续修改。
 
-type IStoreHistoryEntry = {
-  id: number;
-  timestamp: number;
-  label: string;
-  state: Record<string, unknown>;
-};
+普通变更监听若把回放触发的注水也当成用户编辑，每跳转一次就会多记一条历史。
 
-type IActionTrace = {
-  timestamp: number;
-  name: string;
-  payload?: unknown;
-  durationMs?: number;
-  error?: unknown;
-};
+把工具接到真实 Store，保留初始 id 后调用 `jumpTo()`；会话会抑制回放产生的历史，后续真实修改仍正常记录。
 
-type IStoreDevTools = {
-  readonly history: readonly IStoreHistoryEntry[];
-  readonly actions: readonly IActionTrace[];
-  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive
-  record(label?: string): IStoreHistoryEntry;
-  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;
-  jumpTo(id: number): void;
-  clear(): void;
-  dispose(): void;
-};
+### 示例参数
 
-function createStoreDevTools<S extends Record<string, unknown>>(
-  store: IReactiveStore<S>,
-  options?: IStoreDevToolsOptions
-): IStoreDevTools;
-```
+runtime 是本例显式创建并交给 Store 的 Runtime。schedulerStrategy: (run) => run() 将调度改为同步，便于逐条观察；省略时 Runtime 默认通过注入的微任务调度。createStore 的初始 count 为 0，options.runtime 使用该实例；工具 captureRuntimeTrace: false 关闭自动 trace / action，仍保留状态历史。其余 maxHistory / maxTrace 为 100 / 1000，clone 为 diagnostic，now 为 Date.now。
 
-### 构造期校验（同步抛出）
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
 
-调用 `createStoreDevTools` 时按以下顺序做同步校验，全部失败都会在函数返回前抛出：
-
-1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。
-2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。
-3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。**非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。**
-4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。
-5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。
-
-全部通过后：
-
-- `now` 默认 `Date.now`；`clone` 默认 `ClonePolicy.diagnostic`（来自 `@migaia/store-middleware/tolerant-clone`，见[克隆策略](#克隆策略)）。
-- 立即调用一次内部的 `record()`，产生 `label: 'initial'` 的第一条历史条目——因此 `tools.history` 从创建那一刻起就不是空数组。
-- 建立 `store.$subscribe()` 订阅（状态历史）与（除非 `captureRuntimeTrace === false`）`store.$runtime.subscribeTrace()` 订阅（runtime 事件）。
-- 若订阅建立过程本身抛错：已经建立成功的订阅会被逐个 `cleanup()`；清理过程中若又有新的失败，连同原始错误一起打包成 `AggregateError`（`code: 'CLEANUP_FAILED'`）抛出；清理全部成功则原样重新抛出最初的错误。
-
-### `history`：状态历史与时间旅行
-
-`store.$subscribe()` 是 Store 自身的粗粒度订阅——任意一个可变字段变化就触发一次通知，`createStoreDevTools` 在监听器里调用内部 `record()`（默认 `label: 'state change'`）。除创建时那条 `'initial'` 外，之后每条历史的 `label` 默认都是 `'state change'`；想要更有辨识度的标签，调用方需要主动 `tools.record('before-submit')`。
-
-`state` 字段来自 `clone(store.$plain())`：`$plain()` **只包含 signal 支撑的标量字段**，computed（派生值）、方法、WASM 字段都不在其中——这是 `$plain()` 自身的行为，本包只是转发并克隆其结果。
-
-`history.length` 超过 `maxHistory` 时，`record()` 会从数组头部裁掉最旧的条目，只保留最近 `maxHistory` 条；长时间运行后早期历史（包括最初的 `'initial'`）可能已被裁掉，此后 `jumpTo()` 传入一个已裁掉的 `id` 会抛错。
-
-```ts
-record(label: string = 'state change'): IStoreHistoryEntry
-```
-
-手动拍一份当前快照并追加进 `history`，返回新创建的条目本身。内部实现先算好 `timestamp`（`now()`）与克隆后的 `state`，全部就绪后才分配 `id` 并推入队列——一次失败的克隆/时钟调用不会留下半成品条目或消耗掉 `id` 序号。
-
-```ts
-jumpTo(id: number): void
-```
-
-在 `history` 中查找 `id` 匹配的条目：
-
-1. 找不到时抛出 `RangeError('[store] unknown history entry: ${id}')`，`code: 'UNKNOWN_HISTORY_ENTRY'`。
-2. 找到后，把内部"回放深度"计数器加一，调用 `store.$hydrate(clone(entry.state))` 把状态写回该快照（这里的 `clone` 就是构造时传入或默认的克隆函数，防止历史条目的引用在 `$hydrate` 过程中被业务代码污染），`finally` 里把计数器减一。
-3. `$hydrate()` 是"宽松写回"：只写已知的 signal 字段，未知/派生/WASM 键静默跳过（`@migaia/store-light` 的默认行为），因此 `jumpTo()` 不会恢复 computed 值本身（它们会随依赖的 signal 变化自动重新计算），也不会恢复 WASM 字段或外部资源的状态。
-4. `$hydrate()` 触发的 Store 通知会重新走一遍 `$subscribe` 监听器，但由于回放深度计数器 `> 0`，这次通知**不会**被当成新的用户操作再记一条历史，避免每次 `jumpTo()` 都在历史末尾追加一条"跳转产生的历史"。用计数器而不是布尔值是为了处理嵌套回放：某个 `$subscribe` 监听器若在回放期间又触发了另一次 `jumpTo()`，内层结束时不能提前解除外层的回放屏蔽，否则外层剩余的通知会被误记。
-
-会话释放后（`disposed === true`）调用 `jumpTo` 会先在存活检查处失败（见 [`dispose`](#dispose-与生命周期)），不会走到上述查找逻辑。
-
-```ts
-clear(): void
-```
-
-清空 `history`、`actions`、`trace` 三个队列（长度归零），随后立即调用一次内部 `record('initial')`——清空后 `history` 不是空数组，而是重新只有一条 `'initial'`；`id` 计数器不归零，继续从上一次的 `nextId` 累加。
-
-### `actions`：action 追踪
-
-`@migaia/store-light` 的 Store 会把定义时写的每个方法自动包装成一次具名 action（名字是 `<debugName>.<方法名>`），内部经 `store.$runtime.runTracedAction()` 执行，广播 `type: 'action'`、`phase: 'start' | 'end' | 'error'` 的 runtime trace 事件。`createStoreDevTools` 订阅这条 trace 流，收到 `phase !== 'start'`（即 `'end'` 或 `'error'`）的 action 事件时自动调用内部 `recordAction()`，生成一条 `IActionTrace`（`error` 字段仅在 `phase === 'error'` 时有值）。
-
-**只有 Store 自己方法产生的 action 会被自动记录**：`store.$batch()`、`store.$set()`、`store.$hydrate()` 内部走的是底层写入路径，不经过 `runTracedAction()`，因此不会自动出现在 `actions` 里；关心这类调用需要自行调用下面的 `recordAction()`。
-
-```ts
-recordAction(trace: Omit<IActionTrace, 'timestamp'>): void
-```
-
-手动追加一条 action 记录，`timestamp` 由内部 `now()` 补上。`actions.length` 超过 `maxTrace` 时淘汰最旧条目。`actions` 与 `trace` 共用同一个配置上限，但各自使用独立的有界队列，因此一条队列增长不会占用另一条队列的容量；当前没有独立的 `maxActions` 选项。
-
-把 `options.captureRuntimeTrace` 设为 `false` 会连带关闭 action 的自动记录（两者共享同一条 trace 订阅），此时 `actions` 只能靠手动 `recordAction()` 填充。
-
-存活检查：`record`/`recordAction`/`jumpTo`/`clear` 四个方法调用时都先检查 `disposed`，已释放会话立即抛 `Error('[store] DevTools session is disposed')`，`code: 'SESSION_DISPOSED'`。
-
-### `trace`：runtime 原始事件流
-
-`trace` 原样保存 `@migaia/reactive` runtime 广播的 `IRuntimeTraceEvent`：
-
-```ts
-type IRuntimeTraceEvent =
-  | {
-      type: 'observable-change';
-      timestamp: number;
-      observable: IRuntimeNodeDescriptor;
-      reason: 'set' | 'notify';
-    }
-  | {
-      type: 'dependency';
-      timestamp: number;
-      phase: 'connect' | 'disconnect';
-      observable: IRuntimeNodeDescriptor;
-      observer: IRuntimeNodeDescriptor;
-      reason?: 'retrack' | 'invalidate' | 'dispose';
-    }
-  | {
-      type: 'observer-run';
-      timestamp: number;
-      phase: 'start' | 'end' | 'error';
-      observer: IRuntimeNodeDescriptor;
-      durationMs?: number;
-      error?: unknown;
-    }
-  | {
-      type: 'action';
-      timestamp: number;
-      phase: 'start' | 'end' | 'error';
-      name: string;
-      durationMs?: number;
-      error?: unknown;
-    };
-
-type IRuntimeNodeDescriptor = Readonly<{
-  id: string;
-  kind: 'observable' | 'observer' | 'computed';
-  debugName?: string;
-}>;
-```
-
-前三种事件按具体事件类型携带节点描述符；action 仅携带 name/durationMs/error，没有通用节点描述符。事件联合由 `@migaia/reactive` 维护，本包不转换事件。`trace.length` 超过 `maxTrace` 时从头部裁掉最旧条目。`captureRuntimeTrace: false` 完全跳过这条订阅，`trace` 永远是空数组。
-
-### 快照/克隆失败与诊断上报
-
-`record()`/`recordAction()` 内部若抛错（例如自定义 `clone` 函数本身抛错，或 `now()` 抛错），会在 `$subscribe`/`subscribeTrace` 的监听器里被捕获：先尝试 `store.$runtime.reportError(error, { phase: 'trace-listener' })` 上报；如果这一步本身又抛错，退化为 `globalThis.reportError`（若存在）或 `console.error`，且这一步再失败也会被吞掉。**诊断工具的故障不会反过来打断正常的业务写入**——触发这次状态变化的业务代码不会因为快照失败而跟着抛错。
-
-<a id="克隆策略"></a>
-
-### 克隆策略
-
-`options.clone` 默认是 `ClonePolicy.diagnostic`（`@migaia/store-middleware/tolerant-clone`）：优先用 `structuredClone`；成功时使用其克隆结果，普通自定义 Class 可能被转成普通对象；失败时递归遍历普通对象/数组，在无法继续克隆的值上退化为引用共享。这是尽力诊断策略，不保证保留原型或完全隔离。如果状态里包含敏感字段（token、密码等），默认克隆策略**不会做任何脱敏**——要么不让这些字段进入 `store.$plain()`（不用 signal 承载），要么传一个自行脱敏的 `clone` 函数替换默认值（见 README 的[高阶组合示例 5](./README.md#高阶组合示例)）。
-
-<a id="dispose-与生命周期"></a>
-
-### `dispose()` 与生命周期
-
-```ts
-dispose(): void
-```
-
-取消 `store.$subscribe()` 的订阅、取消 runtime trace 的监听（如果启用了的话），并把内部标记为已释放。清理时若有失败：只有一个失败直接重新抛出该错误；多个失败打包成 `AggregateError`（`code: 'CLEANUP_FAILED'`，`errors` 保留每一个原始失败）。`dispose()` 本身幂等——第二次及以后的调用直接返回，不会重复清理也不会抛错。
-
-释放之后：
-
-- `record`/`recordAction`/`jumpTo`/`clear` 均抛 `Error('[store] DevTools session is disposed')`，`code: 'SESSION_DISPOSED'`。
-- 只读属性 `history`/`actions`/`trace` 仍可正常读取，只是不会再增长。
-
-**必须在不再需要诊断时调用 `dispose()`**：不调用的话，`$subscribe()` 建立的订阅和 trace 监听器会一直挂在 Store 和 Runtime 上，既造成内存泄漏，也会让每次状态变化都多付出一次快照克隆的开销。典型用法是只在开发构建下创建、组件卸载或调试会话结束时释放。
-
----
-
-<a id="依赖树模块"></a>
-
-## 依赖树模块
-
-```ts
-import {
-  getDependencyTree,
-  getObserverTree,
-  type IDependencyTreeNode
-} from '@migaia/store-devtools';
-```
-
-`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用。公开句柄类型 `IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect` 来自 `@migaia/reactive`；实现层图协议 `IObservable`/`IObserver` 来自 `@migaia/reactive/extension`。传入 Runtime 工厂创建的真实节点即可，本包按既有图关系读取 `deps`/`subs`/`version`。
-
-```ts
-type IDependencyTreeNode = {
-  kind: 'observable' | 'observer';
-  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'
-  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号
-  children: IDependencyTreeNode[];
-  circular?: boolean; // 该节点在当前递归路径上被重复访问
-};
-
-function getDependencyTree(
-  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,
-  maxDepth?: number
-): IDependencyTreeNode;
-function getObserverTree(
-  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,
-  maxDepth?: number
-): IDependencyTreeNode;
-```
-
-### `maxDepth` 校验
-
-两个函数的第二参数 `maxDepth` 默认 `20`，必须是 `>= 0` 的安全整数，否则同步抛出 `RangeError('[store] DevTools ${name} maxDepth must be a non-negative safe integer')`（`name` 分别是 `'dependency tree'`/`'observer tree'`），`code: 'INVALID_OPTION'`。
-
-### `getDependencyTree(observer, maxDepth = 20)`
-
-从一个 observer（典型是 Effect 或 Computed）出发，向上展开它依赖的每个 observable，再递归展开这些 observable 自己的依赖（如果一个 observable 同时也是 observer，例如 Computed）。根节点 `kind: 'observer'`，本身没有 `version` 字段。`maxDepth = 0` 时连根节点的直接边都不展开（`children` 为空数组）。
-
-### `getObserverTree(observable, maxDepth = 20)`
-
-方向相反：从一个 observable（典型是 Signal）出发，向下展开订阅它的每个 observer，再递归展开这些 observer 自己的订阅者。根节点 `kind: 'observable'`，携带 `version`。
-
-### 循环判定
-
-依赖图里"菱形共享"（同一个节点被两条不同路径各引用一次）很常见，那**不算**循环。判定用的是**当前这一条递归路径**，不是全局访问集合：进入一个节点前把它加入 `path` 集合（`Set<object>`），展开完子节点后（`finally` 里）再移出；只有在展开过程中重新踩到"仍然在当前路径栈上"的节点，才会把该节点标记 `circular: true` 并停止继续展开它的子节点。真正的自环/环形依赖会被正确截断，不会无限递归；菱形共享的两条分支各自都能正常展开到底。
-
-```ts
-getDependencyTree(someEffect, 5);
-// {
-//   kind: 'observer', label: 'someEffect',
-//   children: [
-//     { kind: 'observable', label: 'count', version: 3, children: [] }
-//   ]
-// }
-```
-
----
-
-<a id="命令常量模块"></a>
-
-## 扩展协议迁移
-
-`StoreDevtoolsCommand` / `IStoreDevtoolsCommand` 已从本地诊断入口移除。自建桥接改为：
-
-```ts
-import { ReduxDevToolsCommand, type IReduxDevToolsCommand } from '@migaia/store-middleware';
-```
-
-六个值保持 `DISPATCH` / `COMMIT` / `JUMP_TO_STATE` / `JUMP_TO_ACTION` / `ROLLBACK` / `RESET`。实际消费者 `createReduxDevToolsAdapter` 也使用这份词表；本包不新增扩展桥接层。
-
----
-
-<a id="错误模块"></a>
-
-## 错误模块
-
-```ts
-import {
-  StoreDevtoolsErrorCode,
-  type IStoreDevtoolsErrorCode,
-  STORE_DEVTOOLS_SOURCE,
-  createStoreDevtoolsError,
-  createStoreDevtoolsRangeError,
-  createStoreDevtoolsAggregateError
-} from '@migaia/store-devtools';
-```
-
-包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。
-
-```ts
-const STORE_DEVTOOLS_SOURCE: '@migaia/store-devtools';
-```
-
-### `StoreDevtoolsErrorCode`
-
-```ts
-const StoreDevtoolsErrorCode: {
-  readonly sessionDisposed: 'SESSION_DISPOSED';
-  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';
-  readonly invalidOption: 'INVALID_OPTION';
-  readonly cleanupFailed: 'CLEANUP_FAILED';
-  readonly callbackFailed: 'CALLBACK_FAILED';
-};
-type IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];
-```
-
-| 码值                    | 触发场景                                                                                                                                                               | 抛出的错误类型                                            |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `SESSION_DISPOSED`      | 会话 `dispose()` 后继续调用 `record`/`recordAction`/`jumpTo`/`clear`                                                                                                   | `Error`                                                   |
-| `UNKNOWN_HISTORY_ENTRY` | `jumpTo(id)` 传了一个不在 `history` 里的 `id`（含已被 `maxHistory` 裁掉的）                                                                                            | `RangeError`                                              |
-| `INVALID_OPTION`        | `createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数 | `Error`（options 校验）或 `RangeError`（`maxDepth` 校验） |
-| `CALLBACK_FAILED` | 未分类的 clock、clone 或 action 属性读取失败 | 原生错误同一实例；不可注记值保留在 cause |
-| `CLEANUP_FAILED`        | 多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败                                                                                                                   | `AggregateError`，`errors` 保留每个原始失败               |
-
-`SESSION_DISPOSED`/`UNKNOWN_HISTORY_ENTRY` 是永久性错误：调用方应新建会话或检查 `id` 是否仍存活于 `history`，不要重试同一次调用。
-
-### 错误工厂函数
-
-```ts
-function createStoreDevtoolsError(
-  code: IStoreDevtoolsErrorCode,
-  message: string,
-  options?: { readonly cause?: unknown }
-): Error;
-
-function createStoreDevtoolsRangeError(code: IStoreDevtoolsErrorCode, message: string): RangeError;
-
-function createStoreDevtoolsAggregateError(
-  code: IStoreDevtoolsErrorCode,
-  errors: readonly unknown[],
-  message: string
-): AggregateError;
-```
-
-三者都是本包用于构造带 `(source, code)` 标记错误的内部工厂，一并从公开入口导出，供需要抛出同风格错误的调用方复用（例如自定义 `clone` 内部转发校验失败）：
-
-- `createStoreDevtoolsError`：构造普通 `Error`；`options.cause` 提供时会传入 `Error` 构造函数的 `{ cause }` 选项。
-- `createStoreDevtoolsRangeError`：构造 `RangeError`，用于调用方需要 `instanceof RangeError` 分支处理的场景（本包自身用它构造 `maxDepth`/`unknownHistoryEntry` 相关错误）。
-- `createStoreDevtoolsAggregateError`：构造 `AggregateError(errors, message)`，`errors` 原样保留、不做去重或规整。
-
-```ts
-const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option', {
-  cause: originalError
-});
-error.message; // 'bad option'
-(error as { code?: string }).code; // 'INVALID_OPTION'
-(error as { source?: string }).source; // '@migaia/store-devtools'
-```
-
----
-
-<a id="高阶组合示例"></a>
-
-## 高阶组合示例
-
-见 [README.md 的高阶组合示例](./README.md#高阶组合示例)：开发期挂载/卸载释放、手动锚点 + 时间旅行、关闭 runtime trace 降低开销、双向依赖树排查、自定义 `clone` 脱敏。这里补充两个更细节的排查场景。
-
-### 6. 用 `trace` 精确定位一次意外的多余重算
-
-```ts
-import { createStoreDevTools } from '@migaia/store-devtools';
-
-const tools = createStoreDevTools(store);
-store.recompute();
-
-const observerRuns = tools.trace.filter((event) => event.type === 'observer-run');
-console.log(observerRuns.map((event) => [event.observer.debugName, event.phase, event.durationMs]));
-```
-
-### 7. `jumpTo` 抛 `UNKNOWN_HISTORY_ENTRY` 时按错误码分支处理
-
-```ts
-import { StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode } from '@migaia/store-devtools';
-
+const runtime = createRuntime({ schedulerStrategy: (run) => run() })
+const store = createStore({ count: 0 }, { runtime })
+const tools = createStoreDevTools(store, { captureRuntimeTrace: false })
 try {
-  tools.jumpTo(staleId);
-} catch (error) {
-  if (
-    (error as { code?: IStoreDevtoolsErrorCode }).code ===
-    StoreDevtoolsErrorCode.unknownHistoryEntry
-  ) {
-    console.warn('该历史条目已被裁剪，改用当前 history 里最早的一条');
-    tools.jumpTo(tools.history[0].id);
-  } else {
-    throw error;
-  }
+  const initial = tools.history[0]!
+  store.count = 1
+  store.count = 2
+  console.log(store.count, tools.history.length)
+  tools.jumpTo(initial.id)
+  console.log(store.count, tools.history.length)
+  store.count = 1
+  console.log(store.count, tools.history.length)
+  console.log(initial.state.count, Object.isFrozen(initial.state))
+} finally {
+  tools.dispose()
+  await store.$dispose()
 }
 ```
 
----
+输出：
 
-<a id="构建门禁"></a>
-
-## 构建门禁
-
-```bash
-pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
+```text
+2 3
+0 3
+1 4
+0 true
 ```
 
-准备快照或 action 后、发布前再次检查终态；若 clock/clone/getter 在准备中释放会话，抛 `SESSION_DISPOSED`，不追加队列或消耗 history id。history 条目和 state 为浅冻结，actions 仅返回数组冻结，公开字段类型本身没有额外 readonly 修饰。
+输出为 `2 3`、`0 3`、`1 4`、`0 true`：回放恢复计数但不追加历史，后续修改继续记录，初始状态保持浅冻结。
+
+`jumpTo` 只向 Store 已知字段注水，不会撤销外部副作用、恢复已淘汰条目，也不保证所有诊断值都完全深度隔离。
+
+## 分别限制历史与手动动作队列
+
+长时间调试时，需要只保留少量最近状态，同时留下选定的手动动作说明。
+
+共用一个队列会让动作说明挤掉状态；把清空当成新会话，还可能重用旧 id，留下含混的锚点。
+
+分别设置 `maxHistory`、`maxTrace`，关闭自动追踪并追加手动动作，再清空并检查新的初始条目。
+
+### 示例参数
+
+maxHistory 和 maxTrace 均覆盖为 2，分别限制不同队列；captureRuntimeTrace 为 false 时手动 recordAction 仍可用。now: () => 100 返回确定时间戳，省略为 Date.now。recordAction.name 是说明，timestamp 由工具补；jumpTo 接收历史 id，clear 无参数且不重置序号。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+
+const runtime = createRuntime({ schedulerStrategy: (run) => run() })
+const store = createStore({ count: 0 }, { runtime })
+const tools = createStoreDevTools(store, {
+  maxHistory: 2,
+  maxTrace: 2,
+  captureRuntimeTrace: false,
+  now: () => 100
+})
+try {
+  const initialId = tools.history[0]!.id
+  store.count = 1
+  store.count = 2
+  store.count = 3
+  for (const name of ['第一', '第二', '第三']) tools.recordAction({ name })
+  console.log(tools.history.map((entry) => entry.state.count).join(','))
+  console.log(tools.actions.map((entry) => entry.name).join(','), tools.trace.length)
+  try {
+    tools.jumpTo(initialId)
+  } catch (error) {
+    const failure = error as Error & { code?: string }
+    if (failure.code !== 'UNKNOWN_HISTORY_ENTRY') throw error
+    console.log(failure instanceof RangeError, failure.code)
+  }
+  tools.clear()
+  console.log(
+    tools.history[0]!.id,
+    tools.history[0]!.label,
+    tools.actions.length,
+    tools.trace.length
+  )
+} finally {
+  tools.dispose()
+  await store.$dispose()
+}
+```
+
+输出：
+
+```text
+2,3
+第二,第三 0
+true UNKNOWN_HISTORY_ENTRY
+5 initial 0 0
+```
+
+输出为 `2,3`、`第二,第三 0`、`true UNKNOWN_HISTORY_ENTRY`、`5 initial 0 0`：两个队列各自保留最近条目，清空也不重置 id 序列。
+
+`maxHistory` 默认 `100`；`maxTrace` 默认分别为 actions、trace 保留 `1000` 条，`captureRuntimeTrace: false` 也会关闭自动动作捕获。
+
+## 报告快照失败而不打断业务写入
+
+普通 Store 更新期间，诊断快照回调可能失败，但业务写入仍应可用。
+
+让该回调从 Store 监听器直接逃出，就把调试失败变成业务失败；准备完成前先占用 id，也会在失败后留下空号。
+
+使用真实 Runtime 报告入口和会失败的克隆回调；自动捕获报告原错，手动 `record()` 则在发布前抛出它。
+
+### 示例参数
+
+Runtime onError 接收真实错误，本例收集到 reports，省略时使用 Runtime 默认报告器。clone 是应用回调，这里只做浅展开；fail 开启后抛出同一个 TypeError，默认 clone 则为 diagnostic。captureRuntimeTrace 为 false 使本例只考察状态快照失败；手动 record 未传 label，默认 state change。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+
+const reports: unknown[] = []
+const runtime = createRuntime({
+  schedulerStrategy: (run) => run(),
+  onError: (error) => {
+    reports.push(error)
+  }
+})
+const store = createStore({ count: 0 }, { runtime })
+const original = new TypeError('诊断快照失败')
+let fail = false
+const tools = createStoreDevTools(store, {
+  captureRuntimeTrace: false,
+  clone: (state) => {
+    if (fail) throw original
+    return { ...state }
+  }
+})
+try {
+  fail = true
+  store.count = 1
+  console.log(store.count, tools.history.length)
+  console.log(reports[0] === original, (original as Error & { code?: string }).code)
+  try {
+    tools.record()
+  } catch (error) {
+    if (error !== original) throw error
+    console.log(error === original)
+  }
+  fail = false
+  console.log(tools.record().id)
+} finally {
+  tools.dispose()
+  await store.$dispose()
+}
+```
+
+输出：
+
+```text
+1 1
+true CALLBACK_FAILED
+true
+2
+```
+
+输出为 `1 1`、`true CALLBACK_FAILED`、`true`、`2`：写入成功，自动报告保留原 TypeError，手动记录抛出同一个错误，恢复后使用下一个 id。
+
+这里隔离的只是诊断准备失败；回放克隆的未归属失败会带 `CALLBACK_FAILED` 抛出，Store 注水仍沿自身失败路径传播；此自定义克隆仅作浅展开。
+
+## 释放诊断会话后继续使用 Store
+
+调试面板关闭后，应用仍需要它刚才查看的 Store。
+
+面板退出时连 Store 一起释放，会越过应用的所有权边界；保留诊断监听器，又会让隐藏历史继续增长。
+
+只释放诊断会话，保留其只读队列，再继续写真实 Store；新的诊断修改会被拒绝。
+
+### 示例参数
+
+dispose 不接参数、同步且幂等；释放后 record 拒绝，但 history 数组快照仍可读取。Store 与 Runtime 是借用资源，tools.dispose 不销毁它们。本例 finally 另行调用 store.$dispose；Runtime 的调度与 Store 初始值同前几例。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+
+const runtime = createRuntime({ schedulerStrategy: (run) => run() })
+const store = createStore({ count: 0 }, { runtime })
+const tools = createStoreDevTools(store, { captureRuntimeTrace: false })
+try {
+  tools.dispose()
+  tools.dispose()
+  store.count = 1
+  console.log(store.count, tools.history.length)
+  try {
+    tools.record()
+  } catch (error) {
+    const failure = error as Error & { code?: string }
+    if (failure.code !== 'SESSION_DISPOSED') throw error
+    console.log(failure.code)
+  }
+  store.count = 2
+  console.log(store.count)
+} finally {
+  tools.dispose()
+  await store.$dispose()
+}
+```
+
+输出：
+
+```text
+1 1
+SESSION_DISPOSED
+2
+```
+
+输出为 `1 1`、`SESSION_DISPOSED`、`2`：重复释放无额外影响，旧历史仍可读且不增长，调用方拥有的 Store 仍能写入。
+
+会话释放只移除 Store 与 Runtime 订阅，不清空队列，也不释放借用的 Store；调用方最后单独释放 Store。
+
+## 展开共享依赖的两条路径
+
+两个计算值共享一个信号，effect 同时读取两者；排查时需要看见回到同一信号的两条路径。
+
+全局已访问集合可能把第二条共享路径误标为环，或直接省略它，尽管它并没有递归回到自身。
+
+用真实 Runtime 句柄组成菱形依赖，再检查 effect；遍历只跟踪当前路径，并遵守显式深度上限。
+
+### 示例参数
+
+signal 的初值为 1，left / right 的函数分别读取来源信号，effect 读取两者以建立真实依赖。debugName 是诊断标签，省略时树依次回退到 constructor.name / AnonymousReactiveNode。getDependencyTree 的第二参数默认 20，本例另传 0 验证不展开直接边；函数不拥有这些句柄，最后由创建者释放。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { getDependencyTree } from '@migaia/store-devtools'
+
+const runtime = createRuntime()
+const source = runtime.signal(1, { debugName: '来源' })
+const left = runtime.computed(() => source.value + 1, { debugName: '左分支' })
+const right = runtime.computed(() => source.value + 2, { debugName: '右分支' })
+const view = runtime.effect(
+  () => {
+    void (left.value + right.value)
+  },
+  { debugName: '视图' }
+)
+try {
+  const tree = getDependencyTree(view)
+  console.log(tree.label, tree.children.map((node) => node.label).join(','))
+  console.log(tree.children.map((node) => node.children[0]!.label).join(','))
+  console.log(tree.children.every((node) => node.children[0]!.circular !== true))
+  console.log(getDependencyTree(view, 0).children.length)
+} finally {
+  view.dispose()
+  left.dispose()
+  right.dispose()
+  source.dispose()
+}
+```
+
+输出：
+
+```text
+视图 左分支,右分支
+来源,来源
+true
+0
+```
+
+输出为 `视图 左分支,右分支`、`来源,来源`、`true`、`0`：共享依赖的两条路径都展开，且没有环标记；深度为零时不展开直接边。
+
+默认深度为 `20`，必须是非负安全整数；返回的是上游关系的即时视图，不会新增订阅，也不会执行 effect。
+
+## 在 effect 释放后查看当前订阅者
+
+一个信号通过计算值供两个 effect 使用，但其中一个面板已经停止观察。
+
+另外维护订阅者清单，容易留下已经关闭的面板，误导排查人员判断哪些观察者还会重跑。
+
+直接读取真实信号的下游树，用公开句柄释放一个 effect，再次检查；整个过程不需要创建诊断会话。
+
+### 示例参数
+
+count 初值 2，total 为 count × 2，两 effect 读取它；debugName 标识本例各节点。getObserverTree 接受真实 signal / computed 句柄，maxDepth 默认 20，显式 0 仅返回根。返回树不是持续订阅；first.dispose 后需重新调用函数取得当前关系。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { getObserverTree } from '@migaia/store-devtools'
+
+const runtime = createRuntime()
+const count = runtime.signal(2, { debugName: '计数' })
+const total = runtime.computed(() => count.value * 2, { debugName: '合计' })
+const first = runtime.effect(
+  () => {
+    void total.value
+  },
+  { debugName: '第一个' }
+)
+const second = runtime.effect(
+  () => {
+    void total.value
+  },
+  { debugName: '第二个' }
+)
+try {
+  const before = getObserverTree(count)
+  console.log(before.label, before.children[0]!.label)
+  console.log(before.children[0]!.children.map((node) => node.label).join(','))
+  first.dispose()
+  console.log(
+    getObserverTree(count)
+      .children[0]!.children.map((node) => node.label)
+      .join(',')
+  )
+  console.log(getObserverTree(count, 0).children.length)
+} finally {
+  first.dispose()
+  second.dispose()
+  total.dispose()
+  count.dispose()
+}
+```
+
+输出：
+
+```text
+计数 合计
+第一个,第二个
+第二个
+0
+```
+
+输出为 `计数 合计`、`第一个,第二个`、`第二个`、`0`：重新取得的树反映了公开 effect 释放，深度为零则省略全部订阅边。
+
+默认深度为 `20`；返回的树是即时数据，下一次订阅变化后不会自行更新，需要再次读取。
+
+## 契约细节
+
+### 职责与完整公开面
+
+本包是已有 Store 的本地诊断会话，不创建 Store，不改写或代理写入路径。它使用 Store 的 $subscribe、$runtime.subscribeTrace / reportError、$plain、$hydrate，记录内存历史和 action，另提供两个不依赖会话的响应式图遍历函数。适合排查字段变化、动作失败和节点依赖，不是持久化审计、网络回放或外部副作用的事务回滚。
+
+唯一入口为 `@migaia/store-devtools`，导出 createStoreDevTools、getDependencyTree、getObserverTree、五种公开数据类型、错误码与三个错误工厂。reactive、store-light、store-middleware、utils 是运行时依赖；示例直接导入 reactive / store-light 时仍应直接安装它们。
+
+本包不实现浏览器扩展协议。要连接 Redux DevTools，使用 [Store Middleware](../store-middleware/README.md) 的 createReduxDevToolsAdapter / connectDevTools。原 StoreDevtoolsCommand / IStoreDevtoolsCommand 已移出此入口；自建桥接改为从 store-middleware 导入 ReduxDevToolsCommand / IReduxDevToolsCommand。六个协议值保持 DISPATCH、COMMIT、JUMP_TO_STATE、JUMP_TO_ACTION、ROLLBACK、RESET；这是导入位置的迁移，不是新增协议层。
+
+### 构造参数与订阅边界
+
+`createStoreDevTools<S>(store, options?)` 同步返回 IStoreDevTools。store 必须是 createStore 返回的真实 `IReactiveStore<S>`；会话借用 Store 和 Runtime，不拥有或销毁它们。options 省略为空对象。
+
+| 选项                | 默认值与行为                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| maxHistory          | 100；仅限制 history，必须是正安全整数。                                                   |
+| maxTrace            | 1000；分别限制 actions 和 trace 的独立队列，没有 maxActions。                             |
+| captureRuntimeTrace | 缺省启用；只有严格等于 false 才完全跳过 Runtime trace 订阅，actions 也不再自动填充。      |
+| now                 | Date.now；为历史和 action 记录提供时间戳，显式提供时必须是函数。                          |
+| clone               | ClonePolicy.diagnostic；接收 $plain() 或历史 state 并返回记录对象，显式提供时必须是函数。 |
+
+null / 非对象 options 以 INVALID_OPTION 拒绝；反射或 option 属性读取失败也使用该码，并在 cause 保留捕获的原错。构造读取描述符后读取五个选项，getter 可能在这些属性读取中执行；它不是“完全不执行 getter”的接纳方式。maxHistory / maxTrace 经空值回退后校验，不把 0、负数、分数、无穷或 NaN 静默夹到合法值。now / clone 的非函数配置同样在订阅前拒绝。
+
+通过配置校验后，先同步创建第一条 initial 历史，再订阅当前 Store 的粗粒度状态通知。开启 trace 时订阅的是这个 Store 所用的整个 Runtime，因此共享 Runtime 上其他 Store 或 runTracedAction 的动作也可能进入 actions / trace；它们不自动按本 Store 身份过滤。配置失败不建立订阅；订阅建立失败则尝试释放已取得订阅，主错与回滚错误的保留方式见错误章节。
+
+### 历史、回放与清空
+
+| 成员           | 输入、输出与效果                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| history        | 每次读取返回按时间顺序排列的新冻结数组，元素为 IStoreHistoryEntry。                                                |
+| record(label?) | label 默认 state change；先准备时间戳和状态，再分配 id、追加记录，并返回该条目。                                   |
+| jumpTo(id)     | 必填历史 id；找不到（含已裁剪）抛 UNKNOWN_HISTORY_ENTRY RangeError，找到则 clone(state) 后交给 Store 的 $hydrate。 |
+| clear()        | 无参数；先准备新的 initial，再清三队列并发布这一条，id 继续递增，不归零。                                          |
+
+IStoreHistoryEntry 含 id、timestamp、label、state；公开字段类型没有额外 readonly 修饰，但发布时 entry 与 state 顶层实际冻结。history 的数组快照不随之后入队而变化，嵌套 state 的隔离程度由 clone 决定，不保证任意对象图深冻结。超出 maxHistory 后淘汰最早条目，包括 initial；保留已裁剪 id 也不能继续 jumpTo。
+
+默认 record 从 clone(store.$plain()) 取状态。$plain 只包含 Store 的 signal 支撑字段，不含 computed、方法或 WASM 字段。默认 diagnostic clone 通过公共 structured-clone-first owner 尽力复制；不可克隆或不安全子树可能保持引用，自定义类也不保证原型保持。它不自动脱敏；需要剔除 token 等字段时，应用应提供明确的 clone，或不让敏感值进入可记录状态。
+
+record / clear 的准备失败不发布半条历史，也不消耗下一个 id；clear 准备失败保留全部旧队列。准备完成后还会检查会话是否已被回调释放，已释放则 SESSION_DISPOSED，不发布数据。
+
+jumpTo 不是撤销业务的事务。$hydrate 只写已知 signal 字段，未知、派生、WASM 键按 Store 自身规则跳过；computed 随依赖重算，不直接恢复派生结果、外部资源或已发出的网络请求。回放深度计数只屏蔽同步回放期间新增 history，支持嵌套 jumpTo，不屏蔽 Runtime trace / action，也不承诺取消之后调度的通知。回放 clone 失败同样经既有 CALLBACK_FAILED 分类并保留原错或 cause；$hydrate 的失败继续沿 Store 上游路径传播，不把整次回放任意异常都改成本包码。
+
+### Action 与 Runtime trace
+
+| 数据                 | 字段与记录时机                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| IActionTrace         | timestamp、name，及可选 payload、durationMs、error。                                                        |
+| actions              | Runtime action 的非 start 事件自动生成记录；maxTrace 限制条数。                                             |
+| recordAction(action) | 必填去掉 timestamp 的 action 对象，通常至少 name；读取自身可枚举属性后由 now() 补时间戳，再检查终态并发布。 |
+| trace                | 保存原始 IRuntimeTraceEvent，独立受 maxTrace 限制，不转换事件对象。                                         |
+
+Store 定义中的方法由 Store 包装成具名 action，名称通常为 debugName.方法名。成功 end 和失败 error 都会记录，error 字段只在失败时提供。$batch / $set / $hydrate 不经 Store 方法的 runTracedAction 包装，不能因此期待自动出现 action；可自行 recordAction。captureRuntimeTrace 为 false 时 trace 保持空，actions 仍接受手动记录。它关闭一条诊断订阅，不关闭状态历史，也不改变 Store 写入策略。
+
+| trace.type        | 主要字段与取值                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| observable-change | timestamp、observable、reason 为 set / notify。                                                                 |
+| dependency        | timestamp、observable、observer，phase 为 connect / disconnect，可选 reason 为 retrack / invalidate / dispose。 |
+| observer-run      | timestamp、observer，phase 为 start / end / error，可选 durationMs / error。                                    |
+| action            | timestamp、name，phase 为 start / end / error，可选 durationMs / error。                                        |
+
+节点描述符含 id、kind（observable / observer / computed）和可选 debugName；action 没有通用节点描述符。此联合由 reactive 维护，trace 的 timestamp 与 durationMs 使用 Runtime 的记录语义，不能假定都来自本会话 now。
+
+actions / trace getter 每次也返回新冻结数组，但 action 条目和 trace 事件对象本身不被冻结，payload、error 等嵌套值保留引用。三条队列分别有界，不是总字节或整个应用内存上限；读取数组也会分配快照，不提供未经测量的速度结论。
+
+### 回调失败与生命周期
+
+记录准备中的 now、clone，回放 clone，以及 recordAction 属性读取失败由 CALLBACK_FAILED 分类。可注记、尚无身份的原生错误保留同一对象、类型和 stack；已有完整外包 source/code 则保留，冻结错误、非 Error 或身份冲突值以 cause 保留，反射身份读取失败也保留在聚合错误中。手动 record / recordAction / clear 及 jumpTo 的克隆准备抛错；自动 Store / Runtime 监听把失败交给 Runtime.reportError，phase 为 trace-listener，不反过来让已触发的正常业务写入因诊断失败而抛错。Runtime 自己负责收容 reporter 失败与宿主回退。
+
+dispose() 无参数、同步且幂等：先把会话置为终态，再尝试 Store unsubscribe 和 trace unsubscribe 两个清理。一个清理失败直接重抛原错；多个失败生成 CLEANUP_FAILED AggregateError，errors 保留全部原错。即便第一次清理抛错，重复 dispose 也不重试或再次抛错。
+
+终态后 record / recordAction / jumpTo / clear 均先抛 SESSION_DISPOSED；history / actions / trace 仍可读取，已有队列不清空，不再由会话监听增长。它不销毁借用的 Store / Runtime；调用方仍分别负责它们的释放。开发期按需创建会话，在组件卸载或调试结束时释放，避免持续保留诊断订阅与快照工作。
+
+构造订阅失败时，按 trace unsubscribe、Store unsubscribe 尝试回滚；若回滚全成功原样抛出主错，有清理失败则 CLEANUP_FAILED AggregateError 的 errors 以主错开头，再列清理失败。订阅与单个清理异常保留实际提供者的公共身份，不强行改为本包码。
+
+### 两个独立的响应式图工具
+
+getDependencyTree(root, maxDepth?) 从 observer 沿 deps 查看依赖；接受真实 Runtime effect / computed 公开句柄，或 extension 的 IObserver。getObserverTree(root, maxDepth?) 从 observable 沿 subs 反向查看订阅者；接受 signal / computed 公开句柄，或 extension 的 IObservable。它们不需要 createStoreDevTools，不建立新的业务依赖，也不拥有节点。
+
+maxDepth 缺省 20，必须是非负安全整数；0 连根的直接边也不展开。负数、分数、NaN、无穷均同步抛 INVALID_OPTION RangeError。深度按当前读取的图关系计算，不为了演示而伪造环或图节点。
+
+| IDependencyTreeNode 字段 | 含义                                                                  |
+| ------------------------ | --------------------------------------------------------------------- |
+| kind                     | observable / observer，表示本次遍历方向中的节点角色。                 |
+| label                    | debugName 优先，其次 constructor.name，最后 AnonymousReactiveNode。   |
+| version                  | observable 节点的当前版本；dependency root 为 observer 时不带此字段。 |
+| children                 | 本次展开的后继树节点数组。                                            |
+| circular                 | 仅当前递归路径再次遇到同一节点时为 true，此处停止展开。               |
+
+同一节点在两个不同分支出现的菱形共享不算循环，两边分别展开；真正路径回环才标 circular。达到深度上限直接停止，不标为 circular。Computed 兼具两个角色，因此从依赖方向是 observable 子节点，从反向订阅方向是 observer 子节点；不要把这些数据依赖与插件能力图混为一谈。
+
+### 错误码、错误工厂与维护命令
+
+STORE_DEVTOOLS_SOURCE 为 @migaia/store-devtools；按 source / code 分支，别匹配 message。
+
+| StoreDevtoolsErrorCode 属性 / 值            | 触发与处理                                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| sessionDisposed / SESSION_DISPOSED          | 释放后继续变更诊断会话；新建会话，不重试旧实例。                                              |
+| unknownHistoryEntry / UNKNOWN_HISTORY_ENTRY | jumpTo 的 id 不在当前 history；RangeError，选仍保留的 id。                                    |
+| invalidOption / INVALID_OPTION              | options / getter / 容量 / 回调配置或树深度不合法；options 通常为 Error，树深度为 RangeError。 |
+| callbackFailed / CALLBACK_FAILED            | 未分类的记录准备回调、回放 clone 或 action 属性读取失败；修正回调，检查原错或 cause。         |
+| cleanupFailed / CLEANUP_FAILED              | 多个 dispose 清理失败，或构造主错并伴随回滚失败；检查 AggregateError.errors。                 |
+
+三个错误工厂均公开，但普通使用通常不需要它们：createStoreDevtoolsError(code, message, options?) 返回带身份的原生 Error，options.cause 可省略；createStoreDevtoolsRangeError(code, message) 返回 RangeError；createStoreDevtoolsAggregateError(code, errors, message) 返回 AggregateError，errors 必填只读列表，保留全部原值，不去重。code 与 message 均必填，code 类型为 IStoreDevtoolsErrorCode；工厂不覆盖 stack。
+
+包维护使用已有 fmt、lint、typecheck、typecheck:test、test、build 脚本；构建、测试及文档执行结果由实际门禁报告给出，不把本节的命令清单当作已经运行的证据。
