@@ -1080,3 +1080,20 @@ function configError(code: string, path: string, reason: string, cause?: unknown
   Object.defineProperty(error, 'code', { value: code, enumerable: true })
   return error
 }
+
+export { ConfigOwner } from './config-owner.js'
+export type {
+  IConfigAsyncSource,
+  IConfigDiffEntry,
+  IConfigOwnerAsyncOptions,
+  IConfigOwnerEnvOptions,
+  IConfigOwnerOptions,
+  IConfigOwnerParseOptions,
+  IConfigOwnerPath,
+  IConfigOwnerPathValue,
+  IConfigOwnerWriteValue,
+  IConfigSource,
+  IConfigValidator,
+  IConfigView,
+  IMergedConfig
+} from './config-owner.js'
