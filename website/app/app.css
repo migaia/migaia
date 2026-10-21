@@ -919,13 +919,102 @@ svg {
   text-transform: uppercase;
 }
 
-/* Submitted queries share the palette row layout while keeping delete a separate control. */
-.palette-history-row {
-  display: flex;
+/* Recent-searches heading with its quiet clear link on the right. */
+.palette-history-head {
   align-items: center;
-  gap: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  padding-right: var(--space-3);
 }
+
+.palette-history-clear,
+.palette-history-remove {
+  background: transparent;
+  border: 0;
+  color: var(--text-faint);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background-color var(--motion-quick) var(--motion-ease),
+    color var(--motion-quick) var(--motion-ease),
+    opacity var(--motion-quick) var(--motion-ease);
+}
+
+.palette-history-clear {
+  font-size: 0.6875rem;
+  padding: var(--space-1) 0;
+}
+
+.palette-history-clear:hover,
+.palette-history-clear:focus-visible {
+  color: var(--text-body);
+}
+
+/* Submitted queries share the palette row layout; delete is a small icon at the row's end. */
+.palette-history-row {
+  align-items: center;
+  display: flex;
+  gap: var(--space-1);
+}
+
 .palette-history-row > .palette-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.palette-history-row .palette-item-title {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.palette-history-row .palette-item-title svg {
+  color: var(--text-faint);
+  flex: none;
+  height: 0.875rem;
+  width: 0.875rem;
+}
+
+.palette-history-remove {
+  border-radius: var(--radius-md);
+  display: grid;
+  flex: none;
+  height: 1.75rem;
+  margin-right: var(--space-2);
+  place-items: center;
+  width: 1.75rem;
+}
+
+.palette-history-remove svg {
+  height: 0.875rem;
+  width: 0.875rem;
+}
+
+.palette-history-remove:hover,
+.palette-history-remove:focus-visible {
+  background: var(--surface-subtle);
+  color: var(--text-strong);
+}
+
+/* With a pointer, the delete icon appears only on the row being hovered or focused. */
+@media (hover: hover) {
+  .palette-history-remove {
+    opacity: 0;
+  }
+
+  .palette-history-row:hover .palette-history-remove,
+  .palette-history-row:focus-within .palette-history-remove {
+    opacity: 1;
+  }
+}
+
+.palette-history-clear:disabled,
+.palette-history-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.palette-item {
   flex: 1;
   min-width: 0;
 }

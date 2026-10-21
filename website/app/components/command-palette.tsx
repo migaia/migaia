@@ -5,7 +5,7 @@ import { interfaceCopyFor } from '../copy.js'
 import { LIBRARY_INDEX, libraryReferenceDescription } from '../library-descriptions.js'
 import { domainPath, type ILocale } from '../route-contract.js'
 import { createSearchQuery } from '../search.js'
-import { createSearchHistory } from '../search-history.js'
+import { pageSearchHistory, type ISearchHistory } from '../search-history.js'
 import {
   Dialog,
   DialogContent,
@@ -57,7 +57,7 @@ function PaletteSession({
   readonly onOpenChange: (open: boolean) => void
   readonly open: boolean
   readonly searchQuery: ReturnType<typeof createSearchQuery>
-  readonly history: ReturnType<typeof createSearchHistory>
+  readonly history: ISearchHistory
 }) {
   const copy = interfaceCopyFor(locale)
   const navigate = useNavigate()
@@ -227,7 +227,17 @@ function PaletteSession({
           <div className="palette-results" id="palette-results" ref={listRef} role="listbox">
             {visibleHistory.length > 0 ? (
               <section className="palette-group" aria-label={copy.historyTitle}>
-                <p className="palette-group-label">{copy.historyTitle}</p>
+                <div className="palette-history-head">
+                  <p className="palette-group-label">{copy.historyTitle}</p>
+                  <button
+                    className="palette-history-clear"
+                    disabled={historyState.feedback === 'saving'}
+                    onClick={() => void history.clear(locale)}
+                    type="button"
+                  >
+                    {copy.historyClear}
+                  </button>
+                </div>
                 {visibleHistory.map((entry) => (
                   <div className="palette-history-row" key={entry.query}>
                     <button
@@ -235,29 +245,41 @@ function PaletteSession({
                       type="button"
                       onClick={() => setQuery(entry.query)}
                     >
-                      <span className="palette-item-title">{entry.query}</span>
+                      <span className="palette-item-title">
+                        <svg
+                          aria-hidden="true"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 16 16"
+                        >
+                          <circle cx="8" cy="8" r="5.75" />
+                          <path d="M8 5v3.25l2 1.25" />
+                        </svg>
+                        {entry.query}
+                      </span>
                     </button>
                     <button
-                      type="button"
                       aria-label={`${copy.historyDelete}: ${entry.query}`}
+                      className="palette-history-remove"
                       disabled={historyState.feedback === 'saving'}
                       onClick={() => void history.remove(locale, entry.query)}
+                      title={copy.historyDelete}
+                      type="button"
                     >
-                      {copy.historyDelete}
+                      <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                        <path d="m4.5 4.5 7 7m0-7-7 7" />
+                      </svg>
                     </button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  disabled={historyState.feedback === 'saving'}
-                  onClick={() => void history.clear(locale)}
-                >
-                  {copy.historyClear}
-                </button>
               </section>
             ) : null}
             {/* Stays mounted so save and delete results are still announced after the list empties. */}
-            <p className={historyFeedback ? 'palette-state' : 'sr-only'} role="status">
+            {/* Only failures are shown; routine saves are announced to assistive technology only. */}
+            <p
+              className={historyState.feedback === 'failed' ? 'palette-state' : 'sr-only'}
+              role="status"
+            >
               {historyFeedback}
             </p>
             {renderGroup('libraries', libraries)}
@@ -288,14 +310,8 @@ export default function CommandPalette({
   readonly onOpenChange: (open: boolean) => void
   readonly open: boolean
 }) {
-  /** History is acquired once when the lazy palette first mounts, then survives closing. */
-  const [history, setHistory] = useState<ReturnType<typeof createSearchHistory> | null>(null)
-  useEffect(() => {
-    /** Each committed effect owns its own attachment, including StrictMode replay. */
-    const owner = createSearchHistory()
-    setHistory(owner)
-    return () => owner.dispose()
-  }, [])
+  /** Page-lifetime history, usually already loaded in the background by the shell. */
+  const [history] = useState(pageSearchHistory)
   /** Each open owns a fresh query; a closed panel has no live resource. */
   const [query, setQuery] = useState<ReturnType<typeof createSearchQuery> | null>(null)
   useEffect(() => {
@@ -308,7 +324,7 @@ export default function CommandPalette({
       setQuery(null)
     }
   }, [locale, open])
-  return open && history && query?.locale === locale ? (
+  return open && query?.locale === locale ? (
     <PaletteSession
       locale={locale}
       onOpenChange={onOpenChange}

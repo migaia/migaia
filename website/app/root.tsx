@@ -1,4 +1,5 @@
-import { throttle } from '@migaia/utils/scheduler'
+import { log } from './log.js'
+import { asyncTask, throttle } from '@migaia/utils/scheduler'
 import {
   StoreProvider,
   createStoreRegistry,
@@ -245,6 +246,23 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
       window.removeEventListener('keydown', handleSearchShortcut)
     }
   }, [store])
+
+  /**
+   * Reads recent searches from IndexedDB in the background once the page is idle, so history is
+   * ready before the reader first opens search. The history module stays out of the first screen.
+   */
+  useEffect(() => {
+    /** Cancels the idle registration if the shell unmounts first. */
+    const controller = new AbortController()
+    asyncTask(
+      ['idleCallback', 'timeout'],
+      () => import('./search-history.js').then((module) => module.pageSearchHistory()),
+      { idleTimeout: 3000, signal: controller.signal }
+    ).catch((error: unknown) => {
+      if (!controller.signal.aborted) log.error(error)
+    })
+    return () => controller.abort()
+  }, [])
 
   /** Store writes from any search entry mount the lazy chunk on first open. */
   useEffect(() => {

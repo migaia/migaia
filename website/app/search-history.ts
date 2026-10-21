@@ -25,13 +25,11 @@ const HISTORY_LIMIT = 20
 /** Oversized input remains searchable but is not kept as a local history entry. */
 const HISTORY_QUERY_LIMIT = 200
 
-/** Acquires history on the first palette mount; failures disable only this enhancement. */
-export function createSearchHistory() {
+/** Creates the history owner; failures disable only this enhancement. */
+function createSearchHistory() {
   /** Store is client-owned and never created during prerendering. */
   const store = createStore<IHistoryState>({ entries: [], status: 'loading', feedback: 'idle' })
-  /** Closed owners cannot publish late hydration or persistence feedback. */
-  let closed = false
-  /** IndexedDB and persist are acquired together and released independently. */
+  /** IndexedDB host backing the persisted history. */
   let host: ReturnType<typeof indexedDbHost> | undefined
   /** Attachment owns archive hydration and serialized writes. */
   let handle: ReturnType<typeof persist> | undefined
@@ -45,10 +43,9 @@ export function createSearchHistory() {
     })
     void handle.ready.then(
       () => {
-        if (!closed) store.$set({ status: 'ready' })
+        store.$set({ status: 'ready' })
       },
       (error: unknown) => {
-        if (closed) return
         log.error(error)
         store.$set({ status: 'unavailable' })
       }
@@ -60,15 +57,14 @@ export function createSearchHistory() {
 
   /** Flushes an explicit change; failed deletion restores only its own still-current snapshot. */
   async function commit(entries: IHistoryEntry[], feedback: 'saved' | 'deleted'): Promise<void> {
-    if (closed || store.status !== 'ready' || store.feedback === 'saving' || !handle) return
+    if (store.status !== 'ready' || store.feedback === 'saving' || !handle) return
     /** No subsequent edit is admitted until this snapshot's flush settles. */
     const previous = store.entries
     store.$set({ entries, feedback: 'saving' })
     try {
       await handle.flush()
-      if (!closed) store.$set({ feedback })
+      store.$set({ feedback })
     } catch (error) {
-      if (closed) return
       log.error(error)
       store.$set({ entries: previous, feedback: 'failed' })
     }
@@ -104,27 +100,22 @@ export function createSearchHistory() {
         store.entries.filter((entry) => entry.locale !== locale),
         'deleted'
       )
-    },
-    /** Stops publication immediately, then releases every owner even if cleanup fails. */
-    dispose(): void {
-      closed = true
-      void (async () => {
-        try {
-          await handle?.disposeAsync()
-        } catch (error) {
-          log.error(error)
-        }
-        try {
-          await host?.dispose()
-        } catch (error) {
-          log.error(error)
-        }
-        try {
-          await store.$dispose()
-        } catch (error) {
-          log.error(error)
-        }
-      })()
     }
   }
+}
+
+/** History owner type, derived from its factory. */
+export type ISearchHistory = ReturnType<typeof createSearchHistory>
+
+/** Page-lifetime owner: started in the background after load and shared by every palette open. */
+let pageHistory: ISearchHistory | undefined
+
+/**
+ * Returns the page's history owner, creating it on first call. The shell calls this when the page
+ * goes idle so IndexedDB is already read by the time the reader opens search; the palette reuses
+ * the same owner. It lives as long as the page, so it is never disposed.
+ */
+export function pageSearchHistory(): ISearchHistory {
+  pageHistory ??= createSearchHistory()
+  return pageHistory
 }
