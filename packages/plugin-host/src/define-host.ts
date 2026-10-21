@@ -37,7 +37,9 @@ import type {
  * caller of the protected hook responsible for a number none of them track.
  */
 export type IHostCoreConstructionRequest = Readonly<{
+  /** Registration for which the Host is creating its domain core. */
   readonly pluginName: string
+  /** Opaque admission-batch identity, shared by requests from that batch. */
   readonly batch: object
 }>
 
@@ -71,9 +73,16 @@ export type IDefineHostOptions<
   }
   /** Replaces the `protected createPluginDomainCore` override; absent means an empty object. */
   readonly domainCore?: (request: IHostDomainCoreRequest) => TDomainCore
-  /** Replaces the `protected translateDisposalError` override. */
+  /**
+   * Retained option corresponding to the protected class hook. The default structured cleanup
+   * result path does not invoke it; it is not a callback for translating each cleanupErrors entry.
+   */
   readonly translateDisposalError?: (error: PluginHostError) => Error
-  /** Replaces `override dispose` plus `super.dispose()`; `next()` runs exactly once. */
+  /**
+   * Optional disposal middleware, invoked once inside the shared disposal Promise. Call next() to
+   * include canonical runtime cleanup; its result is shared and cleanup is not repeated. Middleware
+   * may reject, unlike ordinary collected cleanup failures in the default disposal result.
+   */
   readonly dispose?: (
     next: () => Promise<IPluginHostDisposalResult>
   ) => Promise<IPluginHostDisposalResult>
@@ -92,51 +101,76 @@ export type IHostHandle<
   TInstalled extends readonly IPluginConstraint<any>[],
   TPublicSurface extends object = Record<never, never>
 > = Readonly<{
+  /** Immutable issuing Host label/id, shared with its canonical runtime. */
   readonly identity: IPluginHostIdentity
+  /** Reversible availability controls; disabling retains resources rather than unloading. */
   readonly plugin: IPluginEnablement<
     IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>,
     TInstalled,
     TDomainCore,
     TValue
   >
+  /** Runner selected at construction; access fails while closing or disposed. */
   readonly pipelineMode: IMiddlewarePipelineMode
+  /** Current committed publication revision, not a count of attempted operations. */
   readonly revision: number
+  /** Stable name/path config reader and queued transactional updater. */
   readonly config: IPluginHostConfigFor<TInstalled>
+  /** Synchronous owner path; eager setup/async install is rejected and partial work rolls back. */
   useSync<const TPlugins extends readonly IPluginConstraint<any>[]>(
     ...plugins: TPlugins &
       IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins, TInstalled>
   ): IPluginHandleTuple<TPlugins>
+  /** Queues one install batch and returns input-ordered name handles only after atomic publication. */
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
     ...plugins: TPlugins &
       IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins, TInstalled>
   ): Promise<IPluginHandleTuple<TPlugins>>
+  /** Observes a dependency-aware removal plan without cleanup or revision change. */
   unUse(
     name: string,
     options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
   ): Promise<IPluginDependencyPlan>
+  /**
+   * Removes or suspends according to policy; cleanup failures return ok:false with affected
+   * changes.
+   */
   unUse(
     name: string,
     options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
   ): Promise<IPluginRemoval>
+  /** Starts a lazy registration and needed providers; same-name pending callers share one Promise. */
   activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>>
+  /**
+   * Installs a same-name candidate before withdrawing the old generation; failure preserves the
+   * old.
+   */
   replace<TPlugin extends IPluginConstraint<any>>(
     name: string,
     next: TPlugin
   ): Promise<IPluginHandle<TPlugin>>
+  /** Adds an unowned sync stage and returns this same handle; incompatible runner modes fail. */
   usePipeline(
     stage: ISyncMiddlewareStage<TValue>
   ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
+  /** Adds an unowned async stage, subject to canonical mode lifting and execution guards. */
   useAsyncPipeline(
     stage: IAsyncMiddlewareStage<TValue>
   ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
+  /** Adds an unowned generator stage using the middleware generator-return protocol. */
   useGeneratorPipeline(
     stage: IGeneratorMiddlewareStage<TValue>
   ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
+  /** Adds an unowned async-generator stage; the Host still owns execution cancellation/leases. */
   useAsyncGeneratorPipeline(
     stage: IAsyncGeneratorMiddlewareStage<TValue>
   ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
-  /** Replaces the `protected runPipeline`; only the handle's holder can reach it. */
+  /**
+   * Runs the current stage snapshot; done receives the final delivered value if traversal reaches
+   * it.
+   */
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
+  /** Shared singleflight completion; defaults to structured cleanup, custom middleware may reject. */
   dispose(): Promise<IPluginHostDisposalResult>
 }> &
   IPluginHostRuntimeExtensions<TInstalled> &
@@ -154,6 +188,11 @@ export type IHostHandle<
  * The handle is registered as a managed host, so `isManagedHost` and `openComposition` accept it on
  * the same terms as a class instance: a composing package branches on what a value _is_, not on
  * which of the two entries produced it.
+ *
+ * Host.execution must explicitly select finite nonnegative mutation/drain budgets or false for
+ * unbounded waiting. domainCore and surface are optional; their defaults add no domain members.
+ * Invalid input is rejected before a usable handle escapes. Custom disposal middleware failures
+ * retain their native identity or cause under CALLBACK_FAILED, rather than becoming cleanup rows.
  */
 export function defineHost<
   TDomainCore extends object = Record<string, never>,

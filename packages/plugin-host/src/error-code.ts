@@ -1,9 +1,9 @@
 /**
  * The single declaration site for `@migaia/plugin-host` error codes.
  *
- * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
- * `source` is always `'@migaia/plugin-host'`. Throw sites use these constants instead of inline
- * values. Localized messages live in `error-text.ts` and correspond to code names.
+ * The pair `(source, code)` uniquely identifies a package-owned failure. `source` is always
+ * `'@migaia/plugin-host'`. Throw sites use these constants instead of inline values. Localized
+ * messages live in `error-text.ts` and correspond to code names.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -174,10 +174,9 @@ export const PluginHostErrorCode = {
 
   /**
    * Thrown when a plugin context registers an `onDispose()` resource outside installation or after
-   * setup ends.
-   *
-   * Resources belong to the current attempt. Late resources are released before this error is
-   * thrown. Register resources during the active setup or installation phase.
+   * setup ends. Resources belong to the current attempt. A late setup-context registration releases
+   * its resource before rejecting; core.onDispose() outside install rejects without acquiring that
+   * input. Register through the context that owns the active setup or installation phase.
    */
   resourceOutsideInstall: 'RESOURCE_OUTSIDE_INSTALL',
 
@@ -204,8 +203,9 @@ export const PluginHostErrorCode = {
   /**
    * Thrown when a registered stage is incompatible with the host's pipeline mode.
    *
-   * For example, a sync host cannot accept a generator stage. Modes define execution and error
-   * semantics and cannot be mixed. The message identifies both the host and stage modes.
+   * For example, a sync host cannot accept a generator stage. Supported lifting follows the
+   * canonical middleware runner; other combinations fail with both host and stage modes in the
+   * message. Select a compatible runner instead of assuming every stage can be lifted.
    */
   pipelineModeMismatch: 'PIPELINE_MODE_MISMATCH',
 
@@ -237,9 +237,8 @@ export const PluginHostErrorCode = {
    * Thrown when an async stage and its downstream both fail. An `AggregateError` retains `errors`
    * in the fixed order `[stageError, downstreamError]`.
    *
-   * Enforces the boundary error identity contract in `docs/contracts/error-codes.md`. Both original
-   * errors remain reachable by identity in `errors`. Handle each failure rather than retrying it as
-   * one stage failure.
+   * Both original errors remain reachable by identity in `errors`. Handle each failure rather than
+   * retrying it as one stage failure.
    */
   pipelineFailed: 'PIPELINE_FAILED',
 
@@ -294,7 +293,6 @@ export const PluginHostErrorCode = {
    * include plugin names, configuration paths, stages, extensions, domain cores, and resource
    * disposers.
    *
-   * Enforces the untagged-error gate in `docs/contracts/error-codes.md` and input-validation rules.
    * Correct the input before retrying. This is a programming error, not a runtime state failure.
    */
   invalidOption: 'INVALID_OPTION',
@@ -338,10 +336,11 @@ export const PluginHostErrorCode = {
   compositionTargetUnmanaged: 'COMPOSITION_TARGET_UNMANAGED'
 } as const
 
+/** Semantic package-code union; diagnostics may report a code without throwing a new error. */
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]
 
 /**
- * The single declaration site for `source` in `(source, code)` (`docs/contracts/error-codes.md` ).
+ * The single package-owned source identity used together with a semantic error code.
  *
  * Every error leaving the plugin-host boundary uses this value. Throw sites and `error-text.ts`
  * must not repeat its string literal.

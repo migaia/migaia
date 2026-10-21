@@ -20,17 +20,23 @@ type IPluginHostCleanupPolicy = Readonly<{
 
 /** Stable kinds for structured nodes emitted by PluginHost disposal producers. */
 export const PluginHostDisposalNodeKind = Object.freeze({
+  /** Semantic error node created by the Host cleanup producer. */
   hostError: 'host-error',
+  /** Aggregate node retaining several original cleanup failures in order. */
   aggregate: 'aggregate',
+  /** Phase wrapper whose cause preserves a disposer failure. */
   disposerWrapper: 'disposer-wrapper'
 } as const)
 
+/** Kinds proven by readPluginHostDisposalProvenance, not by structural property matching. */
 export type IPluginHostDisposalNodeKind =
   (typeof PluginHostDisposalNodeKind)[keyof typeof PluginHostDisposalNodeKind]
 
 /** Frozen provenance detail stored only in the private producer registry. */
 export type IPluginHostDisposalProvenance = Readonly<{
+  /** Producer-certified node category; copying fields does not copy that authority. */
   readonly kind: IPluginHostDisposalNodeKind
+  /** Cleanup phase when this producer node wraps a phase-specific failure; otherwise omitted. */
   readonly phase?: string
 }>
 

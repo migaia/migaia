@@ -24,9 +24,11 @@ import type { IRegistration } from './registry.js'
 
 /** Registration-scoped publication stages exact receipts in the original install batch. */
 export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly<{
+  /** One stable facade for this Host key/family, created by its canonical extension owner. */
   readonly facade: TFacade
   /** An absent target returns undefined; duplicated instance identity returns null. */
   find(target: string): object | null | undefined
+  /** Snapshot of current ready contributions, separate from cold registration inventory. */
   values(): readonly object[]
   /**
    * Cold inventory reads every committed reservation, including registrations without ready
@@ -41,7 +43,9 @@ export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly
 
 /** Cold Feature inventory retains original guards and can resolve the current named output. */
 export type IPluginRuntimeFeatureSnapshot = Readonly<{
+  /** Captured frozen root map; output objects retain their original identities. */
   readonly outputs: Readonly<Record<string, object>>
+  /** Verifies the captured provider generation/output and the calling core's current availability. */
   assertCurrent(feature: string): void
   /** Recheck connection and Feature availability through the original Host handle on each call. */
   readCurrent(feature: string): object
@@ -49,7 +53,13 @@ export type IPluginRuntimeFeatureSnapshot = Readonly<{
 
 /** A canonical install core exposes only Host identity, Feature reads and shared publication. */
 export type IPluginRuntimeIntegration = Readonly<{
-  readonly identity: Readonly<{ name: string; id: string }>
+  /** Immutable issuing Host identity; it does not itself confer Host mutation authority. */
+  readonly identity: Readonly<{
+    /** Issuing Host's caller label, defaulting to DEFAULT. */
+    name: string
+    /** Module-issued local identifier; the label alone does not establish identity. */
+    id: string
+  }>
   /** One private runtime node fact is shared by every adapter installed on this Host. */
   readonly nodeId: string
   /** Query only the original managed-host authority; this confers no mutation permission. */
@@ -58,6 +68,10 @@ export type IPluginRuntimeIntegration = Readonly<{
   assertCurrent(): void
   /** Read an already committed facade without acquiring ownership or creating another slot. */
   readSharedExtension(key: PropertyKey): object | undefined
+  /**
+   * Acquires one canonical key/family slot during this core's original uncommitted install only.
+   * Conflicting keys/families fail admission; later calls cannot create a parallel publication.
+   */
   acquireSharedSlot<TFacade extends object>(
     key: PropertyKey,
     family: object,
@@ -70,7 +84,12 @@ export type IPluginRuntimeIntegration = Readonly<{
 /** This weak table proves core provenance only; canonical Host state owns slots and registrations. */
 const runtimeIntegrations = new WeakMap<object, IPluginRuntimeIntegration>()
 
-/** Reject structural lookalikes; only the core actually minted for this install gets the port. */
+/**
+ * Reads the canonical integration port from a core minted by this package instance. Adapters use it
+ * to reuse Host-owned publication and Feature guards; it creates no new Host or registry.
+ * Structural copies, forged objects and other package instances fail with
+ * PLUGIN_DEFINITION_INVALID.
+ */
 export function getPluginRuntimeIntegration(core: unknown): IPluginRuntimeIntegration {
   /** Arbitrary fields and copied descriptors never establish package provenance. */
   const integration =

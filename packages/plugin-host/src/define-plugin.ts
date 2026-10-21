@@ -235,7 +235,12 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   }
 }
 
-/** Canonical function form creates one synchronous descriptor for each registration. */
+/**
+ * Defines a trusted plugin from a name and a synchronous per-registration descriptor factory.
+ * Calling definePlugin() captures definition identity without running that factory. The optional
+ * Feature root record defaults to none; the factory runs during installation and cannot return a
+ * Promise. Invalid names/fields fail admission; lifecycle failures roll back the install batch.
+ */
 export function definePlugin<
   TCore extends object = Record<string, never>,
   TExtension extends Record<string, unknown> = Record<never, never>,
@@ -271,7 +276,12 @@ export function definePlugin<
   TExpose
 >
 
-/** Functional full descriptor form retaining config and metadata shape. */
+/**
+ * Captures an object definition with async-capable setup before Feature construction and install.
+ * Configuration is copied/frozen, hooks retain their original receiver, and supported metadata is
+ * snapshotted without running hooks. Omitted activation is eager. Use the async installation path
+ * for eager setup; the exact setup output is passed to featureExpose/install as argument two.
+ */
 export function definePlugin<
   TCore extends object = Record<string, never>,
   TExtension extends Record<string, unknown> = Record<string, never>,
@@ -314,7 +324,11 @@ export function definePlugin<
 > &
   Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any, any, any, any> | 'name'>>
 
-/** Object definition without setup keeps its original one-argument hook signatures. */
+/**
+ * Captures an object definition without setup, preserving one-argument install/featureExpose hooks.
+ * It returns a frozen trusted definition, not a live plugin handle. Invalid own-data fields or
+ * configuration fail now; hooks and per-registration Feature factories run only when installed.
+ */
 export function definePlugin<
   TCore extends object = Record<string, never>,
   TExtension extends Record<string, unknown> = Record<string, never>,
@@ -385,7 +399,8 @@ export const readDefinedPluginDefinition = (value: unknown): IStoredDefinition |
 
 /**
  * Reports whether this package instance created a plugin without reading user properties or running
- * hooks.
+ * hooks. Structural copies and definitions issued by another package instance return false;
+ * canonical Host admission can still process supported raw object definitions separately.
  */
 export const isDefinedPlugin = (value: unknown): value is IDefinedPluginConstraint =>
   readDefinedPluginDefinition(value) !== undefined

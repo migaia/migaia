@@ -61,7 +61,11 @@ export const compileFeatures = (roots: Readonly<Record<string, object>>): IFeatu
   })
 }
 
-/** Inspects trusted Feature topology without invoking factories or creating registration state. */
+/**
+ * Returns a frozen root map and dependency-first local-closure array without running factories or
+ * creating a registration. Use it for definition inspection; cross-plugin references remain
+ * external edges. Invalid/untrusted roots or cyclic local dependencies throw INVALID_OPTION.
+ */
 export const inspectFeatures = <TFeatures extends IFeatureRecord>(
   roots: TFeatures
 ): IFeatureInspection<TFeatures> => {

@@ -8,7 +8,9 @@ import type { IPluginConstraint } from './typing.js'
 
 /** Provider edge derived from a plugin's complete local Feature closure. */
 export type IPluginDependency = Readonly<{
+  /** Name of one cross-plugin provider found in the selected local Feature closure. */
   readonly provider: string
+  /** True if any reference to this provider is required; required wins over optional duplicates. */
   readonly required: boolean
 }>
 
