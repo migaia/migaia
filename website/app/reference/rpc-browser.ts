@@ -10,7 +10,14 @@
  * Uint8Array-only carrier rejects the default unknown-output framer and the native binary framer's
  * carrier-or-fragment output. Its example stays raw I/O.
  */
-import type { ICode, IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type {
+  ICode,
+  IEnhancerDoc,
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  IText
+} from './contract.js'
 import { runtimePeerOptionMembers } from './rpc-runtime-shared.js'
 import { rpcBrowserCases } from './rpc-browser-cases.js'
 
@@ -656,8 +663,102 @@ const rtcChannelMembers: Readonly<Record<string, IMemberDoc>> = {
 }
 
 /** Browser source fields are shown beside the common Peer options without adding source openers. */
+/** Real paired MessagePorts keep each option example independent of browser globals. */
+const portOptionExample = (client: string, server: string, body: string, setup = ''): string =>
+  `import { MessageChannel } from 'node:worker_threads'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+${setup}
+const ports = new MessageChannel()
+const [client, server] = await Promise.all([
+  createBrowserPeer({ connect: { sharedWorker: { port: ports.port1 } }, ${client} }),
+  createBrowserPeer({ connect: { sharedWorker: { port: ports.port2 } }, ${server} })
+])
+try {
+${body}
+} finally {
+  await Promise.all([client.close(), server.close()])
+  ports.port1.close()
+  ports.port2.close()
+}`
+
+/** Inherited proxy hooks are deliberately not read by the direct Peer assembly. */
+const proxyHooksExample = portOptionExample(
+  `keyFactory: () => { keys += 1; return 'logical-read' },
+    retryPort: { dispatch: async (input) => { retries += 1; return input.sendOnce({ expectedGeneration: input.generation }) } }`,
+  `provide: { double: (value: number) => value * 2 }`,
+  `  console.log(await client.request('double', 3))
+  console.log(keys, retries)`,
+  `let keys = 0
+let retries = 0
+`
+)
+
+/** A rejected custom factory exercises the acquired-channel rollback path. */
+const endpointFactoryOptionExample = `import { MessageChannel } from 'node:worker_threads'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const ports = new MessageChannel()
+const failure = new Error('custom endpoint unavailable')
+const controller = new AbortController()
+const remoteOpening = createBrowserPeer({
+  connect: { sharedWorker: { port: ports.port2 } },
+  signal: controller.signal
+}).catch((error: unknown) => error)
+try {
+  await createBrowserPeer({
+    connect: { sharedWorker: { port: ports.port1 } },
+    endpointFactory: async () => { throw failure }
+  })
+} catch (error) {
+  console.log(error === failure)
+} finally {
+  controller.abort()
+  await remoteOpening
+  ports.port1.close()
+  ports.port2.close()
+}`
+
+/** A notification has no response path, so its provider failure reaches the reporter. */
+const reportOptionExample = portOptionExample(
+  '',
+  `provide: { refresh: () => { throw failure } }, report: (error) => { reported.push(error); reportArrived() }`,
+  `  await client.notify('refresh')
+  await reportReady
+  console.log(reported.length > 0)`,
+  `const failure = new Error('refresh failed')
+const reported: unknown[] = []
+let reportArrived!: () => void
+const reportReady = new Promise<void>((resolve) => { reportArrived = resolve })
+`
+)
+
+/** Options of the Peer factory; callbacks retain their own behavior examples. */
 const browserPeerOptions: Readonly<Record<string, IMemberDoc>> = {
   ...runtimePeerOptionMembers,
+  endpointFactory: {
+    ...runtimePeerOptionMembers.endpointFactory!,
+    whenToUse: t(
+      'Use this advanced hook only when the application assembles an endpoint for the acquired channel. Omitting it keeps Core assembly. A thrown error or rejected Promise stops opening and releases the acquired setup; the example checks that the original failure is returned.',
+      '仅当应用需要为已取得的通道组装端点时，使用这个高级回调。省略时由 Core 组装。同步抛错或 Promise 拒绝会停止打开并释放准备阶段取得的资源；示例检查原始失败是否原样返回。'
+    ),
+    example: endpointFactoryOptionExample
+  },
+  report: {
+    ...runtimePeerOptionMembers.report!,
+    whenToUse: t(
+      'Set a reporter when notifications or listener work can fail without a waiting caller. It receives those failures without changing ordinary request results. Omitting it uses the default console reporter.',
+      '通知或监听工作可能失败、却没有等待结果的调用方时，设置报告回调。它接收这些失败，不改变普通请求的结果。省略时使用默认控制台报告函数。'
+    ),
+    example: reportOptionExample
+  },
+  keyFactory: {
+    ...runtimePeerOptionMembers.keyFactory!,
+    whenToUse: t(
+      'This inherited hook belongs to advanced remote-proxy retry paths. Direct Browser Peer requests do not call it or generate an idempotency key from it. Omission leaves those direct calls unchanged; use explicit call options when a direct request needs a key.',
+      '这个继承选项用于高级远程代理的重试路径。直接 Browser Peer 请求不会调用它，也不会用它生成幂等键。省略不影响直接请求；直接请求需要键时，应显式传入调用选项。'
+    ),
+    example: proxyHooksExample
+  },
   self: {
     ...runtimePeerOptionMembers.self!,
     default: t(
@@ -761,6 +862,154 @@ const browserPeerOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
+
+/** Configuration cases cover actual calls and keep carrier ownership explicit. */
+const browserPeerOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t(
+      'Call an existing port and name the local peers',
+      '通过已有端口调用，并为本地对端命名'
+    ),
+    problem: t(
+      'Two existing ports need callable methods and clear diagnostic names. `connect` borrows each port; without `provide`, the server offers no application methods. `self` supplies safe names and instance identifiers rather than credentials.',
+      '两个已有端口需要互相调用，并在诊断信息里有清楚的名字。`connect` 借用端口；不传 `provide` 时，服务端不提供应用方法。`self` 提供安全的名称与实例标识，不是授权凭据。'
+    ),
+    example: portOptionExample(
+      `self: { name: 'editor', instanceId: 'editor-1' }`,
+      `self: { name: 'calculator', instanceId: 'calculator-1' }, provide: { double: (value: number) => value * 2 }`,
+      `  console.log(client.self.name, server.self.name)
+  console.log(await client.request('double', 3))`
+    ),
+    result: t(
+      'Prints `editor calculator`, then `6`. Closing peers leaves port cleanup to their owner.',
+      '输出 `editor calculator`，然后输出 `6`。对端关闭后，端口仍由其拥有者清理。'
+    ),
+    covers: ['connect', 'self', 'provide']
+  },
+  {
+    title: t(
+      'Limit simultaneous work and bound waiting time',
+      '限制同时运行的工作，并限定等待时间'
+    ),
+    problem: t(
+      'A provider can run only one expensive task at once. Default limits permit more work. Set both limits to one so a second task is rejected; `defaultTimeoutMs` also prevents a caller from waiting indefinitely for a slow accepted method.',
+      '提供方一次只能执行一个高开销任务。默认限制允许更多并发。把两个上限设为一，第二个任务就会被拒绝；`defaultTimeoutMs` 还为已接纳的慢方法限定调用方等待时间。'
+    ),
+    example: portOptionExample(
+      'defaultTimeoutMs: 100',
+      `providerLimits: { maxGlobal: 1, maxPerPeer: 1 }, provide: { hold: async () => { entered(); await gate; return 'done' } }`,
+      `  const first = client.request('hold')
+  await started
+  try { await client.request('hold') } catch (error) { console.log(Reflect.get(error as object, 'code')) }
+  release()
+  console.log(await first)`,
+      `let entered!: () => void
+let release!: () => void
+const started = new Promise<void>((resolve) => { entered = resolve })
+const gate = new Promise<void>((resolve) => { release = resolve })
+`
+    ),
+    result: t(
+      'The second call prints `OVERLOADED`; releasing the first lets it print `done` within its 100 ms budget.',
+      '第二次调用输出 `OVERLOADED`；放行第一次调用后，它在 100 毫秒预算内输出 `done`。'
+    ),
+    covers: ['providerLimits', 'defaultTimeoutMs']
+  },
+  {
+    title: t(
+      'Declare methods and reject incomplete frame protection',
+      '声明方法，并拒绝不完整的消息保护配置'
+    ),
+    problem: t(
+      'An application declares exactly which methods it offers. `contract` records the supported mode and keyed replay policy. Authentication is a separate setting: omission adds no frame protection, and supplying a signer without its verifier must reject construction before the connection opens.',
+      '应用需要显式声明提供的方法。`contract` 记录支持的调用方式及按键重放策略。认证是独立设置：省略时不增加消息保护，只提供签名函数而缺少校验函数时，必须在打开连接前拒绝构造。'
+    ),
+    example: portOptionExample(
+      '',
+      `contract: { schemaVersion: 1, plugin: 'billing', features: { numbers: { methods: { double: { mode: 'request', idempotent: true } } } } },
+    provide: { billing: { numbers: { double: (value: number) => value * 2 } } }`,
+      `  console.log(await client.request('billing.numbers.double', 4, { idempotencyKey: 'double-4' }))
+  const invalidPorts = new MessageChannel()
+  try {
+    await createBrowserPeer({
+      connect: { sharedWorker: { port: invalidPorts.port1 } },
+      authentication: { sign: (value) => value }
+    })
+  } catch (error) {
+    console.log(Reflect.get(error as object, 'code'))
+  } finally {
+    invalidPorts.port1.close()
+    invalidPorts.port2.close()
+  }`
+    ),
+    result: t(
+      'The declared method returns `8`. The separate incomplete authentication configuration prints `INVALID_CONFIG` and opens no connection.',
+      '声明的方法返回 `8`。另一次不完整的认证配置输出 `INVALID_CONFIG`，不会打开连接。'
+    ),
+    covers: ['authentication', 'contract']
+  },
+  {
+    title: t('Observe calls without capturing payloads', '观察调用但不捕获载荷'),
+    problem: t(
+      'A diagnostic panel needs to know whether calls occurred. Without `probe`, it receives no observations from this option. A metadata-only probe counts method events without reading application content.',
+      '诊断面板需要知道调用是否发生。不传 `probe` 时，此选项不会提供观察事件。只观察元数据的探针可以统计方法事件，无需读取应用内容。'
+    ),
+    example: portOptionExample(
+      'probe',
+      'provide: { double: (value: number) => value * 2 }',
+      `  console.log(await client.request('double', 2))
+  console.log(events > 0)`,
+      `import { defineProbe } from '@migaia/rpc-core/probe'
+let events = 0
+const probe = defineProbe({ stages: ['message'], emit: (view) => { if (view.method === 'double') events += 1 } })
+`
+    ),
+    result: t(
+      'Prints `4`, then `true`: the business result and diagnostic observations are both available.',
+      '输出 `4` 和 `true`：业务结果与诊断观察均已取得。'
+    ),
+    covers: ['probe']
+  },
+  {
+    title: t(
+      'Stop accepting connections when the owning scope ends',
+      '所属作用域结束时停止接纳连接'
+    ),
+    problem: t(
+      'A SharedWorker service accepts page ports through its `workerScope` connect-event receiver. `listen` starts accepting without creating a page connection. Attach an AbortSignal so ending the owning scope also retires its logical connections; the caller still owns every native port.',
+      'SharedWorker 服务通过 `workerScope` 的连接事件接收端接纳页面端口。`listen` 开始接纳，不创建页面连接。传入 AbortSignal 后，所属作用域结束时会同时终止逻辑连接；每个原生端口仍归调用方拥有。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const controller = new AbortController()
+const service = await createBrowserPeer({
+  listen: workerScope,
+  signal: controller.signal,
+  provide: { double: (value: number) => value * 2 }
+})
+controller.abort()
+await service.close()
+console.log('closed')`,
+    result: t(
+      'Prints `closed` after the listener has stopped and its logical connections are released.',
+      '停止监听并释放逻辑连接后输出 `closed`。'
+    ),
+    covers: ['listen', 'signal']
+  },
+  {
+    title: t('Keep proxy retry settings separate from direct calls', '区分代理重试设置与直接调用'),
+    problem: t(
+      'Options are shared with advanced proxy code, but this example uses direct Peer requests. `retryPort` and `keyFactory` are inherited fields that the direct assembly does not read; supplying them must not be mistaken for enabling retries.',
+      '选项可能与高级代理代码共用，但本例执行的是直接 Peer 请求。`retryPort` 与 `keyFactory` 是直接组装路径不会读取的继承字段，传入它们不代表启用了重试。'
+    ),
+    example: proxyHooksExample,
+    result: t(
+      'Prints `6`, then `0 0`: the request succeeds without invoking either proxy hook.',
+      '输出 `6`，然后输出 `0 0`：请求成功，但两个代理回调均未执行。'
+    ),
+    covers: ['retryPort']
+  }
+]
 
 /** Native Node ports exercise the structural carrier boundary without claiming browser realms. */
 const nativePortIntro = t(
@@ -1002,6 +1251,7 @@ export const rpcBrowserReference: ILibraryReference = {
   },
   types: {
     IRuntimeBrowserPeerOptions: {
+      optionCases: browserPeerOptionCases,
       example: peerExample,
       summary: t(
         'Options of `createBrowserPeer()`: the browser source plus the Core Peer options.',
@@ -1009,6 +1259,9 @@ export const rpcBrowserReference: ILibraryReference = {
       ),
       members: {
         ...runtimePeerOptionMembers,
+        endpointFactory: browserPeerOptions.endpointFactory!,
+        report: browserPeerOptions.report!,
+        keyFactory: browserPeerOptions.keyFactory!,
         self: browserPeerOptions.self!,
         provide: browserPeerOptions.provide!,
         defaultTimeoutMs: browserPeerOptions.defaultTimeoutMs!,
@@ -1168,6 +1421,57 @@ export const rpcBrowserReference: ILibraryReference = {
       members: {}
     },
     IWindowMessageTransportOptions: {
+      optionCases: [
+        {
+          title: t('Address a known popup origin', '向已知来源域的弹窗发送消息'),
+          problem: t(
+            'The application already owns a popup and its inbound `window` receiver. Supplying the target and origin makes outgoing delivery explicit; outside a Window-like global, the receiver cannot be inferred. Raw subscriptions preserve source metadata, while endpoint admission uses `sourceProof`.',
+            '应用已持有弹窗及接收消息的 `window`。显式指定目标与来源域，就能确定消息发往何处；不在类 Window 全局环境中时，接收者也必须提供。原始订阅保留来源元数据，端点接纳则使用 `sourceProof`。'
+          ),
+          example: `import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+
+const transport = createWindowMessageTransport({
+  target: popupWindow,
+  receiver: window,
+  targetOrigin: 'https://reports.example'
+})
+const stop = transport.subscribe((message) => console.log(message.data))
+transport.send({ operation: 'refresh' })
+console.log(transport.sourceProof?.(popupWindow, 'https://reports.example'))
+stop()`,
+          result: t(
+            'The source check prints `true`; sending forwards the refresh message to the configured origin. Stop removes the subscription.',
+            '来源检查输出 `true`；发送操作将刷新消息交给指定来源域。停止函数移除订阅。'
+          ),
+          covers: ['target', 'receiver', 'targetOrigin']
+        },
+        {
+          title: t(
+            'Explicitly allow an unknown destination origin',
+            '显式允许尚未确定的目标来源域'
+          ),
+          problem: t(
+            'A caller-owned window can change origin while retaining its native identity. A wildcard is rejected by default. `allowUnsafeTargetOrigin: true` permits that wildcard and relaxes only the origin check; another window still fails the source check.',
+            '调用方拥有的窗口可能改变来源域，但保持原生窗口身份。默认会拒绝通配来源域。`allowUnsafeTargetOrigin: true` 允许通配符，只放宽来源域检查；其他窗口仍无法通过来源身份检查。'
+          ),
+          example: `import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+
+const transport = createWindowMessageTransport({
+  target: popupWindow,
+  receiver: window,
+  targetOrigin: '*',
+  allowUnsafeTargetOrigin: true
+})
+transport.send({ operation: 'refresh' })
+console.log(transport.sourceProof?.(popupWindow, 'https://new-reports.example'))
+console.log(transport.sourceProof?.(otherWindow, 'https://new-reports.example'))`,
+          result: t(
+            'Prints `true`, then `false`: the origin may vary, but the expected Window identity does not.',
+            '输出 `true` 和 `false`：来源域可以变化，预期的 Window 身份仍必须匹配。'
+          ),
+          covers: ['target', 'receiver', 'targetOrigin', 'allowUnsafeTargetOrigin']
+        }
+      ],
       example: windowEndpointExample,
       summary: t(
         'Options of `createWindowMessageTransport()`.',
@@ -1271,6 +1575,55 @@ export const rpcBrowserReference: ILibraryReference = {
       }
     },
     IServiceWorkerTransportOptions: {
+      optionCases: [
+        {
+          title: t('Send to the controlling worker', '向当前控制页面的工作线程发送消息'),
+          problem: t(
+            'The application already has a ServiceWorker target and its `navigator.serviceWorker` receiver. Neither is created by this adapter. Pass both to separate outgoing delivery from incoming events; omitting either does not discover or register a worker.',
+            '应用已有 ServiceWorker 目标及 `navigator.serviceWorker` 接收端。适配器不会创建它们。分别传入发送目标与事件接收端；省略字段不会自动查找或注册工作线程。'
+          ),
+          example: `import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+
+const transport = createServiceWorkerTransport({
+  target: serviceWorker,
+  receiver: navigator.serviceWorker
+})
+const stop = transport.subscribe((message) => console.log(message.data))
+transport.send({ operation: 'refresh-cache' })
+console.log(transport.sourceProof?.(serviceWorker))
+stop()`,
+          result: t(
+            'Prints `true`; outgoing refresh messages use the configured worker, and the stop function removes the incoming subscription.',
+            '输出 `true`；刷新消息发往指定工作线程，停止函数移除接收订阅。'
+          ),
+          covers: ['target', 'receiver']
+        },
+        {
+          title: t(
+            'Recognize the same client through another wrapper',
+            '通过不同包装识别同一个客户端'
+          ),
+          problem: t(
+            'A worker receives a wrapper for an already known Client. `peerId` identifies that client when object identity differs. Omission uses `target.id` when available; an explicit id selects the expected Client id rather than accepting every source.',
+            '工作线程可能收到已知 Client 的另一个包装对象。对象身份不同时，`peerId` 用于识别这个客户端。省略时可使用 `target.id`；显式标识只接纳指定 Client，不会放行所有来源。'
+          ),
+          example: `import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+
+const transport = createServiceWorkerTransport({
+  target: client,
+  receiver: workerScope,
+  peerId: 'editor-client'
+})
+console.log(transport.sourceProof?.({ id: 'editor-client' }))
+console.log(transport.sourceProof?.({ id: 'another-client' }))
+transport.send({ operation: 'cache-updated' })`,
+          result: t(
+            'Prints `true`, then `false`; messages still go to the configured target.',
+            '输出 `true` 和 `false`；消息仍发往指定目标。'
+          ),
+          covers: ['target', 'receiver', 'peerId']
+        }
+      ],
       example: serviceExample,
       summary: t(
         'Options of `createServiceWorkerTransport()`.',
