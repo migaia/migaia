@@ -28,6 +28,45 @@ const pipelineScenarios = [
 /** End-to-end example of a pipeline instance. */
 const pipelineExample = middlewarePipelineCases.createPipeline[2].example
 
+/** Async stages can wrap downstream work before and after the awaited next call. */
+const pipelineModeExample = `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
+const order: string[] = []
+await pipeline.run([async (value, next) => {
+  order.push('before')
+  await next(value + 1)
+  order.push('after')
+}], 1, (value) => { order.push(String(value)) })
+console.log(order)`
+
+/** Host closure and cancellation stop work at the runner's public boundaries. */
+const pipelineLifecycleExample = `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+let closing = false
+const controller = new AbortController()
+const pipeline = createPipeline<number>({
+  mode: MiddlewarePipelineMode.sync,
+  signal: controller.signal,
+  assertActive: () => {
+    if (closing) throw new Error('host closed')
+  }
+})
+pipeline.run([(value, next) => { next(value + 1) }], 1, (value) => { console.log(value) })
+closing = true
+try {
+  pipeline.run([], 1, (value) => { console.log(value) })
+} catch (error) {
+  console.log((error as Error).message)
+}
+closing = false
+controller.abort(new Error('request cancelled'))
+try {
+  pipeline.run([], 1, (value) => { console.log(value) })
+} catch (error) {
+  console.log((error as Error).message)
+}`
+
 /** Reference of `@migaia/middleware-pipeline`. */
 export const middlewarePipelineReference: ILibraryReference = {
   modules: {
@@ -223,13 +262,46 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
         'Options of createPipeline(); mode is required. Every public option and control getter is read once for its snapshot; getter failure becomes TypeError/INVALID_OPTION with cause. The validated mode is the value published by the runner.',
         '`createPipeline()` 的选项，`mode` 必填；公开选项与运行控制字段单次读取为快照，读取失败抛保留原始原因的 `TypeError/INVALID_OPTION`；发布模式与已验证值相同。'
       ),
+      optionCases: [
+        {
+          title: t('Wrap an asynchronous operation', '包裹一次异步操作'),
+          problem: t(
+            'A request logger must run after the request finishes. Sync mode starts downstream only after the stage returns. Async mode lets the stage await next(), then finish its own work.',
+            '请求日志需要在请求完成后记录。同步模式会等步骤返回后才开始下游。异步模式允许步骤等待 next()，再完成自己的工作。'
+          ),
+          example: pipelineModeExample,
+          result: t(
+            "The order is ['before', '2', 'after']; the outer stage finishes after done().",
+            "输出顺序为 ['before', '2', 'after']；外层步骤在 done() 之后结束。"
+          ),
+          covers: ['mode']
+        },
+        {
+          title: t('Stop work when the host closes', '宿主关闭时停止执行'),
+          problem: t(
+            'A reusable runner does not know when its host closes or a request is cancelled. assertActive rejects work after closure, and signal gives every run a shared cancellation source. Without either, the runner continues normally.',
+            '可复用执行器不知道宿主何时关闭，也不知道请求是否取消。assertActive 在关闭后拒绝执行，signal 为每次运行提供共同的取消来源。不设置这两项时，执行器继续正常运行。'
+          ),
+          example: pipelineLifecycleExample,
+          result: t(
+            'The first run prints 2. Later runs print host closed and request cancelled instead of calling done().',
+            '第一次输出 2；后两次分别输出 host closed 和 request cancelled，不调用 done()。'
+          ),
+          covers: ['signal', 'assertActive']
+        }
+      ],
       members: {
         mode: {
           summary: t(
             'Execution mode of every run. Stages must be written for this mode or converted with `lift()`.',
             '每次运行使用的执行模式。步骤必须按该模式编写，或用 `lift()` 转换。'
           ),
-          values: { enum: 'MiddlewarePipelineMode' }
+          values: { enum: 'MiddlewarePipelineMode' },
+          whenToUse: t(
+            'Choose sync for ordinary transforms, async for stages that await downstream work, generator for synchronous generator stages, or async-generator for asynchronous generators. Generator modes reduce returned values instead of calling next(). mode is required; there is no default.',
+            '普通转换选 sync；需要等待下游的步骤选 async；同步生成器选 generator；异步生成器选 async-generator。生成器模式通过返回值传递结果，不调用 next()。mode 必填，没有默认值。'
+          ),
+          example: pipelineModeExample
         },
         onViolation: {
           summary: t(
@@ -237,14 +309,33 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
             '步骤误用 `next()` 时收到 `duplicate` 或 `late`。误用不会启动第二次下游执行。'
           ),
           default: t('Not set: misuse is ignored silently.', '不设置：误用被静默忽略。'),
-          values: { enum: 'MiddlewarePipelineViolation' }
+          values: { enum: 'MiddlewarePipelineViolation' },
+          whenToUse: t(
+            'Set it when diagnosing a stage that calls next() twice or after returning. duplicate means a repeated call; late means the stage already ended. Both calls are ignored, and without this callback neither is reported.',
+            '排查步骤重复调用 next() 或返回后才调用的问题时设置。duplicate 表示重复调用，late 表示步骤已经结束。两种调用都会被忽略；不设回调时不会报告。'
+          ),
+          example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<number>({
+  mode: MiddlewarePipelineMode.sync,
+  onViolation: (kind) => { console.log(kind) }
+})
+pipeline.run([(value, next) => {
+  next(value + 1)
+  next(value + 2)
+}], 1, console.log)`
         },
         assertActive: {
           summary: t(
             'Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.',
             '在进入运行时以及每个步骤之后调用；它抛错时，下一个步骤不会开始。宿主用它在关闭后阻止继续运行。'
           ),
-          default: t('Not set: no lifecycle check.', '不设置：不做生命周期检查。')
+          default: t('Not set: no lifecycle check.', '不设置：不做生命周期检查。'),
+          whenToUse: t(
+            'Use it when the host has a closing flag rather than an AbortSignal. Throw to prevent the next stage from starting. Return normally while the host is active; omitting it skips host lifetime checks.',
+            '宿主用关闭标记而非 AbortSignal 管理生命周期时设置。抛错可阻止下一步骤开始；宿主存活时正常返回。不设置则跳过宿主生命周期检查。'
+          ),
+          example: pipelineLifecycleExample
         },
         signal: {
           summary: t(
@@ -281,7 +372,29 @@ pipeline.run([halt], 1, () => { console.log('not reached') })`
           default: t(
             'Not set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors.',
             '不设置：抛出带 `EXECUTION_FAILED` 码的 `AggregateError`，两个错误都在 `errors` 中。'
-          )
+          ),
+          whenToUse: t(
+            'Use it in async mode when a stage fails independently of downstream work and your application needs a specific combined message. Keep both original failures in cause or errors. Without it, the runner creates its own AggregateError; other modes do not use it.',
+            '异步模式中，步骤与下游分别失败，而且应用需要指定合并后的消息时设置。必须通过 cause 或 errors 保留两个原始失败。不设置时由执行器创建 AggregateError；其它模式不使用它。'
+          ),
+          example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const stageError = new Error('logging failed')
+const requestError = new Error('request failed')
+const pipeline = createPipeline<number>({
+  mode: MiddlewarePipelineMode.async,
+  combineStageAndDownstreamError: (stage, downstream) =>
+    new AggregateError([stage, downstream], 'request and logging failed')
+})
+try {
+  await pipeline.run([async (value, next) => {
+    await next(value).catch(() => {})
+    throw stageError
+  }], 1, () => { throw requestError })
+} catch (error) {
+  const combined = error as AggregateError
+  console.log(combined.message, combined.errors[0] === stageError, combined.errors[1] === requestError)
+}`
         }
       }
     },
