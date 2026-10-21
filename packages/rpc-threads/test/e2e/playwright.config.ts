@@ -1,4 +1,14 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig, type PlaywrightTestConfig } from '@playwright/test'
+
+/**
+ * Chromium + WebKit fixed matrix, matching storage-web. Firefox cannot launch on the current macOS
+ * host, so it runs only when PLAYWRIGHT_BROWSER selects it for single-engine debugging.
+ */
+const selectedBrowser = process.env.PLAYWRIGHT_BROWSER as
+  | 'chromium'
+  | 'webkit'
+  | 'firefox'
+  | undefined
 
 export default defineConfig({
   testDir: '.',
@@ -12,11 +22,12 @@ export default defineConfig({
     launchOptions: { timeout: 30_000 },
     trace: 'retain-on-failure'
   },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-    { name: 'firefox', use: { browserName: 'firefox' } },
-    { name: 'webkit', use: { browserName: 'webkit' } }
-  ],
+  projects: (selectedBrowser ? [selectedBrowser] : (['chromium', 'webkit'] as const)).map(
+    (browserName): NonNullable<PlaywrightTestConfig['projects']>[number] => ({
+      name: browserName,
+      use: { browserName }
+    })
+  ),
   webServer: {
     command: '../../node_modules/.bin/vite --config test/e2e/vite.config.ts',
     cwd: new URL('../..', import.meta.url).pathname,
