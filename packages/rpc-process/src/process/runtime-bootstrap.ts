@@ -11,7 +11,9 @@ import { RpcProcessErrorText } from './error-text.js'
 
 /** Safe launch selection belongs to the original process launcher, outside the process spec. */
 export type IProcessRuntimeBootstrapOptions = Readonly<{
+  /** Nonempty bounded logical child name, independent of a native PID. */
   name: string
+  /** Nonempty bounded parent instance identity written into the original private first frame. */
   parentInstanceId: string
   /** Only an original supervised launch supplies real restart facts. */
   generation?: IRpcRuntimeGeneration

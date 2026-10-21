@@ -7,7 +7,13 @@ import type { IProcessByteChannel } from './types.js'
 import { ProcessChannelDiagnostics } from './diagnostics.js'
 import { RpcProcessErrorText } from './error-text.js'
 
-/** Process discovery decides whether to consume a frame; Core owns actual decoder handoff. */
+/**
+ * Optionally consume one framed stdin bootstrap and retain Core's same decoder for the following
+ * handshake. 'none' returns the channel without reading. Options default to {}; an omitted timeout
+ * installs no timer, while an explicit finite nonnegative deadline may reject
+ * PROCESS_HANDSHAKE_TIMEOUT. Invalid deadlines reject INVALID_CONFIG; failed bootstrap acquisition
+ * closes its channel.
+ */
 export async function receiveAdapterBootstrap(
   channel: IProcessByteChannel,
   bootstrap: 'stdin' | 'none',

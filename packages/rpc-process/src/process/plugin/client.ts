@@ -10,11 +10,19 @@ import { createRuntimePlugin } from '@migaia/rpc-core/remote'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import { NativeProcessRuntimeLoader } from '../runtime-loader.js'
 
-/** The original advanced declaration is retained only for the serial consumer migration. */
+/**
+ * Define an advanced process-backed plugin with an explicit deployment, endpoint factory and local
+ * registration owner. Construction validates configuration; Host installation acquires the actual
+ * generation. Spawn definitions support replace, while borrowed connect definitions reject it.
+ */
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>
 ): IProcessPlugin
-/** Adds one symmetric connection to the canonical process slot. */
+/**
+ * Define a symmetric Process plugin from the same source forms as createProcessPeer. Host owns the
+ * shared process slot and its release; provide/expose retain Core's Feature admission and typing.
+ * The definition itself does not start a process before installation.
+ */
 export function createProcessPlugin<
   TRemote = Record<never, never>,
   const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<

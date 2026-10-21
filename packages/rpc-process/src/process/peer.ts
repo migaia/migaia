@@ -13,13 +13,16 @@ import { captureProcessTask } from './adapter.js'
 
 /** Native discovery opens the actual runtime I/O, never returns a constructed/trusted Peer DTO. */
 export type IAdapterProcessRuntimeIO = Readonly<{
+  /** Read native child discovery without opening streams or granting authentication. */
   discover(): Readonly<{ marker: string | undefined; runtime: string }>
+  /** Acquire the actual child I/O and optional already-read bootstrap for Core's one handoff. */
   open(): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>>
 }>
 /** Loaded native resources retain their original I/O operations. */
 export type IAdapterProcessRuntimeModule = Readonly<{ processRuntimeIO: IAdapterProcessRuntimeIO }>
 /** The runtime owner retains its real native import Promise. */
 export type IAdapterProcessRuntimeLoader = Readonly<{
+  /** Return the original optional runtime import Promise; undefined selects Core's source path. */
   load(): Promise<IAdapterProcessRuntimeModule> | undefined
 }>
 
@@ -84,7 +87,12 @@ export function createAdapterProcessPeer(
 import { NativeProcessRuntimeLoader } from './runtime-loader.js'
 import { defaultRpcReporter } from '@migaia/rpc-core'
 
-/** Discover this platform's actual I/O while Core owns the peer and its preparation resources. */
+/**
+ * Open one owned child, borrowed connection, listener, or discovered child endpoint. Native modules
+ * load only for the selected runtime. The returned Peer owns its connection resources; closing a
+ * connect Peer does not terminate the external process. Invalid source combinations reject before
+ * launch/dial/listen, and bootstrap/handshake failures retain their owning error identity.
+ */
 export function createProcessPeer<TRemote = Record<never, never>>(
   options: IRuntimeProcessPeerOptions
 ): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>

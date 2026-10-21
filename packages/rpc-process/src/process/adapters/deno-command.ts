@@ -96,9 +96,19 @@ async function drain(
 
 /** One Deno child exposes its byte port only when both directions were piped. */
 export type IDenoProcessHandle = IProcessHandle &
-  Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity }>
+  Readonly<{
+    /** Present only when both standard-input and standard-output directions are channels. */
+    channel?: IProcessByteChannel
+    /** Safe runtime identity present only when the original launch prepared runtime bootstrap. */
+    runtimeApiIdentity?: IRuntimePeerIdentity
+  }>
 
-/** Spawn a Deno.Command with an explicit environment allowlist and early stderr drain. */
+/**
+ * Create a lazy Deno.Command launcher with explicit environment inheritance and early output drain.
+ * Invocation requires Deno's native API and applicable permissions; factory construction does not
+ * spawn. Only stdin bootstrap is supported, and whole-tree termination is advertised unsupported.
+ * Native spawn failures are retained as causes of PROCESS_CHANNEL_CONNECT_FAILED.
+ */
 export function createDenoProcessLauncher(
   options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions }> = {}
 ): IProcessLauncher<IDenoProcessHandle> {
@@ -225,11 +235,18 @@ export function createDenoProcessLauncher(
   })
 }
 
-/** Read the child's stdin bootstrap with the same decoder used for its hello. */
+/**
+ * Open Deno's current standard streams and optionally read one stdin bootstrap using the decoder
+ * later handed to handshake. 'none' skips that read; 'fd' rejects INVALID_CONFIG. The caller owns
+ * the returned channel and must not independently acquire readers/writers on these same streams.
+ */
 export function openProcessStdioChannel(
   options: Readonly<{
+    /** Required bootstrap selection; fd is declared for the common shape but unsupported here. */
     bootstrap: 'stdin' | 'fd' | 'none'
+    /** Reserved fd selection, currently rejected rather than opened. */
     fd?: number
+    /** Optional finite nonnegative first-frame deadline; omission installs no bootstrap timer. */
     bootstrapTimeoutMs?: number
   }>
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {

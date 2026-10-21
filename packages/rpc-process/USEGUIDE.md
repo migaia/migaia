@@ -1,474 +1,192 @@
-# `@migaia/rpc-process` 使用手册
+# `@migaia/rpc-process` 使用指南
 
-本手册覆盖本包的全部公开能力。安装、定位和最短示例见 [README](./README.md)。调用语义（超时、取消、分组、幂等、错误还原）由 `@migaia/rpc-core` 统一实现，本手册只讲在进程场景下怎么用；更底层的 Endpoint 组装见 [rpc-core USEGUIDE](../rpc-core/USEGUIDE.md)。
+按下面的调用或所有权任务查找。示例使用真实 Node 子进程与本机 socket，Host/监督器也来自公开工厂，不伪造原生资源或宿主。
 
-## 目录
+## 按场景查找
 
-1. [导入与平台适配器](#1-导入与平台适配器)
-2. [子进程端：自动连回父进程](#2-子进程端自动连回父进程)
-3. [spawn 来源：启动并拥有子进程](#3-spawn-来源启动并拥有子进程)
-   - [Running the child in an external sandbox](#running-the-child-in-an-external-sandbox)
-4. [调用 API](#4-调用-api)
-5. [连接已运行的服务：connect 与 listen](#5-连接已运行的服务connect-与-listen)
-6. [交给 PluginHost 管理：createProcessPlugin](#6-交给-pluginhost-管理createprocessplugin)
-7. [容量、背压与诊断](#7-容量背压与诊断)
-8. [错误处理](#8-错误处理)
-9. [各平台说明](#9-各平台说明)
-10. [高阶用法：自己提供字节通道](#10-高阶用法自己提供字节通道)
-11. [常见问题](#11-常见问题)
+| 场景                                 | API                       | 详细说明                                          |
+| ------------------------------------ | ------------------------- | ------------------------------------------------- |
+| 在真实子进程中执行函数并关闭其所有者 | `createProcessPeer`       | [完整示例](#在真实子进程中执行函数并关闭其所有者) |
+| 在同一条子进程连接上使用反向调用与流 | `createProcessPeer`       | [完整示例](#在同一条子进程连接上使用反向调用与流) |
+| 关闭一个客户端后仍可连接本机命名服务 | `createProcessPeer`       | [完整示例](#关闭一个客户端后仍可连接本机命名服务) |
+| 把子进程服务及其释放交给 Host        | `createProcessPlugin`     | [完整示例](#把子进程服务及其释放交给-host)        |
+| 让重连复用同一去重范围并隔离不同身份 | `createProcessResilience` | [完整示例](#让重连复用同一去重范围并隔离不同身份) |
+| 真实子进程进入终态后拒绝新任务       | `createProcessResilience` | [完整示例](#真实子进程进入终态后拒绝新任务)       |
 
----
+## 运行准备
 
-## 1. 导入与平台适配器
-
-工厂、类型与错误码都从包根导入；平台相关的能力从 `./adapters/*` 导入。只导入你实际运行的平台，其它平台的依赖（例如 `electron`）不会被加载。
-
-```ts doc-test=check
-import {
-  createProcessPeer,
-  createProcessPlugin,
-  createProcessTransport,
-  createNativeProcessOffer,
-  RpcProcessErrorCode,
-  RPC_PROCESS_ERROR_SOURCE
-} from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import {
-  dialProcessByteChannel,
-  listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
+```bash
+pnpm add @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract
+pnpm add @migaia/plugin-host @migaia/supervision @migaia/utils
 ```
 
-| 子路径                                | 主要导出                                               | 用途                                                    |
-| ------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| `./adapters/node-child-process`       | `createNodeProcessLauncher`、`openProcessStdioChannel` | 父进程启动 Node 子进程；子进程手动打开自己的 stdio 通道 |
-| `./adapters/node-socket`              | `dialProcessByteChannel`、`listenProcessByteChannel`   | 本机 TCP 回环、Unix socket、Windows 命名管道            |
-| `./adapters/bun-spawn`                | `createBunProcessLauncher`、`openProcessStdioChannel`  | Bun 下启动子进程                                        |
-| `./adapters/bun-socket`               | `dialProcessByteChannel`、`listenProcessByteChannel`   | Bun 下的本机 socket                                     |
-| `./adapters/deno-command`             | `createDenoProcessLauncher`、`openProcessStdioChannel` | Deno 下用 `Deno.Command` 启动子进程                     |
-| `./adapters/deno-socket`              | `dialProcessByteChannel`、`listenProcessByteChannel`   | Deno 下的本机 socket                                    |
-| `./adapters/electron-utility-process` | `createElectronUtilityProcessLauncher`                 | Electron 主进程启动 utility process（消息通道）         |
-| `./adapters/windows-job`              | `createWindowsJobProcessLauncher`                      | 占位，当前 `launch` 一律拒绝（见第 9 节）               |
+每个完整示例保存为独立真实 Node 24 TypeScript 入口文件；自派生会重跑该文件，必须保留 isProcessChild 分支。命名端点场景使用 Node/POSIX 同用户权限，显式地址和 Windows 需 token。Host/治理示例直接导入第二行安装的包；本文执行结果不代表 Bun、Deno、Electron、Windows Job、外部语言对端或沙箱工具已验证。
 
-## 2. 子进程端：自动连回父进程
+## 在真实子进程中执行函数并关闭其所有者
 
-子进程入口只需要调用 `createProcessPeer`，并在 `provide` 中声明可被调用的方法：
+主进程需要把计算移到另一个操作系统进程里，但只看到函数返回值，还无法判断代码究竟在哪里执行。
 
-```ts doc-test=run group=process-use-auto file=service.ts
-import { createProcessPeer } from '@migaia/rpc-process'
+手写启动还要处理分帧、认证与清理；同一个入口重新执行时，若不先区分角色，子进程又会继续启动子进程。
 
-await createProcessPeer({
-  provide: {
-    math: { double: (value: number) => value * 2 },
-    feed: {
-      // async generator 方法可以被对端用 stream() 逐项读取
-      count: async function* (limit: number) {
-        for (let index = 1; index <= limit; index++) yield index
-      }
-    }
-  },
-  report: (error) => console.error(error)
-})
-```
+先用 `isProcessChild()` 分支，子端提供方法，父端用 `spawn: true` 启动，并在 `finally` 中关闭返回的 Peer。
 
-父进程同组示例：
-
-```ts doc-test=run group=process-use-auto file=main.ts
-import { createProcessPeer } from '@migaia/rpc-process'
-
-type IServiceApi = {
-  math: { double(value: number): number }
-  feed: { count(limit: number): AsyncIterableIterator<number> }
-}
-const service = await createProcessPeer<IServiceApi>({
-  spawn: new URL('./service.ts', import.meta.url)
-})
-try {
-  console.log(await service.request('math.double', 21)) // 42
-  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3
-} finally {
-  await service.close()
-}
-```
-
-- **自动来源的前提**：省略 `spawn` / `connect` / `listen` 只在"本进程由库的 launcher 启动"时成立。launcher 会通过环境变量（`PROCESS_RUNTIME_API_ENV`）和 bootstrap 把父端信息交给子进程。直接用 `node service.js` 运行这个文件会在配置阶段拒绝。想让一个独立运行的服务被连接，用第 5 节的 `listen`。
-- **`provide` 的规则**：只读取对象自身的可枚举数据属性。嵌套对象生成点分路径（`math.double`），getter、循环引用、重复路径或非法名字会在建立连接前被拒绝。普通函数通过 `request` / `notify` 调用，返回值必须可移植（可被 JSON 表示的数据，或协商后的 `ArrayBuffer` / `Uint8Array`）；返回 iterable 或 async iterable 的方法通过 `stream` 调用。
-- **反向调用**：子进程得到的也是一个 Peer。父端同样可以 `provide` 方法，子进程用 `request` 调用父端。
-- **生命周期**：子进程的 Peer 会保持事件循环存活，直到父端关闭连接。
-
-## 3. spawn 来源：启动并拥有子进程
-
-普通 TS 子进程用 `spawn: './service.ts'` 或 `spawn: new URL('./service.js', import.meta.url)`；`spawn: true` 重跑主入口。
-
-```ts doc-test=run group=process-use-self file=main.ts
+```ts doc-test=run
 import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
 
-type IEchoApi = { echo(value: string): string }
-if (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })
-else {
-  const child = await createProcessPeer<IEchoApi>({ spawn: true })
+type IServiceApi = { double(value: number): number; pid(): number }
+if (isProcessChild()) {
+  await createProcessPeer({
+    provide: { double: (value: number) => value * 2, pid: () => process.pid }
+  })
+} else {
+  const child = await createProcessPeer<IServiceApi>({ spawn: true })
   try {
-    console.log(await child.request('echo', 'hello'))
+    console.log(await child.request('double', 21))
+    console.log((await child.request('pid')) !== process.pid)
   } finally {
     await child.close()
   }
 }
 ```
 
-`isProcessChild()` 只表示本入口由既有 launcher bootstrap 启动，不授予信任。它在发现过程消费 env 标记后仍返回 `true`。子进程执行整个模块，包括顶层初始化；应把父进程启动逻辑放进 `else`。
+输出：
 
-相对字符串按主入口目录解析；显式 URL 不受当前工作目录影响。短对象可用 `{ entry: './service.ts', base: import.meta.url }` 指定基准。Node/Bun 保留 runtime flags 与 loader，移除 eval/print/test 控制参数，所以父入口的 loader 会继续生效；Node 原生类型剥离不解析 `.js` 指向 `.ts` 的 imports，Node/Deno 此类项目要构建输出或 loader，Bun 可直接解析。失败保留原监督错误及其 cause 与 stderr 诊断，不把错误改成成功。
-
-自派生不支持 REPL、eval、Electron、测试运行器及无可用主模块的单文件可执行程序；传精确 URL 或 `{ command, args }`。Deno 默认用 `run` 与 bootstrap 的 env 权限；额外权限通过显式 command/args 提供。
-
-短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。未配置 `report` 时复用默认控制台出口，并按进程合并预期终止能力通知；配置 `report` 后对每次启动都调用该函数，直接传默认函数与转发包装函数一视同仁。若设置短对象 `onNotice`，该 callback 收到原始通知并替代本项 reporter 调用。完整来源保持原有报告语义。
-
-### Running the child in an external sandbox
-
-短对象的 `wrap(command)` 接收 rpc 按当前 Node、Bun 或 Deno 运行时计算出的 `IProcessLaunchCommand`，返回新的 `command`、`args`、`cwd` 与 `env`。首次启动、每次 restart 和 replace 都调用一次；自定义 `supervision.launcher` 也经过这个回调。rpc 不导入沙箱工具，也不提供沙箱配置文件，安装与策略由应用负责。
-
-macOS 上可用 `sandbox-exec` 加载应用自己维护的 profile。下面保留原运行时命令、参数、工作目录与环境设置；应用的 profile 必须允许子入口及其依赖所需的读取：
-
-```ts
-import { createProcessPeer } from '@migaia/rpc-process'
-
-/** The application owns this profile and its permitted filesystem operations. */
-const profile = '/absolute/path/to/application.sb'
-/** The peer owns the sandboxed child and closes it with the original launcher. */
-const child = await createProcessPeer<{ echo(value: string): string }>({
-  spawn: {
-    entry: new URL('./service.ts', import.meta.url),
-    /** Keep runtime detection and wrap only the resulting command. */
-    wrap: (command) => ({
-      ...command,
-      command: '/usr/bin/sandbox-exec',
-      args: ['-f', profile, command.command, ...command.args]
-    })
-  }
-})
-try {
-  console.log(await child.request('echo', 'hello'))
-} finally {
-  await child.close()
-}
+```text
+42
+true
 ```
 
-Linux 上可用 `bwrap`。这个例子把现有文件系统挂为只读，提供 `/proc` 与 `/dev`，并隔离网络；需要写入的应用应按自己的策略增加可写挂载：
+输出依次为 `42`、`true`：计算结果为 42，返回的原生进程 id 也确实不同于父进程。
 
-```ts
-import { createProcessPeer } from '@migaia/rpc-process'
+父端拥有此子进程并显式关闭；Node 自派生入口必须是真实文件，不能是 eval 或测试运行器，也不保证终止所有后代进程。
 
-/** The peer owns the child launched through the application's bubblewrap policy. */
-const child = await createProcessPeer<{ echo(value: string): string }>({
-  spawn: {
-    entry: new URL('./service.ts', import.meta.url),
-    /** Preserve the original runtime arguments, cwd and environment. */
-    wrap: (command) => ({
-      ...command,
-      command: '/usr/bin/bwrap',
-      args: [
-        '--ro-bind',
-        '/',
-        '/',
-        '--proc',
-        '/proc',
-        '--dev',
-        '/dev',
-        '--unshare-net',
-        '--die-with-parent',
-        '--',
-        command.command,
-        ...command.args
-      ]
-    })
-  }
-})
-try {
-  console.log(await child.request('echo', 'hello'))
-} finally {
-  await child.close()
-}
-```
+### 示例参数
 
-`./service.ts` 使用第 2 节的自动来源模式，并在 `provide` 中声明 `echo`。以上都是平台示例，运行前由应用安装相应工具并准备自己的策略。
+spawn:true 重跑当前真实文件，isProcessChild 先分支，child 省略来源时只使用 launcher 已注入的 bootstrap。provide.double 接收 number 并返回两倍，pid 返回真实 process.pid；TRemote 只给静态业务类型。默认 defaultTimeoutMs=30000 ms，request 的 payload 是 21；finally 由拥有者 close。Node termination 仍是 best-effort，不以 PID 不同推导权限沙箱或整树终止。
 
-包装器必须遵守两个规则：
+## 在同一条子进程连接上使用反向调用与流
 
-- **stdin/stdout 直接连到子进程。** stdin 承载 token bootstrap，随后 stdin/stdout 承载 RPC 字节通道；不要分离、消费这些流或把包装器日志写到 stdout。
-- **完整转发子进程环境与退出码。** 保留 `env.inherit` 和 `env.set`；原生 launcher 在 `wrap` 返回后才加入 `PROCESS_RUNTIME_API_ENV`（`MIGAIA_RPC_RUNTIME_API_BOOTSTRAP`）。容器包装器要用例如 `-e MIGAIA_RPC_RUNTIME_API_BOOTSTRAP` 把该变量转入容器，同时转发其余环境变量。包装器应返回子进程的原退出码，不能把非零退出改成成功；这让监督层正确区分正常退出与崩溃。
+子进程处理任务时，既要调用父端持有的服务，也要把一串结果逐项交回调用方。
 
-`wrap` 不接收 `stdio`、`bootstrap`、`limits` 或 `permissions`，返回对象中的这些额外字段会被忽略。完整 `kind: 'spawn'` 来源继续由调用方直接持有 `supervision.launcher` 与 `spec`。
+分别搭建单向管道，就要重复处理路由和结果对应关系；把整串结果塞进一次响应，又迫使提供方先收集全部数据。
 
-非函数 `wrap` 在准备来源时拒绝。回调抛错或返回非法字段会使本次启动失败，带 `PROCESS_PLUGIN_INVALID_OPTION` 的原生 `TypeError` 位于 supervision 的 `LAUNCH_FAILED` cause 链上；回调抛出的原值保留在该 `TypeError.cause`。经 `host.use` 安装时，最外层仍是 `PLUGIN_INSTALL_FAILED`。
+父端通过 `provide` 提供方法，子端拿自己的 Peer 反向请求；序列方法返回异步生成器，父端通过 `stream()` 消费。
 
-`spawn` 对象把四件事组合在一起：**怎么启动**（`supervision`）、**拿哪条通道**（`rawChannel`）、**怎么握手**（`establish`）、**用什么凭据**（`token`）。README 的“高阶用法”直接展示完整来源对象，下表解释每个字段。
-
-| 字段                                     | 说明                                                                                                                              |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `kind: 'spawn'`                          | 固定值，表示对象形式的 spawn 来源。                                                                                               |
-| `channelKind`                            | `'byte'`（stdio / socket 字节流）或 `'message'`（Electron utility process 等消息通道）。                                          |
-| `wire`                                   | 完整 `channelKind: 'byte'` spawn 必须显式选 `'native'` 或 `'jsonrpc'`；message spawn 必须省略 wire。只有短来源会补 native 默认值。                                      |
-| `token`                                  | 会话凭据。经 bootstrap 交给子进程，握手时双方用它认证。每次部署随机生成，不要打印或写入日志。                                     |
-| `supervision.id`                         | 该执行单元在监督与查询中的标识。                                                                                                  |
-| `supervision.launcher`                   | 平台 launcher。`rawChannel` 读取本次启动实际返回的 handle。                                                                       |
-| `supervision.budget`                     | `createUnitBudget({ kind: 'process', maxUnits })`：限制同时存在的子进程数量。这是应用层计数，不是操作系统资源限制。               |
-| `supervision.isolation`                  | `'best-effort'` 或 `'required'`。`required` 要求 launcher 声明必需能力受到保证；Node 的整树终止能力不满足，只能用 `best-effort`。 |
-| `supervision.spec`                       | 启动规格：`command`、`args`、`env`（`inherit` 继承的变量名、`set` 设置的变量）、`stdio`、`bootstrap`，以及可选的 `limits`。       |
-| `supervision.spec.stdio`                 | stdio 走通道时用 `{ stdin: 'channel', stdout: 'channel', stderr: 'drain' }`；stderr 会被持续读取并做限流诊断（第 7 节）。         |
-| `supervision.spec.bootstrap`             | `{ via: 'stdin', payload }`：启动后先把 payload（通常是 token）写给子进程，再开始协议握手。                                       |
-| `supervision.spec.limits.callWallTimeMs` | 可选，单次调用的墙钟上限。它会压低任何调用自己设置的超时。                                                                        |
-| `rawChannel(handle)`                     | 返回 launcher 为这次启动建立的原始通道。                                                                                          |
-| `establish(raw, prepared)`               | 在原始通道上完成握手，返回协议通道。用 `createProcessTransport`，并传入 `prepared` 里的 `offer`、`scheduler` 与会话信息。         |
-
-还有两个可选字段：`offer` 用来手动收窄本端能力提议，一般不需要；`supervision.restart`、`health` 等监督策略见 [`@migaia/supervision`](../supervision/README.md)。
-
-**高级回调形式**：`spawn` 也可以是 `async (context) => sourceResult`，由你自己启动执行单元并返回已完成协商的通道。这种形式不经过 supervision，Peer 不会获得 stop / restart / replace 能力，一般只在自定义运行时中使用。
-
-## 4. 调用 API
-
-`createProcessPeer<TRemote>()` 返回的 Peer 提供以下方法。传入远端方法类型 `TRemote` 后，方法路径、参数和返回值都有类型检查。
-
-| 方法                                  | 返回                    | 说明                                                                                                       |
-| ------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `request(method, payload?, options?)` | `Promise<结果>`         | 调用并等待结果。                                                                                           |
-| `notify(method, payload?, options?)`  | `Promise<void>`         | 只发送，不等业务结果。Promise 完成仅表示已发出，**不代表对端执行成功**。                                   |
-| `stream(method, payload?, options?)`  | `AsyncIterableIterator` | 惰性：第一次 `next()` 前不发送。提前 `break` / `return()` 会通知对端结束生产。                             |
-| `group(steps, options?)`              | `Promise<步骤结果数组>` | 一组 request 按顺序执行；某步失败后，其余步骤为 `not-executed`。**不回滚**已执行步骤。                     |
-| `outcome(idempotencyKey)`             | `Promise<{ state, … }>` | 查询带 `idempotencyKey` 的调用状态：`pending`、`done`（含结果）或 `unknown`。                              |
-| `describe(options?)`                  | `Promise<对象>`         | 本端身份、已接受的连接与方法目录。本地查询，不发网络请求。                                                 |
-| `close()`                             | `Promise<void>`         | 停止接受新调用，已接受的调用继续完成，然后关闭连接；spawn 来源还会停止子进程。重复调用返回同一个 Promise。 |
-
-示例：
-
-```ts doc-test=check
-import type { IRuntimeTypedPeer } from '@migaia/rpc-process'
-
-type IActionApi = {
-  math: { double(value: number): number }
-  log: { note(value: string): void }
-  feed: { count(limit: number): AsyncIterableIterator<number> }
-  fail: { boom(): void }
-}
-/** The application already owns this peer; the idempotency examples need a matching server declaration. */
-declare const service: IRuntimeTypedPeer<IActionApi>
-
-await service.notify('log.note', 'hello')
-
-for await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3
-
-const steps = await service.group([
-  { method: 'math.double', payload: 1 },
-  { method: 'fail.boom' },
-  { method: 'math.double', payload: 3 }
-])
-// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]
-
-await service.request('math.double', 5, { idempotencyKey: 'order-42' })
-await service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }
-```
-
-### 调用选项
-
-| 选项             | 类型              | 说明                                                                                                    |
-| ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------- |
-| `timeoutMs`      | `number \| false` | 截止时间。默认 30000 ms（可用工厂的 `defaultTimeoutMs` 修改）；`false` 关闭默认超时；`0` 表示立即到期。 |
-| `signal`         | `AbortSignal`     | 取消。取消是协作式的：本地放弃等待，不保证对端没有开始执行。                                            |
-| `idempotencyKey` | `string`          | 幂等键。同键重复调用复用已保留的结果；可用 `outcome(key)` 查询。                                        |
-| `orderKey`       | `string`          | 同一 `orderKey` 的调用在对端按发送顺序串行执行。                                                        |
-| `cancel`         | `'before-start'`  | 取消时，若对端尚未开始执行则撤销；若已开始，仍等待并返回真实结果。                                      |
-
-进程间调用不支持 `transfer`（零拷贝转移只在 Worker 中可用）；传入 `transfer` 属性（哪怕是空数组）会被拒绝。`ArrayBuffer` / `Uint8Array` 作为普通数据传输时会被复制。
-
-### 类型
-
-```ts doc-test=run group=process-use-typed file=main.ts
+```ts doc-test=run
 import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
 
-type IServiceApi = {
-  math: { double(value: number): number }
-  feed: { count(limit: number): AsyncIterableIterator<number> }
+type IParentApi = { prefix(value: string): string }
+type IChildApi = {
+  label(value: string): Promise<string>
+  count(limit: number): AsyncGenerator<number>
 }
 if (isProcessChild()) {
-  await createProcessPeer({
+  const parent = createProcessPeer<IParentApi>({
     provide: {
-      math: { double: (value: number) => value * 2 },
-      feed: {
-        count: async function* (limit: number) {
-          for (let value = 1; value <= limit; value++) yield value
-        }
+      label: async (value: string): Promise<string> => (await parent).request('prefix', value),
+      count: async function* (limit: number) {
+        for (let value = 1; value <= limit; value++) yield value
       }
     }
   })
+  await parent
 } else {
-  const service = await createProcessPeer<IServiceApi>({ spawn: true })
-  try {
-    const result: number = await service.request('math.double', 21)
-    console.log(result) // 42
-    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3
-  } finally {
-    await service.close()
-  }
-}
-```
-
-不传泛型时没有可调用的方法类型。需要按字符串动态调用时，用 `IRuntimeDynamicSurface`：它只放宽编译期检查，运行时仍按对端实际目录拒绝未知方法。
-
-## 5. 连接已运行的服务：connect 与 listen
-
-普通名称自动映射同一用户的本机端点，适合独立启动的程序。连接端先启动时，默认等最多 5000 ms；`connectTimeoutMs` 修改这个等待上限。
-
-```ts doc-test=run group=process-use-named file=main.ts
-import { createProcessPeer } from '@migaia/rpc-process'
-
-type IMathApi = { math: { double(value: number): number } }
-const server = await createProcessPeer({
-  listen: 'math-service',
-  provide: { math: { double: (value: number) => value * 2 } }
-})
-const client = await createProcessPeer<IMathApi>({ connect: 'math-service' })
-try {
-  console.log(await client.request('math.double', 21))
-} finally {
-  await client.close()
-  await server.close()
-}
-```
-
-POSIX named endpoint 使用 0700 用户目录与 0600 socket，并复用已有 Unix owner record；第二个同名 listener 拒绝，只有相同服务的崩溃遗留 inode 可以回收。Node-compatible socket API 未提供 peer-credential 读取接口，因此访问控制来自 OS 文件权限。这个边界允许**该用户的任何进程**接入；显式 `token` 可以进一步限制同用户应用。TCP、显式 socket 路径及本 adapter 未提供 ACL 的 Windows named pipe 必须给 token。内部 same-user hello 标记是公开协议值，不是 secret，也不代替 OS 权限。
-
-```ts doc-test=run group=process-use-tcp file=main.ts
-import { createProcessPeer } from '@migaia/rpc-process'
-
-const token = 'local-example-secret'
-const server = await createProcessPeer({
-  listen: 'tcp://127.0.0.1:4000',
-  token,
-  provide: { echo: (value: string) => value }
-})
-const client = await createProcessPeer<{ echo(value: string): string }>({
-  connect: 'tcp://127.0.0.1:4000',
-  token
-})
-try {
-  console.log(await client.request('echo', 'hello'))
-} finally {
-  await client.close()
-  await server.close()
-}
-```
-
-完整监听与连接来源如下。
-
-当服务进程不是由你启动的（例如常驻守护进程），服务端用 `listen` 接受连接，客户端用 `connect` 连接。两端都通过握手认证：服务端的 `verify` 校验客户端提供的 `token`。
-
-**地址格式**：`tcp://127.0.0.1:<port>` 或 `tcp://[::1]:<port>`（只允许回环地址），Unix socket 绝对路径（以 `/` 开头），Windows 命名管道（`\\.\pipe\name`）。端口写 `0` 时由系统分配，实际地址由 `listen` 返回。
-
-### 高阶：完整 socket 来源
-
-这一组在同一程序中创建服务端与客户端，实际地址从原 listener 返回，关闭时分别释放连接和 listener。独立部署时，应用将该地址与凭据交给客户端。
-
-```ts doc-test=run group=process-use-full-socket file=main.ts
-import {
-  createNativeProcessOffer,
-  createProcessPeer,
-  createProcessTransport,
-  type IProcessServeListenerIngress
-} from '@migaia/rpc-process'
-import {
-  dialProcessByteChannel,
-  listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-
-type IServerApi = { math: { double(value: number): number } }
-const report = (error: unknown) => console.error(error)
-/** This example credential is local fixture data; production callers use their credential owner. */
-const token = 'full-socket-example'
-/** The actual listener publishes its selected ephemeral port before client construction. */
-let address = ''
-/** Independent accepted connections receive distinct diagnostic labels. */
-let sequence = 0
-const ingress: IProcessServeListenerIngress = {
-  kind: 'listener',
-  address: 'tcp://127.0.0.1:0',
-  listen: async (options) => {
-    const listener = await listenProcessByteChannel(options)
-    address = listener.address
-    return listener
-  },
-  verify: (auth) => {
-    if (auth !== token) throw new Error('unknown client')
-    return 'math-client'
-  },
-  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),
-  createConnectionContext: () => {
-    sequence += 1
-    return {
-      peerId: `client-${sequence}`,
-      ipc: {
-        connectionId: `conn-${sequence}`,
-        sessionId: `session-${sequence}`,
-        log: () => undefined
-      }
-    }
-  }
-}
-const server = await createProcessPeer({
-  listen: ingress,
-  provide: { math: { double: (value: number) => value * 2 } },
-  report
-})
-try {
-  const client = await createProcessPeer<IServerApi>({
-    report,
-    connect: {
-      kind: 'connect',
-      address,
-      token,
-      dial: (value, signal) =>
-        dialProcessByteChannel({ address: value, signal }),
-      establish: (raw, prepared) =>
-        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {
-          role: 'initiator',
-          offer: prepared.offer!,
-          peerId: 'math-server',
-          scheduler: prepared.scheduler,
-          signal: prepared.signal,
-          ipc: { ...prepared.session, log: () => undefined },
-          report
-        })
-    }
+  const child = await createProcessPeer<IChildApi>({
+    spawn: true,
+    provide: { prefix: (value: string) => '主端:' + value }
   })
   try {
-    console.log(await client.request('math.double', 21))
+    console.log(await child.request('label', '任务'))
+    const values: number[] = []
+    for await (const value of child.stream('count', 3)) values.push(value)
+    console.log(values.join(','))
   } finally {
-    await client.close()
+    await child.close()
+  }
+}
+```
+
+输出：
+
+```text
+主端:任务
+1,2,3
+```
+
+输出为 `主端:任务`、`1,2,3`，证明子端等待了反向请求结果，父端也读取了流的三个值。
+
+双向调用复用同一条已认证连接；流在开始迭代时才发送请求，`notify` 完成则只表示发送完成。
+
+### 示例参数
+
+两边都 provide：父端 prefix 处理字符串，子端 label 等待父 Peer 再反向 request，count 返回 1..limit 的异步生成器。spawn:true 与默认期限同上一例；stream('count',3) 首次迭代才开始，values 数组只收业务结果。子端闭包保留真实工厂 Promise，不伪造已就绪 Peer；应用仍只由父端拥有所启动子进程。
+
+## 关闭一个客户端后仍可连接本机命名服务
+
+一条 CLI 连接结束后，本机服务还需要继续接受后续调用方。
+
+如果把持有连接误当成拥有服务进程或监听器，客户端清理时就可能释放其他调用方仍在使用的服务。
+
+用唯一名称创建监听，再分别建立客户端；每个客户端先关闭自己的借用连接，最后才由服务端关闭监听。
+
+```ts doc-test=run
+import { randomUUID } from 'node:crypto'
+import { createProcessPeer } from '@migaia/rpc-process'
+
+type IServiceApi = { double(value: number): number }
+const name = 'reader-' + randomUUID()
+const server = await createProcessPeer({
+  listen: name,
+  provide: { double: (value: number) => value * 2 }
+})
+try {
+  const first = await createProcessPeer<IServiceApi>({ connect: name })
+  try {
+    console.log(await first.request('double', 20))
+  } finally {
+    await first.close()
+  }
+  const second = await createProcessPeer<IServiceApi>({ connect: name })
+  try {
+    console.log(await second.request('double', 21))
+  } finally {
+    await second.close()
   }
 } finally {
   await server.close()
 }
 ```
 
-省略 `createNativeProcessOffer` 的 `capabilities` 时，监听端根据 Core 已安装的能力生成 runtime 提议。显式传入 `capabilities`（包括空数组）仍表示调用方选择的窄提议，库不会拓宽它。
+输出：
 
-**凭据错误时**：客户端的 `createProcessPeer` 以 `@migaia/rpc/remote` / `REMOTE_START_FAILED` 拒绝，服务端的 `report` 收到 `@migaia/rpc/process` / `PROCESS_CHANNEL_AUTH_REJECTED`。不要用同一个错误凭据重试。
+```text
+40
+42
+```
 
-**要点：**
+输出为 `40`、`42`；第一个客户端关闭后，第二个客户端仍能连接并成功调用。
 
-- 每个接入的客户端都是独立会话，有各自的 `peerId` 和身份。服务端可以对某个会话反向调用；会话 principal 来自 `verify` 的返回值，而不是客户端自报的字段。
-- `connect` 可选 `supervision`（`restart`、`startupTimeoutMs`、`health` 等）：只用于重建本端连接，不会拥有或重启对端进程。
-- Unix socket 监听时会写一个属主记录文件，用来识别并回收崩溃遗留的同名 socket；属于其它服务的路径会被拒绝。
+此例使用 Node/POSIX 的同用户端点权限，不能区分同一用户下的不同应用；Windows 以及显式地址需要提供 token。
 
-## 6. 交给 PluginHost 管理：createProcessPlugin
+### 示例参数
 
-`createProcessPlugin` 接受与 Peer 相同的来源和 `provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。它返回一个插件，由 `host.use` 安装，然后经 `host.process` 出口调用：
+name 用 randomUUID 避免与其它运行争用。同一普通名称由同 OS 用户派生端点，Node/POSIX 默认 0700 目录/0600 socket；这不鉴别同用户应用。listen.provide 暴露 double，两个 connect 先后各自关闭，server 最后关闭。connectTimeoutMs 默认 5000，仅 named local 对 ENOENT/ECONNREFUSED 重试；显式地址和 Windows 需 token。
 
-```ts doc-test=run group=process-use-plugin file=main.ts
+## 把子进程服务及其释放交给 Host
+
+应用安装多个服务时，需要一个所有者在退出时统一关闭它们的进程连接。
+
+把每个子进程分散保存在局部变量里，容易漏掉清理项，也容易把服务查找与原生进程所有权混在一起。
+
+创建带名称的进程插件，用 `host.use()` 安装，经 `host.process` 调用，并在 `finally` 中释放 Host。
+
+```ts doc-test=run
 import { defineHost } from '@migaia/plugin-host'
 import { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'
 
-type IServiceApi = { math: { double(value: number): number } }
+type IServiceApi = { double(value: number): number }
 if (isProcessChild()) {
-  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })
+  await createProcessPeer({ provide: { double: (value: number) => value * 2 } })
 } else {
   const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
     name: 'service',
@@ -479,546 +197,407 @@ if (isProcessChild()) {
   })
   try {
     await host.use(service)
-    console.log(await host.process!.request('service', 'math.double', 21)) // 42
-    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']
+    console.log(await host.process!.request('service', 'double', 21))
+    console.log((await host.process!.list()).connections.map((entry) => entry.kind).join(','))
   } finally {
-    await host.dispose()
+    const result = await host.dispose()
+    console.log(result.cleanupComplete)
   }
 }
 ```
 
-`host.process` 出口的方法：
+输出：
 
-| 方法                                                  | 说明                                                                                          |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `request` / `notify` / `stream` / `group` / `outcome` | 与 Peer 相同，第一个参数是目标：连接名，或 `{ name, instanceId }`（同名多实例时必须精确指定） |
-| `list(options?)` / `get(target, options?)`            | 查询连接、身份、代次、健康与退出信息；拿不到的事实返回 `unavailable`，不会伪造为 0            |
-| `on(event, listener)` / `watch(options?)`             | 订阅生命周期事件；`on` 返回可重复调用的取消函数，`watch` 是有界异步迭代器                     |
-| `broadcast(...)`                                      | 对多个目标调用并汇总各自结果；不保证全部成功                                                  |
-| `stop` / `kill` / `restart` / `replace`               | 只对 spawn 来源有效；对 connect / listen 来源调用会以 `CAPABILITY_CONFLICT` 拒绝              |
-
-**`expose`**：默认为空，即不把本端 Host 的任何方法公开给子进程。要让子进程调用本端某个 Feature 的方法，显式列出路径，例如 `expose: ['parent.echo']`；只列出的方法可见，`expose: ['math.add']` 不会顺带公开 `math.sub`。
-
-**`replace`**：用新的 spec 启动后继进程并切换流量。正在执行的调用仍在原进程中完成，不会被转移到新进程。
-
-## 7. 容量、背压与诊断
-
-- **并发上限**：每个对端最多 64 个、全局最多 256 个同时执行的入站调用。超出时调用方收到 `@migaia/rpc/core` / `OVERLOADED`，对端函数不会被调用。可在工厂选项 `providerLimits` 中调整 `maxPerPeer`、`maxGlobal`，并用 `onRejected` 观察被拒绝的调用及其原因。
-- **单帧上限**：握手帧不超过 `PROCESS_HANDSHAKE_MAX_FRAME_BYTES`；业务消息受协议帧上限约束，超限时以 `FRAME_LIMIT_EXCEEDED` 拒绝。大数据请分批发送，或用 `stream` 逐项传输。
-- **stderr 限流**：子进程 stderr 被持续读取，避免管道写满阻塞子进程。每个会话每 1000 ms 最多产生 32 条 `ipc.stderr` 诊断记录；超出部分合并为一条带 `droppedChunks` 计数的摘要，文本经过脱敏。
-- **健康检查**：native 协议的连接默认启用 ping 健康检查；连续失败时报告 `PROCESS_HEALTH_PING_FAILED`，由监督策略决定是否重启。`wire: 'jsonrpc'` 时默认不启用 ping。
-- **连接治理**：`createProcessResilience` 用于自定义连接数、调用速率、payload 上限，以及实例不健康时的挂起与清算策略。超限时以 `PROCESS_CONNECTION_LIMIT` 拒绝，同样发生在对端函数执行之前。
-
-## 8. 错误处理
-
-### 错误的形状
-
-本包登记的通道、启动和监听错误使用原生 `Error`（或其子类）及 `source`、`code`。原生同步 spawn、Unix listener 准备和 bind 诊断在原对象上附包身份，原生 errno code 改为语义码，类型、其它字段和 stack 保持；已有包装器保留原始 cause。请按 `(source, code)` 分支，不要匹配 `message` 文本。
-
-Web Streams byte I/O 的 close 在回调前发布同一个完成 Promise；回调抛错仍通知其它观察者并执行 reader.cancel、writer.abort 与物理关闭。失败统一以原生 AggregateError/PROCESS_CHANNEL_CLOSED 拒绝，首错在 cause、全部原错在 errors，重复 close 加入同一结果。构造时 writer 获取失败会释放已取得的 reader 锁，调用方仍持有自己的原 writer；原生获取失败保留 TypeError 并附 PROCESS_CHANNEL_CONNECT_FAILED。socket listener 重复 close 同样返回缓存的同一 Promise。
-
-```ts doc-test=check
-import type { IRuntimeTypedPeer } from '@migaia/rpc-process'
-
-/** Error handling continues an established application-owned connection. */
-declare const service: IRuntimeTypedPeer<{ math: { double(value: number): number } }>
-
-import { RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorCode } from '@migaia/rpc-process'
-
-try {
-  await service.request('math.double', 21, { timeoutMs: 1000 })
-} catch (error) {
-  const { source, code } = error as { source?: string; code?: string }
-  if (source === '@migaia/rpc/core' && code === 'DEADLINE_EXCEEDED') {
-    // 超时：对端可能仍在执行，先对账再决定是否重试
-  } else if (source === RPC_PROCESS_ERROR_SOURCE && code === RpcProcessErrorCode.channelClosed) {
-    // 通道已关闭：需要新建连接
-  } else throw error
-}
+```text
+42
+spawn
+true
 ```
 
-**对端业务错误**会被还原为原生类型：子进程抛出 `RangeError('bad input')`，父端收到的也是 `RangeError`，`message` 与 `stack` 保留；它没有 RPC 的 source / code（显示为 `unknown` / `UNKNOWN`）。
+输出为 `42`、`spawn`、`true`：调用成功，出口识别出启动型连接，Host 清理也已完成。
 
-### 本包错误码
+Host 拥有已安装的子进程；两个执行预算都显式设为 `false`，表示不设上限，并非默认值，也不会回滚应用任意外部副作用。
 
-source 均为 `@migaia/rpc/process`。
+### 示例参数
 
-| code                                | 何时发生                                             | 建议处理                                  |
-| ----------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
-| `PROCESS_HANDSHAKE_TIMEOUT`         | 握手未在 `handshakeTimeoutMs` 内完成                 | 关闭这次尝试，在总时间预算内重新建立连接  |
-| `PROCESS_CHANNEL_AUTH_REJECTED`     | 凭据未通过对端认证                                   | 修正 token 或认证配置；不要用同一凭据重试 |
-| `PROCESS_CHANNEL_CLOSED`            | 在已关闭的通道上继续调用                             | 新建连接；在途调用结果未知，先对账        |
-| `PROCESS_CHANNEL_CONNECT_FAILED`    | 拨号或启动失败（地址不可达、权限、可执行文件不存在） | 查看 `cause`，修正后按退避重连            |
-| `PROCESS_CHANNEL_LISTEN_FAILED`     | 本地监听无法绑定（端口占用、路径属于其它服务）       | 换地址或清理占用                          |
-| `PROCESS_PLUGIN_INVALID_OPTION`     | 插件或来源选项不合法                                 | 修正对应字段；原样重试无效                |
-| `PROCESS_HOST_INVALID_OPTION`       | Host 相关选项不合法                                  | 修正对应字段                              |
-| `PROCESS_HOST_CLOSED`               | 出口已开始释放，仍向其提交工作                       | 使用新的 Host 或 Peer                     |
-| `PROCESS_RESILIENCE_INVALID_OPTION` | 连接治理的限额、所有权或健康配置不合法               | 修正配置                                  |
-| `PROCESS_CONNECTION_LIMIT`          | 连接数、调用速率或 payload 超限（对端未执行）        | 降低并发或数据量，在预算内重试            |
-| `PROCESS_INSTANCE_UNHEALTHY`        | 共享目标因健康事件被挂起，后继尚未就绪               | 等待后继就绪，或处理健康事件              |
-| `PROCESS_HEALTH_PING_FAILED`        | 健康 ping 失败                                       | 交给监督策略处理，不要另起一套重启逻辑    |
-| `PROCESS_TERMINAL_CALL`             | 注册已进入终态，拒绝新调用                           | 等待新注册就绪                            |
-| `PROCESS_LIQUIDATED`                | 注册已被清算，不能再重启                             | 创建新的注册                              |
-| `PROCESS_USAGE_SAMPLE_FAILED`       | 采样子进程 CPU / 内存失败                            | 显示为不可用；不影响进程生命周期          |
+service.name='service' 是 Host 内连接名，spawn:true 复用真实自派生，未给 expose 时默认无 Host 方法反向公开。defineHost 的 host.execution.mutationTimeoutMs 和 pipelineDrainTimeoutMs 都显式 false（无上限），不是省略默认。host.use 安装，host.process.request 第一个参数选 service，list 的 kind=spawn，dispose 返回结构化 cleanupComplete；不宣称任意外部副作用回滚。
 
-### 常见的调用层错误
+## 让重连复用同一去重范围并隔离不同身份
 
-source 均为 `@migaia/rpc/core`。
+连接重建后，连接标签会变化，但同一个已认证身份的重试仍应指向同一份已保留结果范围。
 
-| code                 | 含义                             | 建议处理                                                              |
-| -------------------- | -------------------------------- | --------------------------------------------------------------------- |
-| `DEADLINE_EXCEEDED`  | 超时（`TimeoutError`）           | 对端可能已执行；带 `idempotencyKey` 时用 `outcome` 查询，否则业务对账 |
-| `CANCELLED`          | 被 `signal` 取消（`AbortError`） | 同上：本地取消不代表对端未执行                                        |
-| `OVERLOADED`         | 对端并发额度已满，函数未被调用   | 降低并发，带抖动退避后重试                                            |
-| `PROVIDER_NOT_FOUND` | 对端没有这个方法                 | 检查方法路径与对端版本                                                |
-| `TRANSPORT`          | 物理连接失败                     | 调用可能已送达；先对账再决定是否重发                                  |
+只按连接划分会丢掉连续性；直接共用一个没有身份区分的范围，又可能把不同身份的结果混在一起。
 
-完整的调用层错误码表见 [rpc-core USEGUIDE](../rpc-core/USEGUIDE.md#10-错误码与处理)。
+用完整身份调用 `sessionOptions`，比较返回的存储与范围；这里仅演示配置派生，身份字段本身不构成认证。
 
-### 重试原则
-
-超时、取消、断线和"结果未知"都**不能证明对端没有执行**。非幂等操作在重试前必须先确认结果：给调用加 `idempotencyKey`，失败后用 `outcome(key)` 查询；拿不到确定结果时，按业务规则对账。只有在对端确定没有执行时（例如 `OVERLOADED`、`PROCESS_CONNECTION_LIMIT`，或 `cancel: 'before-start'` 成功撤销），才可以直接重试。
-
-## 9. 各平台说明
-
-| 平台                     | 启动子进程                             | 本机 socket   | 备注                                                                                       |
-| ------------------------ | -------------------------------------- | ------------- | ------------------------------------------------------------------------------------------ |
-| Node                     | `createNodeProcessLauncher`            | `node-socket` | 整树终止为 `unsupported`，只能用 `isolation: 'best-effort'`；子进程会被终止，孙进程不保证  |
-| Bun                      | `createBunProcessLauncher`             | `bun-socket`  | 与 Node 相同的通道语义                                                                     |
-| Deno                     | `createDenoProcessLauncher`            | `deno-socket` | 子进程需要相应的 `--allow-*` 权限                                                          |
-| Electron utility process | `createElectronUtilityProcessLauncher` | —             | 使用消息通道（`channelKind: 'message'`），需要安装 `electron`                              |
-| Windows Job              | `createWindowsJobProcessLauncher`      | —             | **占位实现**：未经真实 Job 对象验证，`launch` 一律以 `PROCESS_CHANNEL_CONNECT_FAILED` 拒绝 |
-
-**消息通道的能力协商**：消息通道上的固定基础能力（abort、ping、close、deadline、幂等、trace、stream、batch）无需额外握手。扩展能力（runtime 调用、二进制等）需要对端发回能力确认（ACK）：没有 ACK 或超时时只启用基础能力，实际启用的能力反映在 `agreement.capabilities` 中。
-
-## 10. 高阶用法：自己提供字节通道
-
-如果你有一条现成的有序字节连接（例如自定义的 IPC 或 socket），可以直接用 `createProcessTransport` 完成握手，得到协议通道，再交给 `@migaia/rpc-core` 的 Endpoint 或 Remote 组装：
-
-```ts doc-test=check
-import type { Socket } from 'node:net'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'
-import { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'
+```ts doc-test=run
+import { createProcessResilience } from '@migaia/rpc-process'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
-/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */
-declare const socket: Socket
-const raw = createAdapterSocketByteIO(socket)
-const channel = await createProcessTransport(raw, {
-  peerId: 'service',
-  role: 'initiator',
-  offer: {
-    peer: { id: 'client', runtime: RpcPeerRuntime.node },
-    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
-    codecs: [RpcCodecId.json],
-    capabilities: []
-  },
-  scheduler: systemScheduler,
-  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },
-  report: console.error
-})
+const resilience = createProcessResilience({ scheduler: systemScheduler, report: console.error })
 try {
-  console.log(channel.peerId)
+  const first = resilience.sessionOptions({
+    connectionId: 'connection-1',
+    sessionId: 'session-1',
+    principalId: 'account-A'
+  })
+  const reconnect = resilience.sessionOptions({
+    connectionId: 'connection-2',
+    sessionId: 'session-2',
+    principalId: 'account-A'
+  })
+  const other = resilience.sessionOptions({
+    connectionId: 'connection-3',
+    sessionId: 'session-3',
+    principalId: 'account-B'
+  })
+  const admission = { token: 'operation', senderId: 'caller' }
+  console.log(first.idempotency.store === reconnect.idempotency.store)
+  console.log(first.idempotency.scope!(admission) === reconnect.idempotency.scope!(admission))
+  console.log(first.idempotency.scope!(admission) !== other.idempotency.scope!(admission))
+  console.log(first.limits.maxGlobal, first.limits.maxPerPeer)
 } finally {
-  await channel.close()
+  await resilience.close()
 }
 ```
 
-适配器作者可用的其它构造函数：
+输出：
 
-| 函数                                                                                   | 入口                            | 用途                                      |
-| -------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------------- |
-| `createAdapterSocketByteIO(socket)`                                                    | `./adapters/node-socket`        | 把 Node `Duplex` 包装成字节通道           |
-| `createAdapterChildStdio(child)`                                                       | `./adapters/node-child-process` | 把子进程的 stdio 管道包装成字节通道       |
-| `createAdapterProcessStdio(io)`                                                        | `./adapters/node-child-process` | 子进程一侧：包装自己的 stdin / stdout     |
-| `createAdapterWebByteIO(...)`                                                          | 包根                            | 把 Web Streams 包装成字节通道             |
-| `createAdapterProcessLaunch`、`createAdapterProcessPeer`、`createAdapterProcessPlugin` | 包根                            | 为自定义运行时组装 launch、Peer 与 Plugin |
-
-新适配器使用 `@migaia/rpc-core/adapter` 的 `defineByteAdapter` 或 `defineMessageAdapter`，让 Core 从真实 I/O 组装 Peer 与 Plugin；完整示例见 [Core 的“编写一个适配器”](../rpc-core/USEGUIDE.md)。上表的原生资源构造继续适用于自定义运行时，复杂 launch、session 与诊断组合使用 `@migaia/rpc-core/adapter/internal-advanced`。这些操作只读取实际持有的资源，不接受“已认证 / 已协商”的声明。
-
-## 11. 常见问题
-
-**直接运行子进程文件时报配置错误？**
-自动来源只在库 launcher 启动的进程中成立。独立运行的服务请用 `listen`（第 5 节）。
-
-**父进程退出后子进程还在？**
-`close()` 或 `host.dispose()` 会停止 spawn 来源的子进程。父进程被强杀时来不及清理；子进程会检测到父连接丢失并退出。孙进程在 Node 上不保证被终止。
-
-**能跨机器调用吗？**
-不能。socket 适配器只接受回环地址、Unix socket 和命名管道。
-
-**`notify` 成功了，为什么对端没有执行？**
-`notify` 只保证消息已发出。需要确认业务结果时用 `request`。
-
-**怎样传大文件？**
-单条消息受帧上限约束。用 `stream` 分块传输，或者把文件路径传过去，由对端自己读取。
-
-## JSON-RPC 字节通道与对端协议
-
-普通子进程优先使用 `createProcessPeer` 的 JSON-RPC spawn。下列高级入口保留实际字节通道及其 stderr/诊断归属，不负责替调用方终止借用的进程。
-
-### JSON-RPC 1. TypeScript 端：createProcessJsonRpcChannel
-
-```ts doc-test=check
-import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
+```text
+true
+true
+true
+32 32
 ```
 
-`createProcessJsonRpcChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它用于自有字节通道的高级组合。普通 Python 子进程直接使用 README 的 `createProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })`，不必手写 launcher 或握手。
+输出为 `true`、`true`、`true`、`32 32`：同一治理对象共用存储，相同身份保持范围，不同身份使用不同范围。
 
-| 选项                     | 说明                                                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `byte`                   | 有序字节连接（`IProcessByteChannel`），来自 `@migaia/rpc-process` 的 launcher handle 或 socket 适配器。                |
-| `peerId`                 | 对端标识。                                                                                                             |
-| `target`                 | `{ kind: 'plugin', contract }`（单个服务）或 `{ kind: 'host', catalog }`（对端是一个插件宿主）。见下文。               |
-| `offer`                  | 本端提议：`versions`、`peer: { id, runtime }`、`capabilities`。`codecs` 与 `auth` 由本包填写。                         |
-| `offer.capabilities`     | 只能从 `deadline@1`、`trace@1`、`idempotency@1`（以及桥接必需能力）中选择；其它能力以 `JSONRPC_PROFILE_INVALID` 拒绝。 |
-| `token`                  | 会话凭据，随 `migaia.hello` 发给对端认证。                                                                             |
-| `scheduler`、`wallClock` | 计时依赖，通常用 `@migaia/utils/scheduler` 的 `systemScheduler` 与 `systemWallClock`。                                 |
-| `ipc`                    | `{ connectionId, sessionId, log }`：诊断标签与日志回调。                                                               |
-| `handshakeTimeoutMs`     | 可选，握手超时；超时以 `JSONRPC_HANDSHAKE_TIMEOUT` 失败。                                                              |
-| `signal`                 | 可选，取消握手。                                                                                                       |
-| `report`                 | 接收后台错误。                                                                                                         |
+此会话默认的全局和单对端并发上限都是 `32`；应用必须在认证成功后取得 `principalId`，再把这些配置用于实际连接。
 
-**关于 `target.contract`**：它是本地声明，桥接只用它在建立连接前校验"没有 stream 方法"。真正可以调用的方法以对端 `migaia.describe` 返回的目录为准；调用目录之外的方法会以 `PROVIDER_NOT_FOUND` 拒绝。
+### 示例参数
 
-必需能力 `jsonrpc-bridge@1`、`runtime-api@1`、`batch@1`、`abort@1`、`wire-error@1` 由本包自动加入提议，不需要在 `offer.capabilities` 中列出。
+createProcessResilience 必填 systemScheduler/report。三个 session identity 完整给 connectionId/sessionId/principalId；前两者只变标签，相同 account-A 仍同范围，account-B 分开。admission 的 token:'operation'/senderId:'caller' 仅是本例去重请求上下文，不是认证凭据。默认 maxConcurrentCallsPerConnection=32，所以返回 limits.maxGlobal/maxPerPeer 都是 32；必须在真实认证后使用 principalId。
 
-### JSON-RPC 2. 获得字节通道：子进程与本机 socket
+## 真实子进程进入终态后拒绝新任务
 
-**子进程**：用 `@migaia/rpc-process` 的 launcher 启动对端，取 `handle.channel`。`spec.stdio` 设为 `{ stdin: 'channel', stdout: 'channel', stderr: 'drain' }`，对端从 stdin 读、向 stdout 写；stderr 由库持续读取，对端可以放心向 stderr 写日志。用 `bootstrap: { via: 'stdin', payload }` 把 token 交给对端，对端会先读到一个"4 字节大端长度 + 内容"的 bootstrap 帧（见第 5.1 节）。
+受监督子进程退出，当前策略不会重启，但应用仍可能继续发送新任务。
 
-**本机 socket**：对端已经在监听时，用 `@migaia/rpc-process/adapters/node-socket` 的 `dialProcessByteChannel({ address })` 拨号，把返回的通道作为 `byte`。token 需要通过你自己的方式（例如配置或密钥服务）让双方事先共享。
+缓存的就绪标记可能比真实进程活得更久；用诊断对象替代监督器，又会丢掉实际的生命周期边界。
 
-**所有权**：`connect` 来源只拥有这条连接。`peer.close()` 关闭连接，但不会结束对端进程；如果进程是你启动的，用 `handle.terminate()` 结束它。
+把真实 Node 进程监督器登记到治理对象，等待它的终态通知，并在发送任务前执行返回的守卫。
 
-### JSON-RPC 3. 调用与限制
+```ts doc-test=run
+import { createProcessResilience } from '@migaia/rpc-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createUnitBudget } from '@migaia/supervision'
+import { createProcessSupervisor } from '@migaia/supervision/process'
+import { systemScheduler } from '@migaia/utils/scheduler'
 
-| 调用                       | 映射到                       | 说明                                                      |
-| -------------------------- | ---------------------------- | --------------------------------------------------------- |
-| `request(method, payload)` | 带 `id` 的 `migaia.invoke`   | 等待对端回复                                              |
-| `notify(method, payload)`  | 不带 `id` 的 `migaia.invoke` | 对端执行但不回复                                          |
-| 并发的多个调用             | JSON-RPC 批量数组            | 对端按数组顺序处理，并以数组回复（notify 不出现在回复中） |
-| `signal` / 超时取消        | `migaia.cancel`              | 通知对端放弃该调用；不等待确认，不回滚已发生的副作用      |
-| `stream`                   | —                            | 不支持                                                    |
-| `transfer`                 | —                            | 不支持                                                    |
-
-- payload 必须是数组，作为对端方法的位置参数列表；传入非数组以 `JSONRPC_PROFILE_INVALID` 拒绝。
-- 数据经 JSON 编码。跨语言传整数时，超过 ±(2^53 − 1) 的值请用字符串表示。
-- 帧、UTF-8 或 JSON 格式非法时连接会被终止（`JSONRPC_FRAME_INVALID`）。
-- 收到未知 `id` 或迟到的回复会被报告并丢弃，不影响其它调用。
-
-### JSON-RPC 4. 对端最小实现（Python）
-
-下面的实现只依赖 Python 标准库，与 README 的 TypeScript parent 构成同一个可执行文档组，覆盖 `request`、`notify`、并发批量调用和业务错误。把它保存为 `service.py`，即可作为其它语言实现的参照。
-
-```python doc-test=run group=python-bridge file=service.py
-"""A minimal migaia JSON-RPC bridge responder using only the Python standard library."""
-import json
-import struct
-import sys
-
-# 本端提供的业务方法：只支持 request / notify，不支持 stream。
-METHODS = {
-    "echo": lambda args: args,
-    "math.add": lambda args: args[0] + args[1],
+const reports: unknown[] = []
+const report = (error: unknown) => {
+  reports.push(error)
 }
-# 本端握手时声明的能力；前五项是桥接协议的必需能力。
-CAPABILITIES = ["jsonrpc-bridge@1", "runtime-api@1", "batch@1", "abort@1", "wire-error@1",
-                "deadline@1", "trace@1", "idempotency@1"]
-PEER = {"id": "python-service", "runtime": "python"}
-
-stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
-
-
-def read_exact(size):
-    data = stdin.read(size)
-    if len(data) != size:
-        raise SystemExit(0)
-    return data
-
-
-def read_message():
-    """Read one Content-Length frame; return None at EOF."""
-    header = b""
-    while not header.endswith(b"\r\n\r\n"):
-        byte = stdin.read(1)
-        if not byte:
-            return None
-        header += byte
-    length = next(int(line.split(b":", 1)[1]) for line in header.split(b"\r\n")
-                  if line.lower().startswith(b"content-length:"))
-    return json.loads(read_exact(length).decode("utf-8"))
-
-
-def write_message(message):
-    body = json.dumps(message, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    stdout.write(b"Content-Length: %d\r\n\r\n" % len(body) + body)
-    stdout.flush()
-
-
-def wire_error(code, message):
-    """JSON-RPC error carrying the migaia wire error tree in data.migaiaWireError."""
-    return {"code": -32000, "message": message, "data": {"migaiaWireError": {
-        "source": "python-service", "code": code, "name": "Error",
-        "message": message, "stack": "Error: " + message}}}
-
-
-def handle(message, state):
-    method, params, ident = message.get("method"), message.get("params", {}), message.get("id")
-    if method == "migaia.hello":
-        hello = json.loads(params["hello"])
-        ok = hello.get("auth") == state["token"] and {"major": 1, "minor": 1} in hello["versions"]
-        state["authenticated"] = ok
-        if ok:
-            reply = {"kind": "handshake", "step": "accept", "protocol": "migaia.rpc",
-                     "major": 1, "minor": 1, "codec": "json", "peer": PEER,
-                     "capabilities": [c for c in hello["capabilities"] if c in CAPABILITIES]}
-        else:
-            reply = {"kind": "handshake", "step": "reject", "protocol": "migaia.rpc",
-                     "error": wire_error("AUTH_REJECTED", "authentication rejected")["data"]["migaiaWireError"]}
-        result = {"reply": json.dumps(reply), "methods": ["migaia.hello", "migaia.describe",
-                                                          "migaia.invoke", "migaia.cancel"]}
-        return {"jsonrpc": "2.0", "id": ident, "result": result}
-    if not state["authenticated"]:
-        raise SystemExit(1)
-    if method == "migaia.describe":
-        return {"jsonrpc": "2.0", "id": ident, "result": {
-            "schemaVersion": 2, "self": {"name": "python-service", "instanceId": PEER["id"]},
-            "methods": [{"name": name, "supportedModes": ["request", "notify"], "modeSource": "declared"}
-                        for name in METHODS]}}
-    if method == "migaia.cancel":
-        return None  # 本示例的方法都是同步完成，没有可取消的在途调用
-    if method == "migaia.invoke":
-        provider = METHODS.get(params["method"])
-        if ident is None:  # 无 id 即 notify：执行但不回复
-            if provider:
-                provider(params["args"])
-            return None
-        if provider is None:
-            return {"jsonrpc": "2.0", "id": ident,
-                    "error": wire_error("PROVIDER_NOT_FOUND", "method not found")}
-        try:
-            return {"jsonrpc": "2.0", "id": ident, "result": provider(params["args"])}
-        except Exception as error:  # 业务异常转换为 wire error
-            return {"jsonrpc": "2.0", "id": ident, "error": wire_error("BUSINESS", str(error))}
-    return {"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": "method not found"}}
-
-
-def main():
-    # 父进程先写入一个 4 字节大端长度前缀的 bootstrap 帧，内容是会话 token。
-    (length,) = struct.unpack(">I", read_exact(4))
-    state = {"token": read_exact(length).decode("utf-8"), "authenticated": False}
-    while (message := read_message()) is not None:
-        if isinstance(message, list):  # 已协商 batch：逐个处理，按顺序回复数组
-            replies = [r for r in (handle(m, state) for m in message) if r is not None]
-            if replies:
-                write_message(replies)
-        else:
-            reply = handle(message, state)
-            if reply is not None:
-                write_message(reply)
-
-
-main()
-```
-
-实现要点：
-
-- 先读 bootstrap 帧拿到 token，再进入 Content-Length 消息循环。
-- 握手通过前，除 `migaia.hello` 外的任何消息都应拒绝（示例直接退出）。
-- 握手回复中的 `capabilities` 必须包含五个必需能力，`methods` 必须列出全部四个扩展方法，否则 TypeScript 端以 `JSONRPC_EXTENSION_MISSING` 拒绝。
-- 回复写到 stdout，日志写到 stderr，不要把日志混进 stdout。
-
-### JSON-RPC 5. 高阶用法：对端协议规范
-
-#### 5.1 分帧
-
-- **bootstrap 帧**（仅子进程场景、启用 `bootstrap` 时）：连接建立后，对端最先从 stdin 收到一个 4 字节大端无符号长度，紧接着是该长度的 UTF-8 内容（通常是 token）。之后才是 JSON-RPC 消息。
-- **消息帧**：`Content-Length: <字节数>\r\n\r\n<UTF-8 JSON>`。长度按 UTF-8 字节计算，不是字符数。头部不超过 1024 字节，单帧不超过 16 MiB。
-- 消息体是一个 JSON-RPC 2.0 对象，或者（握手成功后）一个由这些对象组成的数组（批量）。
-
-#### 5.2 `migaia.hello`：握手
-
-请求：
-
-```json
-{ "jsonrpc": "2.0", "id": "…", "method": "migaia.hello", "params": { "hello": "<JSON 字符串>" } }
-```
-
-`params.hello` 是一个 JSON 字符串，解析后为：
-
-```json
-{
-  "kind": "handshake",
-  "step": "hello",
-  "protocol": "migaia.rpc",
-  "versions": [{ "major": 1, "minor": 1 }],
-  "codecs": ["json"],
-  "capabilities": [
-    "jsonrpc-bridge@1",
-    "runtime-api@1",
-    "batch@1",
-    "abort@1",
-    "wire-error@1",
-    "deadline@1"
-  ],
-  "peer": { "id": "node-client-1", "runtime": "node" },
-  "auth": "<token>"
-}
-```
-
-对端校验 `auth`，选出双方共同的版本（目前为 1.1）、codec（`json`）与能力，然后回复：
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "…",
-  "result": {
-    "reply": "<JSON 字符串>",
-    "methods": ["migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"]
+const supervisor = createProcessSupervisor({
+  id: 'worker',
+  launcher: createNodeProcessLauncher(),
+  budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),
+  scheduler: systemScheduler,
+  report,
+  isolation: 'best-effort',
+  restart: { mode: 'never' },
+  spec: {
+    command: process.execPath,
+    args: ['-e', 'process.exit(1)'],
+    env: { inherit: ['PATH'], set: {} },
+    stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'drain' }
   }
-}
-```
-
-`result.reply` 是一个 JSON 字符串。接受时为：
-
-```json
-{
-  "kind": "handshake",
-  "step": "accept",
-  "protocol": "migaia.rpc",
-  "major": 1,
-  "minor": 1,
-  "codec": "json",
-  "capabilities": ["…双方都支持的能力，按请求中的顺序…"],
-  "peer": { "id": "python-service", "runtime": "python" }
-}
-```
-
-拒绝时为 `{ "kind": "handshake", "step": "reject", "protocol": "migaia.rpc", "error": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 source `@migaia/rpc/process`、code `PROCESS_CHANNEL_AUTH_REJECTED`。
-
-#### 5.3 `migaia.describe`：方法目录
-
-请求 `params` 为 `{ "args": [] }`，回复：
-
-```json
-{
-  "schemaVersion": 2,
-  "self": { "name": "python-service", "instanceId": "python-service" },
-  "methods": [
-    { "name": "echo", "supportedModes": ["request", "notify"], "modeSource": "declared" },
-    { "name": "math.add", "supportedModes": ["request", "notify"], "modeSource": "declared" }
-  ]
-}
-```
-
-- `self.instanceId` 必须与握手回复中的 `peer.id` 一致。
-- `supportedModes` 只能包含 `request` 与 `notify`；出现 `stream` 时 TypeScript 端以 `JSONRPC_UNSUPPORTED_MODE` 拒绝。
-- 可选字段 `idempotent: boolean` 声明该方法是否幂等。
-
-#### 5.4 `migaia.invoke`：调用
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "7",
-  "method": "migaia.invoke",
-  "params": { "method": "math.add", "args": [20, 22], "meta": { "timeoutMs": 30000 } }
-}
-```
-
-- `params.args` 就是 TypeScript 端传入的 payload，必须是数组（按位置的参数列表）：`request('math.add', [20, 22])` 发出 `"args": [20, 22]`；不传 payload 时为 `[]`。
-- `params.meta` 可选，只会包含 `timeoutMs`、`idempotencyKey`、`trace` 中实际设置了的字段。对端可以忽略它。
-- 成功：`{ "jsonrpc": "2.0", "id": "7", "result": 42 }`。
-- 没有 `id` 的 invoke 是 notify：执行，但不回复。
-- 方法不存在：回复 wire error，code 为 `PROVIDER_NOT_FOUND`。
-
-#### 5.5 `migaia.cancel`：取消
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "migaia.cancel",
-  "params": { "id": "7", "reason": "…可选，取消原因…" }
-}
-```
-
-通知对端放弃 `id` 为 `"7"` 的在途调用。这是一条通知，对端不回复确认。之后再到达的该调用结果会被 TypeScript 端丢弃。
-
-#### 5.6 错误格式
-
-业务失败时，按 JSON-RPC 规范回复 `error`，并把完整错误信息放在 `data.migaiaWireError`：
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "7",
-  "error": {
-    "code": -32000,
-    "message": "list index out of range",
-    "data": {
-      "migaiaWireError": {
-        "source": "python-service",
-        "code": "BUSINESS",
-        "name": "Error",
-        "message": "list index out of range",
-        "stack": "Error: list index out of range"
-      }
+})
+const resilience = createProcessResilience({ scheduler: systemScheduler, report })
+let finish: () => void = () => undefined
+const terminal = new Promise<void>((resolve) => {
+  finish = resolve
+})
+const off = resilience.onTerminal(() => {
+  finish()
+})
+const registration = resilience.attachRegistration(
+  'worker',
+  {
+    ownership: 'spawn-owned',
+    health: 'none',
+    supervisor: {
+      restart: () => supervisor.restart(),
+      inspect: () => supervisor.inspect(),
+      dispose: () => supervisor.dispose(),
+      onTerminal: (listener) =>
+        supervisor.subscribe((event) => {
+          if (event.type === 'terminal') listener(event)
+        })
     }
+  },
+  { kind: 'standalone-host', release: () => supervisor.dispose() }
+)
+try {
+  const guard = resilience.callGuard('worker')
+  guard.beforeDispatch({ method: 'work', mode: 'request', generation: supervisor.generation })
+  await supervisor.start()
+  await terminal
+  console.log(resilience.inspect('worker')?.state, registration.inspect()?.health)
+  try {
+    guard.beforeDispatch({ method: 'work', mode: 'request', generation: supervisor.generation })
+  } catch (error) {
+    const failure = error as Error & { code?: string }
+    if (failure.code !== 'PROCESS_TERMINAL_CALL') throw error
+    console.log(failure.code)
   }
+  off()
+  const closing = resilience.close()
+  console.log(closing === resilience.close())
+  await closing
+  console.log(resilience.inspect('worker') === undefined)
+  console.log(supervisor.inspect().state)
+} finally {
+  off()
+  await resilience.close()
+  await supervisor.dispose()
 }
 ```
 
-wire error 至少包含 `source`、`code`、`name`、`message`、`stack`；可选的 `cause` 与 `errors` 用于嵌套原因。JSON-RPC 整数 `code` 建议使用标准值：`-32700`（解析错误）、`-32600`（无效请求）、`-32601`（方法不存在）、`-32602`（参数无效）、`-32603`（内部错误）、`-32000`（业务错误）。
+输出：
 
-TypeScript 实现的对端可以直接用 `@migaia/rpc-contract/errors` 的 `toJsonRpcError(serialized, code)` 与 `fromJsonRpcError(value)` 生成和解析这种格式，并用 `@migaia/rpc-contract/framing/jsonrpc` 的 `encodeJsonRpcFrame`、`createJsonRpcFrameDecoder` 处理 Content-Length 分帧。
-
-#### 5.7 批量
-
-握手成功后，TypeScript 端可能把多个调用放进一个数组发送。对端应按数组顺序逐个处理，并把所有带 `id` 的回复按顺序放进一个数组写回；某个成员失败不影响其它成员。全是 notify 的批量不需要回复。
-
-### JSON-RPC 6. 错误处理
-
-#### JSON-RPC 语义错误码
-
-source 均为 `@migaia/rpc/bridge/jsonrpc`。
-
-| code                        | 何时发生                                                   | 处理                                              |
-| --------------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
-| `JSONRPC_FRAME_INVALID`     | 头部、UTF-8、JSON 非法，或连接在一帧中途关闭；连接随之终止 | 修正对端的分帧与编码；已发出的调用先对账          |
-| `JSONRPC_EXTENSION_MISSING` | 握手回复缺少必需能力或四个扩展方法                         | 对端补齐扩展实现                                  |
-| `JSONRPC_PROFILE_INVALID`   | 本端选项不合法，或提议了桥接不支持的能力                   | 修正选项；原样重试无效                            |
-| `JSONRPC_UNSUPPORTED_MODE`  | 本地声明或对端目录中包含 stream 方法                       | 流式场景改用原生协议                              |
-| `JSONRPC_HANDSHAKE_TIMEOUT` | 握手超时                                                   | 检查对端是否在读 stdin / socket，然后重新建立连接 |
-
-这些 JSON-RPC 常量从 Contract 的 framing 入口导入：
-
-```ts doc-test=check
-import {
-  JSONRPC_BRIDGE_ERROR_SOURCE,
-  JsonRpcBridgeErrorCode
-} from '@migaia/rpc-contract/framing/jsonrpc'
+```text
+terminal none
+PROCESS_TERMINAL_CALL
+true
+true
+terminal
 ```
 
-#### 对端返回的业务错误
+输出依次为 `terminal none`、`PROCESS_TERMINAL_CALL`、`true`、`true`、`terminal`：守卫拒绝新任务，关闭复用同一 Promise，解除治理后监督器状态仍被保留。
 
-通过 `createProcessPeer` 或 `createRuntimePeer` 调用时，对端回复的 wire error 按原始 `name`、`source`、`code`、`message`、`stack` 和原因链恢复。Python 示例中的业务错误因此携带 `source: 'python-service'`、`code: 'BUSINESS'`。这些字段只用于诊断，不会获得本地库的控制身份；不要用对端声明的 source / code 判断本地取消、重试或认证策略。
+子进程确实以退出码 `1` 结束，重启模式为 `never`；监听回调将该终态报告标记为已处理，调用方仍负责释放原始监督器。
 
-#### 重试原则
+### 示例参数
 
-超时、取消或连接中断都不能证明对端没有执行。对非幂等方法，重试前请先确认结果，或者让对端在 `meta.idempotencyKey` 上实现去重。
+真实 createProcessSupervisor 使用 Node launcher、maxUnits:1 budget、systemScheduler/report 和 best-effort；restart.mode='never'，spec.command 为当前 Node，args 的 -e 仅用于该直接 supervisor 的退出命令，不是 Peer 自派生入口。env 只继承 PATH，set={}，stdio 为 ignore/ignore/drain。binding 只转发真实 supervisor 方法，ownership='spawn-owned'、health='none'；standalone-host.release 指向实际 dispose。onTerminal 解除函数 off 可重复；回调正常完成表示 handled，guard.beforeDispatch 的 method/mode/generation 来自当前真实状态，治理 close 后原 supervisor 仍由 finally dispose。
 
-### JSON-RPC 7. 常见问题
+## 契约细节
 
-**握手一直超时？**
-确认对端在读 stdin（或 socket），并且回复写到了 stdout 而不是 stderr；确认先消费了 bootstrap 帧。
+### 归属、安装与平台入口
 
-**对端日志打乱了协议？**
-stdout 只能输出协议帧，日志写 stderr。
+本包拥有进程启动、stdio/socket 字节资源、bootstrap、来源认证和监督绑定；Core 拥有 Runtime Peer 调用、目录、超时、取消、幂等与错误还原。supervision 拥有执行单元、预算与重启，PluginHost 拥有插件安装、依赖与替换。Peer 与 Plugin 不应各建一套对同一子进程的关闭 owner。
 
-**需要流式返回？**
-桥接不支持。可以拆成分页的 `request`，或者把对端改为原生协议实现。
+直接安装 rpc-process、rpc-core、rpc-contract；后两者是 peer 依赖，不是“三者版本必须相等”的运行时检查。运行时依赖 plugin-host、supervision、utils。发布保留 dist/schema 和九个入口。包声明 Node>=18，本文实际执行的 TypeScript 示例使用 Node 24；没有把 Node 结果当作 Bun/Deno/Electron/Windows 验证。
 
-**对端能主动调用 TypeScript 端吗？**
-桥接协议在同一连接上允许对端发送 `migaia.invoke`，调用 TypeScript 端 `provide` 的方法。本手册的示例只演示 TypeScript 端发起调用；需要反向调用时，请先在你的场景中验证。
+| 入口                                         | 主要用途与限制                                                                                                                                      |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 根入口                                       | createProcessPeer、createProcessPlugin、createProcessTransport、createNativeProcessOffer、createProcessResilience、错误码/常量、字节/消息与扩展类型 |
+| adapters/node-child-process                  | createNodeProcessLauncher、openProcessStdioChannel、child/process stdio 构造                                                                        |
+| adapters/node-socket                         | dialProcessByteChannel、listenProcessByteChannel、createAdapterSocketByteIO                                                                         |
+| adapters/bun-spawn / adapters/bun-socket     | Bun 启动、stdio 与本机 socket                                                                                                                       |
+| adapters/deno-command / adapters/deno-socket | Deno.Command、stdio 与本机 socket，需宿主权限                                                                                                       |
+| adapters/electron-utility-process            | createElectronUtilityProcessLauncher，实际 whole-message 通道；可选 peer electron ^44.0.0                                                           |
+| adapters/windows-job                         | 可选 peer koffi ^3.1.6；当前占位，全部能力 unsupported，launch 拒绝 PROCESS_CHANNEL_CONNECT_FAILED                                                  |
+
+只导入实际宿主入口；平台依赖在所选路径使用。进程间通信适合本机隔离任务和守护服务，不提供跨机器 socket。Worker 由 rpc-threads、浏览器窗口由 rpc-browser 负责。非 TypeScript 服务可使用 JSON-RPC 字节模式，不能把它当成原生 stream 或 transfer 支持。
+
+### Peer 来源、短启动与 bootstrap
+
+createProcessPeer 的 spawn/connect/listen 必须恰选一种；由本包 launcher 启动的子进程才可省略来源，通过已有发现标记与 stdin bootstrap 连回父进程。直接 node service.js 不满足此前提，应显式 listen。provide 默认无业务方法，只接受自身可枚举数据属性与嵌套方法组；点分路径如 math.double，getter、循环、重复路径和非法名字在连接前拒绝。普通函数用于 request/notify，iterable/async iterable 用 stream；payload/结果仍受 Core 可移植值契约约束。
+
+| 来源    | 实际所有权                         | close 行为                         |
+| ------- | ---------------------------------- | ---------------------------------- |
+| spawn   | 经 supervision 拥有子进程及连接    | 清连接并停止所拥有子进程           |
+| connect | 只拥有自己的本地连接，对端进程外借 | 清本端连接，不结束服务进程         |
+| listen  | 拥有 listener 与已接纳会话         | 停接纳并关闭会话，不拥有客户端进程 |
+
+双方可 provide 并反向调用。子进程 Peer 会保持事件循环直到父连接关闭；正常 parent-loss 路径处理子进程退出，但强杀父进程时无法承诺父端清理已执行，更不能保证孙进程都终止。
+
+短 spawn 接受 true、入口字符串/URL 或普通对象。true 重跑当前主入口全部顶层代码，必须先 isProcessChild 分支，避免无限自派生；该函数只读既有 bootstrap 标记，发现阶段消费标记后仍为 true，不代替认证。REPL/eval/test runner、Electron 和无可用主入口的单文件程序不支持自派生，应给精确入口或显式 command/args。
+
+| 短 spawn 字段         | 默认与作用                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| entry / base          | 相对字符串按主入口目录解析，base 可显式给基准；URL 精确指向文件，不猜调用栈                                          |
+| command / args        | command 省略用当前运行时；显式 command 的 args 默认 []；spawn:true 继承程序 argv.slice(2)，其它入口的应用参数默认 [] |
+| cwd                   | undefined，交由实际 launcher 处理                                                                                    |
+| env.inherit / env.set | ['PATH'] / {}，不默认继承全部环境                                                                                    |
+| stdio                 | {stdin:'channel',stdout:'channel',stderr:'drain'}                                                                    |
+| wire                  | native；jsonrpc 需本地 contract 或自定义 establish                                                                   |
+| token                 | 随机 32 字节 base64url，经 stdin bootstrap 传递，不应打印                                                            |
+| supervision           | 默认每源一个 maxUnits:1 process budget、best-effort 与对应平台 launcher；可显式覆盖                                  |
+| limits / permissions  | undefined，仍受实际 launcher 声明能力限制；不是自动 OS 沙箱                                                          |
+| offer / establish     | 可显式收窄提议或组合真实通道；缺省复用标准 native/jsonrpc 建立路径                                                   |
+| wrap                  | undefined；只包装每次实际启动的 command/args/cwd/env                                                                 |
+| onNotice              | undefined；接管预期终止能力提示，不能吞掉其它启动错误                                                                |
+
+Node/Bun 保留 runtime flags 与 --import loader，移除 eval/print/test 控制参数。Node 原生类型剥离不把 .js import 改成 .ts；这类源码使用构建后的 JS 或实际 loader，Bun 可解析其支持的 TS 导入。Deno 默认 run 仅给 PATH 与 bootstrap 标记所需 env 权限，额外权限用显式 command/args。不要把自己测试运行器的主入口当作可派生业务入口。
+
+PROCESS_RUNTIME_API_ENV 的公开值为 MIGAIA_RPC_RUNTIME_API_BOOTSTRAP，版本标记为 '1'；它是发现信息，不是 secret。实际 bootstrap 先读 4 字节大端长度和对应内容，独立元数据封套不改变 RPC 握手语法；运行时 bootstrap 等待默认 10000 ms，之后才进入原握手截止。
+
+Node launcher 不开 shell，只传显式环境，先开始 stderr drain 再写 bootstrap，stdout channel 不再被普通输出消费者抢读。Node 声明 fault isolation 与 stdin bootstrap enforced，但 termination、内存/CPU/permissions/fd bootstrap 不作 enforced 保证；POSIX 可尝试进程组终止，Windows 尽力停止直接子进程，均不能承诺整树必定终止。required isolation 不能当作 Node best-effort 的别名。
+
+短来源 spawn.supervision.startupTimeoutMs 默认 10000；restart 内平铺 mode:'on-failure'、maxRestarts:5、windowMs:60000、initialDelayMs:250、factor:2、maxDelayMs:30000；stop.drainTimeoutMs/stop.reapTimeoutMs 默认均 5000。restart.mode 仅 never/on-failure/always，分别不重启、失败重启、退出后始终重启。Process managed binding 另复用 Core 5000 ms 调用 drain，并受 stop 剩余预算收窄，不保证无限等待全部不合作调用。
+
+短来源省略 report 时，同一原生进程最多合并报告一次预期 termination unsupported 提示；显式 report 每次启动都收到，直接传默认函数与包装它没有差异。onNotice 可替代该项 reporter 调用。其它错误照常报告，完整来源保持其显式 reporter 语义。
+
+### 外部沙箱与完整来源
+
+wrap(command) 每次首次启动、restart、replace 都执行，接收并仅能返回 command、args、cwd、env；自定义 launcher 同样经过它。macOS 可由应用选择 sandbox-exec/profile，Linux 可选择 bwrap/只读挂载与隔离网络；本包不安装工具、不维护沙箱策略，也不把这些平台示意当作已执行验证。
+
+包装器必须透传 stdin/stdout：stdin 先承载 token/bootstrap，再承载 RPC，stdout 只能是协议帧，日志写 stderr。保留 env.inherit/env.set；launcher 在 wrap 后加入 MIGAIA_RPC_RUNTIME_API_BOOTSTRAP，容器包装还需转入此变量与原环境。原退出码必须保留，不能把非零改成成功。wrap 返回的 stdio/bootstrap/limits/permissions 额外字段不授予更改这些资源的权限。
+
+非函数 wrap 在准备阶段拒绝；回调抛错或非法返回使启动失败，PROCESS_PLUGIN_INVALID_OPTION TypeError 位于 supervision LAUNCH_FAILED 的 cause 链，回调原值保留 cause。Host 安装最外层仍可为 PLUGIN_INSTALL_FAILED，不按 message 判断。
+
+完整 spawn 对象显式组合 kind:'spawn'、channelKind:'byte'|'message'、supervision、rawChannel(handle,signal)、establish(raw,prepared)、token 与可选 offer。完整 byte spawn 必须显式 wire:'native'|'jsonrpc'，message spawn 必须省略 wire；只有短形式补 native 默认。supervision.spec 包含 command/args/env/stdio/bootstrap/limits，bootstrap.stdin payload 与认证 token 一致。budget 限并存执行单元数量，不等于 OS 内存限制；isolation 可为 best-effort/required。spec.limits.callWallTimeMs 会压低每次调用可用截止。
+
+rawChannel 必须返回本次真实 handle 的资源；establish 使用 prepared.offer/scheduler/signal/session/token/stderr 完成实际握手，不接收“已认证”声明替代操作。高级回调来源 async(context)=>sourceResult 不经过本包 supervision，不能据此获得 stop/restart/replace 权限。
+
+### 调用、超时与结果未知
+
+TRemote 只提供业务方法类型；不传泛型时没有可调用方法，动态字符串调用用 IRuntimeDynamicSurface，运行时仍按已接纳目录拒绝未知方法。
+
+| Peer 方法                         | 行为                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| request(method,payload?,options?) | 等待标量结果，保留原操作错误                                               |
+| notify(method,payload?,options?)  | 只等本地发送，不证明远端执行成功                                           |
+| stream(method,payload?,options?)  | 首次 next 才启动，提前 break/return 通知远端结束生产                       |
+| group(steps,options?)             | 顺序执行请求，某步失败后剩余 not-executed，不回滚已完成步骤                |
+| outcome(idempotencyKey)           | 查询 pending/done/unknown，done 携带原结果；unknown 不证明从未执行         |
+| describe(options?)                | 本地查询身份、接纳连接与目录，不额外发网络请求                             |
+| on / Symbol.asyncDispose          | 使用 Core 事件/清理接口；连接工厂已表示首次就绪，listen 工厂仅安装接纳入口 |
+| close()                           | 停新工作并按 owner 的 drain 策略结束现有工作，复用同一清理 Promise         |
+
+工厂 defaultTimeoutMs 默认 30000 ms，正有限 number；只有 request/stream 继承该默认。单次 timeoutMs 可为非负 number 或 false，0 立即到期，false 关闭默认超时；进程预算的 callWallTimeMs 仍可进一步限制。signal 是协作取消，本地结束等待不证明业务没执行。idempotencyKey 只有对端声明并保留对应结果时才复用；orderKey 对同键安排对端串行；cancel:'before-start' 在未开始时撤销，已开始则等待真实结果。
+
+进程路径拒绝 transfer 属性，即使 []，ArrayBuffer/Uint8Array 普通传输会复制。超时、取消、断线和 outcome unknown 都不证明“对端没有执行”；非幂等写入先 outcome 或业务对账再决定重试。明确在 provider 前拒绝的 OVERLOADED/PROCESS_CONNECTION_LIMIT 与成功 before-start 撤销应和已发出但结果未知的调用区分。
+
+### 名称、本机 socket 与认证
+
+短 connect/listen 字符串可为普通服务名或明确地址。普通名不带斜线/协议，由 OS 用户与名称派生相同端点；POSIX 使用 0700 私有用户目录与 0600 socket，拒绝不合所有者/权限的目录、符号链接及其它服务路径。Node-compatible API 不提供 peer credentials，权限只限制 OS 用户，同用户任意进程仍可接入；要区分应用，双方显式 token。
+
+TCP 回环、显式 Unix 路径和未提供 ACL 保证的 Windows named pipe 必须 token；同用户公开 hello 标记不是 secret。只接受 tcp://127.0.0.1:port、tcp://[::1]:port、Unix 绝对路径或 Windows 命名管道，不接受跨机器地址。listen port=0 由 OS 分配，实际地址从 listener.address 读取。
+
+connectTimeoutMs 默认 5000 ms，有限非负 number；只有普通 named local 来源才以最多 25 ms 间隔重试 ENOENT/ECONNREFUSED，显式地址拨号失败不走该重试。signal 取消待重试，保留原取消原因。第二个同名 listener 仍 PROCESS_CHANNEL_LISTEN_FAILED；只有既有 owner record 证明属于同服务的崩溃遗留路径才回收。
+
+完整 connect 为 kind:'connect'、address/token、dial(address,signal)、establish，wire 默认 native，可配本地会话 supervision 的 restart/startupTimeoutMs/health/stop/terminalPolicy/scheduler；它只重建本端连接，不取得对端进程所有权。完整 listen 为 kind:'listener'、listen/address/offer/verify/createConnectionContext，可选 scheduler；verify 返回 principal，不能信客户端自报身份。每次接入有独立 peerId、session 和通道。凭据错误时 client 可外层 REMOTE_START_FAILED，server report 原 PROCESS_CHANNEL_AUTH_REJECTED，不用同凭据盲重试。
+
+Socket listener 拥有监听与未交接资源，不自动拥有已经交出的会话。其 close 复用同一 Promise。Unix owner record 不等于原生路径删除的绝对保证：Node/libuv 在地址被外部 rename/替换后仍可能在原 listener.close 删除同址后继 inode，当前路径会报告一次 PROCESS_CHANNEL_LISTEN_FAILED/cause；重复关闭不重复报告。不要在活动 listener 的路径上另建 owner。现有 Darwin 路径预算为 104 字节，不额外缩短为隐藏 staging 地址。
+
+### PluginHost 出口、替换与描述符
+
+createProcessPlugin 的运行时形式使用 Peer 相同来源/provide，增加 name 与 expose，返回待 Host.use 安装的插件。Host 持有连接，调用方不应再用另一套 owner 终止同一子进程。expose 默认空，只有明确的 Feature 方法路径可反向调用，列出 math.add 不会公开同级 math.sub。
+
+host.process 的 request/notify/stream/group/outcome 第一个参数为连接名，或同名多实例时的 {name,instanceId}。list/get 查询连接、身份、代次、健康与退出，缺事实用 unavailable，不伪造 0；on 返回幂等解除函数，watch 是有界异步迭代；broadcast 分别汇总结果，不保证全部成功。stop/kill/restart/replace 仅 spawn-owned，借用 connect/listen 以 CAPABILITY_CONFLICT 拒绝。
+
+replace 使用既有 supervision/Host 策略，不搬迁已经执行的调用。IProcessPlugin.replace 的 options 默认 {}，strategy 默认 stop-then-start；支持 spec 与 stop-then-start/start-then-switch 策略，结果分别含 supervisor outcome 或后继 plugin；不同策略的准备、切换和回收仍由原 owner 管理。Host execution 两个预算须按 PluginHost 契约显式给出，不能把无限 false 当成默认值。
+
+根入口还提供 parseProcessPluginDescriptor 与 ProcessPluginWire。描述符是持久化配置数据，不含运行时通道、bootstrap 凭据或已认证状态；执行性端口必须由真实工厂提供。低层 IProcessPluginOptions 的 deployment/host/endpointFactory/registrationOwner 与便捷运行时来源形式应分别按其类型使用。
+
+### 连接治理与终态清算
+
+createProcessResilience 必填 scheduler/report，不创建第二个进程监督器。默认 idempotencyStore 使用该 owner 的独立命名空间，同 principal 的不同 connection/session 共享去重 scope，不同 owner 隔离。identity 必须给非空 principalId，connectionId/sessionId 用于各连接标签，processId 可选。
+
+| Resilience 选项                                  | 默认原值                |
+| ------------------------------------------------ | ----------------------- |
+| maxConnections / maxConcurrentCallsPerConnection | 64 / 32                 |
+| maxCallsPerMinute / maxPayloadBytes              | 600 / 16*1024*1024      |
+| maxConsecutiveTimeouts / idleTimeoutMs           | 3 / 60000               |
+| drainMs                                          | 5000                    |
+| reportAtMs                                       | [0,60000,300000,900000] |
+| unhandledLimit / liquidation.cascade             | 3 / false               |
+
+容量、超时与 drain 选项是正安全整数，不用 0 表示关闭；reportAtMs 从 terminal 进入时计时，首个 0 分钟报告由原 supervision 保留。超过默认未处理次数才启动清算，不把第一条诊断等同终态移除。
+
+sessionOptions(identity) 返回接入 Endpoint 所需 idempotency 与 limits；listenRegistrations 接收 wire:'native'、真实 listen/address/offer、verifyToken、createConnectionContext、onCandidate 及可选 serviceId/scheduler/handshakeTimeoutMs/signal。onCandidate 只能 adopt/reject；listener 拥有未接纳候选，已经 adopt 的 lease 交给接纳者关闭，lease.channel/identity 与其 close 属于同一会话。认证后 principal 来自 verifier，不能跳过握手自行声明。
+
+attachRegistration(name,binding,owner) 绑定真实 supervisor；binding.ownership 是 spawn-owned/connection-borrowed，health 是 ping/custom/none。owner 是 proxy-plugin 的 name/Host.unUse，或 standalone-host 的 release。callGuard 在 provider 前拒绝 terminal/liquidated，不需要另写调用旁路；inspect 返回状态、health、unhandled、liquidated 和原 reason，未知为 undefined。onTerminal 任一 handler fulfilled 即视为 handled、重置未处理计数并停止后续诊断；全部 rejected 才保持未处理，拒绝原因仍报告。
+
+共享目标的显式实例健康失败会先关闭所有共享 sessions，再创建/替换后继；失败仍保持隔离并报告原错误。per-connection 只关受影响 session，不替换共享进程。连接速率/payload 超限在 provider 前 PROCESS_CONNECTION_LIMIT；连续超时与空闲只关闭该连接，不证明整个共享实例坏了。
+
+清算只使用 Host 已提交 affected plan，不拿 dry-run 当提交。post-removal cleanup 失败仍视为已提交，reason 保留 terminal 与 cleanup；pre-commit reject 或 standalone release 失败不记 liquidated tombstone、不自动重试该 Host mutation。默认 suspend 为实际受影响依赖启动诊断，cascade 清实际依赖且不再为已释放依赖启动诊断。仅保留最新 100 个已提交 tombstone，旧 registration.close 不能移除同名新代。
+
+registration.close 只停该诊断/退订，不 dispose 外部 supervisor；resilience.close 释放自己开的 listener 与登记，稳定 Promise/allSettled，清理失败 PROCESS_CHANNEL_CLOSED AggregateError。不要泛称关闭后所有只读方法都抛错；sessionOptions/inspect 等按其原接口保留行为。显式关闭实际 supervisor/Host 仍是其原 owner 的责任。
+
+### 通道、握手、诊断与平台能力
+
+IProcessByteChannel 是 kind:'byte' 的有序 write/onData/onClose/close，write 返回真实背压 Promise；IProcessMessageChannel 是 kind:'message' 的 send/onMessage/onClose/close。createProcessTransport 的 byte 参数必须选 initiator+offer 或 responder+offer+auth；responder auth 为 required/verify 或明确 none。common 参数包含 peerId/report/ipc、可选 signal/scheduler/handshakeTimeoutMs；ipc 至少 connectionId/sessionId/log，可选 processId、stderr、maxPendingData/maxPendingControl。
+
+createNativeProcessOffer 必填 peer，可选 auth/stream/capabilities；直接基底为 ping/close/batch，stream:true 才直接加入 stream。capabilities 省略时，Runtime 绑定按 Core 已安装能力完成默认提议；显式列表（包括 []）不被自动拓宽，stream:false 仍禁止自动补 stream。offer 与版本/codec/peer 数据冻结，json codec 和当前 RpcProtocol 版本由 Contract 常量拥有。
+
+消息通道 staticAgreement.local/peer 都必须 codec:'identity' 且 capabilities 相同、有序一致；这是输入声明检查，不授予已协商信任。既有基础能力 abort/ping/close/deadline/idempotency/trace/stream/batch 可直接使用，Runtime/二进制等扩展仍需 Core ACK，缺 ACK 或超时只保留实际基础能力，agreement.capabilities 反映接纳结果。
+
+默认入站调用限额 maxPerPeer=64/maxGlobal=256，可用 providerLimits 覆盖并从 onRejected 读取原因；超过为 Core OVERLOADED，provider 未执行。不要与 resilience 每连接 32 并发默认混为一处限额。首帧握手受 PROCESS_HANDSHAKE_MAX_FRAME_BYTES=65536 字节限制，native 业务帧上限 16 MiB，握手与 message 扩展 ACK 默认 10000 ms。Core 待发送 data/control 默认 256/8。手动 receiveAdapterBootstrap/openProcessStdioChannel 未给 bootstrapTimeout 时不设 timer；automatic child 会显式给 10000 ms。大数据用 stream 或业务分片。
+
+stderr 从启动就持续读取，1000 ms 内每 session 最多 32 条 ipc.stderr；额外片段合并 droppedChunks 摘要，文本脱敏，不把日志写 stdout。Native 默认 ping 每 5000 ms、单次 2000 ms、连续 3 次失败升级不健康，显式 custom health 优先；JSON-RPC 缺省不开 native ping。健康失败 PROCESS_HEALTH_PING_FAILED 交原监督策略，而非文档另起重启器。
+
+Node/Bun/Deno stdio/socket 复用 Core 字节 framing。当前 transport.observe 已提供，旧“尚未实现”描述不再适用。字节观察同步 emit 一次，size 为完整 frame.byteLength，借用 detail 含 frameBytes/drainMs；inbound drainMs=0，outbound 初值 -1，物理 onWrite 完成后只更新同一 detail，不另发第二条异步 carrier event。capture 开启才给原 frame 引用，保留 metadata 应复制数值。Whole-message 内容是原 value 引用、detail=undefined，已知原生字节可给 size，opaque 未知为 -1，不为测大小序列化对象；observer 失败经 Core TRANSPORT 报告。逻辑 send 耗时不等于 drainMs，不把 Node 结果外推成 Electron 验证或速度结论。
+
+Web Streams byte close 在回调前发布同一 Promise，失败仍尝试其余观察者、reader.cancel、writer.abort 与物理关闭；失败为 PROCESS_CHANNEL_CLOSED AggregateError，首错在 cause、全体在 errors。writer 获取失败释放已获 reader 锁，原 TypeError 附 PROCESS_CHANNEL_CONNECT_FAILED。自己取得的 Node/Deno/Web 字节构造仍需真实资源，不能用“已认证”对象替代。
+
+适配器扩展可用 createAdapterSocketByteIO、createAdapterChildStdio、createAdapterProcessStdio、createAdapterWebByteIO，以及 createAdapterProcessLaunch/Peer/Plugin。新适配器优先复用 Core defineByteAdapter/defineMessageAdapter；复杂会话组合用原 advanced SDK，不复制 framing、握手、correlation 或生命周期。
+
+### JSON-RPC 外部语言契约
+
+普通外部子进程用 spawn:{command,args,wire:'jsonrpc',contract}，仍由原 spawn supervision 拥有；自有有序字节连接用 createProcessJsonRpcChannel。旧桥接工厂名统一为此入口，选项类型 IProcessJsonRpcChannelOptions，桥接错误常量从 rpc-contract/framing/jsonrpc 导入。Process 仅保留原 byte 的关闭/stderr/诊断，协议协商、correlation 与 cleanup 由 Core 拥有。
+
+高级参数 byte/peerId/target/offer/token/scheduler/wallClock/ipc/report 明确提供，signal/handshakeTimeoutMs 可选，JSON-RPC 握手默认 10000 ms，不使用 native 长度前缀或默认 ping。target 为 {kind:'plugin',contract} 或 {kind:'host',catalog}；本地 contract 只预检不支持 stream，真正可调用目录来自对端 migaia.describe，不是调用方授予的目录。offer 中 codecs/auth 由桥接填写；可选能力仅 deadline@1、trace@1、idempotency@1，加自动必需的 jsonrpc-bridge@1/runtime-api@1/batch@1/abort@1/wire-error@1，不能随意扩 profile。
+
+| 协议操作        | 线上的要求                                                                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bootstrap       | 子进程先读取 4 字节大端长度与 UTF-8 token，再读消息；socket token 由应用事先共享                                                                                             |
+| framing         | Content-Length 按 UTF-8 字节数，CRLF CRLF 后为 JSON；header≤1024 bytes，单帧≤16 MiB                                                                                          |
+| migaia.hello    | JSON-RPC 2.0 带 id，params.hello 为 handshake hello 的 JSON 字符串，包含 protocol migaia.rpc、versions、json codec、capabilities、peer 与 auth                               |
+| hello result    | reply 为 accept/reject 的 JSON 字符串，methods 必须列出 migaia.hello/migaia.describe/migaia.invoke/migaia.cancel 四个扩展；接受选择双方共同版本（当前 1.1）、json 与共同能力 |
+| migaia.describe | params.args=[]，返回 schemaVersion:2、self{name,instanceId}、methods；instanceId 必须等握手 peer.id                                                                          |
+| methods 项      | name、supportedModes 仅 request/notify、modeSource:'declared'，可选 idempotent；stream 拒绝                                                                                  |
+| migaia.invoke   | params.method 与 args 位置参数数组，缺 payload 为 []；带 id 等结果，不带 id 为 notify、不回复                                                                                |
+| invoke meta     | 可选 timeoutMs/idempotencyKey/trace，仅发送实际设置字段，对端可按自身语义处理                                                                                                |
+| migaia.cancel   | 无 id 的通知，params.id 与可选 reason，通知放弃不等确认、不回滚副作用；迟到结果丢弃                                                                                          |
+| batch           | 握手后可发数组，按数组顺序处理并仅为带 id 的项返回数组，单项失败不取消其它项，全 notify 不回复                                                                               |
+
+握手前必须拒绝 hello 以外消息；hello 认证失败为 reject+wire error。stdout 只写协议、stderr 写日志。对端实现可用任意语言；原最小 Python 模式只是 read-exact bootstrap、读 Content-Length 循环、hello 验证、describe 目录、invoke 分发和 cancel 通知，不提供自动幂等/取消业务实现。反向 migaia.invoke 在协议上可用，但需在应用自己的语言实现中验证。
+
+payload 必须数组，非数组 JSONRPC_PROFILE_INVALID；超过安全整数范围 ±(2^53-1) 用字符串。JSON 编码不支持原生 stream/transfer。帧、UTF-8、JSON 非法或半帧关闭使连接 JSONRPC_FRAME_INVALID 终止；未知/迟到 id 报告并丢弃，不干扰别的调用。
+
+业务 error 使用 JSON-RPC error.code/message/data.migaiaWireError，wire 至少 source/code/name/message/stack，可选 cause/errors，不能在接收侧重造 stack。JSON-RPC 整数 code 可用 -32700 解析、-32600 请求、-32601 方法、-32602 参数、-32603 内部、-32000 业务；诊断语义仍用 wire source/code。Contract 的 toJsonRpcError/fromJsonRpcError 与 encodeJsonRpcFrame/createJsonRpcFrameDecoder 复用同一表示，不另建协议。
+
+| JSON-RPC code（source=@migaia/rpc/bridge/jsonrpc） | 场景                                      |
+| -------------------------------------------------- | ----------------------------------------- |
+| JSONRPC_FRAME_INVALID                              | 非法头部、编码、JSON 或半帧关闭，连接终止 |
+| JSONRPC_EXTENSION_MISSING                          | hello 缺必需能力或四个扩展方法            |
+| JSONRPC_PROFILE_INVALID                            | 本端 profile、payload 或能力不支持        |
+| JSONRPC_UNSUPPORTED_MODE                           | 本地声明/远端目录带 stream                |
+| JSONRPC_HANDSHAKE_TIMEOUT                          | 握手截止，检查 bootstrap/stdin/回复端     |
+
+远端业务 wire source/code 只诊断，不取得本地取消、重试、认证权限；没有语义身份的业务原生 Error 可以还原为相应 native 类型与 unknown/UNKNOWN，不应由接收端伪造本包码。重试非幂等方法仍须对账，或由业务真正实现 meta.idempotencyKey 去重。
+
+### 错误与排查
+
+本包 source 为 RPC_PROCESS_ERROR_SOURCE（@migaia/rpc/process）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。
+
+| Process code                                                   | 场景                                                        |
+| -------------------------------------------------------------- | ----------------------------------------------------------- |
+| PROCESS_HANDSHAKE_TIMEOUT / PROCESS_CHANNEL_AUTH_REJECTED      | 握手未完成 / 凭据拒绝，修正来源和认证                       |
+| PROCESS_CHANNEL_CLOSED                                         | 已关闭或资源/close 观察者清理失败，查 cause/errors          |
+| PROCESS_CHANNEL_CONNECT_FAILED / PROCESS_CHANNEL_LISTEN_FAILED | 拨号/启动或监听准备/bind失败                                |
+| PROCESS_PLUGIN_INVALID_OPTION / PROCESS_HOST_INVALID_OPTION    | 来源、插件或 Host 配置不合法                                |
+| PROCESS_HOST_CLOSED                                            | facade 已开始释放，需新 owner                               |
+| PROCESS_RESILIENCE_INVALID_OPTION / PROCESS_CONNECTION_LIMIT   | 治理配置非法 / 接入、速率、payload 提供前拒绝               |
+| PROCESS_INSTANCE_UNHEALTHY / PROCESS_HEALTH_PING_FAILED        | 共享实例显式健康隔离 / native ping 失败                     |
+| PROCESS_TERMINAL_CALL / PROCESS_LIQUIDATED                     | 终态拒新调用 / 已清算不能重启                               |
+| PROCESS_USAGE_SAMPLE_FAILED                                    | 原生 CPU/内存采样失败，显示 unavailable，不改变进程生命周期 |
+
+Core 调用错误包括 DEADLINE_EXCEEDED/TimeoutError、CANCELLED/AbortError、OVERLOADED、PROVIDER_NOT_FOUND、TRANSPORT，Remote/PluginHost/Supervision 包装保持各自 source。业务原生 RangeError 等经 wire 还原原类型/message/stack/cause，不假装成 Process 主机错误。
+
+自动来源失败先确认确由库 launcher 启动；握手超时确认先消费 bootstrap、stdin 正在读取、stdout 仅协议；socket 检查回环/权限/token。notify 只证明发送；大文件用业务分片/stream 或传约定路径由对端读取。Node 孙进程与强制终止限制、其它宿主权限/能力应按实际平台验证。
+
+现有包脚本如下，列出不代表文档编辑独立运行；本包原 test 保留 coverage 配置，未把基准或多宿主支持文字冒充本轮执行证据。
+
+```bash
+pnpm run fmt
+pnpm run lint
+pnpm run typecheck
+pnpm run typecheck:test
+pnpm run test
+pnpm run build
+```

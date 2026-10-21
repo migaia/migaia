@@ -13,7 +13,9 @@
     "dist",
     "schema",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -65,7 +67,7 @@
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
-    "fmt": "oxfmt src test vitest.config.ts",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage"
   },
@@ -73,6 +75,18 @@
     "@migaia/plugin-host": "workspace:^",
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/serialize": "workspace:^",
+    "@types/node": "24.13.2",
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "@migaia/rpc-contract": "workspace:*",
@@ -87,18 +101,6 @@
     "koffi": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@migaia/rpc-contract": "workspace:*",
-    "@migaia/rpc-core": "workspace:*",
-    "@migaia/serialize": "workspace:^",
-    "@types/node": "24.13.2",
-    "cborg": "6.1.1",
-    "elysia": "1.4.30",
-    "msgpackr": "2.1.0",
-    "protobufjs": "8.8.0",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=18"
