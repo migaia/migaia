@@ -139,6 +139,7 @@ pnpm add @migaia/store-keyed @migaia/reactive
 | `atomDef(init)` / `derivedDef(read)` / `writableDef(read, write)` | 定义源状态、只读派生和可写派生 |
 | `createAtomStore(runtime)` | 创建一个独立保存值的 store |
 | `store.get` / `store.set` / `store.sub` | 读取（登记依赖）、写入、订阅 |
+| `store.setMany(entries)` | 一次批量写入多个源定义，全部成功才写入，订阅者只通知一轮 |
 | `focusDef(def, ...path)` / `splitDef(def, keyOf)` | 字段级定义 / 列表按 key 拆分 |
 | `familyDef(initial, options?)` | 按 key 产出定义 |
 | `store.override(def, replacement)` / `store.dispose()` | 替换定义 / 释放整个 store |

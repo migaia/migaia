@@ -126,17 +126,22 @@ export type IAtomStore = {
     ...args: Args
   ): Result
   /**
-   * Writes source definitions in input order within one batch and one untracked operation.
-   * Subscribers are notified once after the batch. The write is not atomic: when an entry resolves
-   * to a non-source definition it throws OVERRIDE_CONTRACT, and entries before it stay written.
-   * Callers that need all-or-nothing semantics validate every entry first.
+   * Writes source definitions within one batch and one untracked operation; subscribers are
+   * notified once after the batch. The call first resolves every entry and runs every updater in
+   * input order, then writes. An entry that resolves to a non-source definition (OVERRIDE_CONTRACT)
+   * or an updater that throws leaves every atom unchanged. A repeated definition's updater receives
+   * the value from its previous entry; updaters reading other atoms see the values from before the
+   * call.
+   *
+   * Each entry keeps its own value type: `Ts` is inferred from the definitions only, so entries of
+   * different types can share one call and each updater is checked against its own definition.
    */
-  setMany<T>(
-    entries: readonly (readonly [
-      IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
-      IAtomUpdate<T>
-    ])[]
-  ): void
+  setMany<Ts extends readonly unknown[]>(entries: {
+    readonly [K in keyof Ts]: readonly [
+      IPrimitiveDefinition<Ts[K]> | IPrimitiveFactoryDefinition<Ts[K]>,
+      IAtomUpdate<NoInfer<Ts[K]>>
+    ]
+  }): void
   /**
    * Subscribes to a definition and returns an unsubscribe function.
    *
@@ -493,9 +498,11 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       ])[]
     ): void => {
       assertUsable()
-      for (const [definition, update] of entries) {
+      /** Source nodes resolved for every entry before any updater runs or any value is written. */
+      const nodes: (IReactiveSignal<T> & IObservable)[] = []
+      for (const [definition] of entries) {
         assertDefinition(definition)
-        /** Resolve at each write so updater reentrancy observes the same current override route. */
+        /** Current override route; a read-only route rejects the whole call before any write. */
         const target = resolve(definition)
         if (target.kind !== AtomKind.primitive && target.kind !== AtomKind.primitiveFactory) {
           throw createStoreKeyedTypeError(
@@ -503,8 +510,27 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
             StoreKeyedErrorText.readonlyOverride
           )
         }
-        setPrimitive(target, update)
+        nodes.push(instanceOf(target).node as IReactiveSignal<T> & IObservable)
       }
+      /**
+       * Next value per node, in first-occurrence order. A repeated node's updater receives the
+       * value computed by its previous entry, so duplicates chain exactly as sequential writes
+       * would.
+       */
+      const pending = new Map<IReactiveSignal<T> & IObservable, T>()
+      for (let index = 0; index < entries.length; index++) {
+        const node = nodes[index]!
+        const update = entries[index]![1]
+        /** Value this entry's updater sees: an earlier entry's result or the committed value. */
+        const previous = pending.has(node) ? (pending.get(node) as T) : node.peek()
+        pending.set(
+          node,
+          typeof update === 'function' ? (update as (previous: T) => T)(previous) : update
+        )
+      }
+      // Writes start only after every route and updater succeeded, so a failure above leaves all
+      // atoms unchanged.
+      for (const [node, next] of pending) node.value = next
     }
   )
 
