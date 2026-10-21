@@ -159,6 +159,14 @@ const ARCHITECTURE_FAMILIES = [
       'Install plugins, supervise execution budgets and health, and manage discoverable host instances with ordered startup and cleanup.',
     bodyZh: '安装插件，监督执行预算与健康，并按依赖启动、发现、调用和释放宿主实例。',
     libraries: ['plugin-host', 'supervision', 'tray']
+  },
+  {
+    titleEn: 'Micro-frontends',
+    titleZh: '微前端协作',
+    bodyEn:
+      'Let micro-frontend apps on one page share state, events, and requests through typed, versioned contracts.',
+    bodyZh: '让同一页面里的多个微前端应用通过带类型和版本的契约共享状态、事件和请求。',
+    libraries: ['micro-hub']
   }
 ] as const
 
