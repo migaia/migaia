@@ -388,6 +388,13 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'hub',
     'troubleshooting'
   ],
+  'micro-hub': [
+    'state-and-commands',
+    'events-and-requests',
+    'persist-and-resources',
+    'web-components',
+    'troubleshooting'
+  ],
   'middleware-pipeline': ['sync-and-async', 'generators', 'cancellation-and-errors'],
   resource: [
     'caching-and-refresh',

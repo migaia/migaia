@@ -63249,6 +63249,1651 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
+  'micro-hub:index': {
+    zh: {
+      title: 'Micro Hub：微前端之间共享状态、事件和请求',
+      lede: '同一页面上的主应用和子应用（联邦模块子应用或自定义元素）通过一个 hub 通信。每份共享内容都由契约声明，同一时刻只有一个 owner；应用卸载时调用一次就能清理干净。',
+      document: {
+        sections: [
+          {
+            id: 'pain',
+            heading: '你可能遇到过',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '一个子应用写入的状态另一个应用看不到，也没有任何报错，见 [createMicroHub](/zh/docs/micro-hub/api/createMicroHub#micro-hub-index--createMicroHub--case-1)。',
+                  '购物车里多了一件商品，却查不出是哪个应用写的，见 [defineContract](/zh/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-2)。',
+                  '独立部署的子应用还在用旧的数据结构，读写的数据悄悄出错，见 [defineContract](/zh/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-1)。',
+                  '子应用卸载后再挂载，同一次变化收到两遍回调，见 [getMicroHub](/zh/docs/micro-hub/api/getMicroHub#micro-hub-index--getMicroHub--case-1)。',
+                  '改一件商品的价格，整个商品列表都重新渲染，见 [keyed](/zh/docs/micro-hub/api/keyed#micro-hub-index--keyed--case-1)。',
+                  '子应用一挂载就调用另一个还没加载完的应用，调用石沉大海，见 [request](/zh/docs/micro-hub/api/request#micro-hub-index--request--case-1)。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'why',
+            heading: '为什么选它',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '只有主应用创建 hub，任何应用再创建一次都会直接报错，见 [createMicroHub](/zh/docs/micro-hub/api/createMicroHub#micro-hub-index--createMicroHub--case-1)。',
+                  '每个契约只有一个 owner，`writers` 之外的应用调用命令会被拒绝，且不写入任何字段，见 [defineContract](/zh/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-2)。',
+                  '契约带主版本号，版本不一致的应用在读写数据之前就被拦下，见 [defineContract](/zh/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-1)。',
+                  '应用登记的订阅、监听和所有权都归属于它，一次 `disconnect()` 全部释放，见 [getMicroHub](/zh/docs/micro-hub/api/getMicroHub#micro-hub-index--getMicroHub--case-1)。',
+                  '每个字段、每个实体 id 单独订阅，只通知真正变化的地方，见 [keyed](/zh/docs/micro-hub/api/keyed#micro-hub-index--keyed--case-1)。',
+                  '请求可以等 owner 登记处理函数，超时和 owner 离开都有明确的错误码，见 [request](/zh/docs/micro-hub/api/request#micro-hub-index--request--case-1)。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'start',
+            heading: '从这里开始',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '主应用创建 hub，购物车应用认领 cart 契约，页头应用订阅商品列表，商品应用通过命令写入。商品应用在 `writers` 里，所以可以写入；页头应用只能读取。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { createMicroHub, defineContract, getMicroHub } from '@migaia/micro-hub'
+import { state } from '@migaia/micro-hub/state'
+
+const cart = defineContract('cart', {
+  version: 1,
+  state: { items: [] as readonly string[] },
+  commands: { add: (s, sku: string) => ({ items: [...s.items, sku] }) },
+  writers: ['product']
+})
+
+createMicroHub({ plugins: [state()] }) // 主应用
+getMicroHub().connect('cart').own(cart) // 购物车应用认领契约
+const header = getMicroHub().connect('header').use(cart)
+header.state.items.subscribe(() => console.log('页头：', header.state.items.get()))
+getMicroHub().connect('product').use(cart).commands.add('sku-1') // 商品应用写入
+await getMicroHub().dispose()`
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "页头： [ 'sku-1' ]"
+              }
+            ]
+          },
+          {
+            id: 'api-map',
+            heading: '按问题找 API',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['你的问题', 'API（含可运行示例）'],
+                rows: [
+                  [
+                    '整个页面只有一个 hub，子应用取得它',
+                    '[createMicroHub](/zh/docs/micro-hub/api/createMicroHub)、[getMicroHub](/zh/docs/micro-hub/api/getMicroHub)'
+                  ],
+                  [
+                    '声明共享状态、事件、请求、写入方和版本',
+                    '[defineContract](/zh/docs/micro-hub/api/defineContract)'
+                  ],
+                  ['连接、认领契约、卸载一个应用', '[IMicroApp](/zh/docs/micro-hub/api/IMicroApp)'],
+                  [
+                    '读取、订阅共享值，接入界面框架',
+                    '[IReadable](/zh/docs/micro-hub/api/IReadable)'
+                  ],
+                  [
+                    '一个命令改多个字段只通知一次；只在选择结果变化时通知',
+                    '[state](/zh/docs/micro-hub/api/state/state)'
+                  ],
+                  ['按 id 存放实体，只通知变化的那一行', '[keyed](/zh/docs/micro-hub/api/keyed)'],
+                  [
+                    'owner 发出事件；调用 owner 的处理函数并等待结果',
+                    '[events](/zh/docs/micro-hub/api/events/events)、[request](/zh/docs/micro-hub/api/request)'
+                  ],
+                  ['刷新页面后保留字段', '[persist](/zh/docs/micro-hub/api/persist/persist)'],
+                  [
+                    '多个应用共用一次异步加载',
+                    '[resources](/zh/docs/micro-hub/api/resource/resources)'
+                  ],
+                  [
+                    '自定义元素子应用拿到自己的句柄',
+                    '[consumeMicroApp](/zh/docs/micro-hub/api/web-component/consumeMicroApp)'
+                  ],
+                  [
+                    '按错误码处理失败',
+                    '[MicroHubErrorCode](/zh/docs/micro-hub/api/MicroHubErrorCode)'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: '状态与命令',
+          path: 'state-and-commands'
+        }
+      ]
+    },
+    en: {
+      title: 'Micro Hub: shared state, events and requests between micro-frontends',
+      lede: 'The shell and the child apps on one page (Module Federation remotes or custom elements) talk through one hub. Every shared piece is declared by a contract and has one owner at a time; unmounting an app cleans up with one call.',
+      document: {
+        sections: [
+          {
+            id: 'pain',
+            heading: 'Sound familiar?',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'State written by one remote never reaches another app, and nothing reports an error; see [createMicroHub](/en/docs/micro-hub/api/createMicroHub#micro-hub-index--createMicroHub--case-1).',
+                  'The cart holds an item nobody can trace to an app; see [defineContract](/en/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-2).',
+                  'An independently deployed remote still uses the old data shape and quietly reads and writes the wrong data; see [defineContract](/en/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-1).',
+                  'After a remote is unmounted and mounted again, one change triggers its callback twice; see [getMicroHub](/en/docs/micro-hub/api/getMicroHub#micro-hub-index--getMicroHub--case-1).',
+                  'Changing the price of one product re-renders the whole product list; see [keyed](/en/docs/micro-hub/api/keyed#micro-hub-index--keyed--case-1).',
+                  'A remote calls another app as soon as it mounts, before that app has loaded, and the call goes nowhere; see [request](/en/docs/micro-hub/api/request#micro-hub-index--request--case-1).'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'why',
+            heading: 'Why choose it',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Only the shell creates the hub, and any second creation fails at once; see [createMicroHub](/en/docs/micro-hub/api/createMicroHub#micro-hub-index--createMicroHub--case-1).',
+                  'Each contract has one owner, and commands from apps outside `writers` are refused without writing anything; see [defineContract](/en/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-2).',
+                  'Contracts carry a major version, so an app on another version is stopped before it reads or writes; see [defineContract](/en/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-1).',
+                  'Subscriptions, listeners and ownership belong to the app that registered them, and one `disconnect()` releases them all; see [getMicroHub](/en/docs/micro-hub/api/getMicroHub#micro-hub-index--getMicroHub--case-1).',
+                  'Each field and each entity id is subscribed on its own, so only the places that changed are notified; see [keyed](/en/docs/micro-hub/api/keyed#micro-hub-index--keyed--case-1).',
+                  'A request can wait for the owner to register its handler, and a timeout or a departed owner each has its own error code; see [request](/en/docs/micro-hub/api/request#micro-hub-index--request--case-1).'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'start',
+            heading: 'Start here',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The shell creates the hub, the cart app owns the cart contract, the header subscribes to the items and the product app writes through a command. The product app is listed in `writers`, so it may write; the header can only read.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { createMicroHub, defineContract, getMicroHub } from '@migaia/micro-hub'
+import { state } from '@migaia/micro-hub/state'
+
+const cart = defineContract('cart', {
+  version: 1,
+  state: { items: [] as readonly string[] },
+  commands: { add: (s, sku: string) => ({ items: [...s.items, sku] }) },
+  writers: ['product']
+})
+
+createMicroHub({ plugins: [state()] }) // shell
+getMicroHub().connect('cart').own(cart) // the cart app owns the contract
+const header = getMicroHub().connect('header').use(cart)
+header.state.items.subscribe(() => console.log('header:', header.state.items.get()))
+getMicroHub().connect('product').use(cart).commands.add('sku-1') // the product app writes
+await getMicroHub().dispose()`
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "header: [ 'sku-1' ]"
+              }
+            ]
+          },
+          {
+            id: 'api-map',
+            heading: 'Find the API for your problem',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Your problem', 'API (with runnable examples)'],
+                rows: [
+                  [
+                    'One hub for the whole page, found by every child app',
+                    '[createMicroHub](/en/docs/micro-hub/api/createMicroHub), [getMicroHub](/en/docs/micro-hub/api/getMicroHub)'
+                  ],
+                  [
+                    'Declare shared state, events, requests, writers and a version',
+                    '[defineContract](/en/docs/micro-hub/api/defineContract)'
+                  ],
+                  [
+                    'Connect an app, own a contract, unmount',
+                    '[IMicroApp](/en/docs/micro-hub/api/IMicroApp)'
+                  ],
+                  [
+                    'Read and subscribe to shared values from any UI framework',
+                    '[IReadable](/en/docs/micro-hub/api/IReadable)'
+                  ],
+                  [
+                    'Notify once per command; notify only when a selected result changes',
+                    '[state](/en/docs/micro-hub/api/state/state)'
+                  ],
+                  [
+                    'Store entities by id and notify only the row that changed',
+                    '[keyed](/en/docs/micro-hub/api/keyed)'
+                  ],
+                  [
+                    "Emit events from the owner; call the owner's handler and await the result",
+                    '[events](/en/docs/micro-hub/api/events/events), [request](/en/docs/micro-hub/api/request)'
+                  ],
+                  [
+                    'Keep fields across page reloads',
+                    '[persist](/en/docs/micro-hub/api/persist/persist)'
+                  ],
+                  [
+                    'Share one asynchronous load between apps',
+                    '[resources](/en/docs/micro-hub/api/resource/resources)'
+                  ],
+                  [
+                    'Give a custom-element child app its handle',
+                    '[consumeMicroApp](/en/docs/micro-hub/api/web-component/consumeMicroApp)'
+                  ],
+                  [
+                    'Handle failures by error code',
+                    '[MicroHubErrorCode](/en/docs/micro-hub/api/MicroHubErrorCode)'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'State and commands',
+          path: 'state-and-commands'
+        }
+      ]
+    }
+  },
+  'micro-hub:getting-started': {
+    zh: {
+      title: '快速开始：一个 hub、一个契约、两个应用',
+      lede: '安装包，配置联邦模块单例，然后跑通创建 hub、认领契约、写入、监听、请求和卸载的完整流程。',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: '安装',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/micro-hub'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
+              },
+              {
+                type: 'paragraph',
+                text: '只有共享异步值（`resources()` 插件）时才需要再安装可选的对等依赖 `@migaia/resource`。持久化需要一个存储后端，例如 `@migaia/storage-web`。'
+              }
+            ]
+          },
+          {
+            id: 'singleton',
+            heading: '让整个页面只加载一份包',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'hub 保存在包里，所以整个页面只能有一份 `@migaia/micro-hub`。在主应用和每个子应用的联邦模块配置中都把它声明为单例：'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `shared: {
+  '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.2' }
+}`
+              },
+              {
+                type: 'paragraph',
+                text: "子应用的 `requiredVersion` 超出主应用提供的范围时，联邦模块会改用子应用自带的那份，事件和状态就分成了两份。这时子应用的 `getMicroHub()` 会抛 `HUB_NOT_CREATED`。发布前确认所有应用的版本范围一致；入口使用异步边界（`import('./bootstrap')`），避免 “Shared module is not available for eager consumption”。"
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: '第一个例子',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '下面把四个角色写在一个文件里，方便直接运行。实际项目中，契约由 owner 团队维护并通过联邦模块暴露，主应用只负责第 2 步，购物车和商品各是一个子应用。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { createMicroHub, defineContract, event, getMicroHub, request } from '@migaia/micro-hub'
+import { events } from '@migaia/micro-hub/events'
+import { state } from '@migaia/micro-hub/state'
+
+// 1. 契约：由购物车团队维护，通过联邦模块暴露给其它应用
+const cart = defineContract('cart', {
+  version: 1,
+  state: { items: [] as readonly string[] },
+  computed: { count: (s) => s.items.length },
+  commands: { add: (s, sku: string) => ({ items: [...s.items, sku] }) },
+  writers: ['product'],
+  events: { checkedOut: event<{ orderId: string }>() },
+  requests: { checkout: request<{ coupon?: string }, { orderId: string }>() }
+})
+
+// 2. 主应用：在任何子应用挂载前创建一次 hub
+createMicroHub({ plugins: [events(), state()] })
+
+// 3. 购物车应用：认领契约，应答结账请求
+const owned = getMicroHub().connect('cart').own(cart)
+owned.handle('checkout', async () => {
+  const orderId = \`A-\${owned.state.items.get().length}\`
+  owned.events.checkedOut.emit({ orderId })
+  return { orderId }
+})
+
+// 4. 商品应用：用命令写入，读取计算值，监听事件，发起请求
+const product = getMicroHub().connect('product')
+const view = product.use(cart)
+view.computed.count.subscribe(() => console.log('购物车数量：', view.computed.count.get()))
+view.events.checkedOut.on(({ orderId }) => console.log('已结账：', orderId))
+view.commands.add('sku-1')
+view.commands.add('sku-2')
+console.log('请求结果：', await view.requests.checkout({}))
+
+// 5. 卸载商品应用，然后关闭页面
+await product.disconnect()
+await getMicroHub().dispose()`
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "购物车数量： 1\n购物车数量： 2\n已结账： A-2\n请求结果： { orderId: 'A-2' }"
+              },
+              {
+                type: 'paragraph',
+                text: '`defineContract` 只做校验和冻结，没有副作用；第一次有应用用它调用 `use()` 或 `own()` 时，hub 才登记这个契约。`connect(name)` 返回应用句柄，主应用和子应用拿到的形状完全一样。`own()` 让购物车应用成为 owner，它可以发出事件、应答请求；`use()` 给出所有应用都能拿到的视图。'
+              },
+              {
+                type: 'paragraph',
+                text: '订阅回调不带参数，在回调里调用 `get()` 就能拿到新值。命令同步提交，每次调用返回 `{ revision }`。`disconnect()` 同步释放商品应用登记的订阅和监听，再异步完成卸载。'
+              }
+            ]
+          },
+          {
+            id: 'plugins',
+            heading: '按契约的内容选择插件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['插件', '子路径', '依赖', '提供'],
+                rows: [
+                  [
+                    '`events(options?)`',
+                    '`@migaia/micro-hub/events`',
+                    '无',
+                    '契约的 `events` 和 `requests`'
+                  ],
+                  [
+                    '`state()`',
+                    '`@migaia/micro-hub/state`',
+                    '无',
+                    '`state`、`computed`、`commands`、`select`、`keyed()`'
+                  ],
+                  [
+                    '`persist({ store })`',
+                    '`@migaia/micro-hub/persist`',
+                    '`state()`',
+                    '`own(contract, { persist })`'
+                  ],
+                  [
+                    '`resources()`',
+                    '`@migaia/micro-hub/resource`',
+                    '可选对等依赖 `@migaia/resource`',
+                    '契约的 `resources`'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '契约用到未安装的插件时，`use()` 和 `own()` 抛 `PLUGIN_MISSING`。插件自己依赖的插件没装时，`createMicroHub()` 抛 `PLUGIN_MISSING`，而且不会创建 hub。'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'createMicroHub 的选项',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '作用'],
+                rows: [
+                  ['plugins', '必填', '要安装的能力插件，顺序无关；安装前先检查每个插件的依赖'],
+                  [
+                    'report',
+                    '`globalThis.reportError`，没有时用 `console.error`',
+                    '接收不应打断当前操作的错误：监听函数和订阅回调抛出的异常、清理失败、事件调用超过上限。它自己抛错时，两个错误都交给默认处理'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '状态与命令',
+          path: 'state-and-commands'
+        },
+        {
+          label: '事件与请求',
+          path: 'events-and-requests'
+        }
+      ]
+    },
+    en: {
+      title: 'Quick start: one hub, one contract, two apps',
+      lede: 'Install the package, configure the Module Federation singleton, then run the whole flow: create the hub, own a contract, write, listen, request and unmount.',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: 'Install',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/micro-hub'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Install the optional peer `@migaia/resource` only when you share asynchronous values with the `resources()` plugin. Persistence needs a storage backend, for example `@migaia/storage-web`.'
+              }
+            ]
+          },
+          {
+            id: 'singleton',
+            heading: 'Load one copy of the package per page',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The hub lives inside the package, so the page must load exactly one copy of `@migaia/micro-hub`. Declare it as a singleton in the Module Federation config of the shell and of every remote:'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `shared: {
+  '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.2' }
+}`
+              },
+              {
+                type: 'paragraph',
+                text: "When a remote's `requiredVersion` falls outside the range the shell provides, Module Federation uses the remote's own copy and events and state split in two; that remote's `getMicroHub()` then throws `HUB_NOT_CREATED`. Check that every app uses the same version range before release, and give the entry an async boundary (`import('./bootstrap')`) to avoid “Shared module is not available for eager consumption”."
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: 'First example',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The four roles below share one file so you can run it directly. In a real project the owner team maintains the contract and exposes it through Module Federation, the shell does only step 2, and the cart and the product are separate remotes.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { createMicroHub, defineContract, event, getMicroHub, request } from '@migaia/micro-hub'
+import { events } from '@migaia/micro-hub/events'
+import { state } from '@migaia/micro-hub/state'
+
+// 1. Contract: maintained by the cart team, shared through a Module Federation expose
+const cart = defineContract('cart', {
+  version: 1,
+  state: { items: [] as readonly string[] },
+  computed: { count: (s) => s.items.length },
+  commands: { add: (s, sku: string) => ({ items: [...s.items, sku] }) },
+  writers: ['product'],
+  events: { checkedOut: event<{ orderId: string }>() },
+  requests: { checkout: request<{ coupon?: string }, { orderId: string }>() }
+})
+
+// 2. Shell: create the hub once, before any remote mounts
+createMicroHub({ plugins: [events(), state()] })
+
+// 3. Cart app: owns the contract and answers checkout
+const owned = getMicroHub().connect('cart').own(cart)
+owned.handle('checkout', async () => {
+  const orderId = \`A-\${owned.state.items.get().length}\`
+  owned.events.checkedOut.emit({ orderId })
+  return { orderId }
+})
+
+// 4. Product app: writes through a command, reads, listens and calls
+const product = getMicroHub().connect('product')
+const view = product.use(cart)
+view.computed.count.subscribe(() => console.log('cart count:', view.computed.count.get()))
+view.events.checkedOut.on(({ orderId }) => console.log('checked out:', orderId))
+view.commands.add('sku-1')
+view.commands.add('sku-2')
+console.log('reply:', await view.requests.checkout({}))
+
+// 5. Unmount the product app, then close the page
+await product.disconnect()
+await getMicroHub().dispose()`
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "cart count: 1\ncart count: 2\nchecked out: A-2\nreply: { orderId: 'A-2' }"
+              },
+              {
+                type: 'paragraph',
+                text: '`defineContract` only validates and freezes, with no side effect; the hub registers the contract the first time an app calls `use()` or `own()` with it. `connect(name)` returns the app handle, and the shell and child apps get exactly the same shape. `own()` makes the cart app the owner, which may emit events and answer requests; `use()` returns the view every app can get.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Subscription callbacks get no argument; call `get()` inside them to read the new value. Commands commit synchronously and return `{ revision }`. `disconnect()` releases the product app subscriptions and listeners synchronously, then finishes unloading asynchronously.'
+              }
+            ]
+          },
+          {
+            id: 'plugins',
+            heading: 'Choose plugins by what the contract declares',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Plugin', 'Subpath', 'Requires', 'Provides'],
+                rows: [
+                  [
+                    '`events(options?)`',
+                    '`@migaia/micro-hub/events`',
+                    'nothing',
+                    'The contract `events` and `requests`'
+                  ],
+                  [
+                    '`state()`',
+                    '`@migaia/micro-hub/state`',
+                    'nothing',
+                    '`state`, `computed`, `commands`, `select`, `keyed()`'
+                  ],
+                  [
+                    '`persist({ store })`',
+                    '`@migaia/micro-hub/persist`',
+                    '`state()`',
+                    '`own(contract, { persist })`'
+                  ],
+                  [
+                    '`resources()`',
+                    '`@migaia/micro-hub/resource`',
+                    'Optional peer `@migaia/resource`',
+                    'The contract `resources`'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'When a contract uses a plugin that is not installed, `use()` and `own()` throw `PLUGIN_MISSING`. When a plugin needs another plugin that is missing, `createMicroHub()` throws `PLUGIN_MISSING` and no hub is created.'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'createMicroHub options',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Purpose'],
+                rows: [
+                  [
+                    'plugins',
+                    'required',
+                    'Capability plugins to install, in any order; every plugin dependency is checked before anything is installed'
+                  ],
+                  [
+                    'report',
+                    '`globalThis.reportError`, or `console.error` when missing',
+                    'Receives errors that must not interrupt the current operation: exceptions from listeners and subscription callbacks, cleanup failures, and an exhausted event budget. If it throws, both errors go to the default reporter'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'State and commands',
+          path: 'state-and-commands'
+        },
+        {
+          label: 'Events and requests',
+          path: 'events-and-requests'
+        }
+      ]
+    }
+  },
+  'micro-hub:state-and-commands': {
+    zh: {
+      title: '状态与命令',
+      lede: '契约声明字段的初始值和改动它们的命令。所有应用都能读取和订阅，只有 owner 和 `writers` 中的应用能调用命令。',
+      document: {
+        sections: [
+          {
+            id: 'declare',
+            heading: '声明状态、计算值和命令',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['契约部分', '说明'],
+                rows: [
+                  [
+                    'state',
+                    '字段的初始值，或 `keyed<T>()`。初始值用 `structuredClone` 复制并顶层冻结，所以必须能被结构化克隆'
+                  ],
+                  ['computed', '`(state) => value`，只依赖它实际读到的字段'],
+                  ['commands', '`(state, ...args) => patch`，必须同步；补丁里只写要改的字段'],
+                  ['writers', '除 owner 之外可以调用命令的应用名。默认只有 owner 能写']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '一个命令返回的补丁一次提交：所有字段写完后才通知订阅者，`revision` 加一。例子见 [state](/zh/docs/micro-hub/api/state/state#micro-hub-state--state--case-1)。'
+              }
+            ]
+          },
+          {
+            id: 'read',
+            heading: '读取与订阅',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '视图上的 `state.<字段>` 和 `computed.<名字>` 都是 `IReadable`：`get()` 返回当前已提交的值，下一次提交改变它之前一直返回同一个引用；`subscribe(listener)` 在之后每次变化时无参数调用 `listener`，返回取消函数，应用断开时也会自动取消。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `// React
+const total = useSyncExternalStore(view.computed.total.subscribe, view.computed.total.get)
+
+// Vue
+const totalRef = shallowRef(view.computed.total.get())
+onScopeDispose(view.computed.total.subscribe(() => (totalRef.value = view.computed.total.get())))`
+              },
+              {
+                type: 'paragraph',
+                text: '`select(selector, equals?)` 基于状态派生一个 `IReadable`，只在 `equals`（默认 `Object.is`）判定结果变化时通知；最后一个订阅者离开时释放内部节点。'
+              }
+            ]
+          },
+          {
+            id: 'keyed',
+            heading: '按 id 存放实体',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '`keyed<T>()` 字段在视图上是 `{ at(id), ids }`：`at(id)` 只在这个 id 被写入或删除时通知，`ids` 只在增删 id 时通知。命令用 `{ 字段: { [id]: 值 } }` 写入，值为 `undefined` 表示删除。在命令、计算值和选择函数里，它是只读的 `get(id)` / `ids`。例子见 [keyed](/zh/docs/micro-hub/api/keyed#micro-hub-index--keyed--case-1)。'
+              }
+            ]
+          },
+          {
+            id: 'write-rules',
+            heading: '写入规则与失败',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['情况', '结果'],
+                rows: [
+                  [
+                    '调用方既不是 owner 也不在 `writers` 中',
+                    '抛 `WRITE_DENIED`，不写入。例子见 [defineContract](/zh/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-2)'
+                  ],
+                  ['命令返回 Promise 或其它 thenable', '抛 `COMMAND_ASYNC`（`TypeError`），不写入'],
+                  [
+                    '补丁里有契约没声明的字段',
+                    '抛 `INVALID_OPTION`（`TypeError`），不写入任何字段'
+                  ],
+                  ['在订阅回调里调用命令', '当前这批通知结束后再提交'],
+                  ['owner 断开或 `release()`', '状态保留，新的 owner 认领后可以继续写']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '需要异步数据时，先完成异步工作，再用结果调用命令。不应直接写入的应用，改用契约请求让 owner 决定。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '事件与请求',
+          path: 'events-and-requests'
+        },
+        {
+          label: '持久化与共享异步值',
+          path: 'persist-and-resources'
+        }
+      ]
+    },
+    en: {
+      title: 'State and commands',
+      lede: 'A contract declares initial field values and the commands that change them. Every app can read and subscribe; only the owner and the apps in `writers` can call commands.',
+      document: {
+        sections: [
+          {
+            id: 'declare',
+            heading: 'Declare state, computed values and commands',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Contract section', 'Meaning'],
+                rows: [
+                  [
+                    'state',
+                    'Initial field values, or `keyed<T>()`. Initial values are copied with `structuredClone` and frozen at the top level, so they must be structured-cloneable'
+                  ],
+                  [
+                    'computed',
+                    '`(state) => value`, depending only on the fields it actually reads'
+                  ],
+                  [
+                    'commands',
+                    '`(state, ...args) => patch`, synchronous; the patch holds only the fields to change'
+                  ],
+                  [
+                    'writers',
+                    'Names of apps other than the owner that may call commands. By default only the owner writes'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The patch a command returns is committed at once: subscribers are notified after every field is written, and `revision` grows by one. See [state](/en/docs/micro-hub/api/state/state#micro-hub-state--state--case-1).'
+              }
+            ]
+          },
+          {
+            id: 'read',
+            heading: 'Read and subscribe',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '`state.<field>` and `computed.<name>` on a view are `IReadable`s. `get()` returns the committed value and keeps returning the same reference until a commit changes it. `subscribe(listener)` calls `listener` with no argument after each later change and returns a cancel function; the subscription also ends when the app disconnects.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `// React
+const total = useSyncExternalStore(view.computed.total.subscribe, view.computed.total.get)
+
+// Vue
+const totalRef = shallowRef(view.computed.total.get())
+onScopeDispose(view.computed.total.subscribe(() => (totalRef.value = view.computed.total.get())))`
+              },
+              {
+                type: 'paragraph',
+                text: '`select(selector, equals?)` derives an `IReadable` from state and notifies only when `equals` (default `Object.is`) reports a changed result; its internal node is released when the last subscriber leaves.'
+              }
+            ]
+          },
+          {
+            id: 'keyed',
+            heading: 'Store entities by id',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A `keyed<T>()` field is `{ at(id), ids }` on a view: `at(id)` notifies only when that id is written or deleted, and `ids` only when ids are added or removed. Commands write it with `{ field: { [id]: value } }`, where `undefined` deletes the id. Inside commands, computed values and selectors it is a read-only `get(id)` / `ids`. See [keyed](/en/docs/micro-hub/api/keyed#micro-hub-index--keyed--case-1).'
+              }
+            ]
+          },
+          {
+            id: 'write-rules',
+            heading: 'Write rules and failures',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Situation', 'Result'],
+                rows: [
+                  [
+                    'The caller is neither the owner nor in `writers`',
+                    'Throws `WRITE_DENIED` and writes nothing. See [defineContract](/en/docs/micro-hub/api/defineContract#micro-hub-index--defineContract--case-2)'
+                  ],
+                  [
+                    'The command returns a Promise or another thenable',
+                    'Throws `COMMAND_ASYNC` (`TypeError`) and writes nothing'
+                  ],
+                  [
+                    'The patch has a field the contract does not declare',
+                    'Throws `INVALID_OPTION` (`TypeError`) and writes no field'
+                  ],
+                  [
+                    'A command is called inside a subscription callback',
+                    'It commits after the current batch of notifications'
+                  ],
+                  [
+                    'The owner disconnects or calls `release()`',
+                    'The state is kept; a new owner can claim the contract and keep writing'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'When a change needs asynchronous data, finish that work first and call the command with the result. An app that must not write directly sends a contract request and lets the owner decide.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Events and requests',
+          path: 'events-and-requests'
+        },
+        {
+          label: 'Persistence and shared async values',
+          path: 'persist-and-resources'
+        }
+      ]
+    }
+  },
+  'micro-hub:events-and-requests': {
+    zh: {
+      title: '事件与请求',
+      lede: '事件由 owner 发出、所有应用监听，不保存历史；请求由任何应用发起、owner 用唯一的处理函数应答，调用方可以等待结果。',
+      document: {
+        sections: [
+          {
+            id: 'events',
+            heading: '发出和监听事件',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `const stop = view.events.checkedOut.on(({ orderId }) => toast(orderId)) // 任何应用
+owned.events.checkedOut.emit({ orderId: 'A-1' }) // 只有 owner
+stop()`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`emit` 按登记顺序同步调用监听函数；在监听函数里再次发出的事件排到当前分发结束之后。',
+                  '监听函数抛出的错误交给 hub 的 `report`，不影响其它监听函数，也不会抛给发出方。',
+                  '一次顶层 `emit` 最多引发 `publishBudget`（默认 10000）次监听调用，超出时停止分发并上报，防止两个应用互相触发形成死循环。例子见 [events](/zh/docs/micro-hub/api/events/events#micro-hub-events--events--case-1)。',
+                  '事件不保存历史：监听前发出的事件收不到。需要“最后的值”时，放进契约的 `state`。',
+                  '只有 owner 能发出事件，`release()` 之后再发出抛 `EMIT_DENIED`。其它应用需要通知 owner 时，用命令或请求。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'requests',
+            heading: '应答和调用请求',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `const unhandle = owned.handle('checkout', async ({ coupon }) => ({ orderId: await submit(coupon) }))
+const { orderId } = await view.requests.checkout({ coupon: 'SPRING' }, { waitForOwner: 3000 })
+unhandle()`
+              },
+              {
+                type: 'table',
+                headers: ['情况', '调用结果'],
+                rows: [
+                  ['owner 已登记处理函数', '返回处理函数的结果；处理函数抛出的错误原样拒绝'],
+                  ['没有处理函数，也没传 `waitForOwner`', '立即以 `OWNER_ABSENT` 拒绝'],
+                  [
+                    '传了 `waitForOwner`',
+                    '等待处理函数登记后继续；超时以 `OWNER_TIMEOUT` 拒绝，调用方断开以 `APP_DISCONNECTED` 拒绝。例子见 [request](/zh/docs/micro-hub/api/request#micro-hub-index--request--case-1)'
+                  ],
+                  [
+                    '处理期间 owner 断开或 `release()`',
+                    '以 `OWNER_GONE` 拒绝；处理函数可能已经产生副作用，重试前先核对'
+                  ],
+                  ['同一个请求登记第二个处理函数', '`handle` 抛 `HANDLER_DUPLICATED`']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '持久化与共享异步值',
+          path: 'persist-and-resources'
+        },
+        {
+          label: '排错与常见问题',
+          path: 'troubleshooting'
+        }
+      ]
+    },
+    en: {
+      title: 'Events and requests',
+      lede: 'The owner emits events and every app listens, with no history kept. Any app makes requests, the owner answers each with one handler, and the caller can wait for the result.',
+      document: {
+        sections: [
+          {
+            id: 'events',
+            heading: 'Emit and listen to events',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `const stop = view.events.checkedOut.on(({ orderId }) => toast(orderId)) // any app
+owned.events.checkedOut.emit({ orderId: 'A-1' }) // owner only
+stop()`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`emit` calls listeners synchronously in registration order; an event emitted inside a listener waits until the current delivery finishes.',
+                  'An error thrown by a listener goes to the hub `report`; it does not affect other listeners and is not thrown to the emitter.',
+                  'One top-level `emit` may cause at most `publishBudget` (default 10000) listener calls; beyond that, delivery stops and the overflow is reported, so two apps that emit in reaction to each other cannot loop forever. See [events](/en/docs/micro-hub/api/events/events#micro-hub-events--events--case-1).',
+                  'Events keep no history: a listener added after an emit does not receive it. Put a value that late readers need in the contract `state`.',
+                  'Only the owner emits; emitting after `release()` throws `EMIT_DENIED`. Other apps notify the owner through a command or a request.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'requests',
+            heading: 'Answer and call requests',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `const unhandle = owned.handle('checkout', async ({ coupon }) => ({ orderId: await submit(coupon) }))
+const { orderId } = await view.requests.checkout({ coupon: 'SPRING' }, { waitForOwner: 3000 })
+unhandle()`
+              },
+              {
+                type: 'table',
+                headers: ['Situation', 'Result of the call'],
+                rows: [
+                  [
+                    'The owner has registered a handler',
+                    "Resolves with the handler's result; an error the handler throws rejects the call unchanged"
+                  ],
+                  ['No handler and no `waitForOwner`', 'Rejects at once with `OWNER_ABSENT`'],
+                  [
+                    '`waitForOwner` is set',
+                    'Continues once a handler is registered; rejects with `OWNER_TIMEOUT` on timeout and with `APP_DISCONNECTED` if the caller disconnects. See [request](/en/docs/micro-hub/api/request#micro-hub-index--request--case-1)'
+                  ],
+                  [
+                    'The owner disconnects or calls `release()` during the call',
+                    'Rejects with `OWNER_GONE`; the handler may already have had side effects, so reconcile before retrying'
+                  ],
+                  [
+                    'A second handler is registered for the same request',
+                    '`handle` throws `HANDLER_DUPLICATED`'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Persistence and shared async values',
+          path: 'persist-and-resources'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        }
+      ]
+    }
+  },
+  'micro-hub:persist-and-resources': {
+    zh: {
+      title: '持久化与共享异步值',
+      lede: 'owner 可以把选定的字段保存到键值存储，刷新后读回；也可以提供一个获取函数，让所有应用共用同一次异步加载。',
+      document: {
+        sections: [
+          {
+            id: 'persist',
+            heading: '刷新后保留字段',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { persist } from '@migaia/micro-hub/persist'
+import { state } from '@migaia/micro-hub/state'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
+
+createMicroHub({
+  plugins: [state(), persist({ store: localStorageHost({ namespace: 'shop' }), debounceMs: 200 })]
+})
+const owned = getMicroHub().connect('cart').own(cart, { persist: ['items'] })
+await owned.persistence?.ready`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`store` 可以是任何键值存储，例如 `localStorageHost({ namespace })` 或 `indexedDbHost({ dbName })`。hub 只借用它，不会释放它。',
+                  '字段保存在 `<keyPrefix><persistKey ?? 契约名>` 下，`keyPrefix` 默认为 `micro-hub:`；`debounceMs` 默认 0，每次提交后都写入。',
+                  '`persistence.ready` 在首次读回后兑现。读回期间发生的写入会保留，不会被保存的数据覆盖。',
+                  '保存的版本就是契约的 `version`；主版本变化后丢弃旧数据，字段从初始值开始。例子见 [persist](/zh/docs/micro-hub/api/persist/persist#micro-hub-persist--persist--case-1)。',
+                  'owner 断开或 `release()` 后停止持久化；`hub.dispose()` 等待已接受的写入完成。`keyed()` 字段不能持久化。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'resources',
+            heading: '多个应用共用一次加载',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '契约的 `resources` 部分用 `resource<T>()` 声明共享异步值，需要安装 `resources()` 插件和对等依赖 `@migaia/resource`。owner 用 `provide()` 登记获取函数，任何应用用 `read()` 读取。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { createMicroHub, defineContract, getMicroHub, MicroResourceStatus, resource } from '@migaia/micro-hub'
+import { resources } from '@migaia/micro-hub/resource'
+
+type IUser = { name: string }
+const session = defineContract('session', { version: 1, resources: { profile: resource<IUser>() } })
+createMicroHub({ plugins: [resources()] })
+
+const owned = getMicroHub().connect('account').own(session)
+owned.provide('profile', (signal) => fetch('/api/me', { signal }).then((r) => r.json()))
+
+const header = getMicroHub().connect('header').use(session)
+const sidebar = getMicroHub().connect('sidebar').use(session)
+const [a, b] = await Promise.all([header.resources.profile.read(), sidebar.resources.profile.read()])
+const { status, data } = sidebar.resources.profile.state.get()
+if (status === MicroResourceStatus.success) render(data)`
+              },
+              {
+                type: 'list',
+                items: [
+                  '已有值时 `read()` 立即兑现；请求进行中时返回同一个 Promise，所以上面两次并发读取只请求一次。',
+                  '`state` 是 `IReadable<{ status, data, error }>`，`status` 取 `MicroResourceStatus` 中的值；订阅它就开始观察这个值。',
+                  '`refetch()` 丢弃缓存并重新请求，失败交给 `report`。请求被新请求替换或 owner 释放时，获取函数收到的 `signal` 会中止。',
+                  'owner 提供获取函数之前，`read()` 以 `OWNER_ABSENT` 拒绝，`state.get().status` 为 `idle`。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '自定义元素子应用',
+          path: 'web-components'
+        },
+        {
+          label: '排错与常见问题',
+          path: 'troubleshooting'
+        }
+      ]
+    },
+    en: {
+      title: 'Persistence and shared async values',
+      lede: 'An owner can save selected fields to a key-value store and read them back after a reload, and it can provide a fetcher so every app shares one asynchronous load.',
+      document: {
+        sections: [
+          {
+            id: 'persist',
+            heading: 'Keep fields across reloads',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { persist } from '@migaia/micro-hub/persist'
+import { state } from '@migaia/micro-hub/state'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
+
+createMicroHub({
+  plugins: [state(), persist({ store: localStorageHost({ namespace: 'shop' }), debounceMs: 200 })]
+})
+const owned = getMicroHub().connect('cart').own(cart, { persist: ['items'] })
+await owned.persistence?.ready`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`store` can be any key-value store, for example `localStorageHost({ namespace })` or `indexedDbHost({ dbName })`. The hub borrows it and never releases it.',
+                  'Fields are saved under `<keyPrefix><persistKey ?? contract name>`, where `keyPrefix` defaults to `micro-hub:`. `debounceMs` defaults to 0, so every commit is written.',
+                  '`persistence.ready` resolves after the first read-back. A write made while the saved data is being read back is kept and not overwritten by it.',
+                  'The saved version is the contract `version`; after a major version change the old data is discarded and the fields start from their initial values. See [persist](/en/docs/micro-hub/api/persist/persist#micro-hub-persist--persist--case-1).',
+                  'Persistence stops when the owner disconnects or calls `release()`; `hub.dispose()` waits for accepted writes. `keyed()` fields cannot be persisted.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'resources',
+            heading: 'Share one load between apps',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The contract `resources` section declares shared asynchronous values with `resource<T>()`; it needs the `resources()` plugin and the peer `@migaia/resource`. The owner registers a fetcher with `provide()`, and any app reads with `read()`.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { createMicroHub, defineContract, getMicroHub, MicroResourceStatus, resource } from '@migaia/micro-hub'
+import { resources } from '@migaia/micro-hub/resource'
+
+type IUser = { name: string }
+const session = defineContract('session', { version: 1, resources: { profile: resource<IUser>() } })
+createMicroHub({ plugins: [resources()] })
+
+const owned = getMicroHub().connect('account').own(session)
+owned.provide('profile', (signal) => fetch('/api/me', { signal }).then((r) => r.json()))
+
+const header = getMicroHub().connect('header').use(session)
+const sidebar = getMicroHub().connect('sidebar').use(session)
+const [a, b] = await Promise.all([header.resources.profile.read(), sidebar.resources.profile.read()])
+const { status, data } = sidebar.resources.profile.state.get()
+if (status === MicroResourceStatus.success) render(data)`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`read()` resolves at once when a value exists and returns the same Promise while a request is in progress, so the two concurrent reads above make one request.',
+                  '`state` is an `IReadable<{ status, data, error }>` whose `status` is a `MicroResourceStatus` value; subscribing to it starts observing the value.',
+                  '`refetch()` discards the cached value and requests again; failures go to `report`. The `signal` the fetcher receives aborts when a newer request replaces it or the owner releases it.',
+                  'Before the owner provides a fetcher, `read()` rejects with `OWNER_ABSENT` and `state.get().status` is `idle`.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Custom-element child apps',
+          path: 'web-components'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        }
+      ]
+    }
+  },
+  'micro-hub:web-components': {
+    zh: {
+      title: '自定义元素子应用',
+      lede: '以自定义元素挂载的子应用，可以通过社区的 Context Protocol 从主应用拿到自己的应用句柄，不需要全局变量。',
+      document: {
+        sections: [
+          {
+            id: 'provide-consume',
+            heading: '主应用提供，元素请求',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'
+
+// 主应用：让插槽元素应答它下面的请求
+const app = getMicroHub().connect('checkout')
+const stopProviding = provideMicroApp(document.querySelector('#checkout-slot')!, app)
+
+// 子应用：元素挂载时请求句柄，卸载时取消仍在等待的请求
+class CheckoutElement extends HTMLElement {
+  #cancel?: () => void
+  connectedCallback() {
+    this.#cancel = consumeMicroApp(this, (app) => this.render(app.use(cart)))
+  }
+  disconnectedCallback() {
+    this.#cancel?.()
+  }
+}`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`consumeMicroApp` 派发会冒泡、可穿过 shadow DOM 的 `context-request` 事件；最近的提供者应答时，以句柄调用一次回调。',
+                  '元素比提供者先挂载时，请求会等待，`provideMicroApp` 出现在祖先上后补发应答。',
+                  '`provideMicroApp` 返回停止函数；之后的请求不再由这个元素应答。',
+                  '句柄本身不随元素卸载而断开；子应用卸载时仍需调用 `app.disconnect()`。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'lit',
+            heading: '与 Lit 的消费方一起用',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '`MICRO_APP_CONTEXT` 是字符串形式的上下文键，所以 Lit 的 `@consume({ context: MICRO_APP_CONTEXT })` 能直接匹配。Lit 消费方可能先于提供者连接时，先在共同祖先上连接一个 ContextRoot，并设置 `@consume({ context: MICRO_APP_CONTEXT, subscribe: true })`。`provideMicroApp` 会发出穿过 shadow DOM 的 `context-provider` 事件，ContextRoot 收到后重放早到的请求。本包复用这个协议，不自己创建 ContextRoot。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `class CartBadge extends LitElement {
+  @consume({ context: MICRO_APP_CONTEXT, subscribe: true }) app?: IMicroApp
+}`
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'provideMicroApp API',
+          path: 'docs/micro-hub/web-component/provideMicroApp'
+        },
+        {
+          label: '排错与常见问题',
+          path: 'troubleshooting'
+        }
+      ]
+    },
+    en: {
+      title: 'Custom-element child apps',
+      lede: 'A child app mounted as a custom element can get its app handle from the shell through the community Context Protocol, without a global variable.',
+      document: {
+        sections: [
+          {
+            id: 'provide-consume',
+            heading: 'The shell provides, the element asks',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: `import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'
+
+// Shell: make the slot element answer requests from below it
+const app = getMicroHub().connect('checkout')
+const stopProviding = provideMicroApp(document.querySelector('#checkout-slot')!, app)
+
+// Child app: ask for the handle on mount, cancel a waiting request on unmount
+class CheckoutElement extends HTMLElement {
+  #cancel?: () => void
+  connectedCallback() {
+    this.#cancel = consumeMicroApp(this, (app) => this.render(app.use(cart)))
+  }
+  disconnectedCallback() {
+    this.#cancel?.()
+  }
+}`
+              },
+              {
+                type: 'list',
+                items: [
+                  '`consumeMicroApp` dispatches a bubbling `context-request` that crosses shadow DOM; when the nearest provider answers, the callback runs once with the handle.',
+                  'When the element mounts before the provider, the request waits and is answered once `provideMicroApp` appears on an ancestor.',
+                  '`provideMicroApp` returns a stop function; later requests are no longer answered by that element.',
+                  'The handle does not disconnect when the element is removed; call `app.disconnect()` when the child app unmounts.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'lit',
+            heading: 'Use it with Lit consumers',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "`MICRO_APP_CONTEXT` is a string context key, so Lit's `@consume({ context: MICRO_APP_CONTEXT })` matches it directly. When a Lit consumer may connect before the provider, connect a ContextRoot on a common ancestor first and set `@consume({ context: MICRO_APP_CONTEXT, subscribe: true })`. `provideMicroApp` dispatches a `context-provider` event that crosses shadow DOM, and the ContextRoot then replays the early requests. This package reuses that protocol and does not create a ContextRoot of its own."
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: `class CartBadge extends LitElement {
+  @consume({ context: MICRO_APP_CONTEXT, subscribe: true }) app?: IMicroApp
+}`
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'provideMicroApp API',
+          path: 'docs/micro-hub/web-component/provideMicroApp'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        }
+      ]
+    }
+  },
+  'micro-hub:troubleshooting': {
+    zh: {
+      title: '排错与常见问题',
+      lede: '按现象查找原因和解决办法。',
+      document: {
+        sections: [
+          {
+            id: 'hub',
+            heading: 'getMicroHub() 抛 HUB_NOT_CREATED',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '子应用比主应用先初始化：确认主应用在挂载任何子应用之前调用了 `createMicroHub`。',
+                  '子应用加载了自带的那份包：检查联邦模块配置里 `singleton: true` 和各应用的 `requiredVersion` 是否一致。',
+                  'hub 已经被 `dispose()`：释放后需要重新调用 `createMicroHub`。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'connect',
+            heading: 'connect() 抛 APP_ALREADY_CONNECTED',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '同名应用还没断开就又连接了一次，通常是卸载代码没有调用 `disconnect()`，或者组件挂载了两次。卸载时调用 `app.disconnect()`；它返回后就可以立即以同名重新连接。'
+              }
+            ]
+          },
+          {
+            id: 'not-notified',
+            heading: '订阅回调没有被调用',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '订阅的是另一个字段：每个字段单独通知，写入 `total` 不会通知 `items` 的订阅者。',
+                  '用的是 `select()`：结果被 `equals` 判定为相等时不通知。',
+                  '`keyed` 字段的 `ids` 只在增删 id 时通知；要看实体内容变化，订阅 `at(id)`。',
+                  '应用已经断开：断开时所有订阅都会取消，之后调用 `get()` 或 `subscribe()` 抛 `APP_DISCONNECTED`。',
+                  '事件是在订阅之前发出的：事件不保存历史，需要最后的值时放进 `state`。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors-gone',
+            heading: '监听函数的错误不见了',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '监听函数和订阅回调抛出的错误不会抛给发出方或写入方，而是交给 `createMicroHub({ report })`；没配置时交给 `globalThis.reportError`，没有时用 `console.error`。`report` 收到 `source` 为 `@migaia/event-subscriber`、`code` 为 `PUBLISH_FAILED` 的错误，可能是事件调用超过了 `publishBudget`：检查是否有两个应用互相响应对方的事件。'
+              }
+            ]
+          },
+          {
+            id: 'restore',
+            heading: '刷新后字段没有读回来',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '契约的 `version` 变了：主版本变化时旧数据会被丢弃。',
+                  '`persistKey` 或 `keyPrefix` 和上次不同，读的是另一个键。',
+                  '字段是 `keyed()` 字段，不能持久化。',
+                  '读取发生在 `persistence.ready` 兑现之前：先 `await owned.persistence?.ready`。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '这个包的错误代码',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "包抛出的错误带有 `error.source`（'@migaia/micro-hub'）和 `error.code`，错误本身保持原生类型。请比较 `error.source === MICRO_HUB_SOURCE` 和 `MicroHubErrorCode` 常量，不要匹配消息文字。"
+              },
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现', '怎么处理'],
+                rows: [
+                  [
+                    'HUB_ALREADY_CREATED',
+                    '已有 hub 时再调用 `createMicroHub`',
+                    '子应用改用 `getMicroHub()`'
+                  ],
+                  ['HUB_NOT_CREATED', '还没创建 hub，或已释放', '先在主应用创建 hub'],
+                  ['APP_ALREADY_CONNECTED', '同名应用仍在连接', '先断开旧实例'],
+                  ['APP_DISCONNECTED', '断开后继续使用句柄或视图', '重新连接'],
+                  ['PLUGIN_MISSING', '契约或插件需要的能力没安装', '加入 `plugins`'],
+                  ['CONTRACT_VERSION_MISMATCH', '同名契约主版本不同', '对齐各应用部署的版本'],
+                  ['CONTRACT_OWNED', '契约已有 owner', '等 owner 断开或 `release()`'],
+                  [
+                    'WRITE_DENIED',
+                    '调用方不是 owner 也不在 `writers`',
+                    '加入 `writers`，或改用请求'
+                  ],
+                  ['EMIT_DENIED', '`release()` 后调用 emit、handle、provide', '重新认领'],
+                  ['COMMAND_ASYNC', '命令返回 thenable（`TypeError`）', '先完成异步工作再调用命令'],
+                  ['HANDLER_DUPLICATED', '`handle` / `provide` 登记了两次', '去掉重复登记'],
+                  ['OWNER_ABSENT', '请求或读取时没有处理函数', '传 `waitForOwner`，或稍后重试'],
+                  ['OWNER_TIMEOUT', '等待处理函数超时', '上报失败，或稍后重试'],
+                  ['OWNER_GONE', '请求进行中 owner 离开', '核对后再重试'],
+                  ['INVALID_OPTION', '名字、版本、成员或补丁字段非法（`TypeError`）', '修正调用']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: '事件与请求',
+          path: 'events-and-requests'
+        }
+      ]
+    },
+    en: {
+      title: 'Troubleshooting and FAQ',
+      lede: 'Find the cause and the fix by symptom.',
+      document: {
+        sections: [
+          {
+            id: 'hub',
+            heading: 'getMicroHub() throws HUB_NOT_CREATED',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A remote initialized before the shell: make sure the shell calls `createMicroHub` before any child app mounts.',
+                  "A remote loaded its own copy of the package: check `singleton: true` and that every app's `requiredVersion` matches in the Module Federation config.",
+                  'The hub was disposed: call `createMicroHub` again after `dispose()`.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'connect',
+            heading: 'connect() throws APP_ALREADY_CONNECTED',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'An app with the same name connected again before disconnecting, usually because the unmount code does not call `disconnect()` or the component mounted twice. Call `app.disconnect()` on unmount; once it returns, the same name can connect again right away.'
+              }
+            ]
+          },
+          {
+            id: 'not-notified',
+            heading: 'A subscription callback is not called',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'It subscribes to another field: each field notifies on its own, so writing `total` does not notify subscribers of `items`.',
+                  'It uses `select()`: no notification when `equals` reports the result unchanged.',
+                  '`ids` of a `keyed` field notifies only when ids are added or removed; subscribe to `at(id)` to see an entity change.',
+                  'The app has disconnected: every subscription ends on disconnect, and later `get()` or `subscribe()` calls throw `APP_DISCONNECTED`.',
+                  'The event was emitted before the listener was added: events keep no history, so put values late readers need in `state`.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors-gone',
+            heading: 'Listener errors disappear',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Errors thrown by listeners and subscription callbacks never reach the emitter or the writer; they go to `createMicroHub({ report })`, which defaults to `globalThis.reportError`, or `console.error` when that is missing. When `report` receives an error with source `@migaia/event-subscriber` and code `PUBLISH_FAILED`, an emit may have exceeded `publishBudget`: look for two apps that emit in reaction to each other.'
+              }
+            ]
+          },
+          {
+            id: 'restore',
+            heading: 'Fields are not restored after a reload',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The contract `version` changed: a major version change discards the old data.',
+                  '`persistKey` or `keyPrefix` differs from last time, so another key is read.',
+                  'The field is a `keyed()` field, which cannot be persisted.',
+                  'The value is read before `persistence.ready` resolves: `await owned.persistence?.ready` first.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Error codes of this package',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "Errors from this package carry `error.source` ('@migaia/micro-hub') and `error.code`, and keep their native type. Compare `error.source === MICRO_HUB_SOURCE` and the `MicroHubErrorCode` constants instead of matching the message."
+              },
+              {
+                type: 'table',
+                headers: ['error.code', 'When it happens', 'What to do'],
+                rows: [
+                  [
+                    'HUB_ALREADY_CREATED',
+                    '`createMicroHub` is called while a hub exists',
+                    'Child apps use `getMicroHub()`'
+                  ],
+                  [
+                    'HUB_NOT_CREATED',
+                    'No hub exists yet, or it was disposed',
+                    'Create the hub in the shell first'
+                  ],
+                  [
+                    'APP_ALREADY_CONNECTED',
+                    'An app with the same name is still connected',
+                    'Disconnect the old instance first'
+                  ],
+                  [
+                    'APP_DISCONNECTED',
+                    'A handle or view is used after disconnecting',
+                    'Connect again'
+                  ],
+                  [
+                    'PLUGIN_MISSING',
+                    'A capability a contract or plugin needs is not installed',
+                    'Add it to `plugins`'
+                  ],
+                  [
+                    'CONTRACT_VERSION_MISMATCH',
+                    'A contract name is used with another major version',
+                    'Align the deployed versions'
+                  ],
+                  [
+                    'CONTRACT_OWNED',
+                    'The contract already has an owner',
+                    'Wait for it to disconnect or call `release()`'
+                  ],
+                  [
+                    'WRITE_DENIED',
+                    'The caller is neither the owner nor in `writers`',
+                    'Add it to `writers`, or use a request'
+                  ],
+                  [
+                    'EMIT_DENIED',
+                    'emit, handle or provide after `release()`',
+                    'Claim ownership again'
+                  ],
+                  [
+                    'COMMAND_ASYNC',
+                    'A command returns a thenable (`TypeError`)',
+                    'Finish the async work before calling the command'
+                  ],
+                  [
+                    'HANDLER_DUPLICATED',
+                    '`handle` / `provide` is registered twice',
+                    'Remove the duplicate registration'
+                  ],
+                  [
+                    'OWNER_ABSENT',
+                    'No handler exists when a request or read is made',
+                    'Pass `waitForOwner`, or retry later'
+                  ],
+                  [
+                    'OWNER_TIMEOUT',
+                    'Waiting for a handler timed out',
+                    'Report the failure, or retry later'
+                  ],
+                  ['OWNER_GONE', 'The owner left during a request', 'Reconcile, then retry'],
+                  [
+                    'INVALID_OPTION',
+                    'A name, version, member or patch field is invalid (`TypeError`)',
+                    'Fix the call'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Events and requests',
+          path: 'events-and-requests'
+        }
+      ]
+    }
+  },
   'event-subscriber:index': {
     zh: {
       title: 'Event Subscriber：订阅有归属，通知有顺序',

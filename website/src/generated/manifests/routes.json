@@ -2391,13 +2391,43 @@
       "library": "micro-hub"
     },
     {
+      "path": "/en/docs/micro-hub/events-and-requests",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/en/docs/micro-hub/getting-started",
       "locale": "en",
       "domain": "docs",
       "library": "micro-hub"
     },
     {
+      "path": "/en/docs/micro-hub/persist-and-resources",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/en/docs/micro-hub/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/state-and-commands",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/troubleshooting",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/web-components",
       "locale": "en",
       "domain": "docs",
       "library": "micro-hub"
@@ -18933,13 +18963,43 @@
       "library": "micro-hub"
     },
     {
+      "path": "/zh/docs/micro-hub/events-and-requests",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/zh/docs/micro-hub/getting-started",
       "locale": "zh",
       "domain": "docs",
       "library": "micro-hub"
     },
     {
+      "path": "/zh/docs/micro-hub/persist-and-resources",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/zh/docs/micro-hub/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/state-and-commands",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/web-components",
       "locale": "zh",
       "domain": "docs",
       "library": "micro-hub"
