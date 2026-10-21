@@ -199,7 +199,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 | retryHydrate()       | 无参数；失败后重读，成功恢复写入；应等待此调用本身判断恢复结果。                                                              |
 | flush() / clear()    | 无参数，返回 `Promise<void>`，具体串行与删除规则见后文。                                                                      |
 | disposed / dispose() | live 布尔 getter / 同步幂等释放。                                                                                             |
-| disposeAsync()       | 同步停止后等待已接纳的写入/删除及最终防抖写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。                   |
+| disposeAsync()       | 同步停止后等待已接纳的写入/删除及最终写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。                       |
 
 status、error、hydrated 是 Runtime computed；hydration / write 的细分状态通过 IReadonlyPersistValue.value 暴露。公开 PersistState 只有 idle、loading、writing、ready、success、error、disposed；没有 active。IPersistCodecOutput 已移除，类型使用 storage-contract 的 ICodecOutput；运行时 PersistCodecOutput 仍保留 text / structured / binary。旧类型与成员导入需迁移，没有兼容 alias。
 
@@ -217,7 +217,7 @@ clear 同样取消窗口并等待水合，然后在写队列后删除此键，�
 
 dispose 同步、幂等：标记终态、请求 abort 所有在途适配器操作、取消防抖窗口、停止订阅。它不 dispose 借用的 Store、collection、AtomStore、Runtime 或 storage。释放后 flush / clear / retryHydrate 拒绝为带 ABORTED_BY_DISPOSE 的原生 AbortError，不复用旧 handle。
 
-如果释放截断了一个已排定但未触发的防抖 timer，会当场捕获最后快照，并在既有写链之后发起一次最终写入。该写入不等待、不传已中止的 signal；最终编码 / I/O 或捕获失败保留在 writeError，即使 status 已 disposed。没有 pending timer 时不能笼统声称 dispose 总会额外保存一次。
+如果释放截断了一个已排定但未触发的防抖 timer，或者一次已接纳但还没完成的写入（`debounceMs: 0` 时每次变化都会立即接纳一次写入），会当场捕获最后快照，并在既有写链之后发起一次最终写入。被截断的那次写入会中止或不再开始，所以释放前刚刚发生的变化由这次最终写入落盘。该写入不等待、不传已中止的 signal；最终编码 / I/O 或捕获失败保留在 writeError，即使 status 已 disposed。既没有 pending timer、也没有未完成的写入时，dispose 不会再保存一次。
 
 取消复用 lifecycle 的原生 AbortController 工厂与默认 AbortError reason。后端若忽略 signal，已经发出的操作仍可能完成；等待者会在实际操作结算后观察终态，晚到原始失败保留在 AbortError cause。dispose 不是硬期限或强制终止后端的机制。需要确定保存结果时在资源仍可用时 await flush，再按应用顺序释放 handle 和业务资源。
 

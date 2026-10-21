@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createRuntime } from '@migaia/reactive'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { createStore } from '@migaia/store-light'
 import { persist } from '../src/light-index'
@@ -360,6 +361,60 @@ describe('persist（store-light）', () => {
     await expect(handle.clear()).rejects.toSatisfy(
       (error: unknown) => error instanceof DOMException && error.name === 'AbortError'
     )
+    store.$dispose()
+  })
+
+  it('disposeAsync writes a change admitted without debounce before the write started', async () => {
+    /** Explicit runtime delivers the store notification before dispose runs. */
+    const runtime = createRuntime()
+    const storage = memoryStorageHost()
+    const store = createStore({ count: 0 }, { runtime })
+    const handle = persist(store, { key: 'admitted-before-dispose', storage })
+    await handle.ready
+    store.count = 1
+    runtime.flush()
+    await handle.disposeAsync()
+    expect(JSON.parse(String(storage.sync.get('admitted-before-dispose'))).state).toEqual({
+      count: 1
+    })
+    store.$dispose()
+  })
+
+  it('dispose aborts an in-flight write and then writes the latest snapshot after it', async () => {
+    const runtime = createRuntime()
+    const storage = memoryStorageHost()
+    /** Values each storage write delivered, in completion order. */
+    const written: unknown[] = []
+    let release!: () => void
+    /** Holds the first write open so dispose lands while it is in flight. */
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let started!: () => void
+    const startedPromise = new Promise<void>((resolve) => (started = resolve))
+    const set = storage.set
+    let calls = 0
+    storage.set = async (key, value) => {
+      if (++calls === 1) {
+        started()
+        await gate
+      }
+      written.push(JSON.parse(String(value)).state)
+      await set(key, value, {})
+    }
+    const store = createStore({ count: 0 }, { runtime })
+    const handle = persist(store, { key: 'in-flight-before-dispose', storage })
+    await handle.ready
+    store.count = 1
+    runtime.flush()
+    await startedPromise
+    store.count = 2
+    runtime.flush()
+    const disposal = handle.disposeAsync()
+    release()
+    await disposal
+    expect(written).toEqual([{ count: 1 }, { count: 2 }])
+    expect(JSON.parse(String(storage.sync.get('in-flight-before-dispose'))).state).toEqual({
+      count: 2
+    })
     store.$dispose()
   })
 

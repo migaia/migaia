@@ -185,21 +185,21 @@ Changes during hydration mark dirty rather than writing over an unknown archive.
 
 ### Handle state and waiting
 
-| Member               | Values or behavior                                                                                                                                                         |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| status               | loading / ready / error / disposed; disposed takes precedence, then hydration loading, then hydration or write error. In-progress writing has its own writeStatus.         |
-| error                | hydrationError or writeError; both produce HYDRATE_AND_WRITE_FAILED AggregateError with hydration then write in errors.                                                    |
-| hydrated             | Whether hydrationStatus is success, not whether the handle is still active.                                                                                                |
-| hydrationStatus      | loading / success / error, changing again on retry.                                                                                                                        |
-| hydrationError       | Current hydration failure, cleared on success.                                                                                                                             |
-| writeStatus          | idle / writing / error / disposed.                                                                                                                                         |
-| writeError           | Latest write failure, cleared by an ordinary successful write; a final disposal write may also retain failure here.                                                        |
-| ready                | Promise for the first hydration attempt, resolving on success and rejecting on failure or disposal before completion; retry never replaces it.                             |
-| settled              | An always-resolving barrier for the first attempt, not later retry completion.                                                                                             |
-| retryHydrate()       | No arguments; rereads after failure and reopens writing only on success. Await the initiating call itself.                                                                 |
-| flush() / clear()    | No arguments; `Promise<void>`, with ordered write / deletion behavior below.                                                                                               |
-| disposed / dispose() | Live boolean getter / synchronous idempotent release.                                                                                                                      |
-| disposeAsync()       | Stops synchronously, then awaits admitted writes/removals and the final debounce write; final-write failures stay on writeError; existing flush/clear keep their outcomes. |
+| Member               | Values or behavior                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| status               | loading / ready / error / disposed; disposed takes precedence, then hydration loading, then hydration or write error. In-progress writing has its own writeStatus. |
+| error                | hydrationError or writeError; both produce HYDRATE_AND_WRITE_FAILED AggregateError with hydration then write in errors.                                            |
+| hydrated             | Whether hydrationStatus is success, not whether the handle is still active.                                                                                        |
+| hydrationStatus      | loading / success / error, changing again on retry.                                                                                                                |
+| hydrationError       | Current hydration failure, cleared on success.                                                                                                                     |
+| writeStatus          | idle / writing / error / disposed.                                                                                                                                 |
+| writeError           | Latest write failure, cleared by an ordinary successful write; a final disposal write may also retain failure here.                                                |
+| ready                | Promise for the first hydration attempt, resolving on success and rejecting on failure or disposal before completion; retry never replaces it.                     |
+| settled              | An always-resolving barrier for the first attempt, not later retry completion.                                                                                     |
+| retryHydrate()       | No arguments; rereads after failure and reopens writing only on success. Await the initiating call itself.                                                         |
+| flush() / clear()    | No arguments; `Promise<void>`, with ordered write / deletion behavior below.                                                                                       |
+| disposed / dispose() | Live boolean getter / synchronous idempotent release.                                                                                                              |
+| disposeAsync()       | Stops synchronously, then awaits admitted writes/removals and the final write; final-write failures stay on writeError; existing flush/clear keep their outcomes.  |
 
 status, error, and hydrated are Runtime computed values. Hydration and write detail fields expose IReadonlyPersistValue.value. PersistState contains only idle, loading, writing, ready, success, error, and disposed, with no active member. IPersistCodecOutput was removed in favor of storage-contract ICodecOutput; runtime PersistCodecOutput retains text / structured / binary. Old type or member imports require migration without compatibility aliases.
 
@@ -217,7 +217,7 @@ clear also cancels the window, waits for hydration, then deletes the archive aft
 
 dispose is synchronous and idempotent: it marks terminal state, requests abort on active adapter operations, cancels the debounce window, and unsubscribes. It does not dispose the borrowed Store, collection, AtomStore, Runtime, or storage. Subsequent flush / clear / retryHydrate reject with native AbortError carrying ABORTED_BY_DISPOSE; create another handle rather than reviving it.
 
-If disposal cuts short a pending debounce timer, it captures the latest snapshot then schedules one final write behind the existing chain. This write is not awaited and receives no already-aborted signal. Capture, encoding, or I/O failure remains in writeError even while status is disposed. Without a pending timer, disposal does not unconditionally save another snapshot.
+If disposal cuts short a pending debounce timer, or a write that was admitted but had not finished (with `debounceMs: 0` every change admits one at once), it captures the latest snapshot then schedules one final write behind the existing chain. The admitted write itself is aborted or never starts, so the final write is what stores the state changed right before disposal. This write is not awaited and receives no already-aborted signal. Capture, encoding, or I/O failure remains in writeError even while status is disposed. With no pending timer and no unfinished write, disposal does not save another snapshot.
 
 Cancellation reuses lifecycle's native AbortController and default AbortError reason. A backend ignoring signal may still complete already issued work; waiters observe termination after that actual operation settles, and a late original failure remains on the AbortError cause. dispose is not a hard I/O deadline or forced backend termination. For a confirmed save outcome, await flush while resources remain usable, then release persistence and business resources in application order.
 

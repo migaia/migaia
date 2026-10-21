@@ -519,8 +519,10 @@ export function persistUnit<TState>(
     activeOperations.clear()
     writeStatus.value = PersistState.disposed
     lifecycleDisposed.value = true
-    if (clearWriteTimer()) {
-      // A pending debounced write still owes storage the latest state.
+    /** An admitted write is aborted below or never starts, because its loop stops on `disposed`. */
+    const writeAdmitted = writeDrain !== undefined
+    if (clearWriteTimer() || writeAdmitted) {
+      // A pending debounce window or an admitted write still owes storage the latest state.
       startFinalWrite()
     }
     stopSubscription?.()

@@ -88,17 +88,17 @@ export type IPersistHandle = {
   readonly disposed: boolean
   /**
    * Idempotently stops scheduling and aborts active operations without awaiting them. A pending
-   * debounce snapshots one final unawaited write; inspect writeError for failure. Unsubscribe
-   * failures can throw after the handle is already terminal; borrowed resources remain owned by
-   * their caller.
+   * debounce or an admitted, unfinished write snapshots one final unawaited write; inspect
+   * writeError for failure. Unsubscribe failures can throw after the handle is already terminal;
+   * borrowed resources remain owned by their caller.
    */
   dispose(): void
   /**
    * Stops synchronously like dispose, then waits for admitted writes/removals and any final
-   * debounce snapshot to settle, including adapters that ignore abort. Final-write failures remain
-   * on writeError; existing flush/clear promises retain their original outcomes. A synchronous
-   * cleanup failure rejects after the write chain settles. Does not wait for borrowed adapter reads
-   * or dispose the borrowed store/runtime.
+   * snapshot write to settle, including adapters that ignore abort. Final-write failures remain on
+   * writeError; existing flush/clear promises retain their original outcomes. A synchronous cleanup
+   * failure rejects after the write chain settles. Does not wait for borrowed adapter reads or
+   * dispose the borrowed store/runtime.
    */
   disposeAsync(): Promise<void>
 }

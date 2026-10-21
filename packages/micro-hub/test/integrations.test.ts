@@ -150,6 +150,35 @@ describe('persistence integration', () => {
     expect(backend.sync.get('micro-hub:debounced')).toContain('5')
   })
 
+  it.each([{ ending: 'hub.dispose()' }, { ending: 'owned.release()' }])(
+    'keeps a commit made right before $ending without debounce',
+    async ({ ending }) => {
+      /** Backend is borrowed by the ending hub and by the hub that restores from it. */
+      const backend = memoryStorageHost()
+      /** Count updates are written without a debounce window. */
+      const contract = defineContract('immediate', {
+        version: 1,
+        state: { count: 0 },
+        commands: { set: (_current, count: number) => ({ count }) }
+      })
+      /** First hub ends in the same task as the commit. */
+      const hub = createMicroHub({ plugins: [state(), persist({ store: backend })] })
+      /** Owner whose only write is still queued when ownership ends. */
+      const owned = hub.connect('owner').own(contract, { persist: ['count'] })
+      await owned.persistence!.ready
+      owned.commands.set(7)
+      if (ending === 'owned.release()') owned.release()
+      await hub.dispose()
+      expect(backend.sync.get('micro-hub:immediate')).toContain('7')
+      /** A new hub restores the value committed before the first one ended. */
+      const restored = createMicroHub({ plugins: [state(), persist({ store: backend })] })
+        .connect('owner')
+        .own(contract, { persist: ['count'] })
+      await restored.persistence!.ready
+      expect(restored.state.count.get()).toBe(7)
+    }
+  )
+
   it.each([
     {
       sequence: 'pending final write',
