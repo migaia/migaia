@@ -73,100 +73,104 @@ values.clear()
 totals.clear()
 store.dispose()`
 
-/** Family options control definition retention and labels, independently of store values. */
+/** Family options bound definition retention and label room state for diagnostics. */
 const familyOptionCases: readonly IOptionCaseDoc[] = [
   {
-    title: t(
-      'Keep only a small set of recent drafts strongly cached',
-      '只强保留少量最近访问的草稿定义'
-    ),
+    title: t('Bound definition retention in a room editor', '限制房间编辑器保留的定义数量'),
     problem: t(
-      'An embedded editor visits many rooms but needs only two recent definitions kept strongly in its family cache. The default keeps up to 4096. Set `maxSize: 2`; older live definitions remain reusable through weak references, so retaining a token still preserves its identity.',
-      '嵌入式编辑器会访问许多房间，但定义族只需强保留最近两个定义。默认上限为 4096。设置 `maxSize: 2` 后，更早的存活定义仍可通过弱引用复用，持有令牌的代码不会失去原来的身份。'
+      'A support agent may visit thousands of rooms in one shift. The family normally keeps up to 4096 definitions strongly reachable. Set `maxSize` to 100 when the editor needs a smaller cache; definitions still held by the store remain reusable for their rooms.',
+      '客服一班可能访问上千个房间。定义族默认强保留最多 4096 个定义。编辑器只需要较小缓存时，把 `maxSize` 设为 100；存储仍持有的定义可以继续按房间复用。'
     ),
-    example: `import { familyDef } from '@migaia/store-keyed'
+    example: `import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, familyDef } from '@migaia/store-keyed'
 
-const drafts = familyDef((room: string) => ({ room, text: '' }), { maxSize: 2 })
-const first = drafts('room-a')
-drafts('room-b')
-drafts('room-c')
-console.log(drafts.size, drafts('room-a') === first)
-drafts.clear()`,
+const drafts = familyDef((room: string) => ({ room, text: '' }), {
+  maxSize: 100
+})
+const store = createAtomStore(createRuntime())
+onRoomSelected((room) => {
+  renderDraftEditor(store, drafts(room))
+})
+onEditorClosed(() => {
+  store.dispose()
+  drafts.clear()
+})`,
     result: t(
-      'The output is `2 true`: the strong cache stays bounded, and the retained first token is reused.',
-      '输出 `2 true`：强缓存保持在上限以内，先前持有的令牌仍被复用。'
+      'Room drafts keep their store state while the family strongly retains at most 100 recent definitions.',
+      '房间草稿保留各自在存储中的状态，定义族的强缓存最多保留最近 100 个定义。'
     ),
     covers: ['maxSize']
   },
   {
-    title: t(
-      'Distinguish source and derived room values in diagnostics',
-      '在诊断信息里区分房间源值与派生值'
-    ),
+    title: t('Find unread-count state in a diagnostic panel', '在诊断面板找到未读数状态'),
     problem: t(
-      'Several room families appear in the same diagnostics. Without custom labels, source tokens all use `family` and derived tokens use `derived-family`. Give each family a clear `debugLabel`; the key is appended in brackets, while values and dependencies keep their normal behavior.',
-      '同一份诊断信息里出现多个房间定义族。不设置标签时，所有源令牌都用 `family` 前缀，派生令牌都用 `derived-family`。为每个族设置清楚的 `debugLabel`，键会追加在方括号里；值和依赖关系仍按原有方式运行。'
+      'A chat application has many definition families, so the default `family` and `derived-family` labels are hard to distinguish. Give unread counts and their badge text separate `debugLabel` values; each generated label also includes the room key.',
+      '聊天应用中有多个定义族，默认的 `family` 和 `derived-family` 标签难以区分。用不同的 `debugLabel` 标识未读数和徽标文字，生成的标签还会附上房间键。'
     ),
-    example: `import { createRuntime } from '@migaia/reactive'
-import { createAtomStore, familyDef, derivedFamilyDef } from '@migaia/store-keyed'
+    example: `import { familyDef, derivedFamilyDef } from '@migaia/store-keyed'
 
-const unread = familyDef((room: string) => room.length, { debugLabel: 'unread-source' })
-const labels = derivedFamilyDef((room: string) => (get) => get(unread(room)), {
-  debugLabel: 'unread-label'
+const unread = familyDef(() => 0, { debugLabel: 'chat-unread' })
+const badges = derivedFamilyDef((room: string) => (get) => get(unread(room)), {
+  debugLabel: 'chat-badge'
 })
-const store = createAtomStore(createRuntime())
-console.log(unread('ab').debugLabel, labels('ab').debugLabel)
-console.log(store.get(labels('ab')))
-store.set(unread('ab'), 5)
-console.log(store.get(labels('ab')))
-store.dispose()
-unread.clear()
-labels.clear()`,
+showDefinitionInPanel(unread('support'))
+showDefinitionInPanel(badges('support'))`,
     result: t(
-      'The labels print `unread-source[ab] unread-label[ab]`. The derived value prints `2`, then `5` after the source changes.',
-      '标签输出 `unread-source[ab] unread-label[ab]`。派生值先输出 `2`，源值变化后输出 `5`。'
+      'The panel identifies the tokens as `chat-unread[support]` and `chat-badge[support]` instead of generic family labels.',
+      '面板用 `chat-unread[support]` 和 `chat-badge[support]` 标识定义，不再只显示通用族标签。'
     ),
     covers: ['debugLabel']
   }
 ]
 
-/** Native error helpers retain both Error objects and structured application reasons. */
-const errorOptionCases = (name: string, native: string): readonly IOptionCaseDoc[] => [
+/** Error helpers retain the original failure behind application-specific context. */
+const errorOptionCases = (name: string): readonly IOptionCaseDoc[] => [
   {
-    title: t('Keep a failed definition initializer', '保留定义初始化器的原始失败'),
+    title: t('Explain a draft restoration failure', '说明草稿恢复失败'),
     problem: t(
-      'An adapter adds context to a failed initializer. A new error message alone loses the failure and its original stack. Set `cause` to keep that error available without changing its identity.',
-      '适配器需要为初始化器失败补充上下文。只创建新错误消息会丢失原始失败及其堆栈。把原始错误传给 `cause`，便能按原身份保留它。'
+      'The room editor restores saved draft data before showing a form. If restoration fails, a short user message should not replace the storage failure. Preserve it with `cause` so monitoring can find the original stack.',
+      '房间编辑器显示表单前要恢复已保存的草稿。恢复失败时，简短的用户提示不应取代底层读取失败。用 `cause` 保留它，监控就能找到原始堆栈。'
     ),
     example: `import { ${name}, StoreKeyedErrorCode } from '@migaia/store-keyed'
 
-const original = new Error('draft data could not be read')
-const error = ${name}(StoreKeyedErrorCode.invalidOption, 'draft initialization failed', {
-  cause: original
-})
-console.log(error instanceof ${native}, error.cause === original)`,
+try {
+  await restoreRoomDraft(roomId)
+} catch (cause) {
+  const error = ${name}(
+    StoreKeyedErrorCode.invalidOption,
+    'Room draft could not be restored',
+    { cause }
+  )
+  showDraftError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'Both comparisons print `true`: the helper keeps its native error class and the exact original cause.',
-      '两个比较都输出 `true`：辅助函数保留原生错误类型，以及同一个原始原因。'
+      'The editor explains that the draft is unavailable, while monitoring retains the underlying storage failure.',
+      '编辑器提示草稿暂不可用，监控记录仍保留底层读取失败。'
     ),
     covers: ['cause']
   },
   {
-    title: t('Keep the rejected input record', '保留被拒绝的输入记录'),
+    title: t('Keep the rejected editor setting', '保留被拒绝的编辑器设置'),
     problem: t(
-      'A settings loader describes invalid family capacity with a record rather than an Error. Without `cause`, turning it into a message loses its fields. Pass the record directly so the caller can inspect it later.',
-      '设置加载器用记录对象说明族容量无效，而不是提供 Error。只把记录转成消息会丢失其中的字段。直接把记录传给 `cause`，调用方之后仍能检查它。'
+      'The editor settings form validates its family cache limit and returns a record naming an invalid field. Flattening it into a message loses the submitted value. Store the record in `cause` so support can inspect the rejected setting.',
+      '编辑器设置表单校验定义族缓存上限，并用记录指出无效字段。只转成文字会丢失提交值。用 `cause` 保留记录，支持人员就能查看被拒绝的设置。'
     ),
     example: `import { ${name}, StoreKeyedErrorCode } from '@migaia/store-keyed'
 
-const reason = { field: 'maxSize', value: 0 }
-const error = ${name}(StoreKeyedErrorCode.invalidOption, 'family settings rejected', {
-  cause: reason
-})
-console.log(error.cause === reason)`,
+const rejection = validateEditorSettings(formData)
+if (rejection) {
+  const error = ${name}(
+    StoreKeyedErrorCode.invalidOption,
+    'Editor settings rejected',
+    { cause: rejection }
+  )
+  showSettingsError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'The comparison prints `true`; the original input record remains on `error.cause`.',
-      '比较输出 `true`；原始输入记录保留在 `error.cause` 上。'
+      'The settings form stays open with an error, and monitoring keeps the rejected field and submitted value.',
+      '设置表单保留并显示错误，监控中仍能看到被拒绝的字段和提交值。'
     ),
     covers: ['cause']
   }
@@ -1334,7 +1338,7 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
             )
           },
           optionDocs: causeOptions,
-          optionCases: errorOptionCases(name!, native!),
+          optionCases: errorOptionCases(name!),
           returns: t(
             `A tagged native ${native}; the caller chooses whether to throw it.`,
             `返回已标记原生 \`${native}\`，由调用者决定是否抛出。`
