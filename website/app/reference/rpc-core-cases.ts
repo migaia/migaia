@@ -121,76 +121,40 @@ export const rpcCoreCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   ]
 }
 
-/** Configuration scenarios exercise public constructors with the original carrier owners. */
+/** Reader-facing option stories; application functions remain with their application owners. */
 export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   createEndpoint: [
     {
       title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
       },
       problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst server = await createEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n})\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createEndpoint, connect } from '@migaia/rpc-core'\n\nconst checkout = await createEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())",
       result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
       },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst server = await createEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n})\nconst client = await createEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createEndpoint, connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = await createEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n})",
       result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
-      },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
-    },
-    {
-      title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
-      },
-      problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
-      },
-      example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } })\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
-      result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
       covers: ['construction', 'construction.signal', 'construction.timeoutMs']
     }
@@ -198,71 +162,35 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createClientEndpoint: [
     {
       title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
       },
       problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
       },
       example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst server = await createEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n})\nconst client = await createClientEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createClientEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())",
       result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
       },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst server = await createEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n})\nconst client = await createClientEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = await createClientEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n})",
       result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
-      },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
-    },
-    {
-      title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
-      },
-      problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
-      },
-      example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createClientEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } })\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
-      result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
       covers: ['construction', 'construction.signal', 'construction.timeoutMs']
     }
@@ -270,71 +198,35 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createProviderEndpoint: [
     {
       title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
       },
       problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
       },
       example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst server = await createProviderEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n})\nconst client = await createClientEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createProviderEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())",
       result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
       },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst server = await createProviderEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n})\nconst client = await createClientEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = await createProviderEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n})",
       result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
-      },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
-    },
-    {
-      title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
-      },
-      problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
-      },
-      example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createProviderEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } })\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
-      result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
       covers: ['construction', 'construction.signal', 'construction.timeoutMs']
     }
@@ -342,71 +234,35 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createFullEndpoint: [
     {
       title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
       },
       problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
       },
       example:
-        "import { createFullEndpoint } from '@migaia/rpc-core/full'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst server = await createFullEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n})\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createFullEndpoint } from '@migaia/rpc-core/full'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createFullEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())",
       result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
       },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createFullEndpoint } from '@migaia/rpc-core/full'\nimport { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst server = await createFullEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n})\nconst client = await createEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createFullEndpoint } from '@migaia/rpc-core/full'\nimport { connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = await createFullEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n})",
       result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
-      },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
-    },
-    {
-      title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
-      },
-      problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
-      },
-      example:
-        "import { createFullEndpoint } from '@migaia/rpc-core/full'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createFullEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } })\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
-      result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
       covers: ['construction', 'construction.signal', 'construction.timeoutMs']
     }
@@ -414,71 +270,35 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createFullOneWayEndpoint: [
     {
       title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
       },
       problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
       },
       example:
-        "import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst server = await createFullOneWayEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n})\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createFullOneWayEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())",
       result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
       },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'\nimport { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst server = await createFullOneWayEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n})\nconst client = await createEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'\nimport { connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = await createFullOneWayEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n})",
       result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
-      },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
-    },
-    {
-      title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
-      },
-      problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
-      },
-      example:
-        "import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createFullOneWayEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } })\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
-      result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
       covers: ['construction', 'construction.signal', 'construction.timeoutMs']
     }
@@ -486,71 +306,71 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createComposedEndpoint: [
     {
       title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
       },
       problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
       },
       example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst chunk = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunk)\nconst selected = { 'first-party-chunk': chunk, 'first-party-outbound': outbound, 'first-party-provider': createProviderFeature(outbound) }\nconst server = await createComposedEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n}, selected)\nconst client = await createClientEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createComposedEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n}, endpointFeatures)\nonCheckoutClosed(() => checkout.dispose())",
       result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
       },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst chunk = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunk)\nconst selected = { 'first-party-chunk': chunk, 'first-party-outbound': outbound, 'first-party-provider': createProviderFeature(outbound) }\nconst server = await createComposedEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n}, selected)\nconst client = await createClientEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = await createComposedEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n}, endpointFeatures)",
       result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
+      covers: ['construction', 'construction.signal', 'construction.timeoutMs']
+    }
+  ],
+  createRuntimeApiEndpoint: [
+    {
+      title: {
+        en: 'Connect the checkout to its catalog',
+        zh: '把结算页连接到商品服务'
+      },
+      problem: {
+        en: 'The checkout already owns catalogTransport, opened by its platform adapter. Give the endpoint the same transport as connect so requests use that channel. targetIds records the known catalog service. Dispose the endpoint when checkout closes; the transport owner handles its physical lifetime.',
+        zh: '结算页已持有平台适配器打开的 catalogTransport。端点与 connect 使用同一传输对象，请求才能走这条通道；targetIds 记录已知的商品服务。离开结算页时释放端点，物理通道的生命周期由创建它的组件管理。'
+      },
+      example:
+        "import { createRuntimeApiEndpoint, connect } from '@migaia/rpc-core'\n\nconst checkout = createRuntimeApiEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n}, catalogChannel)\nonCheckoutClosed(() => checkout.dispose())",
+      result: {
+        en: 'The checkout endpoint addresses catalog on the application’s existing channel.',
+        zh: '结算页端点通过应用已有通道寻址商品服务。'
+      },
+      covers: ['id', 'targetIds', 'transport', 'middlewares']
     },
     {
       title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
+        en: 'Stop setup when the page leaves',
+        zh: '离开页面时停止连接准备'
       },
       problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
+        en: 'A screen may close while middleware is still starting. Pass its AbortController signal to construction so leaving the screen cancels setup and rolls back installed middleware. A five-second budget also stops setup that never becomes ready.',
+        zh: '界面可能在中间件尚未启动完成时关闭。将界面的 AbortController 信号交给 construction，离开时即可取消准备并回滚已安装的中间件；五秒预算还可结束始终无法就绪的准备。'
       },
       example:
-        "import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createComposedEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } }, {})\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
+        "import { createRuntimeApiEndpoint, connect } from '@migaia/rpc-core'\n\nconst opening = new AbortController()\nonCheckoutClosed(() => opening.abort())\nconst checkout = createRuntimeApiEndpoint({\n  id: 'checkout',\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })],\n  construction: { signal: opening.signal, timeoutMs: 5000 }\n}, catalogChannel)",
       result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
+        en: 'Leaving the screen ends unfinished setup instead of leaving a partially installed endpoint.',
+        zh: '离开界面会终止未完成的准备，不会留下安装到一半的端点。'
       },
       covers: ['construction', 'construction.signal', 'construction.timeoutMs']
     }
@@ -558,71 +378,71 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createRpcIdempotencyStore: [
     {
       title: {
-        en: 'Bound local outcome retention',
-        zh: '限制本地结果保留'
+        en: 'Keep retry results for one checkout session',
+        zh: '为一次结算保留重试结果'
       },
       problem: {
-        en: 'A local task dispatcher owns its own scope and needs bounded retained outcomes. Set entry and byte limits together.',
-        zh: '本地任务派发者自己拥有作用域，需要有界保留结果；同时设置条目和字节限制。'
+        en: 'An order submission can be retried after its reply is lost. Keep completed outcomes for five minutes so a retry with the same key can reuse its result. Bound entries per session so one checkout cannot consume the whole store.',
+        zh: '订单提交后，答复丢失可能触发重试。保留五分钟结果，相同键的重试即可复用先前结果；限制每个会话的条目数，避免某次结算占满存储。'
       },
       example:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-core'\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst first = store.claim('local-save', 'save-1', 0)\nif (first.status === 'claimed') first.settle({ ok: true, data: 42 }, 1)\nconsole.log(store.lookup?.('local-save', 'save-1', 2)?.state)\nconsole.log(store.lookup?.('local-save', 'save-1', 30002)?.state)",
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-core'\n\nconst orderOutcomes = createRpcIdempotencyStore({\n  retentionMs: 300000,\n  maxEntries: 1000,\n  maxEntriesPerScope: 20\n})",
       result: {
-        en: 'Prints done then unknown after retention expires. Pending work is not expired by retentionMs.',
-        zh: '先输出 done；保留期到后输出 unknown。retentionMs 不使在途工作过期。'
+        en: 'Recent order results remain available to keyed retries within the configured capacity.',
+        zh: '在设置的容量内，近期订单结果可供携带相同键的重试复用。'
       },
-      covers: ['retentionMs', 'maxEntries', 'maxEntriesPerScope', 'maxBytes', 'maxOutcomeBytes']
+      covers: ['retentionMs', 'maxEntries', 'maxEntriesPerScope']
     },
     {
       title: {
-        en: 'Share provider results across retried calls',
-        zh: '重试调用共用处理结果'
+        en: 'Keep large exports out of the outcome cache',
+        zh: '避免导出文件占满结果缓存'
       },
       problem: {
-        en: 'A provider needs the same retained outcome for a repeated application key. Inject the bounded store into the endpoint.',
-        zh: '处理方要为重复应用键返回同一结果，把容量受限的存储交给端点。'
+        en: 'An export service returns much larger results than ordinary order calls. Bound total bytes and each outcome so caching exports cannot consume unbounded memory.',
+        zh: '导出服务的结果远大于普通订单调用。限制总字节数与单个结果大小，避免缓存导出内容时无限占用内存。'
       },
       example:
-        "import { createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst server = await createEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n})\nconst client = await createEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-core'\n\nconst exportOutcomes = createRpcIdempotencyStore({\n  maxBytes: 8 * 1024 * 1024,\n  maxOutcomeBytes: 256 * 1024\n})",
       result: {
-        en: 'Prints 1 and 1 1. Only one provider invocation occurs.',
-        zh: '输出 1 和 1 1，处理函数只调用一次。'
+        en: 'The outcome store has an explicit memory budget for retained results.',
+        zh: '保留结果的存储有明确内存预算。'
       },
-      covers: ['retentionMs', 'maxEntries', 'maxEntriesPerScope', 'maxBytes', 'maxOutcomeBytes']
+      covers: ['maxBytes', 'maxOutcomeBytes']
     }
   ],
   contract: [
     {
       title: {
-        en: 'Validate a versioned method at both ends',
-        zh: '双端校验带版本的方法'
+        en: 'Roll out a new catalog version gradually',
+        zh: '逐步发布新版商品服务'
       },
       problem: {
-        en: 'A numeric method should reject malformed data at the RPC boundary. Install matching version and synchronous schemas on each endpoint.',
-        zh: '数字方法应在 RPC 边界拒绝错误数据；双端安装匹配版本与同步结构校验。'
+        en: 'A catalog deployment must accept calls from the previous client while new clients move to version 2. Advertise version 2 but accept both named versions during the rollout.',
+        zh: '商品服务发布新版时，旧客户端仍需继续调用。对外声明版本 2，同时在迁移期间接受两个明确版本。'
       },
       example:
-        "import { createEndpoint, connect, contract } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nconst number = { parse(value: unknown) { if (typeof value !== 'number') throw new TypeError('number required'); return value } }\nconst policy = contract({ version: '1.0.0', acceptVersions: ['1.0.0'], maxIdentifierLength: 128, schemas: { double: { params: number, result: number } } })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right }), policy] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), policy] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { contract } from '@migaia/rpc-core'\n\nconst catalogContract = contract({\n  version: '2.0.0',\n  acceptVersions: ['1.0.0', '2.0.0'],\n  maxIdentifierLength: 128\n})",
       result: {
-        en: 'Prints 42. Both the argument and the result pass the application number parser.',
-        zh: '输出 42；入参和结果都通过应用提供的数字解析函数。'
+        en: 'Old and new clients can negotiate the declared versions during deployment.',
+        zh: '部署期间，新旧客户端都可使用声明的兼容版本。'
       },
-      covers: ['version', 'acceptVersions', 'maxIdentifierLength', 'schemas']
+      covers: ['version', 'acceptVersions', 'maxIdentifierLength']
     },
     {
       title: {
-        en: 'Reject an invalid argument before business work',
-        zh: '业务执行前拒绝非法入参'
+        en: 'Reject invalid order input before saving',
+        zh: '保存订单前拒绝非法输入'
       },
       problem: {
-        en: 'The caller passes text to a numeric method. Keep the same method schema and observe the rejected call.',
-        zh: '调用者给数字方法传入文本；复用相同结构约束并观察拒绝。'
+        en: 'The order handler must receive a valid order shape. Give contract the application’s order schema so malformed requests are rejected before the handler mutates data.',
+        zh: '订单处理函数只应收到合法订单。将应用的订单校验规则交给 contract，让非法请求在处理函数修改数据前被拒绝。'
       },
       example:
-        "import { createEndpoint, connect, contract } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nconst number = { parse(value: unknown) { if (typeof value !== 'number') throw new TypeError('number required'); return value } }\nconst policy = contract({ version: '1.0.0', acceptVersions: ['1.0.0'], maxIdentifierLength: 128, schemas: { double: { params: number, result: number } } })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right }), policy] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), policy] })\ntry { try { await client.send('server', 'double', 'bad') } catch (error) { console.log((error as { code: string }).code) } }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { contract } from '@migaia/rpc-core'\n\nconst orderContract = contract({\n  schemas: { saveOrder: { params: orderSchema, result: savedOrderSchema } }\n})",
       result: {
-        en: 'Prints SCHEMA_INVALID. A schema failure rejects the request.',
-        zh: '输出 SCHEMA_INVALID，结构校验失败使请求拒绝。'
+        en: 'The order provider runs only after its request passes the configured schema.',
+        zh: '请求通过所设校验规则后，订单处理函数才会运行。'
       },
       covers: ['schemas']
     }
@@ -630,71 +450,71 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   hooks: [
     {
       title: {
-        en: 'Observe requests without changing results',
-        zh: '观察请求且不改变结果'
+        en: 'Send request diagnostics to monitoring',
+        zh: '把请求诊断发给监控'
       },
       problem: {
-        en: 'A diagnostics view records actual local event names while requests retain their ordinary result.',
-        zh: '诊断视图记录真实本地事件名，请求仍返回正常结果。'
+        en: 'A checkout needs request diagnostics without adding logging to each provider. Install a listener that forwards hook events to monitoring; it observes endpoint activity without changing business results.',
+        zh: '结算流程需要请求诊断，又不想在每个处理函数里加日志。安装监听器将钩子事件交给监控，即可观察端点活动而不改变业务结果。'
       },
       example:
-        "import { createEndpoint, connect, hooks } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nconst names: string[] = []\nconst observe = hooks({ listeners: (event) => { names.push(event.name) }, onHookError: (error, event) => { console.error(event.name, error) } })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), observe] })\ntry { console.log(await client.send('server', 'double', 21)); console.log(names.length > 0) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { hooks } from '@migaia/rpc-core'\n\nconst requestLogging = hooks({\n  listeners: (event) => recordRpcEvent(event)\n})",
       result: {
-        en: 'Prints 42 and true. Local hooks saw events while the business result was unchanged.',
-        zh: '输出 42 和 true；本地钩子观察到事件，业务结果保持不变。'
+        en: 'Monitoring receives request events from endpoints that install this plugin.',
+        zh: '安装此插件的端点会把请求事件交给监控。'
       },
-      covers: ['listeners', 'onHookError']
+      covers: ['listeners']
     },
     {
       title: {
-        en: 'Retain an observer failure separately',
-        zh: '单独保留观察者失败'
+        en: 'Keep a broken log sink visible',
+        zh: '单独报告日志接收器故障'
       },
       problem: {
-        en: 'A diagnostic listener can fail. Give onHookError the original error while allowing the request to settle normally.',
-        zh: '诊断监听可能失败；通过 onHookError 接收原错误，同时让请求正常完成。'
+        en: 'A logging listener can fail when its sink is unavailable. Send that failure to a separate monitoring path so the observer failure remains visible without replacing the request result.',
+        zh: '日志接收器不可用时，监听器本身可能失败。把这类失败交给独立监控通道，既保留故障信息，也不替换请求的业务结果。'
       },
       example:
-        "import { createEndpoint, connect, hooks } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nconst failure = new Error('observer unavailable')\nconst reported: unknown[] = []\nconst observe = hooks({ listeners: () => { throw failure }, onHookError: (error) => { reported.push(error) } })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), observe] })\ntry { console.log(await client.send('server', 'double', 21)); console.log(reported.includes(failure)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { hooks } from '@migaia/rpc-core'\n\nconst requestLogging = hooks({\n  listeners: (event) => recordRpcEvent(event),\n  onHookError: (error, event) => reportLoggingFailure(error, event)\n})",
       result: {
-        en: 'Prints 42 and true. The original listener error reaches the error callback.',
-        zh: '输出 42 和 true；错误回调收到监听器的原始错误。'
+        en: 'The business call keeps its own result, while monitoring records the logging failure.',
+        zh: '业务调用保留自身结果，监控同时记录日志链路故障。'
       },
-      covers: ['listeners', 'onHookError']
+      covers: ['onHookError']
     }
   ],
   uuid: [
     {
       title: {
-        en: 'Issue traceable operation identifiers',
-        zh: '签发可追踪的操作标识'
+        en: 'Recognize checkout calls in logs',
+        zh: '在日志中识别结算调用'
       },
       problem: {
-        en: 'An application wants unique identifiers that include its endpoint and operation category. Keep a monotonic local sequence in the synchronous generator.',
-        zh: '应用希望唯一标识包含端点与操作类别，在同步生成器中保留本地递增序列。'
+        en: 'Several endpoints share one trace sink. Prefix unique operation identifiers with the checkout name so operators can identify which endpoint originated a call.',
+        zh: '多个端点共用追踪接收器。为唯一操作标识添加结算前缀，排查时就能识别调用来自哪个端点。'
       },
       example:
-        "import { createEndpoint, connect, uuid } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nlet sequence = 0\nconst identity = uuid({ generate: ({ senderId, variation }) => `${senderId}-${variation}-${++sequence}` })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), identity] })\ntry { console.log(await client.send('server', 'double', 21)); console.log(sequence > 0) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { uuid } from '@migaia/rpc-core'\n\nconst checkoutIds = uuid({\n  generate: () => `checkout-${crypto.randomUUID()}`\n})",
       result: {
-        en: 'Prints 42 and true. The installed generator is invoked by actual endpoint operations.',
-        zh: '输出 42 和 true；真实端点操作调用了已安装的生成器。'
+        en: 'Outgoing operations carry unique identifiers with a recognizable checkout prefix.',
+        zh: '出站操作带有唯一标识，并能从前缀识别结算端点。'
       },
       covers: ['generate']
     },
     {
       title: {
-        en: 'Reject an identifier factory failure at the caller',
-        zh: '向调用者保留标识工厂失败'
+        en: 'Use the application’s identifier service',
+        zh: '复用应用的标识生成服务'
       },
       problem: {
-        en: 'The identity source is unavailable. Throw from the synchronous factory and observe the failed operation.',
-        zh: '标识来源不可用时，同步工厂抛错，调用者观察操作失败。'
+        en: 'An application already supplies synchronous globally unique request identifiers. Reuse that generator instead of introducing a second identifier format inside RPC.',
+        zh: '应用已有同步生成全局唯一请求标识的服务。直接复用它，避免 RPC 再引入另一套标识格式。'
       },
       example:
-        "import { createEndpoint, connect, uuid } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nlet sequence = 0\nconst identity = uuid({ generate: ({ senderId, variation }) => (() => { throw new Error('identity offline') })() })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), identity] })\ntry { try { await client.send('server', 'double', 21) } catch (error) { console.log((error as { code: string }).code === 'INVALID_CONFIG') } }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { uuid } from '@migaia/rpc-core'\n\nconst requestIds = uuid({ generate: () => nextRequestId() })",
       result: {
-        en: 'Prints true; no application reply is produced from the failed send.',
-        zh: '输出 true；失败发送不会产生业务答复。'
+        en: 'RPC requests use the identifier format already understood by application tracing.',
+        zh: 'RPC 请求使用应用追踪系统已有的标识格式。'
       },
       covers: ['generate']
     }
@@ -702,35 +522,35 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   timeout: [
     {
       title: {
-        en: 'Override one call deadline',
-        zh: '覆盖单次调用期限'
+        en: 'Limit how long checkout waits for prices',
+        zh: '限制结算等待价格的时间'
       },
       problem: {
-        en: 'Use a shared default but allow an expired call to fail immediately and another call to opt out.',
-        zh: '保留共享默认值，同时让已过期调用立即拒绝，另一次调用明确不设期限。'
+        en: 'A checkout should show a recoverable error if pricing does not answer promptly. Install a two-second default so calls without an override have a bounded wait.',
+        zh: '价格服务迟迟不答复时，结算页应显示可重试的错误。安装两秒默认期限，让没有单次覆盖的调用都有等待上限。'
       },
       example:
-        "import { createEndpoint, connect, timeout } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), timeout({ timeoutMs: 5000 })] })\ntry { try { await client.send('server', 'double', 21, { timeoutMs: 0 }) } catch (error) { console.log((error as { code: string }).code) }; console.log(await client.send('server', 'double', 21, { timeoutMs: false })) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { timeout } from '@migaia/rpc-core'\n\nconst pricingDeadline = timeout({ timeoutMs: 2000 })",
       result: {
-        en: 'Prints DEADLINE_EXCEEDED and 42. false disables this call’s local deadline.',
-        zh: '输出 DEADLINE_EXCEEDED 和 42；false 关闭本次调用的本地期限。'
+        en: 'Calls that inherit this plugin’s policy stop waiting after their local two-second budget.',
+        zh: '继承该插件策略的调用会在本地两秒预算用尽后停止等待。'
       },
       covers: ['timeoutMs']
     },
     {
       title: {
-        en: 'Disable the installed default deadline',
-        zh: '关闭已安装的默认期限'
+        en: 'Let an export own its waiting lifetime',
+        zh: '由导出流程管理等待生命周期'
       },
       problem: {
-        en: 'A cooperative long-running operation should wait for its result rather than inherit the Core fallback.',
-        zh: '协作式长任务应等待实际结果，无需继承 Core 的后备期限。'
+        en: 'A deliberate long export should wait until completion or explicit cancellation. Use false when the application owns that lifetime and should not inherit a timer deadline.',
+        zh: '明确的长时间导出需要等到完成或用户主动取消。由应用管理这段生命周期时使用 false，避免继承计时期限。'
       },
       example:
-        "import { createEndpoint, connect, timeout } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), timeout({ timeoutMs: false })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { timeout } from '@migaia/rpc-core'\n\nconst exportDeadline = timeout({ timeoutMs: false })",
       result: {
-        en: 'Prints 42 with the explicitly disabled default deadline. Cancellation remains separately controlled by a signal.',
-        zh: '输出 42，安装的默认期限已明确关闭；取消仍由独立信号控制。'
+        en: 'The installed default does not end an export merely because a timer elapsed.',
+        zh: '安装后的默认策略不会仅因计时结束而终止导出等待。'
       },
       covers: ['timeoutMs']
     }
@@ -738,143 +558,143 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createPeerPair: [
     {
       title: {
-        en: 'Exercise a bounded in-process service',
-        zh: '在进程内调用有限额的服务'
+        en: 'Call a local pricing service',
+        zh: '调用进程内的价格服务'
       },
       problem: {
-        en: 'Two modules need genuine runtime method discovery and calls without native carrier setup. Provide the real methods on side b.',
-        zh: '两个模块需要真实运行时方法发现与调用，又无需建立原生载体；在 b 端提供实际方法。'
+        en: 'Two application modules need request semantics without a native worker. Register the pricing function on one peer and call it from the other; close both peers when their owner leaves.',
+        zh: '两个应用模块需要请求语义，却不需要原生线程。在一端登记价格函数，再从另一端调用；所有者退出时关闭两端。'
       },
       example:
-        "import { createPeerPair } from '@migaia/rpc-core/testing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst failures: unknown[] = []\nconst pair = await createPeerPair({\n a: { provide: {}, defaultTimeoutMs: 2000 },\n b: { provide: { math: { double: (value: number) => value * 2 } }, providerLimits: { maxGlobal: 8, maxPerPeer: 2 } },\n scheduler: systemScheduler,\n report: (error) => { failures.push(error) }\n})\ntry { console.log(await pair.a.request('math.double', 21), failures.length) }\nfinally { await pair.a.close(); await pair.b.close() }",
+        "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})\ntry {\n  renderPrices(await pair.a.request('prices'))\n} finally {\n  await pair.a.close()\n  await pair.b.close()\n}",
       result: {
-        en: 'Prints 42 0. The call succeeds with no reported background failures. Close both peers afterwards.',
-        zh: '输出 42 0；调用成功且没有报告后台失败，最后关闭两个对端。'
+        en: 'The caller receives the pricing function’s result through the local RPC pair.',
+        zh: '调用方通过进程内 RPC 通道取得价格函数的结果。'
       },
-      covers: ['a', 'b', 'scheduler', 'report']
+      covers: ['a', 'b']
     },
     {
       title: {
-        en: 'Allow both peers to call the other side',
-        zh: '让双方相互调用'
+        en: 'Share local diagnostics and timing',
+        zh: '共用本地诊断与时钟'
       },
       problem: {
-        en: 'A local integration needs callbacks in both directions. Each provide map becomes the other side’s accepted method directory.',
-        zh: '本地集成需要双向回调，每端的 provide 映射成为对方接受的方法目录。'
+        en: 'An application owns both peers and already has a monotonic scheduler and monitoring sink. Pass them to the pair so local RPC work follows the application’s timing and reporting policy.',
+        zh: '应用同时拥有两端，并已有单调调度器和监控接收器。将它们传给通道对，使本地 RPC 使用应用的计时与上报策略。'
       },
       example:
-        "import { createPeerPair } from '@migaia/rpc-core/testing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst failures: unknown[] = []\nconst pair = await createPeerPair({\n a: { provide: { label: (value: string) => `saved:${value}` }, defaultTimeoutMs: 2000 },\n b: { provide: { math: { double: (value: number) => value * 2 } }, providerLimits: { maxGlobal: 8, maxPerPeer: 2 } },\n scheduler: systemScheduler,\n report: (error) => { failures.push(error) }\n})\ntry { console.log(await pair.a.request('math.double', 21)); console.log(await pair.b.request('label', 'draft')) }\nfinally { await pair.a.close(); await pair.b.close() }",
+        "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})",
       result: {
-        en: 'Prints 42 then saved:draft. Both directions use real peers and their negotiated directories.',
-        zh: '先输出 42，再输出 saved:draft；两个方向都经过真实对端及已协商目录。'
+        en: 'Both peers use the selected scheduler and route background failures to monitoring.',
+        zh: '两端共用所选调度器，并把后台失败交给监控。'
       },
-      covers: ['a', 'b', 'scheduler', 'report']
+      covers: ['scheduler', 'report']
     }
   ],
   connect: [
     {
       title: {
-        en: 'Retain a selector configuration on the current routing path',
-        zh: '在当前路由路径保留选择器配置'
+        en: 'Wait for the user to choose a service instance',
+        zh: '等待用户选择服务实例'
       },
       problem: {
-        en: 'An application supplies a receiver selector for future routing policy. Current Core captures this callback, but the public send path does not call receiverForOperation; the example makes that limit visible.',
-        zh: '应用提供接收端选择器作为路由配置。当前 Core 捕获该回调，但公开 send 路径未调用 receiverForOperation，本例直接展示这一限制。'
+        en: 'An administration screen must show discovered instances before sending work. Use manual discovery so the application controls discovery and receiver selection instead of resolving a receiver automatically during send.',
+        zh: '管理界面需要先展示发现的实例，再发送任务。选择手动发现，让应用决定发现与选择时机，而非在发送时自动解析接收端。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nlet selections = 0\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left, discoveryMode: 'automatic', receiverSelector: (servers) => { selections++; return servers[0]?.receiverId } })] })\ntry { await client.send('server', 'double', 1); client.connect.unpinReceiver('server'); console.log(await client.send('server', 'double', 21)); console.log(selections > 0) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { connect } from '@migaia/rpc-core'\n\nconst discovery = connect({\n  transport: serviceTransport,\n  discoveryMode: 'manual'\n})",
       result: {
-        en: 'Prints 42 and false. The request succeeds through existing routing and the selector is not invoked, even after unpinning the initial receiver. Do not rely on this field to change current send routing.',
-        zh: '输出 42 和 false。请求通过现有路由完成，即使解除初始接收端固定，也没有调用选择器。当前不能依靠此字段改变 send 路由。'
+        en: 'The administration screen can use the endpoint’s manual discovery controls before sending.',
+        zh: '管理界面可以先使用端点的手动发现接口，再发送任务。'
       },
-      covers: ['transport', 'discoveryMode', 'receiverSelector']
+      covers: ['transport', 'discoveryMode']
     },
     {
       title: {
-        en: 'Add application instance discrimination on an exclusive pair',
-        zh: '为独占通道增加应用实例区分'
+        en: 'Distinguish application instances on one carrier',
+        zh: '在同一载体上区分应用实例'
       },
       problem: {
-        en: 'This application owns both memory endpoints and restricts accepted sender names. The callback supplements Core’s actual exclusive-channel verification.',
-        zh: '应用拥有两个内存端点并限制允许的发送者名称；回调补充 Core 的真实独占通道校验。'
+        en: 'A dedicated carrier needs an application instance identity in addition to its carrier checks. Add the application’s identifier verifier and generate a unique instance suffix; the verifier remains responsible for admission.',
+        zh: '专用载体除了自身检查，还需要区分应用实例。提供应用校验器并生成唯一实例后缀；是否准入仍由该校验器负责。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nlet verified = 0\nconst identity = { useBaseIdVerifyOnly: false, uniqueTargetId: ({ endpointId }: { endpointId: string }) => `${endpointId}-session`, identifier: (context: { senderId: string; targetId: string }) => { verified++; return ['server', 'client'].includes(context.senderId) } }\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right, ...identity })] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left, ...identity })] })\ntry { console.log(await client.send('server', 'double', 21)); console.log(verified > 0) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { connect } from '@migaia/rpc-core'\n\nconst identifiedConnection = connect({\n  transport: serviceTransport,\n  useBaseIdVerifyOnly: true,\n  uniqueTargetId: () => crypto.randomUUID(),\n  identifier: (context) => verifyApplicationInstance(context)\n})",
       result: {
-        en: 'Prints 42 and true. The custom verifier is invoked only because useBaseIdVerifyOnly is false. This name check is specific to the caller-owned exclusive pair.',
-        zh: '输出 42 和 true；关闭基础验证模式后才调用自定义校验器。该名称检查仅适用于调用者拥有的独占通道对。'
+        en: 'The connection uses the application’s instance identity and explicit admission decision.',
+        zh: '连接使用应用实例身份，并由明确的应用准入决定控制。'
       },
-      covers: ['transport', 'useBaseIdVerifyOnly', 'uniqueTargetId', 'identifier']
+      covers: ['useBaseIdVerifyOnly', 'uniqueTargetId', 'identifier']
     }
   ],
   authentication: [
     {
       title: {
-        en: 'Authenticate frames with an ephemeral shared HMAC key',
-        zh: '用临时共享 HMAC 密钥认证消息'
+        en: 'Verify signed checkout messages',
+        zh: '验证结算消息签名'
       },
       problem: {
-        en: 'Both endpoints in this example hold the same local key. Sign the complete replay envelope and verify before recovering its inner value.',
-        zh: '本例两端持有同一本地密钥，对完整重放封装签名，并在恢复内部值前验证。'
+        en: 'Checkout messages need integrity protection. Supply the application’s signing and verification functions on both ends. They must encode and recover the complete value supplied by Core; encodedType describes the protected representation.',
+        zh: '结算消息需要完整性保护。在两端配置应用的签名与验证函数；它们必须编码并恢复 Core 交给它们的完整值，encodedType 声明保护后的表示形式。'
       },
       example:
-        "import { createEndpoint, connect, authentication, type IRpcAuthenticationConfig } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nconst encoder = new TextEncoder()\nconst decoder = new TextDecoder()\nconst hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])\nconst protection: IRpcAuthenticationConfig = {\n  encodedType: 'string',\n  sign: async (value) => {\n    const text = JSON.stringify(value)\n    const mac = await crypto.subtle.sign('HMAC', hmac, encoder.encode(text))\n    return JSON.stringify({ text, mac: Array.from(new Uint8Array(mac)) })\n  },\n  verify: async (value) => {\n    const signed = JSON.parse(String(value)) as { text: string; mac: number[] }\n    if (!await crypto.subtle.verify('HMAC', hmac, new Uint8Array(signed.mac), encoder.encode(signed.text))) throw new Error('Invalid signature')\n    return JSON.parse(signed.text)\n  }\n}\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right }), authentication(protection)] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), authentication(protection)] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { authentication } from '@migaia/rpc-core'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})",
       result: {
-        en: 'Prints 42. The protected representation is text; HMAC checks the exact serialized inner value. A deployment must supply its own authenticated key distribution.',
-        zh: '输出 42；受保护表示为文本，HMAC 校验内部值的精确序列化文本。实际部署需自行提供可信密钥分发。'
+        en: 'Both endpoints authenticate signed messages before business handlers receive them.',
+        zh: '两端会先验证消息签名，再将消息交给业务处理函数。'
       },
       covers: ['sign', 'verify', 'encodedType']
     },
     {
       title: {
-        en: 'Encrypt before signing and recover after verification',
-        zh: '先加密后签名，验证后恢复'
+        en: 'Protect private order contents',
+        zh: '保护订单的私密内容'
       },
       problem: {
-        en: 'When the payload also needs confidentiality, configure a complete AES-GCM encrypt/decrypt pair alongside signing and verification.',
-        zh: '负载还需要保密时，在签名与验证之外配置完整 AES-GCM 加解密对。'
+        en: 'Order payloads also contain private details. Add the application’s encryption pair to the same signed pipeline: outbound values are encrypted then signed, and inbound values are verified then decrypted.',
+        zh: '订单载荷还包含私密信息。给同一签名管线加上应用的加解密函数；出站先加密再签名，入站先验证再解密。'
       },
       example:
-        "import { createEndpoint, connect, authentication, type IRpcAuthenticationConfig } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nconst encoder = new TextEncoder()\nconst decoder = new TextDecoder()\nconst hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])\nconst aes = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])\nconst protection: IRpcAuthenticationConfig = {\n  encrypt: async (value) => {\n    const iv = crypto.getRandomValues(new Uint8Array(12))\n    const body = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, encoder.encode(JSON.stringify(value)))\n    return { iv: Array.from(iv), body: Array.from(new Uint8Array(body)) }\n  },\n  decrypt: async (value) => {\n    const encrypted = value as { iv: number[]; body: number[] }\n    const body = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(encrypted.iv) }, aes, new Uint8Array(encrypted.body))\n    return JSON.parse(decoder.decode(body))\n  },\n  encodedType: 'string',\n  sign: async (value) => {\n    const text = JSON.stringify(value)\n    const mac = await crypto.subtle.sign('HMAC', hmac, encoder.encode(text))\n    return JSON.stringify({ text, mac: Array.from(new Uint8Array(mac)) })\n  },\n  verify: async (value) => {\n    const signed = JSON.parse(String(value)) as { text: string; mac: number[] }\n    if (!await crypto.subtle.verify('HMAC', hmac, new Uint8Array(signed.mac), encoder.encode(signed.text))) throw new Error('Invalid signature')\n    return JSON.parse(signed.text)\n  }\n}\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right }), authentication(protection)] })\nserver.provide('double', (context) => context.success((context.data as number) * 2))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left }), authentication(protection)] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { authentication } from '@migaia/rpc-core'\n\nconst privateOrders = authentication({\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n})",
       result: {
-        en: 'Prints 42. Each encrypted frame gets a new random IV, signing covers the encrypted representation, and decryption recovers the original replay envelope.',
-        zh: '输出 42；每个加密帧使用新的随机 IV，签名覆盖加密表示，解密恢复原重放封装。'
+        en: 'Order values cross the carrier in the application’s protected representation.',
+        zh: '订单值以应用约定的受保护表示经过载体。'
       },
-      covers: ['encrypt', 'decrypt', 'sign', 'verify', 'encodedType']
+      covers: ['encrypt', 'decrypt']
     }
   ],
   createMemoryTransportPair: [
     {
       title: {
-        en: 'Deliver through the application scheduler',
-        zh: '通过应用调度器交付'
+        en: 'Schedule local notifications with the application',
+        zh: '用应用调度器发送本地通知'
       },
       problem: {
-        en: 'A local integration shares its monotonic scheduler with deferred memory delivery. Wait for the actual subscription callback.',
-        zh: '本地集成把单调调度器用于延迟内存交付，并等待真实订阅回调。'
+        en: 'An editor routes local document notifications through the same scheduler as its other deferred work. Supply that scheduler when creating the memory pair and let the document owner close it.',
+        zh: '编辑器希望本地文档通知与其他延迟任务共用调度器。创建内存通道对时传入应用调度器，再由文档所有者负责关闭。'
       },
       example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nconst [left, right] = createMemoryTransportPair({ scheduler: systemScheduler })\nlet finish!: () => void\nconst delivered = new Promise<void>((resolve) => { finish = resolve })\nconst off = right.subscribe(({ data }) => { console.log(data); finish() })\nleft.send('saved')\nawait delivered\noff(); left.close()",
+        "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [sender, receiver] = createMemoryTransportPair({\n  scheduler: applicationScheduler\n})\nconst stop = receiver.subscribe(({ data }) => applyDocumentChange(data))\nsender.send({ documentId: 'draft-1', state: 'saved' })\nonDocumentClosed(() => {\n  stop()\n  sender.close()\n})",
       result: {
-        en: 'Prints saved after queued delivery. The pair creator closes both sides.',
-        zh: '排队交付后输出 saved，创建者关闭两端。'
+        en: 'Document changes arrive through the selected scheduler; closing the document releases the pair.',
+        zh: '文档变更由所选调度器交付；关闭文档时释放通道对。'
       },
       covers: ['scheduler']
     },
     {
       title: {
-        en: 'Retire queued delivery with its pair',
-        zh: '随通道对关闭未交付消息'
+        en: 'Retire pending local notifications on close',
+        zh: '关闭时结束待交付的本地通知'
       },
       problem: {
-        en: 'A local owner is leaving before the queued message is delivered. Close the pair before awaiting another turn.',
-        zh: '本地拥有者在排队消息交付前退出，于等待下一轮之前关闭通道对。'
+        en: 'A preview can close before its queued update arrives. Close its memory pair as part of preview cleanup so the abandoned preview does not receive later queued updates.',
+        zh: '预览可能在排队更新交付前关闭。清理预览时关闭内存通道对，已退出的预览便不会再收到这些待交付更新。'
       },
       example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nconst [left, right] = createMemoryTransportPair({ scheduler: systemScheduler })\nlet finish!: () => void\nconst delivered = new Promise<void>((resolve) => { finish = resolve })\nconst off = right.subscribe(({ data }) => { console.log(data); finish() })\nleft.send('saved')\nleft.close()\nawait new Promise<void>((resolve) => systemScheduler.schedule(resolve, 0))\nconsole.log(left.closed, right.closed)\noff(); left.close()",
+        "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [sender, receiver] = createMemoryTransportPair({\n  scheduler: applicationScheduler\n})\nreceiver.subscribe(({ data }) => renderPreview(data))\nsender.send(latestDocument)\nonPreviewClosed(() => sender.close())",
       result: {
-        en: 'Prints true true without saved: closing either end retires the pair and drops pending delivery.',
-        zh: '输出 true true，不输出 saved；关闭任一端会释放通道对并丢弃待交付消息。'
+        en: 'Closing the pair removes subscriptions and drops messages that have not been delivered.',
+        zh: '关闭通道对会移除订阅，并丢弃尚未交付的消息。'
       },
       covers: ['scheduler']
     }
@@ -882,35 +702,35 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createBrowserMessagePortTransport: [
     {
       title: {
-        en: 'Let transport cleanup close owned ports',
-        zh: '让传输清理关闭已接管端口'
+        en: 'Close a port with its RPC wrapper',
+        zh: '随 RPC 包装器关闭端口'
       },
       problem: {
-        en: 'The application transfers port lifetime to each wrapper, so final transport close also closes the native port.',
-        zh: '应用把端口生命周期交给包装器，因此最终关闭传输也关闭原生端口。'
+        en: 'A pane creates a MessageChannel solely for this RPC connection. Transfer closure responsibility to the wrapper so its cleanup also closes the original port.',
+        zh: '面板专门为此 RPC 连接创建 MessageChannel。把关闭责任交给包装器，清理时即可一并关闭原端口。'
       },
       example:
-        "import { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\nconst { port1, port2 } = new MessageChannel()\nconst left = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst right = createBrowserMessagePortTransport(port2, { ownership: 'owned' })\nlet finish!: () => void\nconst received = new Promise<void>((resolve) => { finish = resolve })\nconst off = right.subscribe(({ data }) => { console.log(data); finish() })\nleft.send('saved'); await received\noff(); await left.close?.(); await right.close?.()\nconsole.log(left.closed, right.closed)",
+        "import { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\nonViewClosed(() => transport.close?.())",
       result: {
-        en: 'Prints saved and true true after both owned wrappers are closed.',
-        zh: '输出 saved，关闭两个已接管包装器后输出 true true。'
+        en: 'Closing the transport also closes the port it owns.',
+        zh: '关闭传输对象时也会关闭它拥有的端口。'
       },
       covers: ['ownership']
     },
     {
       title: {
-        en: 'Borrow ports managed by a wider component',
-        zh: '借用由外层组件管理的端口'
+        en: 'Keep a shared port under its creator',
+        zh: '由创建者管理共享端口'
       },
       problem: {
-        en: 'A wider component owns the native ports. Choose borrowed and explicitly close the ports after retiring the wrappers.',
-        zh: '外层组件拥有原生端口；选 borrowed，先释放包装器，再自行关闭端口。'
+        en: 'A shell owns a port longer than one RPC view. Borrow the port so disposing this view’s transport does not close the shell’s resource.',
+        zh: '外壳持有端口的时间长于单个 RPC 视图。借用端口，使视图释放传输对象时不会关闭外壳的资源。'
       },
       example:
-        "import { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\nconst { port1, port2 } = new MessageChannel()\nconst left = createBrowserMessagePortTransport(port1, { ownership: 'borrowed' })\nconst right = createBrowserMessagePortTransport(port2, { ownership: 'borrowed' })\nlet finish!: () => void\nconst received = new Promise<void>((resolve) => { finish = resolve })\nconst off = right.subscribe(({ data }) => { console.log(data); finish() })\nleft.send('saved'); await received\noff(); await left.close?.(); await right.close?.()\nport1.close(); port2.close()",
+        "import { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst transport = createBrowserMessagePortTransport(port, { ownership: 'borrowed' })\nonViewClosed(() => transport.close?.())",
       result: {
-        en: 'Prints saved. Wrapper cleanup leaves native port lifetime with the application, which closes both ports here.',
-        zh: '输出 saved；包装器清理仍把原生端口生命周期留给应用，本例由应用关闭两端。'
+        en: 'The shell keeps control of the original port’s final close.',
+        zh: '原端口的最终关闭仍由外壳控制。'
       },
       covers: ['ownership']
     }
@@ -918,169 +738,165 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createWebWorkerTransport: [
     {
       title: {
-        en: 'Wrap real message ports with explicit static routing metadata',
-        zh: '用明确静态路由信息包装真实消息端口'
+        en: 'Identify a dedicated worker connection',
+        zh: '标记专用 Worker 连接'
       },
       problem: {
-        en: 'A dedicated pair has addresses known by construction. Supply the same static capability policy at both physical ends; origin is the expected native origin label, not an authentication proof.',
-        zh: '专用通道对的地址在创建时已确定。双端提供相同静态能力策略，origin 是预期原生来源标签，不是认证凭据。'
+        en: 'A page already has a worker and knows its remote identity. Attach the application’s peer and origin metadata to the transport so inbound diagnostics retain that carrier context.',
+        zh: '页面已持有 Worker，并知道远端身份。为传输对象设置应用的对端和来源元数据，让入站诊断保留这份载体上下文。'
       },
       example:
-        "import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\nconst { port1, port2 } = new MessageChannel()\nport1.start(); port2.start()\nconst left = createWebWorkerTransport(port1, { capabilities: [], peerId: 'right', origin: '' })\nconst right = createWebWorkerTransport(port2, { capabilities: [], peerId: 'left', origin: '' })\nlet finish!: () => void\nconst received = new Promise<void>((resolve) => { finish = resolve })\nconst off = right.subscribe(({ data }) => { console.log(data); finish() })\nleft.send('saved'); await received\noff(); await left.close?.(); await right.close?.()\nport1.close(); port2.close()",
+        "import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\n\nconst transport = createWebWorkerTransport(worker, {\n  peerId: 'price-worker-1',\n  origin: location.origin\n})",
       result: {
-        en: 'Prints saved. The wrappers borrow their native ports, and the application closes them explicitly. No RPC capability is inferred from the peer labels.',
-        zh: '输出 saved；包装器借用原生端口，应用明确关闭。对端标签不会推导出 RPC 能力。'
+        en: 'The worker transport exposes the supplied peer and origin metadata.',
+        zh: 'Worker 传输对象会提供所设对端与来源元数据。'
       },
-      covers: ['capabilities', 'peerId', 'origin']
+      covers: ['peerId', 'origin']
     },
     {
       title: {
-        en: 'Keep the static stream policy symmetric',
-        zh: '双端保持相同静态流策略'
+        en: 'Agree on stream support before calling',
+        zh: '调用前约定流支持'
       },
       problem: {
-        en: 'A deployment chooses the supported static stream profile on both original ports. This configures the carrier and does not replace a runtime handshake.',
-        zh: '部署在两个原始端口上选择受支持的静态流配置；它配置载体，不能替代运行时握手。'
+        en: 'A dedicated worker link uses a static capability agreement. Supply only the capabilities agreed by both ends; advertising a stream mode on one side alone cannot add support to the other.',
+        zh: '专用 Worker 链路采用静态能力约定。只声明双方已经约定的能力；单方面声明流模式无法为另一端增加支持。'
       },
       example:
-        "import { RpcCapability } from '@migaia/rpc-contract'\nimport { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\nconst { port1, port2 } = new MessageChannel()\nport1.start(); port2.start()\nconst left = createWebWorkerTransport(port1, { capabilities: [RpcCapability.stream], peerId: 'right', origin: '' })\nconst right = createWebWorkerTransport(port2, { capabilities: [RpcCapability.stream], peerId: 'left', origin: '' })\nlet finish!: () => void\nconst received = new Promise<void>((resolve) => { finish = resolve })\nconst off = right.subscribe(({ data }) => { console.log(data); finish() })\nleft.send('saved'); await received\noff(); await left.close?.(); await right.close?.()\nport1.close(); port2.close()",
+        "import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\n\nconst transport = createWebWorkerTransport(worker, {\n  capabilities: agreedCapabilities\n})",
       result: {
-        en: 'Prints saved over the same native pair. Static policy is configured equally at both ends.',
-        zh: '通过同一原生通道对输出 saved；两端静态策略一致。'
+        en: 'The transport presents the capability list selected by the application’s agreement.',
+        zh: '传输对象使用应用约定的能力列表。'
       },
-      covers: ['capabilities', 'peerId', 'origin']
+      covers: ['capabilities']
     }
   ],
   createIpcSendQueueFeature: [
     {
       title: {
-        en: 'Observe a small bounded send queue',
-        zh: '观察容量受限的发送队列'
+        en: 'Keep a busy import from filling the send queue',
+        zh: '避免繁忙导入占满发送队列'
       },
       problem: {
-        en: 'Use one original gate for its wrapper and installed feature. Record local watermarks independently from the reply.',
-        zh: '包装器与安装功能共用一个原始门，独立于答复记录本地水位事件。'
+        en: 'An import produces data faster than the carrier drains it. Bound pending data separately from control messages so data load has an explicit queue budget.',
+        zh: '导入产生数据的速度超过载体排空速度。分别限制待发数据和控制消息，为数据负载设置明确队列预算。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createIpcSendQueueFeature, createIpcSendQueueTransport } from '@migaia/rpc-core/plugins/send-queue'\nimport { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\nconst [left, right] = createMemoryTransportPair()\nconst records: string[] = []\nconst queue = createIpcSendQueueFeature({ connectionId: 'save-channel', sessionId: 'local-session', maxPendingData: 1, maxPendingControl: 2 })\nconst transport = createIpcSendQueueTransport(left, queue.gate)\nconst log = createIpcLogFeature({ gate: queue.gate, report: (record) => { records.push(record.name) }, onReportError: (error) => { console.error(error) } })\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({ id: 'client', transport, targetIds: ['server'], features: [queue.feature, log.feature], middlewares: [connect({ transport })] })\ntry { console.log(await client.send('server', 'echo', 'saved')); await queue.gate.whenIdle(); console.log(records.includes('ipc.backlog.high')) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createIpcSendQueueFeature } from '@migaia/rpc-core/plugins/send-queue'\n\nconst sendQueue = createIpcSendQueueFeature({\n  connectionId: 'checkout-pricing',\n  maxPendingData: 64,\n  maxPendingControl: 16\n})",
       result: {
-        en: 'Prints saved and true. The configured data capacity counts the active send, so one send crosses its high watermark.',
-        zh: '输出 saved 和 true；数据容量包含活动发送，一次发送已跨越该配置的高水位。'
+        en: 'The connection has separate bounded queues for data and control traffic.',
+        zh: '连接的数据与控制流量各有有界队列。'
       },
-      covers: ['connectionId', 'sessionId', 'maxPendingData', 'maxPendingControl']
+      covers: ['connectionId', 'maxPendingData', 'maxPendingControl']
     },
     {
       title: {
-        en: 'Keep a failed log sink out of request settlement',
-        zh: '日志接收失败不改变请求结果'
+        en: 'Associate queue activity with one session',
+        zh: '把队列活动归到对应会话'
       },
       problem: {
-        en: 'The diagnostic sink is unavailable. Its error callback observes the original error while the physical send and business reply remain successful.',
-        zh: '诊断接收器不可用时，错误回调观察原始错误，实际发送和业务答复仍成功。'
+        en: 'A desktop process serves several sessions. Give the queue the connection and session identifiers used by application diagnostics so operators can locate a busy link.',
+        zh: '桌面进程同时服务多个会话。为队列设置应用诊断使用的连接和会话标识，便于定位繁忙链路。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createIpcSendQueueFeature, createIpcSendQueueTransport } from '@migaia/rpc-core/plugins/send-queue'\nimport { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\nconst [left, right] = createMemoryTransportPair()\nconst records: string[] = []\nconst sinkFailure = new Error('log offline')\nlet reported = false\nconst queue = createIpcSendQueueFeature({ connectionId: 'save-channel', sessionId: 'local-session', maxPendingData: 1, maxPendingControl: 2 })\nconst transport = createIpcSendQueueTransport(left, queue.gate)\nconst log = createIpcLogFeature({ gate: queue.gate, report: () => { throw sinkFailure }, onReportError: (error) => { reported = error === sinkFailure } })\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({ id: 'client', transport, targetIds: ['server'], features: [queue.feature, log.feature], middlewares: [connect({ transport })] })\ntry { console.log(await client.send('server', 'echo', 'saved')); await queue.gate.whenIdle(); console.log(reported) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createIpcSendQueueFeature } from '@migaia/rpc-core/plugins/send-queue'\n\nconst sendQueue = createIpcSendQueueFeature({\n  connectionId: 'editor-worker',\n  sessionId: currentSessionId\n})",
       result: {
-        en: 'Prints saved and true. Reporter failure reaches onReportError without replacing the reply.',
-        zh: '输出 saved 和 true；报告失败到达 onReportError，不替换答复。'
+        en: 'Queue diagnostics can be associated with the selected connection and session.',
+        zh: '队列诊断可归到所选连接和会话。'
       },
-      covers: ['connectionId', 'sessionId', 'maxPendingData', 'maxPendingControl']
+      covers: ['connectionId', 'sessionId']
     }
   ],
   createIpcLogFeature: [
     {
       title: {
-        en: 'Observe a small bounded send queue',
-        zh: '观察容量受限的发送队列'
+        en: 'Report connection diagnostics to monitoring',
+        zh: '上报连接诊断'
       },
       problem: {
-        en: 'Use one original gate for its wrapper and installed feature. Record local watermarks independently from the reply.',
-        zh: '包装器与安装功能共用一个原始门，独立于答复记录本地水位事件。'
+        en: 'A desktop link needs diagnostics in the application monitor. Pass its existing gate and report callback to the log feature, rather than adding log calls to each RPC method.',
+        zh: '桌面链路需要向应用监控发送诊断。把已有 gate 和上报回调交给日志功能，避免逐个 RPC 方法添加日志。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createIpcSendQueueFeature, createIpcSendQueueTransport } from '@migaia/rpc-core/plugins/send-queue'\nimport { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\nconst [left, right] = createMemoryTransportPair()\nconst records: string[] = []\nconst queue = createIpcSendQueueFeature({ connectionId: 'save-channel', sessionId: 'local-session', maxPendingData: 1, maxPendingControl: 2 })\nconst transport = createIpcSendQueueTransport(left, queue.gate)\nconst log = createIpcLogFeature({ gate: queue.gate, report: (record) => { records.push(record.name) }, onReportError: (error) => { console.error(error) } })\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({ id: 'client', transport, targetIds: ['server'], features: [queue.feature, log.feature], middlewares: [connect({ transport })] })\ntry { console.log(await client.send('server', 'echo', 'saved')); await queue.gate.whenIdle(); console.log(records.includes('ipc.backlog.high')) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\n\nconst logging = createIpcLogFeature({\n  gate: connectionGate,\n  report: (event) => recordConnectionEvent(event),\n  onReportError: (error, event) => reportLoggingFailure(error, event)\n})",
       result: {
-        en: 'Prints saved and true. The configured data capacity counts the active send, so one send crosses its high watermark.',
-        zh: '输出 saved 和 true；数据容量包含活动发送，一次发送已跨越该配置的高水位。'
+        en: 'The application monitor receives diagnostics from the selected gate.',
+        zh: '应用监控收到所选 gate 的诊断。'
       },
       covers: ['gate', 'report', 'onReportError']
     },
     {
       title: {
-        en: 'Keep a failed log sink out of request settlement',
-        zh: '日志接收失败不改变请求结果'
+        en: 'Report failure of the diagnostic sink',
+        zh: '报告诊断接收器自身的故障'
       },
       problem: {
-        en: 'The diagnostic sink is unavailable. Its error callback observes the original error while the physical send and business reply remain successful.',
-        zh: '诊断接收器不可用时，错误回调观察原始错误，实际发送和业务答复仍成功。'
+        en: 'The primary diagnostic sink can fail. Use a separate callback for sink errors so an unavailable logging service does not silently hide its own failure.',
+        zh: '主要诊断接收器也可能失败。用独立回调处理接收器错误，避免日志服务不可用时连自身故障都被隐藏。'
       },
       example:
-        "import { createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createIpcSendQueueFeature, createIpcSendQueueTransport } from '@migaia/rpc-core/plugins/send-queue'\nimport { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\nconst [left, right] = createMemoryTransportPair()\nconst records: string[] = []\nconst sinkFailure = new Error('log offline')\nlet reported = false\nconst queue = createIpcSendQueueFeature({ connectionId: 'save-channel', sessionId: 'local-session', maxPendingData: 1, maxPendingControl: 2 })\nconst transport = createIpcSendQueueTransport(left, queue.gate)\nconst log = createIpcLogFeature({ gate: queue.gate, report: () => { throw sinkFailure }, onReportError: (error) => { reported = error === sinkFailure } })\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({ id: 'client', transport, targetIds: ['server'], features: [queue.feature, log.feature], middlewares: [connect({ transport })] })\ntry { console.log(await client.send('server', 'echo', 'saved')); await queue.gate.whenIdle(); console.log(reported) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
+        "import { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\n\nconst logging = createIpcLogFeature({\n  gate: connectionGate,\n  report: (event) => recordConnectionEvent(event),\n  onReportError: (error, event) => reportLoggingFailure(error, event)\n})",
       result: {
-        en: 'Prints saved and true. Reporter failure reaches onReportError without replacing the reply.',
-        zh: '输出 saved 和 true；报告失败到达 onReportError，不替换答复。'
+        en: 'The fallback monitor receives sink failures with the associated diagnostic event.',
+        zh: '备用监控收到接收器故障及对应诊断事件。'
       },
-      covers: ['gate', 'report', 'onReportError']
+      covers: ['onReportError']
     }
   ],
   defineMessageAdapter: [
     {
       title: {
-        en: 'Open a genuine pair of native ports',
-        zh: '打开一对真实原生端口'
+        en: 'Use an existing native message port',
+        zh: '使用已有原生消息端口'
       },
       problem: {
-        en: 'An application already owns two MessagePorts. Its adapter returns those raw operations and Core performs actual bilateral admission.',
-        zh: '应用已经拥有两个 MessagePort，适配器返回原始操作，由 Core 完成实际双端准入。'
+        en: 'An application already owns a MessagePort. The adapter’s open callback returns that original port; Core owns negotiation and request handling instead of requiring another messaging implementation.',
+        zh: '应用已经拥有 MessagePort。适配器的 open 回调返回原端口；协商和请求处理交给 Core，不再另写一套消息实现。'
       },
       example:
-        "import { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst { port1, port2 } = new MessageChannel()\nport1.start(); port2.start()\nconst [a, b] = await Promise.all([\n  adapter.peer({ self: { name: 'a', instanceId: 'a-1' }, connect: port1 }),\n  adapter.peer({ self: { name: 'b', instanceId: 'b-1' }, listen: port2, provide: { echo: (value: string) => value } })\n])\ntry { console.log(await a.request('echo', 'saved')) }\nfinally { await a.close(); await b.close(); port1.close(); port2.close() }",
+        "import { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst peer = await adapter.peer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  connect: catalogPort\n})\ntry {\n  renderPrices(await peer.request('prices'))\n} finally {\n  await peer.close()\n}",
       result: {
-        en: 'Prints saved after real Peer discovery and request handling. Both peers close before their borrowed ports.',
-        zh: '真实对端发现和请求处理后输出 saved；先关闭两个对端，再关闭借入端口。'
+        en: 'The checkout calls the remote pricing provider through its original native port.',
+        zh: '结算页通过原生端口调用远端价格处理函数。'
       },
       covers: ['open']
     },
     {
       title: {
-        en: 'Retain an owned worker launch and its actual exit',
-        zh: '持有工作线程启动及真实退出'
+        en: 'Launch a worker with its actual exit handle',
+        zh: '启动 Worker 并保留真实退出句柄'
       },
       problem: {
-        en: 'A launcher owns a real Node Worker. Return its original messaging object, native exit Promise and termination request rather than fabricating lifecycle completion.',
-        zh: '启动器拥有真实 Node Worker，返回原始消息对象、原生退出 Promise 和终止请求，不伪造生命周期完成。'
+        en: 'A platform adapter also owns worker startup. Supply launchWorker, which returns the native port, the real exit Promise and termination operation; openExistingWorkerPort handles already-running workers.',
+        zh: '平台适配器还负责启动 Worker。launchWorker 返回原生端口、真实退出 Promise 和终止操作；openExistingWorkerPort 处理已经运行的 Worker。'
       },
-      example: {
-        en: "// worker.ts\nimport { parentPort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nif (!parentPort) throw new Error('worker port required')\nconst adapter = defineMessageAdapter<typeof parentPort>({ open: (port) => port })\nawait adapter.peer({ self: { name: 'worker', instanceId: 'worker-1' }, listen: parentPort, provide: { double: (value: number) => value * 2 } })\n// main.ts\nimport { Worker } from 'node:worker_threads'\nimport { defineMessageAdapter, type IMessageAdapterPort } from '@migaia/rpc-core/adapter'\nconst adapter = defineMessageAdapter<URL>({\n  open: () => { throw new Error('spawn uses launch') },\n  launch: async (url) => {\n    const worker = new Worker(url)\n    const exited = new Promise<number>((resolve) => worker.once('exit', resolve))\n    return { port: worker as IMessageAdapterPort, exited, terminate: () => { void worker.terminate() } }\n  }\n})\nconst peer = await adapter.peer({ self: { name: 'parent', instanceId: 'parent-1' }, spawn: new URL('./worker.js', import.meta.url) })\ntry { console.log(await peer.request('double', 21)) }\nfinally { await peer.close() }",
-        zh: "// worker.ts\nimport { parentPort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nif (!parentPort) throw new Error('worker port required')\nconst adapter = defineMessageAdapter<typeof parentPort>({ open: (port) => port })\nawait adapter.peer({ self: { name: 'worker', instanceId: 'worker-1' }, listen: parentPort, provide: { double: (value: number) => value * 2 } })\n// main.ts\nimport { Worker } from 'node:worker_threads'\nimport { defineMessageAdapter, type IMessageAdapterPort } from '@migaia/rpc-core/adapter'\nconst adapter = defineMessageAdapter<URL>({\n  open: () => { throw new Error('spawn uses launch') },\n  launch: async (url) => {\n    const worker = new Worker(url)\n    const exited = new Promise<number>((resolve) => worker.once('exit', resolve))\n    return { port: worker as IMessageAdapterPort, exited, terminate: () => { void worker.terminate() } }\n  }\n})\nconst peer = await adapter.peer({ self: { name: 'parent', instanceId: 'parent-1' }, spawn: new URL('./worker.js', import.meta.url) })\ntry { console.log(await peer.request('double', 21)) }\nfinally { await peer.close() }"
-      },
+      example:
+        "import { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineMessageAdapter<URL>({\n  open: (url) => openExistingWorkerPort(url),\n  launch: (url) => launchWorker(url)\n})\nconst peer = await adapter.peer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  spawn: new URL('./price-worker.js', import.meta.url)\n})",
       result: {
-        en: 'Prints 42. Closing the peer requests worker termination and joins the original exit event. The worker JavaScript file must be emitted alongside main.',
-        zh: '输出 42；关闭对端时请求终止线程，并等待原始退出事件。须将工作者 JavaScript 文件与主文件一起生成。'
+        en: 'The adapter can stop the worker it launched and observe its actual exit.',
+        zh: '适配器能停止自己启动的 Worker，并观察其真实退出。'
       },
-      covers: ['open', 'launch']
+      covers: ['launch']
     }
   ],
   defineByteAdapter: [
     {
       title: {
-        en: 'Use actual TCP I/O with the canonical byte handshake',
-        zh: '用真实 TCP 读写进入规范字节握手'
+        en: 'Open an application-owned ordered byte stream',
+        zh: '打开应用持有的有序字节流'
       },
       problem: {
-        en: 'A custom TCP deployment owns ordered socket I/O. The adapter returns raw writes and listeners; Core retains framing, JSON negotiation and runtime methods.',
-        zh: '自定义 TCP 部署拥有有序套接字读写，适配器仅返回原始写入与监听；分帧、JSON 协商及运行时方法仍由 Core 处理。'
+        en: 'A platform already supplies ordered byte I/O with write, onData, onClose and close. Keep those carrier operations in openByteConnection and let Core provide negotiation and framing. Application diagnostics and presentation describe this carrier.',
+        zh: '平台已有带 write、onData、onClose 和 close 的有序字节读写。把载体操作留在 openByteConnection，协商和分帧交给 Core；应用诊断与展示配置描述这类载体。'
       },
       example:
-        "import { createServer, connect as connectSocket, type Socket } from 'node:net'\nimport { defineByteAdapter } from '@migaia/rpc-core/adapter'\nfunction raw(socket: Socket) {\n  return {\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => { socket.write(chunk, (error) => error ? reject(error) : resolve()) }),\n    onData: (listener: (chunk: Uint8Array) => void) => { socket.on('data', listener); return () => { socket.off('data', listener) } },\n    onClose: (listener: (reason?: unknown) => void) => { const closed = () => listener(); socket.on('close', closed); return () => { socket.off('close', closed) } },\n    close: () => { socket.destroy() }\n  }\n}\nlet accepted!: (socket: Socket) => void\nconst incoming = new Promise<Socket>((resolve) => { accepted = resolve })\nconst server = createServer(accepted)\nawait new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve) })\nconst address = server.address()\nif (!address || typeof address === 'string') throw new Error('TCP address required')\nconst client = connectSocket(address.port, '127.0.0.1')\nawait new Promise<void>((resolve) => client.once('connect', resolve))\nconst remote = await incoming\nconst adapter = defineByteAdapter<Socket>({\n  open: raw, listen: raw, dial: raw,\n  presentation: { platform: 'Process', expectedStringText: 'TCP frame must contain text' },\n  diagnostics: {\n    closed: { source: 'app/tcp', code: 'CLOSED', message: 'TCP closed' },\n    timeout: { source: 'app/tcp', code: 'TIMEOUT', message: 'TCP handshake expired' },\n    authenticationRejected: { source: 'app/tcp', code: 'AUTH', message: 'TCP authentication refused' },\n    duplicateBinding: 'TCP binding exists', optionsInvalid: 'Invalid TCP options', jsonCodecRequired: 'JSON required', negotiatedCodecUnsupported: 'Codec unsupported', handshakeTimeoutInvalid: 'Invalid handshake budget'\n  }\n})\nconst [a, b] = await Promise.all([\n  adapter.peer({ self: { name: 'a', instanceId: 'a-1' }, connect: client, peerId: 'b-1' }),\n  adapter.peer({ self: { name: 'b', instanceId: 'b-1' }, listen: remote, peerId: 'a-1', provide: { double: (value: number) => value * 2 } })\n])\ntry { console.log(await a.request('double', 21)) }\nfinally { await a.close(); await b.close(); await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())) }",
+        "import { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineByteAdapter<URL>({\n  open: (address) => openByteConnection(address),\n  diagnostics: connectionDiagnostics,\n  presentation: {\n    platform: 'Process',\n    expectedStringText: 'Price connection expects text frames'\n  }\n})\nconst peer = await adapter.peer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  connect: priceServiceAddress,\n  peerId: 'pricing-1'\n})",
       result: {
-        en: 'Prints 42 over the loopback TCP pair. Peer cleanup closes each socket before the local listener closes. Presentation and diagnostic labels grant no capabilities.',
-        zh: '通过回环 TCP 通道对输出 42；对端清理先关闭套接字，再关闭本地监听器。展示和诊断标签不授予能力。'
+        en: 'The pricing connection uses Core’s byte handshake and framing over the platform’s I/O.',
+        zh: '价格连接在平台字节读写上使用 Core 的字节握手与分帧。'
       },
       covers: [
         'open',
-        'listen',
-        'dial',
         'diagnostics',
         'presentation',
         'presentation.platform',
@@ -1089,252 +905,107 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
     },
     {
       title: {
-        en: 'Reuse raw opening for an initiating byte source',
-        zh: '主动字节来源复用原始打开操作'
+        en: 'Separate accepted connections from outgoing dials',
+        zh: '区分接入连接与主动拨号'
       },
       problem: {
-        en: 'When the application uses spawn as the source mode, byte opening uses open. The application has already established the concrete local socket pair.',
-        zh: '应用选择 spawn 来源模式时，字节打开使用 open；本例应用已建立具体本地套接字对。'
+        en: 'A byte adapter handles accepted server connections as well as outgoing clients. Supply the corresponding application open operations so each mode acquires the right native I/O.',
+        zh: '字节适配器既处理服务端接入，也处理客户端主动连接。分别提供应用的打开操作，让两种模式取得正确的原生读写对象。'
       },
       example:
-        "import { createServer, connect as connectSocket, type Socket } from 'node:net'\nimport { defineByteAdapter } from '@migaia/rpc-core/adapter'\nfunction raw(socket: Socket) {\n  return {\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => { socket.write(chunk, (error) => error ? reject(error) : resolve()) }),\n    onData: (listener: (chunk: Uint8Array) => void) => { socket.on('data', listener); return () => { socket.off('data', listener) } },\n    onClose: (listener: (reason?: unknown) => void) => { const closed = () => listener(); socket.on('close', closed); return () => { socket.off('close', closed) } },\n    close: () => { socket.destroy() }\n  }\n}\nlet accepted!: (socket: Socket) => void\nconst incoming = new Promise<Socket>((resolve) => { accepted = resolve })\nconst server = createServer(accepted)\nawait new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve) })\nconst address = server.address()\nif (!address || typeof address === 'string') throw new Error('TCP address required')\nconst client = connectSocket(address.port, '127.0.0.1')\nawait new Promise<void>((resolve) => client.once('connect', resolve))\nconst remote = await incoming\nconst adapter = defineByteAdapter<Socket>({\n  open: raw, listen: raw, dial: raw,\n  presentation: { platform: 'Process', expectedStringText: 'TCP frame must contain text' },\n  diagnostics: {\n    closed: { source: 'app/tcp', code: 'CLOSED', message: 'TCP closed' },\n    timeout: { source: 'app/tcp', code: 'TIMEOUT', message: 'TCP handshake expired' },\n    authenticationRejected: { source: 'app/tcp', code: 'AUTH', message: 'TCP authentication refused' },\n    duplicateBinding: 'TCP binding exists', optionsInvalid: 'Invalid TCP options', jsonCodecRequired: 'JSON required', negotiatedCodecUnsupported: 'Codec unsupported', handshakeTimeoutInvalid: 'Invalid handshake budget'\n  }\n})\nconst [a, b] = await Promise.all([\n  adapter.peer({ self: { name: 'a', instanceId: 'a-1' }, spawn: client, peerId: 'b-1' }),\n  adapter.peer({ self: { name: 'b', instanceId: 'b-1' }, listen: remote, peerId: 'a-1', provide: { double: (value: number) => value * 2 } })\n])\ntry { console.log(await a.request('double', 21)) }\nfinally { await a.close(); await b.close(); await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())) }",
+        "import { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineByteAdapter<URL>({\n  open: (address) => openByteConnection(address),\n  listen: (address) => acceptByteConnection(address),\n  dial: (address) => dialByteConnection(address),\n  diagnostics: connectionDiagnostics\n})",
       result: {
-        en: 'Prints 42. open handles the initiating source while listen handles the accepted socket; no process launch is implied by the source name.',
-        zh: '输出 42；open 处理主动来源，listen 处理已接受套接字，来源名称本身不会启动进程。'
+        en: 'Listening and dialing reuse the same Core protocol while retaining platform-specific acquisition.',
+        zh: '监听与拨号复用同一 Core 协议，同时保留平台各自的资源取得方式。'
       },
-      covers: [
-        'open',
-        'listen',
-        'dial',
-        'diagnostics',
-        'presentation',
-        'presentation.platform',
-        'presentation.expectedStringText'
-      ]
+      covers: ['listen', 'dial']
     }
   ],
   createRuntimePeer: [
     {
       title: {
-        en: 'Call a genuine source with quotas and diagnostics',
-        zh: '通过真实来源调用并配置限额与诊断'
+        en: 'Connect checkout to a negotiated pricing channel',
+        zh: '将结算页接到已协商的价格通道'
       },
       problem: {
-        en: 'A platform adapter has actual ports and known direct addresses. Pass each preparation’s own capability offer into the public channel constructor and let it complete bilateral admission.',
-        zh: '平台适配器拥有真实端口和明确直连地址，把每次准备自己的能力提议传给公开通道构造器，由其完成双端准入。'
+        en: 'The platform adapter’s openPricingChannel returns a real negotiated channel for checkout. Use connect for an existing service and a local timeout for a responsive checkout; send background failures to monitoring.',
+        zh: '平台适配器的 openPricingChannel 为结算页返回真实协商通道。用 connect 连接已有服务，并设置本地期限以保持结算响应；后台失败交给监控。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createRuntimePeer, normalizeRemoteContract } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nconst { port1, port2 } = new MessageChannel()\nconst failures: unknown[] = []\nlet keyReads = 0\nlet retryReads = 0\nconst observed: unknown[] = []\nconst probe = defineProbe({ stages: ['message'], emit: (event) => { observed.push(snapshotProbeEvent(event)) } })\nconst contract = normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { calc: { methods: { double: { mode: 'request', idempotent: true } } } } })\nconst [a, b] = await Promise.all([\n  createRuntimePeer({ self: { name: 'a', instanceId: 'a-1' }, connect: async (context) => createNodeThreadChannel(port1, 'b-1', { scheduler: systemScheduler, capabilities: context.capabilities }), defaultTimeoutMs: 2000, probe, report: (error) => { failures.push(error) }, keyFactory: () => { keyReads++; return 'local-key' }, retryPort: { dispatch: (input) => { retryReads++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } } }),\n  createRuntimePeer({ self: { name: 'math', instanceId: 'b-1' }, listen: async (context) => createNodeThreadChannel(port2, 'a-1', { scheduler: systemScheduler, capabilities: context.capabilities }), provide: { math: { calc: { double: (value: number) => value * 2 } } }, contract, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, report: (error) => { failures.push(error) } })\n])\ntry { console.log(await a.request('math.calc.double', 21)); console.log(observed.length > 0, failures.length); console.log(keyReads, retryReads) }\nfinally { await a.close(); await b.close(); port1.close(); port2.close() }",
+        "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst prices = await createRuntimePeer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  connect: (context) => openPricingChannel(context),\n  defaultTimeoutMs: 2000,\n  report: (error) => reportToMonitoring(error)\n})\ntry {\n  renderPrices(await prices.request('prices'))\n} finally {\n  await prices.close()\n}",
       result: {
-        en: 'Prints 42 and true 0: actual runtime dispatch succeeds, a probe observes messages, and no background failures are reported. Direct Peer requests do not consult inherited keyFactory. The final 0 0 confirms that direct Peer dispatch does not read inherited keyFactory or retryPort.',
-        zh: '输出 42 和 true 0；真实运行时派发成功，探针观察到消息，未报告后台失败。直接 Peer 请求不会调用继承的 keyFactory。 最后的 0 0 确认直接 Peer 派发未读取继承的 keyFactory 或 retryPort。'
+        en: 'Checkout receives prices through the adapter’s channel and reports background failures centrally.',
+        zh: '结算页通过适配器通道取得价格，并集中上报后台失败。'
       },
-      covers: [
-        'self',
-        'provide',
-        'connect',
-        'listen',
-        'providerLimits',
-        'probe',
-        'defaultTimeoutMs',
-        'contract',
-        'report',
-        'keyFactory',
-        'retryPort'
-      ]
+      covers: ['self', 'connect', 'defaultTimeoutMs', 'report']
     },
     {
       title: {
-        en: 'Use an application-owned source opener',
-        zh: '使用应用拥有的来源打开操作'
+        en: 'Serve prices with bounded provider work',
+        zh: '限制价格处理任务的并发'
       },
       problem: {
-        en: 'The source callback owns acquisition of this real channel. Selecting spawn changes which callback Core invokes; it does not itself manufacture an execution unit.',
-        zh: '来源回调负责取得这条真实通道。选择 spawn 改变 Core 调用的回调，本身不制造执行单元。'
+        en: 'A pricing worker accepts an incoming channel and runs expensive lookups. Register the declared price methods before serving, and cap concurrent work so a caller cannot fill the worker with lookups.',
+        zh: '价格 Worker 接受入站通道，并执行昂贵查询。服务开始前登记声明的价格方法，再限制并发，避免单个调用者用查询占满 Worker。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createRuntimePeer, normalizeRemoteContract } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nconst { port1, port2 } = new MessageChannel()\nconst failures: unknown[] = []\nlet keyReads = 0\nlet retryReads = 0\nconst observed: unknown[] = []\nconst probe = defineProbe({ stages: ['message'], emit: (event) => { observed.push(snapshotProbeEvent(event)) } })\nconst contract = normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { calc: { methods: { double: { mode: 'request', idempotent: true } } } } })\nconst [a, b] = await Promise.all([\n  createRuntimePeer({ self: { name: 'a', instanceId: 'a-1' }, spawn: async (context) => createNodeThreadChannel(port1, 'b-1', { scheduler: systemScheduler, capabilities: context.capabilities }), defaultTimeoutMs: 2000, probe, report: (error) => { failures.push(error) }, keyFactory: () => { keyReads++; return 'local-key' }, retryPort: { dispatch: (input) => { retryReads++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } } }),\n  createRuntimePeer({ self: { name: 'math', instanceId: 'b-1' }, listen: async (context) => createNodeThreadChannel(port2, 'a-1', { scheduler: systemScheduler, capabilities: context.capabilities }), provide: { math: { calc: { double: (value: number) => value * 2 } } }, contract, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, report: (error) => { failures.push(error) } })\n])\ntry { console.log(await a.request('math.calc.double', 21)); console.log(observed.length > 0, failures.length); console.log(keyReads, retryReads) }\nfinally { await a.close(); await b.close(); port1.close(); port2.close() }",
+        "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst provider = await createRuntimePeer({\n  self: { name: 'pricing', instanceId: 'pricing-1' },\n  listen: (context) => acceptPricingChannel(context),\n  provide: { pricing: { api: { prices: () => fetchPrices() } } },\n  contract: pricingContract,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})",
       result: {
-        en: 'Prints 42 and true 0 through the actual port pair. The application still closes its borrowed native ports. The final 0 0 confirms that direct Peer dispatch does not read inherited keyFactory or retryPort.',
-        zh: '通过真实端口对输出 42 和 true 0；应用仍负责关闭借入原生端口。 最后的 0 0 确认直接 Peer 派发未读取继承的 keyFactory 或 retryPort。'
+        en: 'The provider exposes its declared price method with global and per-peer concurrency budgets.',
+        zh: '提供方公开声明的价格方法，并应用全局与每个对端的并发预算。'
       },
-      covers: [
-        'self',
-        'provide',
-        'spawn',
-        'listen',
-        'providerLimits',
-        'probe',
-        'defaultTimeoutMs',
-        'contract',
-        'report',
-        'keyFactory',
-        'retryPort'
-      ]
+      covers: ['provide', 'listen', 'contract', 'providerLimits']
     },
     {
       title: {
-        en: 'Authenticate the runtime frame pipeline',
-        zh: '认证运行时消息管线'
+        en: 'Trace one pricing connection',
+        zh: '追踪一条价格连接'
       },
       problem: {
-        en: 'Both actual peers use the same complete signing and encryption configuration. The channel negotiation still derives capabilities from each original preparation.',
-        zh: '两个真实对端使用相同完整签名与加密配置，通道协商仍从各次原始准备派生能力。'
+        en: 'Operations need to inspect one troublesome connection without adding logging to business handlers. Attach a probe that snapshots events before forwarding them to the application collector.',
+        zh: '排查时需要检查某条异常连接，却不想改业务处理函数。附加 probe，在交给应用接收器前将事件快照化。'
       },
       example:
-        "import { type IRpcAuthenticationConfig } from '@migaia/rpc-core'\nimport { MessageChannel } from 'node:worker_threads'\nimport { createRuntimePeer, normalizeRemoteContract } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nconst encoder = new TextEncoder()\nconst decoder = new TextDecoder()\nconst hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])\nconst aes = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])\nconst protection: IRpcAuthenticationConfig = {\n  encrypt: async (value) => {\n    const iv = crypto.getRandomValues(new Uint8Array(12))\n    const body = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, encoder.encode(JSON.stringify(value)))\n    return { iv: Array.from(iv), body: Array.from(new Uint8Array(body)) }\n  },\n  decrypt: async (value) => {\n    const encrypted = value as { iv: number[]; body: number[] }\n    const body = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(encrypted.iv) }, aes, new Uint8Array(encrypted.body))\n    return JSON.parse(decoder.decode(body))\n  },\n  encodedType: 'string',\n  sign: async (value) => {\n    const text = JSON.stringify(value)\n    const mac = await crypto.subtle.sign('HMAC', hmac, encoder.encode(text))\n    return JSON.stringify({ text, mac: Array.from(new Uint8Array(mac)) })\n  },\n  verify: async (value) => {\n    const signed = JSON.parse(String(value)) as { text: string; mac: number[] }\n    if (!await crypto.subtle.verify('HMAC', hmac, new Uint8Array(signed.mac), encoder.encode(signed.text))) throw new Error('Invalid signature')\n    return JSON.parse(signed.text)\n  }\n}\nconst { port1, port2 } = new MessageChannel()\nconst failures: unknown[] = []\nlet keyReads = 0\nlet retryReads = 0\nconst observed: unknown[] = []\nconst probe = defineProbe({ stages: ['message'], emit: (event) => { observed.push(snapshotProbeEvent(event)) } })\nconst contract = normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { calc: { methods: { double: { mode: 'request', idempotent: true } } } } })\nconst [a, b] = await Promise.all([\n  createRuntimePeer({ authentication: protection, self: { name: 'a', instanceId: 'a-1' }, connect: async (context) => createNodeThreadChannel(port1, 'b-1', { scheduler: systemScheduler, capabilities: context.capabilities }), defaultTimeoutMs: 2000, probe, report: (error) => { failures.push(error) }, keyFactory: () => { keyReads++; return 'local-key' }, retryPort: { dispatch: (input) => { retryReads++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } } }),\n  createRuntimePeer({ authentication: protection, self: { name: 'math', instanceId: 'b-1' }, listen: async (context) => createNodeThreadChannel(port2, 'a-1', { scheduler: systemScheduler, capabilities: context.capabilities }), provide: { math: { calc: { double: (value: number) => value * 2 } } }, contract, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, report: (error) => { failures.push(error) } })\n])\ntry { console.log(await a.request('math.calc.double', 21)); console.log(observed.length > 0, failures.length); console.log(keyReads, retryReads) }\nfinally { await a.close(); await b.close(); port1.close(); port2.close() }",
+        "import { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst probe = defineProbe({\n  stages: ['message'],\n  emit: (event) => recordRpcTrace(snapshotProbeEvent(event))\n})\nconst prices = await createRuntimePeer({ ...pricingPeerOptions, probe })",
       result: {
-        en: 'Prints 42 and true 0 over the protected pipeline. Ephemeral local keys are used only for this local example; real deployments own authenticated key distribution. The final 0 0 confirms that direct Peer dispatch does not read inherited keyFactory or retryPort.',
-        zh: '通过受保护管线输出 42 和 true 0。本地示例只使用临时密钥，真实部署自行负责可信密钥分发。 最后的 0 0 确认直接 Peer 派发未读取继承的 keyFactory 或 retryPort。'
+        en: 'The collector receives stable message trace snapshots for this peer.',
+        zh: '接收器取得该对端的稳定消息追踪快照。'
       },
-      covers: [
-        'authentication',
-        'authentication.encrypt',
-        'authentication.decrypt',
-        'authentication.sign',
-        'authentication.verify',
-        'authentication.encodedType'
-      ]
-    },
-    {
-      title: {
-        en: 'Reject an unavailable custom endpoint after channel acquisition',
-        zh: '取得通道后拒绝不可用的自定义端点'
-      },
-      problem: {
-        en: 'An advanced endpoint factory cannot supply its application runtime. Throw the original failure after the actual bilateral channel opens; Core rolls back the acquired channel.',
-        zh: '高级端点工厂无法提供应用运行时，在真实双端通道打开后抛出原始失败，由 Core 回滚已取得通道。'
-      },
-      example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nconst { port1, port2 } = new MessageChannel()\nconst unavailable = new Error('application endpoint unavailable')\nconst results = await Promise.allSettled([\n  createRuntimePeer({ self: { name: 'a', instanceId: 'a-1' }, connect: async (context) => createNodeThreadChannel(port1, 'b-1', { scheduler: systemScheduler, capabilities: context.capabilities }), endpointFactory: async () => { throw unavailable }, report: () => undefined }),\n  createRuntimePeer({ self: { name: 'b', instanceId: 'b-1' }, listen: async (context) => createNodeThreadChannel(port2, 'a-1', { scheduler: systemScheduler, capabilities: context.capabilities }), defaultTimeoutMs: 100, report: () => undefined })\n])\nconsole.log(results[0]?.status === 'rejected' && results[0].reason === unavailable)\nfor (const result of results) if (result.status === 'fulfilled') await result.value.close()\nport1.close(); port2.close()",
-      result: {
-        en: 'Prints true. The custom construction failure retains its identity; the opposite preparation settles separately. The application closes both native ports.',
-        zh: '输出 true；自定义构造失败保留身份，另一端准备独立完成结算，应用关闭两个原生端口。'
-      },
-      covers: ['endpointFactory']
-    }
-  ],
-  createRuntimeApiEndpoint: [
-    {
-      title: {
-        en: 'Install a complete endpoint before accepting calls',
-        zh: '接收调用前完整安装端点'
-      },
-      problem: {
-        en: 'A service must be ready with its provider and pipeline as one construction batch. Use the caller-owned scheduler and transport consistently.',
-        zh: '服务要在同一次构造中备齐处理函数与管线；调度器和传输对象由调用者提供并一致复用。'
-      },
-      example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createRuntimeApiEndpoint, createEndpoint, connect, type IRpcFactoryConfig } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst channel = { peerId: 'client', transport: right, agreement: { capabilities: [] } }\nconst server = createRuntimeApiEndpoint({\n  id: 'server', scheduler: systemScheduler, wallClock: { timestamp: () => 1700000000000 },\n  protocol: rpcProtocol, codec: identityCodec as NonNullable<IRpcFactoryConfig['codec']>, framer: messageFramerV1,\n  transport: right,\n  provider: { double: (context) => context.success((context.data as number) * 2) },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  replay: { maxEntries: 64, ttlMs: 1000 },\n  construction: { signal: controller.signal, timeoutMs: 1000 },\n  middlewares: [connect({ transport: right })], features: []\n}, channel)\nawait server.ready\nconst client = await createClientEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [connect({ transport: left })] })\ntry { console.log(await client.send('server', 'double', 21)) }\nfinally { await client.dispose(); await server.dispose(); left.close() }",
-      result: {
-        en: 'Prints 42. Explicit protocol, codec, framer, provider limits and replay limits are active before construction returns; the borrowed memory pair is closed by its creator.',
-        zh: '输出 42。构造返回前已安装协议、编解码、帧处理、提供方限额和重放限额；借入的内存通道由创建者关闭。'
-      },
-      covers: [
-        'id',
-        'scheduler',
-        'wallClock',
-        'transport',
-        'protocol',
-        'codec',
-        'framer',
-        'targetIds',
-        'provider',
-        'providerLimits',
-        'replay',
-        'replay.maxEntries',
-        'replay.ttlMs',
-        'middlewares',
-        'features',
-        'construction',
-        'construction.signal',
-        'construction.timeoutMs'
-      ]
-    },
-    {
-      title: {
-        en: 'Reuse one outcome for a retried save',
-        zh: '重复保存复用同一结果'
-      },
-      problem: {
-        en: 'A retry of the same operation must not execute the provider twice. Supply one real store and derive its scope from the admitted session token.',
-        zh: '同一操作重试时不能重复执行处理函数；传入真实存储，并从准入会话令牌派生作用域。'
-      },
-      example:
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createRuntimeApiEndpoint, createEndpoint, connect, createRpcIdempotencyStore } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nlet calls = 0\nconst store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 16, maxEntriesPerScope: 8, maxBytes: 4096, maxOutcomeBytes: 1024 })\nconst channel = { peerId: 'client', transport: right, agreement: { capabilities: [] } }\nconst server = createRuntimeApiEndpoint({\n id: 'server', transport: right,\n idempotency: { store, scope: ({ token }) => token },\n provider: { count: (context) => context.success(++calls) },\n middlewares: [connect({ transport: right })]\n}, channel)\nawait server.ready\nconst client = await createClientEndpoint({ id: 'client', transport: left, middlewares: [connect({ transport: left })] })\ntry {\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }))\n console.log(await client.send('server', 'count', null, { idempotencyKey: 'save-1' }), calls)\n} finally { await client.dispose(); await server.dispose(); left.close() }",
-      result: {
-        en: 'Prints 1 and then 1 1: both calls receive one retained outcome, and the provider runs once. The application reuses the same key only for the same operation.',
-        zh: '先输出 1，再输出 1 1；两次调用取得同一保留结果，处理函数仅执行一次。应用只为同一操作复用该键。'
-      },
-      covers: ['idempotency', 'idempotency.store', 'idempotency.scope']
-    },
-    {
-      title: {
-        en: 'Cancel construction before acquiring resources',
-        zh: '取得资源前取消构造'
-      },
-      problem: {
-        en: 'The caller has already abandoned the operation. Pass its native signal and explicitly disable a separate construction deadline.',
-        zh: '调用者已放弃本次操作，传入原生信号，并明确关闭另设的构造期限。'
-      },
-      example:
-        "import { createRuntimeApiEndpoint, createEndpoint, connect } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst controller = new AbortController()\nconst reason = new Error('request ended')\ncontroller.abort(reason)\ntry {\n await createRuntimeApiEndpoint({ id: 'cancelled', transport: left, middlewares: [connect({ transport: left })], construction: { signal: controller.signal, timeoutMs: false } }, { peerId: 'server', transport: left, agreement: { capabilities: [] } }).ready\n} catch (error) { console.log((error as Error).name, (error as { code: string }).code, (error as Error).cause === reason) }\nfinally { left.close() }",
-      result: {
-        en: 'Prints AbortError CANCELLED true: construction rejects and preserves the original cancellation reason on cause. No endpoint is returned.',
-        zh: '输出 AbortError CANCELLED true；构造拒绝，并在 cause 保留原取消原因，不返回端点。'
-      },
-      covers: ['construction', 'construction.signal', 'construction.timeoutMs']
-    },
-    {
-      title: {
-        en: 'Forward operations already held by a real peer',
-        zh: '转发真实对端已经持有的操作'
-      },
-      problem: {
-        en: 'A consumer needs a runtime endpoint facade around an already-ready Peer. Forward only that Peer’s actual request, notify, stream and close operations.',
-        zh: '使用者需要在已就绪 Peer 外提供运行端点外观，仅转发该对端真实请求、通知、流与关闭操作。'
-      },
-      example:
-        "import { createRuntimeApiEndpoint } from '@migaia/rpc-core'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\nconst pair = await createPeerPair({ a: { provide: {} }, b: { provide: { double: (value: number) => value * 2 } } })\nconst endpoint = createRuntimeApiEndpoint({ binding: {\n  ready: Promise.resolve(), request: pair.a.request, notify: pair.a.notify,\n  stream: { open: pair.a.stream }, dispose: pair.a.close\n} })\ntry { await endpoint.ready; console.log(await endpoint.request('double', 21)) }\nfinally { await endpoint.dispose(); await pair.b.close() }",
-      result: {
-        en: 'Prints 42. The Peer pair has completed construction before the resolved ready value is supplied; facade disposal invokes its held close operation.',
-        zh: '输出 42；传入已完成 ready 值前，Peer 对已完成构造。外观释放调用其持有的关闭操作。'
-      },
-      covers: ['binding']
+      covers: ['probe']
     }
   ],
   createStreamFeature: [
     {
       title: {
-        en: 'Restrict streams using the original channel agreement',
-        zh: '按原通道约定限制流'
+        en: 'Advertise the channel’s stream agreement',
+        zh: '声明通道约定的流能力'
       },
       problem: {
-        en: 'The application has an actual fixed-profile Thread channel. Project its real accepted stream availability into the feature’s predicate instead of inventing capability flags.',
-        zh: '应用拥有真实固定配置线程通道，从通道约定投影出流可用性作为功能判定，不自行编造能力标记。'
+        en: 'An export link has already agreed its stream limits. Install that exact capability so streaming uses the carrier’s supported modes and limits.',
+        zh: '导出链路已约定流限制。安装该能力，让流操作使用载体支持的模式与限制。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nconst { port1, port2 } = new MessageChannel()\nconst a = await createNodeThreadChannel(port1, 'server', { scheduler: systemScheduler, capabilities: [RpcCapability.stream] })\nconst b = await createNodeThreadChannel(port2, 'client', { scheduler: systemScheduler, capabilities: [RpcCapability.stream] })\nfunction roots(channel: Awaited<ReturnType<typeof createNodeThreadChannel>>) {\n  const chunk = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunk)\n  const provider = createProviderFeature(outbound)\n  const capability = { supports: (peerId: string) => peerId === channel.peerId && channel.agreement.capabilities.includes(RpcCapability.stream) }\n  return { ...Object.fromEntries(channel.features.map((feature, index) => [`channel-${index}`, feature])), 'first-party-chunk': chunk, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-stream': createStreamFeature(outbound, provider, { capability }) }\n}\nconst server = await createComposedEndpoint({ id: 'server', transport: b.transport, ...b.pipeline, middlewares: [connect({ transport: b.transport })] }, roots(b))\nconst client = await createComposedEndpoint({ id: 'client', transport: a.transport, ...a.pipeline, middlewares: [connect({ transport: a.transport })] }, roots(a))\nconst off = server.stream.provide('numbers', function* () { yield 1; yield 2 })\ntry { for await (const value of client.stream.open('server', 'numbers', null)) console.log(value) }\nfinally { off(); await client.dispose(); await server.dispose(); await a.close(); await b.close(); port1.close(); port2.close() }",
+        "import { createStreamFeature } from '@migaia/rpc-core/stream'\n\nconst streams = createStreamFeature(outbound, provider, { capability: agreedStreamCapability })",
       result: {
-        en: 'Prints 1 then 2. The capability callback checks both the original peer address and that channel’s actual stream policy.',
-        zh: '先输出 1，再输出 2；能力回调同时检查原始对端地址及通道的真实流策略。'
+        en: 'The stream feature follows the capability supplied by the real channel agreement.',
+        zh: '流功能遵守真实通道约定提供的能力。'
       },
       covers: ['capability']
     },
     {
       title: {
-        en: 'Refuse a stream absent from the actual profile',
-        zh: '拒绝真实配置未提供的流'
+        en: 'Keep a scalar-only link scalar',
+        zh: '保持标量链路的能力边界'
       },
       problem: {
-        en: 'The same application selects the empty static profile at both physical ends. Its predicate reads that actual absence and refuses opening a stream.',
-        zh: '同一应用在两个物理端选择空静态配置，判定函数读取实际缺失并拒绝打开流。'
+        en: 'A legacy price service supports only scalar replies. Do not invent stream support in the wrapper; pass its unavailable capability so unsupported stream calls are refused.',
+        zh: '旧价格服务只支持标量答复。包装层不应虚构流支持；传入不可用能力，让不受支持的流调用被拒绝。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nconst { port1, port2 } = new MessageChannel()\nconst a = await createNodeThreadChannel(port1, 'server', { scheduler: systemScheduler, capabilities: [] })\nconst b = await createNodeThreadChannel(port2, 'client', { scheduler: systemScheduler, capabilities: [] })\nfunction roots(channel: Awaited<ReturnType<typeof createNodeThreadChannel>>) {\n  const chunk = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunk)\n  const provider = createProviderFeature(outbound)\n  const capability = { supports: (peerId: string) => peerId === channel.peerId && channel.agreement.capabilities.includes(RpcCapability.stream) }\n  return { ...Object.fromEntries(channel.features.map((feature, index) => [`channel-${index}`, feature])), 'first-party-chunk': chunk, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-stream': createStreamFeature(outbound, provider, { capability }) }\n}\nconst server = await createComposedEndpoint({ id: 'server', transport: b.transport, ...b.pipeline, middlewares: [connect({ transport: b.transport })] }, roots(b))\nconst client = await createComposedEndpoint({ id: 'client', transport: a.transport, ...a.pipeline, middlewares: [connect({ transport: a.transport })] }, roots(a))\nconst off = server.stream.provide('numbers', function* () { yield 1; yield 2 })\ntry { for await (const value of client.stream.open('server', 'numbers', null)) console.log(value) } catch (error) { console.log((error as { code: string }).code) }\nfinally { off(); await client.dispose(); await server.dispose(); await a.close(); await b.close(); port1.close(); port2.close() }",
+        "import { createStreamFeature } from '@migaia/rpc-core/stream'\n\nconst streams = createStreamFeature(outbound, provider, {\n  capability: { supports: () => false }\n})",
       result: {
-        en: 'Prints CAPABILITY_CONFLICT. The installed stream feature refuses opening when its actual channel predicate reports no stream support.',
-        zh: '输出 CAPABILITY_CONFLICT；真实通道判定不支持流时，已安装流功能拒绝打开。'
+        en: 'Unsupported stream work is refused instead of being sent through a scalar-only carrier.',
+        zh: '不受支持的流任务会被拒绝，而非发往只支持标量的载体。'
       },
       covers: ['capability']
     }
@@ -1342,398 +1013,268 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createRemoteHost: [
     {
       title: {
-        en: 'Bound and guard calls to an actual remote Host',
-        zh: '对真实远程宿主调用设置上限与准入'
+        en: 'Use a catalogued remote pricing plugin',
+        zh: '使用目录中的远端价格插件'
       },
       problem: {
-        en: 'The application integration owns a real coroutine supervisor, dedicated memory endpoints and the matching public Host service. Keep deadlines, diagnostics and keys on that same generation owner.',
-        zh: '应用集成拥有真实协程监督器、专用内存端点及配套公开宿主服务，将期限、诊断和键留在同一代次所有者。'
+        en: 'An administration process already owns a supervised pricing binding and its catalog. Create the remote host from those resources; readiness must complete before installing and calling a declared plugin.',
+        zh: '管理进程已持有受监督的价格绑定及其目录。用这些资源创建远端宿主，等待就绪后再安装并调用目录声明的插件。'
       },
       example:
-        "import { createLegacyIntegration } from './app-legacy.js'\nimport { createRemoteHost, createRemoteRetryPort } from '@migaia/rpc-core/remote'\nconst app = createLegacyIntegration('host')\nlet keys = 0\nlet guarded = 0\nconst remote = createRemoteHost({\n  catalog: app.catalog, binding: app.binding, endpointFactory: app.endpointFactory,\n  report: app.report, keyFactory: () => `save-${++keys}`, callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: () => { guarded++ } },\n  retryPort: { dispatch: (input) => createRemoteRetryPort({ events: input.events, scheduler: app.scheduler, report: app.report }).dispatch(input) }\n})\ntry {\n  await remote.ready()\n  const features = await remote.use('math')\n  console.log(await features.api!.double!([21]))\n  console.log(keys > 0, guarded > 0)\n} finally { await remote.release(); await app.close() }",
+        "import { createRemoteHost } from '@migaia/rpc-core/remote'\n\nconst remote = createRemoteHost({\n  catalog: pricingCatalog,\n  binding: pricingBinding,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal),\n  report: (error) => reportToMonitoring(error)\n})\ntry {\n  await remote.ready()\n  const pricing = await remote.use('pricing')\n  renderPrices(await pricing.api!.prices!([]))\n} finally {\n  await remote.release()\n}",
       result: {
-        en: 'Prints 42 and true true. The automatic key and pre-dispatch guard run on actual logical calls; the retry port uses that dispatch’s original generation events.',
-        zh: '输出 42 和 true true；实际逻辑调用执行自动键工厂与派发前检查，重试端口使用本次派发原始代次事件。'
+        en: 'The declared pricing feature becomes callable while the binding retains its resource lifecycle.',
+        zh: '声明的价格功能可被调用，资源生命周期仍由绑定管理。'
       },
-      covers: [
-        'catalog',
-        'binding',
-        'endpointFactory',
-        'report',
-        'keyFactory',
-        'retryPort',
-        'callDeadlineCapMs',
-        'callGuard'
-      ]
+      covers: ['catalog', 'binding', 'endpointFactory', 'report']
     },
     {
       title: {
-        en: 'Refuse one remote method before dispatch',
-        zh: '派发前拒绝某个远程方法'
+        en: 'Authorize pricing calls before dispatch',
+        zh: '派发价格调用前检查权限'
       },
       problem: {
-        en: 'The application integration owns a real coroutine supervisor, dedicated memory endpoints and the matching public Host service. Keep deadlines, diagnostics and keys on that same generation owner.',
-        zh: '应用集成拥有真实协程监督器、专用内存端点及配套公开宿主服务，将期限、诊断和键留在同一代次所有者。'
+        en: 'An administration session must authorize each remote method before it leaves the process. Use callGuard for that decision, generate a fresh logical operation key, and cap each call’s waiting budget.',
+        zh: '管理会话需要在远端方法离开进程前检查权限。用 callGuard 决定是否放行，为逻辑操作生成新键，并限制每次调用的等待预算。'
       },
       example:
-        "import { createLegacyIntegration } from './app-legacy.js'\nimport { createRemoteHost, createRemoteRetryPort } from '@migaia/rpc-core/remote'\nconst app = createLegacyIntegration('host')\nlet keys = 0\nlet guarded = 0\nconst remote = createRemoteHost({\n  catalog: app.catalog, binding: app.binding, endpointFactory: app.endpointFactory,\n  report: app.report, keyFactory: () => `save-${++keys}`, callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: ({ method }) => { guarded++; if (method === 'math.api.double') throw new Error('save paused') } },\n  retryPort: { dispatch: (input) => createRemoteRetryPort({ events: input.events, scheduler: app.scheduler, report: app.report }).dispatch(input) }\n})\ntry {\n  await remote.ready()\n  const features = await remote.use('math')\n  try { await features.api!.double!([21]) } catch (error) { console.log((error as Error).message) }\n  console.log(keys > 0, guarded > 0)\n} finally { await remote.release(); await app.close() }",
+        "import { createRemoteHost } from '@migaia/rpc-core/remote'\n\nconst remote = createRemoteHost({\n  ...pricingHostOptions,\n  keyFactory: () => crypto.randomUUID(),\n  callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: (call) => authorizePricingCall(call) },\n  retryPort: pricingRetryPolicy\n})",
       result: {
-        en: 'Prints save paused and true true. The local guard prevents that method from entering the generation send path.',
-        zh: '输出 save paused 和 true true；本地检查阻止该方法进入代次发送路径。'
+        en: 'Denied calls stop before dispatch; admitted calls use the selected key and deadline policies.',
+        zh: '拒绝的调用在派发前停止；获准调用使用所选逻辑键与期限策略。'
       },
-      covers: [
-        'catalog',
-        'binding',
-        'endpointFactory',
-        'report',
-        'keyFactory',
-        'retryPort',
-        'callDeadlineCapMs',
-        'callGuard'
-      ]
+      covers: ['keyFactory', 'callDeadlineCapMs', 'callGuard', 'retryPort']
     }
   ],
   createRemotePlugin: [
     {
       title: {
-        en: 'Install a proxy through the actual local Host',
-        zh: '通过真实本地宿主安装代理'
+        en: 'Install the remote pricing feature in a local host',
+        zh: '在本地宿主安装远端价格功能'
       },
       problem: {
-        en: 'The application integration serves an adopted math plugin on its supervised endpoint. The local proxy uses the actual local Host enablement port.',
-        zh: '应用集成在受监督端点服务已采用的 math 插件，本地代理使用实际本地宿主启停端口。'
+        en: 'A local plugin host needs the declared API of an existing remote pricing service. Supply the local plugin facade, the remote contract and the supervised binding so the installed plugin keeps those owners.',
+        zh: '本地插件宿主需要使用已有远端价格服务的声明接口。传入本地插件接口、远端契约和受监督绑定，使安装后的插件继续使用这些所有者。'
       },
       example:
-        "import { createLegacyIntegration } from './app-legacy.js'\nimport { createRemotePlugin, createRemoteRetryPort } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\nconst app = createLegacyIntegration('plugin')\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nlet keys = 0\nconst plugin = createRemotePlugin({\n  name: 'math', contract: app.contract, host: host.plugin,\n  binding: app.binding, endpointFactory: app.endpointFactory, report: app.report,\n  keyFactory: () => `save-${++keys}`, callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: () => undefined },\n  retryPort: { dispatch: (input) => createRemoteRetryPort({ events: input.events, scheduler: app.scheduler, report: app.report }).dispatch(input) }\n})\ntry {\n  const [handle] = await host.use(plugin)\n  const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n  console.log(await api.double([21]), keys > 0)\n} finally { await host.dispose(); await app.close() }",
+        "import { createRemotePlugin } from '@migaia/rpc-core/remote'\n\nconst pricing = createRemotePlugin({\n  name: 'pricing',\n  contract: pricingContract,\n  host: applicationHost.plugin,\n  binding: pricingBinding,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal),\n  report: (error) => reportToMonitoring(error)\n})\nawait applicationHost.use(pricing)",
       result: {
-        en: 'Prints 42 true. The declared idempotent method receives an automatically generated key and the actual result crosses both endpoint factories.',
-        zh: '输出 42 true；声明幂等的方法获得自动生成键，实际结果经过双端端点工厂。'
+        en: 'The local host installs a proxy whose feature calls go to the declared remote service.',
+        zh: '本地宿主安装代理，功能调用会送到声明的远端服务。'
       },
-      covers: [
-        'name',
-        'contract',
-        'host',
-        'binding',
-        'endpointFactory',
-        'report',
-        'keyFactory',
-        'retryPort',
-        'callDeadlineCapMs',
-        'callGuard'
-      ]
+      covers: ['name', 'contract', 'host', 'binding', 'endpointFactory', 'report']
     },
     {
       title: {
-        en: 'Preserve a rejected proxy admission reason',
-        zh: '保留代理准入拒绝原因'
+        en: 'Apply the checkout’s remote call policy',
+        zh: '应用结算页的远端调用策略'
       },
       problem: {
-        en: 'The same real proxy should refuse a paused operation before sending it. A local guard owns this decision.',
-        zh: '同一真实代理应在发送前拒绝已暂停操作，该决定由本地检查负责。'
+        en: 'Checkout must authorize remote pricing calls and report background failures through its monitor. Add that policy while keeping the plugin’s existing contract and binding.',
+        zh: '结算页需要校验远端价格调用的权限，并将后台失败交给自己的监控。在保留插件已有契约与绑定的同时增加这些策略。'
       },
       example:
-        "import { createLegacyIntegration } from './app-legacy.js'\nimport { createRemotePlugin, createRemoteRetryPort } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\nconst app = createLegacyIntegration('plugin')\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nlet keys = 0\nconst plugin = createRemotePlugin({\n  name: 'math', contract: app.contract, host: host.plugin,\n  binding: app.binding, endpointFactory: app.endpointFactory, report: app.report,\n  keyFactory: () => `save-${++keys}`, callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: () => { throw new Error('save paused') } },\n  retryPort: { dispatch: (input) => createRemoteRetryPort({ events: input.events, scheduler: app.scheduler, report: app.report }).dispatch(input) }\n})\ntry {\n  const [handle] = await host.use(plugin)\n  const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n  try { await api.double([21]) } catch (error) { console.log((error as Error).message) }\n} finally { await host.dispose(); await app.close() }",
+        "import { createRemotePlugin } from '@migaia/rpc-core/remote'\n\nconst pricing = createRemotePlugin({\n  ...pricingPluginOptions,\n  report: (error) => reportToMonitoring(error),\n  keyFactory: () => crypto.randomUUID(),\n  retryPort: pricingRetryPolicy,\n  callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: (call) => authorizePricingCall(call) }\n})",
       result: {
-        en: 'Prints save paused. The guard rejection remains local and the supervised deployment is still released.',
-        zh: '输出 save paused；检查拒绝留在本地，受监督部署仍会释放。'
+        en: 'The proxy uses checkout’s admission, waiting, key and reporting policies for remote calls.',
+        zh: '代理为远端调用使用结算页的准入、等待、逻辑键和上报策略。'
       },
-      covers: [
-        'name',
-        'contract',
-        'host',
-        'binding',
-        'endpointFactory',
-        'report',
-        'keyFactory',
-        'retryPort',
-        'callDeadlineCapMs',
-        'callGuard'
-      ]
+      covers: ['report', 'keyFactory', 'retryPort', 'callDeadlineCapMs', 'callGuard']
     }
   ],
   createRemoteRetryPort: [
     {
       title: {
-        en: 'Use original dispatch events for one retry policy',
-        zh: '让一次重试策略使用原派发事件'
+        en: 'Reuse runtime events for retry decisions',
+        zh: '用已有运行时事件决定重试'
       },
       problem: {
-        en: 'The application integration owns a real coroutine supervisor, dedicated memory endpoints and the matching public Host service. Keep deadlines, diagnostics and keys on that same generation owner.',
-        zh: '应用集成拥有真实协程监督器、专用内存端点及配套公开宿主服务，将期限、诊断和键留在同一代次所有者。'
+        en: 'A remote call policy must follow the same generation changes as its peer. Build the retry port from that peer’s events and scheduler instead of creating a second lifecycle tracker.',
+        zh: '远端调用策略需要跟随对端原有的代次变化。用该对端的事件与调度器创建重试端口，避免另建一套生命周期追踪。'
       },
       example:
-        "import { createLegacyIntegration } from './app-legacy.js'\nimport { createRemoteHost, createRemoteRetryPort } from '@migaia/rpc-core/remote'\nconst app = createLegacyIntegration('host')\nlet keys = 0\nlet guarded = 0\nconst remote = createRemoteHost({\n  catalog: app.catalog, binding: app.binding, endpointFactory: app.endpointFactory,\n  report: app.report, keyFactory: () => `save-${++keys}`, callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: () => { guarded++ } },\n  retryPort: { dispatch: (input) => createRemoteRetryPort({ events: input.events, scheduler: app.scheduler, report: app.report }).dispatch(input) }\n})\ntry {\n  await remote.ready()\n  const features = await remote.use('math')\n  console.log(await features.api!.double!([21]))\n  console.log(keys > 0, guarded > 0)\n} finally { await remote.release(); await app.close() }",
+        "import { createRemoteRetryPort } from '@migaia/rpc-core/remote'\n\nconst retry = createRemoteRetryPort({\n  events: pricingEvents,\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error)\n})",
       result: {
-        en: 'Prints 42 and true true. The automatic key and pre-dispatch guard run on actual logical calls; the retry port uses that dispatch’s original generation events.',
-        zh: '输出 42 和 true true；实际逻辑调用执行自动键工厂与派发前检查，重试端口使用本次派发原始代次事件。'
+        en: 'Retry decisions follow the selected runtime’s existing generation events and clock.',
+        zh: '重试决定跟随所选运行时已有的代次事件与时钟。'
       },
       covers: ['events', 'scheduler', 'report']
     },
     {
       title: {
-        en: 'Observe generation events from an installed plugin proxy',
-        zh: '从已安装插件代理观察代次事件'
+        en: 'Keep retry cleanup failures observable',
+        zh: '保留重试清理故障'
       },
       problem: {
-        en: 'The application integration serves an adopted math plugin on its supervised endpoint. The local proxy uses the actual local Host enablement port.',
-        zh: '应用集成在受监督端点服务已采用的 math 插件，本地代理使用实际本地宿主启停端口。'
+        en: 'Secondary cleanup failures during retry should reach monitoring without obscuring the call’s primary result. Supply the retry owner’s diagnostic callback.',
+        zh: '重试过程中的次要清理故障应进入监控，同时不能掩盖调用的主要结果。提供重试所有者的诊断回调。'
       },
       example:
-        "import { createLegacyIntegration } from './app-legacy.js'\nimport { createRemotePlugin, createRemoteRetryPort } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\nconst app = createLegacyIntegration('plugin')\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nlet keys = 0\nconst plugin = createRemotePlugin({\n  name: 'math', contract: app.contract, host: host.plugin,\n  binding: app.binding, endpointFactory: app.endpointFactory, report: app.report,\n  keyFactory: () => `save-${++keys}`, callDeadlineCapMs: 2000,\n  callGuard: { beforeDispatch: () => undefined },\n  retryPort: { dispatch: (input) => createRemoteRetryPort({ events: input.events, scheduler: app.scheduler, report: app.report }).dispatch(input) }\n})\ntry {\n  const [handle] = await host.use(plugin)\n  const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n  console.log(await api.double([21]), keys > 0)\n} finally { await host.dispose(); await app.close() }",
+        "import { createRemoteRetryPort } from '@migaia/rpc-core/remote'\n\nconst retry = createRemoteRetryPort({\n  events: pricingEvents,\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error)\n})",
       result: {
-        en: 'Prints 42 true. The declared idempotent method receives an automatically generated key and the actual result crosses both endpoint factories.',
-        zh: '输出 42 true；声明幂等的方法获得自动生成键，实际结果经过双端端点工厂。'
+        en: 'Monitoring receives retry-side failures through the application’s reporting channel.',
+        zh: '监控通过应用上报通道收到重试侧故障。'
       },
-      covers: ['events', 'scheduler', 'report']
+      covers: ['report']
     }
   ],
   serveRemoteHost: [
     {
       title: {
-        en: 'Serve the actual local Host over a dedicated endpoint',
-        zh: '通过专用端点服务真实本地宿主'
+        en: 'Expose only the approved plugin catalog',
+        zh: '只公开获准的插件目录'
       },
       problem: {
-        en: 'A real coroutine task constructs the dedicated endpoint, installs the public service and exposes its client side to the actual generation binding. The task owns cleanup.',
-        zh: '真实协程任务构造专用端点、安装公开服务，并把客户端一侧交给实际代次绑定；任务拥有清理。'
+        en: 'A service process must expose a local host without allowing arbitrary plugin names. Serve its explicit pricing catalog and resolve names only from the application’s approved definitions.',
+        zh: '服务进程需要公开本地宿主，同时不允许任意插件名称。服务只使用明确的价格目录，并仅从应用批准的定义中解析名称。'
       },
       example:
-        "import { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { createEndpoint, connect, ping, abort, type IRpcEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createRemoteHost, createRemotePlugin, serveRemoteHost, serveRemotePlugin,\n  type IRemoteBinding, type IRemoteChannel, type IRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst contract: IRemoteContract = { schemaVersion: 1, plugin: 'math', features: { api: {\n  methods: { double: { mode: 'request', idempotent: true } }\n} } }\nconst definition = definePlugin({ name: 'math', features: { api: defineFeature(() => ({ double: (value: number) => value * 2 })) }, install: () => ({}) })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error); console.error(error) }\nconst serverHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nconst hostMode = true\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'math-service', report, scheduler: systemScheduler,\n  budget: createUnitBudget({ kind: 'coroutine', maxUnits: 1 }),\n  restart: { mode: 'never' },\n  spec: { task: async ({ expose, signal }) => {\n    const [clientTransport, serverTransport] = createMemoryTransportPair()\n    const endpoint = await createEndpoint({ id: 'math-server', transport: serverTransport, middlewares: [connect(), ping(), abort()] }) as IRpcEndpoint\n    if (!hostMode) await serverHost.use(definition)\n    const served = hostMode\n      ? await serveRemoteHost({ host: serverHost, catalog: { math: contract }, resolvePlugin: () => definition, endpoint: { endpoint }, report })\n      : await serveRemotePlugin({ host: serverHost, contract, endpoint: { endpoint }, report, invocationContext: (context) => ({ sender: context.senderId }) })\n    expose({ transport: clientTransport, peerId: 'math-server', scheduler: systemScheduler,\n      agreement: { source: 'static', codec: identityCodec.id, capabilities: ['runtime-api@1'] },\n      pipeline: { codec: identityCodec, framer: messageFramerV1 }, features: [], close: async () => { clientTransport.close() }\n    })\n    try { await new Promise<void>((resolve) => {\n      if (signal.aborted) resolve()\n      else signal.addEventListener('abort', () => resolve(), { once: true })\n    }) } finally { await served.close() }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (unit) => unit.exposed\n}\nlet sequence = 0\nconst endpointFactory = async (channel: IRemoteChannel) => ({ endpoint: await createEndpoint({\n  id: 'math-client', transport: channel.transport, protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1, middlewares: [connect(), ping(), abort()]\n}) as IRpcEndpoint })\nif (hostMode) {\n  const client = createRemoteHost({ catalog: { math: contract }, binding, endpointFactory, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    callGuard: { beforeDispatch: ({ method }) => { if (method === 'forbidden') throw new Error('denied') } }\n  })\n  try {\n    await client.ready()\n    const proxy = await client.use('math')\n    console.log(await proxy.api!.double!([21]))\n    console.log(await client.inspect())\n    console.log(await client.unUse('math', { dryRun: true, policy: 'reject' }))\n  } finally { await client.release() }\n} else {\n  const clientHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  const remote = createRemotePlugin({ name: 'math', contract, binding, endpointFactory, host: clientHost.plugin, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    retryPort: { dispatch: (input) => input.sendOnce({ expectedGeneration: input.generation, key: input.key }) }\n  })\n  try {\n    const [handle] = await clientHost.use(remote)\n    const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n    console.log(await api.double([21]))\n  } finally { await clientHost.dispose() }\n}\nawait serverHost.dispose()\nconsole.log(supervisor.state, reports.length)\n",
+        "import { serveRemoteHost } from '@migaia/rpc-core/remote'\n\nconst service = await serveRemoteHost({\n  host: pricingHost,\n  catalog: pricingCatalog,\n  resolvePlugin: (name) => resolveApprovedPlugin(name),\n  endpoint: { endpoint: pricingEndpoint },\n  report: (error) => reportToMonitoring(error)\n})\nonServiceClosed(() => service.close())",
       result: {
-        en: 'Prints 42 and ends with disposed 0. The actual service and supervisor are released without background diagnostics. Host mode also prints its inspect and dry-run removal state.',
-        zh: '输出 42，最后为 disposed 0；实际服务与监督器释放后未报告后台诊断。宿主模式还输出检查及移除预览状态。'
+        en: 'Remote host operations can address only the declared catalog through this endpoint.',
+        zh: '远端宿主操作只能通过该端点访问声明的目录。'
       },
       covers: ['host', 'catalog', 'resolvePlugin', 'endpoint', 'report']
     },
     {
       title: {
-        en: 'Change the actual adopted implementation without widening its contract',
-        zh: '只更换实际采用实现，保留契约范围'
+        en: 'Report failures beside the serving owner',
+        zh: '由服务所有者上报故障'
       },
       problem: {
-        en: 'The application deploys a different implementation under the same declared method. Service lookup still reads the actual adopted Feature through its Host.',
-        zh: '应用在同一声明方法下部署不同实现，服务查找仍通过宿主读取实际已采用功能。'
+        en: 'Background serving failures need the same monitoring context as the local pricing host. Pass its reporter when exposing the host.',
+        zh: '后台服务故障需要与本地价格宿主共用监控上下文。公开宿主时传入其上报函数。'
       },
       example:
-        "import { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { createEndpoint, connect, ping, abort, type IRpcEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createRemoteHost, createRemotePlugin, serveRemoteHost, serveRemotePlugin,\n  type IRemoteBinding, type IRemoteChannel, type IRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst contract: IRemoteContract = { schemaVersion: 1, plugin: 'math', features: { api: {\n  methods: { double: { mode: 'request', idempotent: true } }\n} } }\nconst definition = definePlugin({ name: 'math', features: { api: defineFeature(() => ({ double: (value: number) => value * 3 })) }, install: () => ({}) })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error); console.error(error) }\nconst serverHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nconst hostMode = true\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'math-service', report, scheduler: systemScheduler,\n  budget: createUnitBudget({ kind: 'coroutine', maxUnits: 1 }),\n  restart: { mode: 'never' },\n  spec: { task: async ({ expose, signal }) => {\n    const [clientTransport, serverTransport] = createMemoryTransportPair()\n    const endpoint = await createEndpoint({ id: 'math-server', transport: serverTransport, middlewares: [connect(), ping(), abort()] }) as IRpcEndpoint\n    if (!hostMode) await serverHost.use(definition)\n    const served = hostMode\n      ? await serveRemoteHost({ host: serverHost, catalog: { math: contract }, resolvePlugin: () => definition, endpoint: { endpoint }, report })\n      : await serveRemotePlugin({ host: serverHost, contract, endpoint: { endpoint }, report, invocationContext: (context) => ({ sender: context.senderId }) })\n    expose({ transport: clientTransport, peerId: 'math-server', scheduler: systemScheduler,\n      agreement: { source: 'static', codec: identityCodec.id, capabilities: ['runtime-api@1'] },\n      pipeline: { codec: identityCodec, framer: messageFramerV1 }, features: [], close: async () => { clientTransport.close() }\n    })\n    try { await new Promise<void>((resolve) => {\n      if (signal.aborted) resolve()\n      else signal.addEventListener('abort', () => resolve(), { once: true })\n    }) } finally { await served.close() }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (unit) => unit.exposed\n}\nlet sequence = 0\nconst endpointFactory = async (channel: IRemoteChannel) => ({ endpoint: await createEndpoint({\n  id: 'math-client', transport: channel.transport, protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1, middlewares: [connect(), ping(), abort()]\n}) as IRpcEndpoint })\nif (hostMode) {\n  const client = createRemoteHost({ catalog: { math: contract }, binding, endpointFactory, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    callGuard: { beforeDispatch: ({ method }) => { if (method === 'forbidden') throw new Error('denied') } }\n  })\n  try {\n    await client.ready()\n    const proxy = await client.use('math')\n    console.log(await proxy.api!.double!([21]))\n    console.log(await client.inspect())\n    console.log(await client.unUse('math', { dryRun: true, policy: 'reject' }))\n  } finally { await client.release() }\n} else {\n  const clientHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  const remote = createRemotePlugin({ name: 'math', contract, binding, endpointFactory, host: clientHost.plugin, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    retryPort: { dispatch: (input) => input.sendOnce({ expectedGeneration: input.generation, key: input.key }) }\n  })\n  try {\n    const [handle] = await clientHost.use(remote)\n    const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n    console.log(await api.double([21]))\n  } finally { await clientHost.dispose() }\n}\nawait serverHost.dispose()\nconsole.log(supervisor.state, reports.length)\n",
+        "import { serveRemoteHost } from '@migaia/rpc-core/remote'\n\nconst service = await serveRemoteHost({\n  ...pricingServiceOptions,\n  report: (error) => reportToMonitoring(error)\n})",
       result: {
-        en: 'Prints 63 and ends with disposed 0. Only declared methods are served, and cleanup follows the original task lifetime.',
-        zh: '输出 63，最后为 disposed 0；仅服务已声明方法，清理仍随原任务生命周期。'
+        en: 'Background serving failures reach the local service monitor.',
+        zh: '后台服务故障进入本地服务监控。'
       },
-      covers: ['host', 'catalog', 'resolvePlugin', 'endpoint', 'report']
+      covers: ['report']
     }
   ],
   serveRemotePlugin: [
     {
       title: {
-        en: 'Serve adopted plugin features over a dedicated endpoint',
-        zh: '通过专用端点服务已采用插件功能'
+        en: 'Serve an already-installed pricing plugin',
+        zh: '公开已安装的价格插件'
       },
       problem: {
-        en: 'A real coroutine task constructs the dedicated endpoint, installs the public service and exposes its client side to the actual generation binding. The task owns cleanup.',
-        zh: '真实协程任务构造专用端点、安装公开服务，并把客户端一侧交给实际代次绑定；任务拥有清理。'
+        en: 'The local host already adopted its pricing plugin. Serve the matching contract on a dedicated endpoint so callers can use its declared methods without exposing host mutation controls.',
+        zh: '本地宿主已采用价格插件。在专用端点服务匹配的契约，让调用者使用声明的方法，而无需公开宿主变更控制。'
       },
       example:
-        "import { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { createEndpoint, connect, ping, abort, type IRpcEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createRemoteHost, createRemotePlugin, serveRemoteHost, serveRemotePlugin,\n  type IRemoteBinding, type IRemoteChannel, type IRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst contract: IRemoteContract = { schemaVersion: 1, plugin: 'math', features: { api: {\n  methods: { double: { mode: 'request', idempotent: true } }\n} } }\nconst definition = definePlugin({ name: 'math', features: { api: defineFeature(() => ({ double: (value: number) => value * 2 })) }, install: () => ({}) })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error); console.error(error) }\nconst serverHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nconst hostMode = false\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'math-service', report, scheduler: systemScheduler,\n  budget: createUnitBudget({ kind: 'coroutine', maxUnits: 1 }),\n  restart: { mode: 'never' },\n  spec: { task: async ({ expose, signal }) => {\n    const [clientTransport, serverTransport] = createMemoryTransportPair()\n    const endpoint = await createEndpoint({ id: 'math-server', transport: serverTransport, middlewares: [connect(), ping(), abort()] }) as IRpcEndpoint\n    if (!hostMode) await serverHost.use(definition)\n    const served = hostMode\n      ? await serveRemoteHost({ host: serverHost, catalog: { math: contract }, resolvePlugin: () => definition, endpoint: { endpoint }, report })\n      : await serveRemotePlugin({ host: serverHost, contract, endpoint: { endpoint }, report, invocationContext: (context) => ({ sender: context.senderId }) })\n    expose({ transport: clientTransport, peerId: 'math-server', scheduler: systemScheduler,\n      agreement: { source: 'static', codec: identityCodec.id, capabilities: ['runtime-api@1'] },\n      pipeline: { codec: identityCodec, framer: messageFramerV1 }, features: [], close: async () => { clientTransport.close() }\n    })\n    try { await new Promise<void>((resolve) => {\n      if (signal.aborted) resolve()\n      else signal.addEventListener('abort', () => resolve(), { once: true })\n    }) } finally { await served.close() }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (unit) => unit.exposed\n}\nlet sequence = 0\nconst endpointFactory = async (channel: IRemoteChannel) => ({ endpoint: await createEndpoint({\n  id: 'math-client', transport: channel.transport, protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1, middlewares: [connect(), ping(), abort()]\n}) as IRpcEndpoint })\nif (hostMode) {\n  const client = createRemoteHost({ catalog: { math: contract }, binding, endpointFactory, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    callGuard: { beforeDispatch: ({ method }) => { if (method === 'forbidden') throw new Error('denied') } }\n  })\n  try {\n    await client.ready()\n    const proxy = await client.use('math')\n    console.log(await proxy.api!.double!([21]))\n    console.log(await client.inspect())\n    console.log(await client.unUse('math', { dryRun: true, policy: 'reject' }))\n  } finally { await client.release() }\n} else {\n  const clientHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  const remote = createRemotePlugin({ name: 'math', contract, binding, endpointFactory, host: clientHost.plugin, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    retryPort: { dispatch: (input) => input.sendOnce({ expectedGeneration: input.generation, key: input.key }) }\n  })\n  try {\n    const [handle] = await clientHost.use(remote)\n    const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n    console.log(await api.double([21]))\n  } finally { await clientHost.dispose() }\n}\nawait serverHost.dispose()\nconsole.log(supervisor.state, reports.length)\n",
+        "import { serveRemotePlugin } from '@migaia/rpc-core/remote'\n\nconst service = await serveRemotePlugin({\n  host: pricingHost,\n  contract: pricingContract,\n  endpoint: { endpoint: pricingEndpoint },\n  report: (error) => reportToMonitoring(error)\n})\nonServiceClosed(() => service.close())",
       result: {
-        en: 'Prints 42 and ends with disposed 0. The actual service and supervisor are released without background diagnostics. Host mode also prints its inspect and dry-run removal state.',
-        zh: '输出 42，最后为 disposed 0；实际服务与监督器释放后未报告后台诊断。宿主模式还输出检查及移除预览状态。'
+        en: 'Callers can invoke the adopted plugin’s declared methods through its dedicated endpoint.',
+        zh: '调用者可通过专用端点调用已采用插件声明的方法。'
       },
-      covers: ['host', 'contract', 'endpoint', 'report', 'invocationContext']
+      covers: ['host', 'contract', 'endpoint', 'report']
     },
     {
       title: {
-        en: 'Change the actual adopted implementation without widening its contract',
-        zh: '只更换实际采用实现，保留契约范围'
+        en: 'Attach local caller context to pricing calls',
+        zh: '给价格调用附加本地调用方上下文'
       },
       problem: {
-        en: 'The application deploys a different implementation under the same declared method. Service lookup still reads the actual adopted Feature through its Host.',
-        zh: '应用在同一声明方法下部署不同实现，服务查找仍通过宿主读取实际已采用功能。'
+        en: 'A pricing feature needs the admitted sender identity for local auditing. Derive invocationContext from the serving RPC context; this value stays local instead of being added to serialized business arguments.',
+        zh: '价格功能需要使用已准入发送方身份进行本地审计。从服务端 RPC 上下文生成 invocationContext；该值留在本地，不会加入序列化业务参数。'
       },
       example:
-        "import { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { identityCodec } from '@migaia/serialize/codecs/identity/v1'\nimport { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport { createEndpoint, connect, ping, abort, type IRpcEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createRemoteHost, createRemotePlugin, serveRemoteHost, serveRemotePlugin,\n  type IRemoteBinding, type IRemoteChannel, type IRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst contract: IRemoteContract = { schemaVersion: 1, plugin: 'math', features: { api: {\n  methods: { double: { mode: 'request', idempotent: true } }\n} } }\nconst definition = definePlugin({ name: 'math', features: { api: defineFeature(() => ({ double: (value: number) => value * 3 })) }, install: () => ({}) })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error); console.error(error) }\nconst serverHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nconst hostMode = false\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'math-service', report, scheduler: systemScheduler,\n  budget: createUnitBudget({ kind: 'coroutine', maxUnits: 1 }),\n  restart: { mode: 'never' },\n  spec: { task: async ({ expose, signal }) => {\n    const [clientTransport, serverTransport] = createMemoryTransportPair()\n    const endpoint = await createEndpoint({ id: 'math-server', transport: serverTransport, middlewares: [connect(), ping(), abort()] }) as IRpcEndpoint\n    if (!hostMode) await serverHost.use(definition)\n    const served = hostMode\n      ? await serveRemoteHost({ host: serverHost, catalog: { math: contract }, resolvePlugin: () => definition, endpoint: { endpoint }, report })\n      : await serveRemotePlugin({ host: serverHost, contract, endpoint: { endpoint }, report, invocationContext: (context) => ({ sender: context.senderId }) })\n    expose({ transport: clientTransport, peerId: 'math-server', scheduler: systemScheduler,\n      agreement: { source: 'static', codec: identityCodec.id, capabilities: ['runtime-api@1'] },\n      pipeline: { codec: identityCodec, framer: messageFramerV1 }, features: [], close: async () => { clientTransport.close() }\n    })\n    try { await new Promise<void>((resolve) => {\n      if (signal.aborted) resolve()\n      else signal.addEventListener('abort', () => resolve(), { once: true })\n    }) } finally { await served.close() }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (unit) => unit.exposed\n}\nlet sequence = 0\nconst endpointFactory = async (channel: IRemoteChannel) => ({ endpoint: await createEndpoint({\n  id: 'math-client', transport: channel.transport, protocol: rpcProtocol, codec: identityCodec, framer: messageFramerV1, middlewares: [connect(), ping(), abort()]\n}) as IRpcEndpoint })\nif (hostMode) {\n  const client = createRemoteHost({ catalog: { math: contract }, binding, endpointFactory, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    callGuard: { beforeDispatch: ({ method }) => { if (method === 'forbidden') throw new Error('denied') } }\n  })\n  try {\n    await client.ready()\n    const proxy = await client.use('math')\n    console.log(await proxy.api!.double!([21]))\n    console.log(await client.inspect())\n    console.log(await client.unUse('math', { dryRun: true, policy: 'reject' }))\n  } finally { await client.release() }\n} else {\n  const clientHost = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  const remote = createRemotePlugin({ name: 'math', contract, binding, endpointFactory, host: clientHost.plugin, report,\n    keyFactory: () => 'operation-' + ++sequence, callDeadlineCapMs: 2000,\n    retryPort: { dispatch: (input) => input.sendOnce({ expectedGeneration: input.generation, key: input.key }) }\n  })\n  try {\n    const [handle] = await clientHost.use(remote)\n    const api = handle.getFeature('api') as { double(params: readonly number[]): Promise<number> }\n    console.log(await api.double([21]))\n  } finally { await clientHost.dispose() }\n}\nawait serverHost.dispose()\nconsole.log(supervisor.state, reports.length)\n",
+        "import { serveRemotePlugin } from '@migaia/rpc-core/remote'\n\nconst service = await serveRemotePlugin({\n  ...pricingServiceOptions,\n  invocationContext: (context) => ({ sender: context.senderId })\n})",
       result: {
-        en: 'Prints 63 and ends with disposed 0. Only declared methods are served, and cleanup follows the original task lifetime.',
-        zh: '输出 63，最后为 disposed 0；仅服务已声明方法，清理仍随原任务生命周期。'
+        en: 'The local feature receives caller context while its wire arguments keep the declared shape.',
+        zh: '本地功能取得调用方上下文，线上参数仍保持声明的形状。'
       },
-      covers: ['host', 'contract', 'endpoint', 'report', 'invocationContext']
+      covers: ['invocationContext']
     }
   ],
   createManagedRuntimePeer: [
     {
       title: {
-        en: 'Retain a real supervised generation for runtime calls',
-        zh: '为运行时调用持有真实受监督代次'
+        en: 'Keep pricing calls on the supervised generation',
+        zh: '让价格调用跟随受监督代次'
       },
       problem: {
-        en: 'The application binding owns a real coroutine task, actual MessagePorts and bilateral channel admission. bindEndpoint retains the served endpoint, and beforeRelease observes final generation release.',
-        zh: '应用绑定拥有真实协程任务、MessagePort 和双端通道准入。bindEndpoint 保留服务端点，beforeRelease 观察最终代次释放。'
+        en: 'The application already owns pricingBinding, whose supervisor launches the service and whose openChannel returns its real channel. The managed peer follows that binding across generations; it does not use direct spawn, connect or listen callbacks to acquire a channel. Checkout limits price requests to two seconds so it can show a retry action if the service does not answer.',
+        zh: '应用已持有 pricingBinding：其中的监督器启动服务，openChannel 返回真实通道。托管对端通过该绑定跟随代次变化，不使用直接 spawn、connect 或 listen 回调取得通道。结算页将价格请求限制在两秒内，服务未答复时即可提示重试。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createRuntimePeer, createManagedRuntimePeer, createRemoteRetryPort, normalizeRemoteContract, type IRemoteBinding, type IRemoteChannel } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nlet keys = 0\nlet retries = 0\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'managed-math', budget, report,\n  restart: { mode: 'never' }, ready: (handle) => handle.exposed.then(() => undefined),\n  spec: { task: async ({ expose, signal }) => {\n    const ports = new MessageChannel()\n    const provider = createRuntimePeer({\n      self: { name: 'math-provider', instanceId: 'provider-1' },\n      provide: { math: { double: (value: number) => value * 2 } }, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }), report,\n      connect: async (context) => createNodeThreadChannel(ports.port2, 'client-1', {\n        scheduler: systemScheduler, capabilities: context.capabilities\n      })\n    })\n    const channel = await createNodeThreadChannel(ports.port1, 'provider-1', {\n      scheduler: systemScheduler,\n      capabilities: [RpcCapability.ping, RpcCapability.close, RpcCapability.abort, RpcCapability.stream,\n        RpcCapability.batch, RpcCapability.runtimeApi, RpcCapability.forwardRoute]\n    })\n    expose(channel)\n    try {\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await (await provider).close()\n      ports.port1.close()\n      ports.port2.close()\n    }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (handle, signal) => {\n    if (signal.aborted) throw signal.reason\n    return handle.exposed\n  }\n}\nlet endpointBindings = 0\nlet beforeRelease = 0\nconst peer = await createManagedRuntimePeer({\n  self: { name: 'managed-client', instanceId: 'client-1' }, defaultTimeoutMs: 2000, report,\n  provide: { local: { api: { echo: (value: string) => value } } },\n  contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'local', features: { api: { methods: { echo: { mode: 'request', idempotent: false } } } } }),\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, callDeadlineCapMs: 2000,\n  keyFactory: () => `call-${++keys}`,\n  retryPort: { dispatch: (input) => { retries++; return createRemoteRetryPort({ events: input.events, scheduler: systemScheduler, report }).dispatch(input) } }\n}, binding, (_channel, endpoint) => { endpointBindings += 1; return endpoint }, undefined, async () => { beforeRelease += 1 })\ntry {\n  const result = await peer.request('math.double', 21)\n  console.log(result, endpointBindings, budget.inUse, keys, retries)\n\n\n} finally {\n  await peer.close()\n  budget.close()\n}\nconsole.log(supervisor.state, budget.inUse, beforeRelease, reports.length)\n\n\n\n\n",
+        "import { createManagedRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst prices = await createManagedRuntimePeer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  defaultTimeoutMs: 2000,\n  callDeadlineCapMs: 2000,\n  report: (error) => reportToMonitoring(error)\n}, pricingBinding)\ntry {\n  renderPrices(await prices.request('prices'))\n} finally {\n  await prices.close()\n}",
       result: {
-        en: 'Prints a successful 42 with one endpoint binding and one live budget lease, then disposed 0 1 0. Logical keys and retries follow the managed registration rather than the direct Peer dispatcher.',
-        zh: '输出成功结果 42、一次端点绑定和一个活动预算租约；最后输出 disposed 0 1 0。逻辑键与重试跟随托管登记，而非直接 Peer 派发器。'
+        en: 'Checkout calls the current ready pricing generation and releases its managed resources on close.',
+        zh: '结算页调用当前已就绪的价格服务代次，并在关闭时释放托管资源。'
       },
-      covers: [
-        'self',
-        'provide',
-        'providerLimits',
-        'defaultTimeoutMs',
-        'contract',
-        'report',
-        'keyFactory',
-        'retryPort',
-        'callDeadlineCapMs'
-      ]
+      covers: ['self', 'defaultTimeoutMs', 'callDeadlineCapMs', 'report']
     },
     {
       title: {
-        en: 'Protect and observe a real managed channel',
-        zh: '保护并观察真实托管通道'
+        en: 'Offer a small local callback API',
+        zh: '提供小范围本地回调接口'
       },
       problem: {
-        en: 'The managed client and its actual service use the same complete ephemeral signing and encryption configuration. Install a synchronous probe on the existing endpoint.',
-        zh: '托管客户端与实际服务使用同一完整临时签名加密配置，在现有端点安装同步探针。'
+        en: 'A supervised pricing service needs to call back into checkout for its current currency. Declare that callback contract and bound local provider work without changing how the binding acquires the remote channel.',
+        zh: '受监督的价格服务需要回调结算页读取当前币种。声明这项回调契约并限制本地处理任务，不改变绑定取得远端通道的方式。'
       },
       example:
-        "import { type IRpcAuthenticationConfig } from '@migaia/rpc-core'\nimport { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nimport { MessageChannel } from 'node:worker_threads'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createRuntimePeer, createManagedRuntimePeer, createRemoteRetryPort, normalizeRemoteContract, type IRemoteBinding, type IRemoteChannel } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nlet keys = 0\nlet retries = 0\nconst encoder = new TextEncoder()\nconst decoder = new TextDecoder()\nconst hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])\nconst aes = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])\nconst protection: IRpcAuthenticationConfig = {\n  encrypt: async (value) => {\n    const iv = crypto.getRandomValues(new Uint8Array(12))\n    const body = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, encoder.encode(JSON.stringify(value)))\n    return { iv: Array.from(iv), body: Array.from(new Uint8Array(body)) }\n  },\n  decrypt: async (value) => {\n    const encrypted = value as { iv: number[]; body: number[] }\n    const body = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(encrypted.iv) }, aes, new Uint8Array(encrypted.body))\n    return JSON.parse(decoder.decode(body))\n  },\n  encodedType: 'string',\n  sign: async (value) => {\n    const text = JSON.stringify(value)\n    const mac = await crypto.subtle.sign('HMAC', hmac, encoder.encode(text))\n    return JSON.stringify({ text, mac: Array.from(new Uint8Array(mac)) })\n  },\n  verify: async (value) => {\n    const signed = JSON.parse(String(value)) as { text: string; mac: number[] }\n    if (!await crypto.subtle.verify('HMAC', hmac, new Uint8Array(signed.mac), encoder.encode(signed.text))) throw new Error('Invalid signature')\n    return JSON.parse(signed.text)\n  }\n}\n\nconst observed: unknown[] = []\nconst probe = defineProbe({ stages: ['message'], emit: (event) => { observed.push(snapshotProbeEvent(event)) } })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'managed-math', budget, report,\n  restart: { mode: 'never' }, ready: (handle) => handle.exposed.then(() => undefined),\n  spec: { task: async ({ expose, signal }) => {\n    const ports = new MessageChannel()\n    const provider = createRuntimePeer({\n      authentication: protection, self: { name: 'math-provider', instanceId: 'provider-1' },\n      provide: { math: { double: (value: number) => value * 2 } }, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }), report,\n      connect: async (context) => createNodeThreadChannel(ports.port2, 'client-1', {\n        scheduler: systemScheduler, capabilities: context.capabilities\n      })\n    })\n    const channel = await createNodeThreadChannel(ports.port1, 'provider-1', {\n      scheduler: systemScheduler,\n      capabilities: [RpcCapability.ping, RpcCapability.close, RpcCapability.abort, RpcCapability.stream,\n        RpcCapability.batch, RpcCapability.runtimeApi, RpcCapability.forwardRoute]\n    })\n    expose(channel)\n    try {\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await (await provider).close()\n      ports.port1.close()\n      ports.port2.close()\n    }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (handle, signal) => {\n    if (signal.aborted) throw signal.reason\n    return handle.exposed\n  }\n}\nlet endpointBindings = 0\nlet beforeRelease = 0\nconst peer = await createManagedRuntimePeer({\n  authentication: protection, probe, self: { name: 'managed-client', instanceId: 'client-1' }, defaultTimeoutMs: 2000, report,\n  provide: { local: { api: { echo: (value: string) => value } } },\n  contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'local', features: { api: { methods: { echo: { mode: 'request', idempotent: false } } } } }),\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, callDeadlineCapMs: 2000,\n  keyFactory: () => `call-${++keys}`,\n  retryPort: { dispatch: (input) => { retries++; return createRemoteRetryPort({ events: input.events, scheduler: systemScheduler, report }).dispatch(input) } }\n}, binding, (_channel, endpoint) => { endpointBindings += 1; return endpoint }, undefined, async () => { beforeRelease += 1 })\ntry {\n  const result = await peer.request('math.double', 21)\n  console.log(result, observed.length > 0)\n\n\n} finally {\n  await peer.close()\n  budget.close()\n}\nconsole.log(supervisor.state, budget.inUse, beforeRelease, reports.length)\n\n\n\n\n",
+        "import { createManagedRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst prices = await createManagedRuntimePeer({\n  ...checkoutPeerOptions,\n  provide: { checkout: { api: { currency: () => selectedCurrency() } } },\n  contract: checkoutContract,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, pricingBinding)",
       result: {
-        en: 'Prints 42 true, then disposed 0 1 0. The probe sees messages and the real supervisor releases its only lease without background errors.',
-        zh: '输出 42 true，随后输出 disposed 0 1 0；探针看到消息，真实监督器释放唯一租约且无后台错误。'
+        en: 'The remote service can call the declared currency callback within its concurrency limits.',
+        zh: '远端服务可以在并发限制内调用已声明的币种回调。'
       },
-      covers: [
-        'authentication',
-        'authentication.encrypt',
-        'authentication.decrypt',
-        'authentication.sign',
-        'authentication.verify',
-        'authentication.encodedType',
-        'probe'
-      ]
-    },
-    {
-      title: {
-        en: 'Roll back a custom endpoint construction failure',
-        zh: '回滚自定义端点构造失败'
-      },
-      problem: {
-        en: 'A custom runtime cannot provide its complete endpoint. Reject its construction callback while the actual generation owner releases acquired resources.',
-        zh: '自定义运行时无法提供完整端点，构造回调拒绝后，由实际代次所有者释放已取得资源。'
-      },
-      example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createRuntimePeer, createManagedRuntimePeer, createRemoteRetryPort, normalizeRemoteContract, type IRemoteBinding, type IRemoteChannel } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nlet keys = 0\nlet retries = 0\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'managed-math', budget, report,\n  restart: { mode: 'never' }, ready: (handle) => handle.exposed.then(() => undefined),\n  spec: { task: async ({ expose, signal }) => {\n    const ports = new MessageChannel()\n    const provider = createRuntimePeer({\n      self: { name: 'math-provider', instanceId: 'provider-1' },\n      provide: { math: { double: (value: number) => value * 2 } }, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }), report,\n      connect: async (context) => createNodeThreadChannel(ports.port2, 'client-1', {\n        scheduler: systemScheduler, capabilities: context.capabilities\n      })\n    })\n    const channel = await createNodeThreadChannel(ports.port1, 'provider-1', {\n      scheduler: systemScheduler,\n      capabilities: [RpcCapability.ping, RpcCapability.close, RpcCapability.abort, RpcCapability.stream,\n        RpcCapability.batch, RpcCapability.runtimeApi, RpcCapability.forwardRoute]\n    })\n    expose(channel)\n    try {\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await (await provider).close()\n      ports.port1.close()\n      ports.port2.close()\n    }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (handle, signal) => {\n    if (signal.aborted) throw signal.reason\n    return handle.exposed\n  }\n}\nconst unavailable = new Error('managed endpoint unavailable')\ntry {\n  await createManagedRuntimePeer({ self: { name: 'managed-client', instanceId: 'client-1' }, endpointFactory: async () => { throw unavailable }, report }, binding)\n} catch (error) { console.log(error === unavailable) }\nfinally { await supervisor.dispose(); budget.close() }\nconsole.log(supervisor.state, budget.inUse)",
-      result: {
-        en: 'Prints true and disposed 0. The original callback error remains the primary failure, and the real unit budget returns to zero.',
-        zh: '输出 true 和 disposed 0；回调原错误仍是主要失败，真实执行单元预算回到零。'
-      },
-      covers: ['endpointFactory']
-    },
-    {
-      title: {
-        en: 'Let the binding select the managed source',
-        zh: '由绑定选择托管来源'
-      },
-      problem: {
-        en: 'Managed construction uses binding.openChannel. Inherited direct-source callbacks are not the acquisition path, even if present on the shared options shape.',
-        zh: '托管构造使用 binding.openChannel；共享选项中即使带有直接来源回调，也不由它们取得通道。'
-      },
-      example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor, type ICoroutineHandle, type ICoroutineSpec } from '@migaia/supervision/coroutine'\nimport { createRuntimePeer, createManagedRuntimePeer, createRemoteRetryPort, normalizeRemoteContract, type IRemoteBinding, type IRemoteChannel } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nlet sources = 0\nlet keys = 0\nlet retries = 0\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })\nconst supervisor = createCoroutineSupervisor<IRemoteChannel>({\n  id: 'managed-math', budget, report,\n  restart: { mode: 'never' }, ready: (handle) => handle.exposed.then(() => undefined),\n  spec: { task: async ({ expose, signal }) => {\n    const ports = new MessageChannel()\n    const provider = createRuntimePeer({\n      self: { name: 'math-provider', instanceId: 'provider-1' },\n      provide: { math: { double: (value: number) => value * 2 } }, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }), report,\n      connect: async (context) => createNodeThreadChannel(ports.port2, 'client-1', {\n        scheduler: systemScheduler, capabilities: context.capabilities\n      })\n    })\n    const channel = await createNodeThreadChannel(ports.port1, 'provider-1', {\n      scheduler: systemScheduler,\n      capabilities: [RpcCapability.ping, RpcCapability.close, RpcCapability.abort, RpcCapability.stream,\n        RpcCapability.batch, RpcCapability.runtimeApi, RpcCapability.forwardRoute]\n    })\n    expose(channel)\n    try {\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await (await provider).close()\n      ports.port1.close()\n      ports.port2.close()\n    }\n  } }\n})\nconst binding: IRemoteBinding<ICoroutineHandle<IRemoteChannel>, ICoroutineSpec<IRemoteChannel>> = {\n  ownership: 'owned', supervisor, scheduler: systemScheduler,\n  openChannel: async (handle, signal) => {\n    if (signal.aborted) throw signal.reason\n    return handle.exposed\n  }\n}\nlet endpointBindings = 0\nlet beforeRelease = 0\nconst peer = await createManagedRuntimePeer({\n  spawn: async () => { sources++; throw new Error('source not selected') }, connect: async () => { sources++; throw new Error('source not selected') }, listen: async () => { sources++; throw new Error('source not selected') }, self: { name: 'managed-client', instanceId: 'client-1' }, defaultTimeoutMs: 2000, report,\n  provide: { local: { api: { echo: (value: string) => value } } },\n  contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'local', features: { api: { methods: { echo: { mode: 'request', idempotent: false } } } } }),\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, callDeadlineCapMs: 2000,\n  keyFactory: () => `call-${++keys}`,\n  retryPort: { dispatch: (input) => { retries++; return createRemoteRetryPort({ events: input.events, scheduler: systemScheduler, report }).dispatch(input) } }\n}, binding, (_channel, endpoint) => { endpointBindings += 1; return endpoint }, undefined, async () => { beforeRelease += 1 })\ntry {\n  const result = await peer.request('math.double', 21)\n  console.log(result, sources)\n\n\n} finally {\n  await peer.close()\n  budget.close()\n}\nconsole.log(supervisor.state, budget.inUse, beforeRelease, reports.length)\n\n\n\n\n",
-      result: {
-        en: 'Prints 42 0 before disposed 0 1 0. None of the three inherited callbacks is invoked; the binding owns actual acquisition.',
-        zh: '先输出 42 0，随后输出 disposed 0 1 0；三个继承回调均未调用，实际取得通道由绑定负责。'
-      },
-      covers: ['spawn', 'connect', 'listen']
+      covers: ['provide', 'contract', 'providerLimits']
     }
   ],
   createCoroutinePlugin: [
     {
       title: {
-        en: 'Keep cooperative work with its parent Host',
-        zh: '让协作任务跟随父宿主'
+        en: 'Run pricing work within the parent host',
+        zh: '在父宿主内运行价格协作任务'
       },
       problem: {
-        en: 'A parent task installs its actual child connection using the opaque connect token. Both Hosts dispose in their original ownership order and the task waits for cancellation.',
-        zh: '父任务使用不透明 connect 令牌安装真实子连接，两个宿主按原所有权顺序释放，任务等待取消后结束。'
+        en: 'A plugin host needs a cooperatively cancellable pricing task. runPricingTask receives the task’s connect input and signal, serves prices in a child host, and disposes that host when cancelled. The explicit remote type makes the outlet request checked by TypeScript. The five-second startup budget bounds waiting for the child service to become ready.',
+        zh: '插件宿主需要可协作取消的价格任务。runPricingTask 接收任务的 connect 输入与 signal，在子宿主提供价格服务，并在取消时释放子宿主。显式远端类型让 TypeScript 检查出口请求；五秒启动预算限制等待子服务就绪的时间。'
       },
       example:
-        "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst service = createCoroutinePlugin<{ double(value: number): number }>({\n name: 'math', self: { name: 'math-parent', instanceId: 'parent-1' }, report, defaultTimeoutMs: 2000, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, supervisor: { restart: { mode: 'never' }, startupTimeoutMs: 2000 },\n task: async ({ connect, signal }) => {\n  const parent = createCoroutinePlugin({ name: 'parent', self: { name: 'math-child', instanceId: 'child-1' }, report, connect, provide: { double: (value: number) => value * 2 } })\n  const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  try {\n   await child.use(parent)\n   await new Promise<void>((resolve) => {\n    if (signal.aborted) resolve()\n    else signal.addEventListener('abort', () => resolve(), { once: true })\n   })\n  } finally { await child.dispose() }\n }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\ntry { await host.use(service); console.log(await host.coroutine!.request('math', 'double', 21)) }\nfinally { await host.dispose() }\nconsole.log(reports.length)",
+        "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\ntype IPricing = { prices(): number[] }\nconst pricing = createCoroutinePlugin<IPricing>({\n  name: 'pricing',\n  task: ({ connect, signal, heartbeat }) => runPricingTask({ connect, signal, heartbeat }),\n  supervisor: { startupTimeoutMs: 5000 }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof pricing]>(hostConfiguration)\ntry {\n  await host.use(pricing)\n  renderPrices(await host.coroutine!.request('pricing', 'prices'))\n} finally {\n  await host.dispose()\n}",
       result: {
-        en: 'Prints 42 then 0. The real child handles double, the selected supervisor does not restart, and no background diagnostics are recorded. The explicit remote generic keeps the request method callable in TypeScript.',
-        zh: '先输出 42，再输出 0；真实子端处理 double，所选监督策略不重启，未记录后台诊断。显式远程泛型确保 TypeScript 允许调用该请求方法。'
+        en: 'The host exposes a typed pricing outlet and owns cancellation and cleanup of the task.',
+        zh: '宿主提供带类型的价格出口，并拥有该任务的取消与清理责任。'
       },
-      covers: [
-        'name',
-        'provide',
-        'task',
-        'supervisor',
-        'connect',
-        'self',
-        'providerLimits',
-        'report',
-        'defaultTimeoutMs'
-      ]
+      covers: ['name', 'task', 'supervisor']
     },
     {
       title: {
-        en: 'Protect a typed cooperative service and its declared methods',
-        zh: '保护带类型的协作服务与声明方法'
+        en: 'Let a child task serve its parent connection',
+        zh: '让子任务服务父连接'
       },
       problem: {
-        en: 'Both genuine coroutine peers receive the same signing and encryption transforms. The child narrows its real provide map with an explicit remote contract and the parent observes actual messages.',
-        zh: '两个真实协程对端接收同一签名加密转换；子端用明确远程契约收窄实际 provide 映射，父端观察真实消息。'
+        en: 'Inside runPricingTask, the task-provided connect input is the child’s connection to its parent. Install a coroutine plugin with that input and the pricing handler; the surrounding child host owns its disposal.',
+        zh: '在 runPricingTask 内，任务提供的 connect 输入就是子任务连接父宿主的通道来源。用它和价格处理函数安装协程插件，再由外层子宿主负责释放。'
       },
       example:
-        "import { type IRpcAuthenticationConfig } from '@migaia/rpc-core'\nimport { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nimport { normalizeRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst encoder = new TextEncoder()\nconst decoder = new TextDecoder()\nconst hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])\nconst aes = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])\nconst protection: IRpcAuthenticationConfig = {\n  encrypt: async (value) => {\n    const iv = crypto.getRandomValues(new Uint8Array(12))\n    const body = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, encoder.encode(JSON.stringify(value)))\n    return { iv: Array.from(iv), body: Array.from(new Uint8Array(body)) }\n  },\n  decrypt: async (value) => {\n    const encrypted = value as { iv: number[]; body: number[] }\n    const body = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(encrypted.iv) }, aes, new Uint8Array(encrypted.body))\n    return JSON.parse(decoder.decode(body))\n  },\n  encodedType: 'string',\n  sign: async (value) => {\n    const text = JSON.stringify(value)\n    const mac = await crypto.subtle.sign('HMAC', hmac, encoder.encode(text))\n    return JSON.stringify({ text, mac: Array.from(new Uint8Array(mac)) })\n  },\n  verify: async (value) => {\n    const signed = JSON.parse(String(value)) as { text: string; mac: number[] }\n    if (!await crypto.subtle.verify('HMAC', hmac, new Uint8Array(signed.mac), encoder.encode(signed.text))) throw new Error('Invalid signature')\n    return JSON.parse(signed.text)\n  }\n}\n\nconst observed: unknown[] = []\nconst probe = defineProbe({ stages: ['message'], emit: (event) => { observed.push(snapshotProbeEvent(event)) } })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst service = createCoroutinePlugin<{ math: { calc: { double(value: number): number } } }>({\n authentication: protection, probe, keyFactory: () => 'local-key', retryPort: { dispatch: (input) => input.sendOnce({ expectedGeneration: input.generation, key: input.key }) }, name: 'math', self: { name: 'math-parent', instanceId: 'parent-1' }, report, defaultTimeoutMs: 2000, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, supervisor: { restart: { mode: 'never' }, startupTimeoutMs: 2000 },\n task: async ({ connect, signal }) => {\n  const parent = createCoroutinePlugin({ authentication: protection, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'math', features: { calc: { methods: { double: { mode: 'request', idempotent: true } } } } }), name: 'parent', self: { name: 'math-child', instanceId: 'child-1' }, report, connect, provide: { math: { calc: { double: (value: number) => value * 2 } } } })\n  const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  try {\n   await child.use(parent)\n   await new Promise<void>((resolve) => {\n    if (signal.aborted) resolve()\n    else signal.addEventListener('abort', () => resolve(), { once: true })\n   })\n  } finally { await child.dispose() }\n }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\ntry { await host.use(service); console.log(await host.coroutine!.request('math', 'math.calc.double', 21)) }\nfinally { await host.dispose() }\nconsole.log(reports.length, observed.length > 0, reports.every((error) => (error as { code?: string }).code === 'AUTHENTICATION_FAILED'))",
+        "import { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst parent = createCoroutinePlugin({\n  name: 'parent',\n  self: { name: 'pricing-child', instanceId: childInstanceId },\n  connect: context.connect,\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  defaultTimeoutMs: 2000\n})\nawait childHost.use(parent)",
       result: {
-        en: 'Prints 42 and 2 true true in this Bun run. The declared business method succeeds and the probe sees messages; this coroutine configuration also reports two AUTHENTICATION_FAILED diagnostics when its verification callback receives non-protected objects. The callbacks reject those objects instead of bypassing verification, so this is not a clean diagnostic-free lifecycle.',
-        zh: '本次 Bun 运行输出 42 和 2 true true。声明业务方法成功，探针看到了消息；此协程配置还记录两项 AUTHENTICATION_FAILED，原因是校验回调收到了未保护对象。回调拒绝这些对象，没有绕过校验，因此本例不能宣称生命周期中没有诊断。'
+        en: 'The child serves prices over the real parent connection with bounded provider work.',
+        zh: '子任务通过真实父连接提供价格服务，并限制处理任务并发。'
       },
-      covers: [
-        'authentication',
-        'authentication.encrypt',
-        'authentication.decrypt',
-        'authentication.sign',
-        'authentication.verify',
-        'authentication.encodedType',
-        'probe',
-        'contract',
-        'keyFactory',
-        'retryPort'
-      ]
+      covers: ['self', 'connect', 'provide', 'providerLimits', 'defaultTimeoutMs']
     },
     {
       title: {
-        en: 'Rollback an unavailable custom cooperative endpoint',
-        zh: '回滚不可用的自定义协作端点'
+        en: 'Expose an approved child-host catalog',
+        zh: '公开获准的子宿主目录'
       },
       problem: {
-        en: 'The owning Host cannot acquire the application endpoint. Reject from the custom factory and let the existing install transaction and supervisor clean up.',
-        zh: '拥有宿主无法取得应用端点，自定义工厂拒绝后，由现有安装事务和监督器清理。'
+        en: 'An administration parent needs host controls for a known child catalog. Expose host controls explicitly, bind them to the actual child host and resolve only approved catalog definitions.',
+        zh: '管理父任务需要控制已知目录中的子宿主功能。显式公开 host 控制，绑定真实子宿主，并只解析获准的目录定义。'
       },
       example:
-        "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst unavailable = new Error('coroutine endpoint unavailable')\nconst service = createCoroutinePlugin<{ double(value: number): number }>({\n endpointFactory: async () => { throw unavailable }, name: 'math', self: { name: 'math-parent', instanceId: 'parent-1' }, report, defaultTimeoutMs: 2000, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, supervisor: { restart: { mode: 'never' }, startupTimeoutMs: 2000 },\n task: async ({ connect, signal }) => {\n  const parent = createCoroutinePlugin({ name: 'parent', self: { name: 'math-child', instanceId: 'child-1' }, report, connect, provide: { double: (value: number) => value * 2 } })\n  const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  try {\n   await child.use(parent)\n   await new Promise<void>((resolve) => {\n    if (signal.aborted) resolve()\n    else signal.addEventListener('abort', () => resolve(), { once: true })\n   })\n  } finally { await child.dispose() }\n }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\ntry { await host.use(service) } catch (error) { console.log((error as Error).cause === unavailable) }\nfinally { await host.dispose() }\nconsole.log(reports.length)",
+        "import { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst parent = createCoroutinePlugin({\n  name: 'parent',\n  connect: context.connect,\n  expose: ['host'],\n  host: childHost,\n  catalog: pricingCatalog,\n  resolvePlugin: (name) => resolveApprovedPlugin(name)\n})",
       result: {
-        en: 'Prints true then 0. Host installation wraps the application failure and retains it on cause; cleanup records no background diagnostic.',
-        zh: '先输出 true，再输出 0；宿主安装包装应用失败，并在 cause 保留原错误，清理未记录后台诊断。'
-      },
-      covers: ['endpointFactory']
-    },
-    {
-      title: {
-        en: 'Expose only the actual child Host’s declared catalog',
-        zh: '仅公开真实子宿主的已声明目录'
-      },
-      problem: {
-        en: 'The child explicitly exposes host controls from its own actual Host. The local catalog resolver returns a real plugin definition; no definition travels across the channel.',
-        zh: '子端明确公开自身真实宿主的控制，本地目录解析器返回实际插件定义，不通过通道传输定义。'
-      },
-      example:
-        "import { RemoteMethodName, type IRemoteHostCatalog } from '@migaia/rpc-core/remote'\nimport { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst business = definePlugin({ name: 'math', features: { api: defineFeature(() => ({ double: (value: number) => value * 2 })) }, install: () => ({}) })\nconst catalog: IRemoteHostCatalog = { math: { schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } } }\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst service = createCoroutinePlugin<{ double(value: number): number }>({\n name: 'math', self: { name: 'math-parent', instanceId: 'parent-1' }, report, defaultTimeoutMs: 2000, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, supervisor: { restart: { mode: 'never' }, startupTimeoutMs: 2000 },\n task: async ({ connect, signal }) => {\n  const child = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\n  const parent = createCoroutinePlugin({ name: 'parent', expose: ['host'], host: child, catalog, resolvePlugin: (name) => { if (name !== 'math') throw new Error('unknown plugin'); return business }, self: { name: 'math-child', instanceId: 'child-1' }, report, connect, provide: { double: (value: number) => value * 2 } })\n  \n  try {\n   await child.use(parent)\n   await new Promise<void>((resolve) => {\n    if (signal.aborted) resolve()\n    else signal.addEventListener('abort', () => resolve(), { once: true })\n   })\n  } finally { await child.dispose() }\n }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\ntry {\n  await host.use(service)\n  const outlet = Reflect.get(host, 'coroutine') as { request(target: string, method: string, payload: unknown): Promise<unknown> }\n  console.log(await outlet.request('math', 'double', 21))\n  await outlet.request('math', RemoteMethodName.hostUse, ['math'])\n  const state = await outlet.request('math', RemoteMethodName.hostInspect, []) as { plugins: unknown[] }\n  console.log(state.plugins.length)\n}\nfinally { await host.dispose() }\nconsole.log(reports.length)",
-      result: {
-        en: 'Prints 42, 1 and 0. The child handles the business call, its same Host adopts one declared plugin, and cleanup reports no background errors.',
-        zh: '依次输出 42、1、0；子端处理业务调用，同一宿主采用一个已声明插件，清理未报告后台错误。'
+        en: 'The parent can use declared child-host controls without opening arbitrary plugin resolution.',
+        zh: '父任务可使用声明的子宿主控制，同时不会开放任意插件解析。'
       },
       covers: ['expose', 'host', 'catalog', 'resolvePlugin']
     }
@@ -1741,941 +1282,1584 @@ export const rpcCoreOptionCases: Readonly<Record<string, readonly IOptionCaseDoc
   createRuntimePlugin: [
     {
       title: {
-        en: 'Acquire a real Host slot for an application adapter',
-        zh: '为应用适配器取得真实宿主槽位'
+        en: 'Install a platform link in the host',
+        zh: '在宿主安装平台链路'
       },
       problem: {
-        en: 'An adapter author reuses the real PluginHost integration and a stable family identity. The third argument delegates to a public message adapter, which opens the original MessagePorts.',
-        zh: '适配器作者复用真实 PluginHost 集成与稳定家族身份，第三参数交给公开消息适配器打开原始 MessagePort。'
+        en: 'A platform adapter needs its runtime outlet to share the host’s existing slot. Reuse the adapter’s integration and peer factory; they own platform acquisition, while name and self identify this link.',
+        zh: '平台适配器需要让运行时出口复用宿主已有槽位。复用适配器的 integration 与 peer 工厂，由它们负责平台资源取得；name 与 self 标记当前链路。'
       },
       example:
-        "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nimport { createRuntimePlugin, RuntimePluginKey } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\n\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst ports = new MessageChannel()\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst provider = adapter.peer({\n  self: { name: 'math-provider', instanceId: 'provider-1' }, connect: ports.port2,\n  provide: { math: { double: (value: number) => value * 2 } }, report\n})\nconst family = Object.freeze({})\nlet acquisitions = 0\nconst plugin = createRuntimePlugin({\n  name: 'math-link', self: { name: 'host', instanceId: 'host-1' }, connect: ports.port1, report\n}, {\n  key: 'thread',\n  acquire: (integration, create) => {\n    acquisitions += 1\n    return integration.acquireSharedSlot(RuntimePluginKey.thread, family, create)\n  }\n}, (options) => adapter.peer({ ...options, spawn: undefined, listen: undefined, connect: ports.port1 }))\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(plugin)\n  const outlet = Reflect.get(host, RuntimePluginKey.thread) as {\n    request(target: string, method: string, value: number): Promise<unknown>\n  }\n  const result = await outlet.request('math-link', 'math.double', 21)\n  console.log(result, acquisitions)\n\n\n} finally {\n  await host.dispose()\n  await (await provider).close()\n  ports.port1.close()\n  ports.port2.close()\n}\n\n",
+        "import { createRuntimePlugin } from '@migaia/rpc-core/remote'\n\nconst pricing = createRuntimePlugin({\n  name: 'pricing-link',\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  connect: pricingSource,\n  report: (error) => reportToMonitoring(error)\n}, platformIntegration, createPlatformPeer)\nawait applicationHost.use(pricing)",
       result: {
-        en: 'Prints 42 1. One genuine Host slot is acquired and the real provider serves the call. Host disposal precedes borrowed port cleanup.',
-        zh: '输出 42 1；取得一次真实宿主槽位，真实处理方完成调用，先释放宿主再清理借入端口。'
+        en: 'The host owns the installed platform outlet and releases the shared link with its lifecycle.',
+        zh: '宿主拥有安装后的平台出口，并在自身生命周期结束时释放共享链路。'
       },
       covers: ['name', 'self', 'connect', 'report']
     },
     {
       title: {
-        en: 'Expose declared controls of the same actual Host',
-        zh: '公开同一真实宿主的已声明控制'
+        en: 'Serve the host’s approved catalog over the link',
+        zh: '通过链路服务宿主的获准目录'
       },
       problem: {
-        en: 'The application explicitly exposes host and passes that exact Host, catalog and local plugin resolver. Core rejects a different Host owner. The remote caller uses the public reserved method names.',
-        zh: '应用明确公开 host，并传入同一宿主、目录与本地插件解析器；Core 会拒绝其他宿主所有者。远端调用公开保留方法名。'
+        en: 'A platform link must allow remote administration of a specific local host. Expose host controls only with that host’s declared catalog and application resolver.',
+        zh: '平台链路需要允许远端管理指定本地宿主。仅对该宿主声明的目录和应用解析器公开 host 控制。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { createRuntimePlugin, createRuntimePeer, RuntimePluginKey, RemoteMethodName, type IRemoteHostCatalog } from '@migaia/rpc-core/remote'\nimport { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst ports = new MessageChannel()\nconst business = definePlugin({\n  name: 'math',\n  features: { api: defineFeature(() => ({ double: (value: number) => value * 2 })) },\n  install: () => ({})\n})\nconst catalog: IRemoteHostCatalog = {\n  math: { schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }\n}\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\nconst caller = createRuntimePeer({\n  self: { name: 'controller', instanceId: 'controller-1' }, report,\n  connect: async (context) => createNodeThreadChannel(ports.port2, 'host-1', {\n    scheduler: systemScheduler, capabilities: context.capabilities\n  })\n})\nvoid caller.catch(() => undefined)\nconst family = Object.freeze({})\nlet acquisitions = 0\nconst runtime = createRuntimePlugin({\n  name: 'control-link', self: { name: 'host', instanceId: 'host-1' },\n  expose: ['host'], host, catalog,\n  resolvePlugin: (name) => {\n    if (name !== 'math') throw new Error('unknown catalog entry')\n    return business\n  },\n  connect: async (context: { capabilities: readonly string[] }) => createNodeThreadChannel(ports.port1, 'controller-1', {\n    scheduler: systemScheduler, capabilities: context.capabilities\n  }),\n  report\n}, {\n  key: 'thread',\n  acquire: (integration, create) => {\n    acquisitions += 1\n    return integration.acquireSharedSlot(RuntimePluginKey.thread, family, create)\n  }\n})\ntry {\n  await host.use(runtime)\n  const remote = await caller\n  const before = await remote.request(RemoteMethodName.hostInspect, []) as { plugins: unknown[] }\n  console.log(before.plugins.length)\n  const installed = await remote.request(RemoteMethodName.hostUse, ['math']) as { name: string; state: string }\n  console.log(installed.state, installed.name)\n  const after = await remote.request(RemoteMethodName.hostInspect, []) as { plugins: { name: string }[] }\n  console.log(after.plugins.length, acquisitions)\n\n\n\n\n\n\n} catch (error) {\n  console.error('host primary', error)\n  throw error\n} finally {\n  await host.dispose()\n  ports.port1.close()\n  ports.port2.close()\n  await (await caller).close()\n}\n\n",
+        "import { createRuntimePlugin } from '@migaia/rpc-core/remote'\n\nconst administration = createRuntimePlugin({\n  ...platformLinkOptions,\n  expose: ['host'],\n  host: applicationHost,\n  catalog: pricingCatalog,\n  resolvePlugin: (name) => resolveApprovedPlugin(name)\n}, platformIntegration, createPlatformPeer)",
       result: {
-        en: "Prints 0, enabled math and 1 1. The declared math definition is installed through the real Host and the shared slot is acquired once. Host control payloads are argument arrays: ['math'] and [].",
-        zh: "依次输出 0、enabled math、1 1；声明的 math 定义通过真实宿主安装，共享槽位取得一次。宿主控制负载为参数数组： ['math'] 和 []。"
+        en: 'Remote administration is limited to the declared catalog of the selected local host.',
+        zh: '远端管理范围限于所选本地宿主声明的目录。'
       },
       covers: ['expose', 'host', 'catalog', 'resolvePlugin']
     },
     {
       title: {
-        en: 'Roll back a failed custom runtime endpoint',
-        zh: '回滚失败的自定义运行端点'
+        en: 'Bound callbacks into the local host',
+        zh: '限制对本地宿主的回调'
       },
       problem: {
-        en: 'A genuine Host install acquires the native channel, then the application endpoint factory fails. Preserve that original cause and do not publish the shared outlet.',
-        zh: '真实宿主安装取得原生通道后，应用端点工厂失败；应保留原始原因，并且不发布共享出口。'
+        en: 'The platform peer also serves a small checkout callback API. Register its contract and limit concurrent provider work so remote lookups do not overwhelm the local host.',
+        zh: '平台对端还需要提供小范围结算回调接口。登记其契约并限制处理任务并发，避免远端查询压满本地宿主。'
       },
       example:
-        "import { MessageChannel } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nimport { createRuntimePlugin, RuntimePluginKey } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\n\nconst failure = new Error('application endpoint setup failed')\nconst reports: unknown[] = []\nconst ports = new MessageChannel()\nconst adapter = defineMessageAdapter<typeof ports.port1>({ open: (port) => port })\nconst other = adapter.peer({ self: { name: 'caller', instanceId: 'caller-1' }, connect: ports.port2, report: (error) => { reports.push(error) } })\nconst otherOutcome = other.then((peer) => ({ peer }), (error: unknown) => ({ error }))\nconst family = Object.freeze({})\nlet endpointCalls = 0\nconst runtime = createRuntimePlugin({\n  name: 'broken-link', self: { name: 'broken-host', instanceId: 'broken-host-1' }, connect: ports.port1,\n  endpointFactory: async () => { endpointCalls += 1; throw failure },\n  report: (error) => { reports.push(error) }\n}, {\n  key: 'thread', acquire: (integration, create) => integration.acquireSharedSlot(RuntimePluginKey.thread, family, create)\n}, (options) => adapter.peer({ ...options, spawn: undefined, listen: undefined, connect: ports.port1 }))\nconst host = defineHost<Record<string, never>, never, readonly [typeof runtime]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  const outcome = await host.use(runtime).then(() => undefined, (error: unknown) => error)\n  let original = false\n  for (let current: unknown = outcome; current && typeof current === 'object'; current = Reflect.get(current, 'cause')) {\n    if (current === failure) original = true\n  }\n  console.log(original, endpointCalls, Reflect.get(host, RuntimePluginKey.thread) === undefined)\n\n\n\n} finally {\n  await host.dispose()\n  ports.port1.close()\n  ports.port2.close()\n  const settled = await otherOutcome\n  if ('peer' in settled) await settled.peer.close()\n}\n",
+        "import { createRuntimePlugin } from '@migaia/rpc-core/remote'\n\nconst pricing = createRuntimePlugin({\n  ...platformLinkOptions,\n  provide: { checkout: { api: { currency: () => selectedCurrency() } } },\n  contract: checkoutContract,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  defaultTimeoutMs: 2000\n}, platformIntegration, createPlatformPeer)",
       result: {
-        en: 'Prints true 1 true. The original failure is in the Host error cause chain, the callback runs once, and the rolled-back outlet is absent.',
-        zh: '输出 true 1 true；宿主错误原因链含原失败，回调运行一次，回滚后的出口不存在。'
+        en: 'The callback API keeps its declared shape and provider concurrency budget.',
+        zh: '回调接口保持声明的形状，并使用设定的处理并发预算。'
       },
-      covers: ['endpointFactory']
-    },
-    {
-      title: {
-        en: 'Set local runtime policy on the real shared connection',
-        zh: '为真实共享连接设置本地运行策略'
-      },
-      problem: {
-        en: 'A Host adapter publishes local own-data methods while calling the actual remote provider. The advanced contract narrows the local map, and quotas and default waiting budget stay with that installed connection.',
-        zh: '宿主适配器公开本地自有数据方法，同时调用真实远端处理方；高级契约收窄本地映射，限额与默认等待预算留在该已安装连接。'
-      },
-      example:
-        "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nimport { createRuntimePlugin, RuntimePluginKey, normalizeRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\n\nlet keys = 0\nlet retries = 0\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst ports = new MessageChannel()\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst provider = adapter.peer({\n  self: { name: 'math-provider', instanceId: 'provider-1' }, connect: ports.port2,\n  provide: { math: { double: (value: number) => value * 2 } }, report\n})\nconst family = Object.freeze({})\nlet acquisitions = 0\nconst plugin = createRuntimePlugin({\n  name: 'math-link', defaultTimeoutMs: 2000, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, provide: { local: { api: { echo: (value: string) => value } } }, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'local', features: { api: { methods: { echo: { mode: 'request', idempotent: false } } } } }), keyFactory: () => `call-${++keys}`, retryPort: { dispatch: (input) => { retries++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } }, self: { name: 'host', instanceId: 'host-1' }, connect: ports.port1, report\n}, {\n  key: 'thread',\n  acquire: (integration, create) => {\n    acquisitions += 1\n    return integration.acquireSharedSlot(RuntimePluginKey.thread, family, create)\n  }\n}, (options) => adapter.peer({ ...options, spawn: undefined, listen: undefined, connect: ports.port1 }))\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(plugin)\n  const outlet = Reflect.get(host, RuntimePluginKey.thread) as {\n    request(target: string, method: string, value: number): Promise<unknown>\n  }\n  const result = await outlet.request('math-link', 'math.double', 21)\n  console.log(result, acquisitions); console.log(keys, retries)\n\n\n} finally {\n  await host.dispose()\n  await (await provider).close()\n  ports.port1.close()\n  ports.port2.close()\n}\n\n",
-      result: {
-        en: 'Prints 42 1 through the genuine slot and message adapter. The local echo contract does not widen the remote math directory. A final 0 0 confirms this direct adapter dispatch does not consume keyFactory or retryPort.',
-        zh: '经真实槽位和消息适配器输出 42 1；本地 echo 契约不会扩大远端 math 目录。 最后的 0 0 确认此直接适配器派发未使用 keyFactory 或 retryPort。'
-      },
-      covers: [
-        'provide',
-        'providerLimits',
-        'defaultTimeoutMs',
-        'contract',
-        'keyFactory',
-        'retryPort'
-      ]
-    },
-    {
-      title: {
-        en: 'Protect both actual sides of the adapter connection',
-        zh: '保护适配器连接的两个真实端点'
-      },
-      problem: {
-        en: 'Both the real provider and the installed Host plugin use complete AES-GCM and HMAC transforms. The probe snapshots observations while their synchronous views are valid.',
-        zh: '真实处理方与已安装宿主插件均使用完整 AES-GCM 和 HMAC 转换；探针在同步视图有效时保存观察快照。'
-      },
-      example:
-        "import { type IRpcAuthenticationConfig } from '@migaia/rpc-core'\nimport { defineProbe, snapshotProbeEvent } from '@migaia/rpc-core/probe'\nimport { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nimport { createRuntimePlugin, RuntimePluginKey, normalizeRemoteContract } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\n\nlet keys = 0\nlet retries = 0\nconst encoder = new TextEncoder()\nconst decoder = new TextDecoder()\nconst hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])\nconst aes = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])\nconst protection: IRpcAuthenticationConfig = {\n  encrypt: async (value) => {\n    const iv = crypto.getRandomValues(new Uint8Array(12))\n    const body = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, encoder.encode(JSON.stringify(value)))\n    return { iv: Array.from(iv), body: Array.from(new Uint8Array(body)) }\n  },\n  decrypt: async (value) => {\n    const encrypted = value as { iv: number[]; body: number[] }\n    const body = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(encrypted.iv) }, aes, new Uint8Array(encrypted.body))\n    return JSON.parse(decoder.decode(body))\n  },\n  encodedType: 'string',\n  sign: async (value) => {\n    const text = JSON.stringify(value)\n    const mac = await crypto.subtle.sign('HMAC', hmac, encoder.encode(text))\n    return JSON.stringify({ text, mac: Array.from(new Uint8Array(mac)) })\n  },\n  verify: async (value) => {\n    const signed = JSON.parse(String(value)) as { text: string; mac: number[] }\n    if (!await crypto.subtle.verify('HMAC', hmac, new Uint8Array(signed.mac), encoder.encode(signed.text))) throw new Error('Invalid signature')\n    return JSON.parse(signed.text)\n  }\n}\n\nconst observed: unknown[] = []\nconst probe = defineProbe({ stages: ['message'], emit: (event) => { observed.push(snapshotProbeEvent(event)) } })\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst ports = new MessageChannel()\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst provider = adapter.peer({\n  authentication: protection, self: { name: 'math-provider', instanceId: 'provider-1' }, connect: ports.port2,\n  provide: { math: { double: (value: number) => value * 2 } }, report\n})\nconst family = Object.freeze({})\nlet acquisitions = 0\nconst plugin = createRuntimePlugin({\n  authentication: protection, probe, name: 'math-link', defaultTimeoutMs: 2000, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }, provide: { local: { api: { echo: (value: string) => value } } }, contract: normalizeRemoteContract({ schemaVersion: 1, plugin: 'local', features: { api: { methods: { echo: { mode: 'request', idempotent: false } } } } }), keyFactory: () => `call-${++keys}`, retryPort: { dispatch: (input) => { retries++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } }, self: { name: 'host', instanceId: 'host-1' }, connect: ports.port1, report\n}, {\n  key: 'thread',\n  acquire: (integration, create) => {\n    acquisitions += 1\n    return integration.acquireSharedSlot(RuntimePluginKey.thread, family, create)\n  }\n}, (options) => adapter.peer({ ...options, spawn: undefined, listen: undefined, connect: ports.port1 }))\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(plugin)\n  const outlet = Reflect.get(host, RuntimePluginKey.thread) as {\n    request(target: string, method: string, value: number): Promise<unknown>\n  }\n  const result = await outlet.request('math-link', 'math.double', 21)\n  console.log(result, acquisitions, observed.length > 0); console.log(keys, retries)\n\n\n} finally {\n  await host.dispose()\n  await (await provider).close()\n  ports.port1.close()\n  ports.port2.close()\n}\n\n",
-      result: {
-        en: 'Prints 42 1 true. The protected business request traverses the real adapter path and the probe observes it. A final 0 0 confirms this direct adapter dispatch does not consume keyFactory or retryPort.',
-        zh: '输出 42 1 true；受保护业务请求经过真实适配器路径，探针观察到了消息。 最后的 0 0 确认此直接适配器派发未使用 keyFactory 或 retryPort。'
-      },
-      covers: [
-        'authentication',
-        'authentication.encrypt',
-        'authentication.decrypt',
-        'authentication.sign',
-        'authentication.verify',
-        'authentication.encodedType',
-        'probe'
-      ]
-    },
-    {
-      title: {
-        en: 'Delegate source interpretation to the actual adapter',
-        zh: '将来源解释交给实际适配器'
-      },
-      problem: {
-        en: 'The shared plugin captures spawn as the adapter’s concrete input; the supplied real peer factory maps that port into its existing direct message opening. The opposite real peer listens on its own original port.',
-        zh: '共享插件把 spawn 捕获为适配器具体输入；实际对端工厂把该端口接入现有直接消息打开路径，另一真实对端在自己的原端口监听。'
-      },
-      example:
-        "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\nimport { createRuntimePlugin, RuntimePluginKey } from '@migaia/rpc-core/remote'\nimport { defineHost } from '@migaia/plugin-host'\n\nconst reports: unknown[] = []\nconst report = (error: unknown) => { reports.push(error) }\nconst ports = new MessageChannel()\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst provider = adapter.peer({\n  self: { name: 'math-provider', instanceId: 'provider-1' }, listen: ports.port2,\n  provide: { math: { double: (value: number) => value * 2 } }, report\n})\nconst family = Object.freeze({})\nlet acquisitions = 0\nconst plugin = createRuntimePlugin({\n  name: 'math-link', self: { name: 'host', instanceId: 'host-1' }, spawn: ports.port1, report\n}, {\n  key: 'thread',\n  acquire: (integration, create) => {\n    acquisitions += 1\n    return integration.acquireSharedSlot(RuntimePluginKey.thread, family, create)\n  }\n}, (options) => adapter.peer({ ...options, spawn: undefined, listen: undefined, connect: ports.port1 }))\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(plugin)\n  const outlet = Reflect.get(host, RuntimePluginKey.thread) as {\n    request(target: string, method: string, value: number): Promise<unknown>\n  }\n  const result = await outlet.request('math-link', 'math.double', 21)\n  console.log(result, acquisitions)\n\n\n} finally {\n  await host.dispose()\n  await (await provider).close()\n  ports.port1.close()\n  ports.port2.close()\n}\n\n",
-      result: {
-        en: 'Prints 42 1. The input chooses the adapter callback; it does not itself create a worker or add a second execution owner.',
-        zh: '输出 42 1；输入选择适配器回调，本身不创建工作线程，也不增加执行所有者。'
-      },
-      covers: ['spawn', 'listen']
+      covers: ['provide', 'contract', 'providerLimits', 'defaultTimeoutMs']
     }
   ]
 }
 
-/** Callback and value choices link to the complete scenario that actually exercises them. */
+/** Behaviour fields use focused examples rather than an unrelated full integration script. */
 export const rpcCoreOptionFields: Readonly<
-  Record<string, Readonly<Record<string, { readonly index: number; readonly whenToUse: IText }>>>
+  Record<string, Readonly<Record<string, { whenToUse: IText; example: string }>>>
 > = {
   createEndpoint: {
-    transport: {
-      index: 0,
+    scheduler: {
       whenToUse: {
-        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
-        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n})'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n})'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n})'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, codec: applicationCodec\n})'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n})'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n})'
+    },
+    provider: {
+      whenToUse: {
+        en: 'Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = await createEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n})'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = await createEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n})'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = await createEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
     },
     'idempotency.scope': {
-      index: 1,
       whenToUse: {
         en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
         zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
+      },
+      example:
+        'const server = await createEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
+    },
+    transport: {
+      whenToUse: {
+        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
+        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
+      },
+      example:
+        "import { createEndpoint, connect } from '@migaia/rpc-core'\n\nconst checkout = await createEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())"
     },
     'construction.timeoutMs': {
-      index: 2,
       whenToUse: {
         en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
         zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const checkout = await createEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n})'
     }
   },
   createClientEndpoint: {
+    scheduler: {
+      whenToUse: {
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n})'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n})'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n})'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, codec: applicationCodec\n})'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n})'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n})'
+    },
+    provider: {
+      whenToUse: {
+        en: 'These shared factory options configure the serving side. A client-only endpoint does not serve providers; set them on createProviderEndpoint instead. Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '这些共享工厂选项配置服务端。仅客户端点不提供处理函数，应在 createProviderEndpoint 上设置。处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n})'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'These shared factory options configure the serving side. A client-only endpoint does not serve providers; set them on createProviderEndpoint instead. Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '这些共享工厂选项配置服务端。仅客户端点不提供处理函数，应在 createProviderEndpoint 上设置。昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n})'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'These shared factory options configure the serving side. A client-only endpoint does not serve providers; set them on createProviderEndpoint instead. Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '这些共享工厂选项配置服务端。仅客户端点不提供处理函数，应在 createProviderEndpoint 上设置。重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
+    },
+    'idempotency.scope': {
+      whenToUse: {
+        en: 'These shared factory options configure the serving side. A client-only endpoint does not serve providers; set them on createProviderEndpoint instead. Derive isolation from an admitted token when sharing an outcome store across sessions.',
+        zh: '这些共享工厂选项配置服务端。仅客户端点不提供处理函数，应在 createProviderEndpoint 上设置。跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
+    },
     transport: {
-      index: 0,
       whenToUse: {
         en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
         zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
-    },
-    'idempotency.scope': {
-      index: 1,
-      whenToUse: {
-        en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
-        zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
+      },
+      example:
+        "import { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createClientEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())"
     },
     'construction.timeoutMs': {
-      index: 2,
       whenToUse: {
         en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
         zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const checkout = await createClientEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n})'
     }
   },
   createProviderEndpoint: {
-    transport: {
-      index: 0,
+    scheduler: {
       whenToUse: {
-        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
-        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n})'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n})'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n})'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, codec: applicationCodec\n})'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n})'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n})'
+    },
+    provider: {
+      whenToUse: {
+        en: 'Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n})'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n})'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
     },
     'idempotency.scope': {
-      index: 1,
       whenToUse: {
         en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
         zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
+      },
+      example:
+        'const server = await createProviderEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
+    },
+    transport: {
+      whenToUse: {
+        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
+        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
+      },
+      example:
+        "import { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createProviderEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())"
     },
     'construction.timeoutMs': {
-      index: 2,
       whenToUse: {
         en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
         zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const checkout = await createProviderEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n})'
     }
   },
   createFullEndpoint: {
-    transport: {
-      index: 0,
+    scheduler: {
       whenToUse: {
-        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
-        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n})'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n})'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n})'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, codec: applicationCodec\n})'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n})'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n})'
+    },
+    provider: {
+      whenToUse: {
+        en: 'Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = await createFullEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n})'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = await createFullEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n})'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = await createFullEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
     },
     'idempotency.scope': {
-      index: 1,
       whenToUse: {
         en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
         zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
+      },
+      example:
+        'const server = await createFullEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
+    },
+    transport: {
+      whenToUse: {
+        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
+        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
+      },
+      example:
+        "import { createFullEndpoint } from '@migaia/rpc-core/full'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createFullEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())"
     },
     'construction.timeoutMs': {
-      index: 2,
       whenToUse: {
         en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
         zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const checkout = await createFullEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n})'
     }
   },
   createFullOneWayEndpoint: {
-    transport: {
-      index: 0,
+    scheduler: {
       whenToUse: {
-        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
-        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n})'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n})'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n})'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, codec: applicationCodec\n})'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n})'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n})'
+    },
+    provider: {
+      whenToUse: {
+        en: 'Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = await createFullOneWayEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n})'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = await createFullOneWayEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n})'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = await createFullOneWayEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
     },
     'idempotency.scope': {
-      index: 1,
       whenToUse: {
         en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
         zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
+      },
+      example:
+        'const server = await createFullOneWayEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n})'
+    },
+    transport: {
+      whenToUse: {
+        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
+        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
+      },
+      example:
+        "import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createFullOneWayEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n})\nonCheckoutClosed(() => checkout.dispose())"
     },
     'construction.timeoutMs': {
-      index: 2,
       whenToUse: {
         en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
         zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const checkout = await createFullOneWayEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n})'
     }
   },
   createComposedEndpoint: {
-    transport: {
-      index: 0,
+    scheduler: {
       whenToUse: {
-        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
-        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n}, endpointFeatures)'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n}, endpointFeatures)'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n}, endpointFeatures)'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, codec: applicationCodec\n}, endpointFeatures)'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n}, endpointFeatures)'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n}, endpointFeatures)'
+    },
+    provider: {
+      whenToUse: {
+        en: 'Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = await createComposedEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n}, endpointFeatures)'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = await createComposedEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, endpointFeatures)'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n}, endpointFeatures)'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = await createComposedEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n}, endpointFeatures)'
     },
     'idempotency.scope': {
-      index: 1,
       whenToUse: {
         en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
         zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
+      },
+      example:
+        'const server = await createComposedEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n}, endpointFeatures)'
+    },
+    transport: {
+      whenToUse: {
+        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
+        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
+      },
+      example:
+        "import { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { connect } from '@migaia/rpc-core'\n\nconst checkout = await createComposedEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n}, endpointFeatures)\nonCheckoutClosed(() => checkout.dispose())"
     },
     'construction.timeoutMs': {
-      index: 2,
       whenToUse: {
         en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
         zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const checkout = await createComposedEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n}, endpointFeatures)'
+    }
+  },
+  createRuntimeApiEndpoint: {
+    scheduler: {
+      whenToUse: {
+        en: 'Pass the application’s monotonic scheduler when endpoint deadlines must share its clock. Omit it to use the host scheduler.',
+        zh: '端点期限需要与应用共用单调时钟时传入应用调度器；省略时使用宿主调度器。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, scheduler: applicationScheduler\n}, catalogChannel)'
+    },
+    wallClock: {
+      whenToUse: {
+        en: 'Set a wall clock when wire timestamps and diagnostic timestamps must use the application clock. It does not control deadlines.',
+        zh: '线上消息和诊断时间戳需要使用应用时钟时设置；它不控制期限。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, wallClock: { timestamp: () => Date.now() }\n}, catalogChannel)'
+    },
+    protocol: {
+      whenToUse: {
+        en: 'Use the protocol descriptor agreed by both ends. Omit it for Core’s default protocol.',
+        zh: '使用双方约定的协议描述；省略时使用 Core 默认协议。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, protocol: rpcProtocol\n}, catalogChannel)'
+    },
+    codec: {
+      whenToUse: {
+        en: 'Use a codec whose output matches the framer input. Both ends must agree on the encoded representation.',
+        zh: '编解码器的输出须匹配分帧器输入；双方必须约定同一编码表示。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, codec: applicationCodec\n}, catalogChannel)'
+    },
+    framer: {
+      whenToUse: {
+        en: 'Use the framer agreed by both ends; its output must match the transport’s accepted frame.',
+        zh: '使用双方约定的分帧器，其输出须匹配传输对象接受的帧。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, framer: messageFramerV1\n}, catalogChannel)'
+    },
+    features: {
+      whenToUse: {
+        en: 'Install application features when endpoint-owned cleanup should release them. Omit this tuple when no extra feature is needed.',
+        zh: '应用功能需要随端点清理时安装；无需额外功能时省略。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, features: [applicationFeature]\n}, catalogChannel)'
+    },
+    provider: {
+      whenToUse: {
+        en: 'Register startup handlers here when they must exist before ingress starts. Later registrations can use provide on a provider-capable endpoint.',
+        zh: '处理函数必须在开始接收消息前就存在时，在此登记；支持提供方能力的端点也可稍后通过 provide 登记。'
+      },
+      example:
+        'const server = createRuntimeApiEndpoint({\n  ...connectionOptions,\n  provider: { prices: async (context) => context.success(await fetchPrices()) }\n}, catalogChannel)'
+    },
+    providerLimits: {
+      whenToUse: {
+        en: 'Bound active provider work when expensive operations need backpressure. The defaults are 256 global and 64 per peer.',
+        zh: '昂贵操作需要背压时限制正在运行的处理任务；默认全局 256 个，每个对端 64 个。'
+      },
+      example:
+        'const server = createRuntimeApiEndpoint({\n  ...connectionOptions, providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, catalogChannel)'
+    },
+    replay: {
+      whenToUse: {
+        en: 'Size retained outbound identifiers for the request rate and replay window. This ledger is separate from the keyed business-result store.',
+        zh: '按请求速率与重放窗口设置出站标识保留量；它与按幂等键保存业务结果的存储不同。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions, replay: { maxEntries: 4096, ttlMs: 310000 }\n}, catalogChannel)'
+    },
+    idempotency: {
+      whenToUse: {
+        en: 'Provide an outcome store on the serving endpoint when retries carry the same idempotency key. A shared store also needs a session scope.',
+        zh: '重试会携带相同幂等键时，在服务端点提供结果存储；共用存储时还需会话作用域。'
+      },
+      example:
+        'const server = createRuntimeApiEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n}, catalogChannel)'
+    },
+    'idempotency.scope': {
+      whenToUse: {
+        en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
+        zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
+      },
+      example:
+        'const server = createRuntimeApiEndpoint({\n  ...connectionOptions,\n  idempotency: { store: orderOutcomes, scope: ({ token }) => token }\n}, catalogChannel)'
+    },
+    transport: {
+      whenToUse: {
+        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
+        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
+      },
+      example:
+        "import { createRuntimeApiEndpoint, connect } from '@migaia/rpc-core'\n\nconst checkout = createRuntimeApiEndpoint({\n  id: 'checkout',\n  targetIds: ['catalog'],\n  transport: catalogTransport,\n  middlewares: [connect({ transport: catalogTransport })]\n}, catalogChannel)\nonCheckoutClosed(() => checkout.dispose())"
+    },
+    'construction.timeoutMs': {
+      whenToUse: {
+        en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
+        zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
+      },
+      example:
+        'const checkout = createRuntimeApiEndpoint({\n  ...connectionOptions,\n  construction: { signal: opening.signal, timeoutMs: false }\n}, catalogChannel)'
+    },
+    binding: {
+      whenToUse: {
+        en: 'Reuse a binding from an existing runtime owner when requests must keep that owner’s operations and cleanup. It is an alternative to constructing from transport options.',
+        zh: '请求需要保留已有运行时所有者的操作与清理语义时复用绑定；它与传输配置构造是两条备选路径。'
+      },
+      example:
+        "import { createRuntimeApiEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = createRuntimeApiEndpoint({ binding: existingRuntimeBinding })"
+    }
+  },
+  connect: {
+    receiverSelector: {
+      whenToUse: {
+        en: 'Existing integrations may retain this captured configuration; current public send routing does not invoke it, so it cannot select a receiver today.',
+        zh: '既有集成可以保留此捕获配置；当前公开 send 路由未调用它，因此目前不能用它选择接收端。'
+      },
+      example:
+        'connect({\n  transport: serviceTransport,\n  receiverSelector: (candidates) => candidates[0]?.receiverId\n})'
+    },
+    discoveryMode: {
+      whenToUse: {
+        en: 'Choose automatic when known targets should be discovered and selected during calls; manual requires explicit discovery controls.',
+        zh: '调用时需要自动发现并选择已知目标时用 automatic；manual 需要显式发现控制。'
+      },
+      example:
+        "import { connect } from '@migaia/rpc-core'\n\nconst discovery = connect({\n  transport: serviceTransport,\n  discoveryMode: 'manual'\n})"
+    },
+    uniqueTargetId: {
+      whenToUse: {
+        en: 'Generate a per-instance suffix together with an enabled custom identifier.',
+        zh: '启用自定义校验器时，同时生成实例后缀。'
+      },
+      example:
+        "import { connect } from '@migaia/rpc-core'\n\nconst identifiedConnection = connect({\n  transport: serviceTransport,\n  useBaseIdVerifyOnly: true,\n  uniqueTargetId: () => crypto.randomUUID(),\n  identifier: (context) => verifyApplicationInstance(context)\n})"
+    },
+    identifier: {
+      whenToUse: {
+        en: 'Supplement actual carrier verification with an application admission decision.',
+        zh: '在实际载体验证之上增加应用准入决定。'
+      },
+      example:
+        "import { connect } from '@migaia/rpc-core'\n\nconst identifiedConnection = connect({\n  transport: serviceTransport,\n  useBaseIdVerifyOnly: true,\n  uniqueTargetId: () => crypto.randomUUID(),\n  identifier: (context) => verifyApplicationInstance(context)\n})"
     }
   },
   hooks: {
     listeners: {
-      index: 1,
       whenToUse: {
         en: 'Supply an application diagnostic callback; route observer errors without throwing into business settlement.',
         zh: '提供应用诊断回调，将观察者错误单独上报，避免抛错影响业务结果。'
-      }
+      },
+      example:
+        "import { hooks } from '@migaia/rpc-core'\n\nconst requestLogging = hooks({\n  listeners: (event) => recordRpcEvent(event)\n})"
     },
     onHookError: {
-      index: 1,
       whenToUse: {
         en: 'Supply an application diagnostic callback; route observer errors without throwing into business settlement.',
         zh: '提供应用诊断回调，将观察者错误单独上报，避免抛错影响业务结果。'
-      }
+      },
+      example:
+        "import { hooks } from '@migaia/rpc-core'\n\nconst requestLogging = hooks({\n  listeners: (event) => recordRpcEvent(event),\n  onHookError: (error, event) => reportLoggingFailure(error, event)\n})"
     }
   },
   uuid: {
     generate: {
-      index: 0,
       whenToUse: {
         en: 'Supply a synchronous unique string generator when application tracing needs stable endpoint prefixes.',
         zh: '应用追踪需要稳定端点前缀时，提供同步唯一字符串生成器。'
-      }
+      },
+      example:
+        "import { uuid } from '@migaia/rpc-core'\n\nconst checkoutIds = uuid({\n  generate: () => `checkout-${crypto.randomUUID()}`\n})"
     }
   },
   timeout: {
     timeoutMs: {
-      index: 0,
       whenToUse: {
         en: 'Choose finite milliseconds for bounded waits or false when the application deliberately owns the waiting lifetime.',
         zh: '需要有界等待时设有限毫秒数，应用明确拥有等待生命周期时用 false。'
-      }
+      },
+      example:
+        "import { timeout } from '@migaia/rpc-core'\n\nconst pricingDeadline = timeout({ timeoutMs: 2000 })"
     }
   },
   createPeerPair: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Collect background diagnostics in the application that owns both local peers.',
         zh: '由同时拥有两端的应用收集后台诊断。'
-      }
-    }
-  },
-  connect: {
-    discoveryMode: {
-      index: 0,
-      whenToUse: {
-        en: 'Choose automatic when known targets should be discovered and selected during calls; manual requires explicit discovery controls.',
-        zh: '调用时需要自动发现并选择已知目标时用 automatic；manual 需要显式发现控制。'
-      }
-    },
-    receiverSelector: {
-      index: 0,
-      whenToUse: {
-        en: 'Existing integrations may retain this captured configuration; current public send routing does not invoke it, so it cannot select a receiver today.',
-        zh: '既有集成可以保留此捕获配置；当前公开 send 路由未调用它，因此目前不能用它选择接收端。'
-      }
-    },
-    uniqueTargetId: {
-      index: 1,
-      whenToUse: {
-        en: 'Generate a per-instance suffix together with an enabled custom identifier.',
-        zh: '启用自定义校验器时，同时生成实例后缀。'
-      }
-    },
-    identifier: {
-      index: 1,
-      whenToUse: {
-        en: 'Supplement actual carrier verification with an application admission decision.',
-        zh: '在实际载体验证之上增加应用准入决定。'
-      }
+      },
+      example:
+        "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})"
     }
   },
   authentication: {
     encrypt: {
-      index: 1,
       whenToUse: {
         en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
         zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+      },
+      example:
+        "import { authentication } from '@migaia/rpc-core'\n\nconst privateOrders = authentication({\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n})"
     },
     decrypt: {
-      index: 1,
       whenToUse: {
         en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
         zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+      },
+      example:
+        "import { authentication } from '@migaia/rpc-core'\n\nconst privateOrders = authentication({\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n})"
     },
     sign: {
-      index: 1,
       whenToUse: {
         en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
         zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+      },
+      example:
+        "import { authentication } from '@migaia/rpc-core'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})"
     },
     verify: {
-      index: 1,
       whenToUse: {
         en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
         zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+      },
+      example:
+        "import { authentication } from '@migaia/rpc-core'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})"
     },
     encodedType: {
-      index: 1,
       whenToUse: {
         en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
         zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+      },
+      example:
+        "import { authentication } from '@migaia/rpc-core'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})"
     }
   },
   createBrowserMessagePortTransport: {
     ownership: {
-      index: 0,
       whenToUse: {
         en: 'Choose owned only when the wrapper should close the original port; choose borrowed when another component retains it.',
         zh: '包装器应负责关闭原端口时选 owned，其他组件保留生命周期时选 borrowed。'
-      }
+      },
+      example:
+        "import { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\nonViewClosed(() => transport.close?.())"
     }
   },
   createIpcLogFeature: {
     report: {
-      index: 1,
       whenToUse: {
         en: 'Observe local diagnostics and send sink failures to a separate application owner.',
         zh: '观察本地诊断，并把接收器失败交给独立应用所有者。'
-      }
+      },
+      example:
+        "import { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\n\nconst logging = createIpcLogFeature({\n  gate: connectionGate,\n  report: (event) => recordConnectionEvent(event),\n  onReportError: (error, event) => reportLoggingFailure(error, event)\n})"
     },
     onReportError: {
-      index: 1,
       whenToUse: {
         en: 'Observe local diagnostics and send sink failures to a separate application owner.',
         zh: '观察本地诊断，并把接收器失败交给独立应用所有者。'
-      }
+      },
+      example:
+        "import { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\n\nconst logging = createIpcLogFeature({\n  gate: connectionGate,\n  report: (event) => recordConnectionEvent(event),\n  onReportError: (error, event) => reportLoggingFailure(error, event)\n})"
     }
   },
   defineMessageAdapter: {
     open: {
-      index: 0,
       whenToUse: {
         en: 'Return the original host MessagePort or messaging object when the connection already exists.',
         zh: '连接已存在时，返回宿主的原始消息端口或消息对象。'
-      }
+      },
+      example:
+        "import { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineMessageAdapter<MessagePort>({ open: (port) => port })\nconst peer = await adapter.peer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  connect: catalogPort\n})\ntry {\n  renderPrices(await peer.request('prices'))\n} finally {\n  await peer.close()\n}"
     },
     launch: {
-      index: 1,
       whenToUse: {
         en: 'Supply launch only when the adapter owns native execution and can observe its actual exit.',
         zh: '仅在适配器拥有原生执行单元且能观察真实退出时提供 launch。'
-      }
+      },
+      example:
+        "import { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineMessageAdapter<URL>({\n  open: (url) => openExistingWorkerPort(url),\n  launch: (url) => launchWorker(url)\n})\nconst peer = await adapter.peer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  spawn: new URL('./price-worker.js', import.meta.url)\n})"
     }
   },
   defineByteAdapter: {
     open: {
-      index: 0,
       whenToUse: {
         en: 'Return the original ordered byte I/O for this source mode; keep handshake and framing in Core.',
         zh: '按来源模式返回原始有序字节读写，把握手与分帧留给 Core。'
-      }
+      },
+      example:
+        "import { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineByteAdapter<URL>({\n  open: (address) => openByteConnection(address),\n  diagnostics: connectionDiagnostics,\n  presentation: {\n    platform: 'Process',\n    expectedStringText: 'Price connection expects text frames'\n  }\n})\nconst peer = await adapter.peer({\n  self: { name: 'checkout', instanceId: 'checkout-1' },\n  connect: priceServiceAddress,\n  peerId: 'pricing-1'\n})"
     },
     listen: {
-      index: 0,
       whenToUse: {
         en: 'Return the original ordered byte I/O for this source mode; keep handshake and framing in Core.',
         zh: '按来源模式返回原始有序字节读写，把握手与分帧留给 Core。'
-      }
+      },
+      example:
+        "import { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineByteAdapter<URL>({\n  open: (address) => openByteConnection(address),\n  listen: (address) => acceptByteConnection(address),\n  dial: (address) => dialByteConnection(address),\n  diagnostics: connectionDiagnostics\n})"
     },
     dial: {
-      index: 0,
       whenToUse: {
         en: 'Return the original ordered byte I/O for this source mode; keep handshake and framing in Core.',
         zh: '按来源模式返回原始有序字节读写，把握手与分帧留给 Core。'
-      }
+      },
+      example:
+        "import { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\nconst adapter = defineByteAdapter<URL>({\n  open: (address) => openByteConnection(address),\n  listen: (address) => acceptByteConnection(address),\n  dial: (address) => dialByteConnection(address),\n  diagnostics: connectionDiagnostics\n})"
     }
   },
   createRuntimePeer: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Keep local diagnostics with this Peer’s owner; keyFactory is inherited but direct requests do not read it.',
         zh: '把本地诊断交给此对端所有者；keyFactory 是继承配置，直接请求不会读取。'
-      }
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n})'
     },
     keyFactory: {
-      index: 0,
       whenToUse: {
-        en: 'Keep local diagnostics with this Peer’s owner; keyFactory is inherited but direct requests do not read it.',
-        zh: '把本地诊断交给此对端所有者；keyFactory 是继承配置，直接请求不会读取。'
-      }
+        en: 'Direct Peer requests do not consult this inherited policy. Use a managed or remote proxy dispatch path when logical-key or retry policy is required.',
+        zh: '直接 Peer 请求不读取此继承策略；需要逻辑键或重试策略时，使用托管或远端代理派发路径。'
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  keyFactory: () => crypto.randomUUID()\n})'
     },
     authentication: {
-      index: 2,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
-        zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     'authentication.encrypt': {
-      index: 2,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
-        zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n})"
     },
     'authentication.decrypt': {
-      index: 2,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
-        zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n})"
     },
     'authentication.sign': {
-      index: 2,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
-        zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     'authentication.verify': {
-      index: 2,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
-        zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     'authentication.encodedType': {
-      index: 2,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt` for confidentiality and `sign` with `verify` for integrity; `encodedType` names the actual protected representation.',
-        zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     spawn: {
-      index: 1,
       whenToUse: {
         en: 'The application source supplies a real negotiated channel; direct Peer calls use their existing dispatcher and do not consult retryPort.',
         zh: '应用来源提供真实已协商通道；直接 Peer 调用使用现有派发器，不读取 retryPort。'
-      }
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  spawn: (context) => openPricingChannel(context)\n})'
     },
     connect: {
-      index: 0,
       whenToUse: {
         en: 'The application source supplies a real negotiated channel; direct Peer calls use their existing dispatcher and do not consult retryPort.',
         zh: '应用来源提供真实已协商通道；直接 Peer 调用使用现有派发器，不读取 retryPort。'
-      }
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  connect: (context) => openPricingChannel(context)\n})'
     },
     listen: {
-      index: 0,
       whenToUse: {
         en: 'The application source supplies a real negotiated channel; direct Peer calls use their existing dispatcher and do not consult retryPort.',
         zh: '应用来源提供真实已协商通道；直接 Peer 调用使用现有派发器，不读取 retryPort。'
-      }
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  listen: (context) => openPricingChannel(context)\n})'
     },
     retryPort: {
-      index: 0,
       whenToUse: {
-        en: 'The application source supplies a real negotiated channel; direct Peer calls use their existing dispatcher and do not consult retryPort.',
-        zh: '应用来源提供真实已协商通道；直接 Peer 调用使用现有派发器，不读取 retryPort。'
-      }
+        en: 'Direct Peer requests do not consult this inherited policy. Use a managed or remote proxy dispatch path when logical-key or retry policy is required.',
+        zh: '直接 Peer 请求不读取此继承策略；需要逻辑键或重试策略时，使用托管或远端代理派发路径。'
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  retryPort: pricingRetryPolicy\n})'
     },
     endpointFactory: {
-      index: 3,
       whenToUse: {
         en: 'Supply this advanced callback only when the application owns a complete served endpoint; reject construction if that endpoint cannot be acquired.',
         zh: '仅在应用拥有完整服务端点时提供此高级回调；无法取得端点时拒绝构造。'
-      }
-    }
-  },
-  createRuntimeApiEndpoint: {
-    transport: {
-      index: 0,
-      whenToUse: {
-        en: 'Supply the exact original carrier side owned by this caller; choose a transport factory for the supported host.',
-        zh: '传入调用者持有的原始载体一侧，并按宿主选用传输工厂。'
-      }
-    },
-    'idempotency.scope': {
-      index: 1,
-      whenToUse: {
-        en: 'Derive isolation from an admitted token when sharing an outcome store across sessions.',
-        zh: '跨会话共用结果存储时，从已准入令牌派生隔离作用域。'
-      }
-    },
-    'construction.timeoutMs': {
-      index: 2,
-      whenToUse: {
-        en: 'Use false to rely solely on caller cancellation; use a finite budget when construction must finish within a deadline.',
-        zh: '只依赖调用者取消时用 false；要求构造限时完成时设置有限预算。'
-      }
+      },
+      example:
+        'const pricing = await createRuntimePeer({\n  ...pricingOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})'
     }
   },
   createRemoteHost: {
     endpointFactory: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual application binding and diagnostic owner; generate keys and check admission before the original dispatch.',
         zh: '使用实际应用绑定与诊断所有者，在原派发前生成键并检查准入。'
-      }
+      },
+      example:
+        'const pricing = createRemoteHost({\n  ...pricingOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})'
     },
     report: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual application binding and diagnostic owner; generate keys and check admission before the original dispatch.',
         zh: '使用实际应用绑定与诊断所有者，在原派发前生成键并检查准入。'
-      }
+      },
+      example:
+        'const pricing = createRemoteHost({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n})'
     },
     keyFactory: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual application binding and diagnostic owner; generate keys and check admission before the original dispatch.',
         zh: '使用实际应用绑定与诊断所有者，在原派发前生成键并检查准入。'
-      }
+      },
+      example:
+        'const pricing = createRemoteHost({\n  ...pricingOptions,\n  keyFactory: () => crypto.randomUUID()\n})'
     },
     callGuard: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual application binding and diagnostic owner; generate keys and check admission before the original dispatch.',
         zh: '使用实际应用绑定与诊断所有者，在原派发前生成键并检查准入。'
-      }
+      },
+      example:
+        'const pricing = createRemoteHost({\n  ...pricingOptions,\n  callGuard: { beforeDispatch: (call) => authorizePricingCall(call) }\n})'
     }
   },
   createRemotePlugin: {
     endpointFactory: {
-      index: 0,
       whenToUse: {
         en: 'Keep proxy construction, diagnostics, logical keys and admission with the actual owning Host and generation binding.',
         zh: '将代理构造、诊断、逻辑键和准入留给实际拥有的宿主及代次绑定。'
-      }
+      },
+      example:
+        'const pricing = createRemotePlugin({\n  ...pricingOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})'
     },
     report: {
-      index: 0,
       whenToUse: {
         en: 'Keep proxy construction, diagnostics, logical keys and admission with the actual owning Host and generation binding.',
         zh: '将代理构造、诊断、逻辑键和准入留给实际拥有的宿主及代次绑定。'
-      }
+      },
+      example:
+        'const pricing = createRemotePlugin({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n})'
     },
     keyFactory: {
-      index: 0,
       whenToUse: {
         en: 'Keep proxy construction, diagnostics, logical keys and admission with the actual owning Host and generation binding.',
         zh: '将代理构造、诊断、逻辑键和准入留给实际拥有的宿主及代次绑定。'
-      }
+      },
+      example:
+        'const pricing = createRemotePlugin({\n  ...pricingOptions,\n  keyFactory: () => crypto.randomUUID()\n})'
     },
     callGuard: {
-      index: 0,
       whenToUse: {
         en: 'Keep proxy construction, diagnostics, logical keys and admission with the actual owning Host and generation binding.',
         zh: '将代理构造、诊断、逻辑键和准入留给实际拥有的宿主及代次绑定。'
-      }
+      },
+      example:
+        'const pricing = createRemotePlugin({\n  ...pricingOptions,\n  callGuard: { beforeDispatch: (call) => authorizePricingCall(call) }\n})'
     }
   },
   createRemoteRetryPort: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Report secondary retry or cleanup failures through the original application diagnostic owner.',
         zh: '通过原应用诊断所有者报告重试或清理的次要失败。'
-      }
+      },
+      example:
+        "import { createRemoteRetryPort } from '@migaia/rpc-core/remote'\n\nconst retry = createRemoteRetryPort({\n  events: pricingEvents,\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error)\n})"
     }
   },
   serveRemoteHost: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Use local callbacks from the actual serving owner; invocationContext remains local and is not serialized as application arguments.',
         zh: '使用实际服务所有者的本地回调；invocationContext 留在本地，不作为业务参数序列化。'
-      }
+      },
+      example:
+        'const pricing = await serveRemoteHost({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n})'
     },
     resolvePlugin: {
-      index: 0,
       whenToUse: {
         en: 'Use local callbacks from the actual serving owner; invocationContext remains local and is not serialized as application arguments.',
         zh: '使用实际服务所有者的本地回调；invocationContext 留在本地，不作为业务参数序列化。'
-      }
+      },
+      example:
+        'const pricing = await serveRemoteHost({\n  ...pricingOptions,\n  resolvePlugin: (name) => resolveApprovedPlugin(name)\n})'
     }
   },
   serveRemotePlugin: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Use local callbacks from the actual serving owner; invocationContext remains local and is not serialized as application arguments.',
         zh: '使用实际服务所有者的本地回调；invocationContext 留在本地，不作为业务参数序列化。'
-      }
+      },
+      example:
+        'const pricing = await serveRemotePlugin({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n})'
     },
     invocationContext: {
-      index: 0,
       whenToUse: {
         en: 'Use local callbacks from the actual serving owner; invocationContext remains local and is not serialized as application arguments.',
         zh: '使用实际服务所有者的本地回调；invocationContext 留在本地，不作为业务参数序列化。'
-      }
+      },
+      example:
+        "import { serveRemotePlugin } from '@migaia/rpc-core/remote'\n\nconst service = await serveRemotePlugin({\n  ...pricingServiceOptions,\n  invocationContext: (context) => ({ sender: context.senderId })\n})"
     }
   },
   createManagedRuntimePeer: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
         zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+      },
+      example:
+        'const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n}, pricingBinding)'
     },
     keyFactory: {
-      index: 0,
       whenToUse: {
         en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
         zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+      },
+      example:
+        'const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  keyFactory: () => crypto.randomUUID()\n}, pricingBinding)'
     },
     retryPort: {
-      index: 0,
       whenToUse: {
         en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
         zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+      },
+      example:
+        'const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  retryPort: pricingRetryPolicy\n}, pricingBinding)'
     },
     endpointFactory: {
-      index: 2,
       whenToUse: {
         en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
         zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+      },
+      example:
+        'const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n}, pricingBinding)'
     },
     spawn: {
-      index: 3,
       whenToUse: {
-        en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
-        zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+        en: 'Do not set spawn to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.',
+        zh: '不要用 spawn 选择托管来源。该工厂使用 pricingBinding.openChannel，不调用此继承回调。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  self: { name: 'checkout', instanceId: 'checkout-1' }\n}, pricingBinding)"
     },
     connect: {
-      index: 3,
       whenToUse: {
-        en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
-        zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+        en: 'Do not set connect to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.',
+        zh: '不要用 connect 选择托管来源。该工厂使用 pricingBinding.openChannel，不调用此继承回调。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  self: { name: 'checkout', instanceId: 'checkout-1' }\n}, pricingBinding)"
     },
     listen: {
-      index: 3,
       whenToUse: {
-        en: 'Use the managed registration’s original binding and diagnostics; inherited direct-source callbacks do not replace binding.openChannel.',
-        zh: '使用托管登记的原绑定和诊断；继承的直接来源回调不会替代 binding.openChannel。'
-      }
+        en: 'Do not set listen to choose a managed source. This factory uses pricingBinding.openChannel; this inherited callback is not invoked.',
+        zh: '不要用 listen 选择托管来源。该工厂使用 pricingBinding.openChannel，不调用此继承回调。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  self: { name: 'checkout', instanceId: 'checkout-1' }\n}, pricingBinding)"
     },
     authentication: {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual managed endpoints.',
-        zh: '在两个实际托管端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, pricingBinding)"
     },
     'authentication.encrypt': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual managed endpoints.',
-        zh: '在两个实际托管端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n}, pricingBinding)"
     },
     'authentication.decrypt': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual managed endpoints.',
-        zh: '在两个实际托管端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n}, pricingBinding)"
     },
     'authentication.sign': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual managed endpoints.',
-        zh: '在两个实际托管端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, pricingBinding)"
     },
     'authentication.verify': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual managed endpoints.',
-        zh: '在两个实际托管端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, pricingBinding)"
     },
     'authentication.encodedType': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual managed endpoints.',
-        zh: '在两个实际托管端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = await createManagedRuntimePeer({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, pricingBinding)"
+    },
+    probe: {
+      whenToUse: {
+        en: 'Attach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.',
+        zh: '这条连接需要诊断追踪时附加应用的消息 probe；无需观察时省略。'
+      },
+      example:
+        'const pricing = await createManagedRuntimePeer({\n  ...pricingOptions, probe: pricingProbe\n}, pricingBinding)'
     }
   },
   createCoroutinePlugin: {
     task: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual parent task and its opaque child token; retain the original callback owner and reject unavailable application construction.',
         zh: '使用实际父任务和不透明子令牌，保留原回调所有者，并拒绝不可用的应用构造。'
-      }
+      },
+      example:
+        "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\ntype IPricing = { prices(): number[] }\nconst pricing = createCoroutinePlugin<IPricing>({\n  name: 'pricing',\n  task: ({ connect, signal, heartbeat }) => runPricingTask({ connect, signal, heartbeat }),\n  supervisor: { startupTimeoutMs: 5000 }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof pricing]>(hostConfiguration)\ntry {\n  await host.use(pricing)\n  renderPrices(await host.coroutine!.request('pricing', 'prices'))\n} finally {\n  await host.dispose()\n}"
     },
     connect: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual parent task and its opaque child token; retain the original callback owner and reject unavailable application construction.',
         zh: '使用实际父任务和不透明子令牌，保留原回调所有者，并拒绝不可用的应用构造。'
-      }
+      },
+      example:
+        "import { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst parent = createCoroutinePlugin({\n  name: 'parent',\n  self: { name: 'pricing-child', instanceId: childInstanceId },\n  connect: context.connect,\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },\n  defaultTimeoutMs: 2000\n})\nawait childHost.use(parent)"
     },
     report: {
-      index: 0,
       whenToUse: {
         en: 'Use the actual parent task and its opaque child token; retain the original callback owner and reject unavailable application construction.',
         zh: '使用实际父任务和不透明子令牌，保留原回调所有者，并拒绝不可用的应用构造。'
-      }
+      },
+      example:
+        'const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n})'
     },
     keyFactory: {
-      index: 1,
       whenToUse: {
         en: 'Use the actual parent task and its opaque child token; retain the original callback owner and reject unavailable application construction.',
         zh: '使用实际父任务和不透明子令牌，保留原回调所有者，并拒绝不可用的应用构造。'
-      }
+      },
+      example:
+        'const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  keyFactory: () => crypto.randomUUID()\n})'
     },
     retryPort: {
-      index: 1,
       whenToUse: {
         en: 'Use the actual parent task and its opaque child token; retain the original callback owner and reject unavailable application construction.',
         zh: '使用实际父任务和不透明子令牌，保留原回调所有者，并拒绝不可用的应用构造。'
-      }
+      },
+      example:
+        'const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  retryPort: pricingRetryPolicy\n})'
     },
     endpointFactory: {
-      index: 2,
       whenToUse: {
         en: 'Use the actual parent task and its opaque child token; retain the original callback owner and reject unavailable application construction.',
         zh: '使用实际父任务和不透明子令牌，保留原回调所有者，并拒绝不可用的应用构造。'
-      }
+      },
+      example:
+        'const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})'
     },
     authentication: {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual coroutine peers.',
-        zh: '在两个实际协程对端上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     'authentication.encrypt': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual coroutine peers.',
-        zh: '在两个实际协程对端上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n})"
     },
     'authentication.decrypt': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual coroutine peers.',
-        zh: '在两个实际协程对端上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n})"
     },
     'authentication.sign': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual coroutine peers.',
-        zh: '在两个实际协程对端上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     'authentication.verify': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual coroutine peers.',
-        zh: '在两个实际协程对端上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     'authentication.encodedType': {
-      index: 1,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on both actual coroutine peers.',
-        zh: '在两个实际协程对端上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createCoroutinePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n})"
     },
     resolvePlugin: {
-      index: 3,
       whenToUse: {
         en: 'Return a local real definition only for names in the catalog of the same exposed Host.',
         zh: '只为同一已公开宿主目录中的名称返回本地真实定义。'
-      }
+      },
+      example:
+        "import { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst parent = createCoroutinePlugin({\n  name: 'parent',\n  connect: context.connect,\n  expose: ['host'],\n  host: childHost,\n  catalog: pricingCatalog,\n  resolvePlugin: (name) => resolveApprovedPlugin(name)\n})"
+    },
+    probe: {
+      whenToUse: {
+        en: 'Attach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.',
+        zh: '这条连接需要诊断追踪时附加应用的消息 probe；无需观察时省略。'
+      },
+      example:
+        'const pricing = createCoroutinePlugin({\n  ...pricingOptions, probe: pricingProbe\n})'
+    },
+    contract: {
+      whenToUse: {
+        en: 'Pass the declared pricing contract so provided methods keep their documented wire names and modes.',
+        zh: '传入声明的价格契约，让提供的方法使用约定的线上名称和模式。'
+      },
+      example:
+        'const pricing = createCoroutinePlugin({\n  ...pricingOptions, contract: pricingContract\n})'
     }
   },
   createRuntimePlugin: {
     report: {
-      index: 0,
       whenToUse: {
         en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
         zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  report: (error) => reportToMonitoring(error)\n}, platformIntegration, createPlatformPeer)'
     },
     connect: {
-      index: 0,
       whenToUse: {
         en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
         zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  connect: pricingSource\n}, platformIntegration, createPlatformPeer)'
     },
     resolvePlugin: {
-      index: 1,
       whenToUse: {
         en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
         zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  resolvePlugin: (name) => resolveApprovedPlugin(name)\n}, platformIntegration, createPlatformPeer)'
     },
     endpointFactory: {
-      index: 2,
       whenToUse: {
         en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
         zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n}, platformIntegration, createPlatformPeer)'
     },
     keyFactory: {
-      index: 3,
       whenToUse: {
         en: 'Supply local logical-key or retry policy only for the actual installed dispatch path; direct borrowed Peer dispatch may leave them unused.',
         zh: '只为实际安装的派发路径提供本地逻辑键或重试策略；直接借入 Peer 的派发可能不使用它们。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  keyFactory: () => crypto.randomUUID()\n}, platformIntegration, createPlatformPeer)'
     },
     retryPort: {
-      index: 3,
       whenToUse: {
         en: 'Supply local logical-key or retry policy only for the actual installed dispatch path; direct borrowed Peer dispatch may leave them unused.',
         zh: '只为实际安装的派发路径提供本地逻辑键或重试策略；直接借入 Peer 的派发可能不使用它们。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  retryPort: pricingRetryPolicy\n}, platformIntegration, createPlatformPeer)'
     },
     authentication: {
-      index: 4,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on the two original adapter endpoints.',
-        zh: '在两个原始适配器端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, platformIntegration, createPlatformPeer)"
     },
     'authentication.encrypt': {
-      index: 4,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on the two original adapter endpoints.',
-        zh: '在两个原始适配器端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n}, platformIntegration, createPlatformPeer)"
     },
     'authentication.decrypt': {
-      index: 4,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on the two original adapter endpoints.',
-        zh: '在两个原始适配器端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  authentication: {\n    encrypt: encryptOrderMessage,\n    decrypt: decryptOrderMessage,\n    sign: signOrderMessage,\n    verify: verifyOrderMessage,\n    encodedType: 'string'\n  }\n}, platformIntegration, createPlatformPeer)"
     },
     'authentication.sign': {
-      index: 4,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on the two original adapter endpoints.',
-        zh: '在两个原始适配器端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, platformIntegration, createPlatformPeer)"
     },
     'authentication.verify': {
-      index: 4,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on the two original adapter endpoints.',
-        zh: '在两个原始适配器端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, platformIntegration, createPlatformPeer)"
     },
     'authentication.encodedType': {
-      index: 4,
       whenToUse: {
-        en: 'Configure `encrypt` with `decrypt`, and `sign` with `verify`, on the two original adapter endpoints.',
-        zh: '在两个原始适配器端点上配置 `encrypt` 与 `decrypt`、`sign` 与 `verify`。'
-      }
+        en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
+        zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
+      },
+      example:
+        "const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  authentication: { sign: signOrderMessage, verify: verifyOrderMessage, encodedType: 'string' }\n}, platformIntegration, createPlatformPeer)"
     },
     spawn: {
-      index: 5,
       whenToUse: {
         en: 'Choose exactly one source input interpreted by the actual platform peer factory; preserve that factory’s acquisition semantics.',
         zh: '选择由实际平台对端工厂解释的一种来源输入，并保留该工厂的资源取得语义。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  spawn: pricingSource\n}, platformIntegration, createPlatformPeer)'
     },
     listen: {
-      index: 5,
       whenToUse: {
         en: 'Choose exactly one source input interpreted by the actual platform peer factory; preserve that factory’s acquisition semantics.',
         zh: '选择由实际平台对端工厂解释的一种来源输入，并保留该工厂的资源取得语义。'
-      }
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions,\n  listen: pricingSource\n}, platformIntegration, createPlatformPeer)'
+    },
+    probe: {
+      whenToUse: {
+        en: 'Attach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.',
+        zh: '这条连接需要诊断追踪时附加应用的消息 probe；无需观察时省略。'
+      },
+      example:
+        'const pricing = createRuntimePlugin({\n  ...pricingOptions, probe: pricingProbe\n}, platformIntegration, createPlatformPeer)'
     }
   }
 }

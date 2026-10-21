@@ -3525,7 +3525,21 @@ symbols.deserializeRpcError = {
     ...symbols.deserializeRpcError.optionDocs,
     unknownFields: {
       ...symbols.deserializeRpcError.optionDocs!.unknownFields,
-      values: contractReference.enums.RpcWireErrorUnknownFieldMode.values
+      values: contractReference.enums.RpcWireErrorUnknownFieldMode.values,
+      example: `import { deserializeRpcError } from '@migaia/rpc-core'
+
+const failure = deserializeRpcError(receivedError, { unknownFields: 'ignore' })
+showConnectionError(failure.message)`
+    },
+    onUnknownField: {
+      ...symbols.deserializeRpcError.optionDocs!.onUnknownField,
+      example: `import { deserializeRpcError } from '@migaia/rpc-core'
+
+const failure = deserializeRpcError(receivedError, {
+  unknownFields: 'ignore',
+  onUnknownField: (pointer, field) => reportDroppedErrorField(pointer, field)
+})
+showConnectionError(failure.message)`
     }
   }
 }
@@ -3831,7 +3845,7 @@ for (const [name, optionCases] of Object.entries(rpcCoreOptionCases)) {
     members[field] = {
       ...members[field]!,
       whenToUse: choice.whenToUse,
-      example: optionCases[choice.index]!.example
+      example: choice.example
     }
   }
   if (name === 'connect') {
