@@ -348,7 +348,11 @@ test('generated projections contain no volatile metadata', () => {
   )
   for (const symbol of symbols) {
     assert.doesNotMatch(symbol.purpose, /Declaration:| · [a-f0-9]{8}/)
-    assert.doesNotMatch(JSON.stringify(symbol.sections), /{} as |source-backed .* example/i)
+    /** Reject placeholder casts without mistaking the prose "default {} as in" for TypeScript. */
+    assert.doesNotMatch(
+      JSON.stringify(symbol.sections),
+      /\{\}\s+as\s+(?!in\b)[A-Za-z_$][\w$]*|source-backed .* example/i
+    )
   }
   for (const symbol of symbols) {
     const required = symbol.parameterDetails.filter((parameter) => !parameter.optional)
