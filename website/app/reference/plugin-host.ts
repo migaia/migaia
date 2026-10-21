@@ -4,7 +4,11 @@
  * cleanup-runtime.ts, state-constants.ts, error-code.ts) and USEGUIDE on 2026-10-18.
  */
 import type { IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
-import { pluginHostCases } from './plugin-host-cases.ts'
+import {
+  pluginHostCases,
+  pluginHostOptionCases,
+  pluginHostOptionExamples
+} from './plugin-host-cases.ts'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -753,6 +757,11 @@ const hostOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     default: t('Not set: diagnostics are dropped.', '不设置：诊断信息被丢弃。')
   },
   onDiagnosticFailure: {
+    whenToUse: t(
+      'Set it to observe diagnostic throwing or rejecting without changing host operations. Omission forwards failure to globalThis.reportError when available. Return no value from this final receiver.',
+      '需要观察 diagnostic 抛错或拒绝，同时不改变宿主操作时设置。省略时交给可用的 globalThis.reportError。最终接收方不返回值。'
+    ),
+    example: pluginHostOptionExamples.classDiagnostic,
     summary: t(
       'Receives the error when `diagnostic` itself throws or rejects.',
       '`diagnostic` 自身抛错或 reject 时，接收那个错误。'
@@ -1001,6 +1010,7 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
 if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇总错误')`
     },
     PluginHostError: {
+      optionCases: pluginHostOptionCases.error,
       role: 'error',
       params: {
         code: t(
@@ -1218,13 +1228,15 @@ await host.dispose()`,
         'Options of a host (`new PluginHost(options)` and `defineHost({ host })`).',
         '宿主的构造选项，用于 `new PluginHost(options)` 以及 `defineHost({ host })`。'
       ),
-      members: hostOptionMembers
+      members: hostOptionMembers,
+      optionCases: pluginHostOptionCases.host
     },
     IDefineHostOptions: {
       summary: t(
         'Options of `defineHost()`.',
         '`defineHost()` 的选项：宿主选项加上替代子类重写的领域钩子。'
       ),
+      optionCases: pluginHostOptionCases.functional,
       members: {
         host: {
           summary: t(
@@ -1235,6 +1247,10 @@ await host.dispose()`,
         ...Object.fromEntries(
           Object.entries(hostOptionMembers).map(([name, doc]) => [`host.${name}`, doc])
         ),
+        'host.onDiagnosticFailure': {
+          ...hostOptionMembers.onDiagnosticFailure!,
+          example: pluginHostOptionExamples.functionDiagnostic
+        },
         surface: {
           summary: t(
             'Domain public members installed on the canonical handle using own descriptors captured once before Runtime creation. Accessors stay live; canonical Host keys, including identity, remain reserved and take precedence. TPublicSurface defaults to an empty object.',
@@ -1246,6 +1262,11 @@ await host.dispose()`,
           )
         },
         domainCore: {
+          whenToUse: t(
+            'Set it when plugins need domain capabilities in their installation core. Return the per-install domain object synchronously. Omission provides an empty domain core; public handle members belong in surface.',
+            '插件安装内核需要领域能力时设置。同步返回每次安装使用的领域对象。省略时提供空领域内核；公开句柄成员应放在 surface。'
+          ),
+          example: pluginHostOptionExamples.domain,
           summary: t(
             'Creates the domain core each plugin install receives; replaces `createPluginDomainCore()`.',
             '为每次插件安装创建领域 core，替代子类的 `createPluginDomainCore()`。'
@@ -1256,6 +1277,11 @@ await host.dispose()`,
           )
         },
         translateDisposalError: {
+          whenToUse: t(
+            'Normally omit this retained hook. The default structured cleanup path does not call it, so it cannot transform cleanupErrors. Setting it does not change those collected failures.',
+            '普通调用方应省略这个保留钩子。默认结构化清理路径不调用它，因此不能转换 cleanupErrors。设置后也不改变这些收集的失败。'
+          ),
+          example: pluginHostOptionExamples.disposal,
           summary: t(
             'Retained counterpart of the class translateDisposalError hook. The default structured-cleanup result path does not invoke it and does not convert individual cleanupErrors through this callback.',
             '保留的类 `translateDisposalError` 钩子对应选项；默认结构化清理结果路径不调用它，也不通过此回调逐项转换 `cleanupErrors`。'
@@ -1266,6 +1292,11 @@ await host.dispose()`,
           )
         },
         dispose: {
+          whenToUse: t(
+            'Use it for application work before and after canonical cleanup. Await next exactly once and return its result. Without it, the handle uses ordinary host disposal; repeated calls still share one Promise.',
+            '需要在规范清理前后执行应用工作时设置。恰好等待一次 next 并返回结果。省略时直接释放宿主；重复调用仍共享同一个 Promise。'
+          ),
+          example: pluginHostOptionExamples.disposal,
           summary: t(
             'Wraps disposal: call next exactly once. Completion is published before middleware runs, so reentrant calls share it and middleware runs once. Unclassified callback failures receive CALLBACK_FAILED; native identity or original cause remains reachable.',
             '包装释放时须恰好调用一次 `next`；中间件执行前发布完成对象，重入调用共享它且中间件仅执行一次。未分类回调失败附 `CALLBACK_FAILED`，原生身份或原始原因可追溯。'

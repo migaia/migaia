@@ -1,7 +1,273 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
 /** Pairs explanations while keeping each public-entry example independently runnable. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Both public host factories run the same option policy with their own construction syntax. */
+const hostConfigurationExample = (
+  functional: boolean,
+  scenario: 'pipeline' | 'queue' | 'diagnostic' | 'cleanup'
+): string => {
+  const configuration = {
+    pipeline: `identity: { name: 'cart' },
+    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+    pipeline: { mode: 'async' }`,
+    queue: `execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+    queueAdmissionTimeoutMs: 20, scheduler`,
+    diagnostic: `execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+    queueAdmissionDiagnosticMs: 10, scheduler,
+    diagnostic: () => { throw new Error('diagnostic unavailable') },
+    onDiagnosticFailure: (error) => { failures.push((error as Error).message) }`,
+    cleanup: `execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+    disposeStepTimeoutMs: 10, scheduler`
+  }[scenario]
+  const body = {
+    pipeline: `const order: string[] = []
+host.useAsyncPipeline(async (value, next) => {
+  order.push('before'); await next(value + 1); order.push('after')
+})
+await host.runPipeline(1, (value) => { order.push(String(value)) })
+console.log(host.identity.name, order)
+await host.dispose()`,
+    queue: `await host.use({ name: 'cart', install: () => ({ ready: true }) })
+console.log(host.identity.name, host.pipelineMode)
+await host.dispose()`,
+    diagnostic: `let late = () => {}
+host.usePipeline((value, next) => { late = () => { next(value) } })
+await host.runPipeline(1, () => {})
+late()
+console.log(failures)
+await host.dispose()`,
+    cleanup: `await host.use({ name: 'slow', install: () => ({}), dispose: () => {
+  started.resolve(); return release.promise
+} })
+const closing = host.dispose()
+await started.promise
+scheduler.advance(11)
+const result = await closing
+console.log(result.cleanupComplete)
+release.resolve()
+await result.physicalCompletion`
+  }[scenario]
+  return `import { PluginHost, defineHost } from '@migaia/plugin-host'
+import { createManualScheduler } from '@migaia/utils/testing'
+${
+  functional
+    ? ''
+    : `class AppHost extends PluginHost<Record<string, never>, number> {
+  run(value: number, done: (value: number) => void) { return this.runPipeline(value, done) }
+}`
+}
+const scheduler = createManualScheduler()
+const failures: string[] = []
+const started = Promise.withResolvers<void>()
+const release = Promise.withResolvers<void>()
+const host = ${functional ? 'defineHost<Record<string, never>, number>({ host: {' : 'new AppHost({'}
+    ${configuration}
+${functional ? '} })' : '})'}
+${functional ? body : body.replaceAll('host.runPipeline(', 'host.run(')}`
+}
+
+/** Functional domain and disposal hooks stay on their supported public boundaries. */
+export const pluginHostOptionExamples = {
+  classPipeline: hostConfigurationExample(false, 'pipeline'),
+  classQueue: hostConfigurationExample(false, 'queue'),
+  classDiagnostic: hostConfigurationExample(false, 'diagnostic'),
+  classCleanup: hostConfigurationExample(false, 'cleanup'),
+  functionPipeline: hostConfigurationExample(true, 'pipeline'),
+  functionQueue: hostConfigurationExample(true, 'queue'),
+  functionDiagnostic: hostConfigurationExample(true, 'diagnostic'),
+  functionCleanup: hostConfigurationExample(true, 'cleanup'),
+  domain: `import { defineHost } from '@migaia/plugin-host'
+const host = defineHost({
+  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },
+  surface: { version: '1.0' },
+  domainCore: () => ({ baseUrl: '/api' })
+})
+const [registration] = await host.use({ name: 'api', install: (core) => ({ url: () => core.baseUrl }) })
+console.log(host.version, registration.extensions.url())
+await host.dispose()`,
+  disposal: `import { defineHost } from '@migaia/plugin-host'
+const order: string[] = []
+let translated = 0
+const host = defineHost({
+  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },
+  translateDisposalError: (error) => { translated++; return error },
+  dispose: async (next) => {
+    order.push('before')
+    const result = await next()
+    order.push('after')
+    return result
+  }
+})
+await host.use({ name: 'broken', install: () => ({}), dispose: () => { throw new Error('cleanup failed') } })
+const result = await host.dispose()
+console.log(order, translated, result.cleanupErrors.length > 0)`,
+  error: `import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'
+const cause = new TypeError('service unavailable')
+const detail = { plugin: 'inventory' }
+const error = new PluginHostError(PluginHostErrorCode.pluginInstallFailed, 'inventory cannot start', { cause, detail })
+console.log(error.cause === cause, error.detail === detail)`,
+  configError: `import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'
+const cause = { field: 'quantity', value: -1 }
+const detail = { plugin: 'cart', path: 'quantity' }
+const error = new PluginHostError(PluginHostErrorCode.invalidConfigValue, 'invalid quantity', { cause, detail })
+console.log(error.cause === cause, error.detail === detail)`
+}
+
+/** Shared descriptions retain separate covers paths for functional and class options. */
+const hostConfigurationCases = (functional: boolean): readonly IOptionCaseDoc[] => {
+  const prefix = functional ? 'host.' : ''
+  const examples = functional
+    ? {
+        pipeline: pluginHostOptionExamples.functionPipeline,
+        queue: pluginHostOptionExamples.functionQueue,
+        diagnostic: pluginHostOptionExamples.functionDiagnostic,
+        cleanup: pluginHostOptionExamples.functionCleanup
+      }
+    : {
+        pipeline: pluginHostOptionExamples.classPipeline,
+        queue: pluginHostOptionExamples.classQueue,
+        diagnostic: pluginHostOptionExamples.classDiagnostic,
+        cleanup: pluginHostOptionExamples.classCleanup
+      }
+  const covers = (fields: readonly string[]) => [
+    ...(functional ? ['host'] : []),
+    ...fields.map((field) => prefix + field)
+  ]
+  return [
+    {
+      title: t('Name an asynchronous processing host', '为异步处理宿主命名'),
+      problem: t(
+        'An outer stage must wait for downstream work before recording completion. pipeline async enables await next(); the default sync mode starts downstream only after the stage returns. identity names diagnostics, and both execution budgets are required.',
+        '外层步骤需要等下游完成后再记录结束。pipeline async 允许 await next()；默认 sync 在步骤返回后才开始下游。identity 为诊断命名，两个执行预算必填。'
+      ),
+      example: examples.pipeline,
+      result: t(
+        "Prints cart and ['before', '2', 'after']; downstream completes before the outer stage ends.",
+        "输出 cart 和 ['before', '2', 'after']；下游在外层步骤结束前完成。"
+      ),
+      covers: covers([
+        'identity',
+        'identity.name',
+        'execution',
+        'execution.mutationTimeoutMs',
+        'execution.pipelineDrainTimeoutMs',
+        'pipeline',
+        'pipeline.mode'
+      ])
+    },
+    {
+      title: t('Set a queue admission budget', '设置队列接纳预算'),
+      problem: t(
+        'Interactive changes should not remain queued indefinitely. A numeric queueAdmissionTimeoutMs limits waiting; false disables admission timers, and omission only diagnoses. The local scheduler owns that clock. This run installs one immediately admitted plugin.',
+        '交互式变更不应无限排队。数值 queueAdmissionTimeoutMs 限制等待；false 关闭接纳定时器；省略时只诊断。局部 scheduler 持有该时钟。本次运行安装一个立即接纳的插件。'
+      ),
+      example: examples.queue,
+      result: t(
+        'Prints DEFAULT sync; installation succeeds without a queue timeout in this run.',
+        '输出 DEFAULT sync；本次安装成功，没有发生排队超时。'
+      ),
+      covers: covers(['queueAdmissionTimeoutMs', 'scheduler'])
+    },
+    {
+      title: t('Observe a diagnostic callback failure', '观察诊断回调失败'),
+      problem: t(
+        'Late next() and long queue waits share diagnostic. queueAdmissionDiagnosticMs changes the default 1000 ms warning threshold; it applies without an admission timeout. onDiagnosticFailure observes diagnostic itself throwing. Without it, that failure reaches globalThis.reportError when available.',
+        '迟到的 next() 和长时间排队共用 diagnostic。queueAdmissionDiagnosticMs 修改默认 1000 毫秒提示阈值，仅在不设接纳超时时生效。onDiagnosticFailure 观察 diagnostic 自身抛错。省略时交给可用的 globalThis.reportError。'
+      ),
+      example: examples.diagnostic,
+      result: t(
+        "Prints ['diagnostic unavailable'] after a late next() call.",
+        "迟到的 next() 调用后输出 ['diagnostic unavailable']。"
+      ),
+      covers: covers([
+        'diagnostic',
+        'onDiagnosticFailure',
+        'queueAdmissionDiagnosticMs',
+        'scheduler'
+      ])
+    },
+    {
+      title: t('Return while one slow disposer settles', '在单个慢速释放函数结算前返回'),
+      problem: t(
+        'An ordinary disposer should not hold logical shutdown forever. disposeStepTimeoutMs changes the default 5000 ms step budget; false removes it. A timed-out Promise continues under physicalCompletion rather than being forcibly cancelled.',
+        '普通释放函数不应永远阻塞逻辑关闭。disposeStepTimeoutMs 修改默认 5000 毫秒步骤预算；false 关闭限制。超时 Promise 在 physicalCompletion 中继续，不会被强制取消。'
+      ),
+      example: examples.cleanup,
+      result: t(
+        'Prints false, then finishes physicalCompletion after the gate is released.',
+        '输出 false，放行后 physicalCompletion 完成。'
+      ),
+      covers: covers(['disposeStepTimeoutMs', 'scheduler'])
+    }
+  ]
+}
+
+/** Each option group has a bounded set of independently runnable configuration workflows. */
+export const pluginHostOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  host: hostConfigurationCases(false),
+  functional: [
+    ...hostConfigurationCases(true),
+    {
+      title: t('Expose a public surface and a plugin domain core', '提供公开表面和插件领域内核'),
+      problem: t(
+        'Applications can add domain state without subclassing. surface adds application-owned public descriptors; domainCore builds what each plugin receives. Omission adds no public domain members and gives plugins an empty domain core.',
+        '应用可以在不继承的情况下加入领域状态。surface 添加应用持有的公开属性；domainCore 构建每个插件收到的领域内核。省略时不增加公开领域成员，插件收到空领域内核。'
+      ),
+      example: pluginHostOptionExamples.domain,
+      result: t(
+        'Prints 1.0 /api; the handle and plugin receive their intended domain data.',
+        '输出 1.0 /api；句柄和插件各自取得对应领域数据。'
+      ),
+      covers: ['host', 'surface', 'domainCore']
+    },
+    {
+      title: t(
+        'Wrap disposal without pretending to translate collected errors',
+        '包装释放并如实处理收集错误'
+      ),
+      problem: t(
+        'dispose wraps canonical cleanup and must call next exactly once. translateDisposalError is retained but the default structured cleanup path does not invoke it. The ordinary structured-cleanup path should omit that retained hook; it does not map cleanupErrors.',
+        'dispose 包装规范清理，必须恰好调用一次 next。translateDisposalError 虽然保留，但默认结构化清理路径不会调用它。普通调用方应省略这个保留钩子；它不映射 cleanupErrors。'
+      ),
+      example: pluginHostOptionExamples.disposal,
+      result: t(
+        "Prints ['before', 'after'], 0 and true; cleanup errors stay in the result and the translation hook was not invoked.",
+        "输出 ['before', 'after']、0 和 true；清理错误保留在结果中，转换钩子没有被调用。"
+      ),
+      covers: ['host', 'dispose', 'translateDisposalError']
+    }
+  ],
+  error: [
+    {
+      title: t('Keep failure identity and plugin context', '保留失败身份与插件上下文'),
+      problem: t(
+        'An installation error needs both its original cause and structured plugin details. cause keeps the earlier failure; detail carries context separately. Omission leaves the corresponding value unattached.',
+        '安装错误需要原始原因和结构化插件详情。cause 保留先前失败；detail 单独携带上下文。省略时不附对应值。'
+      ),
+      example: pluginHostOptionExamples.error,
+      result: t(
+        'Prints true true; both supplied objects retain identity.',
+        '输出 true true；两个传入对象均保留身份。'
+      ),
+      covers: ['detail']
+    },
+    {
+      title: t('Preserve structured configuration diagnostics', '保留结构化配置诊断'),
+      problem: t(
+        'A validation failure may be a details record rather than an Error. Keep that record in cause and identify the affected plugin path in detail instead of parsing a message later.',
+        '校验失败可能是详情记录，而非 Error。将记录保留在 cause，并通过 detail 标识受影响插件路径，无需之后解析消息。'
+      ),
+      example: pluginHostOptionExamples.configError,
+      result: t(
+        'Prints true true; callers can inspect the original record and context.',
+        '输出 true true；调用方可检查原始记录及上下文。'
+      ),
+      covers: ['detail']
+    }
+  ]
+}
 
 /** Installation, dependency and cleanup scenarios use only the published root entry. */
 export const pluginHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
