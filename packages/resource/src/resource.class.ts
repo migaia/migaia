@@ -32,6 +32,11 @@ import { ResourceErrorCode } from './error-code.js'
 import { ResourceErrorText } from './error-text.js'
 import { ResourceStatus, ResourceFetchStatus } from './state-constants.js'
 
+/**
+ * Everything a view needs to decide what to show: `idle` before any request, `pending` while the
+ * first load runs, `success` with `data` (and `refreshing` during a stale-while-revalidate
+ * refresh), `error` with the latest failure, and `cancelled` after an explicit `cancel()`.
+ */
 export type IResourceState<T> =
   | { status: typeof ResourceStatus.idle }
   | { status: typeof ResourceStatus.pending }
@@ -49,6 +54,11 @@ export type IResourceState<T> =
  */
 export type IResourceFetchContext = IGenerationRequest
 
+/**
+ * Loads the data for one request. Reactive values read before the first `await` become
+ * dependencies; hand `ctx.signal` to the underlying I/O so replaced or cancelled requests really
+ * stop.
+ */
 export type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 
 /** Portable durations captured at dehydration; callers account for transport/storage elapsed time. */
@@ -61,6 +71,10 @@ export type IResourceCacheSnapshot<T> = {
   readonly remainingTtlMs: number | null
 }
 
+/**
+ * Retry decision after a failure: a maximum number of retries, or a function receiving the failure
+ * number (starting at 1) and the error that returns whether to try again.
+ */
 export type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)
 
 type IResourceExpiry = {
@@ -81,6 +95,7 @@ type IResourceOptionSnapshot<T> = {
   readonly scheduler: IScheduler
 }
 
+/** Constructor options; every field is read and validated once when the resource is created. */
 export type IResourceOptions<T = unknown> = {
   /** Human-readable owner label used in reactive diagnostics and request error context. */
   debugName?: string
@@ -95,6 +110,10 @@ export type IResourceOptions<T = unknown> = {
   staleWhileRevalidate?: boolean
   /** Retry count or predicate. Suspense Promise throws do not count. */
   retry?: IResourceRetryPolicy
+  /**
+   * Milliseconds to wait before the next retry, fixed or computed from the failure number and
+   * error. Defaults to 0.
+   */
   retryDelay?: number | ((failureCount: number, error: unknown) => number)
   /** Keep upstream reactive edges while no state consumer exists. */
   keepAlive?: boolean
@@ -429,9 +448,13 @@ const appendDisposeCleanupErrors = (
 export class Resource<T> implements IObserver, IDisposable {
   /** Bound graph capabilities operate only on this Resource observer. */
   readonly #tracking: ITrackedObserverBinding
+  /** Reactive nodes the last fetcher run read synchronously; maintained by the dependency graph. */
   readonly deps: ReadonlySet<IObservable>
+  /** Version of each dependency seen by the last run, used to decide whether a reload is needed. */
   readonly depVersions: ReadonlyMap<IObservable, number>
+  /** Runtime that owns this resource's dependency graph; `dispose()` leaves it running. */
   readonly runtime: IRuntime
+  /** Label shown in reactive diagnostics and request error context. */
   debugName?: string
   /** Resource-owned state node exposes subscriber count for the existing suspension lifecycle. */
   #stateSignal: IReactiveSignal<IResourceState<T>> & IObservable
@@ -455,6 +478,11 @@ export class Resource<T> implements IObserver, IDisposable {
   #terminal = createTerminalController()
   #scheduler: IScheduler
 
+  /**
+   * Validates every option once, restores `initialSnapshot` when given, and starts the first
+   * request unless `autoStart` is false or the snapshot is still fresh. Invalid options throw
+   * `INVALID_OPTION`; an invalid snapshot throws `INVALID_SNAPSHOT`.
+   */
   constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options: IResourceOptions<T> = {}) {
     const admittedOptions = snapshotResourceOptions(options)
     this.runtime = runtime
@@ -517,6 +545,7 @@ export class Resource<T> implements IObserver, IDisposable {
     return this.#currentPromise
   }
 
+  /** Whether `dispose()` has run; readable after disposal. */
   get disposed(): boolean {
     return this.#terminal.lifecycle === LifecycleState.terminal
   }
@@ -681,6 +710,11 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#scheduleDependencyRefresh(true)
   }
 
+  /**
+   * Ends the resource: aborts the running request, clears dependencies and releases the state node.
+   * Idempotent. Later reads and requests throw `RESOURCE_DISPOSED`; the first cleanup failure is
+   * thrown with any later ones attached to its `errors`.
+   */
   dispose(): void {
     if (this.#terminal.lifecycle === LifecycleState.terminal) return
     this.#terminal.close()
