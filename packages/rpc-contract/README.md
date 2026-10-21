@@ -236,7 +236,7 @@ schema/wire-error 只提供结构校验起点，不等于有界 normalizer。独
 
 ### 错误身份与维护
 
-本包 source 为 `@migaia/rpc/contract`，常量 RPC_CONTRACT_SOURCE，code 来自 RpcContractErrorCode：
+本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode：
 
 | code                   | 原生类型与含义                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------ |

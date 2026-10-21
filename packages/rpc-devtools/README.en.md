@@ -218,7 +218,7 @@ Logger methods must enqueue without blocking. This package creates no extra buff
 
 ### Error identity and development commands
 
-RPC_DEVTOOLS_SOURCE is @migaia/rpc/devtools; use RpcDevtoolsErrorCode with source rather than matching messages.
+RPC_DEVTOOLS_SOURCE is `@migaia/rpc/devtools`; use RpcDevtoolsErrorCode with source rather than matching messages.
 
 | Code                              | Scenario                                                                                 |
 | --------------------------------- | ---------------------------------------------------------------------------------------- |
