@@ -1,0 +1,581 @@
+# @migaia/store-worker usage guide
+
+Choose a complete example for your task, then consult the parameter and lifecycle contract below. These examples use real Node 24 Workers and MessagePorts. They demonstrate wiring, computation, caching or cleanup, without establishing browser permissions or process isolation.
+
+## Find a scenario
+
+| Scenario                                                     | Main API              | Details                                                                           |
+| ------------------------------------------------------------ | --------------------- | --------------------------------------------------------------------------------- |
+| Run a calculation in a real Worker                           | `WorkerAdapter`       | [Complete example](#run-a-calculation-in-a-real-worker)                           |
+| Stop requests without terminating a borrowed Worker          | `WorkerAdapter`       | [Complete example](#stop-requests-without-terminating-a-borrowed-worker)          |
+| Keep a Worker computation failure traceable                  | `createWorkerHandler` | [Complete example](#keep-a-worker-computation-failure-traceable)                  |
+| Use Resource state and cache for Worker results              | `workerComputed`      | [Complete example](#use-resource-state-and-cache-for-worker-results)              |
+| Run an existing JSON parser through a Worker registry plugin | `workerPlugin`        | [Complete example](#run-an-existing-json-parser-through-a-worker-registry-plugin) |
+| Keep input bytes available when a decode is cancelled        | `workerParser`        | [Complete example](#keep-input-bytes-available-when-a-decode-is-cancelled)        |
+
+## Run the examples
+
+Install this package. The Resource example directly imports reactive, and serialization examples directly import serialize, so install those packages directly too.
+
+```bash
+pnpm add @migaia/store-worker @migaia/reactive @migaia/serialize
+```
+
+Save each example as a separate ESM TypeScript file and run that file with Node 24. Avoid interactive standard input: the Worker reloads the same file through import.meta.url. The child receives the transferred native port, and the parent closes and terminates its resources in finally. No browser-port substitute or additional Worker wrapper is needed.
+
+## Run a calculation in a real Worker
+
+A large calculation needs to leave the UI thread without making callers manage message identifiers and response matching.
+
+Posting application data alone leaves request matching, startup readiness and failure settlement to handwritten listeners.
+
+Create a real Node Worker, transfer a MessagePort to it, and pair WorkerAdapter with createWorkerHandler. request waits for endpoint initialization; the returned PID and thread id show where the calculation ran.
+
+### Example parameters
+
+`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` executes this file in another thread. `isMainThread` selects the branch, `workerData` carries the child port, and `transferList` transfers that port rather than application input. `port1.start()` enables native port event delivery. The two request type arguments describe input and output statically; the payload is `[20, 22]`, with no signal or application transfer list. Adapter defaults are `clientId: 'main'` and `timeoutMs: undefined`, meaning no deadline.
+
+```ts doc-test=run
+import {
+  Worker,
+  MessageChannel,
+  workerData,
+  isMainThread,
+  threadId,
+  type MessagePort
+} from 'node:worker_threads'
+import { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'
+
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createWorkerHandler(
+    (values: number[]) => ({
+      total: values.reduce((sum, value) => sum + value, 0),
+      pid: process.pid,
+      threadId
+    }),
+    (message) => port.postMessage(message)
+  )
+  port.on('message', (message) => void handler(message).catch(console.error))
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const adapter = new WorkerAdapter(port1)
+  try {
+    const result = await adapter.request<
+      number[],
+      {
+        total: number
+        pid: number
+        threadId: number
+      }
+    >([20, 22])
+    console.log('result:', result.total, result.pid === process.pid, result.threadId !== threadId)
+  } finally {
+    await adapter.dispose()
+    port1.close()
+    await worker.terminate()
+  }
+}
+```
+
+Output:
+
+```text
+result: 42 true true
+```
+
+The output is `result: 42 true true`: the result is 42, the Worker shares the parent's process, and it runs on a different thread.
+
+This is Node 24 native Worker execution, not a browser or process-isolation test. clientId defaults to 'main' and timeoutMs to undefined; the caller must close its borrowed port and terminate its own Worker.
+
+## Stop requests without terminating a borrowed Worker
+
+A screen closes its RPC client while the application still owns the Worker and its port.
+
+Terminating the Worker inside client cleanup destroys a resource owned elsewhere; only marking the client closed leaves its endpoint subscriptions installed.
+
+Use close to reject new requests immediately, then await dispose to release the endpoint. Repeated dispose calls share one Promise; a native ping afterward checks that the borrowed Worker port still works.
+
+### Example parameters
+
+`close()` and `dispose()` take no arguments. The former retires request admission synchronously; the latter releases the endpoint asynchronously and shares one Promise across calls. The native `'ping'` / `'pong'` exchange checks that the borrowed port still works; it is separate from this package's request protocol. This example created the port and Worker, so its `finally` block closes and terminates them.
+
+```ts doc-test=run
+import {
+  Worker,
+  MessageChannel,
+  workerData,
+  isMainThread,
+  threadId,
+  type MessagePort
+} from 'node:worker_threads'
+import { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'
+
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createWorkerHandler(
+    (value: number) => value * 2,
+    (message) => port.postMessage(message)
+  )
+  port.on('message', (message) => {
+    if (message === 'ping') {
+      port.postMessage('pong')
+      return
+    }
+    void handler(message).catch(console.error)
+  })
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const adapter = new WorkerAdapter(port1)
+  try {
+    console.log('before close:', await adapter.request(21))
+    adapter.close()
+    const failure = await adapter.request(21).catch((error: unknown) => error)
+    console.log('closed:', adapter.disposed, (failure as { code?: string }).code)
+    const first = adapter.dispose()
+    console.log('same cleanup:', first === adapter.dispose())
+    await first
+    const pong = new Promise<unknown>((resolve) => port1.once('message', resolve))
+    port1.postMessage('ping')
+    console.log('borrowed port:', await pong)
+  } finally {
+    await adapter.dispose()
+    port1.close()
+    await worker.terminate()
+  }
+}
+```
+
+Output:
+
+```text
+before close: 42
+closed: true ADAPTER_DISPOSED
+same cleanup: true
+borrowed port: pong
+```
+
+The output is `before close: 42`, `closed: true ADAPTER_DISPOSED`, `same cleanup: true`, then `borrowed port: pong`.
+
+close only changes admission; dispose performs asynchronous endpoint cleanup and can reject. Neither closes the native port nor terminates the Worker. The final ping is a separate native host message, not an RPC request.
+
+## Keep a Worker computation failure traceable
+
+A Worker calculation throws a TypeError caused by an earlier RangeError, but the caller needs both failures to diagnose the input.
+
+Sending only an error message loses native types, the nested cause and the original stack information across the thread boundary.
+
+Wrap the real computation with createWorkerHandler and forward incoming messages to it. RPC returns a remote failure whose cause retains the native TypeError and its RangeError cause; no custom error-message protocol is needed.
+
+### Example parameters
+
+Both functions passed to `createWorkerHandler(compute, postMessage)` are required. Here, compute throws a native `TypeError` with a cause, while postMessage delegates to the native port. No timeout is configured, so requests have no default deadline. Read the transferred cause chain rather than expecting object identity with the child-side error. The message listener observes delivery failures from the handler's Promise.
+
+```ts doc-test=run
+import {
+  Worker,
+  MessageChannel,
+  workerData,
+  isMainThread,
+  threadId,
+  type MessagePort
+} from 'node:worker_threads'
+import { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'
+
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const root = new RangeError('invalid row')
+  const failure = new TypeError('cannot compute total', { cause: root })
+  const handler = createWorkerHandler(
+    () => {
+      throw failure
+    },
+    (message) => port.postMessage(message)
+  )
+  port.on('message', (message) => void handler(message).catch(console.error))
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const adapter = new WorkerAdapter(port1)
+  try {
+    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error
+    const primary = failure.cause as Error
+    const root = primary.cause as Error
+    console.log('remote:', failure.name, (failure as Error & { code?: string }).code)
+    console.log('primary:', primary instanceof TypeError, primary.message)
+    console.log('cause:', root instanceof RangeError, root.message)
+    console.log('stacks:', Boolean(primary.stack), Boolean(root.stack))
+  } finally {
+    await adapter.dispose()
+    port1.close()
+    await worker.terminate()
+  }
+}
+```
+
+Output:
+
+```text
+remote: RpcRemoteError INTERNAL
+primary: true cannot compute total
+cause: true invalid row
+stacks: true true
+```
+
+The output is `remote: RpcRemoteError INTERNAL`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.
+
+The outer error belongs to RPC Core; the native errors remain below cause rather than becoming the top-level TypeError. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.
+
+## Use Resource state and cache for Worker results
+
+A view needs loading and successful states plus a cached Worker result, and its inputs can change later.
+
+Keeping a separate result variable and cache beside Worker requests duplicates Resource behavior and makes it easy to show a result for outdated inputs.
+
+Use workerComputed with a synchronous selector and the signal's Runtime. autoStart false skips eager construction work; reading state can still start lazy work. Await refetch, read the cached promise, then explicitly refresh after input changes.
+
+### Example parameters
+
+`runtime` is explicitly the input signal's runtime; omission uses `defaultRuntime`. The selector synchronously returns `values.value`. `autoStart: false` overrides the default `true` only for eager construction; the first `state` read can still start work. `ttl` defaults to `Infinity` and is unchanged here. `refetch()` forces work, while passive `promise` reads can reuse fresh cache. Dispose the Resource before its borrowed adapter and native Worker.
+
+```ts doc-test=run
+import {
+  Worker,
+  MessageChannel,
+  workerData,
+  isMainThread,
+  threadId,
+  type MessagePort
+} from 'node:worker_threads'
+import { createRuntime } from '@migaia/reactive'
+import { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'
+
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createWorkerHandler(
+    (values: number[]) => values.reduce((total, value) => total + value, 0),
+    (message) => port.postMessage(message)
+  )
+  port.on('message', (message) => void handler(message).catch(console.error))
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const adapter = new WorkerAdapter(port1)
+  const runtime = createRuntime()
+  const values = runtime.signal([1, 2, 3])
+  const sum = workerComputed<number[], number>(adapter, () => values.value, {
+    runtime,
+    autoStart: false
+  })
+  try {
+    console.log('before:', sum.state.status)
+    console.log('first:', await sum.refetch(), sum.state.status)
+    const cached = sum.promise
+    console.log('cache:', cached === sum.promise, await cached)
+    values.value = [4, 5]
+    console.log('next:', await sum.refetch(), sum.state.status)
+  } finally {
+    sum.dispose()
+    await adapter.dispose()
+    port1.close()
+    await worker.terminate()
+  }
+}
+```
+
+Output:
+
+```text
+before: pending
+first: 6 success
+cache: true 6
+next: 9 success
+```
+
+The output is `before: pending`, `first: 6 success`, `cache: true 6`, then `next: 9 success`.
+
+autoStart defaults to true; false skips eager construction, not lazy state reads. The first state read starts work and reports pending. ttl defaults to Infinity; passive promise reads reuse fresh cache, while refetch forces work. Dispose Resource before its borrowed adapter and Worker.
+
+## Run an existing JSON parser through a Worker registry plugin
+
+An application already uses a serialization registry, but one parser should execute inside a Worker.
+
+Replacing registry calls with ad hoc messages duplicates format routing and cleanup, while running another parser on the main thread defeats the intended execution boundary.
+
+Install jsonParser with createSerializeWorkerHandler inside a real Worker, then register workerPlugin on the main side. Keep the existing registry encode and decode calls; the type label selects this plugin.
+
+### Example parameters
+
+`worker` is required and receives a native port. `type: 'json'` overrides the default `'worker'` label for local registry routing; it does not change the Worker-side `jsonParser()` algorithm. Defaults are `ownership: 'copy'`, `clientId: 'main'`, and `terminateOnDispose: false`. Registry encode/decode calls use the plugin; registry disposal releases its endpoint, while the example still owns the native port and Worker.
+
+```ts doc-test=run
+import {
+  Worker,
+  MessageChannel,
+  workerData,
+  isMainThread,
+  threadId,
+  type MessagePort
+} from 'node:worker_threads'
+import { createSerializeRegistry } from '@migaia/serialize'
+import { jsonParser } from '@migaia/serialize/plugins'
+import { createSerializeWorkerHandler, workerPlugin } from '@migaia/store-worker/serialize/worker'
+
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>
+    port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1])
+  )
+  port.on('message', (message) => void handler(message).catch(console.error))
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const registry = createSerializeRegistry([workerPlugin({ worker: port1, type: 'json' })])
+  try {
+    const chunk = await registry.encode({ title: 'report', count: 2 })
+    const value = (await registry.decode(chunk)) as { title: string; count: number }
+    console.log('chunk:', chunk[0])
+    console.log('restored:', value.title, value.count)
+  } finally {
+    await registry.dispose()
+    port1.close()
+    await worker.terminate()
+  }
+}
+```
+
+Output:
+
+```text
+chunk: text
+restored: report 2
+```
+
+The output is `chunk: text`, then `restored: report 2`: the Worker-side JSON parser produces a text chunk and restores the original fields.
+
+The explicit type 'json' replaces the default 'worker'; ownership defaults to 'copy' and terminateOnDispose to false. Registry disposal releases its parser endpoint, while the caller closes the native port and Worker. This is wiring evidence, not a speed measurement.
+
+## Keep input bytes available when a decode is cancelled
+
+A byte buffer may be needed for a later retry, while the current decode can become unnecessary before it is sent.
+
+Transferring a shared backing buffer can invalidate all its views; treating every cancellation as proof of detachment also discards input that was never sent.
+
+Use workerParser's default copy policy for the real Worker JSON parser. Decode once, then pass a pre-aborted signal and inspect its failure cause and the original bytes before deciding whether to retry.
+
+### Example parameters
+
+`workerParser({ worker: port1 })` uses `type: 'worker'`, `ownership: 'copy'`, `clientId: 'main'`, and `terminateOnDispose: false`. Decode receives `['bytes', bytes]` plus context: `signal` controls this call, and `'settings'` names its diagnostic context. The second call is cancelled before sending, preserving the original `DOMException` as cause and keeping the bytes attached; this does not prove forced interruption of work already running.
+
+```ts doc-test=run
+import {
+  Worker,
+  MessageChannel,
+  workerData,
+  isMainThread,
+  threadId,
+  type MessagePort
+} from 'node:worker_threads'
+import { jsonParser } from '@migaia/serialize/plugins'
+import { createSerializeWorkerHandler, workerParser } from '@migaia/store-worker/serialize/worker'
+
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>
+    port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1])
+  )
+  port.on('message', (message) => void handler(message).catch(console.error))
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const parser = workerParser({ worker: port1 })
+  const bytes = new TextEncoder().encode('{"count":2}')
+  try {
+    const context = { signal: new AbortController().signal, context: 'settings' }
+    const value = (await parser.decode(['bytes', bytes], context)) as { count: number }
+    console.log('decoded:', value.count, bytes.byteLength)
+    const controller = new AbortController()
+    const reason = new DOMException('Request no longer needed', 'AbortError')
+    controller.abort(reason)
+    const failure = (await Promise.resolve(
+      parser.decode(['bytes', bytes], {
+        signal: controller.signal,
+        context: 'settings'
+      })
+    ).catch((error: unknown) => error)) as Error & { code?: string }
+    console.log('cancelled:', failure.code, failure.cause === reason)
+    console.log('input:', new TextDecoder().decode(bytes))
+  } finally {
+    await parser.dispose?.()
+    port1.close()
+    await worker.terminate()
+  }
+}
+```
+
+Output:
+
+```text
+decoded: 2 11
+cancelled: REQUEST_ABORTED true
+input: {"count":2}
+```
+
+The output is `decoded: 2 11`, `cancelled: REQUEST_ABORTED true`, then `input: {"count":2}`.
+
+Copy is the default ownership policy. This pre-cancelled decode preserves the caller's reason as cause and does not send work; it does not prove interruption of an already-running calculation. Transfer and byte detachment also do not establish zero-copy payload delivery.
+
+## Contract details
+
+### Responsibility, entries, and runtime boundaries
+
+This package connects two Worker use cases. WorkerAdapter / createWorkerHandler execute general computation, and workerComputed connects those requests to Resource. The serialization subentry connects an ordinary parser to a Worker and SerializeRegistry. rpc-core owns request correlation, providers, cancellation, deadlines, source handling, and error transport. resource owns caching, retry, and reactive lifetime; serialize owns formats and registry behavior. This package owns payload conversion, chunk credit / ACK, and the integration rather than another RPC engine.
+
+| Entry                                   | Public contents                                                                                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/store-worker`                  | WorkerAdapter, createWorkerHandler, workerComputed, IManagedRpcHandler, port / Resource option types, ownership / diagnostic constants, and errors. |
+| `@migaia/store-worker/serialize/worker` | workerParser, workerPlugin, createSerializeWorkerHandler, IWorkerPluginOptions, IWorkerLike, and IWorkerFailureEvent.                               |
+
+reactive, resource, serialize, rpc-core, rpc-contract, and utils are runtime dependencies. Install packages directly when your application imports them. Serialization factories no longer have root aliases, and there is no serialize/* wildcard entry; migrate imports to the exact subentry without a compatibility shim. encodeWorkerValue / decodeWorkerValue and transferablesOf are internal. CHUNK_MERGE_FAILED was removed because its former merge path no longer exists; six local codes remain.
+
+The bridge uses exclusive topology: one logical connection has one port pair, with main and worker as default identities. connect performs Core consistency checks and directory wiring without a custom identifier. This is not a guarantee of arbitrary multi-client sharing on one Worker object. A MessagePort can satisfy the port surface while its creator still owns physical connection setup and resources.
+
+IWorkerPort aliases Core IWebWorkerLikePort, requiring postMessage, addEventListener, and removeEventListener for message / error / messageerror events. Browser Workers, MessagePorts, and an individual SharedWorker port can provide that surface. Node examples run handlers in real Workers through native MessagePorts rather than fabricated ports. IWorkerLike additionally permits terminate(); accepting this structure does not transfer Worker creation or native-exit ownership.
+
+### WorkerAdapter: the caller's connection
+
+`new WorkerAdapter(port, options?)` returns synchronously while its Endpoint initializes asynchronously. request awaits initialization automatically; there is no additional ready API.
+
+| Construction or request parameter | Default and behavior                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| port                              | Required actual borrowed message port.                                                                             |
+| options.clientId                  | main, the local Core id. Use one adapter for one physical connection rather than duplicating adapters on a Worker. |
+| options.timeoutMs                 | undefined, with no default request deadline; supply milliseconds when needed.                                      |
+| request(payload, options?)        | Sends input and returns a result Promise; Input / Output generics provide caller-side static typing only.          |
+| Request signal                    | Unset; cooperative cancellation scoped to that request.                                                            |
+| Request transfer                  | Unset; an explicit native transfer list, distinct from serializer ownership policy.                                |
+
+Construction captures clientId / timeoutMs, and requests capture signal / transfer without rereading caller getters after initialization. Invalid option objects or property reads produce INVALID_OPTION with caught failures on cause. request rejects its Promise while construction errors throw synchronously. Core retains later port and RPC admission rather than every Core failure becoming a local error.
+
+One adapter supports concurrent requests. Core correlates results and handles each call's cancellation / deadline separately. Use Promise.all for independent work: built-in carriers supporting batch@1 immediately send when idle and coalesce ready requests or responses while a physical write is active. Dependent serial awaits do not become batching. request awaits provider results; internal one-way notify awaits sending rather than business completion.
+
+| Member    | Lifetime                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| disposed  | True immediately after close / dispose.                                                                                                                       |
+| close()   | No arguments; synchronous and idempotent retirement. New requests reject ADAPTER_DISPOSED, but it does not release the Endpoint.                              |
+| dispose() | No arguments; the sole async release operation. It closes admission, awaits initialization, then closes the Endpoint; repeated calls return the same Promise. |
+
+Adapter.dispose does not terminate the borrowed Worker or port. Cleanup failures reject rather than disappearing. Closing before readiness also prevents later initialization from dispatching retired requests. The creator terminates physical resources in application order; Endpoint cleanup is not a native thread exit receipt.
+
+### Worker handlers and payloads
+
+`createWorkerHandler<Input, Output>(compute, postMessage, options?)` validates its two required callbacks before creating the handler. compute(payload, { signal }) returns a result or Promise and receives native cancellation. Long work should check or observe that signal; the framework does not forcibly interrupt running synchronous code. postMessage(message) delegates Core messages to the real parent port. options.timeoutMs defaults to undefined and affects requests initiated by that Endpoint, not provider execution time; normally configure deadlines on the main Adapter.
+
+Feed actual message.data to the returned IManagedRpcHandler. It does not create a Worker or install a global onmessage callback itself. Browser listeners deliver data; Node uses MessagePort delivery. Initialization or delivery failure can still reject the handler Promise and must be observed by its host. Ordinary compute exceptions become Core failure responses, which does not mean every host callback can never reject.
+
+The bridge converts input to portable data: plain records / arrays, finite primitives, undefined, and explicit ArrayBuffer / Uint8Array byte representations. It does not transparently structured-clone arbitrary prototypes, functions, Maps / Sets, or cyclic graphs. Define a transferable representation or an appropriate parser for those shapes. Internal $worker tag shapes are reserved rather than ordinary application records or declarations of trust.
+
+### IManagedRpcHandler closure and cleanup
+
+| Member           | Behavior                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| handler(message) | Accepts a parsed raw message value; after closure it resolves without processing late queue residue.           |
+| pendingCount     | Admitted messages awaiting initialization or delivery, not completed provider computations.                    |
+| disposed         | True immediately after close / dispose.                                                                        |
+| close()          | Synchronously and idempotently retires admission without Endpoint or user cleanup.                             |
+| dispose()        | Closes admission, awaits initialization, and cleans up the Endpoint; reuses one Promise and retains rejection. |
+
+A message admitted during initialization is not delivered after close, and pendingCount eventually returns to zero. This counter is not a safe quiescence gate for Worker.terminate. Core owns provider drain and cleanup; await dispose and follow physical-resource ownership. No disposeAsync alias exists. A serialization handler likewise releases its own Endpoint / provider registrations without invoking the borrowed parser.dispose; the parser creator owns its lifetime.
+
+### workerComputed and Resource
+
+`workerComputed(adapter, selectInput, options?)` returns a standard `Resource<Output>`. Each fetcher invocation synchronously calls selectInput once, requests that input through the Adapter, and forwards Resource signal plus optional transfer(input). Resource tracks synchronous signal / computed reads; reads after await do not become that invocation's synchronous dependencies. This does not establish global caching or deduplication across Resources or Workers.
+
+| Parameter / option   | Default and meaning                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| adapter              | Required WorkerAdapter instance, borrowed rather than disposed by Resource.                  |
+| selectInput          | Required synchronous function producing current input.                                       |
+| runtime              | defaultRuntime.                                                                              |
+| transfer             | undefined; when supplied, a function returning this input's transfer list.                   |
+| ttl                  | Infinity, Resource cache lifetime.                                                           |
+| autoStart            | true; false skips eager construction, while state / promise reads can still start lazy work. |
+| staleWhileRevalidate | false.                                                                                       |
+| retry                | 0; alternatively (failureCount, error) returns whether to retry.                             |
+| retryDelay           | 0; alternatively (failureCount, error) returns milliseconds.                                 |
+| keepAlive            | false.                                                                                       |
+| initialSnapshot      | undefined.                                                                                   |
+| debugName            | undefined.                                                                                   |
+| scheduler            | systemScheduler.                                                                             |
+
+Resource receives these options without Worker-specific reimplementation. Known keys are captured once without object-rest enumeration of unknown getters. Invalid adapter, selectInput, transfer, or option getters synchronously produce INVALID_OPTION before Resource ownership / automatic startup, retaining caught causes. refetch, load, state, and dispose retain the resource package's semantics.
+
+Release Resource first, await adapter.dispose, then let the creator terminate the physical Worker / ports. Do not destroy a connection that Resource still uses. A transfer callback must reflect whether the application will read that input again; Resource retry cannot restore detached backing.
+
+### Serialization parser and plugin
+
+workerParser(options) is a caller-side ISerializeParser. workerPlugin(options) simply combines that parser's name and instance into an ISerializePlugin for createSerializeRegistry. Import both only from /serialize/worker.
+
+| IWorkerPluginOptions field | Default and purpose                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| worker                     | Required IWorkerLike port.                                                                                                      |
+| type                       | worker, the registry format label; it must describe the actual Worker parser's encoding and be selected correctly when reading. |
+| clientId                   | main.                                                                                                                           |
+| ownership                  | copy; the other value is transfer, described below.                                                                             |
+| terminateOnDispose         | false; supplied Workers remain caller-owned.                                                                                    |
+
+These five fields are read once at admission. Invalid option objects, reflection / property reads, or field values produce INVALID_OPTION. There is no parser.timeoutMs option. Use SerializeContext.signal for cancellation; registry lifecycle budgets remain separate.
+
+encode(value, context) classifies Uint8Array input as bytes and other input as value, returning an asynchronous sequence of chunks rather than one merged result. decode(chunk, context) requests decoding and returns the result payload without another chunk wrapper. context carries signal and a diagnostic context name; the registry supplies its actual context.
+
+workerParser.dispose retires active output and closes its Endpoint. By default it does not terminate the physical Worker. With terminateOnDispose true it still attempts optional terminate after Endpoint cleanup failure. This captures synchronous throws from terminate rather than awaiting native asynchronous exit. Endpoint-only failure retains RpcLifecycleError cleanup details; terminate-only failure retains that exception; both failures produce CLEANUP_FAILED AggregateError with Endpoint then termination in errors. Repeated parser.dispose calls reuse one Promise. Await Registry.dispose to observe its async cleanup result.
+
+### Worker serialization and chunk streams
+
+createSerializeWorkerHandler(parser, post) requires a real parser with encode / decode and a post(message, transfer?) callback delegating to its actual port. Invalid shapes reject synchronously before Endpoint creation. An unowned extensible native error thrown by a parser-member getter stays the same object with native type / stack and gains INVALID_OPTION. Complete foreign source/code identities survive, and values that cannot be annotated remain reachable through cause or aggregation.
+
+The handler passes the input chunk payload to parser.encode. Results may be one valid ISerializeChunk or a sync / async chunk iterable. The caller receives open / chunk / end incrementally, with two initial credits and ordered ACK; consumption restores credit. Neither collectStream nor whole-output merging is used. Credit bounds sending progress for one stream, not the whole Worker's byte budget; the producer may obtain its next chunk before waiting for sending credit.
+
+Valid text / bytes / value chunks retain order, including empty and mixed streams. The removed CHUNK_MERGE_FAILED no longer handles that path. parser.decode receives its original chunk, and a Uint8Array result becomes bytes while other results become value. Eligible complete byte backing may transfer on Worker output according to that send path; caller input ownership does not grant reuse guarantees for producer output.
+
+Early consumer completion or cancellation notifies that stream, wakes producers awaiting credit, and attempts iterator.return. If cleanup also fails, existing secondary-error attachment retains the primary and secondary chains. Core RPC rejection transports source/code/name/message/stack/cause/errors rather than a separate application error frame. Uncooperative business code still requires application ownership; stream cancellation does not forcibly stop the Worker.
+
+### Copying, transfer, and actual payloads
+
+WorkerByteOwnership publicly defines copy / transfer and IByteOwnership is their union. WorkerDiagnosticType contains only worker, represented by IWorkerDiagnosticType. These constants take no arguments. Default copy preserves caller input, while transfer explicitly gives up exclusively owned storage.
+
+Serializer input enters the transfer list only for bytes containing a genuine Uint8Array whose view spans one entire ordinary ArrayBuffer: offset zero and view length equal to backing length. Partial subarrays and SharedArrayBuffer-backed views fall back to copying. Other aliases of an eligible ordinary ArrayBuffer are not detected or excluded from transfer, so transferring that backing can detach them too. This does not provide a shared-memory computation protocol. Top-level text / value chunks do not recursively transfer their nested objects because of ownership alone.
+
+A submitted native transfer may detach the full backing and all aliasing views. Pre-cancelled unsent input remains usable, so neither the option nor a cancellation code proves loss. Inspect actual backing before retrying, or use copy / retain an application copy. transferablesOf / exclusiveBuffer are internal rather than callable public APIs.
+
+The current bridge base64url-encodes bytes as portable payload before separately passing a native transfer list. Detachment therefore does not prove zero-copy payload delivery. Small computations and object graphs still incur encoding and round trips. Old timings and ratios do not establish this implementation's behavior; no current timing or speed guarantee is made. Evaluate actual work instead of deriving speed from the presence of a Worker.
+
+### Cancellation, errors, and ownership
+
+General Adapter requests retain canonical Core cancellation, timeout, transport, and remote identities. A compute failure commonly has RpcRemoteError / INTERNAL outside reconstructed native TypeError / RangeError causes with their messages and stacks. Do not expect sender-side object identity or require the top-level error itself to be the original native class. Without a deadline, a provider that never settles can leave a request pending; every broken Worker is not guaranteed to settle promptly.
+
+Serialization decode / request and pre-cancelled encode use SerializeCodecError / REQUEST_ABORTED with type (default worker), phase encode / decode, context, chunkIndex 0, and bytesConsumed (input byte length or zero). The caller's signal.reason remains on cause. Active encode streams can end with the original RPC / cancellation error rather than every codec diagnostic field. Credit waits and explicit stream stop create native DOMException / AbortError with message serialize stream cancelled and REQUEST_ABORTED, preserving native type, message, and stack through the error chain.
+
+| StoreWorkerErrorCode property / value         | Trigger                                                                                   |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| invalidOption / INVALID_OPTION                | Invalid or inaccessible Worker, parser, or Resource configuration.                        |
+| adapterDisposed / ADAPTER_DISPOSED            | A general Adapter request after close / dispose.                                          |
+| requestAborted / REQUEST_ABORTED              | Cooperative serialization or stream cancellation; inspect reason and actual buffer state. |
+| invalidRequestChunk / INVALID_REQUEST_CHUNK   | Invalid Worker request chunk.                                                             |
+| invalidResponseChunk / INVALID_RESPONSE_CHUNK | Invalid response chunk or frame sequence.                                                 |
+| cleanupFailed / CLEANUP_FAILED                | Both parser Endpoint cleanup and optional termination failed.                             |
+
+STORE_WORKER_SOURCE is @migaia/store-worker. createStoreWorkerError(code, message, options?) requires code / message and accepts options.cause, returning an identified Error. createStoreWorkerAggregateError(code, errors, message) returns AggregateError retaining all values and ordering. code has type IStoreWorkerErrorCode, and factories do not overwrite stack. Complete foreign identities retain their owner.
+
+### Troubleshooting and maintenance
+
+For a pending request, check actual message.data delivery to the correct handler, then WorkerAdapter.timeoutMs / caller signal. workerParser uses context.signal and has no timeoutMs. Handle multi-chunk output incrementally rather than following the old local-merge model. A Worker still alive after Endpoint disposal usually reflects borrowed ownership: its creator terminates the general path, while serialization can opt into terminateOnDispose without claiming confirmed native exit.
+
+The package has fmt / lint / typecheck / typecheck:test / test / build and typecheck:e2e / test:e2e. Browser e2e requires installed Playwright browsers. Node scenarios do not establish browser authorization or every host's behavior. Actual reports identify commands and results; a command list or old benchmark does not establish current verification.

@@ -1,8 +1,8 @@
 /**
  * Declares the public error codes for `@migaia/store-worker` in one place.
  *
- * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/store-worker'`. Throw sites use these constants instead of inline
+ * Locally constructed errors use source '@migaia/store-worker'. RPC and application failures retain
+ * their owning identities and original chains. Throw sites use these constants instead of inline
  * literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
@@ -51,4 +51,5 @@ export const StoreWorkerErrorCode = {
   cleanupFailed: 'CLEANUP_FAILED'
 } as const
 
+/** Stable values declared by StoreWorkerErrorCode for package-owned failures. */
 export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode]
