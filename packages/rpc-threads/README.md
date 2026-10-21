@@ -132,7 +132,7 @@ pnpm add @migaia/plugin-host @migaia/utils
 
 直接安装 Core 与 Contract 两个 peer 依赖；不以硬编码版本相等作为运行时规则。lifecycle、supervision、utils 是运行时依赖。Electron-main 入口另需可选 peer `electron: ^44.0.0`。示例直接导入 PluginHost 或 utils 时，也应直接安装相应包。
 
-Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。
+Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。
 
 ### Peer 来源、类型与调用
 
@@ -225,11 +225,12 @@ buffer 在消息真正提交到原生端口时失效，byteLength 变为 0，共
 
 完整 `IRuntimeThreadSpawn` 必填 spec、launcher、budget、scheduler、channelFactory、report；health、supervisor、keyFactory、retryPort 可省略。完整 source 不继承短形式的 isolation 覆盖：省略 supervisor.isolation 时由 supervision 默认 required 处理。spec.entry 是 Node 绝对路径 / file URL，Web 是绝对模块 URL；spec.name / data / limits 可省略。heapBytes 和 callWallTimeMs 是正限制：前者映射为 Node Worker 的 maxOldGenerationSizeMb，后者限制调用期限；不是进程总内存 / 总 CPU 限额。
 
-| 平台                                 | launcher / channel factory     | 原生能力                                                                           |
-| ------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------- |
-| Node                                 | node 子入口的两个工厂          | termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。 |
-| Bun、Deno、浏览器、Electron renderer | 根入口的两个 Web 工厂          | 三项均 unsupported；terminate 请求不产生真实 exit 回执。                           |
-| Electron main                        | electron-main 子入口的两个工厂 | 复用 worker_threads，但明确三项 unsupported，不把 Node 验证外推到 Electron。       |
+| 平台                            | launcher / channel factory     | 原生能力                                                                           |
+| ------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------- |
+| Node                            | node 子入口的两个工厂          | termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。 |
+| Bun                             | node 子入口的两个工厂          | termination / exit-observation enforced；heap-limit unsupported。                  |
+| Deno、浏览器、Electron renderer | 根入口的两个 Web 工厂          | 三项均 unsupported；terminate 请求不产生真实 exit 回执。                           |
+| Electron main                   | electron-main 子入口的两个工厂 | 复用 worker_threads，但明确三项 unsupported，不把 Node 验证外推到 Electron。       |
 
 Web launcher 必填 report，可选 Worker 构造器（默认全局 Worker）和 runtimeApi；构造器接收 entry 与 `{ type: 'module', name }`。Node launcher options 默认空对象，可显式 execArgv / runtimeApi；高级 createAdapterNodeThreadLauncher 另接真实 runtime resource。工厂只在实际启动时获取宿主能力。Node 的 sampleUsage 为冷查询：可用时报告该 isolate 的 heap、CPU 微秒和 ELU，sharedPid 只是共享进程身份；缺少原生方法时字段缺席，退出后返回空对象，不拿整个父进程用量冒充线程用量。
 
@@ -239,7 +240,7 @@ handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.p
 
 AdapterNodeThreadParentChannel 在构造时只保留真实 parentPort，open 才建立固定 profile，不先添加 listener。createAdapterNodeThreadPeer 接收已持有 parentPort 和原始 workerData；runtime resource 的 load 获取真实 Worker 模块，pid 表示共享进程。receiveThreadData 只消费匹配的初始 bootstrap，移除自己的 listener，await prepare(data, peerId) 后发送 ready；返回便携业务 data。readThreadBootstrap 校验并拆出 peerId / data；这些工具不给任意外部 Worker 授权。
 
-新适配器复用 [Core adapter SDK](../rpc-core/USEGUIDE.md) 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。本轮场景只对真实 Node Worker / MessagePort 给出运行证据，浏览器、Bun、Deno、Electron 的权限与退出行为不据此冒称已实测。
+新适配器复用 [Core adapter SDK](../rpc-core/USEGUIDE.md) 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。
 
 ### 载体观察
 
