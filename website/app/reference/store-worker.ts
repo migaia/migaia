@@ -283,32 +283,42 @@ const errorDoc = (aggregate = false) => ({
           {
             title: t('Keep an earlier exception', '保留先前异常'),
             problem: t(
-              'A Worker error explanation should not discard its triggering exception. cause retains that value; without it, no original cause is attached.',
-              'Worker 错误的说明不应丢弃触发它的异常。cause 保留该值；不设置则不附原始原因。'
+              'Preparing a cart calculation can fail before the worker is ready. The page needs a useful message, while monitoring still needs the original exception to locate the failed preparation step. Preserve it as the cause.',
+              '工作线程就绪前，购物车计算的准备步骤可能失败。页面需要可读消息，监控也需要原始异常来定位出错步骤；把它保留为 cause。'
             ),
             example: `import { createStoreWorkerError, StoreWorkerErrorCode } from '@migaia/store-worker'
-const cause = new TypeError('invalid input')
-const error = createStoreWorkerError(StoreWorkerErrorCode.invalidOption, 'cannot start request', { cause })
-console.log(error.cause === cause)`,
+
+try {
+  await prepareCartWorker()
+} catch (cause) {
+  showWorkerError(createStoreWorkerError(
+    StoreWorkerErrorCode.invalidOption,
+    'Unable to prepare cart calculation',
+    { cause }
+  ))
+}`,
             result: t(
-              'Prints true; the exception keeps its identity.',
-              '输出 true；异常保留原有身份。'
+              'The cart shows a preparation failure while its original exception remains available through cause.',
+              '购物车显示计算准备失败，仍可通过 cause 查看原始异常。'
             ),
             covers: ['cause']
           },
           {
             title: t('Keep structured input details', '保留结构化输入详情'),
             problem: t(
-              'Validation may return a details object rather than Error. cause accepts it directly so callers can inspect the original fields.',
-              '校验可能返回详情对象，而非 Error。cause 直接接收它，调用方可检查原始字段。'
+              'A cart validator returns the rejected field and value as a record. The error view needs that record to highlight the input. Keep it as the cause rather than converting it into a message.',
+              '购物车校验器用记录返回被拒绝的字段与值。错误界面需要这份记录来标出输入框；把它保留为 cause，而不是压成消息。'
             ),
             example: `import { createStoreWorkerError, StoreWorkerErrorCode } from '@migaia/store-worker'
-const cause = { field: 'count', value: -1 }
-const error = createStoreWorkerError(StoreWorkerErrorCode.invalidOption, 'invalid input', { cause })
-console.log(error.cause === cause)`,
+
+showWorkerError(createStoreWorkerError(
+  StoreWorkerErrorCode.invalidOption,
+  'Cart input is invalid',
+  { cause: validationFailure }
+))`,
             result: t(
-              'Prints true; cause is the original details object.',
-              '输出 true；cause 是原始详情对象。'
+              'The error view can identify the rejected cart field from the original validation details.',
+              '错误界面可以从原始校验详情中识别被拒绝的购物车字段。'
             ),
             covers: ['cause']
           }
@@ -405,7 +415,6 @@ export const storeWorkerReference: ILibraryReference = {
     },
     createWorkerHandler: {
       role: 'factory',
-      optionCases: storeWorkerOptionCases.handler,
       purpose: t(
         'Registers one worker-side computation with the canonical RPC provider. Pair it with WorkerAdapter; connect returned callback to host message delivery explicitly.',
         '向标准请求提供者注册工作端计算，应与 `WorkerAdapter` 搭配，须显式把返回回调接入宿主消息投递。'
@@ -422,6 +431,7 @@ export const storeWorkerReference: ILibraryReference = {
       },
       optionDocs: {
         timeoutMs: {
+          example: storeWorkerOptionExamples.handler,
           summary: t(
             'Forwarded endpoint option; this provider helper does not apply it as a compute execution deadline. Set request deadline on the main-side adapter.',
             '透传端点选项，此提供者辅助不把它应用为计算执行截止期限，请在主端适配器设置请求期限。'

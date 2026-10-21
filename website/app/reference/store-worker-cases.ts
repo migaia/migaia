@@ -3,279 +3,248 @@ import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 /** Keeps native Worker option scenarios complete in either language. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
-/** Wraps one option workflow in a real native Worker and transferred MessagePort. */
-const computeOptionsExample = (
-  body: string,
-  client = '{}',
-  handler = '{}',
-  compute = `(values: number[] | Uint8Array) => {
-      if (Array.from(values).some((value) => value < 0)) throw new Error('retry this input')
-      return Array.from(values).reduce((sum, value) => sum + value, 0)
-    }`
-): string => `import { Worker, MessageChannel, workerData, isMainThread, type MessagePort } from 'node:worker_threads'
-import { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'
-import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/testing'
-if (!isMainThread) {
-  const port = workerData as MessagePort
-  const handler = createWorkerHandler(${compute}, (message) => port.postMessage(message), ${handler})
-  port.on('message', (message) => { void handler(message).catch(console.error) })
-} else {
-  const { port1, port2 } = new MessageChannel()
-  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
-  port1.start()
-  const adapter = new WorkerAdapter(port1, ${client})
-  try {
-${body}
-  } finally {
-    await adapter.dispose()
-    port1.close()
-    await worker.terminate()
-  }
-}`
-
-/** Serializer cases keep physical Worker ownership separate from endpoint ownership. */
-const serializerOptionsExample = (
-  transfer: boolean
-): string => `import { Worker, MessageChannel, workerData, isMainThread, type MessagePort } from 'node:worker_threads'
-import { createSerializeRegistry } from '@migaia/serialize'
-import { jsonParser } from '@migaia/serialize/plugins'
-import { workerParser, workerPlugin, createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker'
-if (!isMainThread) {
-  const port = workerData as MessagePort
-  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) => port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1]))
-  port.on('message', (message) => { void handler(message).catch(console.error) })
-} else {
-  const { port1, port2 } = new MessageChannel()
-  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
-  port1.start()
-  let termination: Promise<number> | undefined
-  const ownedPort = Object.assign(port1, { terminate: () => { termination = worker.terminate() } })
-  const options = { worker: ownedPort, type: 'json', clientId: 'main', ownership: '${transfer ? 'transfer' : 'copy'}' as const, terminateOnDispose: ${transfer} }
-  const parser = ${transfer ? 'createSerializeRegistry([workerPlugin(options)])' : 'workerParser(options)'}
-  const bytes = new TextEncoder().encode('{"count":2}')
-  try {
-    const value = await parser.decode(['bytes', bytes], { signal: new AbortController().signal, context: 'cart' }) as { count: number }
-    console.log(value.count, bytes.byteLength)
-    await parser.dispose?.()
-    console.log(termination !== undefined)
-  } finally {
-    await parser.dispose?.()
-    port1.close()
-    await (termination ?? worker.terminate())
-  }
-}`
-
-/** Field examples share exact code with the matching configuration workflow. */
+/** Reader snippets use application-owned workers and keep native setup in verification files. */
 export const storeWorkerOptionExamples = {
-  client: computeOptionsExample(
-    '    console.log(await adapter.request([20, 22]))',
-    "{ clientId: 'main', timeoutMs: 1000 }"
-  ),
-  timeout: computeOptionsExample(
-    '    try { await adapter.request([20, 22]) } catch (error) { console.log((error as { code?: string }).code) }',
-    '{ timeoutMs: 1 }',
-    '{}',
-    'async (values: number[]) => { await new Promise((resolve) => setTimeout(resolve, 30)); return values.reduce((sum, value) => sum + value, 0) }'
-  ),
-  handler: computeOptionsExample(
-    '    console.log(await adapter.request([20, 22]))',
-    '{}',
-    '{ timeoutMs: 1000 }'
-  ),
-  handlerSlow: computeOptionsExample(
-    '    console.log(await adapter.request([20, 22]))',
-    '{}',
-    '{ timeoutMs: 1 }',
-    'async (values: number[]) => { await new Promise((resolve) => setTimeout(resolve, 10)); return values.reduce((sum, value) => sum + value, 0) }'
-  ),
-  cache: computeOptionsExample(`    const runtime = createRuntime()
-    const scheduler = createManualScheduler()
-    const total = workerComputed<number[], number>(adapter, () => [20, 22], {
-      runtime, scheduler, debugName: 'cartTotal', autoStart: false,
-      ttl: 1000, staleWhileRevalidate: true
-    })
-    console.log(total.peekState().status)
-    console.log(await total.promise)
-    scheduler.advance(1001)
-    console.log(total.state.status, total.refreshing)
-    await total.promise
-    total.dispose()`),
-  snapshot:
-    computeOptionsExample(`    const original = workerComputed<number[], number>(adapter, () => [20, 22])
-    await original.promise
-    const initialSnapshot = original.dehydrate()
-    original.dispose()
-    let selected = 0
-    const total = workerComputed<number[], number>(adapter, () => { selected++; return [1] }, { initialSnapshot })
-    console.log(await total.promise, selected)
-    total.dispose()`),
-  retry: computeOptionsExample(`    let attempts = 0
-    const total = workerComputed<number[], number>(adapter, () => ++attempts === 1 ? [-1] : [20, 22], {
-      retry: 2,
-      retryDelay: (failureCount) => failureCount * 5
-    })
-    console.log(await total.promise, attempts)
-    total.dispose()`),
-  prefetch: computeOptionsExample(`    const runtime = createRuntime()
-    const input = runtime.signal([1])
-    const total = workerComputed<number[], number>(adapter, () => input.value, { runtime, keepAlive: true })
-    await total.promise
-    input.value = [2]
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    console.log(await total.promise)
-    total.dispose()
-    input.dispose()`),
-  transfer: computeOptionsExample(`    const bytes = new Uint8Array([20, 22])
-    const total = workerComputed<Uint8Array, number>(adapter, () => bytes, {
-      transfer: (input) => [input.buffer]
-    })
-    console.log(await total.promise, bytes.byteLength)
-    total.dispose()`),
-  copyParser: serializerOptionsExample(false),
-  transferPlugin: serializerOptionsExample(true)
+  client: `import { WorkerAdapter } from '@migaia/store-worker'
+
+const adapter = new WorkerAdapter(cartWorker, { clientId: 'main', timeoutMs: 1000 })
+renderTotal(await adapter.request<number[], number>(cartPrices))`,
+  timeout: `import { WorkerAdapter } from '@migaia/store-worker'
+
+const adapter = new WorkerAdapter(cartWorker, { timeoutMs: 2000 })
+try {
+  renderTotal(await adapter.request<number[], number>(cartPrices))
+} catch (error) {
+  showRecalculateButton(error)
+}`,
+  handler: `import { createWorkerHandler } from '@migaia/store-worker'
+
+const handle = createWorkerHandler(calculateCartTotal, postToPage, { timeoutMs: 1000 })
+workerScope.addEventListener('message', (event) => {
+  void handle(event.data).catch(reportToMonitoring)
+})`,
+  cache: `import { workerComputed } from '@migaia/store-worker'
+import { ResourceStatus } from '@migaia/resource'
+
+const total = workerComputed<number[], number>(adapter, () => cartPrices.value, {
+  runtime,
+  scheduler: applicationClock,
+  debugName: 'cart-total',
+  ttl: 10_000,
+  staleWhileRevalidate: true
+})
+runtime.effect(() => {
+  const state = total.state
+  if (state.status === ResourceStatus.success)
+    renderTotal(state.data, { updating: state.refreshing ?? false })
+})`,
+  lazy: `import { workerComputed } from '@migaia/store-worker'
+
+const total = workerComputed<number[], number>(adapter, readCartPrices, { autoStart: false })
+summaryPanel.addEventListener('toggle', () => {
+  if (summaryPanel.open) void total.promise.then(renderTotal)
+})`,
+  snapshot: `import { workerComputed } from '@migaia/store-worker'
+
+const total = workerComputed<number[], number>(adapter, readCartPrices, {
+  initialSnapshot: serverTotalSnapshot
+})
+renderTotal(await total.promise)`,
+  retry: `import { workerComputed } from '@migaia/store-worker'
+
+const total = workerComputed<number[], number>(adapter, readCartPrices, {
+  retry: 2,
+  retryDelay: (failureCount) => 500 * failureCount
+})
+renderTotal(await total.promise)`,
+  prefetch: `import { workerComputed } from '@migaia/store-worker'
+
+const nextPage = runtime.signal(2)
+const summary = workerComputed<number[], number>(adapter, () => pagePrices(nextPage.value), {
+  runtime,
+  keepAlive: true
+})
+nextPage.value = 3`,
+  transfer: `import { workerComputed } from '@migaia/store-worker'
+
+const bytes = await readUploadBytes(file)
+const checksum = workerComputed<Uint8Array, number>(adapter, () => bytes, {
+  transfer: (input) => [input.buffer]
+})
+showChecksum(await checksum.promise)`,
+  copyParser: `import { workerParser } from '@migaia/store-worker/serialize/worker'
+
+const parser = workerParser({
+  worker: jsonWorker,
+  type: 'json',
+  clientId: 'main',
+  ownership: 'copy',
+  terminateOnDispose: false
+})
+const bytes = await readUploadBytes(file)
+const value = await parser.decode(['bytes', bytes], {
+  signal: importLifetime.signal,
+  context: 'cart-import'
+})
+renderImportedCart(value)
+await saveOriginalUpload(bytes)
+await parser.dispose?.()`,
+  transferPlugin: `import { createSerializeRegistry } from '@migaia/serialize'
+import { workerPlugin } from '@migaia/store-worker/serialize/worker'
+
+const registry = createSerializeRegistry([workerPlugin({
+  worker: jsonWorker,
+  type: 'json',
+  clientId: 'main',
+  ownership: 'transfer',
+  terminateOnDispose: true
+})])
+const bytes = await readUploadBytes(file)
+const value = await registry.decode(['bytes', bytes], {
+  signal: importLifetime.signal,
+  context: 'cart-import'
+})
+renderImportedCart(value)
+await registry.dispose()`
 }
 
-/** Configuration cases expose only public options and observable business outcomes. */
+/** Each option case explains one visible application outcome. */
 export const storeWorkerOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   client: [
     {
-      title: t('Pair the default main identity with a deadline', '为默认主端身份设置截止期限'),
+      title: t('Calculate the cart before checkout continues', '结账继续前算出购物车合计'),
       problem: t(
-        'The worker helper addresses main. Keep that matching clientId and set timeoutMs when a request must not wait indefinitely; without timeoutMs there is no default request deadline.',
-        '工作端辅助指向 main。使用匹配的 clientId；请求不能一直等待时设置 timeoutMs。不设置则没有请求默认截止期限。'
+        'A checkout page needs a total from its existing worker before enabling payment. Use the matching main identity and a one-second request deadline so a missing reply does not leave payment waiting forever.',
+        '结账页需要从已有工作线程取得合计，才能启用支付。使用匹配的main身份并设置一秒请求期限，回复丢失时便不会让支付一直等待。'
       ),
       example: storeWorkerOptionExamples.client,
-      result: t('Prints 42 before the one-second deadline.', '在一秒截止期限前输出 42。'),
+      result: t(
+        'The cart total appears before payment continues; a missing response reaches the request error path after the configured deadline.',
+        '支付继续前显示购物车合计；回复未到达时，请求会在设置的期限后进入错误处理。'
+      ),
       covers: ['clientId', 'timeoutMs']
     },
     {
-      title: t('Stop waiting for a slow computation', '停止等待慢速计算'),
+      title: t('Offer another calculation after a slow reply', '回复过慢时提供重新计算入口'),
       problem: t(
-        'A caller no longer wants to wait for a slow response. The client deadline rejects waiting; it does not prove that the remote computation stopped.',
-        '调用方不想继续等待慢速响应。客户端截止期限会拒绝等待，不代表远端计算已经停止。'
+        'A pricing worker may be busy while the customer edits a cart. The page should regain control instead of waiting indefinitely. Bound the client wait and offer a recalculation control when it fails; this does not forcibly stop work in the worker.',
+        '客户编辑购物车时，计价工作线程可能正忙。页面应恢复操作，而不是无限等待。限制客户端等待，并在失败时提供重新计算入口；这不会强行停止工作线程中的计算。'
       ),
       example: storeWorkerOptionExamples.timeout,
       result: t(
-        'Prints the RPC timeout code; endpoint and native Worker cleanup still run.',
-        '输出 RPC 超时码；随后仍清理端点和原生 Worker。'
+        'A timely total is displayed. Otherwise the page shows a recalculation control while the application retains ownership of the worker.',
+        '及时返回的合计正常显示，否则页面显示重新计算入口，工作线程仍由应用拥有。'
       ),
-      covers: ['timeoutMs']
-    }
-  ],
-  handler: [
-    {
-      title: t('Configure the worker endpoint timeout', '配置工作端点的超时'),
-      problem: t(
-        'A worker-side endpoint can carry an outgoing request timeout. This option belongs to the endpoint, and does not impose a compute execution deadline. Omission leaves that outgoing timeout unset.',
-        '工作端点可以设置向外请求的超时。此选项属于端点，不限制计算执行时间。省略时不设置该向外请求超时。'
-      ),
-      example: storeWorkerOptionExamples.handler,
-      result: t('The paired client receives 42.', '配对客户端收到 42。'),
-      covers: ['timeoutMs']
-    },
-    {
-      title: t('Keep compute deadlines on the caller', '由调用方决定计算等待期限'),
-      problem: t(
-        'Setting handler timeoutMs to 1 does not stop a ten-millisecond compute callback. Use the client deadline when bounding how long the caller waits.',
-        '把处理器 timeoutMs 设为 1 不会停止执行十毫秒的计算回调。限制调用方等待时间时，应设置客户端截止期限。'
-      ),
-      example: storeWorkerOptionExamples.handlerSlow,
-      result: t('Prints 42 after the computation finishes.', '计算完成后输出 42。'),
       covers: ['timeoutMs']
     }
   ],
   computed: [
     {
-      title: t('Load a cached total only when needed', '按需加载并缓存合计'),
+      title: t('Keep the previous total visible during refresh', '刷新期间保留上次合计'),
       problem: t(
-        'A collapsed panel needs no immediate Worker request. autoStart false leaves it idle until read. ttl limits cache age; staleWhileRevalidate keeps the previous total during refresh. runtime owns the graph, debugName labels it, and the manual scheduler demonstrates expiry without a real wait.',
-        '折叠面板不需要立即请求 Worker。autoStart false 让它保持空闲，读取时才启动。ttl 限制缓存年龄；staleWhileRevalidate 在刷新期间保留旧合计。runtime 持有依赖图，debugName 提供标签，手动调度器无需真实等待即可演示过期。'
+        'A cart summary can reuse a recent calculation, but it should refresh after ten seconds. Switching to an empty loading view makes the total flash. Keep the successful value during refresh and show a small updating indicator on the same application clock.',
+        '购物车摘要可以复用近期计算，但十秒后需要刷新。切到空的等待界面会让合计闪烁；刷新期间保留成功值，并按应用统一时钟显示小型更新提示。'
       ),
       example: storeWorkerOptionExamples.cache,
       result: t(
-        'Prints idle, 42, then success true while refreshing.',
-        '依次输出 idle、42，以及刷新中的 success true。'
+        'The summary keeps its previous total while a stale read starts a new calculation, then replaces it when the new total arrives.',
+        '过期读取启动新计算时，摘要继续显示上次合计；新合计返回后再替换。'
       ),
-      covers: ['runtime', 'scheduler', 'debugName', 'autoStart', 'ttl', 'staleWhileRevalidate']
+      covers: ['runtime', 'scheduler', 'debugName', 'ttl', 'staleWhileRevalidate']
     },
     {
-      title: t('Restore an already computed total', '恢复已经算好的合计'),
+      title: t('Restore a server-computed total', '恢复服务端已经算好的合计'),
       problem: t(
-        'A saved fresh snapshot avoids repeating Worker work. Pass initialSnapshot from dehydrate(); without it, the resource starts its first computation normally.',
-        '已有的新鲜快照可以避免重复 Worker 计算。把 dehydrate() 结果传入 initialSnapshot；不设置则正常启动第一次计算。'
+        'The server already calculated the cart summary. Starting another worker request on hydration repeats the same work and can show a loading state over correct content. Supply its fresh snapshot to begin with the existing result.',
+        '服务端已经算好购物车摘要。页面恢复时再请求工作线程会重复计算，还可能在正确内容上显示等待状态。传入仍新鲜的快照，直接使用现有结果。'
       ),
       example: storeWorkerOptionExamples.snapshot,
       result: t(
-        'Prints 42 0; the replacement resource never selects new input.',
-        '输出 42 0；替代资源没有选择新输入。'
+        'The cart shows the restored total immediately; worker calculation resumes when the snapshot becomes stale or its dependencies change.',
+        '购物车直接显示恢复的合计，快照过期或依赖变化后才重新计算。'
       ),
       covers: ['initialSnapshot']
     },
     {
-      title: t('Retry a failed input with a delay', '延迟重试失败的输入'),
+      title: t('Retry a transient pricing failure', '重试短暂的计价失败'),
       problem: t(
-        'A transient Worker failure should not immediately leave the resource in error. retry allows extra attempts; retryDelay computes each wait from a one-based failure count. Defaults perform no retry and add no delay.',
-        '短暂 Worker 失败不应立即让资源停在错误状态。retry 允许额外尝试；retryDelay 根据从一开始的失败次数计算等待。默认不重试，也不增加等待。'
+        'A pricing worker can briefly fail while its supporting data is refreshed. Without retries, the cart summary immediately enters its error view. Allow two extra attempts with increasing waits so short failures can recover without rapid repeated requests.',
+        '计价工作线程更新依赖数据时可能短暂失败。不重试时，购物车摘要会立即显示错误。允许额外尝试两次并逐步增加等待，短暂故障便有机会恢复，也不会连续快速请求。'
       ),
       example: storeWorkerOptionExamples.retry,
       result: t(
-        'Prints 42 2; the second selected input succeeds.',
-        '输出 42 2；第二次选择的输入计算成功。'
+        'The cart continues waiting through the allowed retries and displays the total if a later attempt succeeds.',
+        '允许的重试期间购物车继续等待，后续尝试成功后显示合计。'
       ),
       covers: ['retry', 'retryDelay']
     },
     {
-      title: t('Prefetch while nobody observes the result', '无人观察时也预取结果'),
+      title: t('Prepare the next page summary in the background', '在后台准备下一页摘要'),
       problem: t(
-        'A background total must follow input changes before the panel opens. keepAlive keeps input dependencies connected while unobserved; by default they may disconnect.',
-        '后台合计需要在面板打开前跟随输入变化。keepAlive 在无人观察时保持输入依赖；默认可能断开这些依赖。'
+        'A report pager wants its next summary ready before the user opens the summary panel. With no observer, default dependency suspension can postpone recalculation until that opening. Keep the input connected so changing the next-page number starts the background work.',
+        '报表分页器希望用户打开摘要面板前，下一页摘要已经准备好。没有观察者时，默认依赖挂起可能把计算推迟到面板打开。保持输入连接，下一页页码变化时便开始后台工作。'
       ),
       example: storeWorkerOptionExamples.prefetch,
       result: t(
-        'Prints 2 after the input changes, without creating an observer.',
-        '输入变化后输出 2，无需创建观察者。'
+        'Changing the page number starts the next summary calculation while the panel is still closed.',
+        '面板尚未打开时，页码变化便会启动下一页摘要计算。'
       ),
       covers: ['keepAlive', 'runtime']
     },
     {
-      title: t('Transfer disposable input bytes', '转移不再需要的输入字节'),
+      title: t('Give disposable upload bytes to the worker', '把不再需要的上传字节交给工作线程'),
       problem: t(
-        'An application can give up ownership of a complete buffer after sending it. transfer selects native transfer entries per input. Without it no explicit transfer list is supplied. This can detach aliases and is not an end-to-end zero-copy guarantee.',
-        '应用发送完整缓冲区后，可以放弃其所有权。transfer 为每次输入选择原生转移条目。不设置则不提供显式转移列表。这可能分离所有别名，不保证全程零拷贝。'
+        'An upload page needs a checksum and will not use its input buffer again. Select that buffer for native transfer instead of retaining ownership. Every alias may detach when the request is sent, so use this only for disposable input.',
+        '上传页需要校验值，之后不会再使用输入缓冲区。选择该缓冲区进行原生转移，并放弃原有所有权。请求发送时所有别名都可能分离，因此只用于可放弃的输入。'
       ),
       example: storeWorkerOptionExamples.transfer,
       result: t(
-        'Prints 42 0; the Worker calculates the total and the caller buffer is detached.',
-        '输出 42 0；Worker 算出合计，调用方缓冲区已分离。'
+        'The checksum appears on the upload page. The original input buffer is no longer available for another operation after transfer.',
+        '上传页显示校验值，转移后的原始输入缓冲区不能再供其他操作使用。'
       ),
       covers: ['transfer']
+    },
+    {
+      title: t('Calculate only when the summary panel opens', '摘要面板展开时才计算'),
+      problem: t(
+        'Most visitors never open the optional cart summary. Starting its worker request on every visit wastes work. Leave it idle and request its Promise only when the panel is opened.',
+        '大多数访问者不会打开可选的购物车摘要。每次访问都请求工作线程会浪费计算。让资源保持空闲，只在面板展开时读取它的Promise。'
+      ),
+      example: storeWorkerOptionExamples.lazy,
+      result: t(
+        'Closed panels issue no initial calculation; opening the panel starts work and then displays its total.',
+        '未展开的面板不会发起初始计算；展开后开始计算，再显示合计。'
+      ),
+      covers: ['autoStart']
     }
   ],
   serializer: [
     {
-      title: t('Keep bytes for another decode', '保留字节供再次解码'),
+      title: t('Keep an uploaded file for validation and archiving', '保留上传文件供校验与归档'),
       problem: t(
-        'The caller still needs input bytes after decoding. ownership copy keeps them available. Match type json to the Worker parser and clientId main to the helper. terminateOnDispose false leaves physical Worker ownership with the caller.',
-        '调用方解码后仍需要输入字节。ownership copy 保留这些字节。type json 匹配 Worker 解析器，clientId main 匹配辅助端点。terminateOnDispose false 让调用方继续持有物理 Worker。'
+        'A cart importer decodes an uploaded JSON file and also archives the original bytes. Copy ownership preserves that input. Its JSON worker is shared with other imports, so disposing this parser must release only the borrowed endpoint.',
+        '购物车导入器需要解码JSON文件，还要归档原始字节。复制策略保留这些输入。JSON工作线程还供其他导入使用，因此释放解析器时只能结束借用的端点。'
       ),
       example: storeWorkerOptionExamples.copyParser,
       result: t(
-        'Prints count 2, a nonzero input length, then false for automatic termination.',
-        '输出计数 2、非零输入长度，以及表示未自动终止的 false。'
+        'The imported cart is shown and the original upload can still be archived. Parser cleanup leaves the shared worker available.',
+        '导入后的购物车正常显示，原始上传仍可归档，解析器清理后共享工作线程继续可用。'
       ),
       covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
     },
     {
-      title: t('Transfer bytes and own Worker termination', '转移字节并负责终止 Worker'),
+      title: t(
+        'Consume a one-off import and retire its worker',
+        '完成一次性导入后关闭专用工作线程'
+      ),
       problem: t(
-        'A dedicated parser may consume an entire buffer and terminate its Worker on disposal. Choose ownership transfer and terminateOnDispose true explicitly. Partial views and SharedArrayBuffer are not selected for transfer; defaults copy and do not terminate.',
-        '专用解析器可以消耗完整缓冲区，并在释放时终止 Worker。显式选择 ownership transfer 与 terminateOnDispose true。局部视图和 SharedArrayBuffer 不会被选中转移；默认复制且不终止。'
+        'A one-off cart import owns a dedicated JSON worker and does not need the uploaded buffer again. Transfer the complete input view and make registry disposal terminate that worker so the import owns its entire lifetime.',
+        '一次性购物车导入拥有专用JSON工作线程，也不再需要上传缓冲区。转移完整输入视图，并让注册表释放时终止工作线程，导入流程便拥有完整生命周期。'
       ),
       example: storeWorkerOptionExamples.transferPlugin,
       result: t(
-        'Prints 2 0, then true; input bytes detach and disposal requests physical termination.',
-        '先输出 2 0，再输出 true；输入字节分离，释放时请求终止物理 Worker。'
+        'The imported cart appears, the consumed input bytes detach, and registry disposal requests termination of the dedicated worker.',
+        '导入后的购物车显示出来，已消耗的输入字节分离，注册表释放时请求终止专用工作线程。'
       ),
       covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
     }
