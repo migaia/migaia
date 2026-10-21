@@ -292,12 +292,12 @@ payload 必须数组，非数组 JSONRPC_PROFILE_INVALID；超过安全整数范
 下表的 `source` 是保留的错误身份，由 `@migaia/rpc-contract` 定义，供 Process 的 JSON-RPC 字节连接报告失败；它不是包的导入路径。
 
 | JSON-RPC code（source=`@migaia/rpc/bridge/jsonrpc`） | 场景                                      |
-| -------------------------------------------------- | ----------------------------------------- |
-| JSONRPC_FRAME_INVALID                              | 非法头部、编码、JSON 或半帧关闭，连接终止 |
-| JSONRPC_EXTENSION_MISSING                          | hello 缺必需能力或四个扩展方法            |
-| JSONRPC_PROFILE_INVALID                            | 本端 profile、payload 或能力不支持        |
-| JSONRPC_UNSUPPORTED_MODE                           | 本地声明/远端目录带 stream                |
-| JSONRPC_HANDSHAKE_TIMEOUT                          | 握手截止，检查 bootstrap/stdin/回复端     |
+| ---------------------------------------------------- | ----------------------------------------- |
+| JSONRPC_FRAME_INVALID                                | 非法头部、编码、JSON 或半帧关闭，连接终止 |
+| JSONRPC_EXTENSION_MISSING                            | hello 缺必需能力或四个扩展方法            |
+| JSONRPC_PROFILE_INVALID                              | 本端 profile、payload 或能力不支持        |
+| JSONRPC_UNSUPPORTED_MODE                             | 本地声明/远端目录带 stream                |
+| JSONRPC_HANDSHAKE_TIMEOUT                            | 握手截止，检查 bootstrap/stdin/回复端     |
 
 远端业务 wire source/code 只诊断，不取得本地取消、重试、认证权限；没有语义身份的业务原生 Error 可以还原为相应 native 类型与 unknown/UNKNOWN，不应由接收端伪造本包码。重试非幂等方法仍须对账，或由业务真正实现 meta.idempotencyKey 去重。
 

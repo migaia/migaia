@@ -292,12 +292,12 @@ Business failures use JSON-RPC error.code/message/data.migaiaWireError, with sou
 The table retains the error identity defined by `@migaia/rpc-contract` for Process JSON-RPC byte connections. Its `source` is not a package import path.
 
 | Bridge code, source=`@migaia/rpc/bridge/jsonrpc` | Trigger                                                              |
-| ---------------------------------------------- | -------------------------------------------------------------------- |
-| JSONRPC_FRAME_INVALID                          | Invalid header/encoding/JSON or partial closure; terminal connection |
-| JSONRPC_EXTENSION_MISSING                      | Hello omits required capabilities or extension methods               |
-| JSONRPC_PROFILE_INVALID                        | Unsupported local profile, payload, or capabilities                  |
-| JSONRPC_UNSUPPORTED_MODE                       | Stream in the local contract or remote catalog                       |
-| JSONRPC_HANDSHAKE_TIMEOUT                      | Handshake deadline; inspect bootstrap/stdin/reply handling           |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| JSONRPC_FRAME_INVALID                            | Invalid header/encoding/JSON or partial closure; terminal connection |
+| JSONRPC_EXTENSION_MISSING                        | Hello omits required capabilities or extension methods               |
+| JSONRPC_PROFILE_INVALID                          | Unsupported local profile, payload, or capabilities                  |
+| JSONRPC_UNSUPPORTED_MODE                         | Stream in the local contract or remote catalog                       |
+| JSONRPC_HANDSHAKE_TIMEOUT                        | Handshake deadline; inspect bootstrap/stdin/reply handling           |
 
 Remote wire source/code is diagnostic data, not local cancellation/retry/authentication authority. Business Errors without semantic identity can restore their native type with unknown/UNKNOWN rather than invented Process codes. Non-idempotent retry still requires reconciliation or real provider-side meta.idempotencyKey deduplication.
 

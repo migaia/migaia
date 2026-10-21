@@ -119,8 +119,8 @@ L0 means the string key-value channel shared by all backends. L1 adds bytes, str
 | IKeyValueStore member   | Result and meaning                                                                                |
 | ----------------------- | ------------------------------------------------------------------------------------------------- |
 | `get(key, ctx?)`        | `Promise<string \| null>`; a missing value is null, not undefined.                                |
-| `set(key, value, ctx?)` | `set` writes the string value using IWriteOptions and returns `Promise<void>` for that write.                             |
-| `remove(key, ctx?)`     | `remove` deletes the named string-channel entry and returns `Promise<void>` for that deletion.                                                                          |
+| `set(key, value, ctx?)` | `set` writes the string value using IWriteOptions and returns `Promise<void>` for that write.     |
+| `remove(key, ctx?)`     | `remove` deletes the named string-channel entry and returns `Promise<void>` for that deletion.    |
 | `has(key, ctx?)`        | Returns `Promise<boolean>`.                                                                       |
 | `keys(ctx?)`            | Returns `Promise<string[]>`.                                                                      |
 | `clearValues(ctx?)`     | Clears only the string-value channel; returns `Promise<void>`.                                    |
@@ -171,8 +171,8 @@ Admission reads relevant properties once. Detailed results retain exact reflecti
 | `records`          | Required boolean: structured records are available.                                                                                              |
 | `transactions`     | Required boolean: transactions are available.                                                                                                    |
 | `iteration`        | Required boolean: iteration is available.                                                                                                        |
-| `secondaryIndexes` | secondaryIndexes is a boolean indicating logical secondary-index support; the snapshot sets an omitted legacy secondaryIndexes field to false.                                                             |
-| `changeFeed`       | changeFeed is a boolean indicating post-commit invalidation notifications; the snapshot sets an omitted legacy changeFeed field to false.                                                             |
+| `secondaryIndexes` | secondaryIndexes is a boolean indicating logical secondary-index support; the snapshot sets an omitted legacy secondaryIndexes field to false.   |
+| `changeFeed`       | changeFeed is a boolean indicating post-commit invalidation notifications; the snapshot sets an omitted legacy changeFeed field to false.        |
 | `maxValueBytes`    | Nonnegative safe integer or undefined: approximate per-value byte limit. Undefined makes no such limit declaration; total quota may still apply. |
 | `opaqueEntries`    | Required boolean: entries hidden from JavaScript may exist, such as HttpOnly cookies.                                                            |
 

@@ -254,10 +254,10 @@ probe 失败经 onListenerError 报 Core TRANSPORT，原异常保留在 cause，
 
 下表区分线程采样、监督、Core 与 Remote 的错误来源。线程 API 从 `@migaia/rpc-threads` 导入；Core 与 Remote API 分别从 `@migaia/rpc-core` 和 `@migaia/rpc-core/remote` 导入，`source` 值保留各自的错误身份。
 
-| source / code                                    | 含义与处理                                                                      |
-| ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| source / code                                      | 含义与处理                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `@migaia/rpc/threads` / THREAD_USAGE_SAMPLE_FAILED | 线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。 |
-| @migaia/supervision / EXIT_UNOBSERVABLE          | 退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。                  |
+| @migaia/supervision / EXIT_UNOBSERVABLE            | 退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。                  |
 | `@migaia/rpc/core` / INVALID_CONFIG                | 入口、来源、bootstrap、能力 ACK、portable data 或配置不合法；检查字段与 cause。 |
 | `@migaia/rpc/core` / TRANSPORT                     | 原生消息 I/O / 启动资源边界失败，保留原生错误类型和原因。                       |
 | `@migaia/rpc/core` / DEADLINE_EXCEEDED             | TimeoutError；Worker 可能已执行，先对账。                                       |

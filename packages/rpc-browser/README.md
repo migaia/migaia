@@ -200,12 +200,12 @@ Window、SharedWorker、ServiceWorker、BroadcastChannel、RTC 都借用原生�
 表中的 `source` 标识浏览器错误的归属；本包公开 API 的导入路径是 `@migaia/rpc-browser`。
 
 | 本包 code（source=`@migaia/rpc/browser`） | 触发与处理                                                      |
-| --------------------------------------- | --------------------------------------------------------------- |
-| WINDOW_ORIGIN_REQUIRED                  | Window Peer 缺少非空 origin；填写明确对端源                     |
-| RTC_CHANNEL_UNRELIABLE                  | Peer 的频道不是可靠有序；改用受支持配置                         |
-| LISTENER_ALREADY_BOUND                  | SharedWorker scope 已有监听器；先关闭旧监听器                   |
-| INVALID_PEER_SOURCE                     | connect/listen 冲突或来源不支持；恰选一个真实来源               |
-| MESSAGE_DECODE_FAILED                   | Peer 的 RTC JSON 无法解码；检查对端物理输入，cause 保留解码原错 |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| WINDOW_ORIGIN_REQUIRED                    | Window Peer 缺少非空 origin；填写明确对端源                     |
+| RTC_CHANNEL_UNRELIABLE                    | Peer 的频道不是可靠有序；改用受支持配置                         |
+| LISTENER_ALREADY_BOUND                    | SharedWorker scope 已有监听器；先关闭旧监听器                   |
+| INVALID_PEER_SOURCE                       | connect/listen 冲突或来源不支持；恰选一个真实来源               |
+| MESSAGE_DECODE_FAILED                     | Peer 的 RTC JSON 无法解码；检查对端物理输入，cause 保留解码原错 |
 
 这些浏览器准入错误保留 TypeError 与 cause。握手、目录、业务调用、取消、超时及 wire 错误由 Core/Remote 拥有；旧 transport 配置错误为 Core INVALID_CONFIG。BroadcastChannel、SharedWorker、ServiceWorker 的原生发送失败，以及 WebTransport 的读写拒绝，由既有边界归类为 Core TRANSPORT：已有完整外包身份的 I/O Error 保留 source/code，可附身份的未分类原生 Error/DOMException 原位分类，不可附加的失败经 cause 保留。Window 与 RTC 的 raw send 直接委托原生发送，RTC 还可能直接抛出 JSON.stringify 错误，不能把上述分类概括到所有 raw send。监听失败与 RTC 终止事件沿各自报告通道保留原错误链；远端 source/code 不构成本地控制权限。
 

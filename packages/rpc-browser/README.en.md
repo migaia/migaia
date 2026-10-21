@@ -200,12 +200,12 @@ Window, SharedWorker, ServiceWorker, BroadcastChannel, and RTC borrow their nati
 The table uses `source` to identify browser errors. Import this package’s public APIs from `@migaia/rpc-browser`.
 
 | Package code, source=`@migaia/rpc/browser` | Trigger and response                                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
-| WINDOW_ORIGIN_REQUIRED                   | A Window Peer has no nonempty origin; provide the explicit destination origin               |
-| RTC_CHANNEL_UNRELIABLE                   | A Peer channel is not ordered and reliable; use supported settings                          |
-| LISTENER_ALREADY_BOUND                   | A SharedWorker scope already has a listener; close it first                                 |
-| INVALID_PEER_SOURCE                      | Conflicting connect/listen or unsupported sources; choose one real source                   |
-| MESSAGE_DECODE_FAILED                    | The Peer cannot decode RTC JSON; inspect physical input, with the original decoder on cause |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| WINDOW_ORIGIN_REQUIRED                     | A Window Peer has no nonempty origin; provide the explicit destination origin               |
+| RTC_CHANNEL_UNRELIABLE                     | A Peer channel is not ordered and reliable; use supported settings                          |
+| LISTENER_ALREADY_BOUND                     | A SharedWorker scope already has a listener; close it first                                 |
+| INVALID_PEER_SOURCE                        | Conflicting connect/listen or unsupported sources; choose one real source                   |
+| MESSAGE_DECODE_FAILED                      | The Peer cannot decode RTC JSON; inspect physical input, with the original decoder on cause |
 
 Browser admission errors retain TypeError and cause. Core/Remote own handshake, catalog, business call, cancellation, timeout, and wire errors; existing transport configuration failures use Core INVALID_CONFIG. Native send failures in BroadcastChannel, SharedWorker, and ServiceWorker, plus WebTransport read/write rejections, use the existing Core TRANSPORT boundary: complete foreign I/O identity is retained, attachable unclassified Error/DOMException values are classified in place, and non-attachable failures remain reachable through cause. Window and RTC raw sends delegate directly to native sending, and RTC may also throw from JSON.stringify; this classification therefore does not apply to every raw send. Listener failures and RTC terminal events retain their original error chains through their respective report channels. Remote diagnostic source/code is not local control authority.
 

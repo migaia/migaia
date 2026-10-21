@@ -289,8 +289,8 @@ Errors retain native type, message, stack, and cause. Public shapes use IRpcErro
 
 The `source` values below identify errors; they are not import paths. Import Core APIs from `@migaia/rpc-core` and Remote APIs from `@migaia/rpc-core/remote`.
 
-| source             | Constant / code table                             |
-| ------------------ | ------------------------------------------------- |
+| source               | Constant / code table                             |
+| -------------------- | ------------------------------------------------- |
 | `@migaia/rpc/core`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
 | `@migaia/rpc/remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
 

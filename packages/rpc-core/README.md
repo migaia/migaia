@@ -285,8 +285,8 @@ governor 沿原 rate/payload/连续超时/idle 策略，disposer 归实际连接
 
 下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。
 
-| source             | 常量 / 表                                         |
-| ------------------ | ------------------------------------------------- |
+| source               | 常量 / 表                                         |
+| -------------------- | ------------------------------------------------- |
 | `@migaia/rpc/core`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
 | `@migaia/rpc/remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
 

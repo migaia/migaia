@@ -254,10 +254,10 @@ Probe failures report Core TRANSPORT through onListenerError with the original e
 
 The table distinguishes thread sampling, supervision, Core and Remote errors. Import thread APIs from `@migaia/rpc-threads`, Core APIs from `@migaia/rpc-core`, and Remote APIs from `@migaia/rpc-core/remote`; each `source` value retains its error identity.
 
-| Source / code                                    | Meaning and response                                                                                                |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Source / code                                      | Meaning and response                                                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/rpc/threads` / THREAD_USAGE_SAMPLE_FAILED | Thread CPU / memory sampling failed, with cause retained; display unavailable without changing Worker lifecycle.    |
-| @migaia/supervision / EXIT_UNOBSERVABLE          | Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait.            |
+| @migaia/supervision / EXIT_UNOBSERVABLE            | Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait.            |
 | `@migaia/rpc/core` / INVALID_CONFIG                | Invalid entry, source, bootstrap, capability ACK, portable data, or configuration; inspect field details and cause. |
 | `@migaia/rpc/core` / TRANSPORT                     | Native message I/O or startup resource failure, preserving native error type and cause.                             |
 | `@migaia/rpc/core` / DEADLINE_EXCEEDED             | TimeoutError; the Worker may already have executed, so reconcile first.                                             |
