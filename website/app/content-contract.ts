@@ -6,6 +6,7 @@ export {
   type IDomain,
   type ILocale
 } from './route-contract.js'
+import type { ILocale } from './route-contract.js'
 
 /** Generated library fact used by navigation and page recipes. */
 export type ILibrary = {
@@ -13,9 +14,16 @@ export type ILibrary = {
   readonly description: string | null
   readonly version: string | null
   readonly exports: readonly string[]
+  /** Locales with a maintained package README: Chinese `README.md`, English `README.en.md`. */
+  readonly readmeLocales: readonly ILocale[]
   readonly documentation: {
     readonly readme: IMaintainedDocument | null
     readonly guide: IMaintainedDocument | null
+    /** English counterparts read from `README.en.md` and `USEGUIDE.en.md`; absent in route data. */
+    readonly en?: {
+      readonly readme: IMaintainedDocument | null
+      readonly guide: IMaintainedDocument | null
+    }
   }
 }
 
@@ -176,10 +184,23 @@ export function isCallableApiSymbol(
 }
 
 /**
+ * Declaration kind shown to readers in sidebar markers, page badges and hero accents. A callable
+ * `const` (`export const connect = () => …`, or a const typed by a callable alias) is called like a
+ * function, so it reads as `function`; only data constants keep `const`. The generated `kind`
+ * itself stays unchanged because collision-safe route slugs and declaration grouping depend on it.
+ */
+export function apiDisplayKind(
+  symbol: Pick<IApiSymbol, 'kind' | 'name' | 'signature' | 'callable'>
+): string {
+  return symbol.kind === 'const' && isCallableApiSymbol(symbol) ? 'function' : symbol.kind
+}
+
+/**
  * Empty values of the required symbol fields. Route data omits a field holding exactly this value,
  * because most projected symbols (navigation and link entries) leave nearly every field empty and
- * every docs page would otherwise serialize those empty fields twice: once inlined for hydration and
- * once in its `.data` file. `unpackApis` restores them, so components always see complete symbols.
+ * every docs page would otherwise serialize those empty fields twice: once inlined for hydration
+ * and once in its `.data` file. `unpackApis` restores them, so components always see complete
+ * symbols.
  */
 const EMPTY_SYMBOL_FIELDS = {
   signature: '',

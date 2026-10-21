@@ -1,5 +1,6 @@
 import libraryIndexManifest from '../src/generated/manifests/library-index.json'
 import {
+  apiDisplayKind,
   isCallableApiSymbol,
   moduleSlug,
   symbolSlug,
@@ -34,12 +35,17 @@ export type IGuideApiLink = {
   readonly module: string
   readonly name: string
   readonly symbolPath: string
-  /** Declaration kind (`function`, `class`, `const`, …) drawn as the sidebar marker. */
+  /**
+   * Reader-facing declaration kind (`function`, `class`, `const`, …) drawn as the sidebar marker; a
+   * callable const reads as `function`.
+   */
   readonly kind: string
 }
 
 type ILibraryRouteContentOptions = {
   readonly documentation: 'none' | 'readme' | 'guide' | 'all'
+  /** Selects the English `*.en.md` documents; Chinese is the default maintained language. */
+  readonly locale?: 'zh' | 'en'
   readonly includeApiIndex: boolean
   readonly selectedModule?: string
   readonly selectedSymbol?: string
@@ -96,7 +102,7 @@ export async function loadTypeEntryLinks(slug: string): Promise<readonly IGuideA
     module: entry.module,
     name: symbol.name,
     symbolPath: symbolSlug(symbol, entry.symbols),
-    kind: symbol.kind
+    kind: apiDisplayKind(symbol)
   }))
   /** Re-export aliases preserve canonical declaration ownership instead of duplicating pages. */
   const reexported = entry.aliases.flatMap((alias) => {
@@ -110,7 +116,7 @@ export async function loadTypeEntryLinks(slug: string): Promise<readonly IGuideA
             module: owner.module,
             name: symbol.name,
             symbolPath: symbolSlug(symbol, owner.symbols),
-            kind: symbol.kind
+            kind: apiDisplayKind(symbol)
           }
         ]
       : []
@@ -138,7 +144,7 @@ export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuide
         module: api.module,
         name: symbol.name,
         symbolPath: symbolSlug(symbol, api.symbols),
-        kind: symbol.kind
+        kind: apiDisplayKind(symbol)
       }))
   )
 }
@@ -183,6 +189,11 @@ export async function loadLibraryRouteContent(
       )
     : noReferencedTypes
   const library = module.default.library
+  /** Locale-selected README and usage guide; English never falls back to the Chinese text. */
+  const localized =
+    options.locale === 'en'
+      ? (library.documentation.en ?? { readme: null, guide: null })
+      : library.documentation
   return {
     library: {
       ...library,
@@ -190,11 +201,11 @@ export async function loadLibraryRouteContent(
       documentation: {
         readme:
           options.documentation === 'readme' || options.documentation === 'all'
-            ? projectReaderDocument(library.documentation.readme, slug)
+            ? projectReaderDocument(localized.readme, slug)
             : null,
         guide:
           options.documentation === 'guide' || options.documentation === 'all'
-            ? projectReaderDocument(library.documentation.guide, slug)
+            ? projectReaderDocument(localized.guide, slug)
             : null
       }
     },
@@ -426,10 +437,7 @@ function publicSourceName(source: string): string {
 function compactSymbol(symbol: IApiSymbol): IApiSymbol {
   /** Minimal declaration marker retaining callable-const navigation identity. */
   const compactSignature =
-    symbol.kind === 'const' &&
-    new RegExp(
-      `export declare const ${symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*(?:<|\\()`
-    ).test(symbol.signature)
+    symbol.kind === 'const' && isCallableApiSymbol(symbol)
       ? `export declare const ${symbol.name}: (`
       : ''
   return {
