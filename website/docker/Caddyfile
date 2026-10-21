@@ -22,4 +22,13 @@
 	file_server {
 		disable_canonical_uris
 	}
+
+	# Any path with no prerendered file gets the SPA shell with status 404. The client router
+	# then renders the not-found page. Route data (`.data`) and static files keep a plain 404,
+	# which React Router already reads as not found.
+	handle_errors 404 {
+		@page not path *.data /migaia/assets/* /migaia/pagefind/*
+		rewrite @page /migaia/__spa-fallback.html
+		file_server
+	}
 }

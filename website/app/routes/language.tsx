@@ -1,10 +1,16 @@
-import { Link, type MetaFunction as IMetaFunction } from 'react-router'
+import { data, Link, type MetaFunction as IMetaFunction } from 'react-router'
 import { copyFor, domainDescription, domainTitle, interfaceCopyFor } from '../copy.js'
 import { LIBRARY_INDEX, libraryReferenceDescription } from '../library-descriptions.js'
-import { domainPath, type ILocale } from '../route-contract.js'
+import { domainPath, LOCALES, type ILocale } from '../route-contract.js'
 import { requestSearch } from '../search.js'
 
 type ILanguageRouteProps = { readonly params: { readonly lang?: string } }
+
+/** Only public locales have a home; any other single segment such as `/xxx` is a 404. */
+export function loader({ params }: ILanguageRouteProps) {
+  if (!LOCALES.some((locale) => locale === params.lang)) throw data(null, { status: 404 })
+  return null
+}
 
 /** The language home is the docs home, so it carries the docs title and purpose. */
 export const meta: IMetaFunction = ({ params }) => {
