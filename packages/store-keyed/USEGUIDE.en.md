@@ -349,6 +349,20 @@ store.set(writableDerivedDef, ...customArgs) // goes through write(get, set, ...
 - When the target resolves to `derived` (read-only): it throws `TypeError('[store] atom override resolved to a read-only definition')`. TypeScript normally prevents passing a read-only definition directly; this path is mostly hit when an override routes a writable definition to a read-only target.
 - When the target resolves to `writable-derived`: it calls `write(store.get, store.set, ...args)` and returns what `write` returns.
 
+To write several source definitions at once, use `store.setMany`:
+
+```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
+store.setMany([
+  [countDef, (previous) => previous + 1],
+  [nameDef, 'Ada']
+])
+```
+
+- It accepts only source definitions (`atomDef`, `atomDefFactory`). If an override routes any entry to a non-source definition, it throws `OVERRIDE_CONTRACT`.
+- It first resolves every entry and runs every updater in order, and writes only after that. If any entry is rejected or any updater throws, every definition keeps its old value and no subscriber is notified.
+- When a definition appears more than once, a later entry's updater receives the value computed by the earlier one, the same result as calling `set` one by one. An updater that reads another definition sees the value from before the call.
+- The writes happen in one batch, so subscribers are notified once.
+
 ### 3.3 Subscribing
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
@@ -357,7 +371,7 @@ const unsubscribe = store.sub(doubledDef, () => {
 })
 ```
 
-`store.sub(def, onChange)` subscribes through an internal `Effect` instead of handing the underlying node to the caller, so the instantiation strategy (when to create a Signal/Computed, whether lazily) can evolve without breaking subscribers. The first run only records dependencies and does not call `onChange`; after that, every dependency change calls `onChange` inside `runtime.untracked()`. An exception thrown by `onChange` is caught and passed to `runtime.reportError(error, { phase: 'subscription-listener' })`, without stopping other subscribers or breaking the Effect. The returned `unsubscribe` is idempotent and safe to call several times.
+`store.sub(def, onChange)` subscribes to that one node through a reactive static observer instead of handing the underlying node to the caller, so the instantiation strategy (when to create a Signal/Computed, whether lazily) can evolve without breaking subscribers. The first run only records dependencies and does not call `onChange`; after that, every dependency change calls `onChange` inside `runtime.untracked()`. An exception thrown by `onChange` is caught and passed to `runtime.reportError(error, { phase: 'subscription-listener' })`, without stopping other subscribers or ending this subscription. The returned `unsubscribe` is idempotent and safe to call several times.
 
 <a id="34-override"></a>
 

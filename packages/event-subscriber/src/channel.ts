@@ -169,62 +169,109 @@ export const validateChannelLike = <T, R, V = undefined>(
   }
 }
 
-/** Creates a live event context over a registration owner. */
+/** Per-dispatch data shared by the prototype accessors, never reused between contexts. */
+type IEventContextState<T, R, V> = {
+  readonly value: T
+  readonly snapshot: IEventDispatchSnapshot<T, R, V>
+}
+
+/** Keeps dispatch data on each escaping context while sharing the read-only accessors. */
+class EventContext<T, R, V> implements IEventContext<T> {
+  /** A single state slot avoids multiple private-field maps in the ES2020 build. */
+  readonly #state: IEventContextState<T, R, V>
+
+  /** Each cancellation callback retains its registration independently of the call-site receiver. */
+  declare readonly abort: (reason?: unknown) => void
+  /** Each retagging callback remains safe to detach or retain after listener delivery. */
+  declare readonly setTaskId: (taskId: string | undefined) => void
+
+  /** Captures one dispatch without reusing contexts or installing per-instance accessors. */
+  constructor(value: T, snapshot: IEventDispatchSnapshot<T, R, V>) {
+    this.#state = { value, snapshot }
+    this.abort = (reason?: unknown): void => {
+      snapshot.control.abort(reason)
+    }
+    this.setTaskId = (taskId: string | undefined): void => {
+      snapshot.control.setTaskId(taskId)
+    }
+  }
+
+  /** Returns the original payload without cloning or projection. */
+  get value(): T {
+    return this.#state.value
+  }
+
+  /** Reads cancellation from the registration retained by this dispatch. */
+  get aborted(): boolean {
+    return this.#state.snapshot.control.aborted
+  }
+
+  /** Preserves the exact reason identity recorded by the registration. */
+  get abortReason(): unknown {
+    return this.#state.snapshot.control.abortReason
+  }
+
+  /** Retains the label captured before listeners can retag their registration. */
+  get taskId(): string | undefined {
+    return this.#state.snapshot.taskId
+  }
+}
+
+/** Creates a distinct live context and then appends the existing immutable projection alias. */
 export const createEventContext = <T, R, V = undefined>(
   value: T,
   snapshot: IEventDispatchSnapshot<T, R, V>,
   projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
 ): IEventContext<T> => {
-  const context = {
-    get value() {
-      return value
-    },
-    get aborted() {
-      return snapshot.control.aborted
-    },
-    get abortReason() {
-      return snapshot.control.abortReason
-    },
-    get taskId() {
-      return snapshot.taskId
-    },
-    abort(reason?: unknown) {
-      snapshot.control.abort(reason)
-    },
-    setTaskId(taskId: string | undefined) {
-      snapshot.control.setTaskId(taskId)
-    }
-  }
+  /** Every listener invocation owns its context, including callbacks retained after dispatch. */
+  const context = new EventContext(value, snapshot)
   if (projection) addEventProjection(context, projection.plan, projection.outcome)
   return context
 }
 
-/**
- * Builds the live control for one registration owner. It closes over the owner only, so one
- * instance serves every dispatch snapshot of that registration.
- */
-const createOwnerControl = <T, R, V>(owner: IRegistrationOwner<T, R, V>): IEventDispatchControl =>
-  Object.freeze({
-    get active() {
-      return owner.active
-    },
-    get aborted() {
-      return owner.aborted
-    },
-    get abortReason() {
-      return owner.abortReason
-    },
-    abort(reason?: unknown) {
-      if (!owner.active) return
-      owner.aborted = true
-      owner.abortReason = reason
-      owner.release()
-    },
-    setTaskId(taskId: string | undefined) {
-      if (!owner.active) return
-      owner.currentTaskId = validateTaskId(taskId, true)
-    }
-  })
+/** Keeps internal control state off the frozen object's observable own-property surface. */
+const controlOwners = new WeakMap<
+  IEventDispatchControl,
+  Pick<
+    IRegistrationOwner<unknown, unknown, unknown>,
+    'active' | 'aborted' | 'abortReason' | 'currentTaskId' | 'release'
+  >
+>()
+
+/** Reuses control functions while preserving the original plain object's own descriptors and order. */
+const ownerControlDescriptors = Object.getOwnPropertyDescriptors({
+  get active(): boolean {
+    return controlOwners.get(this)!.active
+  },
+  get aborted(): boolean {
+    return controlOwners.get(this)!.aborted
+  },
+  get abortReason(): unknown {
+    return controlOwners.get(this)!.abortReason
+  },
+  abort(reason?: unknown): void {
+    /** Only the control's registration is released, even when another owner has the same listener. */
+    const owner = controlOwners.get(this)!
+    if (!owner.active) return
+    owner.aborted = true
+    owner.abortReason = reason
+    owner.release()
+  },
+  setTaskId(taskId: string | undefined): void {
+    /** Retagging remains live while each dispatch snapshot keeps its earlier fixed task label. */
+    const owner = controlOwners.get(this)!
+    if (!owner.active) return
+    owner.currentTaskId = validateTaskId(taskId, true)
+  }
+} satisfies IEventDispatchControl)
+
+/** Builds one frozen own-property control without allocating five functions per registration. */
+const createOwnerControl = <T, R, V>(owner: IRegistrationOwner<T, R, V>): IEventDispatchControl => {
+  /** The WeakMap entry owns the registration for exactly as long as a control remains reachable. */
+  const control = Object.create(Object.prototype, ownerControlDescriptors) as IEventDispatchControl
+  controlOwners.set(control, owner)
+  return Object.freeze(control)
+}
 
 /**
  * Builds a package-internal snapshot whose task label is fixed at dispatch time while abort state
@@ -588,6 +635,20 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let publishing = false
   const pendingValues: T[] = []
   let pendingIndex = 0
+  /** Unlinks one registration using shared channel state instead of a per-owner closure. */
+  const removeOwner = (target: IRegistrationOwner<T, R, V>, incrementEpoch: boolean): void => {
+    if (!target.active || !target.committed) return
+    target.active = false
+    if (uniqueOwners?.get(target.listener) === target) uniqueOwners.delete(target.listener)
+    if (target.previous) target.previous.next = target.next
+    else first = target.next
+    if (target.next) target.next.previous = target.previous
+    else last = target.previous
+    target.previous = undefined
+    target.next = undefined
+    count -= 1
+    if (incrementEpoch) membershipEpoch += 1
+  }
   const registerRaw = (
     listener: IEventListener<T, R, V>,
     taskId: string | undefined
@@ -595,19 +656,6 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     let released = false
     let committed = false
     const owner = {} as IRegistrationOwner<T, R, V>
-    const removeOwner = (target: IRegistrationOwner<T, R, V>, incrementEpoch: boolean): void => {
-      if (!target.active || !target.committed) return
-      target.active = false
-      if (uniqueOwners?.get(target.listener) === target) uniqueOwners.delete(target.listener)
-      if (target.previous) target.previous.next = target.next
-      else first = target.next
-      if (target.next) target.next.previous = target.previous
-      else last = target.previous
-      target.previous = undefined
-      target.next = undefined
-      count -= 1
-      if (incrementEpoch) membershipEpoch += 1
-    }
     const release = (): void => {
       if (released) return
       released = true
@@ -773,6 +821,24 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       throw error
     }
   }
+  /** Shares chain extension across handles; registration ownership stays in each returned release. */
+  const extendSubscription = (
+    nextListener: IEventListener<T, R, V>,
+    nextOptions?: { readonly taskId?: string }
+  ): IUnsubscribe => {
+    if (typeof nextListener !== 'function') {
+      throw createEventTypeError(
+        EventSubscriberErrorCode.invalidListener,
+        eventErrorText(EventSubscriberErrorCode.invalidListener)
+      )
+    }
+    const nextTaskId = readTaskOption(nextOptions)
+    const nextShared = admitUnique(nextListener, nextTaskId)
+    if (nextShared) return nextShared
+    const nextAdmission = registerRaw(nextListener, nextTaskId)
+    nextAdmission.commit()
+    return nextAdmission.release
+  }
   const channel = {
     subscribe(listener, listenerOptions) {
       if (typeof listener !== 'function') {
@@ -793,20 +859,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
                 if (bound) shared()
               }
             : admission!.release,
-          (nextListener, nextOptions) => {
-            if (typeof nextListener !== 'function') {
-              throw createEventTypeError(
-                EventSubscriberErrorCode.invalidListener,
-                eventErrorText(EventSubscriberErrorCode.invalidListener)
-              )
-            }
-            const nextTaskId = readTaskOption(nextOptions)
-            const nextShared = admitUnique(nextListener, nextTaskId)
-            if (nextShared) return nextShared
-            const nextAdmission = registerRaw(nextListener, nextTaskId)
-            nextAdmission.commit()
-            return nextAdmission.release
-          },
+          extendSubscription,
           stylePlan
         )
         bound = true

@@ -398,6 +398,35 @@ store.dispose()`
     ),
     example: storeExample
   },
+  setMany: {
+    summary: t(
+      'Writes several source definitions in one batch, so subscribers are notified once. Every entry is resolved and every updater runs before anything is written: if one entry is rejected or one updater throws, every definition keeps its old value.',
+      '在一个批次里写入多个源定义，订阅者只通知一轮。所有条目先解析、所有更新函数先执行，然后才写入：只要有一项被拒绝或者某个更新函数抛错，所有定义都保持原值。'
+    ),
+    params: {
+      entries: t(
+        'Pairs of a source definition (`atomDef`, `atomDefFactory`) and a new value or a function from the previous value to the next one. A definition listed twice gives its later updater the value computed by the earlier entry; an updater that reads another definition sees the value from before the call.',
+        '由源定义（`atomDef`、`atomDefFactory`）和新值或「旧值转新值」函数组成的二元组。同一个定义出现两次时，后一项的更新函数收到前一项算出的值；更新函数读取其它定义时，读到的是这次调用之前的值。'
+      )
+    },
+    returns: t(
+      'Undefined. An entry that an override routes to a non-source definition rejects the whole call with OVERRIDE_CONTRACT; an updater error propagates unchanged.',
+      '返回未定义。任何一项经 override 解析到非源定义时，整个调用以 `OVERRIDE_CONTRACT` 拒绝；更新函数的错误原样向外传播。'
+    ),
+    example: `import { createRuntime } from '@migaia/reactive'
+import { atomDef, createAtomStore } from '@migaia/store-keyed'
+
+const count = atomDef(0)
+const name = atomDef('guest')
+const store = createAtomStore(createRuntime())
+const off = store.sub(count, () => console.log(store.peek(count), store.peek(name)))
+store.setMany([
+  [count, (previous) => previous + 1],
+  [name, 'Ada']
+])
+off()
+store.dispose()`
+  },
   sub: {
     summary: t(
       'Establishes dependency observation immediately without calling the listener initially. Later change callbacks run synchronously untracked; throws are reported to runtime.reportError and do not kill other subscriptions.',

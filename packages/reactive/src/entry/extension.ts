@@ -13,6 +13,7 @@ export {
 } from '../runtime/source.js'
 export {
   internalRuntimeOf,
+  createBatchedOperation,
   isRuntimeTracking,
   isAnyRuntimeTracking,
   currentRuntimeVersion,
@@ -35,3 +36,5 @@ export { getDefaultRuntime } from '../runtime/default-runtime-provider.js'
 export { ReactiveErrorPhase } from '../runtime/trace-constants.js'
 
 export { deferRuntimeCleanup } from '../runtime/deferred-cleanup.js'
+
+export { createStaticObserver, type IStaticSubscriptionSource } from '../runtime/static-observer.js'

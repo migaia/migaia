@@ -139,6 +139,7 @@ pnpm add @migaia/store-keyed @migaia/reactive
 | `atomDef(init)` / `derivedDef(read)` / `writableDef(read, write)` | Define source state, read-only derived values and writable derived values |
 | `createAtomStore(runtime)` | Creates a store that keeps its own values |
 | `store.get` / `store.set` / `store.sub` | Read (recording a dependency), write, subscribe |
+| `store.setMany(entries)` | Writes several source definitions in one batch; nothing is written unless every entry succeeds, and subscribers are notified once |
 | `focusDef(def, ...path)` / `splitDef(def, keyOf)` | A field-level definition / a list split by key |
 | `familyDef(initial, options?)` | Produces definitions by key |
 | `store.override(def, replacement)` / `store.dispose()` | Replace a definition / release the whole store |

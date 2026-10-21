@@ -31,8 +31,9 @@ export class Signal<T> implements IObservable, IDisposable {
     return this.#version
   }
   /** Lifecycle hooks stay private; callers receive a removal token instead. */
-  #observedHooks = new Set<() => void>()
-  #unobservedHooks = new Set<() => void>()
+  #observedHooks?: Set<() => void>
+  /** Unobserved callbacks allocate storage only when an owner registers one. */
+  #unobservedHooks?: Set<() => void>
   get onObserved(): (() => void) | undefined {
     return this.#composeHooks(this.#observedHooks)
   }
@@ -59,7 +60,7 @@ export class Signal<T> implements IObservable, IDisposable {
     return this.#disposed
   }
   get observed(): boolean {
-    return !this.#disposed && this.subs.size > 0
+    return !this.#disposed && this.#subs.size > 0
   }
   #assertActive(): void {
     if (this.#disposed) {
@@ -100,7 +101,7 @@ export class Signal<T> implements IObservable, IDisposable {
         })
       )
     }
-    // 先快照 subs：同步 scheduler 可能在通知过程中重新追踪并改动 subs，直接迭代活 Set 会死循环
+    // 通知入口快照可按拓扑复用；扩展 markDirty 仍可同步重新追踪并改动 subs。
     runtime.scheduler.runDeferred(markSubscribers, this)
   }
   peek(): T {
@@ -145,15 +146,15 @@ export class Signal<T> implements IObservable, IDisposable {
     const ownedObserved = onObserved ? () => onObserved() : undefined
     /** The matching unobserved callback shares only this group's removal token. */
     const ownedUnobserved = onUnobserved ? () => onUnobserved() : undefined
-    if (ownedObserved) this.#observedHooks.add(ownedObserved)
-    if (ownedUnobserved) this.#unobservedHooks.add(ownedUnobserved)
+    if (ownedObserved) (this.#observedHooks ??= new Set()).add(ownedObserved)
+    if (ownedUnobserved) (this.#unobservedHooks ??= new Set()).add(ownedUnobserved)
     return () => {
-      if (ownedObserved) this.#observedHooks.delete(ownedObserved)
-      if (ownedUnobserved) this.#unobservedHooks.delete(ownedUnobserved)
+      if (ownedObserved) this.#observedHooks?.delete(ownedObserved)
+      if (ownedUnobserved) this.#unobservedHooks?.delete(ownedUnobserved)
     }
   }
-  #composeHooks(hooks: Set<() => void>): (() => void) | undefined {
-    if (hooks.size === 0) return undefined
+  #composeHooks(hooks: Set<() => void> | undefined): (() => void) | undefined {
+    if (hooks === undefined || hooks.size === 0) return undefined
     return () => {
       const errors: unknown[] = []
       for (const hook of Array.from(hooks)) {
