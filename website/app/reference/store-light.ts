@@ -264,101 +264,94 @@ const resourceOptionFields: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
-/** Store options expose async action diagnostics on an isolated runtime. */
+/** A cart's asynchronous refresh reports its batching boundary on the request runtime. */
 const storeDiagnosticsExample = `import { createStore } from '@migaia/store-light'
 import { createRuntime } from '@migaia/reactive'
 
-const warnings: unknown[] = []
-const runtime = createRuntime({ onError: (error) => { warnings.push(error) } })
+const runtime = createRuntime({
+  onError: (error, context) => reportToMonitoring(error, { phase: context.phase })
+})
 const cart = createStore({
-  count: 0,
-  async refresh() { this.count += 1; await Promise.resolve() }
+  items: [] as string[],
+  async refresh() {
+    this.items = await fetchCartItems()
+  }
 }, { runtime, debugName: 'Cart', warnAsyncActions: true })
 await cart.refresh()
-await cart.refresh()
-console.log(cart.count, warnings.length)
-await cart.$dispose()`
-/** Strict mutation policy admits store actions and refuses an unscoped direct assignment. */
+renderCartItems(cart.items)
+onCheckoutClosed(() => cart.$dispose())`
+/** Cart commands keep all writes inside the existing action boundary. */
 const storeMutationExample = `import { createStore } from '@migaia/store-light'
 import { createMutationPolicy } from '@migaia/store-middleware'
 
-const cart = createStore({ count: 0, increment() { this.count += 1 } }, {
+const cart = createStore({
+  quantity: 1,
+  addItem() { this.quantity += 1 }
+}, {
   mutationPolicy: createMutationPolicy('actions-only')
 })
-try { cart.count = 5 }
-catch (error) { console.log((error as { code: string }).code) }
-cart.increment()
-console.log(cart.count)
-await cart.$dispose()`
-/** A manual clock makes the cache retention period visible without wall-clock waiting. */
-const resourceCacheExample = `import { createStoreResource } from '@migaia/store-light'
-import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/testing'
-
-const runtime = createRuntime()
-const scheduler = createManualScheduler()
-const released: string[] = []
-const profile = createStoreResource(() => ({ name: 'Ada' }), {
-  runtime, scheduler, keepAliveMs: 100,
-  dispose: (value) => { released.push(value.name) }
+onAddToCart(() => {
+  cart.addItem()
+  renderQuantity(cart.quantity)
 })
-const release = profile.retainResource()
-try { profile.read() } catch (pending) {
-  if (!(pending instanceof Promise)) throw pending
-  await pending
-}
-console.log(profile.read().name)
-release()
-scheduler.advance(99)
-console.log(released.length)
-scheduler.advance(1)
-console.log(released)
-profile.forceDispose()
-await profile.whenTerminal()`
-/** Resource reporting and logical termination remain observable when value cleanup fails. */
+onCheckoutClosed(() => cart.$dispose())`
+/** A profile session survives brief panel closures, then closes when its cached value is evicted. */
+const resourceCacheExample = `import { createStoreResource } from '@migaia/store-light'
+
+const profile = createStoreResource(({ signal }) => openProfileSession(userId, signal), {
+  runtime: profileRuntime,
+  scheduler: pageHost.scheduler,
+  keepAliveMs: 30_000,
+  dispose: (session) => session.close()
+})
+onProfilePanelMounted(() => {
+  const release = profile.retainResource()
+  showProfilePanel(profile)
+  return release
+})
+onPageClosed(async () => {
+  profile.forceDispose()
+  await profile.whenTerminal()
+})`
+/** The profile registry tracks logical termination while cleanup failures remain visible. */
 const resourceFailureExample = `import { createStoreResource } from '@migaia/store-light'
 
-const phases: string[] = []
-let terminal = false
-const profile = createStoreResource(() => ({ name: 'Ada' }), {
-  dispose: () => { throw new Error('profile close failed') },
-  onError: (_error, phase) => { phases.push(phase) },
-  onTerminal: () => { terminal = true }
+const profile = createStoreResource(({ signal }) => openProfileSession(userId, signal), {
+  dispose: (session) => session.close(),
+  onError: (error, phase) => reportToMonitoring(error, { feature: 'profile', phase }),
+  onTerminal: () => { profileRegistry.delete(userId) }
 })
-const release = profile.retainResource()
-try { profile.read() } catch (pending) {
-  if (!(pending instanceof Promise)) throw pending
-  await pending
-}
-profile.forceDispose()
-release()
-await profile.whenTerminal()
-console.log(phases, terminal)`
+profileRegistry.set(userId, profile)
+showProfilePanel(profile)
+onPageClosed(async () => {
+  profile.forceDispose()
+  await profile.whenTerminal()
+})`
 /** Creation options group diagnostic choices separately from write admission. */
 const storeOptionCases: readonly IOptionCaseDoc[] = [
   {
     title: t('Name a request store and observe async actions', '给请求状态命名并观察异步动作'),
     problem: t(
-      'A request needs its own graph, and its refresh method returns a Promise. runtime isolates that graph, debugName labels internal nodes, and warnAsyncActions reports the first async action boundary. Without that flag there is no warning; writes after await still need their own batch.',
-      '请求需要独立的依赖图，刷新方法还会返回 Promise。runtime 隔离依赖图，debugName 为内部节点命名，warnAsyncActions 上报首次异步动作边界。省略该开关时没有提示；await 后的写入仍需自行批量更新。'
+      'A checkout request refreshes its cart from the server. Its store belongs to the request runtime, while debugName identifies the cart nodes. `warnAsyncActions` reports the first Promise-returning action so monitoring can locate code whose writes after await are outside the initial batch; omission produces no warning.',
+      '结账请求要从服务端刷新购物车。存储归属于请求运行时，debugName 用来识别购物车节点。`warnAsyncActions` 上报首次返回 Promise 的动作，让监控定位 await 后已不在初始批次中的写入；省略时不产生该提示。'
     ),
     example: storeDiagnosticsExample,
     result: t(
-      'Two refresh calls set count to 2 and produce one warning.',
-      '两次刷新后 count 为 2，共产生一条提示。'
+      'The cart displays the fetched items, and monitoring receives the async action boundary warning on its first refresh.',
+      '购物车显示获取到的商品，第一次刷新时监控收到异步动作边界提示。'
     ),
     covers: ['runtime', 'debugName', 'warnAsyncActions']
   },
   {
     title: t('Require writes to go through actions', '要求写入经过动作'),
     problem: t(
-      'A cart should only change through its methods. Without mutationPolicy direct assignment is allowed. The actions-only policy rejects that assignment while the increment action remains allowed.',
-      '购物车应只通过自身方法更新。省略 mutationPolicy 时可以直接赋值。actions-only 策略拒绝直接赋值，但允许 increment 动作修改。'
+      'Several views can access the cart, but quantity changes should go through its addItem command. Without `mutationPolicy`, a view can assign fields directly. The actions-only policy admits the command and rejects writes that bypass its action boundary.',
+      '多个视图可以访问购物车，但数量更新应经过 addItem 命令。不设 `mutationPolicy` 时，视图可以直接给字段赋值。actions-only 策略允许该命令，拒绝绕过动作边界的写入。'
     ),
     example: storeMutationExample,
     result: t(
-      'The direct write reports ACTION_SCOPE_REQUIRED. increment() then sets count to 1.',
-      '直接写入报 ACTION_SCOPE_REQUIRED；随后 increment() 把 count 改为 1。'
+      'The add-to-cart command updates the displayed quantity; direct writes from outside an action are rejected by the policy.',
+      '加入购物车命令更新显示数量；动作之外的直接写入会被策略拒绝。'
     ),
     covers: ['mutationPolicy']
   }
@@ -368,26 +361,26 @@ const resourceOptionCases: readonly IOptionCaseDoc[] = [
   {
     title: t('Keep a profile briefly after the view leaves', '视图离开后短暂保留资料'),
     problem: t(
-      'A profile panel can reopen shortly after closing. keepAliveMs retains its loaded value after the last holder releases it; zero would evict immediately and the default waits 1000 ms. scheduler supplies this resource’s clock, runtime owns deferred work, and dispose closes the cached object when it is evicted.',
-      '资料面板关闭后可能很快再次打开。keepAliveMs 在最后一个持有者释放后暂存已加载值；零会立即逐出，默认等待 1000 毫秒。scheduler 提供该资源的时钟，runtime 负责延后工作，dispose 在逐出时关闭缓存对象。'
+      'Opening a profile session is expensive, and users often reopen the panel soon after closing it. `keepAliveMs` keeps it for 30 seconds after the last holder leaves, rather than the default second. Use the page host clock and profile runtime for this lifetime, then close the session through `dispose` when it is evicted.',
+      '打开资料会话开销较大，用户关闭面板后又常会很快打开。`keepAliveMs` 在最后一个持有者离开后保留 30 秒，而非默认的一秒。用页面宿主的时钟和资料运行时管理这段生命周期，逐出时再由 `dispose` 关闭会话。'
     ),
     example: resourceCacheExample,
     result: t(
-      'It prints Ada, then 0 at 99 ms, then ["Ada"] at 100 ms.',
-      '先输出 Ada；99 毫秒时输出 0，100 毫秒时输出 ["Ada"]。'
+      'Reopening within 30 seconds can reuse the loaded profile session; after eviction the session closes, and page shutdown waits for cleanup.',
+      '30 秒内重新打开可以复用已加载的资料会话；逐出后关闭会话，页面关闭时等待清理完成。'
     ),
     covers: ['runtime', 'scheduler', 'keepAliveMs', 'dispose']
   },
   {
     title: t('Report failed cleanup and observe termination', '上报清理失败并观察终止'),
     problem: t(
-      'A loaded object has a custom close operation that can fail. dispose supplies that cleanup, onError captures its dispose phase, and onTerminal marks logical termination. Without onError failures go to the runtime reporter. Without onTerminal no extra terminal callback runs; await whenTerminal() for physical completion.',
-      '已加载对象有可能失败的自定义关闭操作。dispose 提供清理，onError 接收 dispose 阶段，onTerminal 标记逻辑终止。省略 onError 时失败交给运行时上报；省略 onTerminal 时不调用额外终态回调。物理完成仍需等待 whenTerminal()。'
+      'The profile registry must drop a resource when its logical lifetime ends, even if closing the session is slow or fails. `onTerminal` removes its registry entry; `onError` forwards a failed close with its dispose phase. Without those callbacks there is no registry update and failures use the runtime reporter. `whenTerminal()` still waits for physical cleanup.',
+      '资料登记表需要在资源逻辑终止时移除它，即使会话关闭很慢或失败。`onTerminal` 移除登记，`onError` 连同 dispose 阶段上报关闭失败。省略这两个回调时不会更新登记表，失败交给运行时报告；`whenTerminal()` 仍负责等待物理清理。'
     ),
     example: resourceFailureExample,
     result: t(
-      'Cleanup reports ["dispose"], the terminal flag is true, and whenTerminal() resolves.',
-      '清理上报 ["dispose"]，终态标志为 true，whenTerminal() 成功完成。'
+      'The profile leaves the registry at logical termination, a failed session close reaches monitoring, and page shutdown waits for physical completion.',
+      '资料在逻辑终止时退出登记表，会话关闭失败会送到监控，页面关闭等待物理清理完成。'
     ),
     covers: ['dispose', 'onError', 'onTerminal']
   }
@@ -395,37 +388,52 @@ const resourceOptionCases: readonly IOptionCaseDoc[] = [
 /** Both native helpers keep caller failures on cause while preserving their own runtime class. */
 const errorOptionCases = (native: 'Error' | 'TypeError'): readonly IOptionCaseDoc[] => [
   {
-    title: t('Keep the original field failure', '保留原始字段失败'),
+    title: t('Explain why cart state could not be created', '说明购物车状态创建失败'),
     problem: t(
-      'A custom field builder adds context to a failure. A new message alone loses the original object; cause keeps it reachable for diagnostics. Omission creates no explicit cause.',
-      '自定义字段构建器需要为失败添加上下文。仅有新消息会丢失原始对象；cause 保留它供诊断使用。省略时不附加显式原因。'
+      'The checkout creates a cart store from saved input. If initialization fails, a short cart message should not replace the field failure. Keep it in `cause` so monitoring can inspect the original error.',
+      '结账页要从保存输入创建购物车存储。初始化失败时，简短的购物车提示不应取代字段失败。用 `cause` 保留它，监控仍能查看原始错误。'
     ),
     example: `import { createStoreLight${native}, StoreLightErrorCode } from '@migaia/store-light'
 
-const cause = new Error('field unavailable')
-const error = createStoreLight${native}(StoreLightErrorCode.invalidOption, 'Could not create field', { cause })
-console.log(error instanceof ${native}, error.cause === cause)`,
+try {
+  await loadCartStore()
+} catch (cause) {
+  const error = createStoreLight${native}(
+    StoreLightErrorCode.invalidOption,
+    'Cart state could not be created',
+    { cause }
+  )
+  showCartError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'Both the native-class check and cause identity check print true.',
-      '原生类别检查和原因身份检查都输出 true。'
+      'The checkout shows a cart initialization error, while monitoring retains the original field failure.',
+      '结账页显示购物车初始化失败，监控记录保留原始字段失败。'
     ),
     covers: ['cause']
   },
   {
-    title: t('Retain several initialization failures', '保留多个初始化失败'),
+    title: t('Keep failed inventory setup and rollback details', '保留库存准备和回滚失败详情'),
     problem: t(
-      'A field setup and its cleanup both fail. Keeping their AggregateError as cause preserves both objects under the new contextual error.',
-      '字段准备和随后的清理都失败。把两者的 AggregateError 作为 cause，可在新上下文错误下保留两个原始对象。'
+      'A cart inventory field can fail during setup and again while rolling back. Its initialization failure retains both errors. Keeping that error as `cause` preserves the original group behind the checkout-level explanation.',
+      '购物车库存字段可能在准备时失败，回滚时再次失败。初始化器会合并这些失败。把该错误留在 `cause` 中，结账页可以给出整体说明，同时保留原始错误组。'
     ),
     example: `import { createStoreLight${native}, StoreLightErrorCode } from '@migaia/store-light'
 
-const failures = [new Error('setup failed'), new Error('cleanup failed')]
-const cause = new AggregateError(failures, 'field initialization failed')
-const error = createStoreLight${native}(StoreLightErrorCode.initAndCleanupFailed, 'Could not initialize field', { cause })
-console.log(error.cause === cause, cause.errors.length)`,
+try {
+  await createCartWithInventory()
+} catch (cause) {
+  const error = createStoreLight${native}(
+    StoreLightErrorCode.initAndCleanupFailed,
+    'Cart inventory could not be initialized',
+    { cause }
+  )
+  showCartError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'The cause identity check is true and the group retains two failures.',
-      '原因身份检查为 true，聚合错误保留两个失败。'
+      'The checkout reports inventory setup failure, and monitoring can inspect both setup and rollback failures.',
+      '结账页提示库存准备失败，监控仍能查看准备和回滚两个原始失败。'
     ),
     covers: ['cause']
   }
