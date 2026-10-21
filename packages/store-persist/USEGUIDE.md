@@ -437,6 +437,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 | retryHydrate()       | 无参数；失败后重读，成功恢复写入；应等待此调用本身判断恢复结果。                                                              |
 | flush() / clear()    | 无参数，返回 `Promise<void>`，具体串行与删除规则见后文。                                                                      |
 | disposed / dispose() | live 布尔 getter / 同步幂等释放。                                                                                             |
+| disposeAsync()       | 同步停止后等待已接纳的写入/删除及最终防抖写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。                   |
 
 status、error、hydrated 是 Runtime computed；hydration / write 的细分状态通过 IReadonlyPersistValue.value 暴露。公开 PersistState 只有 idle、loading、writing、ready、success、error、disposed；没有 active。IPersistCodecOutput 已移除，类型使用 storage-contract 的 ICodecOutput；运行时 PersistCodecOutput 仍保留 text / structured / binary。旧类型与成员导入需迁移，没有兼容 alias。
 

@@ -510,6 +510,22 @@ export function persistUnit<TState>(
   /** Background barriers may always settle without changing the public attempt result. */
   const settled = ready.catch(() => undefined)
 
+  /** Stops admission immediately and queues the final snapshot before releasing the subscription. */
+  const dispose = (): void => {
+    if (disposed) return
+    disposed = true
+    generationEpoch++
+    for (const controller of activeOperations) controller.abort()
+    activeOperations.clear()
+    writeStatus.value = PersistState.disposed
+    lifecycleDisposed.value = true
+    if (clearWriteTimer()) {
+      // A pending debounced write still owes storage the latest state.
+      startFinalWrite()
+    }
+    stopSubscription?.()
+  }
+
   return {
     status,
     error,
@@ -568,19 +584,14 @@ export function persistUnit<TState>(
     get disposed() {
       return disposed
     },
-    dispose() {
-      if (disposed) return
-      disposed = true
-      generationEpoch++
-      for (const controller of activeOperations) controller.abort()
-      activeOperations.clear()
-      writeStatus.value = PersistState.disposed
-      lifecycleDisposed.value = true
-      if (clearWriteTimer()) {
-        // A pending debounced write still owes storage the latest state.
-        startFinalWrite()
+    dispose,
+    /** Drains admitted storage work even when synchronous subscription cleanup throws. */
+    async disposeAsync() {
+      try {
+        dispose()
+      } finally {
+        await writeChain
       }
-      stopSubscription?.()
     }
   }
 }

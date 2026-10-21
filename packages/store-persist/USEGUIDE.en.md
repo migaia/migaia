@@ -423,20 +423,21 @@ Changes during hydration mark dirty rather than writing over an unknown archive.
 
 ### Handle state and waiting
 
-| Member               | Values or behavior                                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| status               | loading / ready / error / disposed; disposed takes precedence, then hydration loading, then hydration or write error. In-progress writing has its own writeStatus. |
-| error                | hydrationError or writeError; both produce HYDRATE_AND_WRITE_FAILED AggregateError with hydration then write in errors.                                            |
-| hydrated             | Whether hydrationStatus is success, not whether the handle is still active.                                                                                        |
-| hydrationStatus      | loading / success / error, changing again on retry.                                                                                                                |
-| hydrationError       | Current hydration failure, cleared on success.                                                                                                                     |
-| writeStatus          | idle / writing / error / disposed.                                                                                                                                 |
-| writeError           | Latest write failure, cleared by an ordinary successful write; a final disposal write may also retain failure here.                                                |
-| ready                | Promise for the first hydration attempt, resolving on success and rejecting on failure or disposal before completion; retry never replaces it.                     |
-| settled              | An always-resolving barrier for the first attempt, not later retry completion.                                                                                     |
-| retryHydrate()       | No arguments; rereads after failure and reopens writing only on success. Await the initiating call itself.                                                         |
-| flush() / clear()    | No arguments; `Promise<void>`, with ordered write / deletion behavior below.                                                                                       |
-| disposed / dispose() | Live boolean getter / synchronous idempotent release.                                                                                                              |
+| Member               | Values or behavior                                                                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| status               | loading / ready / error / disposed; disposed takes precedence, then hydration loading, then hydration or write error. In-progress writing has its own writeStatus.         |
+| error                | hydrationError or writeError; both produce HYDRATE_AND_WRITE_FAILED AggregateError with hydration then write in errors.                                                    |
+| hydrated             | Whether hydrationStatus is success, not whether the handle is still active.                                                                                                |
+| hydrationStatus      | loading / success / error, changing again on retry.                                                                                                                        |
+| hydrationError       | Current hydration failure, cleared on success.                                                                                                                             |
+| writeStatus          | idle / writing / error / disposed.                                                                                                                                         |
+| writeError           | Latest write failure, cleared by an ordinary successful write; a final disposal write may also retain failure here.                                                        |
+| ready                | Promise for the first hydration attempt, resolving on success and rejecting on failure or disposal before completion; retry never replaces it.                             |
+| settled              | An always-resolving barrier for the first attempt, not later retry completion.                                                                                             |
+| retryHydrate()       | No arguments; rereads after failure and reopens writing only on success. Await the initiating call itself.                                                                 |
+| flush() / clear()    | No arguments; `Promise<void>`, with ordered write / deletion behavior below.                                                                                               |
+| disposed / dispose() | Live boolean getter / synchronous idempotent release.                                                                                                                      |
+| disposeAsync()       | Stops synchronously, then awaits admitted writes/removals and the final debounce write; final-write failures stay on writeError; existing flush/clear keep their outcomes. |
 
 status, error, and hydrated are Runtime computed values. Hydration and write detail fields expose IReadonlyPersistValue.value. PersistState contains only idle, loading, writing, ready, success, error, and disposed, with no active member. IPersistCodecOutput was removed in favor of storage-contract ICodecOutput; runtime PersistCodecOutput retains text / structured / binary. Old type or member imports require migration without compatibility aliases.
 
