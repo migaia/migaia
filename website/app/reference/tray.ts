@@ -881,7 +881,7 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
             'Set it in the child entry to receive serving failures where they occur. It runs synchronously; omission writes diagnostics to console.error.',
             '在子端入口设置，以便在发生处接收服务失败。回调同步执行；省略时向 console.error 输出诊断。'
           ),
-          example: trayOptionExamples.registry,
+          example: trayOptionExamples.serveProbe,
           summary: t(
             'Receives background failures from serving the child host.',
             '接收为子宿主提供服务期间出现的后台失败。'
@@ -1874,7 +1874,7 @@ console.log(same.id) // 'alice'`,
             'Set a synchronous receiver for lifecycle and secondary cleanup diagnostics. Omission leaves no application diagnostic receiver; operation results still retain their own failures.',
             '需要接收生命周期及次要清理诊断时设置同步回调。省略时没有应用诊断接收方；操作结果仍保留自身失败。'
           ),
-          example: trayOptionExamples.hostStrict,
+          example: trayOptionExamples.hostReport,
           summary: t('Receives lifecycle and cleanup diagnostics.', '接收生命周期与清理诊断信息。'),
           default: t(
             'Not set: diagnostics are dropped after classification.',

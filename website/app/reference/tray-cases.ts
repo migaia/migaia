@@ -3,200 +3,207 @@ import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 /** Localized option stories share complete public-entry programs. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
-/** Managed operations borrow one explicitly constructed PluginHost. */
-const managedOptionsSetup = `import { PluginHost, definePlugin } from '@migaia/plugin-host'
-import { createHost } from '@migaia/tray/host'
-class AppHost extends PluginHost<Record<string, never>, string> {}`
-
-/** Both registry and child option chapters can run this same real Thread entry. */
-const registryOptionsExample = (
-  customRouting: boolean
-): string => `import { isMainThread } from 'node:worker_threads'
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { createTray, defineTrayHost, defineRoutingPolicy, serveTrayHost } from '@migaia/tray'
-import { defineProbe } from '@migaia/rpc-core/probe'
-const firstReady = defineRoutingPolicy('firstReady', (candidates) => candidates[0]!.id)
-const agent = defineTrayHost({
-  name: 'agent', runtime: 'thread', entry: new URL(import.meta.url),
-  routing: [firstReady] as const,
-  plugins: () => [definePlugin({ name: 'node', features: {
-    svc: defineFeature(() => ({ echo: (value: string) => value }))
-  }, install: () => ({}) })] as const,
-  exposes: ['node.svc'] as const
-})
-const probe = defineProbe({ stages: ['peer'], emit: () => {} })
-const report = (error: unknown) => { console.error(error) }
-if (!isMainThread) {
-  await serveTrayHost(agent, { probe, report })
-} else {
-  const tray = createTray({ hosts: [agent] as const, routing: [firstReady] as const, probe, report })
-  try {
-    const instance = await tray.spawn('agent', { id: 'one' })
-    console.log(await ${customRouting ? 'tray.routing.firstReady(agent)' : 'instance'}.request('node.svc.echo', '${customRouting ? 'routed' : 'hello'}'))
-  } finally {
-    await tray.dispose()
-  }
-}`
-
-/** Managed shutdown examples resolve every held cleanup before their process exits. */
-const hostOptionsExample = (bounded: boolean): string => `${managedOptionsSetup}
-const release = Promise.withResolvers<void>()
-const started = Promise.withResolvers<void>()
-const host = await createHost({
-  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
-  plugins: [definePlugin({ name: 'counter', install: () => ({ count: 1 }), dispose: () => {
-    started.resolve(); ${bounded ? 'return release.promise' : 'return undefined'}
-  } })] as const,
-  mutationAdmissionMs: 1000,
-  quiescenceMs: ${bounded ? '0' : '1000'},
-  shutdown: { mode: '${bounded ? 'bounded' : 'strict-drain'}' },
-  report: (error) => { console.error(error) }
-})
-console.log(host.readyPlugins)
-const closing = host.dispose()
-await started.promise
-const result = await closing
-console.log(result.cleanupComplete)
-release.resolve()
-await result.physicalCompletion`
-
-/** Loading and replacement use local artifacts, never network access or a private loader path. */
-const loadOptionsExample = (replace: boolean): string => `${managedOptionsSetup}
-import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
-import { defineAdapter } from '@migaia/tray/adapter'
-const host = await createHost({
-  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
-  plugins: [], mutationAdmissionMs: 1000, quiescenceMs: 1000, shutdown: { mode: 'strict-drain' }
-})
-let releases = 0
-const loader = defineLoader({ load: (value: number) => ({ value, release: { force: () => { releases++ } } }) })
-const adapter = defineAdapter({ adapt: (value: number) => ({ name: 'answer' as const, install: () => ({ answer: () => value }) }) })
-const caller = new AbortController()
-try {
-  ${replace ? "await loadIntoHost({ host, source: 42, loader, adapter, mutation: 'use', timeoutMs: false })" : ''}
-  const result = await loadIntoHost({
-    host, source: ${replace ? '7' : '42'}, loader, adapter, mutation: '${replace ? 'replace' : 'use'}',
-    timeoutMs: ${replace ? 'false' : '5000'}, signal: caller.signal,
-    report: (error) => { console.error(error) }
-  })
-  if (result.ok) {
-    const extensions = result.view.extensions as { answer(): number }
-    console.log(extensions.answer(), result.operation, releases)
-  }
-} finally {
-  await host.dispose()
-}`
-
-/** Runtime shutdown controls callback waiting and never takes ownership of its managed Host. */
-const runtimeOptionsExample = (bounded: boolean): string => `${managedOptionsSetup}
-import { createRuntime } from '@migaia/tray/runtime'
-const host = await createHost({
-  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
-  plugins: [{ name: 'billing', install: () => ({ double: (value: number) => value * 2 }) }] as const,
-  mutationAdmissionMs: 1000, quiescenceMs: 1000, shutdown: { mode: 'strict-drain' }
-})
-const runtime = createRuntime(host, {
-  shutdown: { mode: '${bounded ? 'bounded' : 'strict-drain'}' },
-  report: (error) => { console.error(error) }
-})
-const release = Promise.withResolvers<void>()
-try {
-  const running = runtime.run('billing', { timeoutMs: false }, async ({ extensions }) => {
-    await release.promise
-    return extensions.double(21)
-  })
-  const closing = runtime.dispose()
-  ${bounded ? 'console.log((await closing).cleanupComplete)' : ''}
-  release.resolve()
-  ${bounded ? '' : 'console.log((await closing).cleanupComplete)'}
-  console.log(await running, host.state)
-} finally {
-  release.resolve()
-  await runtime.dispose()
-  await host.dispose()
-}`
-
-/** Own field examples reuse the complete scenario that demonstrates their setting. */
+/** Short application examples keep parent, child, host and artifact ownership separate. */
 export const trayOptionExamples = {
-  registry: registryOptionsExample(false),
-  routing: registryOptionsExample(true),
-  hostStrict: hostOptionsExample(false),
-  hostBounded: hostOptionsExample(true),
-  load: loadOptionsExample(false),
-  replace: loadOptionsExample(true),
-  runtimeStrict: runtimeOptionsExample(false),
-  runtimeBounded: runtimeOptionsExample(true)
+  registry: `import { createTray } from '@migaia/tray'
+
+const tray = createTray({
+  hosts: [pricingHost] as const,
+  probe: monitoringProbe,
+  report: (error) => reportToMonitoring(error)
+})
+const pricing = await tray.spawn('pricing', { id: 'checkout' })
+renderPrices(await pricing.request('pricing.api.fetchPrices', productIds))
+onCheckoutClosed(() => tray.dispose())`,
+  routing: `import { createTray, defineTrayHost, defineRoutingPolicy } from '@migaia/tray'
+
+const firstReady = defineRoutingPolicy('firstReady', (candidates) => candidates[0]!.id)
+const pricingHost = defineTrayHost({
+  ...pricingHostDefinition,
+  routing: [firstReady] as const
+})
+const tray = createTray({ hosts: [pricingHost] as const, routing: [firstReady] as const })
+await tray.spawn('pricing', { id: 'checkout' })
+const pricing = tray.routing.firstReady(pricingHost)
+renderPrices(await pricing.request('pricing.api.fetchPrices', productIds))
+onCheckoutClosed(() => tray.dispose())`,
+  serveProbe: `import { serveTrayHost } from '@migaia/tray'
+
+await serveTrayHost(pricingHost, {
+  probe: monitoringProbe,
+  report: (error) => reportToMonitoring(error)
+})`,
+  serveReport: `import { serveTrayHost } from '@migaia/tray'
+
+await serveTrayHost(pricingHost, {
+  report: (error) => reportChildFailure('pricing', error)
+})`,
+  hostStrict: `import { createHost } from '@migaia/tray/host'
+
+const host = await createHost({
+  create: () => createApplicationHost(),
+  plugins: [pricingPlugin] as const,
+  mutationAdmissionMs: 1000,
+  quiescenceMs: 1000,
+  shutdown: { mode: 'strict-drain' }
+})
+showPricingPanel(host)
+onCheckoutClosed(async () => {
+  await host.dispose()
+  showCheckoutClosed()
+})`,
+  hostBounded: `import { createHost } from '@migaia/tray/host'
+
+const host = await createHost({
+  ...applicationManagedHostOptions,
+  quiescenceMs: 500,
+  shutdown: { mode: 'bounded' }
+})
+onCheckoutClosed(async () => {
+  const result = await host.dispose()
+  showCheckoutClosed(result.cleanupComplete)
+  await result.physicalCompletion
+})`,
+  hostReport: `import { createHost } from '@migaia/tray/host'
+
+const host = await createHost({
+  ...applicationManagedHostOptions,
+  report: (error) => reportToMonitoring(error)
+})
+onCheckoutClosed(() => host.dispose())`,
+  load: `import { loadIntoHost } from '@migaia/tray/loader'
+
+const result = await loadIntoHost({
+  host: managedHost,
+  source: pricingBundle,
+  loader: bundleLoader,
+  adapter: pricingAdapter,
+  mutation: 'use',
+  timeoutMs: 5000
+})
+if (result.ok) showLoadedPricing(result.view)`,
+  replace: `import { loadIntoHost } from '@migaia/tray/loader'
+
+const result = await loadIntoHost({
+  ...pricingLoadOptions,
+  source: updatedPricingBundle,
+  mutation: 'replace',
+  timeoutMs: false,
+  report: (error) => reportToMonitoring(error)
+})
+if (result.ok) showLoadedPricing(result.view)`,
+  loadCancel: `import { loadIntoHost } from '@migaia/tray/loader'
+
+try {
+  const result = await loadIntoHost({
+    ...pricingLoadOptions,
+    signal: requestSignal,
+    report: (error) => reportToMonitoring(error)
+  })
+  if (result.ok) showLoadedPricing(result.view)
+  else showPricingUnavailable(result.error)
+} catch (error) {
+  showPricingUnavailable(error)
+}`,
+  runtimeStrict: `import { createRuntime } from '@migaia/tray/runtime'
+
+const runtime = createRuntime(managedHost, {
+  shutdown: { mode: 'strict-drain' },
+  report: (error) => reportToMonitoring(error)
+})
+onPriceRequested((ids) => runtime.run('pricing', { timeoutMs: 5000 }, async ({ extensions }) => {
+  renderPrices(await extensions.fetchPrices(ids))
+}))
+onCheckoutClosed(async () => {
+  await runtime.dispose()
+  await managedHost.dispose()
+})`,
+  runtimeBounded: `import { createRuntime } from '@migaia/tray/runtime'
+
+const runtime = createRuntime(managedHost, {
+  shutdown: { mode: 'bounded' },
+  report: (error) => reportToMonitoring(error)
+})
+onPriceRequested((ids) => runtime.run('pricing', { timeoutMs: 5000 }, async ({ extensions }) => {
+  renderPrices(await extensions.fetchPrices(ids))
+}))
+onCheckoutClosed(async () => {
+  const result = await runtime.dispose()
+  showPricingStopped(result.cleanupComplete)
+  await settlePriceRequests()
+  await managedHost.dispose()
+})`
 }
 
-/** Related ownership and waiting fields stay in one observable configuration workflow. */
+/** Every option story describes one reader-visible checkout situation. */
 export const trayOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   registry: [
     {
-      title: t('Register and observe a Thread host', '登记并观察线程宿主'),
+      title: t('Start the checkout price host', '启动结账页的价格宿主'),
       problem: t(
-        'A parent must register host definitions before spawning them. hosts selects those definitions; probe observes connections on each side and report receives background failures. Omitted probes do not observe; the default reporter is console.error.',
-        '父端必须先登记宿主定义，再创建实例。hosts 选择定义；两端的 probe 观察连接，report 接收后台失败。省略探针则不观察；默认上报器为 console.error。'
+        'The checkout page needs a registered price service before it can spawn an instance. Attach connection observations and background-error reporting when creating the registry, so the support panel can follow its lifetime.',
+        '结账页需要先登记价格服务，才能启动实例。创建注册表时接入连接观察与后台错误报告，让支持面板能跟随其生命周期。'
       ),
       example: trayOptionExamples.registry,
       result: t(
-        'A real Thread serves the request and prints hello; registry disposal asks the child to exit.',
-        '真实线程处理请求并输出 hello；注册表释放时要求子端退出。'
+        'The checkout page displays prices from its registered service and releases the registry when it closes.',
+        '结账页显示已登记服务提供的价格，关闭时释放注册表。'
       ),
-      covers: ['hosts', 'probe', 'report', 'routing']
+      covers: ['hosts', 'probe', 'report']
     },
     {
-      title: t('Choose a shared routing policy', '选择共享路由策略'),
+      title: t('Send pricing requests to the first ready instance', '把价格请求发给首个就绪实例'),
       problem: t(
-        'A service needs a deterministic first-ready policy. Register the exact defineRoutingPolicy result in routing and the host tuple. Without custom registration, only built-ins and declared host policies are available.',
-        '服务需要确定的首个就绪实例策略。把 defineRoutingPolicy 的原对象登记到 routing 和宿主元组中。不额外登记时，只能使用内置策略和宿主声明的策略。'
+        'The application already has a pricing host definition and needs a shared first-ready policy. Register the exact policy on both that host and the parent registry before using its routing namespace.',
+        '应用已经拥有价格宿主定义，需要共用首个就绪实例策略。在宿主和父注册表登记同一个策略，再通过路由命名空间调用。'
       ),
       example: trayOptionExamples.routing,
       result: t(
-        'The custom routing namespace dispatches to the ready Thread and prints routed.',
-        '自定义路由命名空间向就绪线程派发并输出 routed。'
+        'The checkout page receives prices through the first-ready route.',
+        '结账页通过首个就绪实例路由取得价格。'
       ),
-      covers: ['hosts', 'routing', 'probe', 'report']
+      covers: ['hosts', 'routing']
     }
   ],
   serve: [
     {
-      title: t('Observe a child connection', '观察子端连接'),
+      title: t('Observe pricing in its child entry', '在子端入口观察价格服务'),
       problem: t(
-        'A child entry must attach probes when it starts serving, rather than after requests have begun. Supply probe to serveTrayHost; omitted probes collect no child observations. report handles serving diagnostics.',
-        '子端入口需要在开始服务时挂接探针，而非请求开始后再挂接。向 serveTrayHost 提供 probe；省略时不收集子端观察。report 处理服务诊断。'
+        'The price worker starts serving before business requests arrive. Attach its existing monitoring probe at that entry so child-side activity and failures reach the application.',
+        '价格工作程序在业务请求到达前开始服务。在该入口接入已有监控探针，让子端活动与失败进入应用。'
       ),
-      example: trayOptionExamples.registry,
+      example: trayOptionExamples.serveProbe,
       result: t(
-        'The complete parent/child program prints hello and closes the child after cleanup.',
-        '完整父子程序输出 hello，并在清理后关闭子端。'
+        'The child serves the declared pricing host with monitoring attached from startup.',
+        '子端从启动时就带着监控，服务已声明的价格宿主。'
       ),
       covers: ['probe', 'report']
     },
     {
-      title: t('Keep serving diagnostics with routed calls', '为路由调用保留服务诊断'),
+      title: t('Name failures from the pricing worker', '标识价格工作程序的失败'),
       problem: t(
-        'Routing still uses an ordinary child connection. Its report callback observes background serving failures and defaults to console.error; a business request keeps its own success or failure.',
-        '路由仍使用普通子端连接。report 回调观察后台服务失败，默认使用 console.error；业务请求保留自身的成功或失败结果。'
+        'Several child services share one monitoring destination. Label this child\u2019s serving failures as pricing so operators can find the affected service without parsing a business response.',
+        '多个子端服务共用监控出口。把当前子端的服务失败标为 pricing，让操作人员定位受影响服务，无需解析业务响应。'
       ),
-      example: trayOptionExamples.routing,
+      example: trayOptionExamples.serveReport,
       result: t(
-        'Prints routed from the actual child; the configured diagnostic receiver remains attached until exit.',
-        '实际子端输出 routed；配置的诊断接收方保持到退出。'
+        'Monitoring receives child failures with the application\u2019s pricing label.',
+        '监控接收带应用 pricing 标签的子端失败。'
       ),
-      covers: ['probe', 'report']
+      covers: ['report']
     }
   ],
   host: [
     {
-      title: t('Construct and strictly release a managed host', '构造并严格释放托管宿主'),
+      title: t('Release checkout plugins before confirming close', '插件释放后再确认结账页关闭'),
       problem: t(
-        'A managed host needs one canonical PluginHost and its initial definitions. create constructs that owner; plugins selects definitions. mutationAdmissionMs and quiescenceMs are required budgets. strict-drain waits for real release; report receives lifecycle diagnostics.',
-        '托管宿主需要唯一的规范 PluginHost 和初始定义。create 构造所有者，plugins 选择定义。mutationAdmissionMs 与 quiescenceMs 是必填预算。strict-drain 等待真正释放；report 接收生命周期诊断。'
+        'The checkout page owns a canonical PluginHost and pricing plugins. Construct them through one managed owner, bound mutation admission, and use strict draining when the close screen must wait for actual release.',
+        '结账页拥有规范 PluginHost 及价格插件。通过一个托管所有者构造它们，限制变更接纳；关闭界面需要等待实际释放时使用严格排空。'
       ),
       example: trayOptionExamples.hostStrict,
       result: t(
-        "Prints ['counter'] then true; cleanup finishes before disposal returns.",
-        "输出 ['counter'] 和 true；释放返回前已完成清理。"
+        'The pricing panel is available after startup, and the closed screen appears after plugin cleanup.',
+        '启动后价格面板可用，插件清理完成后才显示已关闭界面。'
       ),
       covers: [
         'create',
@@ -204,84 +211,88 @@ export const trayOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>
         'mutationAdmissionMs',
         'quiescenceMs',
         'shutdown',
-        'shutdown.mode',
-        'report'
+        'shutdown.mode'
       ]
     },
     {
-      title: t('Return while slow plugin cleanup continues', '慢速插件清理期间先返回'),
+      title: t('Show close progress while a plugin finishes', '插件收尾期间展示关闭进度'),
       problem: t(
-        'A closing screen cannot wait indefinitely for plugin cleanup. bounded uses quiescenceMs before returning a logical result; unfinished work remains observable through physicalCompletion. strict-drain would wait instead.',
-        '页面关闭不能无限等待插件清理。bounded 按 quiescenceMs 等待后返回逻辑结果；未完成工作仍通过 physicalCompletion 可观察。strict-drain 则继续等待。'
+        'A pricing plugin can need more than half a second to release its connection. Use bounded shutdown to show the logical close outcome, then keep waiting for physical completion.',
+        '价格插件释放连接可能需要半秒以上。使用有界关闭先展示逻辑关闭结果，再继续等待物理完成。'
       ),
       example: trayOptionExamples.hostBounded,
       result: t(
-        'Prints false while cleanup waits, then awaits physicalCompletion after releasing the gate.',
-        '清理等待时输出 false，放行后等待 physicalCompletion 完成。'
+        'The page can show incomplete cleanup after its wait budget and still observe final resource release.',
+        '等待预算耗尽后页面可显示清理未完成，并继续观察资源最终释放。'
       ),
-      covers: [
-        'create',
-        'plugins',
-        'mutationAdmissionMs',
-        'quiescenceMs',
-        'shutdown',
-        'shutdown.mode',
-        'report'
-      ]
+      covers: ['quiescenceMs', 'shutdown', 'shutdown.mode']
     }
   ],
   loader: [
     {
-      title: t('Load a local artifact into a host', '把局部制品加载到宿主'),
+      title: t('Install a pricing bundle for this checkout', '为当前结账页安装价格包'),
       problem: t(
-        'Loading needs a source, a loader that owns the artifact, an adapter that creates a compatible plugin, and the receiving host. mutation use adds a definition; timeoutMs is required. signal is cooperative and report receives secondary failures.',
-        '加载需要来源、持有制品的 loader、创建兼容插件的 adapter，以及接收宿主。mutation use 新增定义；timeoutMs 必填。signal 采用合作式取消，report 接收次要失败。'
+        'The application owns an artifact loader and a pricing adapter. Use them together to turn the selected bundle into a plugin, give the load five seconds, and publish its view only after admission commits.',
+        '应用已有制品加载器及价格适配器。把选中的包转换成插件，给加载五秒时间，并在接纳提交后才展示其视图。'
       ),
       example: trayOptionExamples.load,
       result: t(
-        'Prints 42 use 0; the committed generation owns the artifact until host cleanup.',
-        '输出 42 use 0；提交后的代次持有制品，直到宿主清理。'
+        'The checkout page uses the committed pricing generation; its owner retains the loaded artifact.',
+        '结账页使用已提交的价格代次，其所有者保留加载制品。'
       ),
-      covers: ['host', 'source', 'loader', 'adapter', 'mutation', 'timeoutMs', 'signal', 'report']
+      covers: ['host', 'source', 'loader', 'adapter', 'mutation', 'timeoutMs']
     },
     {
-      title: t('Replace a loaded plugin generation', '替换已加载的插件代次'),
+      title: t('Switch checkout to an updated pricing bundle', '切换到更新后的价格包'),
       problem: t(
-        'An updated artifact must replace the same-name definition. mutation replace performs that operation rather than adding a duplicate. timeoutMs false removes the loading deadline; report observes secondary cleanup failure without changing the primary outcome.',
-        '更新后的制品需要替换同名定义。mutation replace 执行替换，避免新增重复定义。timeoutMs false 关闭加载截止期限；report 观察次要清理失败，不改变主结果。'
+        'A new pricing bundle replaces the installed plugin with the same name. The application deliberately owns the wait without a load deadline, while monitoring keeps secondary release failures visible.',
+        '新价格包需要替换已安装的同名插件。应用明确选择不设加载期限，并由监控保留次要释放失败。'
       ),
       example: trayOptionExamples.replace,
       result: t(
-        'Prints 7 replace 1; the prior artifact has been released once.',
-        '输出 7 replace 1；先前制品已释放一次。'
+        'The checkout page receives the updated pricing view after replacement commits.',
+        '替换提交后，结账页取得更新后的价格视图。'
       ),
-      covers: ['host', 'source', 'loader', 'adapter', 'mutation', 'timeoutMs', 'signal', 'report']
+      covers: ['source', 'mutation', 'timeoutMs', 'report']
+    },
+    {
+      title: t('Stop bundle loading with the checkout request', '随结账请求停止包加载'),
+      problem: t(
+        'A checkout request can end while its pricing artifact is loading. Forward the request signal and report secondary cleanup failures, rather than leaving the caller waiting without an outcome.',
+        '价格制品加载期间，结账请求可能结束。转交请求信号并上报次要清理失败，让调用方得到结果。'
+      ),
+      example: trayOptionExamples.loadCancel,
+      result: t(
+        'Successful loading opens the pricing view; cancellation or failure shows unavailable pricing.',
+        '加载成功时打开价格视图，取消或失败时显示价格不可用。'
+      ),
+      covers: ['signal', 'report']
     }
   ],
   runtime: [
     {
-      title: t('Wait for every runtime callback', '等待全部运行器回调'),
+      title: t('Finish price callbacks before releasing their host', '价格回调结束后再释放宿主'),
       problem: t(
-        'A runtime shutdown must wait for callback settlement when released resources are still in use. strict-drain is the default. report receives runtime diagnostics and is absent by default; disposing the runtime never disposes its host.',
-        '运行器关闭时，仍在使用的资源需要等待回调结算。默认 strict-drain 会等待。report 接收运行器诊断，默认没有接收方；释放运行器不会释放宿主。'
+        'Active price callbacks borrow exact plugin generations. Keep strict-drain when their results must settle before the checkout releases its managed host. Runtime disposal alone does not own that host.',
+        '活动价格回调借用确切的插件代次。结账页需要等结果落定后才释放托管宿主时，使用严格排空。运行器本身不拥有该宿主。'
       ),
       example: trayOptionExamples.runtimeStrict,
       result: t(
-        'Prints true, then 42 active; callback work settled and the host remains active.',
-        '输出 true，以及 42 active；回调已结算，宿主仍存活。'
+        'Price callbacks finish before the checkout releases their managed host.',
+        '价格回调结束后，结账页才释放它们使用的托管宿主。'
       ),
       covers: ['shutdown', 'shutdown.mode', 'report']
     },
     {
-      title: t('Close runtime admission before callbacks finish', '在回调结束前关闭运行接纳'),
+      title: t('Stop new prices while existing requests settle', '停止新计价并等待已有请求落定'),
       problem: t(
-        'A runtime may need to return without waiting for callbacks that ignore cancellation. bounded returns a cleanup snapshot immediately. It does not stop those callbacks, which must still settle before the host is released.',
-        '运行器可能需要先返回，而不等待忽略取消的回调。bounded 立即返回清理快照，不会停止这些回调；释放宿主前仍需让它们结算。'
+        'A closing checkout must stop admitting price callbacks immediately, even when existing callbacks ignore cancellation. Bounded disposal returns its snapshot; the application still waits for its tracked requests before releasing the borrowed host.',
+        '结账页关闭时需要立即停止接纳计价回调，即使已有回调忽略取消。有界释放返回快照，应用仍须等待自己跟踪的请求，再释放借用宿主。'
       ),
       example: trayOptionExamples.runtimeBounded,
       result: t(
-        'Prints false, then 42 active after the callback is released.',
-        '先输出 false，放行回调后输出 42 active。'
+        'The page shows pricing stopped while tracked requests settle, then releases the host.',
+        '页面先显示计价已停止，等已跟踪请求落定后再释放宿主。'
       ),
       covers: ['shutdown', 'shutdown.mode', 'report']
     }
