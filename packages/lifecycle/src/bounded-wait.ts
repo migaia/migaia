@@ -14,13 +14,14 @@ import {
 } from './scheduler.js'
 
 /**
- * Waits for one awaitable until an existing absolute deadline, without cancelling it.
+ * Waits for one awaitable until an absolute deadline, without cancelling it; typically used so a
+ * shutdown step waits for work in flight but never hangs on it.
  *
- * Ported from `@migaia/logger`'s `bounded-wait.ts`, generalized off any logger-specific naming.
- * Default behavior is unchanged: it never cancels the task, it always observes the task even when
- * the deadline has already passed, and it always clears its own timer. The deadline clock and timer
- * come from the injected scheduler (default `systemScheduler`), never raw host globals. Cleanup
- * failures reject by default; reportCleanup keeps them diagnostic without replacing the
+ * Resolves `true` when the task settles first and `false` when the deadline comes first (the task
+ * keeps running). `deadlineAt` is a time on the scheduler's clock (`performance.now()` for the
+ * default `systemScheduler`), not `Date.now()`. The task is always observed, even when the deadline
+ * has already passed, so a later rejection is never unhandled, and the timer is always cleared.
+ * Cleanup failures reject by default; `reportCleanup` keeps them diagnostic without replacing the
  * task/deadline winner.
  */
 export const boundedWait = async (

@@ -1,32 +1,141 @@
-# `@migaia/lifecycle`
+# @migaia/lifecycle
 
-运行时中立的**生命周期原语**：作用域所有权、代数（generation）、静默追踪（quiescence）与释放事务。零领域知识——公开 API 里不出现 store / plugin / capability / service / rpc / storage 等词汇，只知道「资源」和「怎么释放资源」。
+[English](./README.en.md)
 
-错误码契约：`docs/contracts/error-codes.md`。
+异步代码最难写对的是“收尾”：谁先关、谁后关；关到一半出错怎么办；旧请求晚到了怎么办；还有请求没处理完，要不要等、等多久。`@migaia/lifecycle` 把这些收尾规则做成一组可以组合的小工具，让关闭、取消和替换在并发情况下依然正确。它不依赖 DOM 或 Node，浏览器、Node、Bun、Deno 和 Worker 里都能用。
 
-## 适用与不适用场景
+## 你可能遇到过
 
-**适用**：需要明确资源所有权、关闭边界、代数失效（用新结果取代旧结果）、静默/排空、或多资源释放事务（含超时降级与错误聚合）的 runtime-neutral 库或运行时宿主。
+- **发布新版本时，进行中的请求被砍断**：容器收到 SIGTERM 后立即退出，正在写数据库的请求返回 502，写了一半的数据丢失。根因是关闭流程没有“先停止接收、再等进行中的工作、最后关连接”这几步。
+- **搜索框显示的是旧结果**：用户输入 “a” 又输入 “ab”，“a” 的慢响应比 “ab” 晚到，把新结果覆盖了。根因是没有判断“这个结果还是不是最新的那次请求”。
+- **切换页面后消息重复、内存上涨**：离开页面时漏掉了一个订阅或计时器，回到页面后同一条消息被处理两次。根因是清理函数散落在各处，靠人记。
+- **初始化到一半失败，留下半个对象**：连上数据库、打开缓存后，第三步失败了，前两个资源没人关。
+- **清理代码自己抛错**：`finally` 里关闭数据库失败，后面的缓存再也没有关闭，最初的错误也被盖掉了。
 
-**不适用**：不要把它当作事件总线、当前值存储/订阅、能力依赖图、拓扑排序/环检测（那些属于 `@migaia/capability/graph`）、业务队列策略，或跨进程传输。`ready`/`blocked` 之类需要依赖关系才能回答的问题，本包刻意不回答。
+## 从这里开始
 
-### 场景怎么选
+下面是一个 Node HTTP 服务的优雅停机。请求处理到一半时开始关闭：服务先停止接收新请求，等进行中的请求完成（最多 5 秒），再关闭数据库连接池。用 Node 24 直接运行。
 
-| 业务问题                                                        | 首选 API                                            | 典型场景                                                      |
-| --------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
-| 一组资源随 owner 统一关闭                                       | `createLifecycleScope`                              | 页面/插件/服务实例拥有 socket、timer、subscription、DB handle |
-| 资源必须在当前 stack 释放                                       | `createSyncLifecycleScope`                          | DOM listener、observer、纯同步 native handle                  |
-| 同步 `dispose()` 启动异步 disposer，另提供 awaitable completion | `createSyncStartedDisposalLedger`                   | Store/registry 的 sync + async 双销毁 API                     |
-| 只接受最新一次异步请求结果                                      | `createGenerationController`                        | 搜索联想、路由加载、刷新覆盖、重连                            |
-| 等所有在途 Promise 真正排空                                     | `createPendingTracker`                              | flush、close、批处理 drain、SSR request completion            |
-| 按 key/object 统计占用并封存                                    | `create*QuiescenceTracker` / `create*LeaseRegistry` | session、channel、cache entry、共享资源引用                   |
-| 构造成功才转交资源，失败自动回滚                                | `createProvisionalScope`                            | 插件安装、模块装配、连接组初始化                              |
-| 多个变更必须 FIFO 串行                                          | `createMutationQueue`                               | config CRUD、拓扑变更、schema/register mutation               |
-| 多资源 graceful→force、deadline、错误聚合                       | `createDisposeTransaction`                          | 服务停机、连接池关闭、插件卸载                                |
-| 真实平台取消信号                                                | `createAbortController`                             | fetch、stream、timer、Worker/RPC operation                    |
-| 可重复、无真实等待的时间测试                                    | `createManualScheduler`（`@migaia/utils/scheduler`） | timeout、deadline、重试和队列 SLA 单测                        |
+```ts doc-test=run
+import { createServer } from 'node:http'
+import { boundedWait } from '@migaia/lifecycle'
+import { createPendingTracker } from '@migaia/lifecycle/quiescence'
+import { createLifecycleScope } from '@migaia/lifecycle/scope'
 
-选择原则：Scope 管“谁拥有资源”；Generation 管“哪个异步结果仍有效”；Pending/Lease 管“还有多少工作”；MutationQueue 管“谁先修改”；DisposeTransaction/Ledger 管“如何结束”。这些轴可以组合，但不要让两个原语同时成为同一状态的 owner。
+const app = createLifecycleScope()
+const inFlight = createPendingTracker()
+
+// 先登记的后释放：数据库连接池最后关闭。
+app.own('db-pool', { force: () => console.log('3. 关闭数据库连接池') })
+
+const server = createServer((request, response) => {
+  // 每个请求都登记为“进行中的工作”，处理需要 200 毫秒。
+  void inFlight.track(
+    new Promise<void>((resolve) =>
+      setTimeout(() => {
+        response.end('订单已保存')
+        resolve()
+      }, 200)
+    )
+  )
+})
+app.own(server, {
+  force: async () => {
+    server.close() // 不再接受新连接
+    console.log('1. 停止接收新请求，等待进行中的请求')
+    const finished = await boundedWait(inFlight.drain(), performance.now() + 5_000)
+    console.log(finished ? '2. 进行中的请求都已完成' : '2. 等待超时，继续关闭')
+    server.closeAllConnections() // 断开剩下的空闲长连接
+  }
+})
+server.listen(0)
+
+// 真实服务里写成：process.once('SIGTERM', () => void app.dispose())
+const { port } = server.address() as { port: number }
+const order = fetch(`http://localhost:${port}/orders`, { method: 'POST' }).then((r) => r.text())
+await new Promise((resolve) => setTimeout(resolve, 50)) // 请求处理到一半时开始停机
+await app.dispose()
+console.log('客户端收到:', await order)
+```
+
+输出：
+
+```text
+1. 停止接收新请求，等待进行中的请求
+2. 进行中的请求都已完成
+3. 关闭数据库连接池
+客户端收到: 订单已保存
+```
+
+`boundedWait` 的截止时间是 `performance.now()` 时间轴上的绝对时刻，不是 `Date.now()`。
+
+下一步：
+
+- 搜索、切换页面时只采用最新结果，看 [USEGUIDE：只采用最新一次请求的结果](./USEGUIDE.md#只采用最新一次请求的结果)。
+- 初始化失败时自动回收，看 [USEGUIDE：初始化失败时回收已经创建的资源](./USEGUIDE.md#初始化失败时回收已经创建的资源)。
+- 清理失败时会发生什么，看 [USEGUIDE：一项清理失败，其余照常释放](./USEGUIDE.md#一项清理失败其余照常释放)。
+
+## 手写时的隐患
+
+很多服务的停机代码是这样的：
+
+```ts doc-test=skip reason="示意手写的停机代码，引用了未定义的服务对象"
+process.on('SIGTERM', async () => {
+  server.close()
+  // 隐患 1：没有等进行中的请求，正在写数据库的请求被直接砍断。
+  await db.end()
+  // 隐患 2：db.end() 抛错时，下面的 cache.quit() 永远不会执行，最初的错误也丢了。
+  await cache.quit()
+  // 隐患 3：任何一步卡住，进程就一直不退出，直到被平台强制结束。
+})
+```
+
+改用作用域后，释放顺序由登记顺序决定，一项失败不影响其余资源，等待有明确的截止时间。新加一个资源时只需要在创建它的地方 `own()` 一次，不用回到停机代码里补一行。
+
+## 它有什么不一样
+
+- **即使某项清理抛错，其余资源也会照常释放。** 失败的原始错误会被加上 `code` 后交给你（多个失败合并成 `AggregateError`），不会被后面的错误盖掉。也可以选择收集成数组（`collect`）或交给日志函数（`report`）。
+- **即使 `dispose()` 被同时调用多次，也只执行一轮释放。** 所有调用拿到同一个 Promise，不会重复关闭同一个连接。
+- **释放顺序默认与登记顺序相反。** 先登记的连接池最后关，后登记的、依赖它的服务先关，依赖关系天然正确；需要时也可以按优先级排序，或先尝试优雅关闭、超时再强制关闭。
+- **旧请求即使晚到，也不会覆盖新结果。** 新请求开始时，旧请求会收到取消信号；旧请求已经拿到的资源可以交给释放函数回收。
+- **等待一定有上限。** `boundedWait` 在截止时间返回，不会因为一个卡住的任务挂住整个关闭流程；它也不会擅自取消那个任务。
+- **初始化失败时自动回收，成功后整体移交。** 半路失败的资源按相反顺序释放；全部成功后一次性交给长期作用域。
+- **可以和原生 `using` 一起用。** 异步作用域支持 `await using`，同步作用域支持 `using`；相比手写 `try/finally`，多了并发安全的释放、错误策略和截止时间。
+
+## 三分钟心智模型
+
+先判断你要回答的是哪个问题，再选对应的工具。它们可以组合，但同一个状态只交给一个工具管理。
+
+| 你要回答的问题 | 工具 |
+| --- | --- |
+| 谁负责释放这些资源？按什么顺序？ | 作用域：`createLifecycleScope`（异步）、`createSyncLifecycleScope`（同步） |
+| 初始化到一半失败了，已经创建的怎么办？ | 临时作用域：`createProvisionalScope` |
+| 这个异步结果还算不算数？ | 请求代次：`createGenerationController` |
+| 还有工作没做完吗？最多等多久？ | `createPendingTracker`、`createQuiescenceTracker`、`boundedWait` |
+| 多个修改谁先谁后？ | 变更队列：`createMutationQueue` |
+| 一组资源怎样先优雅、再强制地关闭？ | 释放事务：`createDisposeTransaction` |
+| 怎样通知操作取消？ | `createAbortController`、`abortableDelay` |
+
+| 名词 | 含义 |
+| --- | --- |
+| scope（作用域） | 负责释放一组资源的对象。用 `own(resource, descriptor)` 登记资源，用 `dispose()` 一起释放。 |
+| descriptor（释放说明） | 说明一个资源怎样释放：`force` 必填；可选 `graceful`（先尝试优雅关闭）、`gracefulTimeoutMs`、`order`。 |
+| `close()` / `dispose()` | `close()` 立即停止接收新资源，不执行任何清理；`dispose()` 真正释放全部资源，返回 Promise。 |
+| generation（代次） | 每次 `begin()` 开始的一次请求。新的一次开始后，旧的那次就“过期”了。 |
+| token | 一次请求的凭证。用 `isCurrent(token)` 判断这次请求是否仍是最新的。 |
+| `deadlineAt` | 截止时刻，使用调度器的时间轴（默认是 `performance.now()`），不是 `Date.now()`。 |
+| 错误策略 | 清理失败时的处理方式：`throw`（默认，全部释放后抛出）、`collect`（作为数组返回）、`report`（交给回调）。 |
+
+## 典型场景
+
+| 场景 | 怎么组合 | 详细说明 |
+| --- | --- | --- |
+| 服务优雅停机 | `createLifecycleScope` + `createPendingTracker` + `boundedWait` | [服务优雅停机](./USEGUIDE.md#服务优雅停机) |
+| 搜索联想、路由切换只显示最新结果 | `createGenerationController` | [只采用最新一次请求的结果](./USEGUIDE.md#只采用最新一次请求的结果) |
+| 离开页面时一起清理连接、订阅和计时器 | `createLifecycleScope` | [离开页面时一起清理](./USEGUIDE.md#离开页面时一起清理) |
+| 插件安装、模块初始化失败时回收 | `createProvisionalScope` | [初始化失败时回收已经创建的资源](./USEGUIDE.md#初始化失败时回收已经创建的资源) |
+| 自动保存不乱序 | `createMutationQueue` | [按提交顺序保存](./USEGUIDE.md#按提交顺序保存) |
+| 清理失败时保留原始错误 | 错误策略 | [一项清理失败，其余照常释放](./USEGUIDE.md#一项清理失败其余照常释放) |
 
 ## 安装
 
@@ -34,619 +143,17 @@
 pnpm add @migaia/lifecycle
 ```
 
-唯一依赖是同层的 `@migaia/utils`（时间/错误原语）；不引入 DOM、Node 或任何领域包类型。
-
-## 目录
-
-- [作用域与释放](#作用域与释放模块)：`createLifecycleScope`、`createSyncLifecycleScope`、`executeReleaseDescriptor`、`createDisposeTransaction`、`createSyncStartedDisposalLedger`
-- [单元与代数](#单元与代数模块)：`createGenerationController`
-- [静默追踪与租约](#静默追踪与租约模块)：`createQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`
-- [事务性所有权](#事务性所有权模块)：`createProvisionalScope`
-- [变更队列](#变更队列模块)：`createMutationQueue`
-- [调度器、中止与有界等待](#调度器中止与有界等待模块)：`snapshotScheduler`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`
-- [错误基础设施](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`
-- [状态常量](#状态常量模块)：`LifecycleState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`
-- [按需导入与 tree-shaking](#按需导入与-tree-shaking)
-- [高阶组合示例](#高阶组合示例)
-- [构建门禁](#构建门禁)
-
-完整签名、边界行为与错误码，见 [USEGUIDE.md](./USEGUIDE.md)。
-
----
-
-<a id="作用域与释放模块"></a>
-
-## 作用域与释放模块
-
-```ts
-import {
-  createLifecycleScope,
-  createSyncLifecycleScope,
-  executeReleaseDescriptor,
-  createDisposeTransaction,
-  type IDisposerContext,
-  type IReleaseDescriptor,
-  type IReleaseContext
-} from '@migaia/lifecycle'
-```
-
-两条正交轴：容器存活轴（`open → closing → terminal`，由 `close()`/`dispose()` 驱动）与资源释放本身。`close()` 永远同步、幂等、不调用用户代码；`dispose()` 永远异步（唯一形态，不提供同步版本）。
-
-**`createLifecycleScope`｜10 秒上手** —— 通用异步所有权容器：
-
-```ts
-const scope = createLifecycleScope()
-const connection = scope.own(
-  { close: () => undefined },
-  {
-    force: (ctx) => connection.close()
-  }
-)
-scope.close() // 同步、幂等，之后 own() 抛 SCOPE_CLOSED
-const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败即抛
-```
-
-全部选项（`ILifecycleScopeOptions`）：
-
-- `errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'` —— 默认 `'throw'`
-- `report?: (error: unknown) => void` —— `report`/`firstError` 策略下的诊断通道；reporter 自身的 throw/rejection 交 utils 共享宿主异常队列
-- `deadlineAt?: number` —— 本次 `dispose()` 内所有资源共享的绝对释放截止时间
-- `scheduler?: IScheduler` —— 默认 `systemScheduler`；决定 `deadlineAt`/`gracefulTimeoutMs` 的时间域
-
-`own(resource, descriptor)` 返回原 resource。factory 返回的 scope 提供：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。提供 `[Symbol.asyncDispose]()`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。
-
-**`createSyncLifecycleScope`｜10 秒上手** —— 纯同步容器，`dispose()` 不返回 Promise：
-
-```ts
-const scope = createSyncLifecycleScope()
-scope.own(node, { syncSafe: true, force: () => node.detach() })
-scope.close()
-const failures = scope.dispose() // 同步返回，不可能有异步资源
-```
-
-全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。**约束**：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。提供 `[Symbol.dispose]()`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。
-
-**`IReleaseDescriptor`｜10 秒上手** —— 领域表达释放意图的唯一词汇（类型，非函数，随 `own()` 一起使用）：
-
-```ts
-scope.own(handle, {
-  syncSafe: false,
-  order: 10, // 大的先释放；只在 order 模式事务里生效
-  graceful: (ctx) => flush(), // 优雅释放；异步超时只放弃等待，仍会跑 force；同步返回即算成功
-  gracefulTimeoutMs: 200,
-  force: (ctx) => handle.close(), // 必填，必须无条件完成
-  gcFallback: true // 遗忘整个异步 scope 后的尽力 GC 兜底；显式释放会 unregister
-})
-```
-
-全部字段：`force: (context: IReleaseContext) => void | PromiseLike<void>`（**必填**）；`syncSafe?: boolean`；`order?: number`（缺省按 `0`）；`graceful?: (context) => void | PromiseLike<void>`；`gracefulTimeoutMs?: number`；`gcFallback?: boolean`；`custom?: (context) => void | PromiseLike<void>`（逃生舱，设置后完全接管释放，`graceful`/`force` 被忽略）。回调收到的 `IReleaseContext`：`signal`（容器进入 closing 时中止）、`deadlineAt`、`scheduler?`、`report(error)`，以及由 `LifecycleScope` 提供的 `disposer.join()`。`disposer.join()` 是当前 owner-disposal 的显式 self-join guard：无论同步调用或 await/microtask/timer/nested helper 后调用，都会立即抛 `SCOPE_REENTRANT_DISPOSE`；它不返回 Promise。通用 `createDisposeTransaction()` 没有 scope owner 时不提供 `disposer`。
-
-**`executeReleaseDescriptor`｜5 秒上手** —— 独立运行单个 descriptor 的完整降级链（`custom` → 否则 `graceful` 带超时 → `force`），不经过完整事务，常用于测试或自定义编排：
-
-```ts
-const errors = await executeReleaseDescriptor(descriptor, {
-  signal: controller.signal,
-  deadlineAt: undefined,
-  report: (e) => console.error(e)
-})
-```
-
-参数：`descriptor: IReleaseDescriptor`（必填）、`context: IReleaseContext`（必填，无可选项——直接构造完整 context 对象）。descriptor 执行及准入失败进入返回的错误数组（成功为空数组）；context getter 或非法 deadline 等 context 准入失败会使 Promise reject。
-
-**`createDisposeTransaction`｜10 秒上手** —— 编排多个资源的释放，`order` 弱排序或 `plan` 强序列二选一：
-
-```ts
-const transaction = createDisposeTransaction(
-  { kind: 'plan' },
-  { errorPolicy: 'collect', signal: controller.signal }
-)
-const failures = await transaction.run([
-  { source: 'db', descriptor: dbDescriptor },
-  { source: 'socket', descriptor: socketDescriptor }
-])
-```
-
-第一参数 `mode`（必填）：`{ kind: 'order' }`（按 `descriptor.order` 降序分组，稳定排序保留同序调用方给定的相对顺序；只读 order 模式的 items）或 `{ kind: 'plan' }`（严格按 `items` 给定顺序执行，从不读取 `order`）——同一事务不能混用。
-
-全部选项（`IDisposeTransactionOptions`）：
-
-- `errorPolicy?` —— 默认 `'throw'`
-- `report?: (error: unknown) => void`
-- `deadlineAt?: number` —— 本次 `run()` 内所有 item 共享的绝对截止时间
-- `scheduler?: IScheduler` —— 默认 `systemScheduler`
-- `signal?: IAbortSignal` —— 转发进每个 item 的 `context.signal`；`run()` 开始时自动镜像中止状态
-- `pending?: { drain(): Promise<void> }` —— 全部 item 释放完后仅一次等待其触发的在途工作排空（通常传 `createPendingTracker()`）
-
-**`createSyncStartedDisposalLedger`｜10 秒上手** —— 为同步 `dispose()` 启动的异步 disposer 提供唯一 pending/error/completion 账本：
-
-```ts
-import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
-
-const ledger = createSyncStartedDisposalLedger()
-ledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行
-ledger.start('cache', () => cache.flush())
-
-const outcome = ledger.seal() // open → closing；之后不再接受 start()
-if (outcome.cleanupErrors.length > 0) {
-  // 领域层决定 throw、report、firstError 或 AggregateError 投影。
-}
-const { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])
-await ledger.whenTerminal()
-```
-
-Ledger 不决定 disposer 顺序、不拥有领域资源、也不制造领域错误。`start()` 捕获 callback 同步失败与 hostile then getter；thenable 只读一次并保持 receiver。`seal()`/`physicalCompletion` identity 稳定；pending 全部 settle 后才进入 `terminal`。永不 settle 的合法 thenable 会让 ledger 保持 `closing`，本原语不自造 timeout 或 cancellation。
-
----
-
-<a id="单元与代数模块"></a>
-
-## 单元与代数模块
-
-```ts
-import { createGenerationController } from '@migaia/lifecycle'
-```
-
-**`createGenerationController`｜10 秒上手** —— 代数 + 每代一个 `AbortSignal`，新一代自动使旧一代失效：
-
-```ts
-const shutdown = new AbortController()
-const generations = createGenerationController({ parentSignal: shutdown.signal })
-const request = generations.begin({ timeoutMs: 5000 }) // 超过 5s 自动 abort 当前代
-const result = await fetchWithSignal(request.signal)
-if (generations.adopt(request.token, result, (v) => v.close())) {
-  use(result) // 仍是当前代，安全采用
-} // 否则内部已调用 release() 回收 result，返回 false
-```
-
-全部选项（`IGenerationControllerOptions`）：
-
-- `parentSignal?: IAbortSignal` —— 该信号中止时，当前活跃代同步中止
-- `onSuperseded?: (info: ILifecycleError) => void` —— `adopt()` 发现 token 已过期时的诊断钩子（`GENERATION_SUPERSEDED`），不是失败信号
-- `scheduler?: IScheduler` —— 默认 `systemScheduler`；驱动 `begin({ timeoutMs })` 的计时
-
-返回方法：`generation`（只读当前代号）、`disposed`（只读）、`begin(options?)` → `{ generation, token, signal }`（`options.timeoutMs?: number`，超时/父中止/新 `begin()` 都会使这个 token 的 `signal` 中止）、`isCurrent(token)`、`complete(token)`（仅匹配当前代时返回 true，作废 token 并释放 timer/parent listener，不中止其 signal；旧 token/已 dispose 返回 false）、`supersede(reason?)`（作废当前代但控制器仍可用）、`adopt(token, value, release, onReleaseError?)`、`dispose(reason?)`（终态，之后 `begin()` 抛 `GENERATION_DISPOSED`）。
-
----
-
-<a id="静默追踪与租约模块"></a>
-
-## 静默追踪与租约模块
-
-```ts
-import {
-  createQuiescenceTracker,
-  createStringLeaseRegistry,
-  createObjectLeaseRegistry,
-  createPendingTracker
-} from '@migaia/lifecycle'
-```
-
-**`createQuiescenceTracker` / `createStringLeaseRegistry`｜10 秒上手** —— 按 key 计数的租约追踪，`WeakMap`（对象键，自动 GC）或 `Map`（字符串键，归零后自动清理未 seal 的条目）：
-
-```ts
-const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()
-const release = tracker.retain(key)
-tracker.count(key) // 1
-tracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED
-release()
-await tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT
-```
-
-两者均无构造参数。返回方法：`retain(key)` → 返回释放函数 `IDisposer`（重复调用幂等）；`count(key)`；`whenZero(key)`（严格独占等待，**必须先 `seal(key)`**，否则同步抛错，不是 rejected Promise）；`whenZeroOnce(key)`（非独占，不要求 seal，随时可等待下一次归零）；`seal(key)`（幂等）；`isSealed(key)`。
-
-**`createObjectLeaseRegistry` / `createStringLeaseRegistry`｜3 秒上手** —— 与上面完全同一引擎的别名，供领域友好命名的调用点使用：
-
-```ts
-const leases = createObjectLeaseRegistry<object>() // 内部就是 createQuiescenceTracker()
-```
-
-无构造参数；`ILeaseRegistry<TKey>` 类型等价于 `IQuiescenceTracker<TKey>`。
-
-**`createPendingTracker`｜5 秒上手** —— 只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise：
-
-```ts
-const pending = createPendingTracker()
-pending.track(doWork()) // 原样返回传入的 promise
-await pending.drain() // 等到 size 归零；排空期间新增的 track() 不会被漏计（内部循环 whenZeroOnce）
-pending.size // 当前在途数量
-```
-
-无构造参数。`track(promise)` 结算后自动释放内部租约，无论 resolve 还是 reject；`drain()` 永不抛出（内部忽略释放函数自身的异常，release 本身也不会抛）。
-
----
-
-<a id="事务性所有权模块"></a>
-
-## 事务性所有权模块
-
-```ts
-import { createProvisionalScope, type ILifecycleOwner } from '@migaia/lifecycle'
-```
-
-**`createProvisionalScope`｜10 秒上手** —— 构造期两阶段所有权：资源先暂存这里，最终要么 `commitTo(parent)` 转移给真正的 owner，要么 `rollback()` 释放，二选一、只能选一次：
-
-```ts
-const provisional = createProvisionalScope()
-const db = provisional.own(await connect(), { force: (ctx) => db.close() })
-try {
-  await provisional.commitTo(outerScope) // 按注册顺序逐个 own() 到 parent
-} catch (error) {
-  // parent 中途拒绝（如已在 closing）：已转移部分留在 parent 名下，剩余部分已被自动释放并 await 完成
-}
-```
-
-全部选项（`IProvisionalScopeOptions`）：`parentSignal?: IAbortSignal` —— 转发到 `provisional.signal`，令其也随父信号中止。
-
-返回方法：`signal`（只读）、`own(resource, descriptor)`、`commitTo(parent: ILifecycleOwner)`（逐个转移；某项失败时，已转移的留给 parent，未转移的由本作用域逆序释放并 **await** 完成后才重新抛出原错误；若失败原因是 parent 已 `closing`/`terminal`，额外包一层 `PROVISIONAL_PARENT_CLOSED`，原错误仍在 `cause`）、`rollback()`（逆序释放全部已注册资源，单错保留附码原生实例，primitive 通过 cause 包装；多错聚合为 `AggregateError`，幂等——并发/重复调用复用同一个 settle Promise）。重复 rollback 复用首次 Promise，包括其 rejection；成功 commit 后 rollback、重复 commit 或 rollback 后 commit 才以 `PROVISIONAL_SETTLED` 拒绝。
-
----
-
-<a id="变更队列模块"></a>
-
-## 变更队列模块
-
-```ts
-import { createMutationQueue } from '@migaia/lifecycle'
-```
-
-**`createMutationQueue`｜10 秒上手** —— 严格 FIFO 串行队列，无并发池，带可选的入队 SLA 看门狗：
-
-```ts
-const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5000 })
-const result = await queue.enqueue(() => applyMutation(), { owner: 'sync-loop' })
-queue.size // 排队中 + 正在执行的任务数
-```
-
-全部选项（`IMutationQueueOptions`）：
-
-- `queueAdmissionTimeoutMs?: number | false` —— 默认 `undefined`（只诊断、从不因排队超时而拒绝）；数字表示任务排队超过这个时长即被移出队列并以 `QUEUE_ADMISSION_TIMEOUT` reject；`false` 连诊断计时器也不开
-- `admissionDiagnosticMs?: number | false` —— 默认 `1000`；仅在 `queueAdmissionTimeoutMs` 为 `undefined` 时生效的诊断阈值，`false` 关闭诊断计时器
-- `onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void`
-- `scheduler?: IScheduler` —— 默认 `systemScheduler`
-
-`enqueue(task, options?)` 的 `options`（`IEnqueueOptions`）：`owner?: string`（用于自依赖检测——同一 owner 在自己正在运行时又提交新任务会立即以 `QUEUE_SELF_DEPENDENCY` reject，因为 FIFO 队列不可能在当前任务完成前跑新任务）、`queueAdmissionTimeoutMs?: number | false`（覆盖本次任务的队列默认值）。`size` 只读，等于排队数加运行中的 0/1。
-
----
-
-<a id="调度器中止与有界等待模块"></a>
-
-## 调度器、中止与有界等待模块
-
-```ts
-import {
-  snapshotScheduler,
-  createAbortController,
-  boundedWait,
-  createTerminalController
-} from '@migaia/lifecycle'
-import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler';
-import { createManualScheduler } from '@migaia/utils/testing';
-```
-
-调度器契约 `IScheduler`、默认实现 `systemScheduler` 与测试用 `createManualScheduler` 由 `@migaia/utils/scheduler` 提供（`now()` 为单调时钟，详见 utils 文档）；本包不再导出它们，只保留注入准入：lifecycle 工厂收到的 scheduler（含缺省时的 `systemScheduler`）都先经 `snapshotScheduler` 快照，非法延迟以 lifecycle `INVALID_OPTION` 拒绝。
-
-**`snapshotScheduler`｜5 秒上手** —— 把任意 duck-typed 值快照成标准 `IScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取；任务的 `cancel`/`unref` 按此顺序各读一次，函数 `unref` 以原任务为接收者转发，非函数 `unref` 在回滚已启动的注入 timer 后以 `INVALID_OPTION` 拒绝）：
-
-```ts
-const snap = snapshotScheduler(candidate) // 缺少必要方法时返回 undefined；getter 或已提供的 defer 无效时抛出带码错误
-```
-
-单参数 `value: unknown`，无选项；`now`/`schedule` 都不是函数时返回 `undefined`；读取 `now`/`schedule` 属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。
-
-**`createAbortController`｜5 秒上手** —— 委托当前宿主的原生 `AbortController`，返回真实 host instance：
-
-```ts
-const controller = createAbortController()
-controller.signal.addEventListener('abort', () => console.log('aborted'))
-controller.abort('reason')
-```
-
-无构造参数。`abort(reason?)` 保持宿主 native brand、reason 与 listener dispatch 语义；宿主能力缺失时抛出带 `ENV_UNSUPPORTED` 的 lifecycle error。
-
-这是 V2 breaking change：`abort()` 或 `abort(undefined)` 的 reason 是宿主 `DOMException`/`AbortError`，不再是 `undefined`；non-`undefined` reason 保持对象 identity。外部 listener 抛错走宿主 EventTarget 错误通道，**不会**从 `controller.abort()` 同步抛出 lifecycle `ABORT_LISTENER_FAILED`。Lifecycle 自己登记的 parent/cancellation callback 由内部 observed-subscription 边界捕获并交给对应 operation 的 collect/report 通道，不会拦截同一 signal 上的外部 listener。
-
-**`boundedWait`｜5 秒上手** —— 等到绝对截止时间为止，**从不取消**被等待的任务：
-
-```ts
-const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）
-```
-
-参数：`task: PromiseLike<unknown>`（必填）、`deadlineAt: number`（必填，绝对时刻）、第三参数选项 `{ scheduler?: IScheduler; reportCleanup?: (error: unknown) => void }`（默认 `systemScheduler`）。无论超时与否都会挂一个 `.catch()` 观察 `task`，避免它日后 reject 变成未处理拒绝；`deadlineAt` 已经过去时立即返回 `false`（仍会先观察 `task`）。
-
-**`createTerminalController`｜5 秒上手** —— 独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope` 内部都基于它：
-
-```ts
-const terminal = createTerminalController()
-terminal.close() // open → closing，幂等
-terminal.forceTerminal() // 直接进 terminal，resolve whenTerminal()
-await terminal.whenTerminal()
-```
-
-无构造参数。`lifecycle`（只读，`'open' | 'closing' | 'terminal'`）、`close()`（同步幂等，只在 `open` 时生效）、`forceTerminal()`（同步幂等，直接到 `terminal`）、`whenTerminal()`（返回同一个 Promise，只在到达 `terminal` 时 resolve 一次）。
-
----
-
-## 按需导入与 tree-shaking
-
-根入口保持兼容；需要控制 retained graph 时使用稳定 leaf：
-
-```ts
-import {
-  createAbortController,
-  observeAbortSubscription,
-  type IObservedAbortFailureSink,
-  type IObservedAbortSubscription
-} from '@migaia/lifecycle/abort'
-import { snapshotScheduler } from '@migaia/lifecycle/scheduler'
-import { createPendingTracker } from '@migaia/lifecycle/quiescence'
-import { createLifecycleScope } from '@migaia/lifecycle/scope'
-import { createGenerationController } from '@migaia/lifecycle/generation'
-import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
-import { probeThenable } from '@migaia/utils/function'
-```
-
-`/abort` 还公开 canonical hostile-signal-safe `observeAbortSubscription` 及其 `I`-prefixed handle/sink types；Resource 等消费者应静态从该 leaf 委托 signal registration，不复制 registration ledger。可用 subpath：`/abort`、`/scheduler`、`/quiescence`、`/scope`、`/generation`、`/disposal`、`/errors`。Root 和 subpath 都 re-export 同一 preserve-modules 实现，同名 runtime export 保持 `===`；包不开放 `dist/*` wildcard。`sideEffects: false` 表示未导入 leaf 可被 bundler 删除；Node/Bun 直接 ESM import 本身不执行 tree-shaking，体积验收应看 bundler retained modules，而不是只看 gzip 总字节。
-
----
-
-<a id="错误基础设施模块"></a>
-
-## 错误基础设施模块
-
-```ts
-import {
-  LIFECYCLE_SOURCE,
-  containAsyncRejection,
-  createErrorCollector,
-  LifecycleErrorCode,
-  LifecycleErrorText
-} from '@migaia/lifecycle'
-import { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'
-```
-
-**`LIFECYCLE_SOURCE`｜3 秒上手** —— 本包所有错误的 `source` 字段固定值：
-
-```ts
-LIFECYCLE_SOURCE // '@migaia/lifecycle'
-```
-
-字符串常量，无调用。
-
-错误构造与身份附加由包内部维护；业务包应使用自身 source/code owner 构造错误。
-
-**`containAsyncRejection`｜5 秒上手** —— 保护性地探测某个返回值是否是 thenable，是则观察其 rejection 而不让其变成未处理拒绝：
-
-```ts
-containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))
-```
-
-参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。
-
-以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。
-
-**`probeThenable`｜5 秒上手** —— 只读一次 `value.then`，返回判别结果（不是布尔值，是否 thenable/是否 getter 抛错都会区分）：
-
-```ts
-const probe = probeThenable(result)
-if (probe.kind === 'thenable') {
-  /* probe.thenFn 已捕获，可安全 apply 一次 */
-}
-```
-
-单参数 `value: unknown`，无选项。三种结果：`{ kind: 'not-thenable' }`、`{ kind: 'thenable', thenFn }`、`{ kind: 'failed', error }`（读 `.then` 本身抛错）。
-
-**`assimilateCapturedThen`｜5 秒上手** —— 把 `probeThenable` 捕获到的 `thenFn` 安全地 apply 成一个真正的 `Promise`，且只调用一次：
-
-```ts
-const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue)
-```
-
-参数：`thenFn`（必填，来自 `probeThenable` 的 `thenFn`）、`thenable: unknown`（必填，作为 `this` receiver 传给 `thenFn`）。无可选项。
-
-**`createErrorCollector`｜10 秒上手** —— 按四种错误策略收集/上报错误，`createDisposeTransaction`/`createSyncLifecycleScope` 内部都用它：
-
-```ts
-const collector = createErrorCollector('collect', undefined)
-collector.add('item-1', error)
-const collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]
-```
-
-参数：`policy: 'throw' | 'collect' | 'report' | 'firstError'`（必填）、`report: ((error: unknown) => void) | undefined`（必填，`throw`/`collect` 可显式传 `undefined`；`report`/`firstError` 必须提供函数，否则创建时抛 `INVALID_OPTION`）。`add(source, error)` 按策略即时处理（`report` 策略立即调用 `report`）；`finalize(message)`：`collect` 返回收集到的数组，`report` 返回空数组（已在 `add` 时上报），`throw` 单错保留原生实例并给未分类错误附 `SCOPE_DISPOSAL_FAILED`，primitive 通过 cause 包装；已有合法外部身份不变。多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`，`firstError` 有错误时抛首个（其余经 `report` 观测），否则返回空数组。
-
-**`LifecycleErrorCode`｜10 秒上手** —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`：
-
-```ts
-if (error.code === LifecycleErrorCode.scopeClosed) {
-  /* ... */
-}
-```
-
-全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 [USEGUIDE.md](./USEGUIDE.md#错误码)。
-
-**`LifecycleErrorText`｜3 秒上手** —— 稳定诊断消息表（本包内部错误信息的唯一声明处，公开是为了让调用方按文本断言/比对）：
-
-```ts
-error.message === LifecycleErrorText.disposeTransactionFailed
-```
-
-全部 49 个键：`delayFailed`、`waitCleanupReporterInvalid`、`provisionalCleanupFailed`、`disposeTransactionFailed`、`scopeReentrantDispose`、`disposeDescriptorInvalid`、`cleanupResultInvalid`、`syncGracefulOverBudget`、`mutationAdmissionTimedOut`、`generationCancellationFailed`、`disposalLedgerClosed`、`disposalLedgerReentrant`、`envUnsupported`、`abortSignalInvalid`、`schedulerTaskCancelGetterFailed`、`schedulerTaskInvalid`、`schedulerAccessorFailed`、`schedulerDeferInvalid`、`schedulerInvalid`、`schedulerNumberType`、`schedulerNumberRange`、`schedulerDelayRange`、`schedulerTimeOverflow`、`errorPolicyReporterMissing`、`generationSupersededReason`、`generationTimedOutReason`、`unitDisposedReason`、`scopeClosedReason`、`provisionalRolledBackReason`、`provisionalCommittedReason`、`quiescenceSealed`、`quiescenceUnsealedWait`、`provisionalSettled`、`provisionalParentClosed`、`unitStartFailed`、`unitTerminal`、`unitClosing`、`generationDisposed`、`generationSupersededBeforeAdopt`、`sharedDeadlinePassed`、`releaseForceFailed`、`syncCallbackReturnedThenable`、`scopeTerminal`、`scopeClosing`、`scopeReentrantOwn`、`syncScopeRequiresSyncSafe`、`syncScopeOwnsAsyncOwner`、`syncScopeDisposalFailed`、`generationTimeoutAccessorFailed`。每个键的稳定文本和语义见 `src/error-text.ts`。
-
----
-
-<a id="状态常量模块"></a>
-
-## 状态常量模块
-
-```ts
-import {
-  LifecycleState,
-  LifecycleErrorPolicy,
-  DisposeTransactionKind
-} from '@migaia/lifecycle'
-import { ThenableProbeKind } from '@migaia/utils/function'
-```
-
-均为纯常量对象（`as const`），无调用参数，用于替代裸字符串字面量做比较/`switch`。
-
-**`LifecycleState`｜3 秒上手** —— 容器存活轴：`{ open: 'open', closing: 'closing', terminal: 'terminal' }`。
-
-**`LifecycleErrorPolicy`｜3 秒上手** —— 释放错误策略：`{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`；`firstError` 不是通用默认值，只为兼容 `web-rpc` discovery-registry 的迁移语义存在。
-
-`ThenableProbeKind` 由 `@migaia/utils/function` 提供，取值为 `notThenable`、`thenable`、`failed`；lifecycle 不再提供平行常量或 `promise` 变体。
-
-**`DisposeTransactionKind`｜3 秒上手** —— `createDisposeTransaction` 的模式：`{ order: 'order', plan: 'plan' }`。
-
----
-
-<a id="高阶组合示例"></a>
-
-## 高阶组合示例
-
-### 1. 作用域 + 代数：请求场景下取代过期结果
-
-```ts
-import { createLifecycleScope, createGenerationController } from '@migaia/lifecycle'
-
-const scope = createLifecycleScope({ errorPolicy: 'collect' })
-const generations = createGenerationController()
-
-async function loadUser(id: string) {
-  const request = generations.begin({ timeoutMs: 5000 })
-  const user = await fetchUser(id, { signal: request.signal })
-  if (!generations.adopt(request.token, user, (u) => u.dispose?.())) return // 已过期，静默丢弃
-  scope.own(user, { force: () => user.dispose?.() })
-}
-```
-
-### 2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope
-
-```ts
-import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
-import { attachSecondaryErrors } from '@migaia/utils/error'
-
-const rootScope = createLifecycleScope()
-
-async function setupModule() {
-  const provisional = createProvisionalScope()
-  try {
-    const db = provisional.own(await connectDb(), { force: (ctx) => closeDb(db) })
-    const cache = provisional.own(await connectCache(), { force: (ctx) => closeCache(cache) })
-    await provisional.commitTo(rootScope) // 全部转移给 rootScope，之后随 rootScope.dispose() 释放
-  } catch (error) {
-    try {
-      await provisional.rollback() // 完成补偿后仍保留 setup 的 primary
-    } catch (cleanupError) {
-      throw attachSecondaryErrors(error, [cleanupError])
-    }
-    throw error
-  }
-}
-```
-
-### 3. 静默追踪 + 变更队列：确保排空后才提交下一批变更
-
-```ts
-import { createPendingTracker, createMutationQueue } from '@migaia/lifecycle'
-
-const pending = createPendingTracker()
-const queue = createMutationQueue({ queueAdmissionTimeoutMs: 3000 })
-
-async function applyBatch(mutations: Array<() => Promise<void>>) {
-  for (const mutation of mutations) {
-    pending.track(queue.enqueue(mutation, { owner: 'batch' }))
-  }
-  await pending.drain() // 等到本批（含批内动态追加的）全部落地
-}
-```
-
-### 4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭
-
-```ts
-import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/testing';
-
-const scheduler = createManualScheduler()
-const items: IDisposeItem[] = [
-  {
-    source: 'socket',
-    descriptor: {
-      order: 10,
-      graceful: (ctx) => flushSocket(),
-      gracefulTimeoutMs: 100,
-      force: () => forceCloseSocket()
-    }
-  },
-  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }
-]
-const transaction = createDisposeTransaction(
-  { kind: 'order' },
-  { errorPolicy: 'collect', scheduler }
-)
-const runPromise = transaction.run(items)
-scheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force
-const failures = await runPromise
-```
-
-### 5. 同步作用域：可暴露 `using` 语法的纯同步资源
-
-```ts
-import { createSyncLifecycleScope } from '@migaia/lifecycle'
-
-function withListeners() {
-  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放
-  const handler = () => console.log('tick')
-  window.addEventListener('tick', handler)
-  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })
-}
-```
-
----
-
-<a id="构建门禁"></a>
-
-## 构建门禁
-
-```bash
-pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
-```
-
-验收用例位于 `test/` 目录。
-
-## 可中止的相对延时
-
-`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。
-`scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。
-返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。
-监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。
-任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。
-
-```ts
-import { abortableDelay, createAbortController } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/testing';
-
-const scheduler = createManualScheduler()
-const controller = createAbortController()
-const waiting = abortableDelay(scheduler, 250, controller.signal)
-controller.abort()
-console.log(await waiting) // false；没有遗留 timer
-```
-
-清理失败默认使 wait 拒绝；提供 `reportCleanup(error)` 后，清理失败走该观察渠道，不替换已完成或已取消的结果。
-注册或调度失败仍拒绝，`DELAY_FAILED` 保留 native Error 的身份与 stack，不能附加身份时用 cause 保留原值。
-无效时长或 cleanup reporter 在接纳前以 `INVALID_OPTION` 拒绝。
-
-`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。
-它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。
-批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。
-
-### Scope 入口边界
-
-`@migaia/lifecycle/scope` 是异步 `createLifecycleScope` 的窄入口；同步与 provisional scope 从 root 导入 `createSyncLifecycleScope` / `createProvisionalScope`。包不提供第二套 scope 实现。generation/quiescence 子路径直接映射各自 canonical owner，未构建的同名 barrel 已删除。
-
-### 已收回内部的辅助 API
-
-`createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。
-
-Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 交 utils 共享宿主异常队列；省略时这些诊断不外发。
-
-Scheduler admission also captures the optional `defer` method once and retains its original receiver. Existing two-method clocks remain usable. A new optional-method getter failure or non-callable defer is rejected with lifecycle INVALID_OPTION before resource work starts. Strict proxies must permit this known property; returned snapshots expose the captured capability when present.
+唯一依赖是 `@migaia/utils`。
+
+## 常用 API
+
+| API | 作用 |
+| --- | --- |
+| `createLifecycleScope()` | 登记一组资源，`dispose()` 时按相反顺序一起释放。 |
+| `createGenerationController()` | 为每次请求发放凭证，只采用最新一次请求的结果。 |
+| `createPendingTracker()` + `boundedWait()` | 登记进行中的工作，并在截止时间前等它们完成。 |
+| `createProvisionalScope()` | 初始化成功才把资源交给长期作用域，失败就回收。 |
+| `createMutationQueue()` | 让修改按提交顺序一个接一个执行。 |
+| `createDisposeTransaction()` | 按顺序关闭一组资源：先优雅关闭，超时再强制关闭。 |
+
+每个 API 的完整签名、选项、边界行为和错误码见 [USEGUIDE.md](./USEGUIDE.md)。

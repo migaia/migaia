@@ -54,11 +54,13 @@ type IMutationRecord = {
 }
 
 /**
- * Serial FIFO queue, ported off `plugin-host`'s `#mutationQueue`/`#armQueueWatchdog` (already
- * verified as: strict FIFO, watchdog disarmed the instant a task settles, and — contrary to an
- * earlier reading of that code — no owner-aware self-dependency detection at all). This module adds
- * that detection as new behavior, plus makes the admission timeout a caller-supplied configuration
- * instead of a hardcoded domain SLA.
+ * Creates a first-in-first-out queue that runs one task at a time, so changes such as saves or
+ * configuration updates land in submission order even when an earlier one is slower.
+ *
+ * `enqueue()` resolves or rejects with the task's own result. An optional admission timeout rejects
+ * a task that waited too long with `QUEUE_ADMISSION_TIMEOUT`; the watchdog disarms the moment a
+ * task starts. Passing `{ owner }` makes a running owner that submits to the same queue fail at
+ * once with `QUEUE_SELF_DEPENDENCY` instead of deadlocking.
  */
 export function createMutationQueue(options: IMutationQueueOptions = {}): IMutationQueue {
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
