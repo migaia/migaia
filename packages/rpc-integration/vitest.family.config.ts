@@ -21,7 +21,9 @@ const excluded = [
   'test/process/conformance*.test.ts',
   'test/bridge/conformance-faults.test.ts',
   'test/bridge/conformance-faults.test.ts',
-  'test/merge/suite-parity.test.ts'
+  'test/merge/suite-parity.test.ts',
+  // Browser specs run under Playwright through each owner's test:e2e, never under Vitest.
+  '../*/test/e2e/**'
 ]
 
 /** A single family gate makes moving a test between owners neutral to Source coverage. */
