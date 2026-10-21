@@ -4645,428 +4645,502 @@ symbols.createStringFramer = {
     '创建有序有界的字符串分帧器，`frame(value, context)` 返回整字符串或有序 `rpc.frame.v1` 分片；`context.source` 为调用方拥有的来源命名空间，`context.messageId` 为发送方关联标识，两者均不认证对端。\n\n`accept(frame, context)` 返回 `pending`、携带重组字符串的 `complete`，或携带带码错误的 `rejected`，按两个上下文字段共同隔离；`close()` 清理保留组装与计时器，并使之后的接收拒绝，不会发送网络消息。'
   )
 }
-/** Public option examples are executed against built package entries. */
+/** Application examples keep protocol I/O and service ownership with the caller. */
 const rpcOptionExamples = {
-  warningKeys: `import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'
-
-const warnings: string[] = []
-const warner = createRpcUnknownFieldWarner({
-  maxKeysPerConnection: 1,
-  warn: (_connection, fieldKey) => { warnings.push(fieldKey) }
-})
-warner.note('a', 'request', '/items/0', 'extra')
-warner.note('a', 'request', '/items/1', 'extra')
-warner.note('a', 'request', '/items/1', 'later')
-console.log(warnings.length, warnings[1])
-warner.clear()`,
-  warningConnections: `import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'
-
-const warnings: string[] = []
-const warner = createRpcUnknownFieldWarner({
-  maxConnections: 1,
-  warn: (connection) => { warnings.push(connection) }
-})
-warner.note('a', 'request', '', 'extra')
-warner.note('b', 'request', '', 'extra')
-warner.note('a', 'request', '', 'extra')
-console.log(warnings)
-warner.clear()`,
-  wireIgnore: `import { serializeRpcError, normalizeRpcSerializedError, deserializeRpcError } from '@migaia/rpc-contract/errors'
-
-const wire = { ...serializeRpcError(new Error('offline'), { report: console.error }), extra: 1 }
-const fields: string[] = []
-const options = {
-  unknownFields: 'ignore' as const,
-  onUnknownField: (_pointer: string, field: string) => { fields.push(field) }
+  warningKeys:
+    "import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'\n\nconst warnings = createRpcUnknownFieldWarner({\n  maxKeysPerConnection: 32,\n  warn: (connection, fieldKey) => reportProtocolChange(connection, fieldKey)\n})\nonGatewayClosed(() => warnings.clear())",
+  warningConnections:
+    "import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'\n\nconst warnings = createRpcUnknownFieldWarner({\n  maxConnections: 128,\n  warn: (connection, fieldKey) => reportProtocolChange(connection, fieldKey)\n})\nonGatewayClosed(() => warnings.clear())",
+  wireIgnore:
+    "import { deserializeRpcError } from '@migaia/rpc-contract/errors'\n\nconst failure = deserializeRpcError(receivedError, {\n  unknownFields: 'ignore',\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\nshowCheckoutFailure(failure)",
+  wireReject:
+    "import { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'\n\ntry {\n  const failure = normalizeRpcSerializedError(receivedError, { unknownFields: 'reject' })\n  saveValidatedFailure(failure)\n} catch (error) {\n  reportProtocolFailure(error)\n}",
+  errorReport:
+    "import { serializeRpcError } from '@migaia/rpc-contract/errors'\n\nconst wire = serializeRpcError(checkoutFailure, {\n  report: (failure) => reportSerializationFailure(failure)\n})\nsendFailureToCheckout(wire)",
+  errorReach:
+    "import { reachRpcError } from '@migaia/rpc-contract/errors'\n\nfor (const failure of reachRpcError(checkoutFailure, {\n  report: (entry) => reportSerializationFailure(entry)\n})) {\n  addFailureToSupportView(failure)\n}",
+  framerBounds:
+    "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({\n  chunkBytes: 4096,\n  maxMessageBytes: 65536,\n  maxChunks: 16\n})\nfor (const frame of framer.frame(encodedOrder, messageContext)) {\n  await sendCarrierFrame(frame)\n}\nonCarrierClosed(() => framer.close())",
+  framerBuffers:
+    "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({\n  maxMessageBytes: 65536,\n  maxBufferedBytes: 1048576,\n  maxConcurrentMessages: 16,\n  assemblyTimeoutMs: 2000\n})\nonCarrierClosed(() => framer.close())",
+  framerTimers:
+    "import { createBinaryFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createBinaryFramer({\n  schedule: (task, delayMs) => carrierTimers.schedule(task, delayMs),\n  cancel: (handle) => carrierTimers.cancel(handle)\n})\nonCarrierClosed(() => framer.close())",
+  framerNow:
+    'const framer = createStringFramer({\n  ...framerConfiguration,\n  now: () => readCarrierClock()\n})',
+  decoderFrames:
+    "import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => handleOrderPayload(payload),\n  onError: (error) => closeCarrierWithFailure(error)\n})\nfor await (const chunk of carrierReads) decoder.push(chunk)\ndecoder.finish()\ndecoder.close()",
+  decoderError:
+    "import { createRpcStreamFrameDecoderWithLimit } from '@migaia/rpc-contract/framing/stream'\n\nconst decoder = createRpcStreamFrameDecoderWithLimit({\n  onFrame: (payload) => handleOrderPayload(payload),\n  onError: (error) => markOrderUploadFailed(error)\n}, () => orderUploadLimitBytes)\nfor await (const chunk of carrierReads) decoder.push(chunk)\ndecoder.finish()\ndecoder.close()",
+  handshakeInitiator:
+    "import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'\n\nconst receiver = createRpcHandshakeFrameReceiver({ role: 'initiator' })\nreceiver.accept(acceptPayload)\nawait completeClientHandshake(await receiver.readHandshakeFrame())\nreceiver.activate()\nonCarrierClosed((reason) => receiver.close(reason))",
+  handshakeResponder:
+    "import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'\n\nconst receiver = createRpcHandshakeFrameReceiver({ role: 'responder' })\nreceiver.accept(helloPayload)\nconst reply = await prepareServiceHandshake(await receiver.readHandshakeFrame())\nreceiver.beginAccept()\nawait sendHandshakeReply(reply)\nreceiver.activate()\nonCarrierClosed((reason) => receiver.close(reason))",
+  handshakeUnknown:
+    "import { normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'\n\nconst hello = normalizeRpcHandshake(receivedHello, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\ninspectPricingHello(hello)",
+  envelopeUnknown:
+    "import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\n\nconst request = normalizeRpcEnvelope(receivedRequest, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\nrouteCheckoutRequest(request)",
+  runtimeOrder:
+    "import { runtimeOperationCapabilities } from '@migaia/rpc-contract/runtime'\n\nconst required = runtimeOperationCapabilities('request', {\n  orderKey: cartId,\n  idempotencyKey: checkoutAttemptId\n})\nrequirePricingCapabilities(required)",
+  runtimeCancel:
+    "import { runtimeOperationCapabilities, RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst required = runtimeOperationCapabilities('stream', { cancel: RpcRuntimeCancel })\nrequireExportCapabilities(required)",
+  runtimeTimeout:
+    "const required = runtimeOperationCapabilities('request', { timeoutMs: 2000 })\nrequirePricingCapabilities(required)",
+  streamFinish:
+    "import { checkRpcRuntimeStreamFinish } from '@migaia/rpc-contract/stream'\nimport { RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst originalTaskOptions = { cancel: RpcRuntimeCancel } as const\nconst failure = checkRpcRuntimeStreamFinish(originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse finishOriginalStream()",
+  streamFinishDenied:
+    "import { checkRpcRuntimeStreamFinish } from '@migaia/rpc-contract/stream'\n\nconst originalTaskOptions = { cancel: undefined }\nconst failure = checkRpcRuntimeStreamFinish(originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse finishOriginalStream()"
 }
-const normalized = normalizeRpcSerializedError(wire, options)
-const error = deserializeRpcError(normalized, options)
-console.log('extra' in normalized, error.message, fields)`,
-  wireReject: `import { serializeRpcError, normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'
-
-const wire = { ...serializeRpcError(new Error('offline'), { report: console.error }), extra: 1 }
-try { normalizeRpcSerializedError(wire, { unknownFields: 'reject' }) }
-catch (error) { console.log((error as { code: string }).code) }`,
-  errorReport: `import { serializeRpcError } from '@migaia/rpc-contract/errors'
-
-const original = new Error('request failed')
-Object.defineProperty(original, 'cause', { get() { throw new Error('cause unavailable') } })
-const fields: string[] = []
-const wire = serializeRpcError(original, { report: ({ field }) => { fields.push(field) } })
-console.log(wire.message, fields)`,
-  errorReach: `import { reachRpcError } from '@migaia/rpc-contract/errors'
-
-const child = new Error('child')
-Object.defineProperty(child, 'cause', { get() { throw new Error('cause unavailable') } })
-const original = new AggregateError([child], 'request failed')
-const fields: string[] = []
-const reached = [...reachRpcError(original, { report: ({ field }) => { fields.push(field) } })]
-console.log(reached.includes(original), reached.includes(child), fields)`,
-  framerBounds: `import { createStringFramer } from '@migaia/rpc-contract/framing'
-
-const framer = createStringFramer({
-  chunkBytes: 2, maxMessageBytes: 8, maxChunks: 4,
-  maxBufferedBytes: 16, maxConcurrentMessages: 2, assemblyTimeoutMs: 1000
-})
-const context = { source: 'page', messageId: 'one' }
-const frames = framer.frame('abcdef', context)
-for (const frame of frames) {
-  const result = framer.accept(frame, context)
-  if (result.status === 'complete') console.log(frames.length, result.value)
-}
-framer.close()`,
-  framerTimers: `import { createBinaryFramer } from '@migaia/rpc-contract/framing'
-
-const tasks = new Map<number, () => void>()
-let nextId = 0
-let clockReads = 0
-let cancelled = 0
-const framer = createBinaryFramer({
-  chunkBytes: 2, assemblyTimeoutMs: 50,
-  now: () => { clockReads += 1; return 0 },
-  schedule: (task, _delayMs) => { const id = ++nextId; tasks.set(id, task); return id },
-  cancel: (handle) => { tasks.delete(handle as number); cancelled += 1 }
-})
-const context = { source: 'page', messageId: 'one' }
-const frames = framer.frame(new Uint8Array([1, 2, 3, 4]), context)
-console.log(framer.accept(frames[0]!, context).status)
-console.log(framer.accept(frames[1]!, context).status, cancelled, clockReads)
-framer.close()`,
-  decoderFrames: `import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-
-const payloads: number[][] = []
-const decoder = createRpcStreamFrameDecoder({
-  onFrame: (frame) => { payloads.push([...frame]) },
-  onError: (error) => { console.error(error) }
-})
-const frame = encodeRpcStreamFrame(new Uint8Array([7, 8]))
-decoder.push(frame.subarray(0, 3))
-decoder.push(frame.subarray(3))
-decoder.finish()
-console.log(payloads)
-decoder.close()`,
-  decoderError: `import { createRpcStreamFrameDecoderWithLimit, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-
-const failures: Error[] = []
-const decoder = createRpcStreamFrameDecoderWithLimit({
-  onFrame: (_frame) => {},
-  onError: (error) => { failures.push(error) }
-}, () => 16)
-decoder.push(encodeRpcStreamFrame(new Uint8Array([7, 8])).subarray(0, 5))
-decoder.finish()
-console.log(failures.length, (failures[0] as Error & { code: string }).code)
-decoder.close()`,
-  handshakeInitiator: `import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'
-import { createRpcHello, acceptRpcHandshake } from '@migaia/rpc-contract/handshake'
-
-const offer = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
-const accepted = acceptRpcHandshake(offer, createRpcHello(offer))
-if (!accepted.ok) throw accepted.error
-const receiver = createRpcHandshakeFrameReceiver({ role: 'initiator' })
-receiver.accept(new TextEncoder().encode(accepted.reply))
-console.log(JSON.parse(await receiver.readHandshakeFrame()).step)
-console.log(receiver.accept(new TextEncoder().encode('business')), receiver.ready)
-receiver.activate()
-receiver.close('done')`,
-  handshakeResponder: `import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'
-import { createRpcHello } from '@migaia/rpc-contract/handshake'
-
-const offer = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
-const receiver = createRpcHandshakeFrameReceiver({ role: 'responder' })
-receiver.accept(new TextEncoder().encode(createRpcHello(offer)))
-console.log(JSON.parse(await receiver.readHandshakeFrame()).step)
-receiver.beginAccept()
-receiver.activate()
-console.log(receiver.accept(new TextEncoder().encode('business')), receiver.ready)
-receiver.close('done')`,
-  handshakeUnknown: `import { createRpcHello, acceptRpcHandshake, completeRpcHandshake, normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'
-
-const offer = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
-const hello = JSON.stringify({ ...JSON.parse(createRpcHello(offer)), extra: 1 })
-const fields: string[] = []
-const options = { onUnknownField: (_pointer: string, field: string) => { fields.push(field) } }
-normalizeRpcHandshake(hello, options)
-const accepted = acceptRpcHandshake(offer, hello, options)
-if (!accepted.ok) throw accepted.error
-completeRpcHandshake(offer, JSON.stringify({ ...JSON.parse(accepted.reply), extra: 2 }), options)
-console.log(fields)`,
-  envelopeUnknown: `import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'
-import { RpcRouteProfile } from '@migaia/rpc-contract'
-
-const fields: string[] = []
-const envelope = normalizeRpcEnvelope({
-  kind: 'request', id: 'one', method: 'ping', extra: true,
-  data: { route: { profile: RpcRouteProfile, type: 'request', applicationVersion: '1', senderId: 'a', targetId: 'b', sentAt: 0 } }
-}, { onUnknownField: (_pointer, field) => { fields.push(field) } })
-console.log(envelope.kind, fields)`,
-  runtimeOrder: `import { runtimeOperationCapabilities } from '@migaia/rpc-contract/runtime'
-
-const required = runtimeOperationCapabilities('request', {
-  orderKey: 'cart-42', timeoutMs: 2000, idempotencyKey: 'save-42'
-})
-console.log(required)`,
-  runtimeCancel: `import { runtimeOperationCapabilities, RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'
-
-const required = runtimeOperationCapabilities('stream', { cancel: RpcRuntimeCancel, timeoutMs: 2000 }, true)
-console.log(required)`,
-  streamFinish: `import { checkRpcRuntimeStreamFinish, checkRpcRuntimeStreamIntent, checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'
-import { RpcRuntimeCancel, RpcRuntimeFinish } from '@migaia/rpc-contract/runtime'
-
-const options = { cancel: RpcRuntimeCancel } as const
-console.log(checkRpcRuntimeStreamFinish(options))
-console.log(checkRpcRuntimeStreamIntent({ finish: true }, options))
-console.log(checkRpcRuntimeStreamTransition({ event: RpcRuntimeFinish }, options))`,
-  streamFinishDenied: `import { checkRpcRuntimeStreamFinish, checkRpcRuntimeStreamIntent, checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'
-import { RpcRuntimeFinish } from '@migaia/rpc-contract/runtime'
-
-const options = { cancel: undefined }
-const errors = [
-  checkRpcRuntimeStreamFinish(options),
-  checkRpcRuntimeStreamIntent({ finish: true }, options),
-  checkRpcRuntimeStreamTransition({ event: RpcRuntimeFinish }, options)
-]
-console.log(errors.map((error) => (error as Error & { code: string }).code))`
-}
-/** Each configuration case keeps one caller problem and its observable result together. */
+/** Each case describes one application choice. */
 const rpcOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   unknownWarner: [
     {
-      title: t('Bound warning keys on a busy connection', '限制繁忙连接的警告键数量'),
-      problem: t(
-        'A peer adds the same field to many array entries. Numeric indexes share one warning identity. maxKeysPerConnection limits remembered identities, then emits one wildcard warning instead of retaining more keys. Without it, the limit is 256.',
-        '对端在许多数组项增加同一字段。数字索引共享一个警告身份。maxKeysPerConnection 限制保留的身份数，达到后只发一次通配警告，不继续保存键；省略时上限为 256。'
-      ),
-      example: rpcOptionExamples.warningKeys,
-      result: t('Two warnings are recorded; the second is *.', '记录两条警告，第二条为 *。'),
+      title: {
+        en: 'Keep rollout warnings useful on a busy checkout connection',
+        zh: '让繁忙结算连接的升级警告保持有用'
+      },
+      problem: {
+        en: 'A newer checkout client repeats additive fields across many cart items. Bound the remembered field identities so one connection cannot fill the gateway’s diagnostic cache; repeated array indexes already share one identity.',
+        zh: '新版结算客户端在大量购物车条目中重复新增字段。限制保留的字段身份，避免一个连接填满网关诊断缓存；重复数组下标本就共享同一身份。'
+      },
+      example:
+        "import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'\n\nconst warnings = createRpcUnknownFieldWarner({\n  maxKeysPerConnection: 32,\n  warn: (connection, fieldKey) => reportProtocolChange(connection, fieldKey)\n})\nonGatewayClosed(() => warnings.clear())",
+      result: {
+        en: 'The gateway reports each retained field once, then uses one overflow warning instead of retaining more keys.',
+        zh: '网关对每个保留字段只报告一次，达到上限后用一次溢出警告代替继续保存字段。'
+      },
       covers: ['maxKeysPerConnection', 'warn']
     },
     {
-      title: t('Bound diagnostic memory across connections', '限制跨连接的诊断内存'),
-      problem: t(
-        'A long-lived endpoint sees many connections. maxConnections evicts the least recently observed one; a later note on that connection warns again. Without it, the cache remembers 1024 connections.',
-        '长期运行的端点会接触很多连接。maxConnections 移除最久未观察到的连接，该连接之后出现时会再次警告；省略时记住 1024 个连接。'
-      ),
-      example: rpcOptionExamples.warningConnections,
-      result: t('The sink records ["a", "b", "a"].', '接收方记录 ["a", "b", "a"]。'),
+      title: {
+        en: 'Bound warning memory in a long-lived gateway',
+        zh: '限制长期运行网关的警告内存'
+      },
+      problem: {
+        en: 'A gateway serves changing checkout sessions all day. Keep a bounded connection cache so sessions that disappeared do not retain diagnostic state indefinitely; an evicted session may warn again when it returns.',
+        zh: '网关全天服务不断变化的结算会话。限制连接缓存，避免已经消失的会话长期保留诊断状态；被移除的会话再次出现时可以重新警告。'
+      },
+      example:
+        "import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'\n\nconst warnings = createRpcUnknownFieldWarner({\n  maxConnections: 128,\n  warn: (connection, fieldKey) => reportProtocolChange(connection, fieldKey)\n})\nonGatewayClosed(() => warnings.clear())",
+      result: {
+        en: 'Recent sessions retain warning deduplication while older cache entries are released.',
+        zh: '近期会话继续复用警告去重状态，较旧缓存项则被释放。'
+      },
       covers: ['maxConnections', 'warn']
     }
   ],
   wireError: [
     {
-      title: t('Admit a newer peer’s additive error field', '接纳新版本对端增加的错误字段'),
-      problem: t(
-        'Unknown error fields reject by default. Choose ignore when additive fields may be discarded, and use onUnknownField to see what was omitted. The callback observes fields; it does not change policy.',
-        '未知错误字段默认被拒绝。可以丢弃新增字段时选择 ignore，并用 onUnknownField 观察省略项。回调只观察字段，不改变策略。'
-      ),
-      example: rpcOptionExamples.wireIgnore,
-      result: t(
-        'extra is absent, the message is offline, and the observer records extra.',
-        'extra 被省略，消息为 offline，观察者记录 extra。'
-      ),
+      title: {
+        en: 'Read an additive error from a newer pricing service',
+        zh: '读取新版价格服务增加字段后的错误'
+      },
+      problem: {
+        en: 'A rolling pricing deployment may add diagnostic fields to its wire errors. When checkout can discard those additions, allow them explicitly and send their locations to rollout monitoring instead of losing the known error.',
+        zh: '价格服务逐步升级时可能给线上错误增加诊断字段。结算页允许丢弃新增内容时，显式接纳并把位置交给升级监控，避免整份已知错误无法读取。'
+      },
+      example:
+        "import { deserializeRpcError } from '@migaia/rpc-contract/errors'\n\nconst failure = deserializeRpcError(receivedError, {\n  unknownFields: 'ignore',\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\nshowCheckoutFailure(failure)",
+      result: {
+        en: 'Checkout can display the restored error while monitoring sees the omitted fields.',
+        zh: '结算页可以展示恢复的错误，监控同时获知被省略的字段。'
+      },
       covers: ['unknownFields', 'onUnknownField']
     },
     {
-      title: t('Keep a strict received-error boundary', '严格检查收到的错误'),
-      problem: t(
-        'A received error must match the known schema. reject refuses an extra field; omission selects this same policy. Use ignore only when dropping additive fields is acceptable.',
-        '收到的错误必须符合已知结构。reject 拒绝额外字段，省略时也使用该策略。只有允许丢弃新增字段时才用 ignore。'
-      ),
-      example: rpcOptionExamples.wireReject,
-      result: t('Normalization reports INVALID_WIRE_ERROR.', '规范化报 INVALID_WIRE_ERROR。'),
+      title: {
+        en: 'Keep the audit error archive strict',
+        zh: '严格检查审计错误归档'
+      },
+      problem: {
+        en: 'An audit archive only accepts the agreed error schema. Reject extra fields at ingress so unreviewed data does not enter the archive; omitting this option selects the same strict policy.',
+        zh: '审计归档只接收约定的错误结构。在入口拒绝额外字段，避免未经审定的数据进入归档；省略选项也使用同一严格策略。'
+      },
+      example:
+        "import { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'\n\ntry {\n  const failure = normalizeRpcSerializedError(receivedError, { unknownFields: 'reject' })\n  saveValidatedFailure(failure)\n} catch (error) {\n  reportProtocolFailure(error)\n}",
+      result: {
+        en: 'Only validated error records reach the archive; incompatible input goes to protocol monitoring.',
+        zh: '只有通过校验的错误记录进入归档，不兼容输入交给协议监控。'
+      },
       covers: ['unknownFields']
     }
   ],
   serializeError: [
     {
-      title: t('Observe an unreadable error property', '观察无法读取的错误属性'),
-      problem: t(
-        'An error may have a cause getter that throws. The serializer can omit unreadable information but needs a report sink to preserve the local diagnostic. The required callback has no default.',
-        '错误的 cause 读取器可能抛错。序列化器可以省略无法读取的信息，但需要 report 接收本地诊断。该回调必填，没有默认值。'
-      ),
-      example: rpcOptionExamples.errorReport,
-      result: t(
-        'The message remains request failed and the sink records cause.',
-        '消息仍为 request failed，接收方记录 cause。'
-      ),
+      title: {
+        en: 'Keep a third-party failure report usable',
+        zh: '保留第三方故障报告的可用部分'
+      },
+      problem: {
+        en: 'A payment SDK error can have unreadable properties. The serializer can still produce its bounded wire error, but omitted reads need a local reporter so support can see why detail was lost.',
+        zh: '支付 SDK 的错误属性可能无法读取。序列化器仍可生成有界线上错误，但需要本地报告器记录省略的读取失败，便于支持人员知道详情为何缺失。'
+      },
+      example:
+        "import { serializeRpcError } from '@migaia/rpc-contract/errors'\n\nconst wire = serializeRpcError(checkoutFailure, {\n  report: (failure) => reportSerializationFailure(failure)\n})\nsendFailureToCheckout(wire)",
+      result: {
+        en: 'Checkout receives the available error information and local monitoring keeps field-read failures.',
+        zh: '结算端收到可用错误信息，本地监控保留字段读取失败。'
+      },
       covers: ['report']
     },
     {
-      title: t('Keep traversal failures visible', '让遍历失败保持可见'),
-      problem: t(
-        'A diagnostic walk encounters an unreadable cause on an aggregate child. report observes the read failure while reachRpcError still yields the reachable original values. No callback is supplied automatically.',
-        '诊断遍历在聚合子错误上遇到无法读取的 cause。report 接收读取失败，reachRpcError 仍产出可达的原始值；库不会自动提供回调。'
-      ),
-      example: rpcOptionExamples.errorReach,
-      result: t(
-        'The original and child are both reached, and cause is reported.',
-        '原错误和子错误均可达，并上报 cause。'
-      ),
+      title: {
+        en: 'Show the reachable payment failure chain',
+        zh: '展示可达的支付故障链'
+      },
+      problem: {
+        en: 'A support view needs the original error and reachable aggregate children even if an SDK cause accessor fails. Report the unreadable branch while continuing to show the errors the traversal can reach.',
+        zh: '支持界面需要原始错误及可达的聚合子错误，即使 SDK 的 cause 访问器失败。报告无法读取的分支，同时继续展示遍历能够到达的错误。'
+      },
+      example:
+        "import { reachRpcError } from '@migaia/rpc-contract/errors'\n\nfor (const failure of reachRpcError(checkoutFailure, {\n  report: (entry) => reportSerializationFailure(entry)\n})) {\n  addFailureToSupportView(failure)\n}",
+      result: {
+        en: 'The support view keeps available failures, and missing branches remain observable locally.',
+        zh: '支持界面保留可用故障，缺失分支仍可在本地追踪。'
+      },
       covers: ['report']
     }
   ],
   framer: [
     {
-      title: t('Fit fragments within a small carrier budget', '让分片符合小型载体预算'),
-      problem: t(
-        'A custom carrier accepts only small fragments. chunkBytes controls splitting; message, chunk, buffer and concurrent-message limits bound retained assembly state. assemblyTimeoutMs releases an incomplete assembly after its deadline. Omitted values use the documented larger defaults.',
-        '自定义载体只接受小分片。chunkBytes 控制切分，消息、片数、缓冲量和并发消息上限约束保留的组装状态。assemblyTimeoutMs 到期后释放未完成组装。省略时使用表中较大的默认值。'
-      ),
-      example: rpcOptionExamples.framerBounds,
-      result: t('Three fragments reconstruct abcdef.', '三个分片重组为 abcdef。'),
-      covers: [
-        'chunkBytes',
-        'maxMessageBytes',
-        'maxChunks',
-        'maxBufferedBytes',
-        'maxConcurrentMessages',
-        'assemblyTimeoutMs'
-      ]
+      title: {
+        en: 'Fit order messages into a small text carrier',
+        zh: '让订单消息适应小型文本载体'
+      },
+      problem: {
+        en: 'A text carrier only accepts small writes. Split an encoded order into bounded ordered fragments and cap the whole order as well, so a large cart cannot turn into an unbounded fragment sequence.',
+        zh: '文本载体每次只接受小段写入。把已编码订单拆成有界有序分片，同时限制整份订单，避免大型购物车变成没有上限的分片序列。'
+      },
+      example:
+        "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({\n  chunkBytes: 4096,\n  maxMessageBytes: 65536,\n  maxChunks: 16\n})\nfor (const frame of framer.frame(encodedOrder, messageContext)) {\n  await sendCarrierFrame(frame)\n}\nonCarrierClosed(() => framer.close())",
+      result: {
+        en: 'The carrier receives ordered fragments within the selected text-unit and message limits.',
+        zh: '载体按顺序接收符合所选文本计量单位及消息上限的分片。'
+      },
+      covers: ['chunkBytes', 'maxMessageBytes', 'maxChunks']
     },
     {
-      title: t('Use a carrier-owned timer queue', '使用载体自己的计时队列'),
-      problem: t(
-        'A host supplies its own timers. schedule returns a handle and cancel receives that same handle once assembly completes. now is retained for configuration compatibility but is not invoked by current expiry logic. Omission uses host setTimeout and clearTimeout.',
-        '宿主提供自己的计时器。schedule 返回句柄，组装完成时 cancel 接收同一句柄。now 会被保存，但当前到期逻辑不会调用它。省略时使用宿主 setTimeout 和 clearTimeout。'
-      ),
-      example: rpcOptionExamples.framerTimers,
-      result: t(
-        'The statuses are pending and complete; one timer is cancelled and the clock is never read.',
-        '状态依次为 pending、complete；取消一次计时器，时钟读取次数为零。'
-      ),
-      covers: ['chunkBytes', 'assemblyTimeoutMs', 'now', 'schedule', 'cancel']
+      title: {
+        en: 'Release abandoned inbound orders',
+        zh: '释放被放弃的入站订单'
+      },
+      problem: {
+        en: 'Mobile checkout connections can disappear between fragments. Limit incomplete orders and their retained text, and expire an unfinished assembly so one abandoned upload cannot keep its slot indefinitely.',
+        zh: '移动结算连接可能在分片之间消失。限制未完成订单及保留文本量，并让未完成组装到期，避免一次被放弃的上传长期占用槽位。'
+      },
+      example:
+        "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({\n  maxMessageBytes: 65536,\n  maxBufferedBytes: 1048576,\n  maxConcurrentMessages: 16,\n  assemblyTimeoutMs: 2000\n})\nonCarrierClosed(() => framer.close())",
+      result: {
+        en: 'Incomplete uploads remain bounded and their assembly expires under the selected timeout.',
+        zh: '未完成上传占用有界资源，组装按所选时限到期。'
+      },
+      covers: ['maxMessageBytes', 'maxBufferedBytes', 'maxConcurrentMessages', 'assemblyTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Keep assembly timers with the carrier',
+        zh: '让组装计时器跟随载体'
+      },
+      problem: {
+        en: 'A custom carrier already owns a timer service. Use that same service for incomplete-message expiry, including cancellation when an assembly finishes or the carrier closes.',
+        zh: '自定义载体已持有计时服务。让未完成消息的到期也使用同一服务，并在组装完成或载体关闭时取消对应计时器。'
+      },
+      example:
+        "import { createBinaryFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createBinaryFramer({\n  schedule: (task, delayMs) => carrierTimers.schedule(task, delayMs),\n  cancel: (handle) => carrierTimers.cancel(handle)\n})\nonCarrierClosed(() => framer.close())",
+      result: {
+        en: 'Assembly cleanup releases the original timer handles through the carrier’s timer service.',
+        zh: '组装清理通过载体计时服务释放原始计时句柄。'
+      },
+      covers: ['schedule', 'cancel']
     }
   ],
   decoder: [
     {
-      title: t('Consume complete payloads after arbitrary reads', '任意读取切分后消费完整载荷'),
-      problem: t(
-        'A byte carrier can split the length prefix and body anywhere. Required onFrame receives each complete payload synchronously. Required onError handles framing failure; neither callback has a default.',
-        '字节载体可以在长度前缀和主体的任意位置切分。必填 onFrame 同步接收完整载荷，必填 onError 处理分帧失败；两者都没有默认实现。'
-      ),
-      example: rpcOptionExamples.decoderFrames,
-      result: t('One payload [7, 8] is delivered.', '交付一份载荷 [7, 8]。'),
+      title: {
+        en: 'Read complete orders from arbitrary byte chunks',
+        zh: '从任意字节块读取完整订单'
+      },
+      problem: {
+        en: 'A socket can split an order’s length prefix and body across reads. Give the decoder one consumer for complete payloads and one failure owner, rather than treating each socket read as a complete message.',
+        zh: '套接字可能把订单长度前缀与主体拆到多次读取。给解码器提供完整载荷消费者和故障所有者，避免把每次读取误当成完整消息。'
+      },
+      example:
+        "import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => handleOrderPayload(payload),\n  onError: (error) => closeCarrierWithFailure(error)\n})\nfor await (const chunk of carrierReads) decoder.push(chunk)\ndecoder.finish()\ndecoder.close()",
+      result: {
+        en: 'The order consumer receives complete payloads without their four-byte prefixes.',
+        zh: '订单消费者收到不含四字节前缀的完整载荷。'
+      },
       covers: ['onFrame', 'onError']
     },
     {
-      title: t('Report a truncated final payload', '上报最终未完成的载荷'),
-      problem: t(
-        'A connection ends after only one body byte arrives. finish() reports the partial tail through onError and makes the decoder terminal. Without the required callback, construction does not provide an error sink.',
-        '连接只收到一个主体字节就结束。finish() 通过 onError 报告未完成部分，并使解码器进入终态；必填回调没有库内默认接收方。'
-      ),
-      example: rpcOptionExamples.decoderError,
-      result: t('One INVALID_FRAME failure is recorded.', '记录一次 INVALID_FRAME 失败。'),
+      title: {
+        en: 'Fail an order upload that ends mid-frame',
+        zh: '使在帧中途结束的订单上传失败'
+      },
+      problem: {
+        en: 'An upload connection can end before its final payload is complete. Finish the decoder at EOF so the application marks that upload failed instead of silently accepting a partial order.',
+        zh: '上传连接可能在最后一份载荷完成前结束。在流结束时完成解码器检查，让应用把上传标记为失败，避免静默接收残缺订单。'
+      },
+      example:
+        "import { createRpcStreamFrameDecoderWithLimit } from '@migaia/rpc-contract/framing/stream'\n\nconst decoder = createRpcStreamFrameDecoderWithLimit({\n  onFrame: (payload) => handleOrderPayload(payload),\n  onError: (error) => markOrderUploadFailed(error)\n}, () => orderUploadLimitBytes)\nfor await (const chunk of carrierReads) decoder.push(chunk)\ndecoder.finish()\ndecoder.close()",
+      result: {
+        en: 'The failure handler receives the incomplete-frame error and the upload can show a failure state.',
+        zh: '失败处理器收到未完成帧错误，上传可以显示失败状态。'
+      },
       covers: ['onFrame', 'onError']
     }
   ],
   handshakeReceiver: [
     {
-      title: t('Receive the responder’s selection', '接收响应方的协商选择'),
-      problem: t(
-        'An initiating carrier can receive business text after the accept frame but before its own activation. role initiator enables that branch. responder and omission do not enable this shortcut.',
-        '发起载体可能在收到 accept 后、自身激活前接到业务文本。role 为 initiator 时允许该分支；responder 或省略时不启用此捷径。'
-      ),
-      example: rpcOptionExamples.handshakeInitiator,
-      result: t(
-        'The handshake step is accept; business is returned while ready remains false.',
-        '握手阶段为 accept；ready 仍为 false 时即可返回 business。'
-      ),
+      title: {
+        en: 'Read the pricing service’s handshake reply',
+        zh: '读取价格服务的握手响应'
+      },
+      problem: {
+        en: 'A custom outgoing carrier has already received the service’s accept payload. Mark this receiver as the initiator so its first control frame follows the client-side path before business decoding is activated.',
+        zh: '自定义出站载体已收到服务的 accept 载荷。将接收器标为发起方，让首个控制帧走客户端路径，再激活业务解码。'
+      },
+      example:
+        "import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'\n\nconst receiver = createRpcHandshakeFrameReceiver({ role: 'initiator' })\nreceiver.accept(acceptPayload)\nawait completeClientHandshake(await receiver.readHandshakeFrame())\nreceiver.activate()\nonCarrierClosed((reason) => receiver.close(reason))",
+      result: {
+        en: 'The client can complete its handshake before the receiver enters the business phase.',
+        zh: '客户端可以先完成握手，再让接收器进入业务阶段。'
+      },
       covers: ['role']
     },
     {
-      title: t('Activate after sending acceptance', '发送接受后进入业务阶段'),
-      problem: t(
-        'A responding carrier reads hello, records acceptance and activates before delivering business messages. Choose responder for this role; omission uses responder-like first-frame handling.',
-        '响应载体读取 hello、记录接受并激活，然后交付业务消息。此角色选择 responder；省略时按响应方的首帧规则处理。'
-      ),
-      example: rpcOptionExamples.handshakeResponder,
-      result: t(
-        'The handshake step is hello, then business is returned with ready true.',
-        '握手阶段为 hello，之后返回 business，ready 为 true。'
-      ),
+      title: {
+        en: 'Accept a checkout connection before serving messages',
+        zh: '服务消息前接纳结算连接'
+      },
+      problem: {
+        en: 'A custom inbound carrier owns the hello payload and physical reply write. Use responder handling, record acceptance before sending its reply, and activate business decoding after that write completes.',
+        zh: '自定义入站载体持有 hello 载荷并负责实际写回响应。采用响应方处理，在发送响应前记录接纳状态，写入完成后再激活业务解码。'
+      },
+      example:
+        "import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'\n\nconst receiver = createRpcHandshakeFrameReceiver({ role: 'responder' })\nreceiver.accept(helloPayload)\nconst reply = await prepareServiceHandshake(await receiver.readHandshakeFrame())\nreceiver.beginAccept()\nawait sendHandshakeReply(reply)\nreceiver.activate()\nonCarrierClosed((reason) => receiver.close(reason))",
+      result: {
+        en: 'The service enters its business phase after its handshake response has been sent.',
+        zh: '服务在握手响应发送完成后进入业务阶段。'
+      },
       covers: ['role']
     }
   ],
   envelope: [
     {
-      title: t('Observe additive handshake fields', '观察新增握手字段'),
-      problem: t(
-        'Peers can add fields without changing the negotiated core. onUnknownField records those fields during normalization, acceptance and completion. Omission silently ignores allowed additive fields.',
-        '对端可以增加字段而不改变协商核心。onUnknownField 在规范化、接受和完成时记录这些字段；省略时静默忽略允许新增的字段。'
-      ),
-      example: rpcOptionExamples.handshakeUnknown,
-      result: t('The observer records extra three times.', '观察者记录三次 extra。'),
+      title: {
+        en: 'Watch a pricing handshake rollout',
+        zh: '观察价格服务握手升级'
+      },
+      problem: {
+        en: 'A newer price service adds optional handshake fields. Record their locations during normalization so rollout monitoring can see the change while known handshake data remains usable.',
+        zh: '新版价格服务给握手增加可选字段。在规范化时记录其位置，让升级监控获知变化，同时继续使用已知握手数据。'
+      },
+      example:
+        "import { normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'\n\nconst hello = normalizeRpcHandshake(receivedHello, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\ninspectPricingHello(hello)",
+      result: {
+        en: 'Known handshake fields remain available and additive fields reach rollout monitoring.',
+        zh: '已知握手字段仍可使用，新增字段交给升级监控。'
+      },
       covers: ['onUnknownField']
     },
     {
-      title: t('Observe a newer request field', '观察新版本请求字段'),
-      problem: t(
-        'A newer sender adds a request field. The callback records its name while known request data remains normalized; throwing from the callback would fail normalization. Omission adds no observer.',
-        '新版发送方增加一个请求字段。回调记录名称，已知请求数据仍完成规范化；回调抛错会使规范化失败。省略时不增加观察者。'
-      ),
-      example: rpcOptionExamples.envelopeUnknown,
-      result: t(
-        'The result remains a request and the observer records extra.',
-        '结果仍是 request，观察者记录 extra。'
-      ),
+      title: {
+        en: 'Observe a newer checkout request shape',
+        zh: '观察新版结算请求结构'
+      },
+      problem: {
+        en: 'A checkout rollout can add fields to requests before every service is updated. Observe those additions at normalization without failing known request data; keep the observer from throwing because it runs synchronously.',
+        zh: '结算升级可能在所有服务更新前给请求增加字段。在规范化时观察新增内容，同时保留已知请求数据；观察器同步执行，应避免抛错。'
+      },
+      example:
+        "import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\n\nconst request = normalizeRpcEnvelope(receivedRequest, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\nrouteCheckoutRequest(request)",
+      result: {
+        en: 'The normalized request remains available to routing and monitoring sees the new field locations.',
+        zh: '规范化请求仍可交给路由，监控获知新字段的位置。'
+      },
       covers: ['onUnknownField']
     }
   ],
   runtime: [
     {
-      title: t('Declare ordered and retry-correlated calls', '声明有序且可关联重试的调用'),
-      problem: t(
-        'An adapter computes capability requirements before enabling ordered calls. orderKey adds ordering, timeoutMs adds deadlines, and idempotencyKey adds outcome lookup requirements. Omission adds only the mode baseline; this helper grants no execution rights.',
-        '适配器在启用有序调用前计算能力需求。orderKey 增加顺序能力，timeoutMs 增加截止时间能力，idempotencyKey 增加结果查询能力。省略时只加入当前模式的基线；此函数不授予执行权限。'
-      ),
-      example: rpcOptionExamples.runtimeOrder,
-      result: t(
-        'The list includes order@1, deadline@1 and outcome@1.',
-        '列表包含 order@1、deadline@1 和 outcome@1。'
-      ),
-      covers: ['orderKey', 'timeoutMs', 'idempotencyKey']
+      title: {
+        en: 'Check support before retrying an ordered checkout',
+        zh: '重试有序结算前检查支持能力'
+      },
+      problem: {
+        en: 'A checkout adapter needs cart-local ordering and result lookup for one logical payment attempt. Compute the required peer capabilities before sending; this helper describes requirements and grants no execution rights.',
+        zh: '结算适配器需要按购物车排序，并查询同一次逻辑支付尝试的结果。发送前计算对端所需能力；此辅助函数只描述需求，不授予执行权限。'
+      },
+      example:
+        "import { runtimeOperationCapabilities } from '@migaia/rpc-contract/runtime'\n\nconst required = runtimeOperationCapabilities('request', {\n  orderKey: cartId,\n  idempotencyKey: checkoutAttemptId\n})\nrequirePricingCapabilities(required)",
+      result: {
+        en: 'The adapter can require ordering and outcome lookup before choosing a pricing connection.',
+        zh: '适配器可在选择价格连接前要求顺序与结果查询能力。'
+      },
+      covers: ['orderKey', 'idempotencyKey']
     },
     {
-      title: t(
-        'Request final-provider cancellation before start',
-        '请求最终提供方在启动前裁定取消'
-      ),
-      problem: t(
-        'Set cancel to before-start when the final provider owns pre-execution cancellation. This adds cancel-before-start capability; timeout and signal do not add ordinary deadline/abort requirements in that mode. Omission keeps ordinary cancellation with its existing owner.',
-        '最终提供方负责执行前取消时，把 cancel 设为 before-start。它增加启动前取消能力；该模式下，超时和信号不增加普通 deadline/abort 需求。省略时普通取消仍归已有所有者。'
-      ),
-      example: rpcOptionExamples.runtimeCancel,
-      result: t(
-        'The stream requirements include stream@1 and cancel-before-start@1, without deadline@1 or abort@1.',
-        '流需求包含 stream@1 和 cancel-before-start@1，不包含 deadline@1 或 abort@1。'
-      ),
-      covers: ['cancel', 'timeoutMs']
+      title: {
+        en: 'Let the export provider arbitrate cancellation before start',
+        zh: '让导出提供方在启动前裁定取消'
+      },
+      problem: {
+        en: 'An export adapter asks the final provider to decide cancellation before execution starts. Require that capability before selecting the stream connection; this option does not add the ordinary deadline or abort requirements.',
+        zh: '导出适配器请求最终提供方在执行启动前裁定取消。选择流连接前要求该能力；此选项不会增加普通截止时间或中止能力需求。'
+      },
+      example:
+        "import { runtimeOperationCapabilities, RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst required = runtimeOperationCapabilities('stream', { cancel: RpcRuntimeCancel })\nrequireExportCapabilities(required)",
+      result: {
+        en: 'Connection selection can require before-start cancellation together with stream support.',
+        zh: '连接选择可以同时要求启动前取消与流支持。'
+      },
+      covers: ['cancel']
     }
   ],
   streamCancel: [
     {
-      title: t(
-        'Admit finish-without-items for a before-start task',
-        '为启动前取消任务接纳停止取项控制'
-      ),
-      problem: t(
-        'A protocol owner validates a finish-without-items control against the task’s original cancel option. before-start admits this form; omission does not. These checks return errors rather than changing the producer.',
-        '协议所有者按任务原始 cancel 选项检查 finish-without-items 控制。before-start 允许此形式，省略时不允许。这些检查返回错误，不修改生产方。'
-      ),
-      example: rpcOptionExamples.streamFinish,
-      result: t('All three checks return undefined.', '三个检查均返回 undefined。'),
+      title: {
+        en: 'Validate finish for a before-start export',
+        zh: '校验启动前取消导出的停止取项控制'
+      },
+      problem: {
+        en: 'The export protocol owner retained the task’s actual before-start cancellation option. Validate a finish-without-items control against those original options before allowing the application to continue that control.',
+        zh: '导出协议所有者已保留任务实际的启动前取消选项。按这些原始选项校验停止取项控制，再让应用继续处理该控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamFinish } from '@migaia/rpc-contract/stream'\nimport { RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst originalTaskOptions = { cancel: RpcRuntimeCancel } as const\nconst failure = checkRpcRuntimeStreamFinish(originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse finishOriginalStream()",
+      result: {
+        en: 'A compatible control can reach the application’s existing stream owner; the checker itself does not drain the producer.',
+        zh: '兼容控制可以交给应用已有的流所有者，校验器本身不排空生产方。'
+      },
       covers: ['cancel']
     },
     {
-      title: t('Reject finish for ordinary cancellation', '拒绝普通取消任务的停止取项控制'),
-      problem: t(
-        'An ordinary task never opted into before-start cancellation. Passing no cancel option must reject finish-without-items instead of treating it as a valid producer operation.',
-        '普通任务没有选择启动前取消。未传 cancel 时必须拒绝 finish-without-items，不能把它当作有效生产方操作。'
-      ),
-      example: rpcOptionExamples.streamFinishDenied,
-      result: t(
-        'All three checks return INVALID_STREAM errors.',
-        '三个检查均返回 INVALID_STREAM 错误。'
-      ),
+      title: {
+        en: 'Reject finish for an ordinary export',
+        zh: '拒绝普通导出的停止取项控制'
+      },
+      problem: {
+        en: 'An ordinary export did not opt into before-start cancellation. Validate the control against its original empty options so an unsupported finish-without-items request is reported instead of being treated as valid.',
+        zh: '普通导出没有选择启动前取消。按原始空选项检查控制，让不支持的停止取项请求得到报告，避免误当成有效控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamFinish } from '@migaia/rpc-contract/stream'\n\nconst originalTaskOptions = { cancel: undefined }\nconst failure = checkRpcRuntimeStreamFinish(originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse finishOriginalStream()",
+      result: {
+        en: 'The application receives a validation failure and can refuse the incompatible stream control.',
+        zh: '应用收到校验失败，可以拒绝不兼容的流控制。'
+      },
+      covers: ['cancel']
+    }
+  ]
+}
+/** Stream validators retain their own public call in each option example. */
+const rpcStreamOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  checkRpcRuntimeStreamFinish: [
+    {
+      title: {
+        en: 'Validate finish for a before-start export',
+        zh: '校验启动前取消导出的停止取项控制'
+      },
+      problem: {
+        en: 'The export protocol owner retained the task’s actual before-start cancellation option. Validate a finish-without-items control against those original options before allowing the application to continue that control.',
+        zh: '导出协议所有者已保留任务实际的启动前取消选项。按这些原始选项校验停止取项控制，再让应用继续处理该控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamFinish } from '@migaia/rpc-contract/stream'\nimport { RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst originalTaskOptions = { cancel: RpcRuntimeCancel } as const\nconst failure = checkRpcRuntimeStreamFinish(originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse finishOriginalStream()",
+      result: {
+        en: 'A compatible control can reach the application’s existing stream owner; the checker itself does not drain the producer.',
+        zh: '兼容控制可以交给应用已有的流所有者，校验器本身不排空生产方。'
+      },
+      covers: ['cancel']
+    },
+    {
+      title: {
+        en: 'Reject finish for an ordinary export',
+        zh: '拒绝普通导出的停止取项控制'
+      },
+      problem: {
+        en: 'An ordinary export did not opt into before-start cancellation. Validate the control against its original empty options so an unsupported finish-without-items request is reported instead of being treated as valid.',
+        zh: '普通导出没有选择启动前取消。按原始空选项检查控制，让不支持的停止取项请求得到报告，避免误当成有效控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamFinish } from '@migaia/rpc-contract/stream'\n\nconst originalTaskOptions = { cancel: undefined }\nconst failure = checkRpcRuntimeStreamFinish(originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse finishOriginalStream()",
+      result: {
+        en: 'The application receives a validation failure and can refuse the incompatible stream control.',
+        zh: '应用收到校验失败，可以拒绝不兼容的流控制。'
+      },
+      covers: ['cancel']
+    }
+  ],
+  checkRpcRuntimeStreamIntent: [
+    {
+      title: {
+        en: 'Validate finish for a before-start export',
+        zh: '校验启动前取消导出的停止取项控制'
+      },
+      problem: {
+        en: 'The export protocol owner retained the task’s actual before-start cancellation option. Validate a finish-without-items control against those original options before allowing the application to continue that control.',
+        zh: '导出协议所有者已保留任务实际的启动前取消选项。按这些原始选项校验停止取项控制，再让应用继续处理该控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamIntent } from '@migaia/rpc-contract/stream'\nimport { RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst originalTaskOptions = { cancel: RpcRuntimeCancel } as const\nconst failure = checkRpcRuntimeStreamIntent(pendingFinishIntent, originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse keepFinishIntent()",
+      result: {
+        en: 'A compatible control can reach the application’s existing stream owner; the checker itself does not drain the producer.',
+        zh: '兼容控制可以交给应用已有的流所有者，校验器本身不排空生产方。'
+      },
+      covers: ['cancel']
+    },
+    {
+      title: {
+        en: 'Reject finish for an ordinary export',
+        zh: '拒绝普通导出的停止取项控制'
+      },
+      problem: {
+        en: 'An ordinary export did not opt into before-start cancellation. Validate the control against its original empty options so an unsupported finish-without-items request is reported instead of being treated as valid.',
+        zh: '普通导出没有选择启动前取消。按原始空选项检查控制，让不支持的停止取项请求得到报告，避免误当成有效控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamIntent } from '@migaia/rpc-contract/stream'\n\nconst originalTaskOptions = { cancel: undefined }\nconst failure = checkRpcRuntimeStreamIntent(pendingFinishIntent, originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse keepFinishIntent()",
+      result: {
+        en: 'The application receives a validation failure and can refuse the incompatible stream control.',
+        zh: '应用收到校验失败，可以拒绝不兼容的流控制。'
+      },
+      covers: ['cancel']
+    }
+  ],
+  checkRpcRuntimeStreamTransition: [
+    {
+      title: {
+        en: 'Validate finish for a before-start export',
+        zh: '校验启动前取消导出的停止取项控制'
+      },
+      problem: {
+        en: 'The export protocol owner retained the task’s actual before-start cancellation option. Validate a finish-without-items control against those original options before allowing the application to continue that control.',
+        zh: '导出协议所有者已保留任务实际的启动前取消选项。按这些原始选项校验停止取项控制，再让应用继续处理该控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'\nimport { RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'\n\nconst originalTaskOptions = { cancel: RpcRuntimeCancel } as const\nconst failure = checkRpcRuntimeStreamTransition(receivedControl, originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse applyStreamControl()",
+      result: {
+        en: 'A compatible control can reach the application’s existing stream owner; the checker itself does not drain the producer.',
+        zh: '兼容控制可以交给应用已有的流所有者，校验器本身不排空生产方。'
+      },
+      covers: ['cancel']
+    },
+    {
+      title: {
+        en: 'Reject finish for an ordinary export',
+        zh: '拒绝普通导出的停止取项控制'
+      },
+      problem: {
+        en: 'An ordinary export did not opt into before-start cancellation. Validate the control against its original empty options so an unsupported finish-without-items request is reported instead of being treated as valid.',
+        zh: '普通导出没有选择启动前取消。按原始空选项检查控制，让不支持的停止取项请求得到报告，避免误当成有效控制。'
+      },
+      example:
+        "import { checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'\n\nconst originalTaskOptions = { cancel: undefined }\nconst failure = checkRpcRuntimeStreamTransition(receivedControl, originalTaskOptions)\nif (failure) rejectStreamControl(failure)\nelse applyStreamControl()",
+      result: {
+        en: 'The application receives a validation failure and can refuse the incompatible stream control.',
+        zh: '应用收到校验失败，可以拒绝不兼容的流控制。'
+      },
       covers: ['cancel']
     }
   ]
@@ -5101,7 +5175,7 @@ framerOptions.now = {
     'Supply only when sharing a framer configuration shape that already includes a clock. Current assembly expiry retains this callback but never invokes it; omission has the same expiry behavior. Use schedule to control expiry.',
     '只在复用已经包含时钟的分片配置形状时提供。当前组装到期逻辑保存但从不调用此回调；省略时到期行为相同。控制到期应使用 schedule。'
   ),
-  example: rpcOptionExamples.framerTimers
+  example: rpcOptionExamples.framerNow
 }
 framerOptions.schedule = {
   ...framerOptions.schedule,
@@ -5206,11 +5280,11 @@ for (const name of [
 ])
   symbols[name] = {
     ...symbols[name],
-    optionCases: rpcOptionCases.streamCancel,
+    optionCases: rpcStreamOptionCases[name],
     optionDocs: {
       cancel: {
         ...runtimeOptions.cancel!,
-        example: rpcOptionExamples.streamFinish,
+        example: rpcStreamOptionCases[name]![0]!.example,
         whenToUse: t(
           'Pass the original task cancel option when validating finish-without-items. before-start admits that control; omission rejects it. These helpers only return the validation error and never cancel or drain a producer.',
           '检查 finish-without-items 时传入任务原始 cancel 选项。before-start 允许此控制，省略时拒绝。这些辅助函数只返回校验错误，不取消或排空生产方。'
@@ -5218,6 +5292,29 @@ for (const name of [
       }
     }
   }
+/** Scalar fields stay independent when their choice needs no combined story. */
+framerOptions.chunkBytes = { ...framerOptions.chunkBytes!, example: rpcOptionExamples.framerBounds }
+framerOptions.maxMessageBytes = {
+  ...framerOptions.maxMessageBytes!,
+  example: rpcOptionExamples.framerBounds
+}
+framerOptions.maxChunks = { ...framerOptions.maxChunks!, example: rpcOptionExamples.framerBounds }
+framerOptions.maxBufferedBytes = {
+  ...framerOptions.maxBufferedBytes!,
+  example: rpcOptionExamples.framerBuffers
+}
+framerOptions.maxConcurrentMessages = {
+  ...framerOptions.maxConcurrentMessages!,
+  example: rpcOptionExamples.framerBuffers
+}
+framerOptions.assemblyTimeoutMs = {
+  ...framerOptions.assemblyTimeoutMs!,
+  example: rpcOptionExamples.framerBuffers
+}
+runtimeOptions.timeoutMs = {
+  ...runtimeOptions.timeoutMs!,
+  example: rpcOptionExamples.runtimeTimeout
+}
 /** Module orientation uses canonical entry points even when other entries are aliases. */
 const modules: ILibraryReference['modules'] = {
   index: {
