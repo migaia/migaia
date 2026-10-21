@@ -1114,17 +1114,42 @@ function moduleRouteSlug(exportPath: string): string {
     .join('/')
 }
 
-/** Produces a stable semantic URL segment, adding kind only for case-folding collisions. */
+/**
+ * Produces a stable semantic URL segment, adding kind for case-folding collisions and for a
+ * root-entry symbol whose name equals a subpath module's first segment, because the route resolver
+ * gives that segment to the module page.
+ */
 function symbolRouteSlug(
   symbol: Readonly<Record<string, unknown>>,
-  siblings: readonly Readonly<Record<string, unknown>>[]
+  siblings: readonly Readonly<Record<string, unknown>>[],
+  reservedSegments: ReadonlySet<string> = new Set()
 ): string {
+  /** Siblings whose names differ from this symbol only by letter case. */
   const collisions = siblings.filter(
     (candidate) =>
       String(candidate.name).toLocaleLowerCase('en-US') ===
       String(symbol.name).toLocaleLowerCase('en-US')
   )
-  return `${encodeURIComponent(String(symbol.name))}${collisions.length > 1 ? `-${String(symbol.kind)}` : ''}`
+  /** True when the plain name would resolve to a subpath module page instead of this symbol. */
+  const reserved = reservedSegments.has(String(symbol.name).toLocaleLowerCase('en-US'))
+  return `${encodeURIComponent(String(symbol.name))}${collisions.length > 1 || reserved ? `-${String(symbol.kind)}` : ''}`
+}
+
+/**
+ * First route segments of a library's subpath modules, which root-entry symbols must not use as
+ * their own segment. Empty for subpath modules, whose symbols live below the module segment.
+ */
+function reservedRouteSegments(
+  exports: readonly string[],
+  exportPath: unknown
+): ReadonlySet<string> {
+  if (moduleRouteSlug(String(exportPath)) !== 'index') return new Set()
+  return new Set(
+    exports
+      .map((entry) => moduleRouteSlug(entry))
+      .filter((slug) => slug !== 'index')
+      .map((slug) => slug.split('/')[0]!.toLocaleLowerCase('en-US'))
+  )
 }
 
 /** Converts a declaration name into a stable fragment without inventing meaning. */
@@ -2709,7 +2734,7 @@ async function generateManifests() {
             )
             const symbolEntries = moduleSymbols.map((symbol) => {
               return {
-                path: `${modulePath}/${symbolRouteSlug(symbol, moduleSymbols)}`,
+                path: `${modulePath}/${symbolRouteSlug(symbol, moduleSymbols, reservedRouteSegments(library.exports, exportPath))}`,
                 locale,
                 domain,
                 library: library.slug
@@ -2747,6 +2772,12 @@ async function generateManifests() {
           library.documentation,
           String(symbol.name)
         )
+        /** Route segment of this symbol; differs from its name only on a collision. */
+        const routeSlug = symbolRouteSlug(
+          symbol,
+          ownerSymbols,
+          reservedRouteSegments(library.exports, exportPath)
+        )
         const maintainedExamples = maintainedExamplesForSymbol(
           maintainedContext,
           String(symbol.name),
@@ -2762,7 +2793,8 @@ async function generateManifests() {
             maintainedContext,
             Array.isArray(symbol.declaredConfiguration) ? symbol.declaredConfiguration : []
           ),
-          fragment: symbolFragment(`${library.slug}-${slug}`, symbolRouteSlug(symbol, ownerSymbols))
+          fragment: symbolFragment(`${library.slug}-${slug}`, routeSlug),
+          ...(routeSlug !== encodeURIComponent(String(symbol.name)) ? { routeSlug } : {})
         }
       })
       const aliases = library.publicAliases
@@ -2783,7 +2815,13 @@ async function generateManifests() {
           )
           const ownerFragment = symbolFragment(
             `${library.slug}-${ownerModule}`,
-            ownerSymbol ? symbolRouteSlug(ownerSymbol, ownerSiblings) : aliasName
+            ownerSymbol
+              ? symbolRouteSlug(
+                  ownerSymbol,
+                  ownerSiblings,
+                  reservedRouteSegments(library.exports, ownerExportPath)
+                )
+              : aliasName
           )
           return {
             identity: ownerIdentity,

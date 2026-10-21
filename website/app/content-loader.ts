@@ -366,6 +366,7 @@ function projectSelectedSymbol(symbol: IApiSymbol, hasAuthoredReference: boolean
     name: symbol.name,
     kind: symbol.kind,
     callable: symbol.callable,
+    routeSlug: symbol.routeSlug,
     fragment: symbol.fragment,
     signature: symbol.signature,
     source: publicSourceName(symbol.source),

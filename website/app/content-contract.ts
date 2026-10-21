@@ -89,6 +89,11 @@ export type IApiSymbol = {
   readonly callable?: boolean
   readonly name: string
   readonly kind: string
+  /**
+   * Route segment chosen by the manifest generator when the default `name` segment is taken, for
+   * example a root-entry symbol named like a subpath module. Absent when the name is used as is.
+   */
+  readonly routeSlug?: string
   readonly fragment: string
   readonly signature: string
   readonly source: string
@@ -162,9 +167,11 @@ export function resolveDocsSelection(segments: readonly string[], apis: readonly
 
 /** Produces a stable semantic path, adding a readable kind only for case-folding collisions. */
 export function symbolSlug(
-  symbol: Pick<IApiSymbol, 'kind' | 'name'>,
+  symbol: Pick<IApiSymbol, 'kind' | 'name' | 'routeSlug'>,
   siblings: readonly Pick<IApiSymbol, 'kind' | 'name'>[]
 ): string {
+  if (symbol.routeSlug) return symbol.routeSlug
+  /** Siblings whose names differ from this symbol only by letter case. */
   const collisions = siblings.filter(
     (candidate) =>
       candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
