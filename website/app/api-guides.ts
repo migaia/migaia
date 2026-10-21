@@ -3,6 +3,7 @@ import { capabilityHostExample } from './reference/capability.js'
 import { storageFeatureExample } from './reference/storage-web.js'
 import { utilsApiGuides } from './utils-api-guides.js'
 import { completionApiGuides } from './completion-api-guides.js'
+import { microHubApiGuides } from './micro-hub-api-guides.js'
 import rpcCoreReference from '../src/generated/manifests/libraries/rpc-core.json'
 import rpcContractReference from '../src/generated/manifests/libraries/rpc-contract.json'
 import rpcProcessReference from '../src/generated/manifests/libraries/rpc-process.json'
@@ -6122,6 +6123,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     rpcApiGuides['rpc-contract:runtime:rpcByteRuntimeBootstrap'],
   ...utilsApiGuides,
   ...runtimeCompletionApiGuides,
+  ...microHubApiGuides,
   'storage-web:memory:memoryStorageHost': createStorageWebGuide({
     purposeEn:
       'Creates an isolated synchronous in-memory record store with text, byte, structured-record, transaction, iteration, metadata, and post-commit change-feed channels. It is process-local and loses all data when the instance is discarded.',
