@@ -154,6 +154,19 @@
       "uuid": "@migaia/logger/plugins",
       "UUID_PLUGIN_NAME": "@migaia/logger/plugins"
     },
+    "@migaia/micro-hub": {
+      "consumeMicroApp": "@migaia/micro-hub/web-component",
+      "events": "@migaia/micro-hub/events",
+      "IEventsOptions": "@migaia/micro-hub/events",
+      "IPersistOptions": "@migaia/micro-hub/persist",
+      "IStateDriver": "@migaia/micro-hub/state",
+      "MICRO_APP_CONTEXT": "@migaia/micro-hub/web-component",
+      "persist": "@migaia/micro-hub/persist",
+      "provideMicroApp": "@migaia/micro-hub/web-component",
+      "resources": "@migaia/micro-hub/resource",
+      "state": "@migaia/micro-hub/state",
+      "stateDriverOf": "@migaia/micro-hub/state"
+    },
     "@migaia/middleware-pipeline": {},
     "@migaia/plugin-host": {
       "createView": "@migaia/plugin-host/composition",

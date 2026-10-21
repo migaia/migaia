@@ -2910,7 +2910,7 @@
           "name": "assertStoreFeature",
           "kind": "function",
           "signature": "export declare function assertStoreFeature(config: IStoreConfigValue | null, path: IStoreFeaturePath, apiName?: string): void;",
-          "declarationLine": 113,
+          "declarationLine": 81,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Throws PROVIDER_REQUIRED for absent config and FEATURE_DISABLED for a disabled path; it does not initialize the requested feature.",
           "core": "config: Normalized config from normalizeStoreConfig or useStoreConfig, possibly null.\npath: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\napiName: Optional application API label used in diagnostics; defaults to this API.\nNothing when enabled; otherwise throws a stable package error.\nfeatures: Normalized explicit WASM boolean and frozen experimental dictionary; only exact true is enabled.\ndefaults: Application defaults with explicit warnAsyncActions boolean; consumers decide whether to apply it to their Stores.\nready: Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.\nfeatures.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nfeatures.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.",
@@ -3005,27 +3005,27 @@
           "declaredConfiguration": [
             {
               "name": "features",
-              "type": "{ /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
               "optional": false,
-              "description": "Boolean feature projection, not a mutation-control interface."
+              "description": ""
             },
             {
               "name": "features.wasm",
               "type": "boolean",
               "optional": false,
-              "description": "False by default; true requires a readiness barrier before the Provider renders children."
+              "description": ""
             },
             {
               "name": "features.experimental",
               "type": "Readonly<Record<string, boolean>>",
               "optional": false,
-              "description": "Frozen null-prototype map of own enumerable data flags, enabled only when exactly true."
+              "description": ""
             },
             {
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": false,
-              "description": "Snapshot of application defaults, including normalized warnAsyncActions=false by default."
+              "description": ""
             },
             {
               "name": "ready",
@@ -3117,34 +3117,34 @@
           "configuration": [
             {
               "name": "features",
-              "type": "{ /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
               "optional": false,
-              "description": "Boolean feature projection, not a mutation-control interface.",
-              "descriptionEn": "Boolean feature projection, not a mutation-control interface.",
+              "description": "Groups `features.wasm`, `features.experimental`; configure the nested fields below.",
+              "descriptionEn": "Groups `features.wasm`, `features.experimental`; configure the nested fields below.",
               "descriptionZh": ""
             },
             {
               "name": "features.wasm",
               "type": "boolean",
               "optional": false,
-              "description": "False by default; true requires a readiness barrier before the Provider renders children.",
-              "descriptionEn": "False by default; true requires a readiness barrier before the Provider renders children.",
+              "description": "",
+              "descriptionEn": "",
               "descriptionZh": ""
             },
             {
               "name": "features.experimental",
               "type": "Readonly<Record<string, boolean>>",
               "optional": false,
-              "description": "Frozen null-prototype map of own enumerable data flags, enabled only when exactly true.",
-              "descriptionEn": "Frozen null-prototype map of own enumerable data flags, enabled only when exactly true.",
+              "description": "",
+              "descriptionEn": "",
               "descriptionZh": ""
             },
             {
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": false,
-              "description": "Snapshot of application defaults, including normalized warnAsyncActions=false by default.",
-              "descriptionEn": "Snapshot of application defaults, including normalized warnAsyncActions=false by default.",
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
               "descriptionZh": ""
             },
             {
@@ -3162,7 +3162,7 @@
           "name": "createStoreReactAggregateError",
           "kind": "function",
           "signature": "export declare function createStoreReactAggregateError(code: IStoreReactErrorCode, errors: readonly unknown[], message: string): AggregateError;",
-          "declarationLine": 14,
+          "declarationLine": 10,
           "source": "packages/store-react/dist/errors.d.ts",
           "purpose": "Creates a native AggregateError with package identity and original failures reachable through errors in input order.",
           "core": "code: A semantic value selected from StoreReactErrorCode.\nerrors: Original failure values retained in the native errors array.\nmessage: Caller-authored explanation covering the combined failure.\nTagged AggregateError; the helper returns without throwing.",
@@ -3336,7 +3336,7 @@
           "name": "createStoreReactError",
           "kind": "function",
           "signature": "export declare function createStoreReactError(code: IStoreReactErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
-          "declarationLine": 10,
+          "declarationLine": 6,
           "source": "packages/store-react/dist/errors.d.ts",
           "purpose": "Creates a native Error tagged with this package source and code; a supplied cause preserves its original identity and the helper does not throw.",
           "core": "code: A stable value selected from StoreReactErrorCode for the actual scenario.\nmessage: Caller-authored concrete error explanation.\nTagged native Error preserving stack and instanceof identity.\ncause: Original failure attached to the new Error cause without replacing it.\nOmitted: no cause property is supplied.",
@@ -3526,7 +3526,7 @@
           "name": "createStoreRegistry",
           "kind": "function",
           "signature": "export declare function createStoreRegistry(runtime?: IRuntime): StoreRegistry;",
-          "declarationLine": 97,
+          "declarationLine": 57,
           "source": "packages/store-react/dist/provider-registry.d.ts",
           "purpose": "Creates an isolated Registry and its local AtomStore in a chosen Runtime; use one per Provider or SSR request when state must stay independent.",
           "core": "runtime: Caller IRuntime or omitted for a new createRuntime; registry disposal never disposes this Runtime.\nCaller-owned StoreRegistry with explicit sync or async disposal.",
@@ -3610,7 +3610,7 @@
           "name": "createStoreToken",
           "kind": "function",
           "signature": "export declare function createStoreToken<T>(debugName: string): IStoreToken<T>;",
-          "declarationLine": 23,
+          "declarationLine": 14,
           "source": "packages/store-react/dist/provider-registry.d.ts",
           "purpose": "Creates a frozen typed token with a fresh Symbol and nonempty diagnostic name. Reuse the token object; separately created tokens with equal names are distinct.",
           "core": "debugName: Nonempty application-selected diagnostic label; it does not determine token equality.\nIStoreToken for register/get/require and Provider lookup; invalid names throw INVALID_CONFIG.",
@@ -3688,8 +3688,8 @@
         {
           "name": "IStableNode",
           "kind": "type",
-          "signature": "export type IStableNode<T> = { /** Tracked read used by the mounted subscription's Runtime Effect. */ readonly value: T; /** Current untracked snapshot used in render, server rendering and commit consistency checks. */ peek(): T; };",
-          "declarationLine": 7,
+          "signature": "export type IStableNode<T> = { readonly value: T; peek(): T; };",
+          "declarationLine": 22,
           "source": "packages/store-react/dist/useNode.d.ts",
           "purpose": "Stable externally owned reactive node protocol with tracked value and untracked peek; useNodeValue also requires canonical reactive ownership.",
           "core": "value: Tracked current node value, read by the owning Runtime Effect for notifications.\npeek: Reads the current node snapshot without registering a dependency, safe for repeated React snapshot reads.\nCurrent synchronous node value; source read errors propagate.",
@@ -3706,7 +3706,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly value: T;",
-              "description": "Tracked read used by the mounted subscription's Runtime Effect.",
+              "description": null,
               "parameterDetails": [],
               "returns": "T"
             },
@@ -3715,7 +3715,7 @@
               "kind": "method",
               "optional": false,
               "signature": "peek(): T;",
-              "description": "Current untracked snapshot used in render, server rendering and commit consistency checks.",
+              "description": null,
               "parameterDetails": [],
               "returns": "T"
             }
@@ -3723,9 +3723,7 @@
           "composes": [],
           "aliasOf": "IStableNode",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type IStableNode<T> = { /** Tracked read used by the mounted subscription's Runtime Effect. */ readonly value: T; /** Current untracked snapshot used in render, server rendering and commit consistency checks. */ peek(): T; };"
-          ],
+          "overloadSignatures": ["export type IStableNode<T> = { readonly value: T; peek(): T; };"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -3763,7 +3761,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/useNode.d.ts:IStableNode:export type IStableNode<T> = { /** Tracked read used by the mounted subscription's Runtime Effect. */ readonly value: T; /** Current untracked snapshot used in render, server rendering and commit consistency checks. */ peek(): T; };",
+          "identity": "packages/store-react/dist/useNode.d.ts:IStableNode:export type IStableNode<T> = { readonly value: T; peek(): T; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3772,8 +3770,8 @@
         {
           "name": "IStoreConfigValue",
           "kind": "type",
-          "signature": "export type IStoreConfigValue = { /** Boolean feature projection, not a mutation-control interface. */ readonly features: { /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }; /** Snapshot of application defaults, including normalized warnAsyncActions=false by default. */ readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };",
-          "declarationLine": 72,
+          "signature": "export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };",
+          "declarationLine": 61,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Normalized feature/default/readiness context returned by normalizeStoreConfig or useStoreConfig; the whole object is not deep-frozen.",
           "core": "features: Normalized explicit WASM boolean and frozen experimental dictionary; only exact true is enabled.\ndefaults: Application defaults with explicit warnAsyncActions boolean; consumers decide whether to apply it to their Stores.\nready: Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.",
@@ -3789,17 +3787,17 @@
               "name": "features",
               "kind": "property",
               "optional": false,
-              "signature": "readonly features: { /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; };",
-              "description": "Boolean feature projection, not a mutation-control interface.",
+              "signature": "readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; };",
+              "description": null,
               "parameterDetails": [],
-              "returns": "{ /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }"
+              "returns": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }"
             },
             {
               "name": "defaults",
               "kind": "property",
               "optional": false,
               "signature": "readonly defaults: IStoreProviderDefaults;",
-              "description": "Snapshot of application defaults, including normalized warnAsyncActions=false by default.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IStoreProviderDefaults"
             },
@@ -3817,7 +3815,7 @@
           "aliasOf": "IStoreConfigValue",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreConfigValue = { /** Boolean feature projection, not a mutation-control interface. */ readonly features: { /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }; /** Snapshot of application defaults, including normalized warnAsyncActions=false by default. */ readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };"
+            "export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3856,7 +3854,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreConfigValue:export type IStoreConfigValue = { /** Boolean feature projection, not a mutation-control interface. */ readonly features: { /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }; /** Snapshot of application defaults, including normalized warnAsyncActions=false by default. */ readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreConfigValue:export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };",
           "guidance": [
             {
               "id": "配置-特性与就绪屏障",
@@ -3943,7 +3941,7 @@
           "name": "IStoreFeatureExperimental",
           "kind": "type",
           "signature": "export type IStoreFeatureExperimental = Readonly<Record<string, boolean>>;",
-          "declarationLine": 7,
+          "declarationLine": 13,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Application string-to-boolean feature dictionary; normalization accepts only exact true values from enumerable own data properties.",
           "core": "Application string-to-boolean feature dictionary; normalization accepts only exact true values from enumerable own data properties.",
@@ -4008,7 +4006,7 @@
           "name": "IStoreFeaturePath",
           "kind": "type",
           "signature": "export type IStoreFeaturePath = 'wasm' | `experimental.${string}`;",
-          "declarationLine": 102,
+          "declarationLine": 79,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Feature lookup path: wasm or experimental.<name>; an empty experimental suffix is disabled.",
           "core": "Feature lookup path: wasm or experimental.<name>; an empty experimental suffix is disabled.",
@@ -4073,7 +4071,7 @@
           "name": "IStoreFeatures",
           "kind": "type",
           "signature": "export type IStoreFeatures = { /** * Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness * barrier. When `true`, `ready` must complete initialization before the provider renders its * subtree. */ readonly wasm?: boolean; /** * Allows experimental features only when their entry is exactly `true`. Missing entries are * disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`. */ readonly experimental?: IStoreFeatureExperimental; };",
-          "declarationLine": 9,
+          "declarationLine": 14,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Input feature switches requiring explicit true; they declare usage and do not install external capabilities.",
           "core": "wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nexperimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.",
@@ -4156,8 +4154,8 @@
         {
           "name": "IStoreProviderConfig",
           "kind": "type",
-          "signature": "export type IStoreProviderConfig = { /** Omission disables wasm and every experimental feature. */ readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier * unless wasm is enabled; factory execution may start during normalization, so use idempotent * work or a caller-owned Promise when render retries must not repeat application work. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending; defaults to null. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };",
-          "declarationLine": 39,
+          "signature": "export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };",
+          "declarationLine": 36,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Input configuration for normalized features, readiness gates, pending fallback and application defaults.",
           "core": "features: Application feature declarations normalized to explicit WASM and experimental booleans.\nOmitted: all features are disabled.\nready: Promises or zero-argument synchronous/async factories. Normalization eagerly invokes uncached factories before returning, caches factory results by scope plus factory identity, and separately caches each list Promise by scope plus array identity. Rejected factory results leave the factory cache; scopes are isolated. A changed array identity selects a new Provider generation and ReadyBoundary, so an old generation cannot release the new one; changing only the array does not rerun a successful cached factory.\nFactory result is awaited and discarded; rejection blocks the subtree and reaches its outer Error Boundary.\nNo barrier, unless WASM is enabled without one, which creates a rejected barrier.\nfallback: ReactNode rendered while readiness remains pending; rejected barriers throw instead of rendering this fallback.\n`null`: render no subtree while pending.\ndefaults: Application-readable defaults snapshot; it does not change existing or future Store construction options.\n`warnAsyncActions` is `false`.",
@@ -4174,7 +4172,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly features?: IStoreFeatures;",
-              "description": "Omission disables wasm and every experimental feature.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IStoreFeatures"
             },
@@ -4183,7 +4181,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly ready?: readonly IStoreReadyBarrier[];",
-              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work.",
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
               "parameterDetails": [],
               "returns": "readonly IStoreReadyBarrier[]"
             },
@@ -4192,7 +4190,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly fallback?: ReactNode;",
-              "description": "Displays this fallback while readiness barriers are pending; defaults to null.",
+              "description": "Displays this fallback while readiness barriers are pending.",
               "parameterDetails": [],
               "returns": "ReactNode"
             },
@@ -4210,7 +4208,7 @@
           "aliasOf": "IStoreProviderConfig",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreProviderConfig = { /** Omission disables wasm and every experimental feature. */ readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier * unless wasm is enabled; factory execution may start during normalization, so use idempotent * work or a caller-owned Promise when render retries must not repeat application work. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending; defaults to null. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };"
+            "export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4249,7 +4247,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderConfig:export type IStoreProviderConfig = { /** Omission disables wasm and every experimental feature. */ readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier * unless wasm is enabled; factory execution may start during normalization, so use idempotent * work or a caller-owned Promise when render retries must not repeat application work. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending; defaults to null. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderConfig:export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4258,8 +4256,8 @@
         {
           "name": "IStoreProviderDefaults",
           "kind": "type",
-          "signature": "export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. Defaults to * false when omitted or not exactly true. */ readonly warnAsyncActions?: boolean; };",
-          "declarationLine": 25,
+          "signature": "export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. */ readonly warnAsyncActions?: boolean; };",
+          "declarationLine": 29,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Readable application preferences, not automatic Store construction overrides.",
           "core": "warnAsyncActions: Application-readable default in useStoreConfig; the Provider does not pass it into createStore, so each Store must explicitly apply its own option.\n`false` in the normalized configuration.\nExpose an enabled application preference without changing any Store automatically.\nExpose a disabled application preference.",
@@ -4276,7 +4274,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly warnAsyncActions?: boolean;",
-              "description": "Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. Defaults to false when omitted or not exactly true.",
+              "description": "Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly.",
               "parameterDetails": [],
               "returns": "boolean"
             }
@@ -4285,7 +4283,7 @@
           "aliasOf": "IStoreProviderDefaults",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. Defaults to * false when omitted or not exactly true. */ readonly warnAsyncActions?: boolean; };"
+            "export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. */ readonly warnAsyncActions?: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4324,7 +4322,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderDefaults:export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. Defaults to * false when omitted or not exactly true. */ readonly warnAsyncActions?: boolean; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderDefaults:export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. */ readonly warnAsyncActions?: boolean; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4333,8 +4331,8 @@
         {
           "name": "IStoreProviderProps",
           "kind": "type",
-          "signature": "export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering. */ readonly children: ReactNode; /** Existing registry to borrow; omission creates a Provider-local registry and atom store. */ readonly registry?: StoreRegistry; /** Runtime for an internal registry; when registry is supplied, this must be its exact Runtime. */ readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
-          "declarationLine": 8,
+          "signature": "export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
+          "declarationLine": 7,
           "source": "packages/store-react/dist/StoreProvider.d.ts",
           "purpose": "React Provider ownership and configuration props; external Registry and Runtime identities must agree.",
           "core": "children: React subtree receiving configuration and Registry contexts after readiness succeeds.\nregistry: Caller-owned StoreRegistry returned by createStoreRegistry or new StoreRegistry; when runtime is also supplied it must be the same object as registry.runtime.\nCreate an internal registry for this Provider scope.\nruntime: IRuntime used for an internally created Registry; when an external registry is supplied it may only confirm the same runtime identity.\nExternal registry.runtime, or a new createRuntime for an internal registry.\ndisposeOnUnmount: Whether final Provider release disposes the registry, its atomStore and owned registrations after a task delay; Runtime remains outside this ownership.\n`true` for internal registries, `false` for injected external registries; SSR runs no unmount effects.\nDispose the registry once no retained Provider owner remains.\nLeave registry disposal to the external application owner.\nconfig: Optional IStoreProviderConfig for feature declarations, readiness, pending fallback and readable defaults.\nAll features disabled with no readiness barrier.",
@@ -4351,7 +4349,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly children: ReactNode;",
-              "description": "Required subtree shown after readiness, if any, permits rendering.",
+              "description": null,
               "parameterDetails": [],
               "returns": "ReactNode"
             },
@@ -4360,7 +4358,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly registry?: StoreRegistry;",
-              "description": "Existing registry to borrow; omission creates a Provider-local registry and atom store.",
+              "description": null,
               "parameterDetails": [],
               "returns": "StoreRegistry"
             },
@@ -4369,7 +4367,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly runtime?: IRuntime;",
-              "description": "Runtime for an internal registry; when registry is supplied, this must be its exact Runtime.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -4396,7 +4394,7 @@
           "aliasOf": "IStoreProviderProps",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering. */ readonly children: ReactNode; /** Existing registry to borrow; omission creates a Provider-local registry and atom store. */ readonly registry?: StoreRegistry; /** Runtime for an internal registry; when registry is supplied, this must be its exact Runtime. */ readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };"
+            "export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4435,7 +4433,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/StoreProvider.d.ts:IStoreProviderProps:export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering. */ readonly children: ReactNode; /** Existing registry to borrow; omission creates a Provider-local registry and atom store. */ readonly registry?: StoreRegistry; /** Runtime for an internal registry; when registry is supplied, this must be its exact Runtime. */ readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
+          "identity": "packages/store-react/dist/StoreProvider.d.ts:IStoreProviderProps:export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4445,7 +4443,7 @@
           "name": "IStoreProviderState",
           "kind": "type",
           "signature": "export type IStoreProviderState = (typeof StoreProviderState)[keyof typeof StoreProviderState];",
-          "declarationLine": 13,
+          "declarationLine": 9,
           "source": "packages/store-react/dist/provider-state-constants.d.ts",
           "purpose": "Value union of StoreProviderState for readiness pending, ready and error.",
           "core": "Value union of StoreProviderState for readiness pending, ready and error.",
@@ -4587,7 +4585,7 @@
           "name": "IStoreReactErrorCode",
           "kind": "type",
           "signature": "export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];",
-          "declarationLine": 69,
+          "declarationLine": 68,
           "source": "packages/store-react/dist/error-code.d.ts",
           "purpose": "Value union of stable StoreReactErrorCode members for typed package failure recognition.",
           "core": "Value union of stable StoreReactErrorCode members for typed package failure recognition.",
@@ -4723,7 +4721,7 @@
           "name": "IStoreReadyBarrier",
           "kind": "type",
           "signature": "export type IStoreReadyBarrier = Promise<unknown> | (() => Promise<unknown> | unknown);",
-          "declarationLine": 23,
+          "declarationLine": 28,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Promise or zero-argument factory returning any value or Promise. A factory is invoked synchronously during normalization; its result is awaited and discarded, and throws become rejections.",
           "core": "Promise or zero-argument factory returning any value or Promise. A factory is invoked synchronously during normalization; its result is awaited and discarded, and throws become rejections.",
@@ -4864,8 +4862,8 @@
         {
           "name": "IStoreRegistrationOptions",
           "kind": "type",
-          "signature": "export type IStoreRegistrationOptions = { /** Defaults to false; true releases this entry through $dispose, or dispose when absent. */ readonly owned?: boolean; };",
-          "declarationLine": 15,
+          "signature": "export type IStoreRegistrationOptions = { readonly owned?: boolean; };",
+          "declarationLine": 11,
           "source": "packages/store-react/dist/provider-registry.d.ts",
           "purpose": "Per-registration cleanup ownership selected independently for new and replacement entries.",
           "core": "owned: Transfer value cleanup responsibility to this registration. Prefer $dispose when present, otherwise dispose; values with neither method need no cleanup.\n`false`: the caller retains value ownership.\nUnregister, replacement, removal or registry disposal can release this value.\nOnly remove the registry reference; do not dispose the borrowed value.",
@@ -4882,7 +4880,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly owned?: boolean;",
-              "description": "Defaults to false; true releases this entry through $dispose, or dispose when absent.",
+              "description": null,
               "parameterDetails": [],
               "returns": "boolean"
             }
@@ -4891,7 +4889,7 @@
           "aliasOf": "IStoreRegistrationOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreRegistrationOptions = { /** Defaults to false; true releases this entry through $dispose, or dispose when absent. */ readonly owned?: boolean; };"
+            "export type IStoreRegistrationOptions = { readonly owned?: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4930,7 +4928,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/provider-registry.d.ts:IStoreRegistrationOptions:export type IStoreRegistrationOptions = { /** Defaults to false; true releases this entry through $dispose, or dispose when absent. */ readonly owned?: boolean; };",
+          "identity": "packages/store-react/dist/provider-registry.d.ts:IStoreRegistrationOptions:export type IStoreRegistrationOptions = { readonly owned?: boolean; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4939,7 +4937,7 @@
         {
           "name": "IStoreToken",
           "kind": "type",
-          "signature": "export type IStoreToken<T> = Readonly<{ /** Unique symbol used for registration; equal debug labels do not make tokens interchangeable. */ key: symbol; /** Human-readable error label, not a lookup key. */ debugName: string; /** Type-only value association; factory-created tokens contain no runtime payload here. */ readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;",
+          "signature": "export type IStoreToken<T> = Readonly<{ key: symbol; debugName: string; readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;",
           "declarationLine": 6,
           "source": "packages/store-react/dist/provider-registry.d.ts",
           "purpose": "Frozen token from createStoreToken carrying a fresh Symbol key and readable label, with a type-only value association.",
@@ -4957,7 +4955,7 @@
               "kind": "property",
               "optional": false,
               "signature": "key: symbol;",
-              "description": "Unique symbol used for registration; equal debug labels do not make tokens interchangeable.",
+              "description": null,
               "parameterDetails": [],
               "returns": "symbol"
             },
@@ -4966,7 +4964,7 @@
               "kind": "property",
               "optional": false,
               "signature": "debugName: string;",
-              "description": "Human-readable error label, not a lookup key.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             }
@@ -4975,7 +4973,7 @@
           "aliasOf": "IStoreToken",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreToken<T> = Readonly<{ /** Unique symbol used for registration; equal debug labels do not make tokens interchangeable. */ key: symbol; /** Human-readable error label, not a lookup key. */ debugName: string; /** Type-only value association; factory-created tokens contain no runtime payload here. */ readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;"
+            "export type IStoreToken<T> = Readonly<{ key: symbol; debugName: string; readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5014,7 +5012,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/provider-registry.d.ts:IStoreToken:export type IStoreToken<T> = Readonly<{ /** Unique symbol used for registration; equal debug labels do not make tokens interchangeable. */ key: symbol; /** Human-readable error label, not a lookup key. */ debugName: string; /** Type-only value association; factory-created tokens contain no runtime payload here. */ readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;",
+          "identity": "packages/store-react/dist/provider-registry.d.ts:IStoreToken:export type IStoreToken<T> = Readonly<{ key: symbol; debugName: string; readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;",
           "guidance": [
             {
               "id": "错误与迁移",
@@ -5095,7 +5093,7 @@
           "name": "normalizeStoreConfig",
           "kind": "function",
           "signature": "export declare function normalizeStoreConfig(config?: IStoreProviderConfig, barrierScope?: object): IStoreConfigValue;",
-          "declarationLine": 93,
+          "declarationLine": 71,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Normalizes features and defaults before eagerly starting readiness factories within a caller cache scope. Top-level and nested defaults getter failures throw INVALID_CONFIG with original cause before any ready factory runs. Experimental flags become a frozen data-only dictionary.",
           "core": "config: Optional application IStoreProviderConfig; omitted disables all features and adds no barrier.\nbarrierScope: Caller-selected object identity isolating readiness factory caches; omitted creates a fresh scope per call.\nIStoreConfigValue with ready null or tracked {promise,status(),error()}; malformed configuration throws INVALID_CONFIG.\nfeatures: Application feature declarations normalized to explicit WASM and experimental booleans.\nOmitted: all features are disabled.\nready: Promises or zero-argument synchronous/async factories. Normalization eagerly invokes uncached factories before returning, caches factory results by scope plus factory identity, and separately caches each list Promise by scope plus array identity. Rejected factory results leave the factory cache; scopes are isolated. A changed array identity selects a new Provider generation and ReadyBoundary, so an old generation cannot release the new one; changing only the array does not rerun a successful cached factory.\nFactory result is awaited and discarded; rejection blocks the subtree and reaches its outer Error Boundary.\nNo barrier, unless WASM is enabled without one, which creates a rejected barrier.\nfallback: ReactNode rendered while readiness remains pending; rejected barriers throw instead of rendering this fallback.\n`null`: render no subtree while pending.\ndefaults: Application-readable defaults snapshot; it does not change existing or future Store construction options.\n`warnAsyncActions` is `false`.\nfeatures.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nfeatures.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.\ndefaults.warnAsyncActions: Application-readable default in useStoreConfig; the Provider does not pass it into createStore, so each Store must explicitly apply its own option.\n`false` in the normalized configuration.\nExpose an enabled application preference without changing any Store automatically.\nExpose a disabled application preference.",
@@ -5181,19 +5179,19 @@
               "name": "features",
               "type": "IStoreFeatures",
               "optional": true,
-              "description": "Omission disables wasm and every experimental feature."
+              "description": ""
             },
             {
               "name": "ready",
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
-              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work."
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`."
             },
             {
               "name": "fallback",
               "type": "ReactNode",
               "optional": true,
-              "description": "Displays this fallback while readiness barriers are pending; defaults to null."
+              "description": "Displays this fallback while readiness barriers are pending."
             },
             {
               "name": "defaults",
@@ -5287,24 +5285,24 @@
               "name": "features",
               "type": "IStoreFeatures",
               "optional": true,
-              "description": "Omission disables wasm and every experimental feature.",
-              "descriptionEn": "Omission disables wasm and every experimental feature.",
+              "description": "",
+              "descriptionEn": "",
               "descriptionZh": ""
             },
             {
               "name": "ready",
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
-              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work.",
-              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work.",
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
+              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
               "descriptionZh": ""
             },
             {
               "name": "fallback",
               "type": "ReactNode",
               "optional": true,
-              "description": "Displays this fallback while readiness barriers are pending; defaults to null.",
-              "descriptionEn": "Displays this fallback while readiness barriers are pending; defaults to null.",
+              "description": "Displays this fallback while readiness barriers are pending.",
+              "descriptionEn": "Displays this fallback while readiness barriers are pending.",
               "descriptionZh": ""
             },
             {
@@ -5322,7 +5320,7 @@
           "name": "readStoreFeature",
           "kind": "function",
           "signature": "export declare function readStoreFeature(config: IStoreConfigValue, path: IStoreFeaturePath): boolean;",
-          "declarationLine": 107,
+          "declarationLine": 80,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Synchronously reads a normalized feature path without throwing merely because it is disabled.",
           "core": "config: IStoreConfigValue returned by normalizeStoreConfig or useStoreConfig after checking for null.\npath: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\nBoolean enabled value; unknown or empty experimental names return false.\nfeatures: Normalized explicit WASM boolean and frozen experimental dictionary; only exact true is enabled.\ndefaults: Application defaults with explicit warnAsyncActions boolean; consumers decide whether to apply it to their Stores.\nready: Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.\nfeatures.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nfeatures.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.",
@@ -5403,27 +5401,27 @@
           "declaredConfiguration": [
             {
               "name": "features",
-              "type": "{ /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
               "optional": false,
-              "description": "Boolean feature projection, not a mutation-control interface."
+              "description": ""
             },
             {
               "name": "features.wasm",
               "type": "boolean",
               "optional": false,
-              "description": "False by default; true requires a readiness barrier before the Provider renders children."
+              "description": ""
             },
             {
               "name": "features.experimental",
               "type": "Readonly<Record<string, boolean>>",
               "optional": false,
-              "description": "Frozen null-prototype map of own enumerable data flags, enabled only when exactly true."
+              "description": ""
             },
             {
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": false,
-              "description": "Snapshot of application defaults, including normalized warnAsyncActions=false by default."
+              "description": ""
             },
             {
               "name": "ready",
@@ -5515,34 +5513,34 @@
           "configuration": [
             {
               "name": "features",
-              "type": "{ /** False by default; true requires a readiness barrier before the Provider renders children. */ readonly wasm: boolean; /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */ readonly experimental: Readonly<Record<string, boolean>>; }",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
               "optional": false,
-              "description": "Boolean feature projection, not a mutation-control interface.",
-              "descriptionEn": "Boolean feature projection, not a mutation-control interface.",
+              "description": "Groups `features.wasm`, `features.experimental`; configure the nested fields below.",
+              "descriptionEn": "Groups `features.wasm`, `features.experimental`; configure the nested fields below.",
               "descriptionZh": ""
             },
             {
               "name": "features.wasm",
               "type": "boolean",
               "optional": false,
-              "description": "False by default; true requires a readiness barrier before the Provider renders children.",
-              "descriptionEn": "False by default; true requires a readiness barrier before the Provider renders children.",
+              "description": "",
+              "descriptionEn": "",
               "descriptionZh": ""
             },
             {
               "name": "features.experimental",
               "type": "Readonly<Record<string, boolean>>",
               "optional": false,
-              "description": "Frozen null-prototype map of own enumerable data flags, enabled only when exactly true.",
-              "descriptionEn": "Frozen null-prototype map of own enumerable data flags, enabled only when exactly true.",
+              "description": "",
+              "descriptionEn": "",
               "descriptionZh": ""
             },
             {
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": false,
-              "description": "Snapshot of application defaults, including normalized warnAsyncActions=false by default.",
-              "descriptionEn": "Snapshot of application defaults, including normalized warnAsyncActions=false by default.",
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
               "descriptionZh": ""
             },
             {
@@ -5696,7 +5694,7 @@
           "name": "StoreProvider",
           "kind": "function",
           "signature": "export declare function StoreProvider({ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps): import(\"react\").JSX.Element;",
-          "declarationLine": 35,
+          "declarationLine": 22,
           "source": "packages/store-react/dist/StoreProvider.d.ts",
           "purpose": "Provides Registry and feature/readiness contexts to a React subtree. Pending barriers render fallback; rejection reaches an outer Error Boundary and new barrier-list identity creates a new readiness generation.",
           "core": "props: JSX props object destructured by the component: children, optional registry/runtime ownership, disposal policy and feature/readiness config.\nReact element tree; internal registries default to disposal on final unmount and external registries remain borrowed by default.\nchildren: React subtree receiving configuration and Registry contexts after readiness succeeds.\nregistry: Caller-owned StoreRegistry returned by createStoreRegistry or new StoreRegistry; when runtime is also supplied it must be the same object as registry.runtime.\nCreate an internal registry for this Provider scope.\nruntime: IRuntime used for an internally created Registry; when an external registry is supplied it may only confirm the same runtime identity.\nExternal registry.runtime, or a new createRuntime for an internal registry.\ndisposeOnUnmount: Whether final Provider release disposes the registry, its atomStore and owned registrations after a task delay; Runtime remains outside this ownership.\n`true` for internal registries, `false` for injected external registries; SSR runs no unmount effects.\nDispose the registry once no retained Provider owner remains.\nLeave registry disposal to the external application owner.\nconfig: Optional IStoreProviderConfig for feature declarations, readiness, pending fallback and readable defaults.\nAll features disabled with no readiness barrier.\nconfig.features: Application feature declarations normalized to explicit WASM and experimental booleans.\nOmitted: all features are disabled.\nconfig.ready: Promises or zero-argument synchronous/async factories. Normalization eagerly invokes uncached factories before returning, caches factory results by scope plus factory identity, and separately caches each list Promise by scope plus array identity. Rejected factory results leave the factory cache; scopes are isolated. A changed array identity selects a new Provider generation and ReadyBoundary, so an old generation cannot release the new one; changing only the array does not rerun a successful cached factory.\nFactory result is awaited and discarded; rejection blocks the subtree and reaches its outer Error Boundary.\nNo barrier, unless WASM is enabled without one, which creates a rejected barrier.\nconfig.fallback: ReactNode rendered while readiness remains pending; rejected barriers throw instead of rendering this fallback.\n`null`: render no subtree while pending.\nconfig.defaults: Application-readable defaults snapshot; it does not change existing or future Store construction options.\n`warnAsyncActions` is `false`.\nconfig.features.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nconfig.features.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.\nconfig.defaults.warnAsyncActions: Application-readable default in useStoreConfig; the Provider does not pass it into createStore, so each Store must explicitly apply its own option.\n`false` in the normalized configuration.\nExpose an enabled application preference without changing any Store automatically.\nExpose a disabled application preference.\nInstalls scoped Registry and configuration contexts; definition hooks gain one local AtomStore and token hooks resolve registered values.",
@@ -5769,7 +5767,7 @@
               "name": "children",
               "type": "ReactNode",
               "optional": false,
-              "description": "Required subtree shown after readiness, if any, permits rendering."
+              "description": "Normalizes a ready rejection without coercing hostile reasons or replacing Error identity. */ export function normalizeStoreReadyError(reason: unknown): Error { return reason instanceof Error ? reason : createStoreReactError(StoreReactErrorCode.readyRejected, StoreReactErrorText.readyRejected, { cause: reason }) } /** Provider inputs separating registry ownership, Runtime selection and optional readiness gating. */ export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering."
             },
             {
               "name": "registry",
@@ -5781,7 +5779,7 @@
               "name": "runtime",
               "type": "IRuntime",
               "optional": true,
-              "description": "Runtime for an internal registry; when registry is supplied, this must be its exact Runtime."
+              "description": ""
             },
             {
               "name": "disposeOnUnmount",
@@ -5799,19 +5797,19 @@
               "name": "config.features",
               "type": "IStoreFeatures",
               "optional": true,
-              "description": "Omission disables wasm and every experimental feature."
+              "description": ""
             },
             {
               "name": "config.ready",
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
-              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work."
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`."
             },
             {
               "name": "config.fallback",
               "type": "ReactNode",
               "optional": true,
-              "description": "Displays this fallback while readiness barriers are pending; defaults to null."
+              "description": "Displays this fallback while readiness barriers are pending."
             },
             {
               "name": "config.defaults",
@@ -5975,8 +5973,8 @@
               "name": "children",
               "type": "ReactNode",
               "optional": false,
-              "description": "Required subtree shown after readiness, if any, permits rendering.",
-              "descriptionEn": "Required subtree shown after readiness, if any, permits rendering.",
+              "description": "Normalizes a ready rejection without coercing hostile reasons or replacing Error identity. */ export function normalizeStoreReadyError(reason: unknown): Error { return reason instanceof Error ? reason : createStoreReactError(StoreReactErrorCode.readyRejected, StoreReactErrorText.readyRejected, { cause: reason }) } /** Provider inputs separating registry ownership, Runtime selection and optional readiness gating. */ export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering.",
+              "descriptionEn": "Normalizes a ready rejection without coercing hostile reasons or replacing Error identity. */ export function normalizeStoreReadyError(reason: unknown): Error { return reason instanceof Error ? reason : createStoreReactError(StoreReactErrorCode.readyRejected, StoreReactErrorText.readyRejected, { cause: reason }) } /** Provider inputs separating registry ownership, Runtime selection and optional readiness gating. */ export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering.",
               "descriptionZh": ""
             },
             {
@@ -5992,7 +5990,7 @@
               "type": "IRuntime",
               "optional": true,
               "description": "token 的 debugName 必填且非空，类型是 IReactiveStore<ICounter>。每份 Store 的 options.runtime 使用对应 Registry.runtime；register 的 options.owned 本例 true、默认 false。StoreProvider.registry 显式传入，children 必填；useProvidedStore 的 selector 返回 count，isEqual 默认 Object.is。",
-              "descriptionEn": "Runtime for an internal registry; when registry is supplied, this must be its exact Runtime.",
+              "descriptionEn": "",
               "descriptionZh": "token 的 debugName 必填且非空，类型是 IReactiveStore<ICounter>。每份 Store 的 options.runtime 使用对应 Registry.runtime；register 的 options.owned 本例 true、默认 false。StoreProvider.registry 显式传入，children 必填；useProvidedStore 的 selector 返回 count，isEqual 默认 Object.is。"
             },
             {
@@ -6015,24 +6013,24 @@
               "name": "config.features",
               "type": "IStoreFeatures",
               "optional": true,
-              "description": "Omission disables wasm and every experimental feature.",
-              "descriptionEn": "Omission disables wasm and every experimental feature.",
+              "description": "",
+              "descriptionEn": "",
               "descriptionZh": ""
             },
             {
               "name": "config.ready",
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
-              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work.",
-              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier unless wasm is enabled; factory execution may start during normalization, so use idempotent work or a caller-owned Promise when render retries must not repeat application work.",
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
+              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
               "descriptionZh": ""
             },
             {
               "name": "config.fallback",
               "type": "ReactNode",
               "optional": true,
-              "description": "Displays this fallback while readiness barriers are pending; defaults to null.",
-              "descriptionEn": "Displays this fallback while readiness barriers are pending; defaults to null.",
+              "description": "Displays this fallback while readiness barriers are pending.",
+              "descriptionEn": "Displays this fallback while readiness barriers are pending.",
               "descriptionZh": ""
             },
             {
@@ -6049,7 +6047,7 @@
         {
           "name": "StoreProviderState",
           "kind": "const",
-          "signature": "export declare const StoreProviderState: { /** At least one normalized barrier has not settled; Provider renders fallback. */ readonly pending: 'pending'; /** All barriers fulfilled and the child subtree may render. */ readonly ready: 'ready'; /** A barrier rejected; the Provider raises its normalized error during rendering. */ readonly error: 'error'; };",
+          "signature": "export declare const StoreProviderState: { readonly pending: 'pending'; readonly ready: 'ready'; readonly error: 'error'; };",
           "declarationLine": 2,
           "source": "packages/store-react/dist/provider-state-constants.d.ts",
           "purpose": "Readiness state vocabulary selecting pending fallback, fulfilled subtree or render-time error propagation.",
@@ -6067,7 +6065,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly pending: 'pending';",
-              "description": "At least one normalized barrier has not settled; Provider renders fallback.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'pending'"
             },
@@ -6076,7 +6074,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly ready: 'ready';",
-              "description": "All barriers fulfilled and the child subtree may render.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'ready'"
             },
@@ -6085,7 +6083,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: 'error';",
-              "description": "A barrier rejected; the Provider raises its normalized error during rendering.",
+              "description": null,
               "parameterDetails": [],
               "returns": "'error'"
             }
@@ -6094,7 +6092,7 @@
           "aliasOf": "StoreProviderState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreProviderState: { /** At least one normalized barrier has not settled; Provider renders fallback. */ readonly pending: 'pending'; /** All barriers fulfilled and the child subtree may render. */ readonly ready: 'ready'; /** A barrier rejected; the Provider raises its normalized error during rendering. */ readonly error: 'error'; };"
+            "export declare const StoreProviderState: { readonly pending: 'pending'; readonly ready: 'ready'; readonly error: 'error'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6133,7 +6131,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/provider-state-constants.d.ts:StoreProviderState:export declare const StoreProviderState: { /** At least one normalized barrier has not settled; Provider renders fallback. */ readonly pending: 'pending'; /** All barriers fulfilled and the child subtree may render. */ readonly ready: 'ready'; /** A barrier rejected; the Provider raises its normalized error during rendering. */ readonly error: 'error'; };",
+          "identity": "packages/store-react/dist/provider-state-constants.d.ts:StoreProviderState:export declare const StoreProviderState: { readonly pending: 'pending'; readonly ready: 'ready'; readonly error: 'error'; };",
           "guidance": [
             {
               "id": "配置-特性与就绪屏障",
@@ -6219,8 +6217,8 @@
         {
           "name": "StoreReactErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause` * for the original reason; Error rejections, including frozen Errors, retain their identity * instead of receiving this code. */ readonly readyRejected: 'READY_REJECTED'; };",
-          "declarationLine": 9,
+          "signature": "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: 'READY_REJECTED'; };",
+          "declarationLine": 10,
           "source": "packages/store-react/dist/error-code.d.ts",
           "purpose": "Stable codes for Registry admission/disposal, Provider requirements, feature gates and readiness failures.",
           "core": "registryDisposed: Registry lookup or mutation after its lifecycle left open.\nregistryDisposalFailed: Owned cleanup failed: a mutable native uncoded error keeps identity and gains this code; frozen or non-Error values remain on cause/errors. Foreign coded errors keep their owner; multiple failures form an ordered native AggregateError.\nproviderRequired: Provider-dependent hook or feature assertion has no Provider configuration.\nfeatureDisabled: Feature assertion targets a flag not explicitly enabled.\nstoreMissing: Required token has no current Registry entry.\nstoreDuplicate: Register attempts to insert an already registered token.\ncrossRuntime: Registered reactive value belongs to another Runtime graph.\ninvalidConfig: Malformed token, ownership, Provider config or readiness declaration.\nreadyRejected: Readiness rejected with a non-Error value; wrapper retains that original value in cause.",
@@ -6309,7 +6307,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly readyRejected: 'READY_REJECTED';",
-              "description": "A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause` * for the original reason; Error rejections, including frozen Errors, retain their identity * instead of receiving this code.",
+              "description": "The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure.",
               "parameterDetails": [],
               "returns": "'READY_REJECTED'"
             }
@@ -6318,7 +6316,7 @@
           "aliasOf": "StoreReactErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause` * for the original reason; Error rejections, including frozen Errors, retain their identity * instead of receiving this code. */ readonly readyRejected: 'READY_REJECTED'; };"
+            "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: 'READY_REJECTED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6357,7 +6355,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/error-code.d.ts:StoreReactErrorCode:export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign package identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause` * for the original reason; Error rejections, including frozen Errors, retain their identity * instead of receiving this code. */ readonly readyRejected: 'READY_REJECTED'; };",
+          "identity": "packages/store-react/dist/error-code.d.ts:StoreReactErrorCode:export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign package identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: 'READY_REJECTED'; };",
           "guidance": [
             {
               "id": "错误与迁移",
@@ -6437,8 +6435,8 @@
         {
           "name": "StoreRegistry",
           "kind": "class",
-          "signature": "export declare class StoreRegistry implements IDisposable { #private; /** Selected Runtime; even a registry-created Runtime is not disposed by registry cleanup. */ readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; /** Create an isolated atom store in the supplied Runtime, or a fresh Runtime when omitted. */ constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; /** True from closing onward, before asynchronous owned cleanup has necessarily settled. */ get disposed(): boolean; /** * Register one token, defaulting owned to false. Duplicate token, foreign Runtime ownership and * closed-registry admission reject. The returned idempotent disposer removes only this entry; * owned cleanup starts synchronously, with later rejection reported rather than awaited. */ register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; /** * Publish a new entry, defaulting owned to false, then release a different previously owned * value. An old registration disposer cannot remove this replacement. Cleanup failure does not * restore the old entry; asynchronous cleanup is reported and not added to whole-registry * completion. */ replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; /** * Read a registered value or undefined; use has to distinguish an explicitly registered * undefined. */ get<T>(token: IStoreToken<T>): T | undefined; /** Read a registered value or throw STORE_MISSING; registry closure throws REGISTRY_DISPOSED. */ require<T>(token: IStoreToken<T>): T; /** Test exact token membership while open, without creating a reactive dependency. */ has<T>(token: IStoreToken<T>): boolean; /** * Remove a token and return whether it existed. By default start owned cleanup; false detaches * without disposing. Later cleanup rejection is reported, not awaited by disposeAsync. */ remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * Retain a committed Provider and return an idempotent release. If this release requests disposal * and leaves no retainers, schedule a task to recheck the count/generation before disposing. A * newer retain cancels that scheduled retirement, including StrictMode effect replay. */ retain(disposeOnRelease: boolean): IDisposer; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }",
-          "declarationLine": 30,
+          "signature": "export declare class StoreRegistry implements IDisposable { #private; readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; get disposed(): boolean; register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; get<T>(token: IStoreToken<T>): T | undefined; require<T>(token: IStoreToken<T>): T; has<T>(token: IStoreToken<T>): boolean; remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an * internally-owned registry between those two phases. */ retain(disposeOnRelease: boolean): IDisposer; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }",
+          "declarationLine": 16,
           "source": "packages/store-react/dist/provider-registry.d.ts",
           "purpose": "Constructs the same runtime-bound registry as createStoreRegistry, holding typed registrations and a registry-local AtomStore.",
           "core": "runtime: IRuntime from @migaia/reactive that owns the source nodes; this adapter never disposes it.\nOwned registry; an omitted Runtime creates a fresh graph, not the global default.\nruntime: Owning graph used for cross-runtime admission and lifecycle failure reporting; never disposed by this registry.\natomStore: Registry-local IAtomStore from store-keyed; registries remain isolated even when sharing one Runtime.\nlifecycle: Canonical ILifecycleState: public admission enters closing before any owned disposer runs, then reaches terminal only after every tracked disposer settles.\ndisposed: True as soon as whole-registry disposal starts, including during the first owned callback; register/replace/get/require/has/remove and retain reject. Use whenTerminal for physical completion.\nwhenTerminal: Waits for the whole-registry disposal ledger to finish; it does not initiate disposal or wait for ad-hoc remove/replace cleanup.\nPromise of physical terminal completion; inspect disposeAsync for cleanup failures.\nregister: Registers one token/value pair after runtime admission; duplicate token registration rejects. Use the original token returned by createStoreToken.\nregister.token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nregister.value: Application-owned value; reactive ownership, if present, must match registry.runtime.\nregister.options: Optional IStoreRegistrationOptions; owned defaults false and nonobject or nonboolean flags reject.\nIdempotent unregister function; it only removes its original entry and disposes it when owned, leaving replacements untouched.\nreplace: Installs or replaces a token entry. A different previously owned value is disposed after replacement, so a cleanup throw does not undo the new entry.\nreplace.token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nreplace.value: Replacement value admitted to this Runtime ownership boundary.\nreplace.options: Optional ownership for the new entry, default false; not inherited from the old entry.\nNothing; the new value is registered, or validation/old synchronous cleanup fails.\nget: Looks up a token synchronously without adding a React subscription to registry changes.\nget.token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nRegistered value, or undefined if absent; throws after registry closure.\nrequire: Reads an existing registration and rejects a missing token with STORE_MISSING.\nrequire.token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nRegistered value preserving its original identity.\nhas: Checks whether this exact token key has a current entry; no source data subscription is created.\nhas.token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nTrue for a present entry, including one storing undefined.\nremove: Deletes an entry before optional owned-value cleanup; asynchronous cleanup failures are reported through Runtime and not joined by later disposeAsync.\nremove.token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nremove.disposeOwned: Defaults true; false removes the registration while retaining any owned value for external cleanup.\nTrue if an entry was removed, false if absent; synchronous cleanup can throw after removal.\nretain: Acquires one Provider retention. Its release function schedules disposal via setTimeout(0) only if requested and the registry still has zero owners in that generation.\nretain.disposeOnRelease: True requests terminal registry disposal after the last owner releases; false only drops this retention.\nIdempotent release callback; repeated release cannot decrement ownership twice.\ndispose: Closes public admission before callbacks, starts reverse-registration-order owned cleanup, then atomStore cleanup. The shared async completion is published first, so reentrant disposeAsync returns the same Promise. Every cleanup is attempted; thenables stay observed and tracked until terminal completion.\nNothing; idempotent after the first start. One mutable native uncoded failure retains object/type/stack and gains REGISTRY_DISPOSAL_FAILED; frozen or non-Error failures remain on cause/errors. Complete foreign identity stays unchanged; multiple failures form AggregateError in cleanup order.\ndisposeAsync: Starts disposal if needed and returns one stable shared completion, including thenables started by an earlier synchronous dispose.\nOne stable Promise resolving at cleanup completion, including reentrant calls. Failures use the same native identity/cause/foreign-owner policy as dispose; multiple failures reject as ordered AggregateError.",
@@ -6461,7 +6459,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly runtime: IRuntime;",
-              "description": "Selected Runtime; even a registry-created Runtime is not disposed by registry cleanup.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -6497,7 +6495,7 @@
               "kind": "get",
               "optional": false,
               "signature": "get disposed(): boolean;",
-              "description": "True from closing onward, before asynchronous owned cleanup has necessarily settled.",
+              "description": null,
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -6506,7 +6504,7 @@
               "kind": "method",
               "optional": false,
               "signature": "register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer;",
-              "description": "Register one token, defaulting owned to false. Duplicate token, foreign Runtime ownership and closed-registry admission reject. The returned idempotent disposer removes only this entry; owned cleanup starts synchronously, with later rejection reported rather than awaited.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "token",
@@ -6531,7 +6529,7 @@
               "kind": "method",
               "optional": false,
               "signature": "replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void;",
-              "description": "Publish a new entry, defaulting owned to false, then release a different previously owned value. An old registration disposer cannot remove this replacement. Cleanup failure does not restore the old entry; asynchronous cleanup is reported and not added to whole-registry completion.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "token",
@@ -6556,7 +6554,7 @@
               "kind": "method",
               "optional": false,
               "signature": "get<T>(token: IStoreToken<T>): T | undefined;",
-              "description": "Read a registered value or undefined; use has to distinguish an explicitly registered undefined.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "token",
@@ -6571,7 +6569,7 @@
               "kind": "method",
               "optional": false,
               "signature": "require<T>(token: IStoreToken<T>): T;",
-              "description": "Read a registered value or throw STORE_MISSING; registry closure throws REGISTRY_DISPOSED.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "token",
@@ -6586,7 +6584,7 @@
               "kind": "method",
               "optional": false,
               "signature": "has<T>(token: IStoreToken<T>): boolean;",
-              "description": "Test exact token membership while open, without creating a reactive dependency.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "token",
@@ -6601,7 +6599,7 @@
               "kind": "method",
               "optional": false,
               "signature": "remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean;",
-              "description": "Remove a token and return whether it existed. By default start owned cleanup; false detaches without disposing. Later cleanup rejection is reported, not awaited by disposeAsync.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "token",
@@ -6621,7 +6619,7 @@
               "kind": "method",
               "optional": false,
               "signature": "retain(disposeOnRelease: boolean): IDisposer;",
-              "description": "Retain a committed Provider and return an idempotent release. If this release requests disposal and leaves no retainers, schedule a task to recheck the count/generation before disposing. A newer retain cancels that scheduled retirement, including StrictMode effect replay.",
+              "description": "React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an internally-owned registry between those two phases.",
               "parameterDetails": [
                 {
                   "name": "disposeOnRelease",
@@ -6654,7 +6652,7 @@
           "aliasOf": "StoreRegistry",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class StoreRegistry implements IDisposable { #private; /** Selected Runtime; even a registry-created Runtime is not disposed by registry cleanup. */ readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; /** Create an isolated atom store in the supplied Runtime, or a fresh Runtime when omitted. */ constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; /** True from closing onward, before asynchronous owned cleanup has necessarily settled. */ get disposed(): boolean; /** * Register one token, defaulting owned to false. Duplicate token, foreign Runtime ownership and * closed-registry admission reject. The returned idempotent disposer removes only this entry; * owned cleanup starts synchronously, with later rejection reported rather than awaited. */ register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; /** * Publish a new entry, defaulting owned to false, then release a different previously owned * value. An old registration disposer cannot remove this replacement. Cleanup failure does not * restore the old entry; asynchronous cleanup is reported and not added to whole-registry * completion. */ replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; /** * Read a registered value or undefined; use has to distinguish an explicitly registered * undefined. */ get<T>(token: IStoreToken<T>): T | undefined; /** Read a registered value or throw STORE_MISSING; registry closure throws REGISTRY_DISPOSED. */ require<T>(token: IStoreToken<T>): T; /** Test exact token membership while open, without creating a reactive dependency. */ has<T>(token: IStoreToken<T>): boolean; /** * Remove a token and return whether it existed. By default start owned cleanup; false detaches * without disposing. Later cleanup rejection is reported, not awaited by disposeAsync. */ remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * Retain a committed Provider and return an idempotent release. If this release requests disposal * and leaves no retainers, schedule a task to recheck the count/generation before disposing. A * newer retain cancels that scheduled retirement, including StrictMode effect replay. */ retain(disposeOnRelease: boolean): IDisposer; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }"
+            "export declare class StoreRegistry implements IDisposable { #private; readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; get disposed(): boolean; register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; get<T>(token: IStoreToken<T>): T | undefined; require<T>(token: IStoreToken<T>): T; has<T>(token: IStoreToken<T>): boolean; remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an * internally-owned registry between those two phases. */ retain(disposeOnRelease: boolean): IDisposer; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -6701,7 +6699,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/provider-registry.d.ts:StoreRegistry:export declare class StoreRegistry implements IDisposable { #private; /** Selected Runtime; even a registry-created Runtime is not disposed by registry cleanup. */ readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; /** Create an isolated atom store in the supplied Runtime, or a fresh Runtime when omitted. */ constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; /** True from closing onward, before asynchronous owned cleanup has necessarily settled. */ get disposed(): boolean; /** * Register one token, defaulting owned to false. Duplicate token, foreign Runtime ownership and * closed-registry admission reject. The returned idempotent disposer removes only this entry; * owned cleanup starts synchronously, with later rejection reported rather than awaited. */ register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; /** * Publish a new entry, defaulting owned to false, then release a different previously owned * value. An old registration disposer cannot remove this replacement. Cleanup failure does not * restore the old entry; asynchronous cleanup is reported and not added to whole-registry * completion. */ replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; /** * Read a registered value or undefined; use has to distinguish an explicitly registered * undefined. */ get<T>(token: IStoreToken<T>): T | undefined; /** Read a registered value or throw STORE_MISSING; registry closure throws REGISTRY_DISPOSED. */ require<T>(token: IStoreToken<T>): T; /** Test exact token membership while open, without creating a reactive dependency. */ has<T>(token: IStoreToken<T>): boolean; /** * Remove a token and return whether it existed. By default start owned cleanup; false detaches * without disposing. Later cleanup rejection is reported, not awaited by disposeAsync. */ remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * Retain a committed Provider and return an idempotent release. If this release requests disposal * and leaves no retainers, schedule a task to recheck the count/generation before disposing. A * newer retain cancels that scheduled retirement, including StrictMode effect replay. */ retain(disposeOnRelease: boolean): IDisposer; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }",
+          "identity": "packages/store-react/dist/provider-registry.d.ts:StoreRegistry:export declare class StoreRegistry implements IDisposable { #private; readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; get disposed(): boolean; register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; get<T>(token: IStoreToken<T>): T | undefined; require<T>(token: IStoreToken<T>): T; has<T>(token: IStoreToken<T>): boolean; remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an * internally-owned registry between those two phases. */ retain(disposeOnRelease: boolean): IDisposer; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -6711,7 +6709,7 @@
           "name": "useAssertStoreFeature",
           "kind": "function",
           "signature": "export declare function useAssertStoreFeature(path: IStoreFeaturePath, apiName?: string): void;",
-          "declarationLine": 128,
+          "declarationLine": 96,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Guards a component API against missing configuration or disabled features during rendering.",
           "core": "path: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\napiName: Optional application API name for diagnostic text; defaults to this API.\nNothing when enabled; otherwise throws PROVIDER_REQUIRED or FEATURE_DISABLED.",
@@ -6877,7 +6875,7 @@
           "name": "useAsyncAtomValue",
           "kind": "function",
           "signature": "export declare function useAsyncAtomValue<T>(atom: IAsyncAtom<T>): T;",
-          "declarationLine": 34,
+          "declarationLine": 16,
           "source": "packages/store-react/dist/useAtom.d.ts",
           "purpose": "Reads atom.resource through the same render-time Resource unwrapping as useResourceValue; it does not create or own the Resource.",
           "core": "atom: Application-owned object containing a stable Resource<T> in its readonly resource property.\nSuccessful resource data; idle/pending throws Promise and error/cancelled throws the original failure.",
@@ -6955,7 +6953,7 @@
           "name": "useAtom",
           "kind": "function",
           "signature": "export declare function useAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): readonly [T, (...args: Args) => Result];",
-          "declarationLine": 23,
+          "declarationLine": 10,
           "source": "packages/store-react/dist/useAtom.d.ts",
           "purpose": "Combines atom value subscription and stable writer without changing Provider routing or source ownership.",
           "core": "atom: Stable external IWritableAtom; definitions route through the current Provider when available.\nReadonly [current value, writer] pair; writer preserves Args, Result and synchronous failures.",
@@ -7033,7 +7031,7 @@
           "name": "useAtomDefinition",
           "kind": "function",
           "signature": "export declare function useAtomDefinition<T>(definition: IAtomDefinition<T>): T;",
-          "declarationLine": 7,
+          "declarationLine": 2,
           "source": "packages/store-react/dist/useAtomDefinition.d.ts",
           "purpose": "Reads and subscribes to exactly the current Provider AtomStore, using speculative preview snapshots without publishing derived edges during render.",
           "core": "definition: IAtomDefinition returned by the external atomDef, derivedDef or familyDef APIs.\nCurrent definition value; missing Provider throws PROVIDER_REQUIRED.",
@@ -7114,7 +7112,7 @@
           "name": "useAtomValue",
           "kind": "function",
           "signature": "export declare function useAtomValue<T>(atom: IReadableAtom<T>): T;",
-          "declarationLine": 14,
+          "declarationLine": 7,
           "source": "packages/store-react/dist/useAtom.d.ts",
           "purpose": "Reads an atom protocol value; when both Provider and atomDefinition exist, uses the Provider AtomStore and disables direct-node subscription.",
           "core": "atom: Stable IReadableAtom from the external store-keyed protocol; atomDefinition optionally bridges it to scoped state.\nCurrent scoped or direct atom value; hook subscription cleanup does not dispose the caller atom.",
@@ -7192,7 +7190,7 @@
           "name": "useNodeValue",
           "kind": "function",
           "signature": "export declare function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled?: boolean): T;",
-          "declarationLine": 19,
+          "declarationLine": 26,
           "source": "packages/store-react/dist/useNode.d.ts",
           "purpose": "Subscribes to one stable, ownership-admitted node through an Effect and reads snapshots using peek; ownership mismatch throws during render.",
           "core": "node: Stable reactive-owned IStableNode with tracked value and untracked peek; a plain lookalike without reactive ownership is not sufficient.\nruntime: IRuntime from @migaia/reactive that owns the source nodes; this adapter never disposes it.\nenabled: Defaults true. False disables subscribing but still validates ownership and reads the current peek snapshot.\nCurrent node.peek result; enabled false does not freeze snapshots on parent rerenders.",
@@ -7295,7 +7293,7 @@
           "name": "useProvidedStore",
           "kind": "function",
           "signature": "export declare function useProvidedStore<S extends Record<string, unknown>, Result>(token: IStoreToken<IReactiveStore<S>>, selector: (state: IStoreShape<S>) => Result, isEqual?: (left: Result, right: Result) => boolean): Result;",
-          "declarationLine": 24,
+          "declarationLine": 13,
           "source": "packages/store-react/dist/provider.d.ts",
           "purpose": "Resolves a Store token from the nearest Provider and subscribes to the selected fields through useStore; it inherits async Store readiness.",
           "core": "token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nselector: Synchronous callback receiving the resolved Store state view and returning render data; throws reach rendering.\nisEqual: Optional synchronous comparator receiving previous and next selector results; return true to reuse the prior snapshot. Defaults to Object.is; throws propagate.\nCurrent selected Store value; missing Provider/registration throws before selection.",
@@ -7400,7 +7398,7 @@
           "name": "useResource",
           "kind": "function",
           "signature": "export declare function useResource<T>(res: Resource<T>): IResourceState<T>;",
-          "declarationLine": 36,
+          "declarationLine": 9,
           "source": "packages/store-react/dist/useStore.d.ts",
           "purpose": "Subscribes to a Resource state machine without automatically unwrapping or throwing its pending/error state.",
           "core": "res: Stable Resource<T> from @migaia/resource; its Runtime owns tracking.\nCurrent external IResourceState<T>, including idle, pending, success, error or cancelled.",
@@ -7478,7 +7476,7 @@
           "name": "useResourceValue",
           "kind": "function",
           "signature": "export declare function useResourceValue<T>(resource: Resource<T>): T;",
-          "declarationLine": 29,
+          "declarationLine": 15,
           "source": "packages/store-react/dist/useAtom.d.ts",
           "purpose": "Unwraps a subscribed Resource during render: returns success data, throws its Promise for idle/pending, and throws the original error for error/cancelled.",
           "core": "resource: Stable caller-owned Resource<T> from @migaia/resource, rendered under appropriate Suspense and Error Boundary owners.\nSuccessful T value; pending suspends and failure propagates through React rendering.",
@@ -7558,7 +7556,7 @@
           "name": "useSetAtom",
           "kind": "function",
           "signature": "export declare function useSetAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): (...args: Args) => Result;",
-          "declarationLine": 21,
+          "declarationLine": 9,
           "source": "packages/store-react/dist/useAtom.d.ts",
           "purpose": "Returns a stable writer using Provider AtomStore when a definition bridge exists, otherwise atom.write; it creates no value subscription.",
           "core": "atom: Stable external IWritableAtom with declared Args and Result.\nCallback forwarding original arguments and return value synchronously; write failures propagate unchanged.",
@@ -7636,7 +7634,7 @@
           "name": "useSetAtomDefinition",
           "kind": "function",
           "signature": "export declare function useSetAtomDefinition<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>): (...args: Args) => Result;",
-          "declarationLine": 13,
+          "declarationLine": 3,
           "source": "packages/store-react/dist/useAtomDefinition.d.ts",
           "purpose": "Returns a stable writer for one writable definition in the current Provider AtomStore without subscribing to its value.",
           "core": "definition: External IWritableAtomDefinition whose Args and Result define the returned callback.\nSynchronous callback forwarding arguments to AtomStore.set and preserving its result/failures; missing Provider throws.",
@@ -7715,7 +7713,7 @@
           "name": "useSignal",
           "kind": "function",
           "signature": "export declare function useSignal<T>(s: IReactiveSignal<T>): readonly [T, (next: T) => void];",
-          "declarationLine": 24,
+          "declarationLine": 7,
           "source": "packages/store-react/dist/useStore.d.ts",
           "purpose": "Reads one signal through the stable-node path and returns a setter stable for that signal identity, without requiring a Provider.",
           "core": "s: IReactiveSignal created in its owning Runtime; caller retains signal lifetime.\nReadonly pair [value, setter]; setter(next) assigns the exact value synchronously, returns void and propagates write failures.",
@@ -7793,7 +7791,7 @@
           "name": "useStore",
           "kind": "function",
           "signature": "export declare function useStore<S extends Record<string, unknown>, R>(store: IReactiveStore<S>, selector: (state: IStoreShape<S>) => R, isEqual?: (a: R, b: R) => boolean): R;",
-          "declarationLine": 30,
+          "declarationLine": 8,
           "source": "packages/store-react/dist/useStore.d.ts",
           "purpose": "Selectively subscribes to Store fields using its own Runtime; async Stores suspend through storeReady before the selector runs. No Provider is required.",
           "core": "store: Stable IReactiveStore returned by createStore from store-light; the caller retains ownership.\nselector: Synchronous callback receiving the Store state view and returning render data; reads establish dependencies and throws reach render.\nisEqual: Optional synchronous comparator receiving previous and next selector results; return true to reuse the prior snapshot. Defaults to Object.is; throws propagate.\nCurrent selected value; equality preserves the prior snapshot reference.",
@@ -7974,7 +7972,7 @@
           "name": "useStoreConfig",
           "kind": "function",
           "signature": "export declare function useStoreConfig(): IStoreConfigValue | null;",
-          "declarationLine": 118,
+          "declarationLine": 86,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Reads configuration context independently of Registry lookup; missing Provider returns null without throwing.",
           "core": "Current IStoreConfigValue or null; defaults remain application-readable data.",
@@ -8116,7 +8114,7 @@
           "name": "useStoreFeature",
           "kind": "function",
           "signature": "export declare function useStoreFeature(path: IStoreFeaturePath): boolean;",
-          "declarationLine": 123,
+          "declarationLine": 91,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Reads a normalized feature flag in the current context; returns false when no configuration Provider exists.",
           "core": "path: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\nTrue only for an explicitly enabled feature.",
@@ -8272,7 +8270,7 @@
           "name": "useStoreFromProvider",
           "kind": "function",
           "signature": "export declare function useStoreFromProvider<T>(token: IStoreToken<T>): T;",
-          "declarationLine": 18,
+          "declarationLine": 12,
           "source": "packages/store-react/dist/provider.d.ts",
           "purpose": "Requires one registered token from the nearest Provider; registry entry replacement alone is not an external-store subscription.",
           "core": "token: The exact IStoreToken returned by createStoreToken; reuse that object for registration and lookup. Equal debug names do not share identity.\nExact registered value; missing Provider or registration throws its corresponding stable code.",
@@ -8350,7 +8348,7 @@
           "name": "useStoreRegistry",
           "kind": "function",
           "signature": "export declare function useStoreRegistry(): import(\"./provider-registry.js\").StoreRegistry;",
-          "declarationLine": 11,
+          "declarationLine": 10,
           "source": "packages/store-react/dist/provider.d.ts",
           "purpose": "Reads the current Registry context without creating a new registry or subscribing to entry replacements.",
           "core": "Current StoreRegistry; missing Provider throws PROVIDER_REQUIRED.",
@@ -8414,7 +8412,7 @@
           "name": "useStoreResource",
           "kind": "function",
           "signature": "export declare function useStoreResource<T>(resource: IStoreResource<T>): T;",
-          "declarationLine": 10,
+          "declarationLine": 4,
           "source": "packages/store-react/dist/useStore.d.ts",
           "purpose": "Subscribes to the store-light resource protocol, captures a render snapshot and commits its lease in layout; previous committed leases release after replacement.",
           "core": "resource: Stable IStoreResource field from store-light; distinct from Resource<T> and retained by its source Store owner.\nCaptured snapshot value; resource read failures or suspension remain governed by its captureSnapshot contract.",
@@ -8492,7 +8490,7 @@
           "name": "useStoreRuntime",
           "kind": "function",
           "signature": "export declare function useStoreRuntime(): IRuntime;",
-          "declarationLine": 13,
+          "declarationLine": 11,
           "source": "packages/store-react/dist/provider.d.ts",
           "purpose": "Returns the Runtime of the current Registry; it does not construct or dispose a graph.",
           "core": "Borrowed IRuntime; missing Provider throws PROVIDER_REQUIRED.",
@@ -8554,7 +8552,7 @@
           "name": "useTracked",
           "kind": "function",
           "signature": "export declare function useTracked<T>(read: () => T, isEqual?: (a: T, b: T) => boolean, runtime?: IRuntime): T;",
-          "declarationLine": 18,
+          "declarationLine": 5,
           "source": "packages/store-react/dist/useStore.d.ts",
           "purpose": "Tracks arbitrary synchronous reactive reads with render capture and commit validation; changing selectors retracks dependencies without exposing abandoned render closures.",
           "core": "read: No-argument synchronous reader returning render data; do not return asynchronous work. Throws surface through rendering.\nisEqual: Optional synchronous comparator receiving previous and next selector results; return true to reuse the prior snapshot. Defaults to Object.is; throws propagate.\nruntime: Owning IRuntime; omitted uses defaultRuntime, and switching it creates a separate tracking instance.\nCurrent reader result; only tracked dependencies and equality affect notifications.",

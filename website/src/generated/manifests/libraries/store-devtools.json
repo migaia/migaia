@@ -2231,7 +2231,7 @@
           "name": "createStoreDevTools",
           "kind": "function",
           "signature": "export declare function createStoreDevTools<S extends Record<string, unknown>>(store: IReactiveStore<S>, options?: IStoreDevToolsOptions): IStoreDevTools;",
-          "declarationLine": 128,
+          "declarationLine": 46,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Subscribes to an existing reactive store to collect bounded state history, completed actions and optional runtime trace. Replay hydrates local state and never reverses business side effects; dispose the session after inspection.",
           "core": "store: Live IReactiveStore returned by @migaia/store-light createStore(); the caller keeps ownership and must dispose the diagnostic session before releasing it.\nCaller-owned IStoreDevTools. Construction snapshots options and initial state; invalid options throw Error/INVALID_OPTION, while unclassified initial clock or clone failures carry CALLBACK_FAILED. Existing foreign identities remain unchanged.\nmaxHistory: Safe integer at least one limiting retained state-history entries; old entries are evicted chronologically.\n`100` history entries; it does not bound the action queue.\nmaxTrace: Safe integer at least one bounding both runtime trace and action queues independently.\n`1000` entries per queue for actions and runtime trace.\ncaptureRuntimeTrace: False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.\n`true`: capture runtime-wide events and completed action outcomes.\nSubscribe to the Store Runtime, including other Stores using it.\nSkip Runtime trace and automatic actions; manual recordAction remains enabled.\nnow: Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.\nDate.now supplies ordinary wall-clock timestamps.\nclone: Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot and replay cloning classify unowned failures as CALLBACK_FAILED; automatic capture reports them, while manual record and replay throw. Store hydration errors retain their own path. Apply redaction here.\nClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed.",
@@ -2397,7 +2397,7 @@
           "name": "createStoreDevtoolsAggregateError",
           "kind": "function",
           "signature": "export declare function createStoreDevtoolsAggregateError(code: IStoreDevtoolsErrorCode, errors: readonly unknown[], message: string): AggregateError;",
-          "declarationLine": 18,
+          "declarationLine": 10,
           "source": "packages/store-devtools/dist/errors.d.ts",
           "purpose": "Builds a tagged native AggregateError retaining every supplied cleanup failure in errors. Use it when several subscription releases fail, rather than discarding the original failures.",
           "core": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nerrors: Application-collected original failures in the desired order; every value remains reachable through errors.\nNew AggregateError whose errors list retains original failure identities.",
@@ -2545,7 +2545,7 @@
           "name": "createStoreDevtoolsError",
           "kind": "function",
           "signature": "export declare function createStoreDevtoolsError(code: IStoreDevtoolsErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
-          "declarationLine": 10,
+          "declarationLine": 6,
           "source": "packages/store-devtools/dist/errors.d.ts",
           "purpose": "Builds a native Error tagged with this package source and selected semantic code. The message remains application supplied; an optional original cause is retained without rewriting stack or changing native type.",
           "core": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nNew native Error with source and code properties; the original cause remains reachable.\ncause: Original application failure preserved by identity on Error.cause when supplied and not undefined.\nOmitted or undefined: no cause property is installed by the constructor.",
@@ -2709,7 +2709,7 @@
           "name": "createStoreDevtoolsRangeError",
           "kind": "function",
           "signature": "export declare function createStoreDevtoolsRangeError(code: IStoreDevtoolsErrorCode, message: string): RangeError;",
-          "declarationLine": 25,
+          "declarationLine": 15,
           "source": "packages/store-devtools/dist/errors.d.ts",
           "purpose": "Builds a source-and-code tagged native RangeError. Built-in paths use it for invalid tree depth or a missing history selection; queue limit validation uses ordinary Error/INVALID_OPTION.",
           "core": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nNew RangeError with unchanged native stack and tagged source/code.",
@@ -2843,7 +2843,7 @@
           "name": "getDependencyTree",
           "kind": "function",
           "signature": "export declare function getDependencyTree(root: IObserver | IReactiveEffect | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
-          "declarationLine": 111,
+          "declarationLine": 43,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Traverses upstream dependencies from a runtime effect or computed handle, without requiring a store session. Current-path cycle detection marks recursion loops while allowing shared diamond nodes to appear on each branch.",
           "core": "root: Public effect or computed handle returned by the same reactive runtime, or an extension IObserver node.\nmaxDepth: Optional nonnegative safe integer, default `20`; `0` returns only the root and no direct edges.\nIDependencyTreeNode snapshot. Invalid depth throws RangeError tagged INVALID_OPTION; no resource or subscription is created.",
@@ -2936,7 +2936,7 @@
           "name": "getObserverTree",
           "kind": "function",
           "signature": "export declare function getObserverTree(root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
-          "declarationLine": 118,
+          "declarationLine": 45,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Traverses downstream subscribers from a runtime signal or computed handle, without a store session. Depth bounds and current-path cycle flags describe an instantaneous graph view, not a live subscription.",
           "core": "root: Public signal or computed handle from createRuntime(), or an extension IObservable graph node.\nmaxDepth: Optional nonnegative safe integer, default `20`; `0` omits all subscriber edges.\nIDependencyTreeNode snapshot; invalid depth throws RangeError tagged INVALID_OPTION, without creating a subscription.",
@@ -3028,8 +3028,8 @@
         {
           "name": "IActionTrace",
           "kind": "type",
-          "signature": "export type IActionTrace = { /** Configured now() value taken when this action is appended, not the trace event's timestamp. */ timestamp: number; /** Runtime action name or a caller-selected manual name. */ name: string; /** Optional manual diagnostic payload; automatic action capture does not add one. */ payload?: unknown; /** Optional duration supplied by the Runtime trace or manual caller. */ durationMs?: number; /** Optional original failure reference, populated automatically for action error events. */ error?: unknown; };",
-          "declarationLine": 30,
+          "signature": "export type IActionTrace = { timestamp: number; name: string; payload?: unknown; durationMs?: number; error?: unknown; };",
+          "declarationLine": 18,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Manual action metadata or a completed runtime action outcome; payload and errors retain their supplied identity.",
           "core": "timestamp: Timestamp assigned by the session clock when recordAction appends the entry.\nname: Application action name or the original name from a completed runtime trace event.\npayload: Optional application-supplied payload kept as-is without implicit cloning or redaction.\nOmitted: no payload is stored on the action entry.\ndurationMs: Optional application duration or the elapsed duration of the completed runtime action.\nOmitted: elapsed duration is not specified.\nerror: Optional original failure; automatic capture includes it only for runtime action error events.\nOmitted: no failure is recorded for this action.",
@@ -3046,7 +3046,7 @@
               "kind": "property",
               "optional": false,
               "signature": "timestamp: number;",
-              "description": "Configured now() value taken when this action is appended, not the trace event's timestamp.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3055,7 +3055,7 @@
               "kind": "property",
               "optional": false,
               "signature": "name: string;",
-              "description": "Runtime action name or a caller-selected manual name.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -3064,7 +3064,7 @@
               "kind": "property",
               "optional": true,
               "signature": "payload?: unknown;",
-              "description": "Optional manual diagnostic payload; automatic action capture does not add one.",
+              "description": null,
               "parameterDetails": [],
               "returns": "unknown"
             },
@@ -3073,7 +3073,7 @@
               "kind": "property",
               "optional": true,
               "signature": "durationMs?: number;",
-              "description": "Optional duration supplied by the Runtime trace or manual caller.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3082,7 +3082,7 @@
               "kind": "property",
               "optional": true,
               "signature": "error?: unknown;",
-              "description": "Optional original failure reference, populated automatically for action error events.",
+              "description": null,
               "parameterDetails": [],
               "returns": "unknown"
             }
@@ -3090,7 +3090,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IActionTrace = { /** Configured now() value taken when this action is appended, not the trace event's timestamp. */ timestamp: number; /** Runtime action name or a caller-selected manual name. */ name: string; /** Optional manual diagnostic payload; automatic action capture does not add one. */ payload?: unknown; /** Optional duration supplied by the Runtime trace or manual caller. */ durationMs?: number; /** Optional original failure reference, populated automatically for action error events. */ error?: unknown; };"
+            "export type IActionTrace = { timestamp: number; name: string; payload?: unknown; durationMs?: number; error?: unknown; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3129,7 +3129,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:IActionTrace:export type IActionTrace = { /** Configured now() value taken when this action is appended, not the trace event's timestamp. */ timestamp: number; /** Runtime action name or a caller-selected manual name. */ name: string; /** Optional manual diagnostic payload; automatic action capture does not add one. */ payload?: unknown; /** Optional duration supplied by the Runtime trace or manual caller. */ durationMs?: number; /** Optional original failure reference, populated automatically for action error events. */ error?: unknown; };",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:IActionTrace:export type IActionTrace = { timestamp: number; name: string; payload?: unknown; durationMs?: number; error?: unknown; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3138,8 +3138,8 @@
         {
           "name": "IDependencyTreeNode",
           "kind": "type",
-          "signature": "export type IDependencyTreeNode = { /** Traversal role: dependency roots are observers and reverse-tree roots are observables. */ kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; /** DebugName, then constructor.name, then AnonymousReactiveNode; not a stable node identifier. */ label: string; /** Current version on observable-role nodes; observer-role nodes omit this field. */ version?: number; /** Edges in the graph's current iteration order, truncated at maxDepth or a path cycle. */ children: IDependencyTreeNode[]; /** Present as true only when this node repeats on the current path, not for a shared diamond leaf. */ circular?: boolean; };",
-          "declarationLine": 6,
+          "signature": "export type IDependencyTreeNode = { kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; label: string; version?: number; children: IDependencyTreeNode[]; circular?: boolean; };",
+          "declarationLine": 5,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Snapshot tree node from dependency or observer traversal, with current-path cycle detection rather than global deduplication.",
           "core": "kind: Observable nodes provide values; observer nodes subscribe to dependencies.\nA signal or computed value observed by downstream nodes.\nAn effect or computed observer depending on upstream nodes.\nlabel: Node debugName, otherwise constructor name, otherwise AnonymousReactiveNode.\nversion: Observable version at traversal time; observer-only nodes omit this field.\nchildren: Dependencies for dependency traversal, subscribers for observer traversal; truncated at maxDepth.\ncircular: True only when this node already exists on the current recursion path; shared diamonds are not cycles.",
@@ -3156,7 +3156,7 @@
               "kind": "property",
               "optional": false,
               "signature": "kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind];",
-              "description": "Traversal role: dependency roots are observers and reverse-tree roots are observables.",
+              "description": null,
               "parameterDetails": [],
               "returns": "(typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]"
             },
@@ -3165,7 +3165,7 @@
               "kind": "property",
               "optional": false,
               "signature": "label: string;",
-              "description": "DebugName, then constructor.name, then AnonymousReactiveNode; not a stable node identifier.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -3174,7 +3174,7 @@
               "kind": "property",
               "optional": true,
               "signature": "version?: number;",
-              "description": "Current version on observable-role nodes; observer-role nodes omit this field.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3183,7 +3183,7 @@
               "kind": "property",
               "optional": false,
               "signature": "children: IDependencyTreeNode[];",
-              "description": "Edges in the graph's current iteration order, truncated at maxDepth or a path cycle.",
+              "description": null,
               "parameterDetails": [],
               "returns": "IDependencyTreeNode[]"
             },
@@ -3192,7 +3192,7 @@
               "kind": "property",
               "optional": true,
               "signature": "circular?: boolean;",
-              "description": "Present as true only when this node repeats on the current path, not for a shared diamond leaf.",
+              "description": null,
               "parameterDetails": [],
               "returns": "boolean"
             }
@@ -3200,7 +3200,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDependencyTreeNode = { /** Traversal role: dependency roots are observers and reverse-tree roots are observables. */ kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; /** DebugName, then constructor.name, then AnonymousReactiveNode; not a stable node identifier. */ label: string; /** Current version on observable-role nodes; observer-role nodes omit this field. */ version?: number; /** Edges in the graph's current iteration order, truncated at maxDepth or a path cycle. */ children: IDependencyTreeNode[]; /** Present as true only when this node repeats on the current path, not for a shared diamond leaf. */ circular?: boolean; };"
+            "export type IDependencyTreeNode = { kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; label: string; version?: number; children: IDependencyTreeNode[]; circular?: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3239,7 +3239,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:IDependencyTreeNode:export type IDependencyTreeNode = { /** Traversal role: dependency roots are observers and reverse-tree roots are observables. */ kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; /** DebugName, then constructor.name, then AnonymousReactiveNode; not a stable node identifier. */ label: string; /** Current version on observable-role nodes; observer-role nodes omit this field. */ version?: number; /** Edges in the graph's current iteration order, truncated at maxDepth or a path cycle. */ children: IDependencyTreeNode[]; /** Present as true only when this node repeats on the current path, not for a shared diamond leaf. */ circular?: boolean; };",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:IDependencyTreeNode:export type IDependencyTreeNode = { kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; label: string; version?: number; children: IDependencyTreeNode[]; circular?: boolean; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3248,8 +3248,8 @@
         {
           "name": "IStoreDevTools",
           "kind": "type",
-          "signature": "export type IStoreDevTools = { /** A fresh frozen chronological array of retained shallow-frozen history entries. */ readonly history: readonly IStoreHistoryEntry[]; /** A fresh frozen array; action records and their payload/error references remain mutable. */ readonly actions: readonly IActionTrace[]; /** A fresh frozen array of original Runtime event references, with independent maxTrace capacity. */ readonly trace: readonly IRuntimeTraceEvent[]; /** * Prepare and append a snapshot, default label 'state change'; failure leaves queues/id * unchanged. */ record(label?: string): IStoreHistoryEntry; /** * Append a shallow action copy with now(); manual capture remains available when runtime trace is * disabled. */ recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; /** * Clone a retained snapshot into Store.$hydrate, suppressing synchronous replay history only. * Missing/evicted ids throw UNKNOWN_HISTORY_ENTRY RangeError; this is not external-effect * rollback. Unclassified clone failures receive CALLBACK_FAILED; hydrate errors retain their * upstream identity. Replay suppression is restored even when either step throws. */ jumpTo(id: number): void; /** * Prepare the current snapshot first, then reset all queues to one new initial entry without * resetting ids. */ clear(): void; /** * Mark terminal and attempt both subscriptions once, without disposing the Store/Runtime or * clearing retained queues. One cleanup failure is rethrown; multiple failures become * CLEANUP_FAILED. Later dispose calls return, while record/recordAction/jumpTo/clear reject * SESSION_DISPOSED. */ dispose(): void; };",
-          "declarationLine": 68,
+          "signature": "export type IStoreDevTools = { readonly history: readonly IStoreHistoryEntry[]; readonly actions: readonly IActionTrace[]; readonly trace: readonly IRuntimeTraceEvent[]; record(label?: string): IStoreHistoryEntry; recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; jumpTo(id: number): void; clear(): void; dispose(): void; };",
+          "declarationLine": 32,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Caller-owned local diagnostic session subscribed to an existing reactive store, with bounded history and runtime traces.",
           "core": "history: Frozen chronological array snapshot of retained IStoreHistoryEntry entries, bounded by maxHistory. Entry state is shallow-frozen after cloning.\nactions: Frozen chronological array of manual and completed runtime action traces, bounded by maxTrace rather than maxHistory.\ntrace: Frozen chronological array of original runtime events, bounded by maxTrace; empty when runtime capture is disabled.\nrecord: Prepares the clock and cloned store snapshot, checks that the session is still active, then publishes one history entry. Callback failure or disposal during preparation leaves queues and the next history ID unchanged.\nrecord.label: Optional application label; omitted defaults to state change. Initial construction and clear use initial.\nFrozen IStoreHistoryEntry with a new monotonic ID. Unclassified clock or clone failures become CALLBACK_FAILED; writable native errors retain identity, foreign identities remain unchanged, and immutable errors or primitive values remain on cause.\nrecordAction: Prepares an application action record and session timestamp, then checks session activity before publishing. Disposal from a getter or clock prevents publication; payload and errors retain their supplied identity.\nrecordAction.trace: Application-created action name, optional payload, durationMs and error; omit timestamp because the session supplies it.\nNo return value; the operation is complete. After disposal it throws SESSION_DISPOSED.\njumpTo: Clones a retained history state into store.$hydrate(), suppressing replay-generated history; business side effects are not undone.\njumpTo.id: ID returned by tools.record() or read from tools.history; an entry trimmed by maxHistory is no longer available.\nNo return value; unknown IDs throw RangeError/UNKNOWN_HISTORY_ENTRY. Unclassified replay clone failures receive CALLBACK_FAILED, while complete foreign identities stay unchanged; frozen errors and primitive values remain on cause. Store hydration failures propagate from Store without this catch; replay suppression is restored in either case.\nclear: Prepares one current initial snapshot and rechecks session activity before clearing all three queues. A preparation failure or disposal leaves queues and history ID unchanged; success retains only the new entry without resetting IDs.\ndispose: Idempotently closes the session and cancels store and runtime subscriptions; it neither disposes the store nor clears diagnostic queues.\nNo value. One cleanup failure propagates unchanged; several produce CLEANUP_FAILED AggregateError. The session remains terminal even after cleanup failure.",
@@ -3266,7 +3266,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly history: readonly IStoreHistoryEntry[];",
-              "description": "A fresh frozen chronological array of retained shallow-frozen history entries.",
+              "description": null,
               "parameterDetails": [],
               "returns": "readonly IStoreHistoryEntry[]"
             },
@@ -3275,7 +3275,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly actions: readonly IActionTrace[];",
-              "description": "A fresh frozen array; action records and their payload/error references remain mutable.",
+              "description": null,
               "parameterDetails": [],
               "returns": "readonly IActionTrace[]"
             },
@@ -3284,7 +3284,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly trace: readonly IRuntimeTraceEvent[];",
-              "description": "A fresh frozen array of original Runtime event references, with independent maxTrace capacity.",
+              "description": null,
               "parameterDetails": [],
               "returns": "readonly IRuntimeTraceEvent[]"
             },
@@ -3293,7 +3293,7 @@
               "kind": "method",
               "optional": false,
               "signature": "record(label?: string): IStoreHistoryEntry;",
-              "description": "Prepare and append a snapshot, default label 'state change'; failure leaves queues/id unchanged.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "label",
@@ -3308,7 +3308,7 @@
               "kind": "method",
               "optional": false,
               "signature": "recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;",
-              "description": "Append a shallow action copy with now(); manual capture remains available when runtime trace is disabled.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "trace",
@@ -3323,7 +3323,7 @@
               "kind": "method",
               "optional": false,
               "signature": "jumpTo(id: number): void;",
-              "description": "Clone a retained snapshot into Store.$hydrate, suppressing synchronous replay history only. Missing/evicted ids throw UNKNOWN_HISTORY_ENTRY RangeError; this is not external-effect rollback. Unclassified clone failures receive CALLBACK_FAILED; hydrate errors retain their upstream identity. Replay suppression is restored even when either step throws.",
+              "description": null,
               "parameterDetails": [
                 {
                   "name": "id",
@@ -3338,7 +3338,7 @@
               "kind": "method",
               "optional": false,
               "signature": "clear(): void;",
-              "description": "Prepare the current snapshot first, then reset all queues to one new initial entry without resetting ids.",
+              "description": null,
               "parameterDetails": [],
               "returns": "void"
             },
@@ -3347,7 +3347,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dispose(): void;",
-              "description": "Mark terminal and attempt both subscriptions once, without disposing the Store/Runtime or clearing retained queues. One cleanup failure is rethrown; multiple failures become CLEANUP_FAILED. Later dispose calls return, while record/recordAction/jumpTo/clear reject SESSION_DISPOSED.",
+              "description": null,
               "parameterDetails": [],
               "returns": "void"
             }
@@ -3355,7 +3355,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreDevTools = { /** A fresh frozen chronological array of retained shallow-frozen history entries. */ readonly history: readonly IStoreHistoryEntry[]; /** A fresh frozen array; action records and their payload/error references remain mutable. */ readonly actions: readonly IActionTrace[]; /** A fresh frozen array of original Runtime event references, with independent maxTrace capacity. */ readonly trace: readonly IRuntimeTraceEvent[]; /** * Prepare and append a snapshot, default label 'state change'; failure leaves queues/id * unchanged. */ record(label?: string): IStoreHistoryEntry; /** * Append a shallow action copy with now(); manual capture remains available when runtime trace is * disabled. */ recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; /** * Clone a retained snapshot into Store.$hydrate, suppressing synchronous replay history only. * Missing/evicted ids throw UNKNOWN_HISTORY_ENTRY RangeError; this is not external-effect * rollback. Unclassified clone failures receive CALLBACK_FAILED; hydrate errors retain their * upstream identity. Replay suppression is restored even when either step throws. */ jumpTo(id: number): void; /** * Prepare the current snapshot first, then reset all queues to one new initial entry without * resetting ids. */ clear(): void; /** * Mark terminal and attempt both subscriptions once, without disposing the Store/Runtime or * clearing retained queues. One cleanup failure is rethrown; multiple failures become * CLEANUP_FAILED. Later dispose calls return, while record/recordAction/jumpTo/clear reject * SESSION_DISPOSED. */ dispose(): void; };"
+            "export type IStoreDevTools = { readonly history: readonly IStoreHistoryEntry[]; readonly actions: readonly IActionTrace[]; readonly trace: readonly IRuntimeTraceEvent[]; record(label?: string): IStoreHistoryEntry; recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; jumpTo(id: number): void; clear(): void; dispose(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3394,7 +3394,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:IStoreDevTools:export type IStoreDevTools = { /** A fresh frozen chronological array of retained shallow-frozen history entries. */ readonly history: readonly IStoreHistoryEntry[]; /** A fresh frozen array; action records and their payload/error references remain mutable. */ readonly actions: readonly IActionTrace[]; /** A fresh frozen array of original Runtime event references, with independent maxTrace capacity. */ readonly trace: readonly IRuntimeTraceEvent[]; /** * Prepare and append a snapshot, default label 'state change'; failure leaves queues/id * unchanged. */ record(label?: string): IStoreHistoryEntry; /** * Append a shallow action copy with now(); manual capture remains available when runtime trace is * disabled. */ recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; /** * Clone a retained snapshot into Store.$hydrate, suppressing synchronous replay history only. * Missing/evicted ids throw UNKNOWN_HISTORY_ENTRY RangeError; this is not external-effect * rollback. Unclassified clone failures receive CALLBACK_FAILED; hydrate errors retain their * upstream identity. Replay suppression is restored even when either step throws. */ jumpTo(id: number): void; /** * Prepare the current snapshot first, then reset all queues to one new initial entry without * resetting ids. */ clear(): void; /** * Mark terminal and attempt both subscriptions once, without disposing the Store/Runtime or * clearing retained queues. One cleanup failure is rethrown; multiple failures become * CLEANUP_FAILED. Later dispose calls return, while record/recordAction/jumpTo/clear reject * SESSION_DISPOSED. */ dispose(): void; };",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:IStoreDevTools:export type IStoreDevTools = { readonly history: readonly IStoreHistoryEntry[]; readonly actions: readonly IActionTrace[]; readonly trace: readonly IRuntimeTraceEvent[]; record(label?: string): IStoreHistoryEntry; recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; jumpTo(id: number): void; clear(): void; dispose(): void; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3513,8 +3513,8 @@
         {
           "name": "IStoreDevToolsOptions",
           "kind": "type",
-          "signature": "export type IStoreDevToolsOptions = { /** * Positive safe-integer history capacity, default 100; oldest snapshots are evicted * independently. */ maxHistory?: number; /** Positive safe-integer capacity for each independent actions/trace queue, default 1000. */ maxTrace?: number; /** * Enabled unless exactly false; captures the entire borrowed Runtime, not only this Store's * actions. */ captureRuntimeTrace?: boolean; /** * Optional timestamp source, default Date.now; its result is retained without clock * normalization. */ now?: () => number; /** * Optional snapshot/replay clone, default ClonePolicy.diagnostic; it does not redact sensitive * fields. */ clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
-          "declarationLine": 43,
+          "signature": "export type IStoreDevToolsOptions = { maxHistory?: number; maxTrace?: number; captureRuntimeTrace?: boolean; now?: () => number; clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
+          "declarationLine": 25,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Queue limits, runtime capture, clock and snapshot policy fixed when a session is created.",
           "core": "maxHistory: Safe integer at least one limiting retained state-history entries; old entries are evicted chronologically.\n`100` history entries; it does not bound the action queue.\nmaxTrace: Safe integer at least one bounding both runtime trace and action queues independently.\n`1000` entries per queue for actions and runtime trace.\ncaptureRuntimeTrace: False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.\n`true`: capture runtime-wide events and completed action outcomes.\nSubscribe to the Store Runtime, including other Stores using it.\nSkip Runtime trace and automatic actions; manual recordAction remains enabled.\nnow: Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.\nDate.now supplies ordinary wall-clock timestamps.\nclone: Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot and replay cloning classify unowned failures as CALLBACK_FAILED; automatic capture reports them, while manual record and replay throw. Store hydration errors retain their own path. Apply redaction here.\nClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed.",
@@ -3531,7 +3531,7 @@
               "kind": "property",
               "optional": true,
               "signature": "maxHistory?: number;",
-              "description": "Positive safe-integer history capacity, default 100; oldest snapshots are evicted independently.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3540,7 +3540,7 @@
               "kind": "property",
               "optional": true,
               "signature": "maxTrace?: number;",
-              "description": "Positive safe-integer capacity for each independent actions/trace queue, default 1000.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3549,7 +3549,7 @@
               "kind": "property",
               "optional": true,
               "signature": "captureRuntimeTrace?: boolean;",
-              "description": "Enabled unless exactly false; captures the entire borrowed Runtime, not only this Store's actions.",
+              "description": null,
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -3558,7 +3558,7 @@
               "kind": "property",
               "optional": true,
               "signature": "now?: () => number;",
-              "description": "Optional timestamp source, default Date.now; its result is retained without clock normalization.",
+              "description": null,
               "parameterDetails": [],
               "returns": "() => number"
             },
@@ -3567,7 +3567,7 @@
               "kind": "property",
               "optional": true,
               "signature": "clone?: (state: Record<string, unknown>) => Record<string, unknown>;",
-              "description": "Optional snapshot/replay clone, default ClonePolicy.diagnostic; it does not redact sensitive fields.",
+              "description": null,
               "parameterDetails": [],
               "returns": "(state: Record<string, unknown>) => Record<string, unknown>"
             }
@@ -3575,7 +3575,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreDevToolsOptions = { /** * Positive safe-integer history capacity, default 100; oldest snapshots are evicted * independently. */ maxHistory?: number; /** Positive safe-integer capacity for each independent actions/trace queue, default 1000. */ maxTrace?: number; /** * Enabled unless exactly false; captures the entire borrowed Runtime, not only this Store's * actions. */ captureRuntimeTrace?: boolean; /** * Optional timestamp source, default Date.now; its result is retained without clock * normalization. */ now?: () => number; /** * Optional snapshot/replay clone, default ClonePolicy.diagnostic; it does not redact sensitive * fields. */ clone?: (state: Record<string, unknown>) => Record<string, unknown>; };"
+            "export type IStoreDevToolsOptions = { maxHistory?: number; maxTrace?: number; captureRuntimeTrace?: boolean; now?: () => number; clone?: (state: Record<string, unknown>) => Record<string, unknown>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3614,7 +3614,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:IStoreDevToolsOptions:export type IStoreDevToolsOptions = { /** * Positive safe-integer history capacity, default 100; oldest snapshots are evicted * independently. */ maxHistory?: number; /** Positive safe-integer capacity for each independent actions/trace queue, default 1000. */ maxTrace?: number; /** * Enabled unless exactly false; captures the entire borrowed Runtime, not only this Store's * actions. */ captureRuntimeTrace?: boolean; /** * Optional timestamp source, default Date.now; its result is retained without clock * normalization. */ now?: () => number; /** * Optional snapshot/replay clone, default ClonePolicy.diagnostic; it does not redact sensitive * fields. */ clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:IStoreDevToolsOptions:export type IStoreDevToolsOptions = { maxHistory?: number; maxTrace?: number; captureRuntimeTrace?: boolean; now?: () => number; clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3623,8 +3623,8 @@
         {
           "name": "IStoreHistoryEntry",
           "kind": "type",
-          "signature": "export type IStoreHistoryEntry = { /** Session-local increasing identifier, starting at 1 and not reset by clear. */ id: number; /** Value returned by the configured clock when this entry was prepared. */ timestamp: number; /** 'initial', default 'state change', or the caller's manual record label. */ label: string; /** Clone of store.$plain(); unsupported subtrees may remain aliased under the diagnostic policy. */ state: Record<string, unknown>; };",
-          "declarationLine": 19,
+          "signature": "export type IStoreHistoryEntry = { id: number; timestamp: number; label: string; state: Record<string, unknown>; };",
+          "declarationLine": 12,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "Frozen local state checkpoint with a session-assigned monotonic ID and a shallow-frozen cloned state.",
           "core": "id: Monotonic ID assigned by record or initial capture; retained history IDs are accepted by jumpTo.\ntimestamp: Milliseconds returned by the session now callback before any history mutation.\nlabel: Application checkpoint label, or the stable initial and state change labels supplied by the session.\nstate: Diagnostic clone of store.$plain(), shallow-frozen before publication; nested cloning semantics belong to clone.",
@@ -3641,7 +3641,7 @@
               "kind": "property",
               "optional": false,
               "signature": "id: number;",
-              "description": "Session-local increasing identifier, starting at 1 and not reset by clear.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3650,7 +3650,7 @@
               "kind": "property",
               "optional": false,
               "signature": "timestamp: number;",
-              "description": "Value returned by the configured clock when this entry was prepared.",
+              "description": null,
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3659,7 +3659,7 @@
               "kind": "property",
               "optional": false,
               "signature": "label: string;",
-              "description": "'initial', default 'state change', or the caller's manual record label.",
+              "description": null,
               "parameterDetails": [],
               "returns": "string"
             },
@@ -3668,7 +3668,7 @@
               "kind": "property",
               "optional": false,
               "signature": "state: Record<string, unknown>;",
-              "description": "Clone of store.$plain(); unsupported subtrees may remain aliased under the diagnostic policy.",
+              "description": null,
               "parameterDetails": [],
               "returns": "Record<string, unknown>"
             }
@@ -3676,7 +3676,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreHistoryEntry = { /** Session-local increasing identifier, starting at 1 and not reset by clear. */ id: number; /** Value returned by the configured clock when this entry was prepared. */ timestamp: number; /** 'initial', default 'state change', or the caller's manual record label. */ label: string; /** Clone of store.$plain(); unsupported subtrees may remain aliased under the diagnostic policy. */ state: Record<string, unknown>; };"
+            "export type IStoreHistoryEntry = { id: number; timestamp: number; label: string; state: Record<string, unknown>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3715,7 +3715,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:IStoreHistoryEntry:export type IStoreHistoryEntry = { /** Session-local increasing identifier, starting at 1 and not reset by clear. */ id: number; /** Value returned by the configured clock when this entry was prepared. */ timestamp: number; /** 'initial', default 'state change', or the caller's manual record label. */ label: string; /** Clone of store.$plain(); unsupported subtrees may remain aliased under the diagnostic policy. */ state: Record<string, unknown>; };",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:IStoreHistoryEntry:export type IStoreHistoryEntry = { id: number; timestamp: number; label: string; state: Record<string, unknown>; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -3835,7 +3835,7 @@
           "name": "StoreDevtoolsErrorCode",
           "kind": "const",
           "signature": "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: 'SESSION_DISPOSED'; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY'; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: 'INVALID_OPTION'; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: 'CALLBACK_FAILED'; };",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/store-devtools/dist/error-code.d.ts",
           "purpose": "Stable failure codes under source @migaia/store-devtools; native error types are retained. Consult each member before interpreting a diagnostic or implementing your own bridge.",
           "core": "sessionDisposed: A session mutation ran after disposal; create a new diagnostic session.\nunknownHistoryEntry: The selected ID is absent or was trimmed; inspect the current history before replay.\ninvalidOption: Options are not an object, an option getter fails, a callback is not callable, a queue limit is not a positive safe integer, or tree depth is not a nonnegative safe integer. Fix the input before retrying.\ncallbackFailed: Unclassified diagnostic preparation failed in a clock, snapshot clone or action property read. Manual capture throws; automatic capture reports through the runtime. Original errors remain identical or reachable on cause.\ncleanupFailed: Several cleanup failures were aggregated, or setup rollback also failed; inspect errors for originals.",

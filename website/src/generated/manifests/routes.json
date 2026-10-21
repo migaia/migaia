@@ -2007,6 +2007,384 @@
       "library": "logger"
     },
     {
+      "path": "/en/docs/micro-hub",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/ICommitResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IComputedView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IContract",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IContractSpec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IContractTypes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IContractTypesOf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IContractView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/ICreateMicroHubOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IEventMarker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IEventView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IKeyedMarker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IKeyedReadable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IKeyedSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroApp",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroHub",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroHubErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroResourceFetcher",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroResourceState",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IMicroResourceView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IOwnOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IOwnedContract",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IOwnedEventView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IReadable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IRequestMarker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IRequestOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IResourceMarker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IStatePatch",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IStateValues",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/IStateView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/MICRO_HUB_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/MicroCapability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/MicroHubErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/MicroHubErrorText",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/MicroResourceStatus",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/createMicroHub",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/createMicroHubError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/createMicroHubTypeError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/defineContract",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/event",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/events",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/events/IEventsOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/events/events",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/getMicroHub",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/keyed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/persist",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/persist/IPersistOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/persist/persist",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/request",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/resource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/resource/resources",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/state",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/state/IStateDriver",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/state/state",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/state/stateDriverOf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/web-component",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/web-component/MICRO_APP_CONTEXT",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/web-component/consumeMicroApp",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/api/web-component/provideMicroApp",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/en/docs/micro-hub/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/en/docs/middleware-pipeline",
       "locale": "en",
       "domain": "docs",
@@ -3358,6 +3736,36 @@
     },
     {
       "path": "/en/docs/resource/caching-and-refresh",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/cancellation-and-retry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/suspense-and-ssr",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "resource"
@@ -15693,6 +16101,294 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/scheduler/ITimeSliceReport",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/IWallClock",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/asyncTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/coalesce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/debounce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/deferTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/isAsyncTaskSupported",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/repeat",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/resolveAsyncTaskStrategy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/systemScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/systemWallClock",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/throttle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/timeSlice",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/timeSliceMap",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/timeSliceReduce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/scheduler/yieldToHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/IFormatOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/IFormatPlaceholder",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/IStringConversion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/format",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/string/tryString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing/IManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing/createManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing/IDiscriminatedByField",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing/IDiscriminatedByPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/typing/IUrlLike",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/IPrimitive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isBlankString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isEmptyValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isNullish",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isPrimitive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/value/isSafeIntegerValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes-and-text",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/collector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/configuration-ownership",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/deadlines-and-abort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error-identity-and-causes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function-and-value-guards",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/immutable-objects-and-paths",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/retry-and-concurrency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/strings-and-numbers",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/type-utilities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/wasm",
       "locale": "en",
       "domain": "docs",
@@ -17817,6 +18513,384 @@
       "library": "logger"
     },
     {
+      "path": "/zh/docs/micro-hub",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/ICommitResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IComputedView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IContract",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IContractSpec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IContractTypes",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IContractTypesOf",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IContractView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/ICreateMicroHubOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IEventMarker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IEventView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IKeyedMarker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IKeyedReadable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IKeyedSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroApp",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroHub",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroHubErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroResourceFetcher",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroResourceState",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IMicroResourceView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IOwnOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IOwnedContract",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IOwnedEventView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IReadable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IRequestMarker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IRequestOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IResourceMarker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IStatePatch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IStateValues",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/IStateView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/MICRO_HUB_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/MicroCapability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/MicroHubErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/MicroHubErrorText",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/MicroResourceStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/createMicroHub",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/createMicroHubError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/createMicroHubTypeError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/defineContract",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/event",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/events",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/events/IEventsOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/events/events",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/getMicroHub",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/keyed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/persist",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/persist/IPersistOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/persist/persist",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/request",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/resource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/resource/resources",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/state",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/state/IStateDriver",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/state/state",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/state/stateDriverOf",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/web-component",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/web-component/MICRO_APP_CONTEXT",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/web-component/consumeMicroApp",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/web-component/provideMicroApp",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/zh/docs/middleware-pipeline",
       "locale": "zh",
       "domain": "docs",
@@ -19047,36 +20121,6 @@
       "library": "reactive"
     },
     {
-      "path": "/en/docs/resource/cancellation-and-retry",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/getting-started",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/readme",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/suspense-and-ssr",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
-      "path": "/en/docs/resource/troubleshooting",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
       "path": "/zh/docs/resource",
       "locale": "zh",
       "domain": "docs",
@@ -19168,6 +20212,66 @@
     },
     {
       "path": "/zh/docs/resource/api/Resource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceFetchStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/createResource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/caching-and-refresh",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/cancellation-and-retry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/suspense-and-ssr",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "resource"
@@ -30363,294 +31467,6 @@
       "library": "tray"
     },
     {
-      "path": "/en/docs/utils/api/scheduler/ITimeSliceReport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/IWallClock",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/asyncTask",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/coalesce",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/debounce",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/deferTask",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/isAsyncTaskSupported",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/repeat",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/resolveAsyncTaskStrategy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/systemScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/systemWallClock",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/throttle",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/timeSlice",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/timeSliceMap",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/timeSliceReduce",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/yieldToHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/IFormatOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/IFormatPlaceholder",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/IStringConversion",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/format",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/string/tryString",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/testing",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/testing/IManualScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/testing/createManualScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing/IDiscriminatedByField",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing/IDiscriminatedByPath",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/typing/IUrlLike",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/IPrimitive",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isBlankString",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isEmptyValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isNullish",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isPrimitive",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/value/isSafeIntegerValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/bytes-and-text",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/collector",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/configuration-ownership",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/deadlines-and-abort",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/error-identity-and-causes",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/function-and-value-guards",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/getting-started",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/immutable-objects-and-paths",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/readme",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/retry-and-concurrency",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/strings-and-numbers",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/type-utilities",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/zh/docs/utils",
       "locale": "zh",
       "domain": "docs",
@@ -31503,132 +32319,6 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/wasm",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/ConversionResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/InitInput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/InitOutput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/SyncInitInput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/__wbg_init",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/alloc_bytes",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/byte_len_of",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/dealloc_bytes",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/initSync",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/json_to_msgpack",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/msgpack_to_json",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/api/ptr_of",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/arena-memory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/conversion-boundaries",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/getting-started",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/initialization-and-hosts",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/ownership-and-cleanup",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/readme",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
-      "path": "/zh/docs/wasm/troubleshooting",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "wasm"
-    },
-    {
       "path": "/zh/docs/utils/api/object/identitySnapshot",
       "locale": "zh",
       "domain": "docs",
@@ -32205,64 +32895,130 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/resource/api/ResourceErrorCode",
+      "path": "/zh/docs/wasm",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/api/ResourceFetchStatus",
+      "path": "/zh/docs/wasm/api",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/api/ResourceStatus",
+      "path": "/zh/docs/wasm/api/ConversionResult",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/api/createResource",
+      "path": "/zh/docs/wasm/api/InitInput",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/caching-and-refresh",
+      "path": "/zh/docs/wasm/api/InitOutput",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/cancellation-and-retry",
+      "path": "/zh/docs/wasm/api/SyncInitInput",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/getting-started",
+      "path": "/zh/docs/wasm/api/__wbg_init",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/readme",
+      "path": "/zh/docs/wasm/api/alloc_bytes",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/suspense-and-ssr",
+      "path": "/zh/docs/wasm/api/byte_len_of",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
     },
     {
-      "path": "/zh/docs/resource/troubleshooting",
+      "path": "/zh/docs/wasm/api/dealloc_bytes",
       "locale": "zh",
       "domain": "docs",
-      "library": "resource"
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/initSync",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/json_to_msgpack",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/msgpack_to_json",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/ptr_of",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/arena-memory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/conversion-boundaries",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/initialization-and-hosts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/ownership-and-cleanup",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
     }
   ]
 }
