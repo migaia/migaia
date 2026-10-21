@@ -111,7 +111,49 @@ const errorDoc = (native: string, cause = false, aggregate = false) => ({
             ),
             default: t('Omitted: no cause attached.', '默认省略，不附加原因字段。')
           }
-        }
+        },
+        optionCases: [
+          {
+            title: t('Keep the failure behind a field error', '保留字段错误背后的原始失败'),
+            problem: t(
+              'A field adapter adds context to a failed operation. Without `cause`, its new message loses the original error and stack. Pass the original error so callers can inspect both failures.',
+              '字段适配器需要为失败补充上下文。只创建新错误会丢失原始错误及其堆栈。把原始错误传给 `cause`，调用方就能同时查看两层失败。'
+            ),
+            example: `import { createStoreWasm${native}, StoreWasmErrorCode } from '@migaia/store-wasm'
+
+const original = new Error('input could not be decoded')
+const error = createStoreWasm${native}(StoreWasmErrorCode.invalidOption, 'field input rejected', {
+  cause: original
+})
+console.log(error instanceof ${native}, error.cause === original)`,
+            result: t(
+              'Both comparisons print `true`: the helper keeps its native class and the original cause by identity.',
+              '两个比较都输出 `true`：辅助函数保留原生错误类型，并按身份保留原始原因。'
+            ),
+            covers: ['cause']
+          },
+          {
+            title: t('Retain a cancellation reason', '保留取消操作的原因'),
+            problem: t(
+              'An aborted setup can carry a structured reason rather than an Error. Without `cause`, replacing it with a field error hides that reason. The option accepts the original value without converting it to text.',
+              '准备阶段中止时，原因可能是结构化对象而不是 Error。若只创建字段错误，这个原因就会丢失。`cause` 可以直接接收原始值，不必先转为字符串。'
+            ),
+            example: `import { createStoreWasm${native}, StoreWasmErrorCode } from '@migaia/store-wasm'
+
+const controller = new AbortController()
+const reason = { operation: 'open-editor' }
+controller.abort(reason)
+const error = createStoreWasm${native}(StoreWasmErrorCode.initAborted, 'field setup cancelled', {
+  cause: controller.signal.reason
+})
+console.log(error.cause === reason)`,
+            result: t(
+              'The comparison prints `true`; the structured cancellation reason remains available on `error.cause`.',
+              '比较输出 `true`；结构化的取消原因仍可从 `error.cause` 取得。'
+            ),
+            covers: ['cause']
+          }
+        ]
       }
     : {}),
   returns: t(
