@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-devtools",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "private": true,
   "description": "RPC probe, service and offline record contracts.",
   "license": "MIT",
