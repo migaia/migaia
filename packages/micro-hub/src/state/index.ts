@@ -107,12 +107,14 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
 
   /** Returns the contract's slot, creating atoms for every field on first access. */
   const slotOf = (entry: IContractEntry): IStateSlot => {
+    /** Slot built by an earlier access to this contract. */
     const existing = entry.slots.get(MicroCapability.state) as IStateSlot | undefined
     if (existing) return existing
     const { contract } = entry
     /** Field atoms by name. */
     const fields = new Map<string, IPlainField | IKeyedField>()
     for (const [name, initial] of Object.entries(contract.state)) {
+      /** Debug label of the field atom: `<contract>.<field>`. */
       const label = `${contract.name}.${name}`
       if (isMarker(initial, ContractMarker.keyed)) {
         fields.set(name, {
@@ -247,6 +249,7 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
     /** Validated patch entries, collected first so a bad field writes nothing. */
     const writes: [IWritableAtomDefinition<any>, unknown][] = []
     for (const [name, value] of Object.entries(patch ?? {})) {
+      /** Field definition named by the patch key; unknown keys fail before anything is written. */
       const field = slot.fields.get(name)
       if (!field) {
         throw createMicroHubTypeError(
@@ -276,6 +279,7 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
       /** New ids retain patch enumeration order after all previously present ids. */
       let added: string[] | undefined
       for (const [id, item] of Object.entries(value as Record<string, unknown>)) {
+        /** Whether the id is already a member, deciding between delete, replace and append. */
         const present = members.has(id)
         if (item === undefined) {
           if (!present) continue
@@ -352,11 +356,13 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
     runtime,
     store,
     plainField: (entry, field) => {
+      /** Field definition of the requested name, if the contract declares it. */
       const found = slotOf(entry).fields.get(field)
       return found && !found.keyed ? found.def : undefined
     },
     write: (entry, patch) => commit(entry, slotOf(entry), patch),
     view: (entry: IContractEntry, app: IAppRuntime): IDriverMembers => {
+      /** State slot of the contract; created on first access. */
       const slot = slotOf(entry)
       /** Readable per state field. */
       const state: Record<string, unknown> = {}

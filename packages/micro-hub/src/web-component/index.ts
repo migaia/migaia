@@ -107,6 +107,7 @@ export function consumeMicroApp(element: Element, callback: (app: IMicroApp) => 
 export function provideMicroApp(element: Element, app: IMicroApp): () => void {
   /** Answers matching requests from descendants and stops them at this provider. */
   const listener = (event: Event): void => {
+    /** The event as a context request; only requests for the micro-app context are answered. */
     const request = event as ContextRequestEvent
     /** Protocol implementations may omit Lit's original-target extension. */
     const target = request.contextTarget ?? event.composedPath()[0]

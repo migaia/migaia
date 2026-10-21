@@ -50,9 +50,11 @@ function createPersistDriver(hub: IHubRuntime, options: IPersistOptions): IMicro
       /** Fields the owner asked to persist. */
       const fields = (ownOptions.persist ?? []) as readonly string[]
       if (fields.length === 0) return {}
+      /** State driver; persistence reads and writes plain fields through it. */
       const state = stateDriverOf(hub)
       /** Field atoms in the order given, validated before anything is read from storage. */
       const defs = fields.map((field) => {
+        /** Atom of the named plain field; keyed or unknown fields are rejected. */
         const def = state.plainField(entry, field)
         if (!def) {
           throw createMicroHubTypeError(

@@ -116,10 +116,15 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
   /** Set once `dispose()` starts; all later calls reuse its Promise. */
   let disposal: Promise<void> | undefined
 
+  /**
+   * Hub services handed to capability drivers: failure reporting, lookup of another installed
+   * driver, and subscription to ownership changes of a contract.
+   */
   const hubRuntime: IHubRuntime = {
     report,
     driver: (kind) => drivers.get(kind),
     onOwnerChange: (entry, listener) => {
+      /** Ownership channel of this contract entry; created by the first subscriber. */
       let channel = ownerChannels.get(entry)
       if (!channel) {
         channel = createEventChannel<void>({ report: ({ error }) => report(error) })
@@ -156,6 +161,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
    *   `PLUGIN_MISSING` when the contract needs an absent capability.
    */
   const register = (contract: IContract): IContractEntry => {
+    /** Entry already registered under this contract name, if any. */
     const existing = contracts.get(contract.name)
     if (existing) {
       if (existing.contract.version !== contract.version) {
@@ -218,6 +224,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
     build: (driver: IMicroDriver) => IDriverMembers | undefined
   ): void => {
     for (const driver of drivers.values()) {
+      /** Members this driver contributes to the target, or `undefined` when it adds none. */
       const members = build(driver)
       if (members) Object.assign(target, members)
     }
@@ -242,12 +249,14 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
     })
     /** Plugin-host registration name; the generation suffix allows reconnecting during unload. */
     const pluginName = `${APP_PLUGIN_PREFIX}${name}#${++generation}`
+    /** Becomes false when `disconnect()` starts; every member of this app checks it before acting. */
     let connected = true
     /** Views by contract entry, so repeated `use()` returns the same object. */
     const views = new Map<IContractEntry, IContractView<IContract>>()
     /** Promise of the first `disconnect()` call. */
     let disconnection: Promise<void> | undefined
 
+    /** Throws `APP_DISCONNECTED` when this app handle is used after `disconnect()`. */
     const assertConnected = (): void => {
       if (!connected) {
         throw createMicroHubError(
@@ -267,6 +276,10 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
       }
     }
 
+    /**
+     * App runtime handed to drivers: lets them check the connection and tie registrations to this
+     * app's lifecycle scope.
+     */
     const runtime: IAppRuntime = {
       name,
       get connected() {
@@ -285,9 +298,18 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
       }))
     )
 
+    /**
+     * Returns the shared view of `contract`, registering the contract on first use. Repeated calls
+     * return the same frozen view.
+     *
+     * @throws Error `APP_DISCONNECTED` after disconnect; `CONTRACT_VERSION_MISMATCH` or
+     *   `PLUGIN_MISSING` from registration.
+     */
     const use = <C extends IContract>(contract: C): IContractView<C> => {
       assertConnected()
+      /** Registry entry of the requested contract. */
       const entry = register(contract)
+      /** View built by an earlier `use()` of the same contract. */
       const cached = views.get(entry)
       if (cached) return cached as unknown as IContractView<C>
       /** View assembled from every driver's members. */
@@ -298,11 +320,20 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
       return view as unknown as IContractView<C>
     }
 
+    /**
+     * Claims ownership of `contract` and returns its view plus the owner-only members. Ownership
+     * ends on `release()` or when the app disconnects; a failure while building the owner members
+     * rolls the claim back before rethrowing.
+     *
+     * @throws Error `CONTRACT_OWNED` when another app owns the contract; `PLUGIN_MISSING` when
+     *   persistence is requested without the persist plugin.
+     */
     const own = <C extends IContract>(
       contract: C,
       ownOptions: IOwnOptions<C> = {}
     ): IOwnedContract<C> => {
       assertConnected()
+      /** Registry entry of the contract being claimed. */
       const entry = register(contract)
       if (entry.owner) {
         throw createMicroHubError(
@@ -321,7 +352,12 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
         errorPolicy: LifecycleErrorPolicy.report,
         report
       })
+      /** True until this ownership is released; owner-only members check it. */
       let owning = true
+      /**
+       * Runtime for owner-only members. Besides the connection check it fails with `EMIT_DENIED`
+       * after release, and ties registrations to the ownership scope instead of the app scope.
+       */
       const ownerRuntime: IAppRuntime = {
         name,
         get connected() {
@@ -381,6 +417,11 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
       }
     }
 
+    /**
+     * Disconnects this app once: marks it disconnected, releases its registrations synchronously so
+     * no callback reaches an unmounted app, then unloads its plugin. Later calls return the same
+     * Promise.
+     */
     const disconnect = (): Promise<void> => {
       if (disconnection) return disconnection
       connected = false
@@ -391,6 +432,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
       return disconnection
     }
 
+    /** Frozen app handle returned to the caller. */
     const app: IMicroApp = Object.freeze({
       name,
       get connected() {
@@ -404,6 +446,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
     return app
   }
 
+  /** Frozen hub handle; also stored as the page-wide current hub for `getMicroHub()`. */
   const hub: IMicroHub = Object.freeze({
     connect,
     get apps() {

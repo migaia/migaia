@@ -40,6 +40,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
 
   /** Maps a `@migaia/resource` state to the hub's stable snapshot shape. */
   const toSnapshot = (state: IResourceState<unknown>): IMicroResourceState<unknown> => {
+    /** Snapshot already built for this exact state object. */
     let snapshot = snapshots.get(state)
     if (!snapshot) {
       snapshot = Object.freeze({
@@ -57,6 +58,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
 
   /** Returns the contract slot, creating one signal per declared resource. */
   const slotOf = (entry: IContractEntry): IResourceSlot => {
+    /** Slot built by an earlier access to this contract. */
     const existing = entry.slots.get(MicroCapability.resource) as IResourceSlot | undefined
     if (existing) return existing
     /** Current resource per name; `undefined` until the owner provides it. */
@@ -75,6 +77,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
   ): IReadable<IMicroResourceState<unknown>> => ({
     get: () => {
       app.assertConnected()
+      /** Resource currently provided by the owner, if any. */
       const resource = current.peek()
       return resource ? toSnapshot(resource.peekState()) : IDLE
     },
@@ -95,6 +98,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
   return {
     kind: MicroCapability.resource,
     view: (entry: IContractEntry, app: IAppRuntime): IDriverMembers => {
+      /** Resource slot of the contract; created on first access. */
       const slot = slotOf(entry)
       /** View per resource. */
       const resources: Record<string, unknown> = {}
@@ -103,6 +107,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
           state: stateReadable(app, current),
           read: (): Promise<unknown> => {
             app.assertConnected()
+            /** Resource currently provided by the owner, if any. */
             const resource = current.peek()
             if (!resource) {
               return Promise.reject(
@@ -112,6 +117,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
                 )
               )
             }
+            /** State at call time, deciding whether to return data, wait, or refetch. */
             const state = resource.peekState()
             if (state.status === ResourceStatus.success) return Promise.resolve(state.data)
             if (state.status === ResourceStatus.pending) return resource.promise
@@ -130,6 +136,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
       return { resources: Object.freeze(resources) }
     },
     own: (entry: IContractEntry, owner: IAppRuntime): IDriverMembers => {
+      /** Resource slot of the contract; created on first access. */
       const slot = slotOf(entry)
       return {
         provide: (name: string, fetcher: IMicroResourceFetcher<unknown>) => {
@@ -140,6 +147,7 @@ function createResourceDriver(hub: IHubRuntime): IMicroDriver {
               MicroHubErrorText.unknownMember(entry.contract.name, name)
             )
           }
+          /** Provider signal of the named resource; validated to exist just above. */
           const current = slot.get(name) as IReactiveSignal<Resource<unknown> | undefined>
           if (current.peek()) {
             throw createMicroHubError(

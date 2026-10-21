@@ -60,6 +60,7 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
 
   /** Returns the contract slot, creating channels on first access. */
   const slotOf = (entry: IContractEntry): IEventsSlot => {
+    /** Slot built by an earlier access to this contract. */
     const existing = entry.slots.get(MicroCapability.events) as IEventsSlot | undefined
     if (existing) return existing
     /** Event channels by event name. */
@@ -74,6 +75,7 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
         })
       )
     }
+    /** New slot; registered on the entry before it is returned. */
     const slot: IEventsSlot = {
       channels,
       requests: createEventChannel<unknown, unknown>({ report }),
@@ -173,6 +175,7 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
   return {
     kind: MicroCapability.events,
     view: (entry: IContractEntry, app: IAppRuntime): IDriverMembers => {
+      /** Events slot of the contract; created on first access. */
       const slot = slotOf(entry)
       /** `on` members per event. */
       const events: Record<string, unknown> = {}
@@ -212,6 +215,7 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
       return { events: Object.freeze(events), requests: Object.freeze(requests) }
     },
     own: (entry: IContractEntry, owner: IAppRuntime): IDriverMembers => {
+      /** Events slot of the contract; created on first access. */
       const slot = slotOf(entry)
       // Registered first, so it runs last: handlers are gone before callers learn the owner left.
       owner.track(() => {
