@@ -15,6 +15,7 @@ import type {
   IListenerResult
 } from './types.js'
 
+/** Channels the async helpers accept: a canonical channel, or a task-filter view of one. */
 type IAsyncChannel<T, R, V = undefined> =
   | ICanonicalEventChannel<T, R, undefined, V>
   | IFilteredEventChannel<T, R, V>
@@ -27,6 +28,7 @@ const createTaskSelectionError = (
   taskId: string,
   matchCount: number
 ) => {
+  /** Native `TypeError` that receives the selection details as read-only properties. */
   const error = createEventTypeError(code, eventErrorText(code))
   Object.defineProperties(error, {
     taskId: { configurable: false, enumerable: true, value: taskId },
@@ -76,9 +78,11 @@ export const invokeParallelSettled = <T, R, V = undefined>(
 ): Promise<readonly IListenerResult<R>[]> => {
   const { snapshots, capability } = targetSnapshots(channel)
   if (snapshots.length === 0) return Promise.resolve([])
+  /** Value-path projection computed once for every listener of this call. */
   const projection = capability.plan
     ? { plan: capability.plan, outcome: capability.project(value) }
     : undefined
+  /** One settlement per listener, started in registration order without waiting. */
   const pending = snapshots.map((snapshot) => settleSnapshot(snapshot, value, projection))
   if (projection?.outcome.diagnostic)
     reportEventProjectionFailure(
@@ -104,10 +108,12 @@ export const invokeSerialSettled = <T, R, V = undefined>(
 ): Promise<readonly IListenerResult<R>[]> => {
   const { snapshots, capability } = targetSnapshots(channel)
   if (snapshots.length === 0) return Promise.resolve([])
+  /** Value-path projection computed once for every listener of this call. */
   const projection = capability.plan
     ? { plan: capability.plan, outcome: capability.project(value) }
     : undefined
   return (async (): Promise<readonly IListenerResult<R>[]> => {
+    /** Settled results in registration order; each listener starts after the previous one settles. */
     const results: IListenerResult<R>[] = []
     for (const snapshot of snapshots)
       results.push(await settleSnapshot(snapshot, value, projection))
@@ -123,6 +129,7 @@ export const invokeSerialSettled = <T, R, V = undefined>(
 
 /** Converts settled results to throwing values while retaining every listener failure. */
 const throwOnFailures = <R>(results: readonly IListenerResult<R>[]): readonly Awaited<R>[] => {
+  /** Rejected results; when any exist they are thrown together, keeping every reason. */
   const failures = results.filter(
     (result) => result.status === EventSubscriberState.rejected
   ) as readonly {
@@ -179,8 +186,10 @@ const selectTask = <T, R, V = undefined>(
   readonly snapshot: IEventDispatchSnapshot<T, R, V>
   readonly capability: ReturnType<typeof getCapability<T, R, V>>['capability']
 } => {
+  /** Task name after validation; a non-string or empty name has already thrown. */
   const validated = validateTaskId(taskId, false) as string
   const { capability } = getCapability(channel)
+  /** Registrations currently carrying that task name. */
   const snapshots = capability.snapshot(validated)
   if (snapshots.length === 0) {
     throw createTaskSelectionError(EventSubscriberErrorCode.taskNotFound, validated, 0)
@@ -211,10 +220,13 @@ export const invokeTaskSettled = <T, R, V = undefined>(
   value: T
 ): Promise<IListenerResult<R>> => {
   const { snapshot, capability } = selectTask(channel, taskId)
+  /** Value-path projection for the selected listener. */
   const projection = capability.plan
     ? { plan: capability.plan, outcome: capability.project(value) }
     : undefined
+  /** Settlement of the single selected listener. */
   const settled = settleSnapshot(snapshot, value, projection)
+  /** Projection failure to report once the listener has settled. */
   const diagnostic = projection?.outcome.diagnostic
   if (!diagnostic) return settled
   return settled.then((result) => {

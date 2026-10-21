@@ -79,14 +79,21 @@ export function createEventHub<C extends IEventMap, const V = undefined>(
 export function createEventHub<C extends IEventMap, const V = undefined>(
   options?: IEventHubOptions<C, undefined, V>
 ): IEventHub<C, undefined, V>
+/** Implementation shared by the overloads above. */
 export function createEventHub<C extends IEventMap, V = undefined>(
   options: unknown = {}
 ): IEventHub<C, undefined, V> {
+  /** Validated `report` option. */
   let report: IEventHubOptions<C, undefined, V>['report']
+  /** Validated `terminalReport` option. */
   let terminalReport: IEventHubOptions<C, undefined, V>['terminalReport']
+  /** Raw `valueConfig` option; validated when the projection plan is built. */
   let valueConfig: unknown
+  /** Projection plan of the value alias, shared by every channel of the Hub. */
   let projectionPlan: IEventProjectionPlan | undefined
+  /** Raw `style` option. */
   let style: IEventApiStyle | undefined
+  /** Alias names resolved from `style`. */
   let stylePlan: IEventApiStylePlan
   try {
     if (typeof options !== 'object' || options === null || Array.isArray(options)) {
@@ -95,11 +102,13 @@ export function createEventHub<C extends IEventMap, V = undefined>(
         eventErrorText(EventSubscriberErrorCode.invalidOptions)
       )
     }
+    /** Options read as a record after the object check above. */
     const optionRecord = options as IEventHubOptions<C, IEventApiStyle | undefined, V>
     report = optionRecord.report
     terminalReport = optionRecord.terminalReport
     valueConfig = optionRecord.valueConfig as unknown
   } catch (error) {
+    /** Whether the failure came from this package's own option validation. */
     let isOptionsError = false
     try {
       isOptionsError =
@@ -120,6 +129,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
     )
   }
   try {
+    /** Options read as a record, for the style field only. */
     const optionRecord = options as IEventHubOptions<C, IEventApiStyle | undefined>
     style = optionRecord.style
   } catch (error) {
@@ -151,12 +161,19 @@ export function createEventHub<C extends IEventMap, V = undefined>(
     )
   }
   projectionPlan = createEventValueProjectionPlan(valueConfig)
+  /** One canonical channel per event key, created on first subscription. */
   const channels = new Map<PropertyKey, ICanonicalEventChannel<unknown, void, undefined, V>>()
+  /** Deactivation callbacks of each channel's registrations, used by `clear(key)` and `size`. */
   const registrations = new Map<
     ICanonicalEventChannel<unknown, void, undefined, V>,
     Set<() => void>
   >()
+  /** Number of active registrations across all keys; exposed as `size`. */
   let totalSize = 0
+  /**
+   * Returns the key unchanged, or throws `INVALID_EVENT_KEY` for anything other than a string,
+   * number or symbol.
+   */
   const validateKey = (key: PropertyKey): PropertyKey => {
     if (typeof key !== 'string' && typeof key !== 'number' && typeof key !== 'symbol') {
       throw createEventTypeError(
@@ -166,10 +183,14 @@ export function createEventHub<C extends IEventMap, V = undefined>(
     }
     return key
   }
+  /** Returns the channel of `key`, creating it with the Hub's reporters on first use. */
   const getChannel = <K extends keyof C>(key: K) => {
+    /** Key after validation. */
     const validated = validateKey(key as PropertyKey)
+    /** Existing channel of the key. */
     let channel = channels.get(validated)
     if (!channel) {
+      /** Channel options that add the event key to every report. */
       const channelOptions: IEventChannelOptions<unknown, undefined, V> = {
         report: report
           ? (failure) =>
@@ -189,6 +210,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
     }
     return { channel, validated }
   }
+  /** Public Hub object; its methods close over the channel map. */
   const hub: IEventHub<C, undefined, V> = {
     subscribe<K extends keyof C>(
       key: K,
@@ -197,6 +219,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
         | IEventValueListener<C[K]>,
       listenerOptions?: Pick<IEventSubscribeOptions, 'delivery'>
     ): IEventHubSubscription<C, K, undefined, V> {
+      /** Release of the first registration of the chain. */
       const release = registerRaw(key, listener, listenerOptions)
       return createRawSubscriptionOwner(
         release,
@@ -205,13 +228,16 @@ export function createEventHub<C extends IEventMap, V = undefined>(
       ) as IEventHubSubscription<C, K, undefined, V>
     },
     publish<K extends keyof C>(key: K, value: C[K]): void {
+      /** Channel of the key; publishing to a key without listeners does nothing. */
       const channel = channels.get(validateKey(key as PropertyKey))
       if (!channel) return
       channel.publish(value)
     },
     clear(key?: keyof C): void {
       if (key !== undefined) {
+        /** Key after validation. */
         const validated = validateKey(key as PropertyKey)
+        /** Channel of the key, if it has ever had listeners. */
         const channel = channels.get(validated)
         if (!channel) return
         channel.clear()
@@ -233,6 +259,10 @@ export function createEventHub<C extends IEventMap, V = undefined>(
       return channels.get(validateKey(key as PropertyKey))?.size ?? 0
     }
   }
+  /**
+   * Registers one listener on the channel of `key` and returns its release. Context listeners get a
+   * context whose `abort()` also removes the Hub's bookkeeping entry.
+   */
   function registerRaw<K extends keyof C>(
     key: K,
     listener:
@@ -249,6 +279,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
     /** Validate the mode before creating a keyed channel or acquiring registration ownership. */
     const delivery = readDeliveryOption(listenerOptions)
     const { channel, validated } = getChannel(key)
+    /** Hub bookkeeping removal, assigned once the registration exists. */
     let deactivateRegistration: (() => void) | undefined
     /** Value delivery needs no context overlay; canonical dispatch still owns results and errors. */
     const channelRelease =
@@ -281,9 +312,15 @@ export function createEventHub<C extends IEventMap, V = undefined>(
             return (listener as IEventListener<C[K], void>)(context as never)
           })
     totalSize += 1
+    /** False once this registration has been removed from the Hub's bookkeeping. */
     let active = true
+    /** Bookkeeping set of the channel; created for its first registration. */
     const channelRegistrations = registrations.get(channel) ?? new Set<() => void>()
     registrations.set(channel, channelRegistrations)
+    /**
+     * Removes this registration from the Hub's bookkeeping once, deleting the channel when it
+     * becomes empty.
+     */
     const deactivate = (): void => {
       if (!active) return
       active = false
@@ -296,6 +333,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
     }
     deactivateRegistration = deactivate
     channelRegistrations.add(deactivate)
+    /** Releases the channel registration and the bookkeeping entry. */
     const release = (): void => {
       channelRelease()
       deactivate()

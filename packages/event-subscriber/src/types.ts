@@ -45,16 +45,19 @@ export type IEventValueConfig<T> = {
   readonly alias: string
 }
 
+/** Removes leading and trailing spaces from a string literal type. */
 type ITrim<S extends string> = S extends ` ${infer R}`
   ? ITrim<R>
   : S extends `${infer R} `
     ? ITrim<R>
     : S
+/** Names an alias may not use, because the context or the object model already uses them. */
 type IReservedEventContextKey =
   | keyof IEventContext<unknown>
   | '__proto__'
   | 'prototype'
   | 'constructor'
+/** Turns an invalid `valueConfig` into a type error at the call site. */
 type IEventValueConfigValidation<V> = V extends {
   readonly readPath: infer P extends string
   readonly alias: infer A extends string
@@ -65,6 +68,7 @@ type IEventValueConfigValidation<V> = V extends {
       ? never
       : V
   : V
+/** Adds the alias property, typed from the read path, to the context. */
 type IEventValueExtension<T, V> = V extends {
   readonly readPath: infer P extends string
   readonly alias: infer A extends string
@@ -75,7 +79,9 @@ type IEventValueExtension<T, V> = V extends {
       ? Readonly<Record<A, IObjectPathValue<T, P> | undefined>>
       : Readonly<Record<A, undefined>>
   : Record<never, never>
+/** Event context plus the configured alias property. */
 type IProjectedEventContext<T, V> = IEventContext<T> & IEventValueExtension<T, V>
+/** The value configuration for one Hub key, or `undefined` when it does not apply to that payload. */
 type IEventValueForKey<T, V> = V extends IEventValueConfig<T> ? V : undefined
 
 /**
@@ -122,7 +128,12 @@ export type IEventHubSubscription<
   ): IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>
 } & IEventHubSubscriptionStyleProjection<C, UsedKeys, S, V>
 
+/** True when `T` is a union type. */
 type IIsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never
+/**
+ * Keys already used in a Hub subscription chain, so a finite event map cannot add the same key
+ * twice.
+ */
 type IEventHubNextUsedKey<C extends IEventMap, UsedKeys, K> = string extends keyof C
   ? UsedKeys
   : number extends keyof C
@@ -171,6 +182,7 @@ export type IEventContext<T> = {
   setTaskId(taskId: string | undefined): void
 }
 
+/** Live control of one registration, shared by every dispatch snapshot of it. */
 export type IEventDispatchControl = {
   readonly active: boolean
   readonly aborted: boolean
@@ -179,6 +191,7 @@ export type IEventDispatchControl = {
   setTaskId(taskId: string | undefined): void
 }
 
+/** Registration state fixed when a dispatch starts. Package-internal; never reaches user code. */
 export type IEventDispatchSnapshot<T, R, V = undefined> = {
   readonly listener: IEventListener<T, R, V> | IEventValueListener<T, R>
   /** Argument mode captured with this listener; dispatch helpers share one invocation branch. */
@@ -257,6 +270,7 @@ export type IEventChannelLike<T, R = void, V = undefined> = {
   ): IUnsubscribe
 }
 
+/** Alias methods a style adds to a channel. */
 type IEventChannelStyleProjection<T, R, S extends IEventApiStyle | undefined, V> = [
   IEventApiStyleMethodNames<S>
 ] extends [never]
@@ -277,6 +291,7 @@ type IEventChannelStyleProjection<T, R, S extends IEventApiStyle | undefined, V>
       }
     : Record<never, never>
 
+/** Alias methods a style adds to a channel subscription handle. */
 type IEventChannelSubscriptionStyleProjection<T, R, S extends IEventApiStyle | undefined, V> = [
   IEventApiStyleMethodNames<S>
 ] extends [never]
@@ -348,7 +363,9 @@ export type IStyledEventChannel<
   V = undefined
 > = IEventChannel<T, R, S, V> & IEventChannelStyleProjection<T, R, S, V>
 
+/** Type-only brand that keeps task-filter views distinct from canonical channels. */
 declare const filteredChannelBrand: unique symbol
+/** Type-only brand that marks channels created by this package. */
 declare const canonicalChannelBrand: unique symbol
 
 /**
@@ -445,6 +462,7 @@ export type IEventHub<
   size(key?: keyof C): number
 }
 
+/** Alias methods a style adds to a Hub. */
 type IEventHubStyleProjection<C extends IEventMap, S extends IEventApiStyle | undefined, V> = [
   IEventApiStyleMethodNames<S>
 ] extends [never]
@@ -460,6 +478,7 @@ type IEventHubStyleProjection<C extends IEventMap, S extends IEventApiStyle | un
       }
     : Record<never, never>
 
+/** Alias methods a style adds to a Hub subscription handle. */
 type IEventHubSubscriptionStyleProjection<
   C extends IEventMap,
   UsedKeys,

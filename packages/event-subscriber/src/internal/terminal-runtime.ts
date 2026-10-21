@@ -25,6 +25,7 @@ export const createSystemTerminalRuntime = (
     return true
   },
   consoleError(error: unknown): boolean {
+    /** Host console, read once. */
     const consoleObject = host.console
     if (consoleObject === undefined) return false
     if (!('error' in consoleObject)) return false
@@ -32,6 +33,7 @@ export const createSystemTerminalRuntime = (
     return true
   },
   enqueueThrow(error: unknown): void {
+    /** Whether the host offers `queueMicrotask`. */
     let hasQueueMicrotask = false
     try {
       hasQueueMicrotask = 'queueMicrotask' in host
@@ -43,6 +45,7 @@ export const createSystemTerminalRuntime = (
       )
     }
     if (hasQueueMicrotask) {
+      /** Set when the host had a callable `queueMicrotask` and the callback was built. */
       let callbackArgumentEvaluated = false
       try {
         // Optional method call reads the getter once, evaluates its argument only when
@@ -76,8 +79,14 @@ export const reportTerminalDiagnostic = (
   terminalReport: ((error: AggregateError) => void | PromiseLike<void>) | undefined,
   runtime: IEventTerminalRuntime
 ): void => {
+  /**
+   * Sends errors to the host: `reportError` first, then `console.error`, and finally a thrown error
+   * on a microtask.
+   */
   const reportSystem = (currentErrors: readonly unknown[]): void => {
+    /** Errors to report, including later reporter failures. */
     const accumulated = [...currentErrors]
+    /** Builds the aggregate error from the current list. */
     const diagnostic = (): AggregateError =>
       createEventAggregateError(code, accumulated, eventErrorText(code))
     try {
@@ -92,6 +101,7 @@ export const reportTerminalDiagnostic = (
     }
     runtime.enqueueThrow(diagnostic())
   }
+  /** Aggregate error handed to `terminalReport`. */
   const diagnostic = createEventAggregateError(code, errors, eventErrorText(code))
   if (!terminalReport) {
     reportSystem(errors)

@@ -20,6 +20,7 @@ export const EventApiStyle = {
 /** Supported built-in naming preset values; runtime constants and type share the same name. */
 export type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle]
 
+/** Method names a style may not reuse, because the channel or Hub already uses them. */
 type IEventApiReservedName =
   | 'subscribe'
   | 'subscribeOnce'
@@ -85,8 +86,11 @@ export type IEventApiStyleNames<
 /** Built-in naming preset or custom operation names; neither changes event dispatch semantics. */
 export type IEventApiStyle = EventApiStyle | IEventApiStyleNames
 
+/** Names a custom subscribe alias may not take. */
 type IEventApiForbiddenSubscribeName = Exclude<IEventApiReservedName, 'subscribe'>
+/** Names a custom publish alias may not take. */
 type IEventApiForbiddenPublishName = Exclude<IEventApiReservedName, 'publish'>
+/** Names a custom unsubscribe alias may not take. */
 type IEventApiForbiddenUnsubscribeName = Exclude<IEventApiReservedName, 'unsubscribe'>
 
 /** Rejects known invalid literal styles while retaining runtime validation for wider string names. */
@@ -169,11 +173,17 @@ export const normalizeEventApiStyle = (value: unknown): IEventApiStylePlan => {
   if (typeof value === 'string') {
     if (hasEventApiStylePreset(value)) return Object.freeze({ ...eventApiStyleNames[value] })
   } else if (isRecord(value)) {
+    /** Raw subscribe alias, read once. */
     const subscribe = value.subscribe
+    /** Raw publish alias, read once. */
     const publish = value.publish
+    /** Raw unsubscribe alias, read once. */
     const unsubscribe = value.unsubscribe
+    /** Subscribe alias after validation. */
     const validatedSubscribe = validateStyleName(subscribe)
+    /** Publish alias after validation. */
     const validatedPublish = validateStyleName(publish)
+    /** Unsubscribe alias after validation; defaults to `unsubscribe`. */
     const validatedUnsubscribe = validateStyleName(
       unsubscribe === undefined ? 'unsubscribe' : unsubscribe
     )
@@ -197,13 +207,16 @@ export const normalizeEventApiStyle = (value: unknown): IEventApiStylePlan => {
 
 /** Builds only non-canonical alias descriptors; canonical members remain the original methods. */
 export const projectEventApiStyle = <T extends object>(surface: T, plan: IEventApiStylePlan): T => {
+  /** Alias descriptors to define on the surface. */
   const descriptors: PropertyDescriptorMap = {}
+  /** Alias names that differ from the canonical names, without duplicates. */
   const aliasNames = [plan.subscribe, plan.publish].filter(
     (name, index, names) =>
       name !== (index === 0 ? 'subscribe' : 'publish') && names.indexOf(name) === index
   )
   if (!Object.isExtensible(surface)) throw invalidStyle()
   for (const name of aliasNames) {
+    /** Existing property under the alias name; a non-configurable one blocks the style. */
     const existing = Object.getOwnPropertyDescriptor(surface, name)
     if (existing && !existing.configurable) throw invalidStyle()
   }

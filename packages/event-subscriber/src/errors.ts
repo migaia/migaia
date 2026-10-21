@@ -6,6 +6,7 @@ import {
 import { EventSubscriberErrorText } from './error-text.js'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
+/** Native error with the optional identity fields this package attaches. */
 type IEventError = Error & {
   readonly source?: string
   readonly code?: string
@@ -92,6 +93,7 @@ export const createEventError = (
  * the package boundary uncoded.
  */
 export const codeExistingError = (value: unknown, code: IEventSubscriberErrorCode): unknown => {
+  /** Only objects and functions can carry an attached code; primitives are wrapped instead. */
   const objectLike = (typeof value === 'object' && value !== null) || typeof value === 'function'
   if (!objectLike) return createEventTypeError(code, eventErrorText(code), value)
   try {
@@ -112,6 +114,7 @@ export const createEventAggregateError = (
   readonly source: typeof EVENT_SUBSCRIBER_SOURCE
   readonly code: IEventSubscriberErrorCode
 } => {
+  /** Native `AggregateError` whose `cause` is its first entry. */
   const error = new AggregateError(errors, message, { cause: errors[0] })
   return attachEventErrorCode(error, code)
 }
@@ -146,6 +149,7 @@ const eventErrorTextByCode: Record<IEventSubscriberErrorCode, string> = {
 export const eventErrorText = (code: IEventSubscriberErrorCode): string =>
   eventErrorTextByCode[code]
 
+/** Error that carries this package's `source` and one of its codes. */
 export type IEventErrorWithCode = IEventError & {
   readonly source: typeof EVENT_SUBSCRIBER_SOURCE
   readonly code: IEventSubscriberErrorCode

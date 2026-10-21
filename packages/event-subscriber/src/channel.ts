@@ -60,6 +60,7 @@ import {
   type IEventProjectionPlan
 } from './value-projection.js'
 
+/** Internal record of one registration, linked into the channel's ordered owner list. */
 type IRegistrationOwner<T, R, V> = {
   listener: IEventListener<T, R, V> | IEventValueListener<T, R>
   /** Fixed argument mode owned by this registration and copied into every dispatch snapshot. */
@@ -76,6 +77,10 @@ type IRegistrationOwner<T, R, V> = {
   control: IEventDispatchControl
 }
 
+/**
+ * Package-internal operations of one channel, kept off the public object and looked up through a
+ * WeakMap by the helpers.
+ */
 type IChannelCapability<T, R, V = undefined> = {
   snapshot(taskId?: string): readonly IEventDispatchSnapshot<T, R, V>[]
   project(value: T): IEventProjectionOutcome
@@ -88,11 +93,13 @@ type IChannelCapability<T, R, V = undefined> = {
   ): void
 }
 
+/** Internal record of a task-filter view: the source channel and the task name it selects. */
 type IFilteredCapability<T, R, V = undefined> = {
   readonly channel: ICanonicalEventChannel<T, R, undefined, V>
   readonly taskId: string
 }
 
+/** Structural channel after validation: `subscribe` is known to be callable. */
 type IValidatedChannel<T, R, V = undefined> = IEventChannelLike<T, R, V> & {
   readonly subscribe: IEventChannelLike<T, R, V>['subscribe']
 }
@@ -130,6 +137,7 @@ const readTaskOption = (options: unknown): string | undefined => {
     }
     return validateTaskId(options.taskId, true)
   } catch (error) {
+    /** Whether the failure came from task-name validation, which keeps its own code. */
     let isTaskIdError = false
     try {
       isTaskIdError =
@@ -347,13 +355,18 @@ export const withSnapshotEntries = <T, R, V = undefined>(
   visitor: IEventInvocationVisitor<R>
 ): void | Promise<void> => {
   const { capability, taskId } = getCapability(channel)
+  /** Registrations that match the view's task name at the time of the call. */
   const snapshots = capability.snapshot(taskId)
+  /** Value-path projection, computed only when at least one listener will be offered. */
   const projection =
     snapshots.length > 0 && capability.plan
       ? { plan: capability.plan, outcome: capability.project(value) }
       : undefined
+  /** Set when the visitor finishes; later `invoke()` calls then throw `INVOCATION_CLOSED`. */
   let closed = false
+  /** Single-use invocation entries, one per snapshot, in registration order. */
   const entries = snapshots.map((snapshot) => {
+    /** Set by the first `invoke()` of this entry; a second call throws. */
     let invoked = false
     return Object.freeze({
       taskId: snapshot.taskId,
@@ -368,6 +381,7 @@ export const withSnapshotEntries = <T, R, V = undefined>(
       }
     }) as IEventInvocation<R>
   })
+  /** Closes every entry once and reports a pending projection failure. */
   const close = (): void => {
     if (closed) return
     closed = true
@@ -379,6 +393,7 @@ export const withSnapshotEntries = <T, R, V = undefined>(
       )
   }
   try {
+    /** Visitor result; a Promise keeps the entries open until it settles. */
     const result = visitor(Object.freeze(entries))
     if (result === undefined) {
       close()
@@ -416,6 +431,7 @@ export const invokeEachLive = <T, R, V = undefined>(
   visitor: (invocation: IEventInvocation<R>) => void
 ): void => {
   const { capability, taskId } = getCapability(channel)
+  /** Live-visit operation; absent on objects that are not channels of this package. */
   const liveVisit = capability.liveVisit
   if (!liveVisit) return
   liveVisit(value, taskId, visitor)
@@ -425,10 +441,12 @@ export const invokeEachLive = <T, R, V = undefined>(
 export const getCapability = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>
 ): { readonly capability: IChannelCapability<T, R, V>; readonly taskId: string | undefined } => {
+  /** Internal record when the argument is a task-filter view. */
   const filtered = filteredCapabilities.get(channel as object) as
     | IFilteredCapability<T, R, V>
     | undefined
   if (filtered) {
+    /** Capability of the source channel behind the view. */
     const capability = channelCapabilities.get(filtered.channel as object) as
       | IChannelCapability<T, R, V>
       | undefined
@@ -439,6 +457,7 @@ export const getCapability = <T, R, V = undefined>(
       )
     return { capability, taskId: filtered.taskId }
   }
+  /** Capability registered for this channel object. */
   const capability = channelCapabilities.get(channel as object) as
     | IChannelCapability<T, R, V>
     | undefined
@@ -460,13 +479,16 @@ export const reportLateFailure = <
   event: IEventContext<T>,
   failure: unknown
 ): void => {
+  /** Aggregate error that carries the late listener failure as its first entry. */
   const diagnostic = createEventAggregateError(
     EventSubscriberErrorCode.unhandledListenerFailure,
     [failure],
     eventErrorText(EventSubscriberErrorCode.unhandledListenerFailure)
   )
+  /** Caller's reporter, if configured; otherwise the terminal path receives the failure. */
   const report = options.report
   if (report) {
+    /** Reporter result; a rejection is forwarded to the terminal path. */
     let reportResult: void | PromiseLike<void>
     try {
       reportResult = report({ event: event as never, error: failure })
@@ -486,6 +508,7 @@ export const reportLateFailure = <
  * microtask later as an asynchronous rejection, and any other value schedules no work.
  */
 const observeRejection = (value: unknown, onRejected: (error: unknown) => void): void => {
+  /** Result of reading `then` exactly once, so a throwing getter is observed instead of escaping. */
   const inspection = inspectThenable(value)
   if ('error' in inspection) void Promise.reject(inspection.error).then(undefined, onRejected)
   else observeThenableRejection(value, inspection, onRejected)
@@ -497,6 +520,10 @@ const reportTerminal = <T, S extends IEventApiStyle | undefined = undefined, V =
   diagnostic: AggregateError,
   failure: unknown
 ): void => {
+  /**
+   * Errors passed to the terminal reporter: the diagnostic entries plus the reporter's own failure,
+   * if any.
+   */
   const errors = failure === undefined ? diagnostic.errors : [...diagnostic.errors, failure]
   reportTerminalDiagnostic(
     EventSubscriberErrorCode.unhandledListenerFailure,
@@ -561,20 +588,33 @@ export function createCanonicalChannel<T, R = void, const V = undefined>(
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options?: IEventChannelOptions<T, undefined, V>
 ): ICanonicalEventChannel<T, R, undefined, V>
+/**
+ * Implementation shared by the overloads above. Internal callers may pass an already validated
+ * projection plan as the second argument.
+ */
 export function createCanonicalChannel<T, R = void, V = undefined>(
   options: IEventChannelOptions<T, IEventApiStyle | undefined, V> = {},
   suppliedProjectionPlan?: IEventProjectionPlan
 ): ICanonicalEventChannel<T, R, undefined, V> {
+  /** Validated `report` option. */
   let report: IEventChannelOptions<T, undefined, V>['report']
+  /** Validated `terminalReport` option. */
   let terminalReport: IEventChannelOptions<T, undefined, V>['terminalReport']
+  /** Validated `dispatchPolicy` option. */
   let dispatchPolicy: IEventChannelOptions<T, undefined, V>['dispatchPolicy']
   /** The selected mode is read once before creating any registration state. */
   let admissionPolicy: IEventChannelOptions<T, undefined, V>['admissionPolicy']
+  /** Validated `removalPolicy` option; defaults to removing only the called handle. */
   let removalPolicy: IEventChannelOptions<T, undefined, V>['removalPolicy']
+  /** Validated `publishBudget` option. */
   let publishBudget: number | undefined
+  /** Validated `throwOnAborted` option. */
   let throwOnAborted: boolean
+  /** Raw `valueConfig` option; validated when the projection plan is built. */
   let valueConfig: unknown
+  /** Raw `style` option. */
   let style: IEventApiStyle | undefined
+  /** Alias names resolved from `style`. */
   let stylePlan: IEventApiStylePlan
   try {
     if (!isRecord(options)) {
@@ -589,6 +629,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     admissionPolicy = options.admissionPolicy
     removalPolicy = options.removalPolicy ?? EventRemovalPolicy.handle
     publishBudget = options.publishBudget ?? 100_000
+    /** Raw `throwOnAborted` option, read once so a getter cannot change between checks. */
     const suppliedThrowOnAborted = options.throwOnAborted
     throwOnAborted = suppliedThrowOnAborted === undefined ? false : suppliedThrowOnAborted
     valueConfig = options.valueConfig as unknown
@@ -649,6 +690,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
+  /** Options after validation, shared by dispatch, reporters and helper functions. */
   const normalizedOptions: IEventChannelOptions<T, undefined, V> = {
     report,
     terminalReport,
@@ -658,10 +700,18 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     publishBudget,
     throwOnAborted
   }
+  /** Projection plan of the value alias; `undefined` when no `valueConfig` was given. */
   const projectionPlan = suppliedProjectionPlan ?? createEventValueProjectionPlan(valueConfig)
+  /** First registration in delivery order. */
   let first: IRegistrationOwner<T, R, V> | undefined
+  /** Last registration; new registrations are appended after it. */
   let last: IRegistrationOwner<T, R, V> | undefined
+  /** Number of committed registrations; exposed as `size`. */
   let count = 0
+  /**
+   * Incremented when registrations are removed, so an in-progress live visit stops admitting new
+   * ones.
+   */
   let membershipEpoch = 0
   /** Unique channels alone index active owners by listener identity. */
   const uniqueOwners =
@@ -670,7 +720,9 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       : undefined
   /** Queued values used only when the caller explicitly opts into queued reentrancy. */
   let publishing = false
+  /** Values waiting for delivery under the queued policy. */
   const pendingValues: T[] = []
+  /** Index of the next queued value to deliver. */
   let pendingIndex = 0
   /** Unlinks one registration using shared channel state instead of a per-owner closure. */
   const removeOwner = (target: IRegistrationOwner<T, R, V>, incrementEpoch: boolean): void => {
@@ -686,19 +738,33 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     count -= 1
     if (incrementEpoch) membershipEpoch += 1
   }
+  /**
+   * Creates one registration in two steps: `commit()` links it into the list, and the returned
+   * release removes it according to the removal policy. Splitting the steps lets callers finish
+   * their own setup before the listener becomes visible.
+   */
   const registerRaw = (
     listener: IEventListener<T, R, V> | IEventValueListener<T, R>,
     taskId: string | undefined,
     delivery: EventDelivery
   ): { readonly release: IUnsubscribe; readonly commit: () => void } => {
+    /** Set by the first release; later releases do nothing. */
     let released = false
+    /** Set once the registration is linked into the list. */
     let committed = false
+    /** Owner record of this registration; filled in field by field below. */
     const owner = {} as IRegistrationOwner<T, R, V>
+    /**
+     * Removes this registration once. Under the `listenerAll` removal policy it removes every
+     * registration of the same listener.
+     */
     const release = (): void => {
       if (released) return
       released = true
       if (removalPolicy === EventRemovalPolicy.listenerAll && committed && !uniqueOwners) {
+        /** Registrations of the same listener, collected before any of them is unlinked. */
         const matching: IRegistrationOwner<T, R, V>[] = []
+        /** Cursor over the registration list. */
         let current = first
         while (current) {
           if (current.listener === owner.listener) matching.push(current)
@@ -719,6 +785,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     owner.release = release
     owner.committed = false
     owner.control = createOwnerControl(owner)
+    /** Links the registration at the end of the list once; does nothing after release. */
     const commit = (): void => {
       if (committed || released) return
       committed = true
@@ -739,6 +806,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     taskId: string | undefined,
     delivery: EventDelivery
   ): IUnsubscribe | undefined => {
+    /** Registration already holding this listener on a unique channel. */
     const existing = uniqueOwners?.get(listener)
     if (!existing) return undefined
     if (existing.currentTaskId !== taskId || existing.delivery !== delivery) {
@@ -753,16 +821,24 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let remaining: number
   /** Records omitted snapshot targets even when no nested value remains queued. */
   let budgetExhausted = false
+  /** Synchronous listener failures of the current top-level publish. */
   let failures: unknown[] = []
+  /** Depth of nested dispatches, used to switch to queuing before the native stack overflows. */
   let nativeDepth = 0
+  /**
+   * Values published while the native stack is at its depth limit; drained after the current
+   * listener returns.
+   */
   let spillCapture: T[] | undefined
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
   const dispatchValue = (value: T): void => {
     // A channel without owners has nothing to snapshot, project, or report.
     if (!first) return
     ++nativeDepth
+    /** Frozen list of registrations taken before any listener runs. */
     const snapshots = capability.snapshot()
     try {
+      /** Value-path projection, computed once for this value. */
       const projection = projectionPlan
         ? { plan: projectionPlan, outcome: capability.project(value) }
         : undefined
@@ -774,6 +850,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         }
         --remaining
         if (nativeDepth >= MAX_NATIVE_RECURSION_DEPTH) spillCapture = []
+        /** Listener return value; checked for a later rejection when it is an object or function. */
         let result: R | PromiseLike<R>
         try {
           result = invokeDispatchSnapshot(snapshot, value, projection)
@@ -813,6 +890,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
 
   /** Delivers a value recursively by default, or drains an explicit queued policy. */
   const publishValue = (initialValue: T): void => {
+    /** True when this call starts a new top-level publish and must reset its budget and failures. */
     const rootTransaction = !nativeDepth && !publishing
     if (rootTransaction) {
       remaining = publishBudget!
@@ -846,6 +924,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       rootTransaction &&
       (budgetExhausted || failures.length + pendingValues.length - pendingIndex)
     ) {
+      /** `PUBLISH_FAILED` aggregate holding every synchronous failure of this publish. */
       const error = createEventAggregateError(
         EventSubscriberErrorCode.publishFailed,
         failures,
@@ -873,15 +952,19 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         eventErrorText(EventSubscriberErrorCode.invalidListener)
       )
     }
+    /** Task name of the next link in the chain. */
     const nextTaskId = readTaskOption(nextOptions)
     /** Argument mode is admitted with the task label before a chain can acquire a new owner. */
     const nextDelivery = readDeliveryOption(nextOptions)
+    /** Release of an existing unique registration that already holds this listener. */
     const nextShared = admitUnique(nextListener, nextTaskId, nextDelivery)
     if (nextShared) return nextShared
+    /** New registration for the next link of the chain. */
     const nextAdmission = registerRaw(nextListener, nextTaskId, nextDelivery)
     nextAdmission.commit()
     return nextAdmission.release
   }
+  /** Public canonical channel object; its methods close over the state above. */
   const channel = {
     subscribe(
       listener: IEventListener<T, R, V> | IEventValueListener<T, R>,
@@ -893,14 +976,18 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
           eventErrorText(EventSubscriberErrorCode.invalidListener)
         )
       }
+      /** Validated task name of this subscription. */
       const taskId = readTaskOption(listenerOptions)
       /** Mode stays immutable for the registration, including all handles sharing unique admission. */
       const delivery = readDeliveryOption(listenerOptions)
+      /** Release of an existing unique registration, when the listener is already registered. */
       const shared = admitUnique(listener, taskId, delivery)
+      /** New registration, created only when no existing one is shared. */
       const admission = shared ? undefined : registerRaw(listener, taskId, delivery)
       /** A duplicate handle may release the shared owner only after projection succeeds. */
       let bound = false
       try {
+        /** Callable subscription handle with `unsubscribe`, chained `subscribe` and style aliases. */
         const handle = createRawSubscriptionOwner(
           shared
             ? () => {
@@ -922,7 +1009,9 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       publishValue(value)
     },
     filterTaskId(taskId) {
+      /** Task name after validation. */
       const validated = validateTaskId(taskId, false) as string
+      /** Opaque view object; its behaviour lives in the internal filter record. */
       const filtered = {} as IFilteredEventChannel<T, R, V>
       filteredCapabilities.set(filtered as object, {
         channel: channel as ICanonicalEventChannel<unknown, unknown, undefined, unknown>,
@@ -932,8 +1021,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     },
     clear() {
       if (count > 0) membershipEpoch += 1
+      /** Cursor over the registration list. */
       let current = first
       while (current) {
+        /** Next registration, read before this one is unlinked. */
         const next = current.next
         current.active = false
         current.previous = undefined
@@ -949,6 +1040,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       return count
     }
   } as ICanonicalEventChannel<T, R, undefined, V>
+  /** Package-internal operations of this channel, registered in a WeakMap after construction. */
   const capability: IChannelCapability<T, R, V> = {
     plan: projectionPlan,
     options: normalizedOptions,
@@ -956,7 +1048,9 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       return projectEventValue(value, projectionPlan)
     },
     snapshot(taskId) {
+      /** Snapshots of the matching registrations, in registration order. */
       const snapshots: IEventDispatchSnapshot<T, R, V>[] = []
+      /** Cursor over the registration list. */
       let current = first
       while (current) {
         if (taskId === undefined || current.currentTaskId === taskId)
@@ -972,12 +1066,17 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       let scanned: IRegistrationOwner<T, R, V> | undefined
       /** True after the first pass, which admits every owner present at dispatch start. */
       let started = false
+      /** Value-path projection, computed when the first registration is offered. */
       let projection:
         | { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
         | undefined
+      /** Error thrown by the visitor; rethrown after every invocation is closed. */
       let primaryError: unknown
+      /** Set when the visitor throws, so the original error is rethrown after cleanup. */
       let visitorFailed = false
+      /** Registrations admitted to this visit and not yet offered to the visitor. */
       const pending: IRegistrationOwner<T, R, V>[] = []
+      /** Close functions of every invocation offered so far. */
       const liveInvocations: Array<() => void> = []
       try {
         /**
@@ -988,6 +1087,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         const append = (): void => {
           if (started && membershipEpoch !== epoch) return
           started = true
+          /** Cursor resuming after the last registration already scanned. */
           let current = scanned ? scanned.next : first
           while (current) {
             if (current.committed && (taskId === undefined || current.currentTaskId === taskId))
@@ -997,14 +1097,20 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
           }
         }
         append()
+        /** Position of the next pending registration. */
         let index = 0
         while (index < pending.length) {
+          /** Registration offered next. */
           const owner = pending[index++]!
           if (!projection && capability.plan)
             projection = { plan: capability.plan, outcome: capability.project(value) }
+          /** Snapshot of that registration, taken when it is offered. */
           const snapshot = snapshotOwner(owner)
+          /** Set by the first `invoke()` of this invocation. */
           let invoked = false
+          /** Set when the visit ends; later `invoke()` calls throw `INVOCATION_CLOSED`. */
           let closed = false
+          /** Single-use invocation handed to the visitor. */
           const invocation: IEventInvocation<R> = {
             taskId: snapshot.taskId,
             invoke: () => {
@@ -1017,6 +1123,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
               return invokeDispatchSnapshot(snapshot, value, projection)
             }
           }
+          /** Closes this invocation. */
           const close = (): void => {
             closed = true
           }
@@ -1076,7 +1183,9 @@ export const subscribeSubscriber = <T, R>(
   channel: IEventChannelLike<T, R>,
   subscriber: { readonly handle?: unknown }
 ): IUnsubscribe => {
+  /** Channel after structural validation. */
   const validated = validateChannelLike<T, R>(channel)
+  /** Raw `handle` member of the subscriber, read once. */
   let handleValue: unknown
   try {
     if (!isRecord(subscriber)) {
@@ -1095,6 +1204,7 @@ export const subscribeSubscriber = <T, R>(
       eventErrorText(EventSubscriberErrorCode.invalidSubscriber)
     )
   }
+  /** Subscriber whose `handle` has been checked to be callable. */
   const typedSubscriber = subscriber as {
     handle(event: IEventContext<T>): R | PromiseLike<R>
   }
@@ -1104,6 +1214,7 @@ export const subscribeSubscriber = <T, R>(
       (event) => typedSubscriber.handle(event)
     )
   } catch (error) {
+    /** Whether the thrown value already carries a `code`, in which case it is rethrown unchanged. */
     let hasCode = false
     try {
       hasCode =
@@ -1132,7 +1243,9 @@ export const subscribeOnce = <T, R, V = undefined>(
   listener: IEventListener<T, R, V>,
   options?: { readonly taskId?: string }
 ): IUnsubscribe => {
+  /** Channel after structural validation. */
   const validated = validateChannelLike<T, R, V>(channel)
+  /** Validated task name forwarded to the source subscription. */
   const taskId = readTaskOption(options)
   if (typeof listener !== 'function') {
     throw createEventTypeError(
@@ -1140,7 +1253,9 @@ export const subscribeOnce = <T, R, V = undefined>(
       eventErrorText(EventSubscriberErrorCode.invalidListener)
     )
   }
+  /** Set by the first delivery; later deliveries are ignored. */
   let fired = false
+  /** Release of the source subscription; replaced once installation succeeds. */
   let release: IUnsubscribe = () => undefined
   release = installSubscriptionSource<Parameters<IEventListener<T, R, V>>[0], R | PromiseLike<R>>(
     (wrapped) => validated.subscribe(wrapped, taskId === undefined ? undefined : { taskId }),
@@ -1172,7 +1287,9 @@ export const subscribeUntil = <T, R, V = undefined>(
   listener: IEventListener<T, R, V>,
   options?: { readonly taskId?: string }
 ): IUnsubscribe => {
+  /** Channel after structural validation. */
   const validated = validateChannelLike<T, R, V>(channel)
+  /** Validated task name forwarded to the source subscription. */
   const taskId = readTaskOption(options)
   if (typeof listener !== 'function') {
     throw createEventTypeError(
@@ -1180,6 +1297,7 @@ export const subscribeUntil = <T, R, V = undefined>(
       eventErrorText(EventSubscriberErrorCode.invalidListener)
     )
   }
+  /** Result of checking the signal at subscription time: invalid, already aborted, or usable. */
   let admission
   try {
     if (!isRecord(signal))
@@ -1204,6 +1322,7 @@ export const subscribeUntil = <T, R, V = undefined>(
       admission.cause
     )
   }
+  /** Whether the channel was created to throw instead of ignoring an already-aborted signal. */
   const throwOnAborted = channelCapabilities.get(channel as object)?.options.throwOnAborted === true
   if (admission.aborted) {
     if (throwOnAborted)
@@ -1213,11 +1332,20 @@ export const subscribeUntil = <T, R, V = undefined>(
       )
     return () => undefined
   }
+  /** Set when the signal aborts after installation; the overlay context then reports aborted. */
   let overlayAborted = false
+  /** Abort reason read from the signal; reported by the overlay context. */
   let overlayReason: unknown
+  /** Set once the abort reason has been read from the signal. */
   let captured = false
+  /** Set when reading the abort reason threw. */
   let captureFailed = false
+  /** Failure thrown while reading the abort reason. */
   let captureFailure: unknown
+  /**
+   * Reads the signal's abort reason once and returns the same value, or rethrows the same failure,
+   * on later calls.
+   */
   const captureReason = (): unknown => {
     if (captured) {
       if (captureFailed) throw captureFailure
@@ -1232,19 +1360,31 @@ export const subscribeUntil = <T, R, V = undefined>(
     }
     return (overlayReason = read.value)
   }
+  /** Release of the source subscription; replaced once installation succeeds. */
   let sourceRelease: IUnsubscribe = () => undefined
+  /** Set by the first release of this subscription. */
   let released = false
+  /** Set before the abort listener is added, so cleanup knows whether to remove it. */
   let abortInstallAttempted = false
+  /** Set when installing the source subscription failed. */
   let sourceSubscriptionFailed = false
+  /** Set once the abort listener installation has finished, successfully or not. */
   let observerInstallComplete = false
+  /** Set when removal was requested before installation finished. */
   let removeRequested = false
+  /** Set once the abort listener has been removed from the signal. */
   let observerRemoved = false
+  /**
+   * Removes the abort listener once. Before installation finishes the removal is deferred unless
+   * `force` is set.
+   */
   const removeObserver = (force = false): void => {
     removeRequested = true
     if (observerRemoved || (!observerInstallComplete && !force)) return
     observerRemoved = true
     signal.removeEventListener(EventSubscriberState.abort, abortListener)
   }
+  /** Releases the source subscription once. */
   const release = (): void => {
     if (released) return
     released = true
@@ -1254,6 +1394,10 @@ export const subscribeUntil = <T, R, V = undefined>(
       throw codeExistingError(error, EventSubscriberErrorCode.invalidSignal)
     }
   }
+  /**
+   * Context passed to the listener: same payload and controls as the source event, but `aborted`
+   * also reflects the signal.
+   */
   const eventWrapper = (sourceEvent: IEventContext<T>): IEventContext<T> =>
     copyEventProjection(
       {
@@ -1279,9 +1423,16 @@ export const subscribeUntil = <T, R, V = undefined>(
       sourceEvent,
       channelCapabilities.get(channel as object)?.plan
     )
+  /**
+   * Finishes an abort: reads the reason, removes the listener and releases the subscription.
+   * Failures are collected and thrown together as `INVALID_SIGNAL`, with the first one as `cause`.
+   */
   const completeAbort = (removeSignalListener: boolean): void => {
+    /** Failure thrown while reading the abort reason. */
     let primary: unknown
+    /** Whether reading the abort reason failed. */
     let hasPrimary = false
+    /** Failures from removing the listener and releasing the subscription. */
     const cleanup: unknown[] = []
     try {
       captureReason()
@@ -1302,7 +1453,9 @@ export const subscribeUntil = <T, R, V = undefined>(
       cleanup.push(error)
     }
     if (hasPrimary || cleanup.length > 0) {
+      /** All failures, the primary one first. */
       const errors = [...(hasPrimary ? [primary] : []), ...cleanup]
+      /** First failure; becomes the aggregate's `cause`. */
       const first = errors[0]
       throw attachEventErrorCode(
         new AggregateError(errors, eventErrorText(EventSubscriberErrorCode.invalidSignal), {
@@ -1312,6 +1465,7 @@ export const subscribeUntil = <T, R, V = undefined>(
       )
     }
   }
+  /** Abort listener installed on the signal. */
   const abortListener = (): void => {
     if (released) return
     overlayAborted = true
@@ -1341,6 +1495,7 @@ export const subscribeUntil = <T, R, V = undefined>(
       throw error
     }
     if (released) sourceRelease()
+    /** Second read of `signal.aborted`, catching an abort during installation. */
     const secondAborted = signal.aborted
     if (typeof secondAborted !== 'boolean') {
       throw createEventTypeError(
@@ -1358,6 +1513,7 @@ export const subscribeUntil = <T, R, V = undefined>(
         )
     }
   } catch (primary) {
+    /** Failures from rolling back a partly installed subscription. */
     const cleanup: unknown[] = []
     observerInstallComplete = true
     if (abortInstallAttempted) {
@@ -1382,6 +1538,7 @@ export const subscribeUntil = <T, R, V = undefined>(
         EventSubscriberErrorCode.invalidSignal
       )
     }
+    /** Whether the primary failure already carries a `code`. */
     let hasExistingCode = false
     try {
       hasExistingCode =
@@ -1396,9 +1553,13 @@ export const subscribeUntil = <T, R, V = undefined>(
   }
   return (): void => {
     if (observerRemoved && released) return
+    /** Failure thrown while removing the abort listener. */
     let removeError: unknown
+    /** Whether removing the abort listener failed. */
     let hasRemoveError = false
+    /** Failure thrown while releasing the source subscription. */
     let releaseError: unknown
+    /** Whether releasing the source subscription failed. */
     let hasReleaseError = false
     try {
       removeObserver()
@@ -1413,7 +1574,9 @@ export const subscribeUntil = <T, R, V = undefined>(
       releaseError = error
     }
     if (hasRemoveError && hasReleaseError) {
+      /** Removal failure, coded as `INVALID_SIGNAL`; it stays first in the aggregate. */
       const primary = codeExistingError(removeError, EventSubscriberErrorCode.invalidSignal)
+      /** Release failure, coded as `INVALID_SIGNAL`. */
       const secondary = codeExistingError(releaseError, EventSubscriberErrorCode.invalidSignal)
       throw attachEventErrorCode(
         new AggregateError(

@@ -15,12 +15,14 @@ import {
 import type { IEventChannelOptions, IEventContext } from './types.js'
 import type { IEventApiStyle } from './style.js'
 
+/** Validated value alias: its property name, the dotted read path, and the parsed path segments. */
 export type IEventProjectionPlan = {
   readonly alias: string
   readonly readPath: string
   readonly segments: IObjectPathTuple
 }
 
+/** Result of reading the path for one value: the value, or a diagnostic when reading failed. */
 export type IEventProjectionOutcome = {
   readonly value: unknown
   readonly diagnostic: Error | undefined
@@ -37,6 +39,7 @@ export function createEventValueProjectionPlan(config: unknown): IEventProjectio
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
+  /** Raw `readPath` member, read once. */
   let readPath: unknown
   try {
     readPath = (config as { readonly readPath?: unknown }).readPath
@@ -54,6 +57,7 @@ export function createEventValueProjectionPlan(config: unknown): IEventProjectio
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
   if (readPath.trim() === '') return undefined
+  /** Raw `alias` member, read once. */
   let alias: unknown
   try {
     alias = (config as { readonly alias?: unknown }).alias
@@ -64,6 +68,7 @@ export function createEventValueProjectionPlan(config: unknown): IEventProjectio
       error
     )
   }
+  /** Names an alias may not use at runtime, matching the type-level check. */
   const reservedContextKeys = new Set([
     '__proto__',
     'prototype',
@@ -85,6 +90,7 @@ export function createEventValueProjectionPlan(config: unknown): IEventProjectio
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
+  /** Path segments parsed from `readPath`. */
   let segments: IObjectPathTuple
   try {
     segments = parseObjectPath(readPath)
@@ -104,11 +110,13 @@ export function projectEventValue<T>(
   plan: IEventProjectionPlan | undefined
 ): IEventProjectionOutcome {
   if (!plan) return { value: undefined, diagnostic: undefined }
+  /** Result of walking the read path on the payload. */
   const probe = probeObjectPathSegments(
     value,
     plan.segments as IObjectPathTupleFor<T>
   ) as IPathProbe<T, IObjectPathInput<T>>
   if (probe.kind === 'value') return { value: probe.value, diagnostic: undefined }
+  /** `VALUE_PROJECTION_FAILED` error carrying the path failure, if any, as `cause`. */
   const diagnostic = createEventTypeError(
     EventSubscriberErrorCode.valueProjectionFailed,
     eventErrorText(EventSubscriberErrorCode.valueProjectionFailed),
@@ -157,9 +165,11 @@ export function reportEventProjectionFailure<T, S extends IEventApiStyle | undef
   event: IEventContext<T>,
   diagnostic: Error
 ): void {
+  /** Caller's reporter, if configured. */
   const report = options.report
   if (report) {
     try {
+      /** Reporter result; a rejection is forwarded to the terminal path. */
       const result = report({ event: event as never, error: diagnostic })
       Promise.resolve(result).catch((failure: unknown) =>
         reportProjectionTerminal(options, diagnostic, failure)
@@ -179,6 +189,7 @@ function reportProjectionTerminal<T, S extends IEventApiStyle | undefined, V>(
   diagnostic: Error,
   failure: unknown
 ): void {
+  /** Errors passed to the terminal reporter: the diagnostic plus the reporter's own failure, if any. */
   const errors = failure === undefined ? [diagnostic] : [diagnostic, failure]
   reportTerminalDiagnostic(
     EventSubscriberErrorCode.valueProjectionFailed,

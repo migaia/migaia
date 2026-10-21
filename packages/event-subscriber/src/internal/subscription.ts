@@ -15,12 +15,18 @@ type ISubscriptionHandle<T> = IUnsubscribe & {
   readonly subscribe: (...args: never[]) => ISubscriptionHandle<T>
 }
 
+/**
+ * Builds the callable handle of a subscription chain. Calling the handle or `unsubscribe` releases
+ * every link in reverse order; `subscribe` adds a link; style aliases are added from `stylePlan`.
+ */
 export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown>>(
   first: () => void,
   extend: (...args: never[]) => void | (() => void),
   stylePlan: IEventApiStylePlan
 ): T => {
+  /** Release functions of the chain, in registration order. */
   const disposers: Array<() => void> = [first]
+  /** Set when the chain is released; adding a link afterwards throws `SUBSCRIPTION_CLOSED`. */
   let closed = false
   /**
    * Closes the chain once and runs every disposer in reverse registration order. A failing disposer
@@ -49,6 +55,7 @@ export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown
     )
   }) as T
   try {
+    /** Adds one link to the chain and returns the same handle. */
     const subscribe = (...args: never[]): ISubscriptionHandle<T> => {
       if (closed) {
         throw createEventError(
@@ -56,10 +63,12 @@ export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown
           eventErrorText(EventSubscriberErrorCode.subscriptionClosed)
         )
       }
+      /** Release of the new link, if the extension produced one. */
       const disposer = extend(...args)
       if (typeof disposer === 'function') disposers.push(disposer)
       return handle
     }
+    /** Property descriptors of the handle's members. */
     const descriptors: PropertyDescriptorMap = {
       unsubscribe: { value: handle, enumerable: false, writable: false, configurable: false },
       subscribe: {
@@ -113,11 +122,23 @@ export const installSubscriptionSource = <TEvent, R>(
   /** Suppresses an installation-time delivery already made terminal by an outer abort protocol. */
   ignoreSynchronousDelivery: () => boolean = () => false
 ): IUnsubscribe => {
+  /** Release function returned by the source; set once installation succeeds. */
   let sourceRelease: IUnsubscribe | undefined
+  /** Set once the source `subscribe` call has returned. */
   let ready = false
+  /** Set by the first release request. */
   let released = false
+  /** Set once the source release has been called. */
   let sourceReleaseCalled = false
+  /**
+   * Set when the source delivered an event while `subscribe` was still running, which is not
+   * allowed.
+   */
   let synchronousDelivery = false
+  /**
+   * Releases the source once. A release requested during installation runs after the source has
+   * returned its release function.
+   */
   const release = (): void => {
     if (released && sourceReleaseCalled) return
     released = true
@@ -129,6 +150,7 @@ export const installSubscriptionSource = <TEvent, R>(
       throw codeExistingError(error, releaseErrorCode)
     }
   }
+  /** Value returned by the source `subscribe`; checked to be a function below. */
   const candidate = subscribe((event) => {
     if (released || ignoreSynchronousDelivery()) return undefined as R
     if (!ready) {
@@ -146,6 +168,7 @@ export const installSubscriptionSource = <TEvent, R>(
   ready = true
   if (released) release()
   if (synchronousDelivery) {
+    /** `INVALID_CHANNEL` error for a source that delivered during installation. */
     const primary = createEventTypeError(
       EventSubscriberErrorCode.invalidChannel,
       eventErrorText(EventSubscriberErrorCode.invalidChannel)
