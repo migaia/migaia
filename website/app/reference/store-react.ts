@@ -96,112 +96,104 @@ const configExample = `const config = normalizeStoreConfig({ features: { experim
 console.log(readStoreFeature(config, 'experimental.charts'))
 assertStoreFeature(config, 'experimental.charts', 'Charts')`
 
-/** Feature declarations are observable without creating WASM fields. */
-const wasmOptionExample = `import { normalizeStoreConfig, readStoreFeature } from '@migaia/store-react'
+/** A pricing panel waits for the initialization promised by its WASM declaration. */
+const wasmOptionExample = `import { StoreProvider } from '@migaia/store-react'
 
-const enabled = normalizeStoreConfig({ features: { wasm: true }, ready: [Promise.resolve()] })
-await enabled.ready?.promise
-console.log(readStoreFeature(enabled, 'wasm'), enabled.ready?.status())
-const disabled = normalizeStoreConfig({ features: { wasm: false } })
-console.log(readStoreFeature(disabled, 'wasm'), disabled.ready)`
+const pricingConfig = {
+  features: { wasm: true },
+  ready: [initializePricingWasm]
+}
+function PricingApp() {
+  return (
+    <StoreProvider config={pricingConfig}>
+      <PricingTable />
+    </StoreProvider>
+  )
+}`
 
-/** Defaults remain application data instead of silently configuring every Store. */
-const featureOptionExample = `import { normalizeStoreConfig, readStoreFeature, assertStoreFeature } from '@migaia/store-react'
+/** A Store explicitly consumes the preference exposed by normalized application configuration. */
+const featureOptionExample = `import { normalizeStoreConfig, readStoreFeature } from '@migaia/store-react'
+import { createStore } from '@migaia/store-light'
 
 const config = normalizeStoreConfig({
   features: { experimental: { charts: true } },
   defaults: { warnAsyncActions: true }
 })
-console.log(readStoreFeature(config, 'experimental.charts'))
-assertStoreFeature(config, 'experimental.charts', 'Charts')
-console.log(config.defaults.warnAsyncActions, readStoreFeature(config, 'experimental.unknown'))`
+const invoice = createStore({ total: 0 }, {
+  warnAsyncActions: config.defaults.warnAsyncActions
+})
+if (readStoreFeature(config, 'experimental.charts')) mountInvoiceCharts(invoice)`
 
-/** Disabled-feature checks use the same normalized input and preserve the package code. */
-const disabledFeatureOptionExample = `import { normalizeStoreConfig, readStoreFeature, assertStoreFeature } from '@migaia/store-react'
+/** An application feature guard gives the user an unavailable view instead of opening the panel. */
+const disabledFeatureOptionExample = `import { normalizeStoreConfig, assertStoreFeature } from '@migaia/store-react'
 
-const config = normalizeStoreConfig({ features: { wasm: false }, defaults: { warnAsyncActions: false } })
-console.log(readStoreFeature(config, 'wasm'), config.defaults.warnAsyncActions)
-try { assertStoreFeature(config, 'wasm', 'WasmPanel') }
-catch (error) { console.log(Reflect.get(error as object, 'code')) }`
+const config = normalizeStoreConfig({ features: { wasm: false } })
+function openPricing() {
+  try {
+    assertStoreFeature(config, 'wasm', 'PricingPanel')
+    openPricingPanel()
+  } catch (error) {
+    showFeatureUnavailable(error)
+  }
+}
+pricingButton.onclick = openPricing`
 
-/** Real DOM commits expose both the registry context and delayed unmount disposal. */
-const providerOwnershipOptionExample = `import { createElement } from 'react'
-import { flushSync } from 'react-dom'
-import { createRoot } from 'react-dom/client'
-import { StoreProvider, createStoreRegistry, createStoreToken, useStoreRuntime } from '@migaia/store-react'
+/** One editor widget transfers its registry's final cleanup to its Provider. */
+const providerOwnershipOptionExample = `import { StoreProvider, createStoreRegistry, createStoreToken } from '@migaia/store-react'
 
-for (const disposeOnUnmount of [false, true]) {
-  const registry = createStoreRegistry()
-  let disposed = 0
-  registry.register(createStoreToken('editor'), { dispose: () => { disposed += 1 } }, { owned: true })
-  function Editor() { return createElement('span', null, useStoreRuntime() === registry.runtime ? 'same' : 'other') }
-  const container = document.createElement('div')
-  const root = createRoot(container)
-  flushSync(() => root.render(createElement(StoreProvider, {
-    registry, runtime: registry.runtime, disposeOnUnmount, children: createElement(Editor)
-  })))
-  console.log(container.textContent)
-  root.unmount()
-  await new Promise<void>((resolve) => setTimeout(resolve, 0))
-  console.log(disposeOnUnmount, registry.lifecycle, disposed)
-  await registry.disposeAsync()
+const registry = createStoreRegistry()
+const editorToken = createStoreToken<typeof editorStore>('editor')
+registry.register(editorToken, editorStore, { owned: true })
+function EditorWidget() {
+  return (
+    <StoreProvider registry={registry} runtime={registry.runtime} disposeOnUnmount={true}>
+      <Editor />
+    </StoreProvider>
+  )
 }`
 
-/** Readiness keeps real children out of the DOM until the caller-owned Promise settles. */
-const providerReadyOptionExample = `import { createElement } from 'react'
-import { flushSync } from 'react-dom'
-import { createRoot } from 'react-dom/client'
-import { StoreProvider, normalizeStoreConfig, useStoreConfig } from '@migaia/store-react'
+/** A stable configuration keeps asynchronous editor preparation outside the child render. */
+const providerReadyOptionExample = `import { StoreProvider } from '@migaia/store-react'
 
-let finish!: () => void
-const initialization = new Promise<void>((resolve) => { finish = resolve })
-const config = {
-  features: { experimental: { charts: true } },
-  ready: [initialization], fallback: 'Loading', defaults: { warnAsyncActions: true }
+const editorConfig = {
+  ready: [loadEditorSettings],
+  fallback: <p>Loading editor settings…</p>
 }
-const normalized = normalizeStoreConfig(config)
-console.log(normalized.ready?.status())
-function Content() { return createElement('span', null, String(useStoreConfig()?.defaults.warnAsyncActions)) }
-const container = document.createElement('div')
-const root = createRoot(container)
-const props = { config, children: createElement(Content) }
-flushSync(() => root.render(createElement(StoreProvider, props)))
-console.log(container.textContent)
-finish()
-await normalized.ready?.promise
-await new Promise<void>((resolve) => setTimeout(resolve, 0))
-flushSync(() => root.render(createElement(StoreProvider, props)))
-console.log(normalized.ready?.status(), container.textContent)
-root.unmount()
-await new Promise<void>((resolve) => setTimeout(resolve, 0))`
+function EditorApp() {
+  return (
+    <StoreProvider config={editorConfig}>
+      <Editor />
+    </StoreProvider>
+  )
+}`
 
 /** Shared inspection cases use real normalized configuration, not partial lookalikes. */
 const featureOptionCases: readonly IOptionCaseDoc[] = [
   {
     title: t('Inspect an enabled application feature', '读取已启用的应用特性'),
     problem: t(
-      'An application enables a chart panel and publishes an async-action warning preference. Missing experimental names stay disabled. `defaults` is readable data; each Store decides whether to apply that preference.',
-      '应用启用图表面板，并公开异步操作警告偏好。未声明的实验名称仍关闭。`defaults` 是可读数据，每个 Store 自行决定是否应用这个偏好。'
+      'An invoice screen enables an experimental chart panel and wants its Stores to warn about asynchronous actions. A Provider preference does not configure those Stores automatically. Read the normalized preference when creating the Store, and check the chart flag before mounting its UI.',
+      '发票页面启用实验图表，并希望它的 Store 对异步操作发出警告。Provider 中的偏好不会自动配置这些 Store；创建 Store 时读取归一化偏好，再在挂载图表前检查开关。'
     ),
     example: featureOptionExample,
     result: t(
-      'Prints `true`, then `true false`; the declared flag and preference are available, and an unknown feature stays disabled.',
-      '输出 `true`，然后输出 `true false`；已声明的开关及偏好可被读取，未知特性保持关闭。'
+      'The invoice chart mounts because its application flag is enabled, and the Store receives the warning preference explicitly.',
+      '发票图表因应用开关已启用而挂载，Store 也显式取得异步操作警告偏好。'
     ),
     covers: ['features', 'features.experimental', 'defaults']
   },
   {
     title: t('Reject use of a disabled feature', '拒绝使用已关闭的特性'),
     problem: t(
-      'A panel requires WASM while this configuration explicitly disables it. `readStoreFeature` returns false; `assertStoreFeature` raises a stable error rather than enabling or loading that feature. Omitted flags are also disabled.',
-      '面板要求使用 WASM，但当前配置显式关闭了它。`readStoreFeature` 返回假，`assertStoreFeature` 抛出稳定错误，不会启用或加载特性。省略的开关同样关闭。'
+      'A pricing panel requires WASM, but this deployment disables that feature. Opening the panel directly would ignore the application policy. Guard the entry action with assertStoreFeature so the page can explain why the panel is unavailable without loading it.',
+      '定价面板依赖 WASM，但当前部署关闭了这个特性。直接打开面板会忽略应用策略；在入口操作使用 assertStoreFeature，页面便能说明面板为何不可用，而不去加载它。'
     ),
     example: disabledFeatureOptionExample,
     result: t(
-      'Prints `false false`, then `FEATURE_DISABLED`; the disabled feature is not silently enabled.',
-      '输出 `false false`，然后输出 `FEATURE_DISABLED`；关闭的特性不会被悄悄启用。'
+      'Clicking the pricing control shows the unavailable view with FEATURE_DISABLED; the WASM panel never opens.',
+      '点击定价入口会显示带 FEATURE_DISABLED 的不可用界面，不会打开 WASM 面板。'
     ),
-    covers: ['features', 'defaults']
+    covers: ['features']
   }
 ]
 
@@ -209,15 +201,15 @@ const featureOptionCases: readonly IOptionCaseDoc[] = [
 const readyOptionCase: IOptionCaseDoc = {
   title: t('Wait for initialization before rendering children', '初始化完成后再渲染子树'),
   problem: t(
-    'A panel needs asynchronous preparation. Without `ready`, the Provider renders it immediately. A pending barrier renders `fallback`; after fulfillment, children can read the configured defaults and feature declarations.',
-    '面板需要异步准备。不传 `ready` 时，Provider 会立即渲染面板。屏障待完成时显示 `fallback`；完成后，子树即可读取配置的默认值及特性声明。'
+    'An editor needs its saved settings before its controls can render. Rendering immediately could show the wrong initial state. Keep the settings loader in a stable configuration and show a loading view until it finishes, then mount the editor.',
+    '编辑器需要先取得保存的设置，才能显示控件。立即渲染可能展示错误的初始状态；把设置加载函数放入稳定配置，加载完成前显示等待界面，再挂载编辑器。'
   ),
   example: providerReadyOptionExample,
   result: t(
-    'Prints `pending`, `Loading`, then `ready true`: children appear only after initialization and read the warning preference.',
-    '输出 `pending`、`Loading`，然后输出 `ready true`：子树在初始化完成后才出现，并读到警告偏好。'
+    'The settings-loading message appears first. The editor appears after the settings load, without rendering against incomplete configuration.',
+    '先显示设置加载提示，设置加载完成后再显示编辑器，避免用不完整配置渲染控件。'
   ),
-  covers: ['features', 'ready', 'fallback', 'defaults']
+  covers: ['ready', 'fallback']
 }
 /** Features are declarative switches, not automatic implementation installers. */
 const features: Readonly<Record<string, IMemberDoc>> = {
@@ -332,13 +324,19 @@ const normalizedConfig: Readonly<Record<string, IMemberDoc>> = {
       'Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.',
       '无屏障时为空值，否则包含承诺、同步状态查询与错误查询；状态为待完成、就绪或错误，在微任务中更新，错误查询保留拒绝身份。'
     ),
-    example:
-      'const config = normalizeStoreConfig({ ready: [Promise.resolve()] }); await config.ready?.promise; console.log(config.ready?.status(), config.ready?.error())'
+    example: `import { normalizeStoreConfig } from '@migaia/store-react'
+
+const config = normalizeStoreConfig({ ready: [loadEditorSettings] })
+await config.ready?.promise
+mountEditor(config)`
   }
 }
 /** Component props describe ownership independently of readiness. */
 const providerProps: Readonly<Record<string, IMemberDoc>> = {
   children: {
+    example: `import { StoreProvider } from '@migaia/store-react'
+
+const editorView = <StoreProvider children={<Editor />} />`,
     summary: t(
       'React subtree receiving configuration and Registry contexts after readiness succeeds.',
       '就绪成功后接收配置与登记表上下文的组件子树。'
@@ -638,15 +636,15 @@ export const storeReactReference: ILibraryReference = {
         {
           title: t('Choose who releases an injected registry', '选择谁来释放注入的登记表'),
           problem: t(
-            'A reusable editor can borrow an application registry or own a widget registry. Pass the registry and its matching runtime so children share the intended graph. `disposeOnUnmount` chooses whether the final unmount releases that registry; the runtime remains caller-owned.',
-            '可复用编辑器可以借用应用登记表，也可以拥有组件登记表。传入登记表及其匹配运行时，让子树使用预期依赖图。`disposeOnUnmount` 决定最终卸载是否释放登记表；运行时仍归调用方所有。'
+            'An embedded editor owns its registered Store and should release it when the widget disappears. An injected registry stays borrowed by default, so a plain unmount would retain it. Explicitly transfer final unmount cleanup to the Provider while keeping the matching runtime identity.',
+            '嵌入式编辑器拥有自己登记的 Store，组件消失后应释放它。注入的登记表默认借用，普通卸载仍会保留它；显式把最终卸载清理交给 Provider，并传入匹配的运行时身份。'
           ),
           example: providerOwnershipOptionExample,
           result: t(
-            'Each mount prints `same`. False leaves `open 0`; true produces `terminal 1` after unmount. The application then releases the borrowed registry explicitly.',
-            '每次挂载都输出 `same`。假值卸载后输出 `open 0`，真值输出 `terminal 1`。应用随后显式释放借用的登记表。'
+            'The editor uses the injected registry. After its final unmount, the registry and its owned Store are released; the runtime remains caller-owned.',
+            '编辑器使用注入的登记表；最终卸载后，登记表和它拥有的 Store 被释放，运行时仍归调用方所有。'
           ),
-          covers: ['children', 'registry', 'runtime']
+          covers: ['registry', 'runtime']
         },
         { ...readyOptionCase, covers: ['config'] }
       ],
@@ -1012,7 +1010,7 @@ export const storeReactReference: ILibraryReference = {
       optionCases: [
         ...featureOptionCases.map((optionCase) => ({
           ...optionCase,
-          covers: ['features', 'defaults']
+          covers: optionCase.covers.filter((field) => field !== 'features.experimental')
         })),
         readyOptionCase
       ],
@@ -1138,12 +1136,21 @@ export const storeReactReference: ILibraryReference = {
           ),
           example: `import { createStoreReactError, StoreReactErrorCode } from '@migaia/store-react'
 
-const original = new Error('settings unavailable')
-const error = createStoreReactError(StoreReactErrorCode.invalidConfig, 'provider settings failed', { cause: original })
-console.log(error.cause === original)`,
+async function loadSettings() {
+  try {
+    return await fetchEditorSettings()
+  } catch (cause) {
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      'Unable to load editor settings',
+      { cause }
+    )
+  }
+}
+await loadSettings().catch(showSettingsError)`,
           result: t(
-            'Prints `true`; the original failure remains on `error.cause`.',
-            '输出 `true`；原始失败仍保留在 `error.cause`。'
+            'The page shows an editor-specific failure message, and monitoring can inspect the original loader error through cause.',
+            '页面显示编辑器设置加载失败的消息，监控仍可通过 cause 查看原始加载错误。'
           ),
           covers: ['cause']
         },
@@ -1155,12 +1162,17 @@ console.log(error.cause === original)`,
           ),
           example: `import { createStoreReactError, StoreReactErrorCode } from '@migaia/store-react'
 
-const reason = { initializer: 'editor', available: false }
-const error = createStoreReactError(StoreReactErrorCode.readyRejected, 'editor not ready', { cause: reason })
-console.log(error.cause === reason)`,
+const ready = initializeEditor().catch((cause: unknown) => {
+  throw createStoreReactError(
+    StoreReactErrorCode.readyRejected,
+    'Editor is not ready',
+    { cause }
+  )
+})
+showInitializationState(ready)`,
           result: t(
-            'Prints `true`; the rejection record remains available to the application.',
-            '输出 `true`；应用仍可取得原始拒绝记录。'
+            'The editor shows its initialization failure while the original rejection record remains available to explain which initializer failed.',
+            '编辑器显示初始化失败，原始拒绝记录仍可用于说明哪个初始化步骤失败。'
           ),
           covers: ['cause']
         }
