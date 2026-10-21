@@ -1,4 +1,286 @@
-import type { ICaseDoc } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
+
+/** Keeps native Worker option scenarios complete in either language. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Wraps one option workflow in a real native Worker and transferred MessagePort. */
+const computeOptionsExample = (
+  body: string,
+  client = '{}',
+  handler = '{}',
+  compute = `(values: number[] | Uint8Array) => {
+      if (Array.from(values).some((value) => value < 0)) throw new Error('retry this input')
+      return Array.from(values).reduce((sum, value) => sum + value, 0)
+    }`
+): string => `import { Worker, MessageChannel, workerData, isMainThread, type MessagePort } from 'node:worker_threads'
+import { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'
+import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/testing'
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createWorkerHandler(${compute}, (message) => port.postMessage(message), ${handler})
+  port.on('message', (message) => { void handler(message).catch(console.error) })
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  const adapter = new WorkerAdapter(port1, ${client})
+  try {
+${body}
+  } finally {
+    await adapter.dispose()
+    port1.close()
+    await worker.terminate()
+  }
+}`
+
+/** Serializer cases keep physical Worker ownership separate from endpoint ownership. */
+const serializerOptionsExample = (
+  transfer: boolean
+): string => `import { Worker, MessageChannel, workerData, isMainThread, type MessagePort } from 'node:worker_threads'
+import { createSerializeRegistry } from '@migaia/serialize'
+import { jsonParser } from '@migaia/serialize/plugins'
+import { workerParser, workerPlugin, createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker'
+if (!isMainThread) {
+  const port = workerData as MessagePort
+  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) => port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1]))
+  port.on('message', (message) => { void handler(message).catch(console.error) })
+} else {
+  const { port1, port2 } = new MessageChannel()
+  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })
+  port1.start()
+  let termination: Promise<number> | undefined
+  const ownedPort = Object.assign(port1, { terminate: () => { termination = worker.terminate() } })
+  const options = { worker: ownedPort, type: 'json', clientId: 'main', ownership: '${transfer ? 'transfer' : 'copy'}' as const, terminateOnDispose: ${transfer} }
+  const parser = ${transfer ? 'createSerializeRegistry([workerPlugin(options)])' : 'workerParser(options)'}
+  const bytes = new TextEncoder().encode('{"count":2}')
+  try {
+    const value = await parser.decode(['bytes', bytes], { signal: new AbortController().signal, context: 'cart' }) as { count: number }
+    console.log(value.count, bytes.byteLength)
+    await parser.dispose?.()
+    console.log(termination !== undefined)
+  } finally {
+    await parser.dispose?.()
+    port1.close()
+    await (termination ?? worker.terminate())
+  }
+}`
+
+/** Field examples share exact code with the matching configuration workflow. */
+export const storeWorkerOptionExamples = {
+  client: computeOptionsExample(
+    '    console.log(await adapter.request([20, 22]))',
+    "{ clientId: 'main', timeoutMs: 1000 }"
+  ),
+  timeout: computeOptionsExample(
+    '    try { await adapter.request([20, 22]) } catch (error) { console.log((error as { code?: string }).code) }',
+    '{ timeoutMs: 1 }',
+    '{}',
+    'async (values: number[]) => { await new Promise((resolve) => setTimeout(resolve, 30)); return values.reduce((sum, value) => sum + value, 0) }'
+  ),
+  handler: computeOptionsExample(
+    '    console.log(await adapter.request([20, 22]))',
+    '{}',
+    '{ timeoutMs: 1000 }'
+  ),
+  handlerSlow: computeOptionsExample(
+    '    console.log(await adapter.request([20, 22]))',
+    '{}',
+    '{ timeoutMs: 1 }',
+    'async (values: number[]) => { await new Promise((resolve) => setTimeout(resolve, 10)); return values.reduce((sum, value) => sum + value, 0) }'
+  ),
+  cache: computeOptionsExample(`    const runtime = createRuntime()
+    const scheduler = createManualScheduler()
+    const total = workerComputed<number[], number>(adapter, () => [20, 22], {
+      runtime, scheduler, debugName: 'cartTotal', autoStart: false,
+      ttl: 1000, staleWhileRevalidate: true
+    })
+    console.log(total.peekState().status)
+    console.log(await total.promise)
+    scheduler.advance(1001)
+    console.log(total.state.status, total.refreshing)
+    await total.promise
+    total.dispose()`),
+  snapshot:
+    computeOptionsExample(`    const original = workerComputed<number[], number>(adapter, () => [20, 22])
+    await original.promise
+    const initialSnapshot = original.dehydrate()
+    original.dispose()
+    let selected = 0
+    const total = workerComputed<number[], number>(adapter, () => { selected++; return [1] }, { initialSnapshot })
+    console.log(await total.promise, selected)
+    total.dispose()`),
+  retry: computeOptionsExample(`    let attempts = 0
+    const total = workerComputed<number[], number>(adapter, () => ++attempts === 1 ? [-1] : [20, 22], {
+      retry: 2,
+      retryDelay: (failureCount) => failureCount * 5
+    })
+    console.log(await total.promise, attempts)
+    total.dispose()`),
+  prefetch: computeOptionsExample(`    const runtime = createRuntime()
+    const input = runtime.signal([1])
+    const total = workerComputed<number[], number>(adapter, () => input.value, { runtime, keepAlive: true })
+    await total.promise
+    input.value = [2]
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    console.log(await total.promise)
+    total.dispose()
+    input.dispose()`),
+  transfer: computeOptionsExample(`    const bytes = new Uint8Array([20, 22])
+    const total = workerComputed<Uint8Array, number>(adapter, () => bytes, {
+      transfer: (input) => [input.buffer]
+    })
+    console.log(await total.promise, bytes.byteLength)
+    total.dispose()`),
+  copyParser: serializerOptionsExample(false),
+  transferPlugin: serializerOptionsExample(true)
+}
+
+/** Configuration cases expose only public options and observable business outcomes. */
+export const storeWorkerOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  client: [
+    {
+      title: t('Pair the default main identity with a deadline', '为默认主端身份设置截止期限'),
+      problem: t(
+        'The worker helper addresses main. Keep that matching clientId and set timeoutMs when a request must not wait indefinitely; without timeoutMs there is no default request deadline.',
+        '工作端辅助指向 main。使用匹配的 clientId；请求不能一直等待时设置 timeoutMs。不设置则没有请求默认截止期限。'
+      ),
+      example: storeWorkerOptionExamples.client,
+      result: t('Prints 42 before the one-second deadline.', '在一秒截止期限前输出 42。'),
+      covers: ['clientId', 'timeoutMs']
+    },
+    {
+      title: t('Stop waiting for a slow computation', '停止等待慢速计算'),
+      problem: t(
+        'A caller no longer wants to wait for a slow response. The client deadline rejects waiting; it does not prove that the remote computation stopped.',
+        '调用方不想继续等待慢速响应。客户端截止期限会拒绝等待，不代表远端计算已经停止。'
+      ),
+      example: storeWorkerOptionExamples.timeout,
+      result: t(
+        'Prints the RPC timeout code; endpoint and native Worker cleanup still run.',
+        '输出 RPC 超时码；随后仍清理端点和原生 Worker。'
+      ),
+      covers: ['timeoutMs']
+    }
+  ],
+  handler: [
+    {
+      title: t('Configure the worker endpoint timeout', '配置工作端点的超时'),
+      problem: t(
+        'A worker-side endpoint can carry an outgoing request timeout. This option belongs to the endpoint, and does not impose a compute execution deadline. Omission leaves that outgoing timeout unset.',
+        '工作端点可以设置向外请求的超时。此选项属于端点，不限制计算执行时间。省略时不设置该向外请求超时。'
+      ),
+      example: storeWorkerOptionExamples.handler,
+      result: t('The paired client receives 42.', '配对客户端收到 42。'),
+      covers: ['timeoutMs']
+    },
+    {
+      title: t('Keep compute deadlines on the caller', '由调用方决定计算等待期限'),
+      problem: t(
+        'Setting handler timeoutMs to 1 does not stop a ten-millisecond compute callback. Use the client deadline when bounding how long the caller waits.',
+        '把处理器 timeoutMs 设为 1 不会停止执行十毫秒的计算回调。限制调用方等待时间时，应设置客户端截止期限。'
+      ),
+      example: storeWorkerOptionExamples.handlerSlow,
+      result: t('Prints 42 after the computation finishes.', '计算完成后输出 42。'),
+      covers: ['timeoutMs']
+    }
+  ],
+  computed: [
+    {
+      title: t('Load a cached total only when needed', '按需加载并缓存合计'),
+      problem: t(
+        'A collapsed panel needs no immediate Worker request. autoStart false leaves it idle until read. ttl limits cache age; staleWhileRevalidate keeps the previous total during refresh. runtime owns the graph, debugName labels it, and the manual scheduler demonstrates expiry without a real wait.',
+        '折叠面板不需要立即请求 Worker。autoStart false 让它保持空闲，读取时才启动。ttl 限制缓存年龄；staleWhileRevalidate 在刷新期间保留旧合计。runtime 持有依赖图，debugName 提供标签，手动调度器无需真实等待即可演示过期。'
+      ),
+      example: storeWorkerOptionExamples.cache,
+      result: t(
+        'Prints idle, 42, then success true while refreshing.',
+        '依次输出 idle、42，以及刷新中的 success true。'
+      ),
+      covers: ['runtime', 'scheduler', 'debugName', 'autoStart', 'ttl', 'staleWhileRevalidate']
+    },
+    {
+      title: t('Restore an already computed total', '恢复已经算好的合计'),
+      problem: t(
+        'A saved fresh snapshot avoids repeating Worker work. Pass initialSnapshot from dehydrate(); without it, the resource starts its first computation normally.',
+        '已有的新鲜快照可以避免重复 Worker 计算。把 dehydrate() 结果传入 initialSnapshot；不设置则正常启动第一次计算。'
+      ),
+      example: storeWorkerOptionExamples.snapshot,
+      result: t(
+        'Prints 42 0; the replacement resource never selects new input.',
+        '输出 42 0；替代资源没有选择新输入。'
+      ),
+      covers: ['initialSnapshot']
+    },
+    {
+      title: t('Retry a failed input with a delay', '延迟重试失败的输入'),
+      problem: t(
+        'A transient Worker failure should not immediately leave the resource in error. retry allows extra attempts; retryDelay computes each wait from a one-based failure count. Defaults perform no retry and add no delay.',
+        '短暂 Worker 失败不应立即让资源停在错误状态。retry 允许额外尝试；retryDelay 根据从一开始的失败次数计算等待。默认不重试，也不增加等待。'
+      ),
+      example: storeWorkerOptionExamples.retry,
+      result: t(
+        'Prints 42 2; the second selected input succeeds.',
+        '输出 42 2；第二次选择的输入计算成功。'
+      ),
+      covers: ['retry', 'retryDelay']
+    },
+    {
+      title: t('Prefetch while nobody observes the result', '无人观察时也预取结果'),
+      problem: t(
+        'A background total must follow input changes before the panel opens. keepAlive keeps input dependencies connected while unobserved; by default they may disconnect.',
+        '后台合计需要在面板打开前跟随输入变化。keepAlive 在无人观察时保持输入依赖；默认可能断开这些依赖。'
+      ),
+      example: storeWorkerOptionExamples.prefetch,
+      result: t(
+        'Prints 2 after the input changes, without creating an observer.',
+        '输入变化后输出 2，无需创建观察者。'
+      ),
+      covers: ['keepAlive', 'runtime']
+    },
+    {
+      title: t('Transfer disposable input bytes', '转移不再需要的输入字节'),
+      problem: t(
+        'An application can give up ownership of a complete buffer after sending it. transfer selects native transfer entries per input. Without it no explicit transfer list is supplied. This can detach aliases and is not an end-to-end zero-copy guarantee.',
+        '应用发送完整缓冲区后，可以放弃其所有权。transfer 为每次输入选择原生转移条目。不设置则不提供显式转移列表。这可能分离所有别名，不保证全程零拷贝。'
+      ),
+      example: storeWorkerOptionExamples.transfer,
+      result: t(
+        'Prints 42 0; the Worker calculates the total and the caller buffer is detached.',
+        '输出 42 0；Worker 算出合计，调用方缓冲区已分离。'
+      ),
+      covers: ['transfer']
+    }
+  ],
+  serializer: [
+    {
+      title: t('Keep bytes for another decode', '保留字节供再次解码'),
+      problem: t(
+        'The caller still needs input bytes after decoding. ownership copy keeps them available. Match type json to the Worker parser and clientId main to the helper. terminateOnDispose false leaves physical Worker ownership with the caller.',
+        '调用方解码后仍需要输入字节。ownership copy 保留这些字节。type json 匹配 Worker 解析器，clientId main 匹配辅助端点。terminateOnDispose false 让调用方继续持有物理 Worker。'
+      ),
+      example: storeWorkerOptionExamples.copyParser,
+      result: t(
+        'Prints count 2, a nonzero input length, then false for automatic termination.',
+        '输出计数 2、非零输入长度，以及表示未自动终止的 false。'
+      ),
+      covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
+    },
+    {
+      title: t('Transfer bytes and own Worker termination', '转移字节并负责终止 Worker'),
+      problem: t(
+        'A dedicated parser may consume an entire buffer and terminate its Worker on disposal. Choose ownership transfer and terminateOnDispose true explicitly. Partial views and SharedArrayBuffer are not selected for transfer; defaults copy and do not terminate.',
+        '专用解析器可以消耗完整缓冲区，并在释放时终止 Worker。显式选择 ownership transfer 与 terminateOnDispose true。局部视图和 SharedArrayBuffer 不会被选中转移；默认复制且不终止。'
+      ),
+      example: storeWorkerOptionExamples.transferPlugin,
+      result: t(
+        'Prints 2 0, then true; input bytes detach and disposal requests physical termination.',
+        '先输出 2 0，再输出 true；输入字节分离，释放时请求终止物理 Worker。'
+      ),
+      covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
+    }
+  ]
+}
 
 /** Complete native Node Worker examples shared with both usage guides. */
 export const storeWorkerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
