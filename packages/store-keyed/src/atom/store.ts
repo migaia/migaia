@@ -7,6 +7,9 @@ import {
 } from '@migaia/reactive'
 import {
   claimOwnership,
+  createBatchedOperation,
+  createStaticObserver,
+  type IStaticSubscriptionSource,
   deferRuntimeCleanup,
   invalidateObservable,
   currentRuntimeVersion,
@@ -122,6 +125,18 @@ export type IAtomStore = {
     definition: IWritableAtomDefinition<T, Args, Result>,
     ...args: Args
   ): Result
+  /**
+   * Writes source definitions in input order within one batch and one untracked operation.
+   * Subscribers are notified once after the batch. The write is not atomic: when an entry resolves
+   * to a non-source definition it throws OVERRIDE_CONTRACT, and entries before it stay written.
+   * Callers that need all-or-nothing semantics validate every entry first.
+   */
+  setMany<T>(
+    entries: readonly (readonly [
+      IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
+      IAtomUpdate<T>
+    ])[]
+  ): void
   /**
    * Subscribes to a definition and returns an unsubscribe function.
    *
@@ -432,6 +447,16 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     return created
   }
 
+  /** Shared source update semantics are identical for set and the additive bulk operation. */
+  const setPrimitive = <T>(
+    target: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
+    update: IAtomUpdate<T>
+  ): void => {
+    /** Only source definitions enter this path; the instance retains its existing lifecycle owner. */
+    const node = instanceOf(target).node as IReactiveSignal<T> & IObservable
+    node.value = typeof update === 'function' ? (update as (previous: T) => T)(node.peek()) : update
+  }
+
   const setDefinition = <T, Args extends readonly unknown[], Result>(
     definition: IWritableAtomDefinition<T, Args, Result>,
     ...args: Args
@@ -442,12 +467,8 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     return runtime.batch(() => {
       return runtime.untracked(() => {
         if (target.kind === AtomKind.primitive || target.kind === AtomKind.primitiveFactory) {
-          const node = instanceOf(target).node as IReactiveSignal<unknown> & IObservable
-          const [update] = args as unknown as [IAtomUpdate<unknown>]
-          node.value =
-            typeof update === 'function'
-              ? (update as (previous: unknown) => unknown)(node.peek())
-              : update
+          const [update] = args as unknown as [IAtomUpdate<T>]
+          setPrimitive(target, update)
           return undefined as Result
         }
         if (target.kind === AtomKind.derived) {
@@ -461,6 +482,31 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       })
     })
   }
+
+  /** One stable batch capability replaces per-entry callback allocation and nested boundaries. */
+  const setMany = createBatchedOperation(
+    runtime,
+    <T>(
+      entries: readonly (readonly [
+        IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
+        IAtomUpdate<T>
+      ])[]
+    ): void => {
+      assertUsable()
+      for (const [definition, update] of entries) {
+        assertDefinition(definition)
+        /** Resolve at each write so updater reentrancy observes the same current override route. */
+        const target = resolve(definition)
+        if (target.kind !== AtomKind.primitive && target.kind !== AtomKind.primitiveFactory) {
+          throw createStoreKeyedTypeError(
+            StoreKeyedErrorCode.overrideContract,
+            StoreKeyedErrorText.readonlyOverride
+          )
+        }
+        setPrimitive(target, update)
+      }
+    }
+  )
 
   const store: IAtomStore = {
     runtime,
@@ -490,34 +536,31 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     },
 
     set: setDefinition,
+    setMany,
 
     sub: (definition, onChange) => {
       assertUsable()
-      let first = true
-      // 用 Effect 订阅而不是把节点交出去：所有权校验、observed 生命周期、
-      // trace 都留在内核手里，实例化策略也保持可替换
-      const effect = runtime.effect(() => {
-        void instanceOf(resolve(definition)).read()
-        if (first) {
-          first = false
-          return
+      /**
+       * Known-node ticks stay inside reactive; initial/override materialization keeps normal
+       * tracking.
+       */
+      const observer = createStaticObserver(
+        runtime,
+        () => instanceOf(resolve(definition)) as unknown as IStaticSubscriptionSource,
+        () => {
+          try {
+            runtime.untracked(onChange)
+          } catch (error) {
+            reportAtomFailure(runtime, error, ReactiveErrorPhase.subscriptionListener)
+          }
         }
-        // Listener code is outside the reactive graph contract. If it
-        // throws while this Effect is still being tracked, runTracked
-        // would roll back the replacement dependency and permanently
-        // kill the subscription after an override.
-        try {
-          runtime.untracked(onChange)
-        } catch (error) {
-          reportAtomFailure(runtime, error, ReactiveErrorPhase.subscriptionListener)
-        }
-      })
+      )
       let active = true
       const unsubscribe = () => {
         if (!active) return
         active = false
         subscriptions.delete(unsubscribe)
-        effect.dispose()
+        observer.dispose()
       }
       subscriptions.add(unsubscribe)
       return unsubscribe
