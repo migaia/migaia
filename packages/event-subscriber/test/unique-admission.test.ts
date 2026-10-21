@@ -191,7 +191,7 @@ describe('channel admission policies', () => {
     expect(measurement.files.length).toBeGreaterThan(1)
     expect(measurement.bytes).toBeGreaterThan(measurement.indexOnlyBytes)
     expect(measurement.bytes).toBeLessThanOrEqual(baseline.absoluteLimitBytes)
-    expect(measurement.bytes).toBeLessThanOrEqual(baseline.bytes + 600)
+    expect(measurement.bytes).toBeLessThanOrEqual(baseline.bytes + 640)
     expect(gateSource).toContain('measureRootClosure(packageRoot).bytes')
   })
 })

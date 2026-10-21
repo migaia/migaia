@@ -718,10 +718,11 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let spillCapture: T[] | undefined
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
   const dispatchValue = (value: T): void => {
+    // A channel without owners has nothing to snapshot, project, or report.
+    if (!first) return
     ++nativeDepth
     const snapshots = capability.snapshot()
     try {
-      if (!snapshots.length) return
       const projection = projectionPlan
         ? { plan: projectionPlan, outcome: capability.project(value) }
         : undefined
