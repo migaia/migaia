@@ -4,7 +4,7 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -3002,7 +3002,7 @@
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [".", "./subscriber"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -5050,7 +5050,7 @@
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./abort",
@@ -8540,7 +8540,7 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [".", "./plugins", "./plugins/file"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -11410,7 +11410,7 @@
     {
       "slug": "micro-hub",
       "description": "Singleton micro-frontend hub: contract-first shared state, owner-scoped events and requests, plugin-based persistence for Module Federation and Web Components.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./events", "./persist", "./resource", "./state", "./web-component"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -12742,7 +12742,7 @@
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -14326,7 +14326,7 @@
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [".", "./composition"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -17664,7 +17664,7 @@
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [".", "./extension"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -20080,7 +20080,7 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -22388,7 +22388,7 @@
     {
       "slug": "rpc-browser",
       "description": "RPC browser owner.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [
         ".",
         "./adapters/broadcast-channel",
@@ -24796,7 +24796,7 @@
     {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [
         ".",
         "./binary",
@@ -27258,7 +27258,7 @@
     {
       "slug": "rpc-core",
       "description": "RPC core owner.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [
         ".",
         "./adapter",
@@ -30471,7 +30471,7 @@
     {
       "slug": "rpc-devtools",
       "description": "RPC probe, service and offline record contracts.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [".", "./contract", "./hub", "./log"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -32840,7 +32840,7 @@
     {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -34931,7 +34931,7 @@
     {
       "slug": "rpc-process",
       "description": "RPC process owner.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [
         ".",
         "./adapters/bun-socket",
@@ -38145,7 +38145,7 @@
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "exports": [".", "./adapters/electron-main", "./adapters/node"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -40914,7 +40914,7 @@
     {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./codec",
@@ -43812,7 +43812,7 @@
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -46512,7 +46512,7 @@
     {
       "slug": "storage-web",
       "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./cookies",
@@ -49843,7 +49843,7 @@
     {
       "slug": "store-devtools",
       "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -52082,7 +52082,7 @@
     {
       "slug": "store-indexed",
       "description": "Indexed reactive collections with lazy cell materialization.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -54814,7 +54814,7 @@
     {
       "slug": "store-keyed",
       "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./atom/definition", "./atom/store", "./optics", "./reactive/atom"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -57902,7 +57902,7 @@
     {
       "slug": "store-light",
       "description": "Minimal object-state Store facade.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -60757,7 +60757,7 @@
     {
       "slug": "store-middleware",
       "description": "Store mutation policy and middleware pipeline.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./tolerant-clone"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -63657,7 +63657,7 @@
     {
       "slug": "store-persist",
       "description": "Store snapshot persistence and storage adapter protocol.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./indexed", "./keyed", "./light"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -66338,7 +66338,7 @@
     {
       "slug": "store-react",
       "description": "React Provider and hooks for the Store runtime.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -69239,7 +69239,7 @@
     {
       "slug": "store-shared",
       "description": "SharedArrayBuffer and Atomics-backed Store state.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -71654,7 +71654,7 @@
     {
       "slug": "store-ssr",
       "description": "Request-scoped Store SSR dehydration and hydration.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -74177,7 +74177,7 @@
     {
       "slug": "store-wasm",
       "description": "Optional WASM-backed fields for Store light.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -76635,7 +76635,7 @@
     {
       "slug": "store-worker",
       "description": "Worker adapters and worker-backed Resource/serialization integrations.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./serialize/worker"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -79131,7 +79131,7 @@
     {
       "slug": "supervision",
       "description": "Runtime-neutral supervision for execution units and coroutines.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [".", "./coroutine", "./process", "./threads"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -80564,7 +80564,7 @@
     {
       "slug": "tray",
       "description": null,
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -83916,7 +83916,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./bytes",
@@ -90220,7 +90220,7 @@
     {
       "slug": "wasm",
       "description": null,
-      "version": "0.1.2",
+      "version": "0.1.3",
       "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {

@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-middleware",
     "description": "Store mutation policy and middleware pipeline.",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "exports": [".", "./tolerant-clone"],
     "readmeLocales": ["zh", "en"],
     "documentation": {

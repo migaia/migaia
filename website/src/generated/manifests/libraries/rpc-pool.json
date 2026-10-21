@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-pool",
     "description": "Thread and process pools composed from public RPC peers.",
-    "version": "0.0.10",
+    "version": "0.0.11",
     "exports": ["."],
     "readmeLocales": ["zh", "en"],
     "documentation": {

@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-indexed",
     "description": "Indexed reactive collections with lazy cell materialization.",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "exports": ["."],
     "readmeLocales": ["zh", "en"],
     "documentation": {

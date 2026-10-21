@@ -3,7 +3,7 @@
   "library": {
     "slug": "serialize",
     "description": "Store-neutral chunked serialization and codec registry.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [
       ".",
       "./codec",

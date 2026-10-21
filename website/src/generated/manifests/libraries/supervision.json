@@ -3,7 +3,7 @@
   "library": {
     "slug": "supervision",
     "description": "Runtime-neutral supervision for execution units and coroutines.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": [".", "./coroutine", "./process", "./threads"],
     "readmeLocales": ["zh", "en"],
     "documentation": {

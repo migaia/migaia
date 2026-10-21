@@ -282973,7 +282973,7 @@
           "name": "__wbg_init",
           "kind": "function",
           "signature": "export default function __wbg_init(\n  module_or_path?:\n    | { module_or_path: InitInput | Promise<InitInput> }\n    | InitInput\n    | Promise<InitInput>,\n): Promise<InitOutput>;",
-          "declarationLine": 118,
+          "declarationLine": 214,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Default async initializer imported as init; fetches the bundled wasm asset when omitted, or instantiates application-provided bytes/module. Call before any allocation or conversion. The first completed initialization publishes the exports; concurrent calls return that same memory/arena as named wrappers. Concurrent instantiation may still occur: Promise identity and single compilation are not promised.",
           "core": "module_or_path: Optional initialization argument. Use `{ module_or_path: source }`, where source is `RequestInfo`, `URL`, `Response`, `BufferSource`, a precompiled `WebAssembly.Module`, or `Promise<InitInput>`. Omitting the argument selects the bundled `wasm_provider_bg.wasm` URL; Node should supply bytes or a module instead of fetching a local file URL. Positional input is deprecated.\nPromise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes.",
@@ -283053,7 +283053,7 @@
           "name": "alloc_bytes",
           "kind": "function",
           "signature": "export function alloc_bytes(byte_len: number): number;",
-          "declarationLine": 37,
+          "declarationLine": 70,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Allocates a zeroed arena buffer, aligned and rounded up to eight bytes. Pair with dealloc_bytes for deterministic ownership; memory growth invalidates old ArrayBuffer views.",
           "core": "byte_len: Application-requested unsigned 32-bit byte count; actual capacity rounds upward to a multiple of eight.\nA stable nonzero arena ID or zero when memory/identifier space is exhausted. Call dealloc_bytes for every successful allocation, including zero-length allocations.",
@@ -283138,7 +283138,7 @@
           "name": "byte_len_of",
           "kind": "function",
           "signature": "export function byte_len_of(id: number): number;",
-          "declarationLine": 43,
+          "declarationLine": 82,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Returns actual rounded arena capacity for a live allocation. Pair with alloc_bytes when sizing numeric views; use ConversionResult.len instead for the exact converted document length.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nCapacity in bytes rounded upward to eight; unknown or dead IDs return zero.",
@@ -283219,8 +283219,8 @@
         {
           "name": "ConversionResult",
           "kind": "class",
-          "signature": "export class ConversionResult {\n  private constructor();\n  free(): void;\n  [Symbol.dispose](): void;\n  /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string;\n  /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number;\n  /** * Exact output byte length; zero on failure. */ readonly len: number;\n}",
-          "declarationLine": 11,
+          "signature": "export class ConversionResult {\n  private constructor();\n  /** * Releases the WASM metadata after reading this result, including failed results. * Call once; do not read properties or reuse this wrapper after disposal. * Input and output arena allocations remain live until `dealloc_bytes(id)`. */ free(): void;\n  /** * Releases this result's metadata when leaving an explicit resource-management scope. * This is the same operation as `free()`; use one disposal path per result. * Input and output arena allocations require separate `dealloc_bytes(id)` calls. */ [Symbol.dispose](): void;\n  /** * Returns an empty string on success or the current operation's failure reason. * * Invalid handles and lengths report `unknown allocation id or length past * capacity`. Initial output allocation failure reports `arena exhausted`. * Parse and write failures start with `json to msgpack failed:` or * `msgpack to json failed:`. * Read before freeing this metadata wrapper; no global error lookup is needed. */ readonly error: string;\n  /** * Returns the new output allocation id, or `0` when conversion failed. * * A nonzero id belongs to the caller and remains live after this result's * `free()`. Read the exact output range with `len` and release the allocation * with `dealloc_bytes(id)` when finished. The input id is never consumed. */ readonly id: number;\n  /** * Returns the exact number of output bytes, or `0` on failure. * * Use this length when reading output or passing it to another converter. * `byte_len_of(id)` includes arena padding and can exceed this value. */ readonly len: number;\n}",
+          "declarationLine": 16,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Generated metadata class returned by both conversion functions; its constructor is private. It owns the Rust result struct, while its output id names a separate arena allocation that free() does not release.",
           "core": "An operation-created `ConversionResult` holding this conversion’s id, exact length and error; callers do not construct it directly. Read its fields before `free()` or `[Symbol.dispose]()`, then separately release successful output and input arena IDs with `dealloc_bytes`.\nfree: Releases this Rust metadata struct; first read required fields and separately release arena IDs. Do not read or free the metadata again afterwards.\nThe metadata struct is released; input and output arena allocations remain unchanged.\n[Symbol.dispose]: Explicit resource-management alias of free when Symbol.dispose is available; it releases metadata only.\nThe metadata struct is released; release its successful output ID separately.\nid: Nonzero output arena ID on success, zero on failure; copy it before metadata free and later release with dealloc_bytes.\nlen: Exact output payload bytes on success, zero on failure; never substitute rounded arena capacity.\nerror: Empty string on success. Failure is unknown allocation id or length past capacity, arena exhausted, or text prefixed json to msgpack failed:/msgpack to json failed: with parsing details.",
@@ -283237,7 +283237,7 @@
               "kind": "method",
               "optional": false,
               "signature": "free(): void;",
-              "description": null,
+              "description": "Releases the WASM metadata after reading this result, including failed results. Call once; do not read properties or reuse this wrapper after disposal. Input and output arena allocations remain live until `dealloc_bytes(id)`.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -283246,7 +283246,7 @@
               "kind": "method",
               "optional": false,
               "signature": "[Symbol.dispose](): void;",
-              "description": null,
+              "description": "Releases this result's metadata when leaving an explicit resource-management scope. This is the same operation as `free()`; use one disposal path per result. Input and output arena allocations require separate `dealloc_bytes(id)` calls.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -283255,7 +283255,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: string;",
-              "description": "Empty on success, otherwise the operation-specific failure reason.",
+              "description": "Returns an empty string on success or the current operation's failure reason. Invalid handles and lengths report `unknown allocation id or length past capacity`. Initial output allocation failure reports `arena exhausted`. Parse and write failures start with `json to msgpack failed:` or `msgpack to json failed:`. Read before freeing this metadata wrapper; no global error lookup is needed.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -283264,7 +283264,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly id: number;",
-              "description": "Allocation id containing the conversion output, or zero on failure.",
+              "description": "Returns the new output allocation id, or `0` when conversion failed. A nonzero id belongs to the caller and remains live after this result's `free()`. Read the exact output range with `len` and release the allocation with `dealloc_bytes(id)` when finished. The input id is never consumed.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -283273,7 +283273,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly len: number;",
-              "description": "Exact output byte length; zero on failure.",
+              "description": "Returns the exact number of output bytes, or `0` on failure. Use this length when reading output or passing it to another converter. `byte_len_of(id)` includes arena padding and can exceed this value.",
               "parameterDetails": [],
               "returns": "number"
             }
@@ -283281,7 +283281,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }"
+            "export class ConversionResult { private constructor(); /** * Releases the WASM metadata after reading this result, including failed results. * Call once; do not read properties or reuse this wrapper after disposal. * Input and output arena allocations remain live until `dealloc_bytes(id)`. */ free(): void; /** * Releases this result's metadata when leaving an explicit resource-management scope. * This is the same operation as `free()`; use one disposal path per result. * Input and output arena allocations require separate `dealloc_bytes(id)` calls. */ [Symbol.dispose](): void; /** * Returns an empty string on success or the current operation's failure reason. * * Invalid handles and lengths report `unknown allocation id or length past * capacity`. Initial output allocation failure reports `arena exhausted`. * Parse and write failures start with `json to msgpack failed:` or * `msgpack to json failed:`. * Read before freeing this metadata wrapper; no global error lookup is needed. */ readonly error: string; /** * Returns the new output allocation id, or `0` when conversion failed. * * A nonzero id belongs to the caller and remains live after this result's * `free()`. Read the exact output range with `len` and release the allocation * with `dealloc_bytes(id)` when finished. The input id is never consumed. */ readonly id: number; /** * Returns the exact number of output bytes, or `0` on failure. * * Use this length when reading output or passing it to another converter. * `byte_len_of(id)` includes arena padding and can exceed this value. */ readonly len: number; }"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -283320,7 +283320,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/wasm/src/wasm_provider.d.ts:ConversionResult:export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }",
+          "identity": "packages/wasm/src/wasm_provider.d.ts:ConversionResult:export class ConversionResult { private constructor(); /** * Releases the WASM metadata after reading this result, including failed results. * Call once; do not read properties or reuse this wrapper after disposal. * Input and output arena allocations remain live until `dealloc_bytes(id)`. */ free(): void; /** * Releases this result's metadata when leaving an explicit resource-management scope. * This is the same operation as `free()`; use one disposal path per result. * Input and output arena allocations require separate `dealloc_bytes(id)` calls. */ [Symbol.dispose](): void; /** * Returns an empty string on success or the current operation's failure reason. * * Invalid handles and lengths report `unknown allocation id or length past * capacity`. Initial output allocation failure reports `arena exhausted`. * Parse and write failures start with `json to msgpack failed:` or * `msgpack to json failed:`. * Read before freeing this metadata wrapper; no global error lookup is needed. */ readonly error: string; /** * Returns the new output allocation id, or `0` when conversion failed. * * A nonzero id belongs to the caller and remains live after this result's * `free()`. Read the exact output range with `len` and release the allocation * with `dealloc_bytes(id)` when finished. The input id is never consumed. */ readonly id: number; /** * Returns the exact number of output bytes, or `0` on failure. * * Use this length when reading output or passing it to another converter. * `byte_len_of(id)` includes arena padding and can exceed this value. */ readonly len: number; }",
           "guidance": [],
           "usageScore": 26,
           "configuration": [],
@@ -283330,7 +283330,7 @@
           "name": "dealloc_bytes",
           "kind": "function",
           "signature": "export function dealloc_bytes(id: number): boolean;",
-          "declarationLine": 48,
+          "declarationLine": 92,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Releases exactly one arena allocation created by allocation or successful conversion. Pair with alloc_bytes or the conversion result ID; copied JS bytes survive, but views into the released allocation must no longer be used.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nTrue if a live allocation was removed, false for zero, unknown or already released IDs; repeated release is harmless.",
@@ -283415,7 +283415,7 @@
           "name": "InitInput",
           "kind": "type",
           "signature": "export type InitInput =\n  | RequestInfo\n  | URL\n  | Response\n  | BufferSource\n  | WebAssembly.Module;",
-          "declarationLine": 79,
+          "declarationLine": 147,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Native source accepted by async initialization: request/string, URL, response, bytes or a precompiled module. Request-like sources fetch; other sources instantiate directly.",
           "core": "Native source accepted by async initialization: request/string, URL, response, bytes or a precompiled module. Request-like sources fetch; other sources instantiate directly.",
@@ -283478,8 +283478,8 @@
         {
           "name": "InitOutput",
           "kind": "interface",
-          "signature": "export interface InitOutput {\n  readonly memory: WebAssembly.Memory;\n  readonly __wbg_conversionresult_free: (a: number, b: number) => void;\n  readonly alloc_bytes: (a: number) => number;\n  readonly byte_len_of: (a: number) => number;\n  readonly conversionresult_error: (a: number) => [number, number];\n  readonly conversionresult_id: (a: number) => number;\n  readonly conversionresult_len: (a: number) => number;\n  readonly dealloc_bytes: (a: number) => number;\n  readonly json_to_msgpack: (a: number, b: number) => number;\n  readonly msgpack_to_json: (a: number, b: number) => number;\n  readonly ptr_of: (a: number) => number;\n  readonly __wbindgen_externrefs: WebAssembly.Table;\n  readonly __wbindgen_free: (a: number, b: number, c: number) => void;\n  readonly __wbindgen_start: () => void;\n}",
-          "declarationLine": 81,
+          "signature": "export interface InitOutput {\n  /** Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory. */ readonly memory: WebAssembly.Memory;\n  /** Generated metadata destructor: a is a result pointer; b selects explicit disposal (0) or finalization (1). Use ConversionResult.free() instead of calling this directly. */ readonly __wbg_conversionresult_free: (\n    a: number,\n    b: number,\n  ) => void;\n  /** Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper. */ readonly alloc_bytes: (\n    a: number,\n  ) => number;\n  /** Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block. */ readonly byte_len_of: (\n    a: number,\n  ) => number;\n  /** Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage. */ readonly conversionresult_error: (\n    a: number,\n  ) => [number, number];\n  /** Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id. */ readonly conversionresult_id: (\n    a: number,\n  ) => number;\n  /** Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len. */ readonly conversionresult_len: (\n    a: number,\n  ) => number;\n  /** Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean. */ readonly dealloc_bytes: (\n    a: number,\n  ) => number;\n  /** Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly json_to_msgpack: (\n    a: number,\n    b: number,\n  ) => number;\n  /** Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly msgpack_to_json: (\n    a: number,\n    b: number,\n  ) => number;\n  /** Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id. */ readonly ptr_of: (\n    a: number,\n  ) => number;\n  /** Generated table holding JavaScript references required by wasm-bindgen. Owned and initialized by the glue; application arena data does not belong here. */ readonly __wbindgen_externrefs: WebAssembly.Table;\n  /** Generated temporary-storage release: a is a pointer, b its byte length, and c its alignment. Owned by the glue; arena ids must use dealloc_bytes instead. */ readonly __wbindgen_free: (\n    a: number,\n    b: number,\n    c: number,\n  ) => void;\n  /** Generated startup hook called by module initialization. Applications must initialize through init or initSync rather than invoking this hook again. */ readonly __wbindgen_start: () => void;\n}",
+          "declarationLine": 150,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Initialized native exports: memory plus raw numeric ABI functions. Named JS imports wrap metadata pointers and boolean results; prefer those wrappers for normal conversion.",
           "core": "memory: Native `WebAssembly.Memory` shared with the arena; reread memory.buffer after any call that can allocate or grow memory.\nalloc_bytes: Raw byte allocator taking requested byte count; returns an arena ID, zero on exhaustion. Memory growth requires fresh typed-array views.\nalloc_bytes.a: Application-requested unsigned 32-bit byte count.\nOwned arena ID, or zero on allocation failure.\nbyte_len_of: Raw capacity query accepting an arena identifier and returning its eight-byte-rounded capacity, or zero for an unknown ID.\nbyte_len_of.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nAllocated capacity in bytes, not the encoded document length.\nptr_of: Raw arena pointer query returns a stable eight-byte-aligned byte offset until deallocation, or zero for an unknown ID.\nptr_of.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nByte offset into current memory, not an arena ID.\ndealloc_bytes: Raw arena release returns numeric one for a removed live allocation and zero for an absent ID; the named JS wrapper returns boolean.\ndealloc_bytes.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nNumeric native boolean; subsequent release of the same ID returns zero.\njson_to_msgpack: Raw JSON converter returns a result-struct pointer, unlike the named JS wrapper json_to_msgpack which returns ConversionResult. Prefer the wrapper for owned metadata.\njson_to_msgpack.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\njson_to_msgpack.b: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nRaw metadata pointer managed by generated glue; use the named wrapper for safe metadata access and free().\nmsgpack_to_json: Raw MessagePack converter returns a result-struct pointer, unlike the named JS wrapper msgpack_to_json which returns ConversionResult. Prefer the wrapper for metadata ownership.\nmsgpack_to_json.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nmsgpack_to_json.b: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nRaw metadata pointer; the named wrapper constructs and owns its ConversionResult.\nconversionresult_id: Raw metadata getter receives a result-struct pointer and returns its output arena ID; use ConversionResult.id instead of handling raw pointers.\nconversionresult_id.a: Raw result-struct pointer returned by the corresponding `InitOutput` conversion function; never pass an arena allocation identifier here.\nOutput arena ID, zero on conversion failure.\nconversionresult_len: Raw metadata getter receives a result-struct pointer and returns exact output byte length; use ConversionResult.len for normal consumers.\nconversionresult_len.a: Raw result-struct pointer returned by the corresponding `InitOutput` conversion function; never pass an arena allocation identifier here.\nExact output bytes, zero on conversion failure.\nconversionresult_error: Raw metadata getter copies UTF-8 error text into a temporary allocation and returns pointer/length. Generated glue decodes and frees that temporary; use ConversionResult.error.\nconversionresult_error.a: Raw result-struct pointer returned by the corresponding `InitOutput` conversion function; never pass an arena allocation identifier here.\nA [bytePointer, byteLength] tuple for generated glue, not a JavaScript string.",
@@ -283496,7 +283496,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly memory: WebAssembly.Memory;",
-              "description": null,
+              "description": "Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory.",
               "parameterDetails": [],
               "returns": "WebAssembly.Memory"
             },
@@ -283505,7 +283505,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly alloc_bytes: (a: number) => number;",
-              "description": null,
+              "description": "Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -283514,7 +283514,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly byte_len_of: (a: number) => number;",
-              "description": null,
+              "description": "Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -283523,7 +283523,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly conversionresult_error: (a: number) => [number, number];",
-              "description": null,
+              "description": "Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage.",
               "parameterDetails": [],
               "returns": "(a: number) => [number, number]"
             },
@@ -283532,7 +283532,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly conversionresult_id: (a: number) => number;",
-              "description": null,
+              "description": "Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -283541,7 +283541,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly conversionresult_len: (a: number) => number;",
-              "description": null,
+              "description": "Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -283550,7 +283550,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly dealloc_bytes: (a: number) => number;",
-              "description": null,
+              "description": "Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -283559,7 +283559,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly json_to_msgpack: (a: number, b: number) => number;",
-              "description": null,
+              "description": "Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper.",
               "parameterDetails": [],
               "returns": "(a: number, b: number) => number"
             },
@@ -283568,7 +283568,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly msgpack_to_json: (a: number, b: number) => number;",
-              "description": null,
+              "description": "Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper.",
               "parameterDetails": [],
               "returns": "(a: number, b: number) => number"
             },
@@ -283577,7 +283577,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly ptr_of: (a: number) => number;",
-              "description": null,
+              "description": "Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             }
@@ -283585,7 +283585,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }"
+            "export interface InitOutput { /** Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory. */ readonly memory: WebAssembly.Memory; /** Generated metadata destructor: a is a result pointer; b selects explicit disposal (0) or finalization (1). Use ConversionResult.free() instead of calling this directly. */ readonly __wbg_conversionresult_free: (a: number, b: number) => void; /** Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper. */ readonly alloc_bytes: (a: number) => number; /** Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block. */ readonly byte_len_of: (a: number) => number; /** Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage. */ readonly conversionresult_error: (a: number) => [number, number]; /** Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id. */ readonly conversionresult_id: (a: number) => number; /** Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len. */ readonly conversionresult_len: (a: number) => number; /** Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean. */ readonly dealloc_bytes: (a: number) => number; /** Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly json_to_msgpack: (a: number, b: number) => number; /** Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly msgpack_to_json: (a: number, b: number) => number; /** Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id. */ readonly ptr_of: (a: number) => number; /** Generated table holding JavaScript references required by wasm-bindgen. Owned and initialized by the glue; application arena data does not belong here. */ readonly __wbindgen_externrefs: WebAssembly.Table; /** Generated temporary-storage release: a is a pointer, b its byte length, and c its alignment. Owned by the glue; arena ids must use dealloc_bytes instead. */ readonly __wbindgen_free: (a: number, b: number, c: number) => void; /** Generated startup hook called by module initialization. Applications must initialize through init or initSync rather than invoking this hook again. */ readonly __wbindgen_start: () => void; }"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -283624,7 +283624,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/wasm/src/wasm_provider.d.ts:InitOutput:export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }",
+          "identity": "packages/wasm/src/wasm_provider.d.ts:InitOutput:export interface InitOutput { /** Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory. */ readonly memory: WebAssembly.Memory; /** Generated metadata destructor: a is a result pointer; b selects explicit disposal (0) or finalization (1). Use ConversionResult.free() instead of calling this directly. */ readonly __wbg_conversionresult_free: (a: number, b: number) => void; /** Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper. */ readonly alloc_bytes: (a: number) => number; /** Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block. */ readonly byte_len_of: (a: number) => number; /** Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage. */ readonly conversionresult_error: (a: number) => [number, number]; /** Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id. */ readonly conversionresult_id: (a: number) => number; /** Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len. */ readonly conversionresult_len: (a: number) => number; /** Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean. */ readonly dealloc_bytes: (a: number) => number; /** Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly json_to_msgpack: (a: number, b: number) => number; /** Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly msgpack_to_json: (a: number, b: number) => number; /** Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id. */ readonly ptr_of: (a: number) => number; /** Generated table holding JavaScript references required by wasm-bindgen. Owned and initialized by the glue; application arena data does not belong here. */ readonly __wbindgen_externrefs: WebAssembly.Table; /** Generated temporary-storage release: a is a pointer, b its byte length, and c its alignment. Owned by the glue; arena ids must use dealloc_bytes instead. */ readonly __wbindgen_free: (a: number, b: number, c: number) => void; /** Generated startup hook called by module initialization. Applications must initialize through init or initSync rather than invoking this hook again. */ readonly __wbindgen_start: () => void; }",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -283634,7 +283634,7 @@
           "name": "initSync",
           "kind": "function",
           "signature": "export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;",
-          "declarationLine": 108,
+          "declarationLine": 196,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Synchronously initializes from bytes or a precompiled native module without fetching. Use the object input form; already initialized modules return their existing exports.",
           "core": "module: Required application `SyncInitInput`, wrapped as `{ module: bytesOrModule }`: bytes or a precompiled `WebAssembly.Module`, with no default and no fetch. Positional bytes/module remain accepted but emit a deprecation warning.\nAn `InitOutput`; native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError retain their type, identity and stack without source/code, as the registered pass-through exception.",
@@ -283712,7 +283712,7 @@
           "name": "json_to_msgpack",
           "kind": "function",
           "signature": "export function json_to_msgpack(id: number, len: number): ConversionResult;",
-          "declarationLine": 64,
+          "declarationLine": 113,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Synchronously transcodes exactly one UTF-8 JSON document to MessagePack within the arena; trailing JSON whitespace is accepted. Pair with alloc_bytes and dealloc_bytes to own input and output separately. Preservation is limited to JSON data and representable numbers.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nlen: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nAn owned `ConversionResult`: success has nonzero id, exact len and empty error; invalid ID/length, parsing/trailing-document or allocation failure has id/len zero and error text. Input stays owned by the caller.",
@@ -283803,7 +283803,7 @@
           "name": "msgpack_to_json",
           "kind": "function",
           "signature": "export function msgpack_to_json(id: number, len: number): ConversionResult;",
-          "declarationLine": 69,
+          "declarationLine": 132,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Synchronously transcodes exactly one MessagePack document to UTF-8 JSON, rejecting any trailing bytes. Pair with dealloc_bytes to release the new output allocation; bin/ext, non-string map keys and out-of-range integers are not promised reversible JSON forms.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nlen: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nAn independently owned `ConversionResult`; zero id/len and error text report failure without throwing a package error. Each successful output and every input remain separately releasable.",
@@ -283893,7 +283893,7 @@
           "name": "ptr_of",
           "kind": "function",
           "signature": "export function ptr_of(id: number): number;",
-          "declarationLine": 77,
+          "declarationLine": 144,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Looks up the byte offset for one live arena ID. Pair with alloc_bytes and initialized memory to construct a fresh typed-array view; offset stability does not preserve an old memory.buffer after growth.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nEight-byte-aligned offset valid until this allocation is released; unknown or dead IDs return zero.",
@@ -283976,7 +283976,7 @@
           "name": "SyncInitInput",
           "kind": "type",
           "signature": "export type SyncInitInput = BufferSource | WebAssembly.Module;",
-          "declarationLine": 98,
+          "declarationLine": 182,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Native bytes or a precompiled WebAssembly.Module supplied by the application to initSync; no fetch-capable sources are accepted.",
           "core": "Native bytes or a precompiled WebAssembly.Module supplied by the application to initSync; no fetch-capable sources are accepted.",

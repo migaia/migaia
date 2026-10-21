@@ -3,7 +3,7 @@
   "library": {
     "slug": "tray",
     "description": null,
-    "version": "0.0.5",
+    "version": "0.0.6",
     "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
     "readmeLocales": ["zh", "en"],
     "documentation": {

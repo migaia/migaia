@@ -3,7 +3,7 @@
   "library": {
     "slug": "utils",
     "description": "Runtime-neutral reusable utility primitives.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [
       ".",
       "./bytes",
