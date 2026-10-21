@@ -37,6 +37,7 @@ import { storeSharedReference } from './store-shared.js'
 import { storeSsrReference } from './store-ssr.js'
 import { storeWasmReference } from './store-wasm.js'
 import { storeWorkerReference } from './store-worker.js'
+import { microHubReference } from './micro-hub.js'
 
 /** Audited libraries keyed by slug, in the order they were migrated. */
 export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
@@ -72,7 +73,8 @@ export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
   'store-shared': storeSharedReference,
   'store-ssr': storeSsrReference,
   'store-wasm': storeWasmReference,
-  'store-worker': storeWorkerReference
+  'store-worker': storeWorkerReference,
+  'micro-hub': microHubReference
 }
 
 /** Returns the reference of an audited library, or `undefined` when it is not migrated yet. */
