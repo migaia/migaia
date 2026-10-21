@@ -35,6 +35,8 @@ pnpm add @migaia/utils
 
 ## `/promise` 模块
 
+`@migaia/utils/scheduler` 另外提供 `asyncTask`（按策略选择微任务/宏任务/帧/空闲/优先级队列）、`yieldToHost`、`timeSlice`（大数据时间切片）以及 `debounce` / `throttle` / `coalesce` / `repeat`。详见 USEGUIDE。
+
 ```ts
 import {
   sleep,
@@ -223,6 +225,8 @@ withTimeout(op, { timeoutMs: 100, report: myLogger }); // 用自定义 reporter 
 <a id="error-模块"></a>
 
 ## `/error` 模块
+
+需要带 `source`/`code` 身份、可比较、可派生、可序列化的错误对象时，用 `IdentifyError`（含 `define()` 工厂、`find()` / `match()` 链路查找）；下面的函数是它的底层原语。详见 USEGUIDE。
 
 ```ts
 import {
@@ -667,6 +671,8 @@ type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;
 <a id="config-模块"></a>
 
 ## `/config` 模块
+
+需要一个可链式读写、可监听、可从 JSON / 异步源 / 环境变量构建的配置对象时，用 `ConfigOwner`；下面的函数是它的底层原语。详见 USEGUIDE 的 `ConfigOwner` 一节。
 
 ```ts
 import {

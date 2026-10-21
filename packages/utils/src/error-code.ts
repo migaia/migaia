@@ -95,6 +95,27 @@ export const UtilsErrorCode = {
    * The caller must pass a safe, well-formed path.
    */
   configPathInvalid: 'CONFIG_PATH_INVALID',
+  /**
+   * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native
+   * `SyntaxError` stays on `cause`; the caller must fix the source text.
+   */
+  configParseFailed: 'CONFIG_PARSE_FAILED',
+  /**
+   * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The
+   * rejection stays on `cause`; the caller may retry the source or fall back to a default config.
+   */
+  configSourceFailed: 'CONFIG_SOURCE_FAILED',
+  /**
+   * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the
+   * value in its config source or use `getOr()` with an explicit fallback.
+   */
+  configValueMissing: 'CONFIG_VALUE_MISSING',
+  /**
+   * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous
+   * snapshot stays committed and the validator error stays on `cause`; the caller must correct the
+   * rejected change.
+   */
+  configValidationFailed: 'CONFIG_VALIDATION_FAILED',
   /** The supplied string or tuple cannot safely identify an object path. */
   objectPathInvalid: 'OBJECT_PATH_INVALID',
   /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */

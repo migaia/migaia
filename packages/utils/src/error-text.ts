@@ -45,6 +45,33 @@ export const UtilsErrorText = {
     `[utils] config ${limit} limit exceeded at ${path}`,
   configPathInvalid: (path: string, reason: string) =>
     `[utils] invalid config path at ${path}: ${reason}`,
+  /** Stable text for `ConfigOwner.from()` input that is not a JSON string. */
+  configParseFailed: (reason: string) => `[utils] config text could not be parsed: ${reason}`,
+  /** Stable text for a `ConfigOwner.fromAsync()` source that rejected or threw. */
+  configSourceFailed: '[utils] async config source failed',
+  /** Stable text for `ConfigOwner.require()` when the path has no own value. */
+  configValueMissing: (path: string) => `[utils] required config value is missing at ${path}`,
+  /** Stable text for a candidate snapshot rejected by the owner's validator. */
+  configValidationFailed: '[utils] config validation rejected the change',
+  /** Stable text for an `IdentifyError` identity whose `source` or `code` is not usable. */
+  identityInvalid: (field: string) => `[utils] invalid error identity ${field}`,
+  /** Default message for `IdentifyError` when neither caller nor wrapped error supplies one. */
+  identifyErrorDefault: (source: string, code: string) => `[${source}] ${code}`,
+  /**
+   * Capability label passed to `envUnsupported()` by `asyncTask()`; names both the requested
+   * strategy and the missing host API so diagnostics identify which fallback to configure.
+   */
+  asyncTaskCapability: (strategy: string, capability: string) => `${strategy} (${capability})`,
+  /** Expectation text for an unknown `asyncTask()` strategy key. */
+  asyncTaskStrategyExpectation: 'a known AsyncTaskStrategy key or a non-empty list of keys',
+  /** Expectation text shared by callback arguments of the scheduler helpers. */
+  functionExpectation: 'a function',
+  /** Expectation text shared by delay, wait, budget and interval arguments. */
+  delayExpectation: 'a finite non-negative number not above 2147483647',
+  /** Expectation text for time-slice sources. */
+  iterableExpectation: 'an Iterable or AsyncIterable',
+  /** Expectation text for a time-slice budget, which must allow at least some work per slice. */
+  budgetExpectation: 'a finite number greater than 0',
   objectPathInvalid: (path: string, reason: string) =>
     `[utils] invalid object path at ${path}: ${reason}`,
   /** Stable text for malformed template configuration or unsafe value conversion. */

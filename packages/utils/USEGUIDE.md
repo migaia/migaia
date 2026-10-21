@@ -73,6 +73,51 @@ scheduler.advance(50); // 未触发
 scheduler.advance(50); // 触发，打印 'fired'
 ```
 
+### 异步任务、时间切片与调用频率（`@migaia/utils/scheduler`）
+
+`asyncTask(strategy, callback, delay | options)` 用一个入口覆盖各运行时的微任务/宏任务队列。`strategy` 取 `AsyncTaskStrategy` 的键：
+
+| 键 | 宿主 API | 适用 |
+| --- | --- | --- |
+| `promise` / `microtask` | `Promise.then` / `queueMicrotask` | 当前同步代码之后、任何 I/O 之前 |
+| `nextTick` | `process.nextTick` | Node/Bun，宏任务中调度时先于 promise 微任务 |
+| `timeout` | `setTimeout` | 处处可用，原生支持 `delay` |
+| `immediate` | `setImmediate` | Node/Bun 的 check 阶段 |
+| `messageChannel` | `MessageChannel` | 没有 4ms 钳制的快速宏任务 |
+| `animationFrame` | `requestAnimationFrame` | 下一次绘制前，回调拿到 `frameTime` |
+| `idleCallback` | `requestIdleCallback` | 空闲期，回调拿到 `timeRemaining()`；`idleTimeout` 设兜底 |
+| `postTaskUserBlocking` / `postTaskUserVisible` / `postTaskBackground` | `scheduler.postTask` | 按优先级排队，原生支持 `delay` |
+| `schedulerYield` | `scheduler.yield()` | 拆分长任务后优先续跑 |
+| `auto` | 依次尝试 `schedulerYield → postTaskUserVisible → messageChannel → immediate → timeout` | 默认让出 |
+
+宿主不支持所选策略时同步抛出 `ENV_UNSUPPORTED`，不会静默降级；传数组即声明自己的回退顺序。没有原生延迟的策略会先用定时器等待 `delay` 再进入对应队列。`signal` 在回调开始前中止会撤销宿主注册并以 `ABORTED` 拒绝。
+
+```ts
+import { asyncTask, isAsyncTaskSupported, yieldToHost } from '@migaia/utils/scheduler'
+
+await asyncTask(['postTaskBackground', 'idleCallback', 'timeout'], flushLogs, 100)
+await asyncTask('idleCallback', ({ timeRemaining }) => prefetch(timeRemaining()), { idleTimeout: 2000 })
+for (const row of rows) {
+  process(row)
+  if (++count % 500 === 0) await yieldToHost()
+}
+```
+
+`timeSlice(source, handler, { budget, strategy, signal, onProgress, clock })` 处理大数据时按时间片切分：每片最多工作 `budget` 毫秒（默认 8），然后让出宿主；每片至少处理一项，保证前进。支持同步/异步可迭代对象和生成器。处理函数抛错时会调用迭代器 `return()` 并以原始错误拒绝，`return()` 自身的失败挂在 `errors` 上。`timeSliceMap` / `timeSliceReduce` 是对应的 map/reduce 形式。
+
+```ts
+const parsed = await timeSliceMap(lines, parseLine, { budget: 5, onProgress: ({ processed }) => bar(processed) })
+```
+
+调用频率控制，都接受可注入的 `scheduler`（测试用 `createManualScheduler()`）：
+
+- `debounce(fn, wait, { leading, trailing, maxWait, signal })`：一串调用结束后执行一次；返回的函数带 `cancel()` / `flush()` / `pending()`，支持 `using`。
+- `throttle(fn, wait | 'animationFrame', options)`：每个窗口最多执行一次；传 `'animationFrame'` 时每帧最多一次并使用最新参数。
+- `coalesce(fn, strategy = 'microtask')`：把同一轮里的所有调用合并成一次 `fn(calls)`。
+- `repeat(task, interval, { immediate, maxIterations, onError, signal })`：不重叠的轮询；上一轮结束后才排下一轮，按起点校正漂移，落后时重新对齐而不是补发。`onError: 'stop'`（默认）以原始错误拒绝 `done`，`'continue'` 报告给宿主后继续。
+
+定时器触发的调用没有调用方可以接住异常，这些异常会进入宿主的未捕获错误队列，不会被吞掉。
+
 ### `deferred`
 
 ```ts
@@ -520,6 +565,25 @@ const UtilsErrorCode = {
 ---
 
 <a id="bytes-模块"></a>
+
+### `IdentifyError`
+
+`IdentifyError` 是带稳定身份（`source`、`code`，可选 `phase`、`detail`）的 `Error` 子类，把本模块的错误工具集中成一个类。身份字段通过 `attachErrorIdentity` 写成只读、不可配置的自有属性，原始失败保留在 `cause` 上，`native()` 返回原生根错误，`stack` 不会被改写。原型已冻结，方法不能被赋值覆盖。
+
+```ts
+import { IdentifyError } from '@migaia/utils/error'
+
+const OrderError = IdentifyError.define('@app/orders', { notFound: 'NOT_FOUND', conflict: 'CONFLICT' })
+throw OrderError.notFound({ cause, detail: { id } })      // IdentifyError<'@app/orders', 'NOT_FOUND'>
+
+if (OrderError.is(error, 'notFound')) showEmpty()
+const status = IdentifyError.match(error, { NOT_FOUND: () => 404, CONFLICT: () => 409, _: () => 500 })
+const timeout = IdentifyError.find(error, { source: '@migaia/utils', code: 'DEADLINE_EXCEEDED' })
+```
+
+- 静态方法：`from(error, identity)`（同身份的实例原样返回）、`define`、`assert`、`wrap`（同步异常与异步拒绝都转换）、`is`、`find`、`match`、`identityOf`（从不抛出），以及委托给现有函数的 `combine` / `walk` / `reason` / `serialize` / `deserialize`。
+- 实例方法：`identity()`、`native()`、`causes()`、`has(match)`、`equal(other)`、`compare(other)`、`clone()`、`mutable()`（可编辑的身份草稿）、`withPhase()`、`withDetail()`、`combine(...others)`（`errors` 首项为自身）、`attachSecondary(...errors)`、`toJSON()`、`toString()`。
+- 非法身份抛出 `INVALID_ARGUMENT` 的 `TypeError`。`match` 没有命中且没有 `_` 时原样重抛。
 
 ## `/bytes` 模块
 
@@ -1110,6 +1174,31 @@ const diff = {
 ---
 
 <a id="function-模块"></a>
+
+### `ConfigOwner`
+
+`ConfigOwner` 持有一份不可变的配置快照，把 `ownConfig` / `readConfigPath` / `patchConfig` / `combineConfig` / `readonlyConfig` 集中到一个可链式调用的类上。每次写入都会先完整构建并校验下一份快照，再提交；失败时旧快照不变。路径类型由 `IObjectPath` 推导，`get('server.port')` 的类型就是 `number | undefined`。
+
+```ts
+import { ConfigOwner } from '@migaia/utils/config'
+
+const config = new ConfigOwner(defaults, { validate: (value) => value.server.port > 0 })
+config.set('server.port', 8080).patch({ debug: true }).combine({ cache: { ttl: 60 } })
+config.require('server.port')            // 缺失时抛 CONFIG_VALUE_MISSING
+const stop = config.watch('server.port', (next, prev) => restart(next))
+
+const fromText = ConfigOwner.from<IAppConfig>(text)                       // 非法 JSON：CONFIG_PARSE_FAILED
+const remote = await ConfigOwner.fromAsync(({ signal }) => fetch(url, { signal }).then((r) => r.text()), {
+  timeoutMs: 5000
+})                                                                        // 源失败：CONFIG_SOURCE_FAILED
+const env = ConfigOwner.fromEnv(process.env, { prefix: 'APP__', key: (s) => s.toLowerCase() })
+```
+
+- 读取：`get` / `getOr` / `require` / `read` / `has` / `view()`（深只读视图）/ `select(path)`（子树的新 owner）/ `diff` / `equals`。
+- 写入（返回 `this`）：`set` / `delete` / `patch` / `combine` / `batch(fn)`（一次校验、一次通知，失败整体回滚）/ `reset()` / `lock()`。
+- 监听：`watch(listener)` 或 `watch(path, listener)`；监听器异常交给 `report`（默认进入宿主未捕获错误队列），监听器内再写入会抛 `REENTRANT_CALL`。
+- 序列化：`toJSON()` / `toString(space)`；Map、Set、函数等非 JSON 值抛 `CONFIG_UNSUPPORTED`。
+- 静态：`from`、`fromAsync`（Promise、值或接收 `signal` 的工厂；支持 `signal` / `timeoutMs`）、`fromEnv`、`merge`、`is`。与 `@migaia/resource` 的 `createResource` 组合即可得到一份响应式的配置资源。
 
 ## `/function` 模块
 

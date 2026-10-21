@@ -335,6 +335,19 @@ function isAggregateErrorLike(value: unknown): value is AggregateError {
 export { UtilsErrorCode }
 export type { IUtilsErrorCode }
 
+export { IdentifyError } from './identify-error.js'
+export type {
+  IErrorIdentityComparison,
+  IErrorIdentityMatch,
+  IIdentifiedError,
+  IIdentifyErrorCases,
+  IIdentifyErrorFactory,
+  IIdentifyErrorFactoryOptions,
+  IIdentifyErrorIdentity,
+  IIdentifyErrorOptions,
+  IMutableErrorIdentity
+} from './identify-error.js'
+
 export {
   serializeErrorChain,
   deserializeErrorChain,
