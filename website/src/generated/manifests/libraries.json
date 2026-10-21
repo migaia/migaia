@@ -3187,7 +3187,15 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。"
+                  "text": "`createEventChannel<T, R>()` 中，`T` 是发布载荷类型，`R` 是监听器结果类型。指定结果类型不会改变 channel 的订阅模型，也不会创建全局任务表。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文，原始载荷放在 `event.value`；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 是调用方给本次登记起的标签；返回的 `subscription` 负责取消并可追加订阅。"
                 },
                 {
                   "type": "paragraph",
@@ -3216,7 +3224,23 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。"
+                  "text": "`invokeParallelSettled(channel, payload)` 按登记顺序返回结算项：`{ status: 'fulfilled', value }` 的 `value` 是监听器兑现后的返回值；`{ status: 'rejected', reason }` 的 `reason` 是监听器原始的抛错或拒绝原因。这些字段描述监听器执行结果，不是消息发送回执。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "设置 `style: 'on-emit'` 后，`channel.on(listener)` 登记监听器并返回本次订阅的句柄，`channel.emit(value)` 按所选派发策略把 value 交给当前快照中的监听器。默认 handle 取消策略下，句柄的 `off()` 只移除它拥有的登记。`on`、`emit`、`off` 分别与 `subscribe`、`publish`、`unsubscribe` 指向同一函数；canonical（固定原名）方法仍保留。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "从 `@migaia/event-subscriber/subscriber` 导入的 `subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` 只通过 `channel.subscribe(listener, options?)` 工作，不读取 style 配置，因此可以接收仍保留该方法的 styled channel（增加命名别名的通道）。它们的返回值固定为普通 `IUnsubscribe`，即同步、幂等的取消函数，不带 `off`、`dispose`、`unlisten` 或订阅链方法。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。旧草案中的抽象类 `EventSubscriber`、静态 `EVENT_NAME` 与 `onCall()` 不属于当前公开契约，不把事件名重复存进 class。"
                 },
                 {
                   "type": "paragraph",
@@ -4185,7 +4209,15 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener. The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` names the registration. The returned subscription cancels its registrations and can extend the chain."
+                    "text": "In `createEventChannel<T, R>()`, `T` is the published payload type and `R` is the listener result type. Specifying a result type keeps the same channel subscription model and creates no global task registry."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts, with the original payload in `event.value`; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` is a caller-chosen label for this registration. The returned subscription cancels its registrations and can extend the chain."
                   },
                   {
                     "type": "paragraph",
@@ -4214,7 +4246,23 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads."
+                    "text": "`invokeParallelSettled(channel, payload)` returns outcomes in registration order: the `value` in `{ status: 'fulfilled', value }` is the listener's awaited return value; the `reason` in `{ status: 'rejected', reason }` is its original thrown value or rejection reason. These fields describe listener execution, not message-send acknowledgments."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "With `style: 'on-emit'`, `channel.on(listener)` registers a listener and returns its subscription handle, while `channel.emit(value)` delivers value to the current snapshot under the selected dispatch policy. Under default handle-scoped removal, the handle's `off()` removes only the registrations it owns. `on`, `emit` and `off` are the same functions as `subscribe`, `publish` and `unsubscribe`, respectively; the canonical names remain available."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Import `subscribeOnce`, `subscribeUntil` and `subscribeSubscriber` from `@migaia/event-subscriber/subscriber`. They work only through `channel.subscribe(listener, options?)` without reading style configuration, so they also accept styled channels that retain this method. A styled channel adds naming aliases. Each helper returns a plain `IUnsubscribe`: a synchronous, idempotent cancellation function with no `off`, `dispose`, `unlisten` or chain methods."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. The old draft's abstract `EventSubscriber` class, static `EVENT_NAME` and `onCall()` are outside the current public contract; event names are not repeated on subscriber classes."
                   },
                   {
                     "type": "paragraph",
@@ -14341,7 +14389,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.dispose()"
+                  "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -14771,6 +14819,23 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "把这三个 symbol 作为 stage 返回值时，它们是控制信号，不是业务数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下面把输入 `migaia` 转成大写，再加上方括号。第一步返回 `GENERATOR_CONTINUE`，让最后一次 yield 的值进入第二步；第二步直接返回最终字符串。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\n/** 这个宿主持有两步字符串转换与它们的释放责任。 */\nconst textHost = defineHost<Record<never, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: MiddlewarePipelineMode.generator }\n  }\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  return `[${value}]`\n})\ntextHost.runPipeline('migaia', (value) => console.log(value))\nawait textHost.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "输出 `[MIGAIA]`：第二个 stage 收到 `MIGAIA`，完成回调收到加上方括号后的结果。中间 yield 不会逐个触发下游。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "执行中（含外层尚未结束的嵌套调用）注册新 stage 抛 PIPELINE_EXECUTING。每次运行捕获已准入 stage；slot 按首次分配顺序与 Host stage 排列，禁用、恢复、替换不重排。新运行不再取得已撤销代，旧运行用自己的 lease 完成或协作退出。"
                 },
                 {
@@ -14815,7 +14880,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "composition owner 可读取 revision/getCurrentSnapshot()，通过 createPluginAdmission 捕获定义、createDataOrderSlot(name) 保留 opaque 排序槽，再 prepareAdmissions([{ admission, slot }])。setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开。commitPreparedAdmissions 同步发布、不执行用户代码，revision 已变化则拒绝；discardPreparedAdmissions 对暂存资源只回滚一次。返回 registration token 精确指向那次安装，不按名称误删新代。"
+                  "text": "revision 是 Host 已提交修改的版本号，不是尝试操作的次数。composition owner 可读取 revision/getCurrentSnapshot()，通过 createPluginAdmission 捕获定义、createDataOrderSlot(name) 保留 opaque 排序槽，再 prepareAdmissions([{ admission, slot }])。setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开。commitPreparedAdmissions 同步发布、不执行用户代码，revision 已变化则拒绝；discardPreparedAdmissions 对暂存资源只回滚一次。返回 registration token 精确指向那次安装，不按名称误删新代。"
                 },
                 {
                   "type": "paragraph",
@@ -14823,7 +14888,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；要真实释放，应观察全部 physicalCompletion，或由拥有 realm 的外层终止其实际执行环境。"
+                  "text": "托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；确认物理释放前，应等待全部 physicalCompletion 延续完成，或由拥有 realm 的外层终止其实际执行环境。"
                 },
                 {
                   "type": "paragraph",
@@ -15893,7 +15958,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => 'hello' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.dispose()"
+                    "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => 'hello' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
                   },
                   {
                     "type": "paragraph",
@@ -16392,6 +16457,23 @@
                   },
                   {
                     "type": "paragraph",
+                    "text": "When returned from a stage, these three symbols control traversal rather than represent business data."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "This example uppercases the input `migaia`, then adds square brackets. The first stage returns `GENERATOR_CONTINUE` to pass its last yielded value to the second stage; the second returns the final string directly."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { defineHost } from '@migaia/plugin-host'\nimport { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\n/** This host owns the two string transformations and their cleanup. */\nconst textHost = defineHost<Record<never, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: MiddlewarePipelineMode.generator }\n  }\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  return `[${value}]`\n})\ntextHost.runPipeline('migaia', (value) => console.log(value))\nawait textHost.dispose()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "It prints `[MIGAIA]`: the second stage receives `MIGAIA`, and the completion callback receives the bracketed result. Intermediate yields do not invoke downstream stages individually."
+                  },
+                  {
+                    "type": "paragraph",
                     "text": "Registering stages while any nested run remains active throws PIPELINE_EXECUTING. A run captures its admitted stages. Host stages and plugin slots follow first-allocation order; disabling, restoring, and replacing retain positions. New runs do not acquire revoked generations; old runs retain their leases until completion or cooperative exit."
                   },
                   {
@@ -16436,7 +16518,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "A composition owner reads revision/getCurrentSnapshot(), captures definitions with createPluginAdmission, reserves opaque positions with createDataOrderSlot(name), then calls prepareAdmissions([{ admission, slot }]). Setup may execute, but candidate extensions, config, Features, and stages remain unpublished. commitPreparedAdmissions is synchronous without user code and rejects stale revisions. discardPreparedAdmissions rolls temporary resources back once. Returned registration tokens identify exact installations rather than whichever plugin currently has a name."
+                    "text": "revision is the Host's committed modification version, not a count of attempted operations. A composition owner reads revision/getCurrentSnapshot(), captures definitions with createPluginAdmission, reserves opaque positions with createDataOrderSlot(name), then calls prepareAdmissions([{ admission, slot }]). Setup may execute, but candidate extensions, config, Features, and stages remain unpublished. commitPreparedAdmissions is synchronous without user code and rejects stale revisions. discardPreparedAdmissions rolls temporary resources back once. Returned registration tokens identify exact installations rather than whichever plugin currently has a name."
                   },
                   {
                     "type": "paragraph",
@@ -16444,7 +16526,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Observe all physicalCompletion continuations for physical release, or let the outer realm owner terminate its actual execution environment."
+                    "text": "Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Wait for every physicalCompletion continuation to finish before treating physical release as complete, or let the outer realm owner terminate its actual execution environment."
                   },
                   {
                     "type": "paragraph",
@@ -20042,11 +20124,15 @@
                   "type": "list",
                   "items": [
                     "旧请求的结果写不进来，即使底层接口不能取消。 手写时谁最后返回谁赢；`Resource` 给每次请求一个世代编号，只有最新一代的结果会写入 `state`。示例",
-                    "依赖自动登记，同一轮改几个条件只发一次请求。 手写时每个条件的变化回调各发一次请求；请求函数在第一个 `await` 之前读到的响应式值都会成为依赖，同一轮里的多次修改在下一个微任务合并成一次请求。示例",
+                    "依赖自动登记，同一轮改几个条件只发一次请求。 手写时每个条件的变化回调各发一次请求；请求函数在第一个 `await` 之前读到的响应式值都会成为依赖，同一轮里的多次修改默认在下一个微任务合并成一次请求。示例",
                     "多处读取共享一个 Promise。 手写去重要自己处理失败后清除、过期后重取；同一个 `Resource` 的 `promise` 在请求进行中和缓存有效时都返回同一个 Promise。示例",
                     "取消有自己的状态，不会被当成失败。 `cancel()` 后状态是 `cancelled`，资源还能 `refetch()`；`dispose()` 会把中止信号传给底层请求，等待方收到原生 `AbortError`。示例",
                     "服务端快照带的是剩余有效期，不是时间点。 浏览器用本地时钟接着计时，两端时钟不一致也不影响，快照仍有效时不发请求。示例"
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "当异步结果依赖 `Signal` 或 `Computed`，又需要界面观察状态、共享请求或刷新缓存时，用 `Resource` 管理这套可观察、可复用的状态。只加载一次、没有这些需求的请求，直接 `await` 一个 Promise 更简单。"
                 }
               ]
             },
@@ -20061,7 +20147,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -20074,7 +20160,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`re` 比 `react` 晚返回，日志里能看到它返回了，但页面停在 `react` 的结果上。请求函数读了 `keyword.value`，关键词一变 `Resource` 就发起新请求，并作废旧的那一次；旧请求即使跑完，也写不进 `state`。"
+                  "text": "`re` 比 `react` 晚返回，日志里能看到它返回了，但页面停在 `react` 的结果上。请求函数在返回 Promise 前同步读取了 `keyword.value`，关键词一变 `Resource` 就发起新请求，并作废旧的那一次；旧请求即使跑完，也写不进 `state`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`view` 是一个 Effect（响应式副作用），执行时读取 `results.state`，所以请求状态变化会让它再次执行并更新页面。把 `state` 保存到普通变量只得到当时的状态快照；要持续更新界面，应在 Effect 或 UI 框架的状态订阅中读取它。结束时先释放 `view`，再释放 `results`，最后释放输入 `keyword`，避免清理过程再次触发渲染或请求。"
                 },
                 {
                   "type": "paragraph",
@@ -20130,7 +20220,10 @@
                       "`cancel()` / `dispose()`",
                       "停掉这一次请求、资源还能用 / 停掉请求并释放整个资源"
                     ],
-                    ["快照", "`dehydrate()` 导出数据和剩余有效期，另一端用 `initialSnapshot` 恢复"]
+                    [
+                      "快照",
+                      "调用方可传输或保存 `dehydrate()` 导出的数据和剩余有效期，再用 `initialSnapshot` 恢复"
+                    ]
                   ]
                 },
                 {
@@ -20236,7 +20329,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
+                  "text": "构造选项 `autoStart` 默认为 `true`：没有仍有效的 `initialSnapshot` 时，构造函数立即发起第一代请求。传 `autoStart: false` 时不在构造期请求，首次被动读取仍可启动；有效的初始快照会直接复用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。依赖变化何时刷新由传入的 `runtime` 调度决定，默认在微任务中处理。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 每次刷新会创建新的一代，并中止仍在途的上一代的 `signal`；只有当前一代能把结果写入状态。想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 需要暂时停止当前请求、稍后继续使用同一个资源时调用 `cancel()`。正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
                 }
               ]
             },
@@ -21176,11 +21273,15 @@
                     "type": "list",
                     "items": [
                       "An old request cannot write its result, even when the API cannot be cancelled. By hand, whichever answers last wins; `Resource` gives every request a generation number and writes only the newest generation's result to `state`. Example",
-                      "Dependencies are recorded for you, and several changes in one turn send one request. By hand, each filter's change handler sends its own request; every reactive value the fetcher reads before its first `await` becomes a dependency, and several changes in the same turn merge into one request on the next microtask. Example",
+                      "Dependencies are recorded for you, and several changes in one turn send one request. By hand, each filter's change handler sends its own request; every reactive value the fetcher reads before its first `await` becomes a dependency, and several changes in the same turn merge into one request on the next microtask by default. Example",
                       "Every reader shares one Promise. Hand-written de-duplication has to clear the Promise after a failure and fetch again after expiry; the `promise` of one `Resource` returns the same Promise while a request runs and while the cache is fresh. Example",
                       "Cancellation has its own state and is never mistaken for a failure. After `cancel()` the state is `cancelled` and the resource can still `refetch()`; `dispose()` passes the abort on to the underlying request, and waiters receive a native `AbortError`. Example",
                       "Server snapshots carry the remaining lifetime, not a point in time. The browser keeps counting on its own clock, so the two clocks need not agree, and no request is sent while the snapshot is fresh. Example"
                     ]
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Use `Resource` when an async result depends on a `Signal` or `Computed` and callers need to observe its state, share a request, or refresh cached data. It keeps that reusable state together. For a one-off request without those needs, directly `await` the Promise."
                   }
                 ]
               },
@@ -21195,7 +21296,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// Fake search API: shorter keywords answer more slowly, and it cannot be cancelled\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`API answered: \"${text}\"`)\n      resolve(`3 results for \"${text}\"`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`page shows: ${state.data}`)\n})\n\nkeyword.value = 'react' // the user keeps typing\nawait new Promise((resolve) => setTimeout(resolve, 100)) // wait for both requests to answer\nview.dispose()\nresults.dispose()"
+                    "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// Fake search API: shorter keywords answer more slowly, and it cannot be cancelled\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`API answered: \"${text}\"`)\n      resolve(`3 results for \"${text}\"`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`page shows: ${state.data}`)\n})\n\nkeyword.value = 'react' // the user keeps typing\nawait new Promise((resolve) => setTimeout(resolve, 100)) // wait for both requests to answer\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
                   },
                   {
                     "type": "paragraph",
@@ -21208,7 +21309,11 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "`re` answers after `react`. The log shows it arriving, but the page stays on the results for `react`. The fetcher read `keyword.value`, so a keyword change makes the `Resource` start a new request and void the old one; even when the old request finishes, it cannot write into `state`."
+                    "text": "`re` answers after `react`. The log shows it arriving, but the page stays on the results for `react`. The fetcher reads `keyword.value` synchronously before returning its Promise, so a keyword change makes the `Resource` start a new request and void the old one; even when the old request finishes, it cannot write into `state`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`view` is an Effect, a reactive side effect. It reads `results.state` while running, so request state changes run it again and update the page. Saving `state` in an ordinary variable gives only a snapshot of that moment; keep the read inside an Effect or a UI framework's state subscription to keep the view up to date. On leaving, dispose `view` first, then `results`, then the input `keyword`, so cleanup cannot trigger another render or request."
                   },
                   {
                     "type": "paragraph",
@@ -21269,7 +21374,7 @@
                       ],
                       [
                         "Snapshot",
-                        "`dehydrate()` exports the data and its remaining lifetime; the other side restores it through `initialSnapshot`"
+                        "The caller can transfer or store the data and remaining lifetime exported by `dehydrate()`, then restore them through `initialSnapshot`"
                       ]
                     ]
                   },
@@ -21397,7 +21502,11 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "1. Dependency tracking sees only synchronous reads before the first `await`. Reactive values read after an `await` are not tracked; read them into a local variable first, or move the read into a `Computed`. 2. The fetcher should hand `signal` to I/O that can really be cancelled (for example `fetch(url, { signal })`). Otherwise a cancel only makes the `Resource` ignore the result, and the underlying request still runs to the end. 3. `refetch()` always starts a new request; passive reads (`state`, `promise`, `read()`) start one only when idle or expired. Call `refetch()` or `invalidate()` to force a refresh. 4. Call `dispose()` when the resource is no longer used, or its dependency registrations and running request stay alive. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and a second `dispose()` are safe no-ops. `dispose()` does not dispose the `runtime` passed in. 5. `keepAlive` defaults to `false`. When nobody reads `state`, the `Resource` disconnects from its upstream but keeps the dependency versions and the cache; the next read reuses the old value and Promise when the dependencies did not change and the cache is fresh, and requests again when they changed. Pass `keepAlive: true` to stay connected while nobody watches. 6. Passive reads do not restart after `cancel()`. A cancelled initial load is in the `cancelled` state; a cancelled background refresh keeps the old data and clears `refreshing`. Only an explicit `refetch()` starts again."
+                    "text": "The constructor option `autoStart` defaults to `true`: the first request starts immediately unless `initialSnapshot` is still fresh. With `autoStart: false`, construction does not request, but the first passive read can still start one; a fresh initial snapshot is reused directly."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "1. Dependency tracking sees only synchronous reads before the first `await`. Reactive values read after an `await` are not tracked; read them into a local variable first, or move the read into a `Computed`. The supplied `runtime` decides when dependency changes trigger a refresh; by default, it schedules this work in a microtask. 2. The fetcher should hand `signal` to I/O that can really be cancelled (for example `fetch(url, { signal })`). Otherwise a cancel only makes the `Resource` ignore the result, and the underlying request still runs to the end. 3. `refetch()` always starts a new request; passive reads (`state`, `promise`, `read()`) start one only when idle or expired. Each refresh creates a new generation and aborts the `signal` of the previous generation if it is still running; only the current generation can write its result to state. Call `refetch()` or `invalidate()` to force a refresh. 4. Call `dispose()` when the resource is no longer used, or its dependency registrations and running request stay alive. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and a second `dispose()` are safe no-ops. `dispose()` does not dispose the `runtime` passed in. 5. `keepAlive` defaults to `false`. When nobody reads `state`, the `Resource` disconnects from its upstream but keeps the dependency versions and the cache; the next read reuses the old value and Promise when the dependencies did not change and the cache is fresh, and requests again when they changed. Pass `keepAlive: true` to stay connected while nobody watches. 6. Passive reads do not restart after `cancel()`. Call `cancel()` to stop the current request temporarily while keeping the same resource available for later use. A cancelled initial load is in the `cancelled` state; a cancelled background refresh keeps the old data and clears `refreshing`. Only an explicit `refetch()` starts again."
                   }
                 ]
               },
@@ -58022,6 +58131,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "`createStore` 的 `shape` 是带 `this` 推导的 `IStoreDefinition<S>`，只接受同步字段；`options?: ICreateStoreOptions` 用于指定 Runtime 和异步 Action 警告，返回 `IReactiveStore<S>`。异步字段应改用 `createAsyncStore`，等待它返回的 Promise 后再访问已就绪字段。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "1. getter 只读。 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。 2. 异步方法只有第一个 `await` 之前的写入在同一个批次里。 `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。 3. `$batch()` 不是事务。 recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。 4. `$dispose()` 先切换状态再释放。 `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。 5. 构造失败会回滚。 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。 6. 导入时不创建默认 Runtime。 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。 7. StoreResource 的值由它持有。 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。 8. 错误身份。 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。"
                 },
                 {
@@ -59431,6 +59544,10 @@
                 "id": "contract-details",
                 "heading": "Contract details",
                 "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`createStore` takes a `shape` typed as `IStoreDefinition<S>` with inferred `this`, accepting synchronous fields only. Its optional `options?: ICreateStoreOptions` selects the Runtime and async Action warnings; the result is `IReactiveStore<S>`. Use `createAsyncStore` for asynchronous fields and await its Promise before reading the ready fields."
+                  },
                   {
                     "type": "paragraph",
                     "text": "Every signature, boundary behaviour and error message is in USEGUIDE.en.md. These are the constraints that matter most in use."
@@ -84090,6 +84207,226 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "promise-什么时候执行-什么时候共用-promise",
+              "heading": "/promise：什么时候执行，什么时候共用 Promise",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "需要从外部完成一个 Promise 时，优先使用原生 API `Promise.withResolvers()`；`deferred()` 用于兼容旧运行时，或项目已经约定使用 `IDeferred` 的边界。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const { promise, resolve } = Promise.withResolvers<number>()\nresolve(42)\nconsole.log(await promise) // 42"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`toPromise(run)` 在当前调用栈立即执行 `run`，把同步返回值或异常统一变成 Promise 的结果。若返回的是原生 Promise，就保留同一个 Promise。`Promise.resolve().then(run)` 则等到下一次 microtask（微任务）才执行，并创建新的链式 Promise。前者适合要求同步副作用立即生效的调用，后者适合主动延后工作；两者都能用 rejection 表达失败。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { toPromise } from '@migaia/utils/promise'\n\n/** 用现成 Promise 比较两种调用方式是否保留身份。 */\nconst pending = Promise.resolve(42)\n/** 同步副作用必须在本次调用返回前生效。 */\nconst immediate = toPromise(() => {\n  console.log('now')\n  return pending\n})\n/** 主动延后工作，调用方得到另一条 Promise 链。 */\nconst later = Promise.resolve().then(() => {\n  console.log('later')\n  return pending\n})\nconsole.log(immediate === pending, later === pending) // true false\nawait later\n// 依次输出 now、true false、later。"
+                }
+              ]
+            },
+            {
+              "id": "scheduler-间隔和日期使用不同的时钟",
+              "heading": "/scheduler：间隔和日期使用不同的时钟",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`systemScheduler` 用 `performance.now()` 计时；`now()` 的毫秒数单调不递减，也就是后一次读数不小于前一次，但不是 Unix 时间戳。注入调度器时，用同一个 `scheduler.now()` 计算期限、用 `scheduler.schedule()` 安排到期任务，避免两者使用不同的时间基准。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`systemWallClock.timestamp()` 返回 `Date.now()`，用于日志里的日期时间。不要把它与 `now()` 混用或参与截止时间比较。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/utils/testing` 的 `createManualScheduler()` 是本仓测试专用的虚拟时钟，不面向外部业务代码。外部项目应优先使用测试框架提供的 fake timers；生产代码使用 `systemScheduler` 或注入满足同一契约的调度器。"
+                }
+              ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "bytes-字节存在哪里-视图看到哪一段",
+              "heading": "/bytes：字节存在哪里，视图看到哪一段",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ArrayBuffer` 是原始连续内存，本身不能按下标读写；`Uint8Array` 是这块内存上的 8 位无符号整数视图，每个元素为 0～255。`new Uint8Array(buffer, byteOffset, length)` 中的 `byteOffset` 指起始字节，这种构造不会复制数据，多个视图可以读写同一底层 `ArrayBuffer`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "需要独立副本时用 `slice()`；需要共享窗口时用 `subarray()`。窗口里的写入会影响原数组，复制后的写入不会。`SharedArrayBuffer` 允许多个执行环境共享内存，并发语义不同，不能把它当作普通缓冲区的隔离副本。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const buffer = new ArrayBuffer(4)\nconst bytes = new Uint8Array(buffer)\nbytes[1] = 42\n/** 借用第二、第三个字节，让窗口写入影响原存储。 */\nconst shared = bytes.subarray(1, 3)\n/** 保留修改窗口之前的数值，用来对照复制与共享。 */\nconst copied = shared.slice()\nshared[0] = 7\nconsole.log(bytes[1], copied[0], shared.byteOffset) // 7 42 1"
+                }
+              ]
+            },
+            {
+              "id": "object-把缺失-读取失败和复制策略分开",
+              "heading": "/object：把缺失、读取失败和复制策略分开",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`probeProperty(value, key)` 的第一个参数 `value` 是要读取的对象，可以是普通对象、class 实例或其他可读属性的对象。它把字段不存在与读取字段失败分开：`missing` 可以采用业务默认值，`failed` 必须检查并处理原始错误；成功的 `value` 分支消费实际读到的值。判断结果不需要再访问一次字段，getter 只执行一次。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { probeProperty } from '@migaia/utils/object'\n\n/** failed 分支应报告这个原始错误，不能重新构造一个。 */\nconst profileUnavailable = new Error('profile unavailable')\n/** 记录 getter 的访问次数，使读取副作用可见。 */\nlet profileReads = 0\n/** 同时提供正常字段、缺失字段与抛错 getter 三类输入。 */\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1\n    throw profileUnavailable\n  }\n}\n\n/** 失败时报告原错误，缺失时才使用默认标签。 */\nfunction readLabel(value: object, key: PropertyKey): string {\n  /** 保存判别结果，后续分支不再读取输入字段。 */\n  const result = probeProperty<string>(value, key)\n  switch (result.kind) {\n    case 'value':\n      return result.value\n    case 'missing':\n      return 'Anonymous'\n    case 'failed':\n      console.error('property read failed', result.error)\n      return 'Unavailable'\n  }\n}\n\nconsole.log(readLabel(user, 'name')) // Ada：读取成功，消费 value\nconsole.log(readLabel(user, 'email')) // Anonymous：字段不存在，走业务默认值\nconsole.log(readLabel(user, 'profile')) // Unavailable：getter 异常被显式上报\nconsole.log(profileReads) // 1：没有为了判断结果而重复触发 getter"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`immutableSnapshot(value)` 调用宿主的 `globalThis.structuredClone()`，不经过 JSON 字符串。它保留循环引用与图内共享关系，支持 `Date`、`Map`、`Set`、`ArrayBuffer`、TypedArray 等原生可克隆类型；不会保留自定义 class 的原型方法、getter/setter 与属性描述符。这里没有传 transfer list，所以 `ArrayBuffer` 的内容会被复制，源缓冲区不会变成 detached（所有权被转移后不可用）的状态。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这个函数不调用 `Object.freeze()`，返回对象本身仍可修改。原生 `structuredClone(value)` 是整图全有或全无：任一成员不可克隆就失败。`immutableSnapshot(value)` 在宿主缺少该能力时抛 `ENV_UNSUPPORTED`，值不能克隆时抛 `CLONE_UNSUPPORTED`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { immutableSnapshot } from '@migaia/utils/object'\n\n/** 让两个字段指向同一节点，展示图内别名的复制语义。 */\nconst shared = { count: 1 }\nconst source = { primary: shared, alias: shared, createdAt: new Date('2026-01-01T00:00:00Z') }\n/** 后续只修改源对象，观察独立副本与内部共享关系。 */\nconst copy = immutableSnapshot(source)\nsource.primary.count = 2\nconsole.log(copy.primary.count) // 1：源对象的修改没有写进副本\nconsole.log(copy.primary === copy.alias) // true：共享引用关系被保留\nconsole.log(copy.createdAt instanceof Date, Object.isFrozen(copy)) // true false"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`diagnosticSnapshot(value)` 不先克隆整张对象图，而是逐个投影普通对象、数组和可克隆内置子树；遇到不支持的函数或实例会保留原引用，并在 `diagnostics` 记录位置与原因。`structuredDiagnosticSnapshot(value)` 先尝试原生 `structuredClone`，失败或宿主不支持时退回这种尽力复制，并保留降级诊断。两者用于日志等允许部分复制的场景；`diagnostics` 非空时，要检查哪些部分降级，不能把返回值宣称为完全隔离快照。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { diagnosticSnapshot } from '@migaia/utils/object'\n\n/** 不可克隆的叶值，用来展示诊断复制保留引用的分支。 */\nconst callback = () => 'ready'\nconst { value, diagnostics } = diagnosticSnapshot({ label: 'job', callback })\nconsole.log(value.callback === callback) // true：不支持的函数保留原引用\nconsole.log(diagnostics.length > 0) // true：调用方能发现这部分没有隔离"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`identitySnapshot` 原样返回对象，单独调用它没有运行时收益。它用于可配置 snapshot policy（保存值时选择怎样复制的函数）的零拷贝分支，明确接受共享引用。只有可信进程内、身份敏感或不可克隆对象且允许共享所有权时才适用；外部输入隔离、保存历史状态或跨边界传输应选择 `immutableSnapshot`，并处理不可克隆的失败。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { identitySnapshot } from '@migaia/utils/object'\n\n/** 应用仍会修改的进程内设置，用来观察共享所有权。 */\nconst liveConfig = { retry: 2 }\n/** 这个保存策略明确接受原引用及其后续变更。 */\nconst snapshotPolicy = identitySnapshot\n/** 保存策略的结果，供后续读取以观察共享引用的影响。 */\nconst retained = snapshotPolicy(liveConfig)\nliveConfig.retry = 3\nconsole.log(retained.retry, retained === liveConfig) // 3 true：仍是同一对象"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "路径更新中的 immutable 指更新方式：`set()` 不会深拷贝整棵树，也不会调用 `Object.freeze()`。值真正变化时才返回新根；若新旧值用 `Object.is()` 比较相等，就直接返回原根对象。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { set } from '@migaia/utils/object'\n\n/** 把更新路径与未修改的兄弟分支放在同一棵树上。 */\nconst data = { user: { name: 'Ada' }, settings: { theme: 'dark' } }\n/** 只改 user.name，以两个分支的身份显示复制范围。 */\nconst next = set(data, 'user.name', 'Grace')\nconsole.log(next.user !== data.user) // true：路径上的对象被浅拷贝\nconsole.log(next.settings === data.settings) // true：未修改分支继续共享引用\nconsole.log(data.user.name, next.user.name) // Ada Grace\nconsole.log(set(data, 'user.name', 'Ada') === data) // true：同值更新复用原根"
+                }
+              ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
+            },
+            {
+              "id": "function-一次初始化属于哪个实例",
+              "heading": "/function：一次初始化属于哪个实例",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`once(fn)` 记住同步初始化的首次结果，首次抛出的错误也会一直保留。每调用一次 `once(fn)` 都会创建一份独立缓存；在模块顶层只创建并导出一个包装函数，才能让这个模块实例里的调用方共享它。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { once } from '@migaia/utils/function'\n\n/** 模块只导出这个包装函数，让所有导入方使用同一份缓存。 */\nexport const getRuntime = once(() => ({ registry: new Map([['help', 'Show help']]) }))\n/** 首次读取创建当前模块的运行实例。 */\nconst first = getRuntime()\n/** 后来的调用者复用实例，不再构造 registry。 */\nconst second = getRuntime()\nconsole.log(first === second) // true：只创建了一份 registry"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "重复加载的模块以及 iframe、Worker、Node `vm` 等不同 realm（各自独立的全局执行环境）不共享这份缓存。它不会自动保证全局唯一；需要同一环境共享时，由应用入口或依赖注入容器持有实例。如果应用选择 `globalThis[Symbol.for('your-app/runtime')]` 这样的全局位置，还要自己管理版本、释放与测试清理。`Proxy` 可以把首次属性访问转成惰性初始化，但实例是否唯一仍由存放位置和创建它的所有者决定。`once` 不适合需要重试、重置、热更新或按请求隔离的初始化。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`onceAsync` 适合加载不会刷新的启动配置、初始化一个共享 SDK 客户端，或动态导入并编译同一份 WASM 模块。首次调用就保留 Promise，其他调用无论发生在执行中还是完成后都复用它。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { onceAsync } from '@migaia/utils/function'\n\n/** 共享不刷新的启动配置；直接返回数据使例子可以独立运行。 */\nexport const loadAppConfig = onceAsync(async () => ({ apiBaseUrl: '/api' }))\nconst [routerConfig, telemetryConfig] = await Promise.all([loadAppConfig(), loadAppConfig()])\nconsole.log(routerConfig === telemetryConfig) // true：两处获得同一次初始化的结果"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "首次失败会一直缓存，没有 reset。需要失败重试时，把重试放进被包装的初始化函数；需要刷新、登出后重建或按租户或请求隔离时，应选有对应生命周期的容器。如果把某一个调用者的取消信号交给共享任务，该调用者取消后，其他等待者也会受影响。每个包装函数的缓存独立，模块重复实例化或跨 iframe、Worker、Node `vm` 时不会共享。"
+                }
+              ]
             }
           ]
         },
@@ -87034,6 +87371,278 @@
                       "`/function`: where `once` and `onceAsync` fit",
                       "Collector, troubleshooting and the public entry index"
                     ]
+                  }
+                ]
+              },
+              {
+                "id": "promise-when-work-starts-and-when-a-promise-is-shared",
+                "heading": "/promise: when work starts and when a Promise is shared",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "Prefer the native `Promise.withResolvers()` API when you need to settle a Promise from outside. `deferred()` serves older runtimes that lack it, or project boundaries already expressed through `IDeferred`."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "const { promise, resolve } = Promise.withResolvers<number>()\nresolve(42)\nconsole.log(await promise) // 42"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`toPromise(run)` calls `run` immediately in the current call stack and turns its return value or thrown error into a Promise result. If `run` returns a native Promise, the same Promise is returned."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`Promise.resolve().then(run)` waits until the next microtask and returns a new chained Promise. Use `toPromise` when synchronous side effects must happen before the call returns, and `.then(run)` to defer work deliberately; both express failures through rejection."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { toPromise } from '@migaia/utils/promise'\n\n/** An existing Promise makes identity preservation visible in both calling styles. */\nconst pending = Promise.resolve(42)\n/** Its synchronous side effect must happen before this call returns. */\nconst immediate = toPromise(() => {\n  console.log('now')\n  return pending\n})\n/** Deliberately defers work, giving the caller a separate Promise chain. */\nconst later = Promise.resolve().then(() => {\n  console.log('later')\n  return pending\n})\nconsole.log(immediate === pending, later === pending) // true false\nawait later\n// Prints now, true false, then later."
+                  }
+                ]
+              },
+              {
+                "id": "scheduler-elapsed-time-and-calendar-time-use-different-clocks",
+                "heading": "/scheduler: elapsed time and calendar time use different clocks",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`systemScheduler` uses `performance.now()`. Its millisecond `now()` readings never decrease: a later reading can equal an earlier one, but cannot be smaller. They are not Unix timestamps."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "With an injected scheduler, calculate deadlines with `scheduler.now()` and schedule their tasks with the same `scheduler.schedule()` so that both use one time base."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`systemWallClock.timestamp()` returns `Date.now()` for dates in logs. Do not subtract it from `now()` or use it in deadline comparisons."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`createManualScheduler()` from `@migaia/utils/testing` is a virtual clock for this repository's tests, rather than an API for external application code. Other projects should prefer their test framework's fake timers; production code uses `systemScheduler` or an injected scheduler that satisfies the same contract."
+                  }
+                ]
+              },
+              {
+                "id": "error-use-codes-to-decide-how-to-handle-a-failure",
+                "heading": "/error: use codes to decide how to handle a failure",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "An error's `source` identifies its owner, and `code` identifies the failure within that owner. These are the keys and values of `UtilsErrorCode`. Attaching a code preserves native types such as `TypeError` and `RangeError`; do not depend on message wording."
+                  },
+                  {
+                    "type": "list",
+                    "items": [
+                      "`invalidArgument` / `INVALID_ARGUMENT`: an argument has the wrong type or range; correct it before calling again.",
+                      "`nonErrorValue` / `NON_ERROR_VALUE`: `toError()` wrapped a thrown value that was not an error; its original value is on `cause`.",
+                      "`envUnsupported` / `ENV_UNSUPPORTED`: a required host capability is missing; use a suitable host or inject an implementation.",
+                      "`aborted` / `ABORTED`: an operation observed cooperative cancellation; the original reason remains on the error chain.",
+                      "`deadlineExceeded` / `DEADLINE_EXCEEDED`: an operation, attempt or total deadline expired; inspect `scope` and `timeoutMs` before choosing whether to retry.",
+                      "`schedulerRunaway` / `SCHEDULER_RUNAWAY`: one virtual-clock advance ran more than 10000 callbacks; check for tasks that keep scheduling work at the same time.",
+                      "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`: incoming fields conflict with an existing identity; retain the original identity and choose a conflict policy explicitly.",
+                      "`errorChainInvalid` / `ERROR_CHAIN_INVALID`: a serialized error tree violates its field, depth, count or byte limits; correct the boundary input.",
+                      "`cloneUnsupported` / `CLONE_UNSUPPORTED`: structured cloning rejected the value; convert it to cloneable data first.",
+                      "`invalidEncoding` / `INVALID_ENCODING`: encoded bytes or text are malformed; use the reported position to correct the input.",
+                      "`limiterClosed` / `LIMITER_CLOSED`: a closed concurrency limiter cannot accept new tasks; create a new limiter.",
+                      "`reentrantCall` / `REENTRANT_CALL`: a non-reentrant operation was called again while it was running; move the nested call outside that execution.",
+                      "`configUnsupported` / `CONFIG_UNSUPPORTED`: a config root, field or value is outside the supported domain; supply data accepted by the selected profile.",
+                      "`configReadonly` / `CONFIG_READONLY`: a caller tried to modify read-only config; derive a new config through a patch or merge.",
+                      "`configConflict` / `CONFIG_CONFLICT`: config sources, profiles or ownership disagree; reconcile their constraints first.",
+                      "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`: the config graph exceeded a bound, or a limit option is invalid; reduce the input and check the limits.",
+                      "`configPathInvalid` / `CONFIG_PATH_INVALID`: a config path or key is malformed or unsafe; correct the path.",
+                      "`configParseFailed` / `CONFIG_PARSE_FAILED`: `ConfigOwner.from()` received a non-string or invalid JSON; the original parser error stays on `cause`.",
+                      "`configSourceFailed` / `CONFIG_SOURCE_FAILED`: a source supplied to `ConfigOwner.fromAsync()` failed; its rejection stays on `cause`, and the caller chooses whether to retry or use defaults.",
+                      "`configValueMissing` / `CONFIG_VALUE_MISSING`: `ConfigOwner.require()` found no value at the path; supply it or use `getOr()` with an explicit fallback.",
+                      "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`: a validator rejected the next config; the previous one stays committed and the validator error stays on `cause`.",
+                      "`objectPathInvalid` / `OBJECT_PATH_INVALID`: an object path or one of its segments is invalid; correct the path input.",
+                      "`formatInvalid` / `FORMAT_INVALID`: template syntax or interpolation is invalid; check the template and its values.",
+                      "`formatValueMissing` / `FORMAT_VALUE_MISSING`: strict template formatting could not find a placeholder's value; supply that data.",
+                      "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`: `Intl.NumberFormat` rejected a locale, currency, option or number; correct the formatting arguments."
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "bytes-where-bytes-live-and-which-part-a-view-sees",
+                "heading": "/bytes: where bytes live and which part a view sees",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "An `ArrayBuffer` holds raw contiguous memory; it cannot be read or written by numeric index itself. A `Uint8Array` is a view of that memory as unsigned 8-bit integers, each from 0 to 255."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "In `new Uint8Array(buffer, byteOffset, length)`, `byteOffset` selects the starting byte. This constructor does not copy the data, so several views can read and write the same underlying `ArrayBuffer`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Use `slice()` for an independent copy and `subarray()` for a shared window. Writing through the window changes the original array; writing through the copy does not. `SharedArrayBuffer` shares memory across execution environments and has different concurrency semantics, so it is not an isolated copy of an ordinary buffer."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "const buffer = new ArrayBuffer(4)\nconst bytes = new Uint8Array(buffer)\nbytes[1] = 42\n/** Borrows the second and third bytes so window writes reach the original storage. */\nconst shared = bytes.subarray(1, 3)\n/** Retains the value before the window changes, to contrast copying with sharing. */\nconst copied = shared.slice()\nshared[0] = 7\nconsole.log(bytes[1], copied[0], shared.byteOffset) // 7 42 1"
+                  }
+                ]
+              },
+              {
+                "id": "object-distinguish-missing-fields-failed-reads-and-copying-policies",
+                "heading": "/object: distinguish missing fields, failed reads and copying policies",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "The first argument to `probeProperty(value, key)` is the object to read. It can be a plain object, a class instance or another object with readable properties."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "A missing field and a failed field read have separate outcomes: `missing` can use a business default, while `failed` requires handling the original error. The successful `value` branch consumes the value that was read. Checking the result does not require reading the field again, so a getter runs only once."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { probeProperty } from '@migaia/utils/object'\n\n/** The failed branch must report this original error rather than construct another. */\nconst profileUnavailable = new Error('profile unavailable')\n/** Makes the getter's read side effect visible. */\nlet profileReads = 0\n/** Supplies a readable field, a missing field and a throwing getter. */\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1\n    throw profileUnavailable\n  }\n}\n\n/** Reports the original failure; only a missing field uses the default label. */\nfunction readLabel(value: object, key: PropertyKey): string {\n  /** Branches on this retained outcome without reading the input field again. */\n  const result = probeProperty<string>(value, key)\n  switch (result.kind) {\n    case 'value':\n      return result.value\n    case 'missing':\n      return 'Anonymous'\n    case 'failed':\n      console.error('property read failed', result.error)\n      return 'Unavailable'\n  }\n}\n\nconsole.log(readLabel(user, 'name')) // Ada: consumes the successful value\nconsole.log(readLabel(user, 'email')) // Anonymous: uses the missing-field default\nconsole.log(readLabel(user, 'profile')) // Unavailable: reports the getter's original failure\nconsole.log(profileReads) // 1: checking the result did not invoke the getter again"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`immutableSnapshot(value)` calls the host's `globalThis.structuredClone()` without passing through a JSON string. It preserves cycles and shared references within the graph and supports native cloneable types such as `Date`, `Map`, `Set`, `ArrayBuffer` and TypedArray."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "It does not preserve a custom class's prototype methods, getters/setters or property descriptors. No transfer list is supplied, so `ArrayBuffer` contents are copied and the source is not detached, the unusable state that follows an ownership transfer."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The function does not call `Object.freeze()`; the returned object remains mutable. Native `structuredClone(value)` works on the whole graph or fails: one unsupported member rejects the clone. `immutableSnapshot(value)` throws `ENV_UNSUPPORTED` when the host lacks the capability, or `CLONE_UNSUPPORTED` when the value cannot be cloned."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { immutableSnapshot } from '@migaia/utils/object'\n\n/** Both fields refer to one node so the example exposes alias preservation. */\nconst shared = { count: 1 }\nconst source = { primary: shared, alias: shared, createdAt: new Date('2026-01-01T00:00:00Z') }\n/** Only the source changes later, exposing isolation and sharing within the copy. */\nconst copy = immutableSnapshot(source)\nsource.primary.count = 2\nconsole.log(copy.primary.count) // 1: changing the source did not change the copy\nconsole.log(copy.primary === copy.alias) // true: the shared reference within the graph survives\nconsole.log(copy.createdAt instanceof Date, Object.isFrozen(copy)) // true false"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`diagnosticSnapshot(value)` projects plain objects, arrays and cloneable built-in subtrees without first cloning the complete graph. Unsupported functions or instances keep their original references, and `diagnostics` records their locations and reasons."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`structuredDiagnosticSnapshot(value)` tries native `structuredClone` first; when cloning fails or the host lacks it, it falls back to that best-effort copy and retains diagnostics about the degradation. These policies suit logs and similar consumers that accept partial copies."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "When `diagnostics` is nonempty, check which parts degraded; do not describe the result as a completely isolated snapshot."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { diagnosticSnapshot } from '@migaia/utils/object'\n\n/** An uncloneable leaf demonstrates the diagnostic policy's reference fallback. */\nconst callback = () => 'ready'\nconst { value, diagnostics } = diagnosticSnapshot({ label: 'job', callback })\nconsole.log(value.callback === callback) // true: the unsupported function keeps its reference\nconsole.log(diagnostics.length > 0) // true: the caller can detect this lack of isolation"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`identitySnapshot` returns the original object; calling it alone has no runtime benefit. It is the zero-copy choice in a configurable snapshot policy, the function that decides how a retained value is copied. Choosing it accepts shared references."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Use it only inside a trusted process for objects whose identity matters, or which cannot be cloned, when shared ownership is acceptable. For isolating outside input, retaining historical state or crossing a boundary, choose `immutableSnapshot` and handle cloning failures."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { identitySnapshot } from '@migaia/utils/object'\n\n/** Settings that the application still modifies make shared ownership observable. */\nconst liveConfig = { retry: 2 }\n/** This retention policy explicitly accepts the original reference and later changes. */\nconst snapshotPolicy = identitySnapshot\n/** Retained for a later read that reveals the effects of shared references. */\nconst retained = snapshotPolicy(liveConfig)\nliveConfig.retry = 3\nconsole.log(retained.retry, retained === liveConfig) // 3 true: still the same object"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "For path updates, immutable describes how the update is made: `set()` neither deep-copies the whole tree nor calls `Object.freeze()`. An actual value change returns a new root. If `Object.is()` considers the old and new values equal, the original root is returned directly."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { set } from '@migaia/utils/object'\n\n/** Keeps the changed path and an untouched sibling in one input tree. */\nconst data = { user: { name: 'Ada' }, settings: { theme: 'dark' } }\n/** Changes only user.name so branch identities reveal the extent of copying. */\nconst next = set(data, 'user.name', 'Grace')\nconsole.log(next.user !== data.user) // true: objects along the path were shallow-copied\nconsole.log(next.settings === data.settings) // true: the unchanged branch is still shared\nconsole.log(data.user.name, next.user.name) // Ada Grace\nconsole.log(set(data, 'user.name', 'Ada') === data) // true: an equal value reuses the root"
+                  }
+                ]
+              },
+              {
+                "id": "config-accept-config-expose-reads-and-derive-its-successor",
+                "heading": "/config: accept config, expose reads and derive its successor",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`ownConfig` is the boundary for outside config: it copies the input and records independently verifiable ownership. A `WeakMap`, a metadata table that adds no fields to the config, retains its `profile` and `limits`. An ordinary object cannot claim admission by forging a field. The default `data` profile accepts data; `richRuntime` also admits callbacks or factories."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** Original config that its caller continues to change after admission. */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** Isolates both records and collections, then serves as the base for config operations. */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false: the Set was copied too\n/** Gives readers protected access to the previous config. */\nconst view = readonlyConfig(config)\n/** Produces new retry settings while existing readers retain the old values. */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** Distinguishes a missing path from a present path whose value is undefined. */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2: the previous config is unchanged"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The object returned by `ownConfig` is not frozen; ownership and public read-only access are separate concerns. `readonlyConfig` protects the existing config while reads still access its data, without making another copy."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Callers cannot change any level: mutating methods such as `Map.set()`, `Set.add()` and `Date.setFullYear()` throw as well. Expose this view for reads and use `patchConfig()` to produce the next managed config instead of writing to `view`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Use `readConfigPath` when a missing path must be distinguished from a value of `undefined`. Patches affect root fields only; calculate a new nested subtree first, then supply it as a whole patch value. A `richRuntime` config carrying functions is runtime config and should not be treated as serializable data."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`combineConfig` merges sources in order, with later sources overriding earlier ones. Records merge recursively by default, and arrays are replaced. The example explicitly chooses array concatenation and shows both inputs, the result and a change record prepared by the caller."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** Supplies the base retry count, tags and transport settings. */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** Overrides selected fields while omitted transport settings retain their defaults. */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** Builds a new config root with explicit record merging and array concatenation. */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** The caller prepares its own change record rather than treating the result as a diff. */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Neither `defaults` nor `override` changes. This `diff` only makes the changes explicit; it is not an extra return value from `combineConfig`."
+                  }
+                ]
+              },
+              {
+                "id": "function-which-instance-owns-an-initialization",
+                "heading": "/function: which instance owns an initialization",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`once(fn)` remembers the first result of a synchronous initialization, including its first thrown error. Each call to `once(fn)` creates a separate cache. Create and export one wrapper at module scope to share it among consumers of that module instance."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { once } from '@migaia/utils/function'\n\n/** One exported wrapper lets all importers of this module use the same cache. */\nexport const getRuntime = once(() => ({ registry: new Map([['help', 'Show help']]) }))\n/** The first read creates this module's runtime instance. */\nconst first = getRuntime()\n/** Later consumers reuse the instance without constructing another registry. */\nconst second = getRuntime()\nconsole.log(first === second) // true: one registry was created"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Repeated module instances and separate realms, execution environments with their own globals such as iframes, Workers and Node `vm`, do not share this cache. `once` does not ensure global uniqueness."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Let an application entry point or dependency-injection container own an instance that must be shared within one environment. If the application chooses a global location such as `globalThis[Symbol.for('your-app/runtime')]`, it must also manage versions, disposal and test cleanup."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "A `Proxy` can turn the first property access into lazy initialization, but uniqueness still depends on where the instance is stored and how many owners create it. Avoid `once` for initialization that needs retries, resets, hot updates or isolation per request."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`onceAsync` suits startup config that never refreshes, a shared SDK client, or dynamically importing and compiling one WASM module. The first call retains a Promise, and other callers reuse it both while it runs and after it settles."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { onceAsync } from '@migaia/utils/function'\n\n/** Shares fixed startup config; returning data directly keeps this example self-contained. */\nexport const loadAppConfig = onceAsync(async () => ({ apiBaseUrl: '/api' }))\nconst [routerConfig, telemetryConfig] = await Promise.all([loadAppConfig(), loadAppConfig()])\nconsole.log(routerConfig === telemetryConfig) // true: both received one initialization result"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The first failure stays cached, and there is no reset. Put required retries inside the wrapped initializer. For refreshing, rebuilding after logout or isolating work per tenant or request, use a container with that lifecycle."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "If the shared task uses one caller's cancellation signal, that caller's cancellation affects every other waiter too. Each wrapper has its own cache; duplicated module instances, iframes, Workers and Node `vm` do not share it."
                   }
                 ]
               }

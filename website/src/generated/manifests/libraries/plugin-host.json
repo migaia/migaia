@@ -66,7 +66,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.dispose()"
+                "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
               },
               {
                 "type": "paragraph",
@@ -496,6 +496,23 @@
               },
               {
                 "type": "paragraph",
+                "text": "把这三个 symbol 作为 stage 返回值时，它们是控制信号，不是业务数据。"
+              },
+              {
+                "type": "paragraph",
+                "text": "下面把输入 `migaia` 转成大写，再加上方括号。第一步返回 `GENERATOR_CONTINUE`，让最后一次 yield 的值进入第二步；第二步直接返回最终字符串。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { defineHost } from '@migaia/plugin-host'\nimport { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\n/** 这个宿主持有两步字符串转换与它们的释放责任。 */\nconst textHost = defineHost<Record<never, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: MiddlewarePipelineMode.generator }\n  }\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  return `[${value}]`\n})\ntextHost.runPipeline('migaia', (value) => console.log(value))\nawait textHost.dispose()"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `[MIGAIA]`：第二个 stage 收到 `MIGAIA`，完成回调收到加上方括号后的结果。中间 yield 不会逐个触发下游。"
+              },
+              {
+                "type": "paragraph",
                 "text": "执行中（含外层尚未结束的嵌套调用）注册新 stage 抛 PIPELINE_EXECUTING。每次运行捕获已准入 stage；slot 按首次分配顺序与 Host stage 排列，禁用、恢复、替换不重排。新运行不再取得已撤销代，旧运行用自己的 lease 完成或协作退出。"
               },
               {
@@ -540,7 +557,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "composition owner 可读取 revision/getCurrentSnapshot()，通过 createPluginAdmission 捕获定义、createDataOrderSlot(name) 保留 opaque 排序槽，再 prepareAdmissions([{ admission, slot }])。setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开。commitPreparedAdmissions 同步发布、不执行用户代码，revision 已变化则拒绝；discardPreparedAdmissions 对暂存资源只回滚一次。返回 registration token 精确指向那次安装，不按名称误删新代。"
+                "text": "revision 是 Host 已提交修改的版本号，不是尝试操作的次数。composition owner 可读取 revision/getCurrentSnapshot()，通过 createPluginAdmission 捕获定义、createDataOrderSlot(name) 保留 opaque 排序槽，再 prepareAdmissions([{ admission, slot }])。setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开。commitPreparedAdmissions 同步发布、不执行用户代码，revision 已变化则拒绝；discardPreparedAdmissions 对暂存资源只回滚一次。返回 registration token 精确指向那次安装，不按名称误删新代。"
               },
               {
                 "type": "paragraph",
@@ -548,7 +565,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；要真实释放，应观察全部 physicalCompletion，或由拥有 realm 的外层终止其实际执行环境。"
+                "text": "托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；确认物理释放前，应等待全部 physicalCompletion 延续完成，或由拥有 realm 的外层终止其实际执行环境。"
               },
               {
                 "type": "paragraph",
@@ -1602,7 +1619,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => 'hello' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.dispose()"
+                  "code": "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => 'hello' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2091,6 +2108,23 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "When returned from a stage, these three symbols control traversal rather than represent business data."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "This example uppercases the input `migaia`, then adds square brackets. The first stage returns `GENERATOR_CONTINUE` to pass its last yielded value to the second stage; the second returns the final string directly."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\n/** This host owns the two string transformations and their cleanup. */\nconst textHost = defineHost<Record<never, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: MiddlewarePipelineMode.generator }\n  }\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\ntextHost.useGeneratorPipeline(function* (value) {\n  return `[${value}]`\n})\ntextHost.runPipeline('migaia', (value) => console.log(value))\nawait textHost.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "It prints `[MIGAIA]`: the second stage receives `MIGAIA`, and the completion callback receives the bracketed result. Intermediate yields do not invoke downstream stages individually."
+                },
+                {
+                  "type": "paragraph",
                   "text": "Registering stages while any nested run remains active throws PIPELINE_EXECUTING. A run captures its admitted stages. Host stages and plugin slots follow first-allocation order; disabling, restoring, and replacing retain positions. New runs do not acquire revoked generations; old runs retain their leases until completion or cooperative exit."
                 },
                 {
@@ -2135,7 +2169,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "A composition owner reads revision/getCurrentSnapshot(), captures definitions with createPluginAdmission, reserves opaque positions with createDataOrderSlot(name), then calls prepareAdmissions([{ admission, slot }]). Setup may execute, but candidate extensions, config, Features, and stages remain unpublished. commitPreparedAdmissions is synchronous without user code and rejects stale revisions. discardPreparedAdmissions rolls temporary resources back once. Returned registration tokens identify exact installations rather than whichever plugin currently has a name."
+                  "text": "revision is the Host's committed modification version, not a count of attempted operations. A composition owner reads revision/getCurrentSnapshot(), captures definitions with createPluginAdmission, reserves opaque positions with createDataOrderSlot(name), then calls prepareAdmissions([{ admission, slot }]). Setup may execute, but candidate extensions, config, Features, and stages remain unpublished. commitPreparedAdmissions is synchronous without user code and rejects stale revisions. discardPreparedAdmissions rolls temporary resources back once. Returned registration tokens identify exact installations rather than whichever plugin currently has a name."
                 },
                 {
                   "type": "paragraph",
@@ -2143,7 +2177,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Observe all physicalCompletion continuations for physical release, or let the outer realm owner terminate its actual execution environment."
+                  "text": "Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Wait for every physicalCompletion continuation to finish before treating physical release as complete, or let the outer realm owner terminate its actual execution environment."
                 },
                 {
                   "type": "paragraph",
@@ -3494,7 +3528,8 @@
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst settings = { limit: 3 }\nconst definition = definePlugin({\n  name: 'meter',\n  config: { settings },\n  install: () => ({})\n})\nsettings.limit = 99\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nawait host.use(definition)\nconsole.log(host.config.get('meter.settings.limit'))\nconsole.log(Object.isFrozen(definition.config), Object.isFrozen(definition.config?.settings))\nawait host.dispose()",
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst released: string[] = []\nconst resource = definePlugin({\n  name: 'resource',\n  install: (core) => {\n    core.onDispose(() => {\n      released.push('先取得')\n    })\n    core.onDispose(() => {\n      released.push('后取得')\n    })\n    return {}\n  },\n  dispose: () => {\n    released.push('插件')\n  }\n})\nawait host.use(resource)\nconst closing = host.dispose()\nconsole.log(host.dispose() === closing)\nawait closing\nconsole.log(released.join(','))\nawait host.dispose()\nconsole.log(released.length)",
             "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst order: string[] = []\nconst output = { read: () => 42 }\nlet sameOutput = false\nconst cache = defineFeature(() => {\n  order.push('提供方')\n  return output\n})\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => {\n    order.push('消费方')\n    sameOutput = dependencies.cache === output\n    return { read: () => dependencies.cache.read() }\n  },\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({ name: 'consumer', features: { summary }, install: () => ({}) })\nconst [consumerHandle, providerHandle] = await host.use(consumer, provider)\nconsole.log(order.join(' -> '))\nconsole.log(sameOutput)\nconsole.log(consumerHandle.name, providerHandle.name)\nawait host.dispose()",
-            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()"
+            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()",
+            "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -3936,7 +3971,7 @@
               ]
             }
           ],
-          "usageScore": 170,
+          "usageScore": 180,
           "configuration": [
             {
               "name": "host",
@@ -4139,7 +4174,8 @@
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst settings = { limit: 3 }\nconst definition = definePlugin({\n  name: 'meter',\n  config: { settings },\n  install: () => ({})\n})\nsettings.limit = 99\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nawait host.use(definition)\nconsole.log(host.config.get('meter.settings.limit'))\nconsole.log(Object.isFrozen(definition.config), Object.isFrozen(definition.config?.settings))\nawait host.dispose()",
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst released: string[] = []\nconst resource = definePlugin({\n  name: 'resource',\n  install: (core) => {\n    core.onDispose(() => {\n      released.push('先取得')\n    })\n    core.onDispose(() => {\n      released.push('后取得')\n    })\n    return {}\n  },\n  dispose: () => {\n    released.push('插件')\n  }\n})\nawait host.use(resource)\nconst closing = host.dispose()\nconsole.log(host.dispose() === closing)\nawait closing\nconsole.log(released.join(','))\nawait host.dispose()\nconsole.log(released.length)",
             "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst order: string[] = []\nconst output = { read: () => 42 }\nlet sameOutput = false\nconst cache = defineFeature(() => {\n  order.push('提供方')\n  return output\n})\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => {\n    order.push('消费方')\n    sameOutput = dependencies.cache === output\n    return { read: () => dependencies.cache.read() }\n  },\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({ name: 'consumer', features: { summary }, install: () => ({}) })\nconst [consumerHandle, providerHandle] = await host.use(consumer, provider)\nconsole.log(order.join(' -> '))\nconsole.log(sameOutput)\nconsole.log(consumerHandle.name, providerHandle.name)\nawait host.dispose()",
-            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()"
+            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()",
+            "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
           ],
           "members": [],
           "composes": [],

@@ -188,7 +188,15 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。"
+                "text": "`createEventChannel<T, R>()` 中，`T` 是发布载荷类型，`R` 是监听器结果类型。指定结果类型不会改变 channel 的订阅模型，也不会创建全局任务表。"
+              },
+              {
+                "type": "paragraph",
+                "text": "基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文，原始载荷放在 `event.value`；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。"
+              },
+              {
+                "type": "paragraph",
+                "text": "公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 是调用方给本次登记起的标签；返回的 `subscription` 负责取消并可追加订阅。"
               },
               {
                 "type": "paragraph",
@@ -217,7 +225,23 @@
               },
               {
                 "type": "paragraph",
-                "text": "订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。"
+                "text": "`invokeParallelSettled(channel, payload)` 按登记顺序返回结算项：`{ status: 'fulfilled', value }` 的 `value` 是监听器兑现后的返回值；`{ status: 'rejected', reason }` 的 `reason` 是监听器原始的抛错或拒绝原因。这些字段描述监听器执行结果，不是消息发送回执。"
+              },
+              {
+                "type": "paragraph",
+                "text": "订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。"
+              },
+              {
+                "type": "paragraph",
+                "text": "设置 `style: 'on-emit'` 后，`channel.on(listener)` 登记监听器并返回本次订阅的句柄，`channel.emit(value)` 按所选派发策略把 value 交给当前快照中的监听器。默认 handle 取消策略下，句柄的 `off()` 只移除它拥有的登记。`on`、`emit`、`off` 分别与 `subscribe`、`publish`、`unsubscribe` 指向同一函数；canonical（固定原名）方法仍保留。"
+              },
+              {
+                "type": "paragraph",
+                "text": "从 `@migaia/event-subscriber/subscriber` 导入的 `subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` 只通过 `channel.subscribe(listener, options?)` 工作，不读取 style 配置，因此可以接收仍保留该方法的 styled channel（增加命名别名的通道）。它们的返回值固定为普通 `IUnsubscribe`，即同步、幂等的取消函数，不带 `off`、`dispose`、`unlisten` 或订阅链方法。"
+              },
+              {
+                "type": "paragraph",
+                "text": "对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。旧草案中的抽象类 `EventSubscriber`、静态 `EVENT_NAME` 与 `onCall()` 不属于当前公开契约，不把事件名重复存进 class。"
               },
               {
                 "type": "paragraph",
@@ -1178,7 +1202,15 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener. The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` names the registration. The returned subscription cancels its registrations and can extend the chain."
+                  "text": "In `createEventChannel<T, R>()`, `T` is the published payload type and `R` is the listener result type. Specifying a result type keeps the same channel subscription model and creates no global task registry."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts, with the original payload in `event.value`; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` is a caller-chosen label for this registration. The returned subscription cancels its registrations and can extend the chain."
                 },
                 {
                   "type": "paragraph",
@@ -1207,7 +1239,23 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads."
+                  "text": "`invokeParallelSettled(channel, payload)` returns outcomes in registration order: the `value` in `{ status: 'fulfilled', value }` is the listener's awaited return value; the `reason` in `{ status: 'rejected', reason }` is its original thrown value or rejection reason. These fields describe listener execution, not message-send acknowledgments."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With `style: 'on-emit'`, `channel.on(listener)` registers a listener and returns its subscription handle, while `channel.emit(value)` delivers value to the current snapshot under the selected dispatch policy. Under default handle-scoped removal, the handle's `off()` removes only the registrations it owns. `on`, `emit` and `off` are the same functions as `subscribe`, `publish` and `unsubscribe`, respectively; the canonical names remain available."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Import `subscribeOnce`, `subscribeUntil` and `subscribeSubscriber` from `@migaia/event-subscriber/subscriber`. They work only through `channel.subscribe(listener, options?)` without reading style configuration, so they also accept styled channels that retain this method. A styled channel adds naming aliases. Each helper returns a plain `IUnsubscribe`: a synchronous, idempotent cancellation function with no `off`, `dispose`, `unlisten` or chain methods."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. The old draft's abstract `EventSubscriber` class, static `EVENT_NAME` and `onCall()` are outside the current public contract; event names are not repeated on subscriber classes."
                 },
                 {
                   "type": "paragraph",
@@ -2237,7 +2285,7 @@
           ],
           "identity": "packages/event-subscriber/dist/channel.d.ts:createEventChannel:export declare function createEventChannel<T, R, const S extends IEventApiStyle | undefined, const V = undefined>(options: S extends IEventApiStyle ? IStyledEventChannelOptions<T, S, V> : IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, S, V> & (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>);\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'subscribe-publish'; }): ICanonicalEventChannel<T, R>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-emit'; }): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-trigger'; }): ICanonicalEventChannel<T, R, 'on-trigger', V> & IStyledEventChannel<T, R, 'on-trigger', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'listen-fire'; }): ICanonicalEventChannel<T, R, 'listen-fire', V> & IStyledEventChannel<T, R, 'listen-fire', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options?: IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, undefined, V>;",
           "guidance": [],
-          "usageScore": 140,
+          "usageScore": 142,
           "configuration": [
             {
               "name": "report",
@@ -6027,7 +6075,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/async.d.ts:invokeParallelSettled:export declare const invokeParallelSettled: <T, R, V = undefined>(channel: IAsyncChannel<T, R, V>, value: T) => Promise<readonly IListenerResult<R>[]>;",
           "guidance": [],
-          "usageScore": 34,
+          "usageScore": 36,
           "configuration": [],
           "fragment": "event-subscriber-index--invokeParallelSettled"
         },
@@ -6943,7 +6991,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IEventSubscriber:export type IEventSubscriber<T, R = void> = { /** * Handles each delivered context. Its return or failure follows the source channel's dispatch * policy. */ handle(event: IEventContext<T>): R | PromiseLike<R>; };",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IEventSubscriber"
         },
@@ -7006,7 +7054,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IUnsubscribe:export type IUnsubscribe = () => void;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IUnsubscribe"
         },
@@ -7119,7 +7167,7 @@
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [
             {
               "name": "taskId",
@@ -7193,7 +7241,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeSubscriber:export declare const subscribeSubscriber: <T, R>(channel: IEventChannelLike<T, R>, subscriber: { readonly handle?: unknown; }) => IUnsubscribe;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeSubscriber"
         },
@@ -7308,7 +7356,7 @@
               ]
             }
           ],
-          "usageScore": 56,
+          "usageScore": 58,
           "configuration": [
             {
               "name": "taskId",

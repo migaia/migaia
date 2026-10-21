@@ -9158,7 +9158,7 @@
           ],
           "identity": "packages/event-subscriber/dist/channel.d.ts:createEventChannel:export declare function createEventChannel<T, R, const S extends IEventApiStyle | undefined, const V = undefined>(options: S extends IEventApiStyle ? IStyledEventChannelOptions<T, S, V> : IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, S, V> & (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>);\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'subscribe-publish'; }): ICanonicalEventChannel<T, R>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-emit'; }): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-trigger'; }): ICanonicalEventChannel<T, R, 'on-trigger', V> & IStyledEventChannel<T, R, 'on-trigger', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'listen-fire'; }): ICanonicalEventChannel<T, R, 'listen-fire', V> & IStyledEventChannel<T, R, 'listen-fire', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options?: IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, undefined, V>;",
           "guidance": [],
-          "usageScore": 140,
+          "usageScore": 142,
           "configuration": [
             {
               "name": "report",
@@ -12948,7 +12948,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/async.d.ts:invokeParallelSettled:export declare const invokeParallelSettled: <T, R, V = undefined>(channel: IAsyncChannel<T, R, V>, value: T) => Promise<readonly IListenerResult<R>[]>;",
           "guidance": [],
-          "usageScore": 34,
+          "usageScore": 36,
           "configuration": [],
           "fragment": "event-subscriber-index--invokeParallelSettled"
         },
@@ -13864,7 +13864,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IEventSubscriber:export type IEventSubscriber<T, R = void> = { /** * Handles each delivered context. Its return or failure follows the source channel's dispatch * policy. */ handle(event: IEventContext<T>): R | PromiseLike<R>; };",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IEventSubscriber"
         },
@@ -13927,7 +13927,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IUnsubscribe:export type IUnsubscribe = () => void;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IUnsubscribe"
         },
@@ -14040,7 +14040,7 @@
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [
             {
               "name": "taskId",
@@ -14114,7 +14114,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeSubscriber:export declare const subscribeSubscriber: <T, R>(channel: IEventChannelLike<T, R>, subscriber: { readonly handle?: unknown; }) => IUnsubscribe;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeSubscriber"
         },
@@ -14229,7 +14229,7 @@
               ]
             }
           ],
-          "usageScore": 56,
+          "usageScore": 58,
           "configuration": [
             {
               "name": "taskId",
@@ -40425,7 +40425,8 @@
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst settings = { limit: 3 }\nconst definition = definePlugin({\n  name: 'meter',\n  config: { settings },\n  install: () => ({})\n})\nsettings.limit = 99\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nawait host.use(definition)\nconsole.log(host.config.get('meter.settings.limit'))\nconsole.log(Object.isFrozen(definition.config), Object.isFrozen(definition.config?.settings))\nawait host.dispose()",
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst released: string[] = []\nconst resource = definePlugin({\n  name: 'resource',\n  install: (core) => {\n    core.onDispose(() => {\n      released.push('先取得')\n    })\n    core.onDispose(() => {\n      released.push('后取得')\n    })\n    return {}\n  },\n  dispose: () => {\n    released.push('插件')\n  }\n})\nawait host.use(resource)\nconst closing = host.dispose()\nconsole.log(host.dispose() === closing)\nawait closing\nconsole.log(released.join(','))\nawait host.dispose()\nconsole.log(released.length)",
             "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst order: string[] = []\nconst output = { read: () => 42 }\nlet sameOutput = false\nconst cache = defineFeature(() => {\n  order.push('提供方')\n  return output\n})\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => {\n    order.push('消费方')\n    sameOutput = dependencies.cache === output\n    return { read: () => dependencies.cache.read() }\n  },\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({ name: 'consumer', features: { summary }, install: () => ({}) })\nconst [consumerHandle, providerHandle] = await host.use(consumer, provider)\nconsole.log(order.join(' -> '))\nconsole.log(sameOutput)\nconsole.log(consumerHandle.name, providerHandle.name)\nawait host.dispose()",
-            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()"
+            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()",
+            "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -40867,7 +40868,7 @@
               ]
             }
           ],
-          "usageScore": 170,
+          "usageScore": 180,
           "configuration": [
             {
               "name": "host",
@@ -41070,7 +41071,8 @@
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst settings = { limit: 3 }\nconst definition = definePlugin({\n  name: 'meter',\n  config: { settings },\n  install: () => ({})\n})\nsettings.limit = 99\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nawait host.use(definition)\nconsole.log(host.config.get('meter.settings.limit'))\nconsole.log(Object.isFrozen(definition.config), Object.isFrozen(definition.config?.settings))\nawait host.dispose()",
             "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst released: string[] = []\nconst resource = definePlugin({\n  name: 'resource',\n  install: (core) => {\n    core.onDispose(() => {\n      released.push('先取得')\n    })\n    core.onDispose(() => {\n      released.push('后取得')\n    })\n    return {}\n  },\n  dispose: () => {\n    released.push('插件')\n  }\n})\nawait host.use(resource)\nconst closing = host.dispose()\nconsole.log(host.dispose() === closing)\nawait closing\nconsole.log(released.join(','))\nawait host.dispose()\nconsole.log(released.length)",
             "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst order: string[] = []\nconst output = { read: () => 42 }\nlet sameOutput = false\nconst cache = defineFeature(() => {\n  order.push('提供方')\n  return output\n})\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => {\n    order.push('消费方')\n    sameOutput = dependencies.cache === output\n    return { read: () => dependencies.cache.read() }\n  },\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({ name: 'consumer', features: { summary }, install: () => ({}) })\nconst [consumerHandle, providerHandle] = await host.use(consumer, provider)\nconsole.log(order.join(' -> '))\nconsole.log(sameOutput)\nconsole.log(consumerHandle.name, providerHandle.name)\nawait host.dispose()",
-            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()"
+            "import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nlet installs = 0\nconst cache = defineFeature(() => ({ read: () => 42 }))\nconst provider = definePlugin({ name: 'provider', features: { cache }, install: () => ({}) })\nconst summary = defineFeature(\n  (_core, dependencies) => ({\n    read: () => dependencies.cache.read()\n  }),\n  { cache: provider.getFeature('cache') }\n)\nconst consumer = definePlugin({\n  name: 'consumer',\n  features: { summary },\n  install: () => {\n    installs++\n    return {}\n  }\n})\ntry {\n  await host.use(consumer)\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nconsole.log(installs)\nawait host.dispose()",
+            "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst greeting = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: () => '你好' })\n})\nconst [registration] = await host.use(greeting)\nconsole.log(registration.extensions.greet())\nawait host.unUse('greeting')\nawait host.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -60817,7 +60819,8 @@
             "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 2, data, ageMs, remainingTtlMs }\n// 通过安全的 JSON 传输通道发送；若内嵌 HTML，必须采用适合 HTML 上下文的编码。\n// 根据已知传输/存储耗时调整 ageMs/remainingTtlMs。\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})",
             "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n})\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标",
             "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n})",
-            "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle：请求函数还没被调用\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle：同一个实例，没有缓存数据\nconsole.log(await value.promise) // 更新的 generation\nvalue.dispose()"
+            "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle：请求函数还没被调用\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle：同一个实例，没有缓存数据\nconsole.log(await value.promise) // 更新的 generation\nvalue.dispose()",
+            "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
           ],
           "members": [
             {
@@ -61413,7 +61416,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
+                  "text": "构造选项 `autoStart` 默认为 `true`：没有仍有效的 `initialSnapshot` 时，构造函数立即发起第一代请求。传 `autoStart: false` 时不在构造期请求，首次被动读取仍可启动；有效的初始快照会直接复用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。依赖变化何时刷新由传入的 `runtime` 调度决定，默认在微任务中处理。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 每次刷新会创建新的一代，并中止仍在途的上一代的 `signal`；只有当前一代能把结果写入状态。想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 需要暂时停止当前请求、稍后继续使用同一个资源时调用 `cancel()`。正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
                 }
               ]
             },
@@ -61428,7 +61435,7 @@
               ]
             }
           ],
-          "usageScore": 392,
+          "usageScore": 394,
           "configuration": [
             {
               "name": "debugName",
@@ -62007,7 +62014,8 @@
             "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nlet version = 0\n\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 10))\n    version++\n    return `价格表 v${version}`\n  },\n  runtime,\n  { staleWhileRevalidate: true } // 刷新期间继续显示旧数据\n)\n\nconst view = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) {\n    console.log(state.refreshing ? `${state.data}（后台刷新中）` : state.data)\n  }\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // 用户点“刷新”\nruntime.flush() // 让副作用立即看到新结果\nview.dispose()\nprices.dispose()",
             "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\n// 服务端：请求一次，把结果和剩余有效期一起放进页面\nconst onServer = new Resource(async () => ({ name: 'Ada' }), createRuntime(), { ttl: 60_000 })\nawait onServer.promise\nconst html = JSON.stringify(onServer.dehydrate())\nonServer.dispose()\n\n// 浏览器：用页面里的快照创建资源\nlet browserRequests = 0\nconst onClient = new Resource(\n  async () => {\n    browserRequests++\n    return { name: 'Ada' }\n  },\n  createRuntime(),\n  { ttl: 60_000, initialSnapshot: JSON.parse(html) }\n)\n\nconst state = onClient.state\nif (state.status === ResourceStatus.success) console.log(`首屏直接显示：${state.data.name}`)\nconsole.log(`浏览器端请求次数：${browserRequests}`)\nonClient.dispose()",
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n})\n\nuserId.value = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}",
-            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
+            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'",
+            "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
           ],
           "members": [
             {
@@ -198244,7 +198252,7 @@
               ]
             }
           ],
-          "usageScore": 56,
+          "usageScore": 58,
           "configuration": [
             {
               "name": "runtime",
@@ -198266,9 +198274,9 @@
               "name": "warnAsyncActions",
               "type": "boolean",
               "optional": true,
-              "description": "`warnAsyncActions` — `boolean` — 可选 — `false` — 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\"",
+              "description": "1. getter 只读。 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。 2. 异步方法只有第一个 `await` 之前的写入在同一个批次里。 `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。 3. `$batch()` 不是事务。 recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。 4. `$dispose()` 先切换状态再释放。 `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。 5. 构造失败会回滚。 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。 6. 导入时不创建默认 Runtime。 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。 7. StoreResource 的值由它持有。 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。 8. 错误身份。 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。",
               "descriptionEn": "",
-              "descriptionZh": "`warnAsyncActions` — `boolean` — 可选 — `false` — 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
+              "descriptionZh": "1. getter 只读。 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。 2. 异步方法只有第一个 `await` 之前的写入在同一个批次里。 `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。 3. `$batch()` 不是事务。 recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。 4. `$dispose()` 先切换状态再释放。 `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。 5. 构造失败会回滚。 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。 6. 导入时不创建默认 Runtime。 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。 7. StoreResource 的值由它持有。 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。 8. 错误身份。 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。"
             },
             {
               "name": "mutationPolicy",
@@ -198631,7 +198639,7 @@
               ]
             }
           ],
-          "usageScore": 174,
+          "usageScore": 176,
           "configuration": [
             {
               "name": "runtime",
@@ -199803,7 +199811,7 @@
               ]
             }
           ],
-          "usageScore": 24,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "store-light-index--ICreateStoreOptions"
         },
@@ -200655,7 +200663,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStore:export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "store-light-index--IReactiveStore"
         },
@@ -201143,7 +201151,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/reactive-store.d.ts:IStoreDefinition:export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "store-light-index--IStoreDefinition"
         },
@@ -256052,7 +256060,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true },\n});\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 },\n});\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' },\n});\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged;\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },\n};"
+            "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true },\n});\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 },\n});\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' },\n});\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged;\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },\n};",
+            "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
           ],
           "members": [],
           "composes": [],
@@ -256298,9 +256307,41 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 42,
+          "usageScore": 56,
           "configuration": [
             {
               "name": "strategies",
@@ -256610,7 +256651,7 @@
           "declarationLine": 84,
           "source": "packages/utils/dist/config-owner.d.ts",
           "purpose": "Stateful owner of one immutable config snapshot, built on `ownConfig`, `patchConfig`, `combineConfig` and `readonlyConfig`. Every write builds and validates a complete next snapshot before committing it, so a failed write changes nothing; writes return the owner for chaining, reads return deep readonly views typed from the path, and watchers run once per commit. Statics `from`, `fromAsync`, `fromEnv` and `merge` build owners from JSON text, async sources, environment variables and several sources.",
-          "core": "value: Plain root record, copied and validated by `ownConfig`; arrays, symbol keys or unsupported values throw `CONFIG_UNSUPPORTED`.\nA new `ConfigOwner`; a rejected initial value throws `CONFIG_VALIDATION_FAILED`.\nlocked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner.\nvalidate: Validator `(view) => boolean | void` run on construction and before every commit (once per `batch`). Throwing or returning `false` rejects the change with `CONFIG_VALIDATION_FAILED`, the validator error on `cause`.\nNot set: every structurally valid snapshot is accepted.\nSet a validator when structurally valid settings can still violate a business rule. It runs on construction and once per commit; false or a throw rejects the change. Omission accepts structurally valid snapshots.\nreport: Receives errors thrown by `watch()` listeners, so a failing listener is never swallowed and never stops the others.\nNot set: the error is rethrown from a microtask so the host reports it as uncaught.\nSet this callback to route watcher failures to application diagnostics. Other watchers continue when the reporter returns normally. Omission rethrows on a microtask. A reporter throw propagates and stops the notification loop.\nprofile: Validation profile forwarded to `ownConfig`: which values the config may contain.\n`data`: portable plain data only.\nChoose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.\nlimits: Partial `IConfigLimits` forwarded to `ownConfig` (depth, node, key and path bounds).\nNot set: the package default limits apply.",
+          "core": "value: Plain root record, copied and validated by `ownConfig`; arrays, symbol keys or unsupported values throw `CONFIG_UNSUPPORTED`.\nA new `ConfigOwner`; a rejected initial value throws `CONFIG_VALIDATION_FAILED`.\nlocked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, retaining the original source failure on `cause`; `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner.\nvalidate: Validator `(view) => boolean | void` run on construction and before every commit (once per `batch`). Throwing or returning `false` rejects the change with `CONFIG_VALIDATION_FAILED`, the validator error on `cause`.\nNot set: every structurally valid snapshot is accepted.\nSet a validator when structurally valid settings can still violate a business rule. It runs on construction and once per commit; false or a throw rejects the change. Omission accepts structurally valid snapshots.\nreport: Receives errors thrown by `watch()` listeners, so a failing listener is never swallowed and never stops the others.\nNot set: the error is rethrown from a microtask so the host reports it as uncaught.\nSet this callback to route watcher failures to application diagnostics. Other watchers continue when the reporter returns normally. Omission rethrows on a microtask. A reporter throw propagates and stops the notification loop.\nprofile: Validation profile forwarded to `ownConfig`: which values the config may contain.\n`data`: portable plain data only.\nChoose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.\nlimits: Partial `IConfigLimits` forwarded to `ownConfig` (depth, node, key and path bounds).\nNot set: the package default limits apply.",
           "advanced": "Keep one application config that many modules read, change it in place with validated, all-or-nothing writes, and notify only the modules whose path changed.\nBuild the config from JSON text, a remote source or environment variables with `from()`, `fromAsync()` and `fromEnv()`.\nA config that is read once at startup and never changes: `readonlyConfig(ownConfig(value))` is simpler.",
           "parameters": ["value: T", "options: IConfigOwnerOptions<T> (optional)"],
           "parameterDetails": [
@@ -257110,7 +257151,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "value: Plain root record, copied and validated by `ownConfig`; arrays, symbol keys or unsupported values throw `CONFIG_UNSUPPORTED`.\nA new `ConfigOwner`; a rejected initial value throws `CONFIG_VALIDATION_FAILED`.\nlocked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner.\nvalidate: Validator `(view) => boolean | void` run on construction and before every commit (once per `batch`). Throwing or returning `false` rejects the change with `CONFIG_VALIDATION_FAILED`, the validator error on `cause`.\nNot set: every structurally valid snapshot is accepted.\nSet a validator when structurally valid settings can still violate a business rule. It runs on construction and once per commit; false or a throw rejects the change. Omission accepts structurally valid snapshots.\nreport: Receives errors thrown by `watch()` listeners, so a failing listener is never swallowed and never stops the others.\nNot set: the error is rethrown from a microtask so the host reports it as uncaught.\nSet this callback to route watcher failures to application diagnostics. Other watchers continue when the reporter returns normally. Omission rethrows on a microtask. A reporter throw propagates and stops the notification loop.\nprofile: Validation profile forwarded to `ownConfig`: which values the config may contain.\n`data`: portable plain data only.\nChoose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.\nlimits: Partial `IConfigLimits` forwarded to `ownConfig` (depth, node, key and path bounds).\nNot set: the package default limits apply."
+              "content": "value: Plain root record, copied and validated by `ownConfig`; arrays, symbol keys or unsupported values throw `CONFIG_UNSUPPORTED`.\nA new `ConfigOwner`; a rejected initial value throws `CONFIG_VALIDATION_FAILED`.\nlocked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, retaining the original source failure on `cause`; `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner.\nvalidate: Validator `(view) => boolean | void` run on construction and before every commit (once per `batch`). Throwing or returning `false` rejects the change with `CONFIG_VALIDATION_FAILED`, the validator error on `cause`.\nNot set: every structurally valid snapshot is accepted.\nSet a validator when structurally valid settings can still violate a business rule. It runs on construction and once per commit; false or a throw rejects the change. Omission accepts structurally valid snapshots.\nreport: Receives errors thrown by `watch()` listeners, so a failing listener is never swallowed and never stops the others.\nNot set: the error is rethrown from a microtask so the host reports it as uncaught.\nSet this callback to route watcher failures to application diagnostics. Other watchers continue when the reporter returns normally. Omission rethrows on a microtask. A reporter throw propagates and stops the notification loop.\nprofile: Validation profile forwarded to `ownConfig`: which values the config may contain.\n`data`: portable plain data only.\nChoose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.\nlimits: Partial `IConfigLimits` forwarded to `ownConfig` (depth, node, key and path bounds).\nNot set: the package default limits apply."
             },
             {
               "id": "advanced-usage",
@@ -257170,9 +257211,49 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
             }
           ],
-          "usageScore": 42,
+          "usageScore": 48,
           "configuration": [
             {
               "name": "validate",
@@ -260296,7 +260377,7 @@
           "declarationLine": 62,
           "source": "packages/utils/dist/config-owner.d.ts",
           "purpose": "Source accepted by `combine()`, `merge()` and `diff()`: another `ConfigOwner` of any shape or a plain record.",
-          "core": "locked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner.",
+          "core": "locked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, retaining the original source failure on `cause`; `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -260337,7 +260418,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "locked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner."
+              "content": "locked: `true` after `lock()`: every later write throws `CONFIG_READONLY`.\nget: Reads the value at a typed path as a deep readonly view; nested writes through the view throw `CONFIG_READONLY`.\nget.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe value typed from the path, or `undefined` when the path is missing.\ngetOr: Reads a path and falls back when it is missing; an own `undefined` value is returned as is, not replaced.\ngetOr.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\ngetOr.fallback: Value returned when the path is missing.\nThe stored value or `fallback`.\nrequire: Reads a path that must exist; a missing path throws `CONFIG_VALUE_MISSING` naming the path.\nrequire.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nThe stored value, typed from the path.\nread: Reads a path and tells a missing path apart from an own `undefined` value.\nread.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`{ kind: \"missing\" }` or `{ kind: \"value\", value }` (an `IConfigReadResult`).\nhas: Tells whether the path has an own value, which may be `undefined`.\nhas.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\n`true` when the path exists.\nview: Returns a deep readonly view of the current snapshot; structural writes through it throw `CONFIG_READONLY`.\nThe view typed as `IConfigView<T>`; it keeps showing the snapshot it was taken from after later writes.\nselect: Creates a new owner for a record subtree (for example `db`), sharing profile and limits but not listeners, validator or lock state.\nselect.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nA new `ConfigOwner`; a missing path throws `CONFIG_VALUE_MISSING`, a non-record value throws `CONFIG_UNSUPPORTED`.\ndiff: Lists the paths that differ between this snapshot and another owner or plain record, comparing records and arrays key by key.\ndiff.other: A `ConfigOwner` or plain record to compare with, for example a freshly loaded config.\nA frozen array of `IConfigDiffEntry`; `added` means only in `other`, `removed` only in this snapshot.\nequals: Tells whether another owner or plain record holds the same data (deep, own keys).\nequals.other: A `ConfigOwner` or plain record to compare with.\n`true` when `diff(other)` is empty.\nset: Writes one path with copy-on-write; missing intermediate records are created, and an intermediate that is neither a record nor an array throws `CONFIG_PATH_INVALID`.\nset.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\nset.value: New value; its type is checked against the path, with literal leaves widened (`8080` is accepted for a `number`).\nThis owner, for chaining. The write is all-or-nothing: on any error (validation, locked, reentrant) the previous snapshot stays committed.\ndelete: Removes one path; deleting a missing path does nothing, and an array item is removed by index.\ndelete.path: Dot/bracket path typed from the config shape (`server.port`, `items.[0]`), or a pre-split segment list (`[\"server\", \"port\"]`); dangerous keys such as `__proto__` throw `CONFIG_PATH_INVALID`.\npatch: Applies a root-level overlay through `patchConfig`; `CONFIG_DELETE` as a value removes that root key.\npatch.patch: Plain record of root keys to replace or delete.\npatch.options: Optional `IConfigPatchOptions` forwarded to `patchConfig`; omitted keeps the owner’s profile and limits.\ncombine: Merges sources into this owner through `combineConfig`, later sources winning and records merging deeply. Pass a list plus `IConfigCombineOptions` to choose merge strategies. The owner is retyped with the merged shape.\ncombine.sources: Plain records or other owners, merged left to right; or, in the list form, an array of them.\ncombine.options: List form only: `IConfigCombineOptions` (`strategies`, `pathRules`, `onConflict`).\nThis owner retyped as `ConfigOwner<T & merged>`, for chaining; failures leave the previous snapshot.\nbatch: Runs several writes as one commit: the validator and watchers run once at the end. If the callback throws or validation fails, every write of the batch is rolled back. Nested batches join the outer one.\nbatch.fn: Synchronous callback that receives this owner and performs the writes.\nreset: Restores the snapshot captured at construction; watchers fire when it differs from the current one.\nlock: Rejects every later write with `CONFIG_READONLY`; reads keep working. It cannot be undone; use `clone()` for a writable copy.\nThis owner, now locked.\nwatch: Watches the whole snapshot, or one path (called only when data under that path changed). Listeners run after each commit in registration order; a throw goes to `report`, and a write from inside a listener throws `REENTRANT_CALL`.\nwatch.path: Optional path to watch, typed like `get()`; omit it to watch the whole snapshot.\nwatch.listener: Callback `(next, prev)` receiving readonly views of the new and old value (or of the whole snapshot).\nAn idempotent unsubscribe function.\nclone: Creates a new owner with the same snapshot, options and validator; listeners and lock state are not copied.\nAn independent `ConfigOwner` of the same type.\ntoJSON: Converts the current snapshot into JSON data: dates become ISO strings, and values JSON cannot represent (Map, Set, functions) throw `CONFIG_UNSUPPORTED`.\nA plain JSON record; `JSON.stringify(config)` uses it.\ntoString: Formats the current snapshot as JSON text.\ntoString.space: Optional indentation forwarded to `JSON.stringify`.\nThe JSON text of the snapshot.\nfrom: Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.\nfrom.text: JSON text, for example the content of `config.json`.\nfrom.options: Optional `IConfigOwnerParseOptions`.\nA new `ConfigOwner` typed by the generic argument.\nfromAsync: Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, retaining the original source failure on `cause`; `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.\nfromAsync.source: `IConfigAsyncSource`: value, Promise or factory.\nfromAsync.options: Optional `IConfigOwnerAsyncOptions`.\nA Promise of a new `ConfigOwner`.\nfromEnv: Builds a nested config from flat environment variables (`process.env`, `Deno.env.toObject()` or any record). Values stay strings unless `coerce` converts them; conflicting keys such as `APP__DB` and `APP__DB__PORT` throw `CONFIG_CONFLICT`.\nfromEnv.env: Record of variable names to string values.\nfromEnv.options: Optional `IConfigOwnerEnvOptions`.\nA new `ConfigOwner` of the nested record.\nmerge: Merges sources left to right into a new owner, later sources winning and records merging deeply; the result is typed with the merged shape.\nmerge.sources: One or more plain records or owners.\nA new `ConfigOwner`; the inputs are not changed.\nis: Brand check that is `true` only for real `ConfigOwner` instances; objects created from its prototype fail.\nis.value: Any value.\n`true` for an owner."
             },
             {
               "id": "advanced-usage",
@@ -260863,7 +260944,9 @@
             "const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE });\nnext.retries; // 3\n'debug' in next; // false",
             "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true },\n});\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 },\n});\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' },\n});\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged;\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },\n};",
             "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/testing';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);",
-            "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
+            "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });",
+            "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动",
+            "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
           ],
           "members": [],
           "composes": [],
@@ -261162,9 +261245,41 @@
                   "code": "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 116,
+          "usageScore": 136,
           "configuration": [
             {
               "name": "profile",
@@ -261446,7 +261561,8 @@
             "import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'\n\nconst userOptions = { endpoint: 'https://api.example.com', retry: { attempts: 3 }, debug: true }\nconst config = ownConfig(userOptions) // 复制一份，从此与调用方的对象无关\nuserOptions.retry.attempts = 100 // 调用方事后改了自己的对象\nconsole.log('库内看到的重试次数:', config.retry.attempts)\n\nconst view = readonlyConfig(config) // 交给插件的只读视图\ntry {\n  view.retry.attempts = 0\n} catch (error) {\n  console.log('只读视图拒绝修改:', (error as Error).name, (error as { code?: string }).code)\n}\n\n// 生成新配置：改 endpoint，删掉 debug；没改的 retry 直接复用\nconst next = patchConfig(config, { endpoint: 'https://staging.example.com', debug: CONFIG_DELETE })\nconsole.log(next.endpoint, '| debug 还在吗:', 'debug' in next, '| retry 复用:', next.retry === config.retry)",
             "const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE });\nnext.retries; // 3\n'debug' in next; // false",
             "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/testing';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);",
-            "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
+            "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });",
+            "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
           ],
           "members": [],
           "composes": [],
@@ -261755,9 +261871,41 @@
                   "code": "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 110,
+          "usageScore": 122,
           "configuration": [
             {
               "name": "reuseUnchangedRoot",
@@ -261811,7 +261959,9 @@
           "returns": "IConfigReadResult",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [],
+          "examples": [
+            "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+          ],
           "members": [],
           "composes": [],
           "exportPath": "./config",
@@ -262025,9 +262175,41 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 22,
+          "usageScore": 34,
           "configuration": [],
           "fragment": "utils-config--readConfigPath"
         },
@@ -262053,7 +262235,8 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'\n\nconst userOptions = { endpoint: 'https://api.example.com', retry: { attempts: 3 }, debug: true }\nconst config = ownConfig(userOptions) // 复制一份，从此与调用方的对象无关\nuserOptions.retry.attempts = 100 // 调用方事后改了自己的对象\nconsole.log('库内看到的重试次数:', config.retry.attempts)\n\nconst view = readonlyConfig(config) // 交给插件的只读视图\ntry {\n  view.retry.attempts = 0\n} catch (error) {\n  console.log('只读视图拒绝修改:', (error as Error).name, (error as { code?: string }).code)\n}\n\n// 生成新配置：改 endpoint，删掉 debug；没改的 retry 直接复用\nconst next = patchConfig(config, { endpoint: 'https://staging.example.com', debug: CONFIG_DELETE })\nconsole.log(next.endpoint, '| debug 还在吗:', 'debug' in next, '| retry 复用:', next.retry === config.retry)",
-            "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/testing';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);"
+            "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/testing';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);",
+            "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
           ],
           "members": [],
           "composes": [],
@@ -262322,9 +262505,41 @@
                   "text": "`createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并登记入参；`readonlyConfig` 返回带缓存、只能读取不能修改的对象；`patchConfig` 返回一份新的受管理配置，`CONFIG_DELETE` 只在根一层的补丁里生效。"
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 78,
+          "usageScore": 90,
           "configuration": [],
           "fragment": "utils-config--readonlyConfig"
         }
@@ -266946,9 +267161,49 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
             }
           ],
-          "usageScore": 22,
+          "usageScore": 24,
           "configuration": [
             {
               "name": "message",
@@ -267599,6 +267854,46 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
             }
           ],
           "usageScore": 48,
@@ -268043,9 +268338,49 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
             }
           ],
-          "usageScore": 40,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "utils-error--UtilsErrorCode"
         },
@@ -269144,7 +269479,8 @@
           "lifecycleConcurrency": "",
           "examples": [
             "// runtime.ts：整个模块只创建并导出这一份包装函数。\nexport const getRuntime = once(() => {\n  const registry = buildCommandRegistry();\n  return { registry, startedAt: Date.now() };\n});\n\nconst first = getRuntime(); // 创建 registry\nconst second = getRuntime(); // 直接返回 first\nfirst === second; // true",
-            "import { once } from '@migaia/utils/function';\nimport { attachErrorIdentity } from '@migaia/utils/error';\n\nconst initOnce = once(() => {\n  try {\n    return dangerousInit();\n  } catch (error) {\n    throw attachErrorIdentity(error as Error, { source: 'my-module', code: 'INIT_FAILED' });\n  }\n});"
+            "import { once } from '@migaia/utils/function';\nimport { attachErrorIdentity } from '@migaia/utils/error';\n\nconst initOnce = once(() => {\n  try {\n    return dangerousInit();\n  } catch (error) {\n    throw attachErrorIdentity(error as Error, { source: 'my-module', code: 'INIT_FAILED' });\n  }\n});",
+            "import { once } from '@migaia/utils/function'\n\n/** 模块只导出这个包装函数，让所有导入方使用同一份缓存。 */\nexport const getRuntime = once(() => ({ registry: new Map([['help', 'Show help']]) }))\n/** 首次读取创建当前模块的运行实例。 */\nconst first = getRuntime()\n/** 后来的调用者复用实例，不再构造 registry。 */\nconst second = getRuntime()\nconsole.log(first === second) // true：只创建了一份 registry"
           ],
           "members": [],
           "composes": [],
@@ -269215,7 +269551,7 @@
               ]
             }
           ],
-          "usageScore": 52,
+          "usageScore": 68,
           "configuration": [],
           "fragment": "utils-function--once"
         },
@@ -269242,7 +269578,8 @@
           "examples": [
             "import { onceAsync } from '@migaia/utils/function'\n\nlet connects = 0\n// 三个模块启动时都会调用 getDb()，但连接只应建立一次。\nconst getDb = onceAsync(async () => {\n  connects += 1\n  console.log('正在连接数据库……')\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  return { query: (sql: string) => `执行 ${sql}` }\n})\n\nconst [users, orders, reports] = await Promise.all([getDb(), getDb(), getDb()])\nconsole.log('连接次数:', connects, '是同一个连接:', users === orders && orders === reports)\nconsole.log(users.query('select 1'))",
             "import { onceAsync } from '@migaia/utils/function'\n\nlet attempts = 0\nconst loadConfig = onceAsync(async () => {\n  attempts += 1\n  throw new Error('配置服务不可达')\n})\n\nfor (let index = 0; index < 3; index += 1)\n  await loadConfig().catch((error) => console.log(`第 ${index + 1} 次调用:`, error.message))\nconsole.log('实际执行次数:', attempts)",
-            "// app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。\nexport const loadAppConfig = onceAsync(async () => {\n  const response = await fetch('/config');\n  if (!response.ok) throw new Error(`config request failed: ${response.status}`);\n  return response.json() as Promise<{ apiBaseUrl: string }>;\n});\n\nconst [routerConfig, telemetryConfig] = await Promise.all([\n  loadAppConfig(),\n  loadAppConfig()\n]); // 两处共享同一次请求"
+            "// app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。\nexport const loadAppConfig = onceAsync(async () => {\n  const response = await fetch('/config');\n  if (!response.ok) throw new Error(`config request failed: ${response.status}`);\n  return response.json() as Promise<{ apiBaseUrl: string }>;\n});\n\nconst [routerConfig, telemetryConfig] = await Promise.all([\n  loadAppConfig(),\n  loadAppConfig()\n]); // 两处共享同一次请求",
+            "import { onceAsync } from '@migaia/utils/function'\n\n/** 共享不刷新的启动配置；直接返回数据使例子可以独立运行。 */\nexport const loadAppConfig = onceAsync(async () => ({ apiBaseUrl: '/api' }))\nconst [routerConfig, telemetryConfig] = await Promise.all([loadAppConfig(), loadAppConfig()])\nconsole.log(routerConfig === telemetryConfig) // true：两处获得同一次初始化的结果"
           ],
           "members": [],
           "composes": [],
@@ -269297,7 +269634,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/function.d.ts:onceAsync:export declare function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>;",
           "guidance": [],
-          "usageScore": 74,
+          "usageScore": 86,
           "configuration": [],
           "fragment": "utils-function--onceAsync"
         },
@@ -270516,7 +270853,9 @@
           "returns": "IDiagnosticSnapshot<T>",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [],
+          "examples": [
+            "import { diagnosticSnapshot } from '@migaia/utils/object'\n\n/** 不可克隆的叶值，用来展示诊断复制保留引用的分支。 */\nconst callback = () => 'ready'\nconst { value, diagnostics } = diagnosticSnapshot({ label: 'job', callback })\nconsole.log(value.callback === callback) // true：不支持的函数保留原引用\nconsole.log(diagnostics.length > 0) // true：调用方能发现这部分没有隔离"
+          ],
           "members": [],
           "composes": [],
           "exportPath": "./object",
@@ -270570,7 +270909,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object.d.ts:diagnosticSnapshot:export declare function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;",
           "guidance": [],
-          "usageScore": 22,
+          "usageScore": 34,
           "configuration": [],
           "fragment": "utils-object--diagnosticSnapshot"
         },
@@ -270646,7 +270985,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object.d.ts:identitySnapshot:export declare function identitySnapshot<T>(value: T): T;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "utils-object--identitySnapshot"
         },
@@ -270756,7 +271095,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const shared = { count: 1 };\nconst source = {\n  primary: shared,\n  alias: shared,\n  createdAt: new Date('2026-01-01T00:00:00Z')\n};\nconst copy = immutableSnapshot(source);\n\nsource.primary.count = 2;\ncopy.primary.count; // 1\ncopy.primary === copy.alias; // true\ncopy.createdAt instanceof Date; // true\nObject.isFrozen(copy); // false"
+            "const shared = { count: 1 };\nconst source = {\n  primary: shared,\n  alias: shared,\n  createdAt: new Date('2026-01-01T00:00:00Z')\n};\nconst copy = immutableSnapshot(source);\n\nsource.primary.count = 2;\ncopy.primary.count; // 1\ncopy.primary === copy.alias; // true\ncopy.createdAt instanceof Date; // true\nObject.isFrozen(copy); // false",
+            "import { immutableSnapshot } from '@migaia/utils/object'\n\n/** 让两个字段指向同一节点，展示图内别名的复制语义。 */\nconst shared = { count: 1 }\nconst source = { primary: shared, alias: shared, createdAt: new Date('2026-01-01T00:00:00Z') }\n/** 后续只修改源对象，观察独立副本与内部共享关系。 */\nconst copy = immutableSnapshot(source)\nsource.primary.count = 2\nconsole.log(copy.primary.count) // 1：源对象的修改没有写进副本\nconsole.log(copy.primary === copy.alias) // true：共享引用关系被保留\nconsole.log(copy.createdAt instanceof Date, Object.isFrozen(copy)) // true false"
           ],
           "members": [],
           "composes": [],
@@ -270809,7 +271149,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object.d.ts:immutableSnapshot:export declare function immutableSnapshot<T>(value: T): T;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 46,
           "configuration": [],
           "fragment": "utils-object--immutableSnapshot"
         },
@@ -271242,7 +271582,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const profileUnavailable = new Error('profile unavailable');\nlet profileReads = 0;\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1;\n    throw profileUnavailable;\n  }\n};\n\nfunction readLabel(value: object, key: PropertyKey): string {\n  const result = probeProperty<string>(value, key);\n  switch (result.kind) {\n    case 'value':\n      return result.value;\n    case 'missing':\n      return 'Anonymous';\n    case 'failed':\n      console.error('property read failed', result.error);\n      return 'Unavailable';\n  }\n}\n\nreadLabel(user, 'name'); // 'Ada'\nreadLabel(user, 'email'); // 'Anonymous'\nreadLabel(user, 'profile'); // 'Unavailable'\nprofileReads; // 1：getter 只被读取一次"
+            "const profileUnavailable = new Error('profile unavailable');\nlet profileReads = 0;\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1;\n    throw profileUnavailable;\n  }\n};\n\nfunction readLabel(value: object, key: PropertyKey): string {\n  const result = probeProperty<string>(value, key);\n  switch (result.kind) {\n    case 'value':\n      return result.value;\n    case 'missing':\n      return 'Anonymous';\n    case 'failed':\n      console.error('property read failed', result.error);\n      return 'Unavailable';\n  }\n}\n\nreadLabel(user, 'name'); // 'Ada'\nreadLabel(user, 'email'); // 'Anonymous'\nreadLabel(user, 'profile'); // 'Unavailable'\nprofileReads; // 1：getter 只被读取一次",
+            "import { probeProperty } from '@migaia/utils/object'\n\n/** failed 分支应报告这个原始错误，不能重新构造一个。 */\nconst profileUnavailable = new Error('profile unavailable')\n/** 记录 getter 的访问次数，使读取副作用可见。 */\nlet profileReads = 0\n/** 同时提供正常字段、缺失字段与抛错 getter 三类输入。 */\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1\n    throw profileUnavailable\n  }\n}\n\n/** 失败时报告原错误，缺失时才使用默认标签。 */\nfunction readLabel(value: object, key: PropertyKey): string {\n  /** 保存判别结果，后续分支不再读取输入字段。 */\n  const result = probeProperty<string>(value, key)\n  switch (result.kind) {\n    case 'value':\n      return result.value\n    case 'missing':\n      return 'Anonymous'\n    case 'failed':\n      console.error('property read failed', result.error)\n      return 'Unavailable'\n  }\n}\n\nconsole.log(readLabel(user, 'name')) // Ada：读取成功，消费 value\nconsole.log(readLabel(user, 'email')) // Anonymous：字段不存在，走业务默认值\nconsole.log(readLabel(user, 'profile')) // Unavailable：getter 异常被显式上报\nconsole.log(profileReads) // 1：没有为了判断结果而重复触发 getter"
           ],
           "members": [],
           "composes": [],
@@ -271302,7 +271643,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object.d.ts:probeProperty:export declare function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "utils-object--probeProperty"
         },
@@ -271458,7 +271799,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object.d.ts:structuredDiagnosticSnapshot:export declare function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "utils-object--structuredDiagnosticSnapshot"
         }
@@ -272217,9 +272558,49 @@
                   "code": "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
                 }
               ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
             }
           ],
-          "usageScore": 130,
+          "usageScore": 138,
           "configuration": [],
           "fragment": "utils-object-path--get"
         },
@@ -274214,7 +274595,8 @@
             "const before = { user: { name: 'Ada', tags: ['a'] } };\nconst after = set(before, 'user.name', 'Grace');\nafter.user.name; // 'Grace'\nafter !== before; // true（发生更新时返回新根对象）\nafter.user !== before.user; // true（更新路径上的节点被复制）\nafter.user.tags === before.user.tags; // true（未涉及的分支保持引用不变）\nbefore.user.name; // 'Ada'（原对象未被修改）\nObject.isFrozen(after); // false（immutable update 不等于冻结）",
             "const accessor = createPathAccessor(\n  { count: 0 },\n  { onSet: (event) => console.log('write', event.originKey, event.value) }\n);\naccessor.set('count', 5); // 打印 write count 5\naccessor.value; // { count: 5 }",
             "import { ConfigOwner } from '@migaia/utils/config'\n\nconst config = new ConfigOwner(defaults, { validate: (value) => value.server.port > 0 })\nconfig.set('server.port', 8080).patch({ debug: true }).combine({ cache: { ttl: 60 } })\nconfig.require('server.port')            // 缺失时抛 CONFIG_VALUE_MISSING\nconst stop = config.watch('server.port', (next, prev) => restart(next))\n\nconst fromText = ConfigOwner.from<IAppConfig>(text)                       // 非法 JSON：CONFIG_PARSE_FAILED\nconst remote = await ConfigOwner.fromAsync(({ signal }) => fetch(url, { signal }).then((r) => r.text()), {\n  timeoutMs: 5000\n})                                                                        // 源失败：CONFIG_SOURCE_FAILED\nconst env = ConfigOwner.fromEnv(process.env, { prefix: 'APP__', key: (s) => s.toLowerCase() })",
-            "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
+            "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });",
+            "import { set } from '@migaia/utils/object'\n\n/** 把更新路径与未修改的兄弟分支放在同一棵树上。 */\nconst data = { user: { name: 'Ada' }, settings: { theme: 'dark' } }\n/** 只改 user.name，以两个分支的身份显示复制范围。 */\nconst next = set(data, 'user.name', 'Grace')\nconsole.log(next.user !== data.user) // true：路径上的对象被浅拷贝\nconsole.log(next.settings === data.settings) // true：未修改分支继续共享引用\nconsole.log(data.user.name, next.user.name) // Ada Grace\nconsole.log(set(data, 'user.name', 'Ada') === data) // true：同值更新复用原根"
           ],
           "members": [],
           "composes": [],
@@ -274486,9 +274868,41 @@
                   "code": "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 142,
+          "usageScore": 158,
           "configuration": [],
           "fragment": "utils-object-path--set"
         }
@@ -275025,7 +275439,7 @@
               ]
             }
           ],
-          "usageScore": 34,
+          "usageScore": 36,
           "configuration": [],
           "fragment": "utils-promise--deferred"
         },
@@ -276077,7 +276491,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/promise.d.ts:IDeferred:export type IDeferred<T> = { readonly promise: Promise<T>; readonly resolve: (value: T | PromiseLike<T>) => void; readonly reject: (reason?: unknown) => void; };",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "utils-promise--IDeferred"
         },
@@ -276900,9 +277314,41 @@
                   "text": "`combineErrors` 在没有失败时返回 `undefined`，只有一个失败时返回它本身，多个失败时合并成 `AggregateError`。"
                 }
               ]
+            },
+            {
+              "id": "config-先接纳配置-再公开读取和派生新配置",
+              "heading": "/config：先接纳配置，再公开读取和派生新配置",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 是接收外部配置的边界：复制输入并登记独立、可验证所有权。`WeakMap` 是不往配置上添加字段的元数据表，库用它保留 `profile` 与 `limits`；普通对象不能通过伪造字段变成已接纳的配置。默认 `data` 档位接纳数据，`richRuntime` 还允许回调或工厂。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ownConfig, patchConfig, readConfigPath, readonlyConfig } from '@migaia/utils/config'\n\n/** 传入后仍由调用方继续修改的原配置。 */\nconst callerOptions = { retry: { attempts: 2 }, labels: new Set(['stable']) }\n/** 接纳时隔离对象与集合，后续配置操作都以它为基准。 */\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\ncallerOptions.labels.add('changed')\nconsole.log(config.retry.attempts, config.labels.has('changed')) // 2 false：Set 也已复制\n/** 给读取方保留旧配置的只读访问。 */\nconst view = readonlyConfig(config)\n/** 生成新的重试设置，旧配置的读取方继续使用原值。 */\nconst next = patchConfig(config, { retry: { attempts: 3 } })\n/** 显式区分路径缺失与该路径存在但值为空的情况。 */\nconst result = readConfigPath(next, 'retry.attempts')\nif (result.kind === 'value') console.log(result.value) // 3\nconsole.log(view.retry.attempts) // 2：旧配置没有被改动"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig` 返回对象没有被冻结；获得所有权和公开只读访问是两件事。`readonlyConfig` 给已有配置套上只读保护，正常读取仍访问原数据，没有复制第二份配置，不允许调用方修改任何层级。`Map.set()`、`Set.add()`、`Date.setFullYear()` 等修改方法都会报错。公开读取用它，更新用 `patchConfig()` 生成下一份受管理配置，不是写 `view`；需要区分路径缺失与值为 `undefined` 时用 `readConfigPath`。补丁只作用于根字段，嵌套修改先算出新子树，再整体放入补丁。携带函数的 `richRuntime` 是运行时配置，不应当作可序列化数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`combineConfig` 按输入顺序合并，后面的来源覆盖前面；对象默认递归合并，数组默认替换。下面明确改用数组拼接，展示两个输入、结果与调用方自己整理的变化记录。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { combineConfig, ownConfig } from '@migaia/utils/config'\n\n/** 提供基础重试次数、标签及连接设置。 */\nconst defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\n/** 只指定覆盖项，省略的连接设置仍从基础配置继承。 */\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n/** 用明确的对象合并与数组拼接规则生成新的配置根。 */\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\nconsole.log(merged)\n// { retries: 3, tags: ['default', 'custom'], transport: { timeoutMs: 2500, keepAlive: true } }\n/** 调用方自己整理变化，不把合并结果误作变化报告。 */\nconst diff = { retries: { before: defaults.retries, after: merged.retries } }\nconsole.log(diff) // { retries: { before: 1, after: 3 } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaults` 与 `override` 没有被修改。这里的 `diff` 只是把结果变化写明，不是 `combineConfig` 的额外返回值。"
+                }
+              ]
             }
           ],
-          "usageScore": 190,
+          "usageScore": 220,
           "configuration": [],
           "fragment": "utils-promise--retry"
         },
@@ -277106,7 +277552,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const found = await toPromise(() => cache.get('key'));\nconst pending = toPromise(() => {\n  throw new Error('read failed');\n});\nawait pending; // 异步观察 rejection"
+            "const found = await toPromise(() => cache.get('key'));\nconst pending = toPromise(() => {\n  throw new Error('read failed');\n});\nawait pending; // 异步观察 rejection",
+            "import { toPromise } from '@migaia/utils/promise'\n\n/** 用现成 Promise 比较两种调用方式是否保留身份。 */\nconst pending = Promise.resolve(42)\n/** 同步副作用必须在本次调用返回前生效。 */\nconst immediate = toPromise(() => {\n  console.log('now')\n  return pending\n})\n/** 主动延后工作，调用方得到另一条 Promise 链。 */\nconst later = Promise.resolve().then(() => {\n  console.log('later')\n  return pending\n})\nconsole.log(immediate === pending, later === pending) // true false\nawait later\n// 依次输出 now、true false、later。"
           ],
           "members": [],
           "composes": [],
@@ -277198,7 +277645,7 @@
               ]
             }
           ],
-          "usageScore": 42,
+          "usageScore": 54,
           "configuration": [],
           "fragment": "utils-promise--toPromise"
         },
@@ -279968,7 +280415,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/internal/scheduler.d.ts:systemScheduler:export declare const systemScheduler: IScheduler;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "utils-scheduler--systemScheduler"
         },
@@ -280034,7 +280481,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/internal/scheduler.d.ts:systemWallClock:export declare const systemWallClock: IWallClock;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "utils-scheduler--systemWallClock"
         },
@@ -281071,6 +281518,46 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "error-按代码决定怎样处理失败",
+              "heading": "/error：按代码决定怎样处理失败",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。",
+                    "`nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。",
+                    "`envUnsupported` / `ENV_UNSUPPORTED`：宿主缺少必要能力，换用支持它的环境或注入实现。",
+                    "`aborted` / `ABORTED`：操作收到协作式取消，原取消原因在错误链上。",
+                    "`deadlineExceeded` / `DEADLINE_EXCEEDED`：操作、单次尝试或总流程超时；检查 `scope` 与 `timeoutMs` 再决定是否重试。",
+                    "`schedulerRunaway` / `SCHEDULER_RUNAWAY`：虚拟时钟一次推进执行超过 10000 个回调，检查同一时刻不断排入任务的循环。",
+                    "`errorIdentityConflict` / `ERROR_IDENTITY_CONFLICT`：已有身份与新字段冲突，保留原错误身份，由调用方选择冲突策略。",
+                    "`errorChainInvalid` / `ERROR_CHAIN_INVALID`：序列化错误树不符合字段、深度、数量或字节约束，修正边界输入。",
+                    "`cloneUnsupported` / `CLONE_UNSUPPORTED`：结构化克隆拒绝该值，先转换为可克隆数据。",
+                    "`invalidEncoding` / `INVALID_ENCODING`：字节或文本编码输入不合法，根据错误中的位置修正输入。",
+                    "`limiterClosed` / `LIMITER_CLOSED`：关闭后的并发限制器拒绝新任务，需要创建新限制器。",
+                    "`reentrantCall` / `REENTRANT_CALL`：不允许重入的操作在自身执行期间再次被调用，把嵌套调用移出当前执行过程。",
+                    "`configUnsupported` / `CONFIG_UNSUPPORTED`：配置的根、字段或值不在支持范围内，按所选配置档位提供数据。",
+                    "`configReadonly` / `CONFIG_READONLY`：尝试修改只读配置，改用补丁或合并生成下一份配置。",
+                    "`configConflict` / `CONFIG_CONFLICT`：配置来源、档位或所有权不一致，先统一来源约束。",
+                    "`configLimitExceeded` / `CONFIG_LIMIT_EXCEEDED`：配置图超过上限，或上限选项不合法，缩小输入并检查限制设置。",
+                    "`configPathInvalid` / `CONFIG_PATH_INVALID`：配置路径格式或键名不安全，修正路径。",
+                    "`configParseFailed` / `CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到非字符串或非法 JSON，原解析错误保留在 `cause`。",
+                    "`configSourceFailed` / `CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源失败，原拒绝保留在 `cause`，由调用方选择重试或默认配置。",
+                    "`configValueMissing` / `CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 没找到路径值，补充配置或用 `getOr()` 明确提供默认值。",
+                    "`configValidationFailed` / `CONFIG_VALIDATION_FAILED`：校验器拒绝下一份配置，上一份保持不变，校验错误保留在 `cause`。",
+                    "`objectPathInvalid` / `OBJECT_PATH_INVALID`：对象路径或其中一段不合法，修正路径输入。",
+                    "`formatInvalid` / `FORMAT_INVALID`：模板语法或插值不合法，检查模板与值。",
+                    "`formatValueMissing` / `FORMAT_VALUE_MISSING`：严格模板模式缺少占位符的值，补充对应数据。",
+                    "`numberFormatInvalid` / `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝地区、货币、选项或数值，修正格式化参数。"
+                  ]
+                }
+              ]
             }
           ],
           "usageScore": 28,
@@ -281562,7 +282049,7 @@
               ]
             }
           ],
-          "usageScore": 58,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "utils-testing--createManualScheduler"
         },

@@ -47,11 +47,15 @@
                 "type": "list",
                 "items": [
                   "旧请求的结果写不进来，即使底层接口不能取消。 手写时谁最后返回谁赢；`Resource` 给每次请求一个世代编号，只有最新一代的结果会写入 `state`。示例",
-                  "依赖自动登记，同一轮改几个条件只发一次请求。 手写时每个条件的变化回调各发一次请求；请求函数在第一个 `await` 之前读到的响应式值都会成为依赖，同一轮里的多次修改在下一个微任务合并成一次请求。示例",
+                  "依赖自动登记，同一轮改几个条件只发一次请求。 手写时每个条件的变化回调各发一次请求；请求函数在第一个 `await` 之前读到的响应式值都会成为依赖，同一轮里的多次修改默认在下一个微任务合并成一次请求。示例",
                   "多处读取共享一个 Promise。 手写去重要自己处理失败后清除、过期后重取；同一个 `Resource` 的 `promise` 在请求进行中和缓存有效时都返回同一个 Promise。示例",
                   "取消有自己的状态，不会被当成失败。 `cancel()` 后状态是 `cancelled`，资源还能 `refetch()`；`dispose()` 会把中止信号传给底层请求，等待方收到原生 `AbortError`。示例",
                   "服务端快照带的是剩余有效期，不是时间点。 浏览器用本地时钟接着计时，两端时钟不一致也不影响，快照仍有效时不发请求。示例"
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "当异步结果依赖 `Signal` 或 `Computed`，又需要界面观察状态、共享请求或刷新缓存时，用 `Resource` 管理这套可观察、可复用的状态。只加载一次、没有这些需求的请求，直接 `await` 一个 Promise 更简单。"
               }
             ]
           },
@@ -66,7 +70,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()"
+                "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
               },
               {
                 "type": "paragraph",
@@ -79,7 +83,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "`re` 比 `react` 晚返回，日志里能看到它返回了，但页面停在 `react` 的结果上。请求函数读了 `keyword.value`，关键词一变 `Resource` 就发起新请求，并作废旧的那一次；旧请求即使跑完，也写不进 `state`。"
+                "text": "`re` 比 `react` 晚返回，日志里能看到它返回了，但页面停在 `react` 的结果上。请求函数在返回 Promise 前同步读取了 `keyword.value`，关键词一变 `Resource` 就发起新请求，并作废旧的那一次；旧请求即使跑完，也写不进 `state`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`view` 是一个 Effect（响应式副作用），执行时读取 `results.state`，所以请求状态变化会让它再次执行并更新页面。把 `state` 保存到普通变量只得到当时的状态快照；要持续更新界面，应在 Effect 或 UI 框架的状态订阅中读取它。结束时先释放 `view`，再释放 `results`，最后释放输入 `keyword`，避免清理过程再次触发渲染或请求。"
               },
               {
                 "type": "paragraph",
@@ -135,7 +143,10 @@
                     "`cancel()` / `dispose()`",
                     "停掉这一次请求、资源还能用 / 停掉请求并释放整个资源"
                   ],
-                  ["快照", "`dehydrate()` 导出数据和剩余有效期，另一端用 `initialSnapshot` 恢复"]
+                  [
+                    "快照",
+                    "调用方可传输或保存 `dehydrate()` 导出的数据和剩余有效期，再用 `initialSnapshot` 恢复"
+                  ]
                 ]
               },
               {
@@ -238,7 +249,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
+                "text": "构造选项 `autoStart` 默认为 `true`：没有仍有效的 `initialSnapshot` 时，构造函数立即发起第一代请求。传 `autoStart: false` 时不在构造期请求，首次被动读取仍可启动；有效的初始快照会直接复用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。依赖变化何时刷新由传入的 `runtime` 调度决定，默认在微任务中处理。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 每次刷新会创建新的一代，并中止仍在途的上一代的 `signal`；只有当前一代能把结果写入状态。想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 需要暂时停止当前请求、稍后继续使用同一个资源时调用 `cancel()`。正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
               }
             ]
           },
@@ -1178,11 +1193,15 @@
                   "type": "list",
                   "items": [
                     "An old request cannot write its result, even when the API cannot be cancelled. By hand, whichever answers last wins; `Resource` gives every request a generation number and writes only the newest generation's result to `state`. Example",
-                    "Dependencies are recorded for you, and several changes in one turn send one request. By hand, each filter's change handler sends its own request; every reactive value the fetcher reads before its first `await` becomes a dependency, and several changes in the same turn merge into one request on the next microtask. Example",
+                    "Dependencies are recorded for you, and several changes in one turn send one request. By hand, each filter's change handler sends its own request; every reactive value the fetcher reads before its first `await` becomes a dependency, and several changes in the same turn merge into one request on the next microtask by default. Example",
                     "Every reader shares one Promise. Hand-written de-duplication has to clear the Promise after a failure and fetch again after expiry; the `promise` of one `Resource` returns the same Promise while a request runs and while the cache is fresh. Example",
                     "Cancellation has its own state and is never mistaken for a failure. After `cancel()` the state is `cancelled` and the resource can still `refetch()`; `dispose()` passes the abort on to the underlying request, and waiters receive a native `AbortError`. Example",
                     "Server snapshots carry the remaining lifetime, not a point in time. The browser keeps counting on its own clock, so the two clocks need not agree, and no request is sent while the snapshot is fresh. Example"
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Use `Resource` when an async result depends on a `Signal` or `Computed` and callers need to observe its state, share a request, or refresh cached data. It keeps that reusable state together. For a one-off request without those needs, directly `await` the Promise."
                 }
               ]
             },
@@ -1197,7 +1216,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// Fake search API: shorter keywords answer more slowly, and it cannot be cancelled\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`API answered: \"${text}\"`)\n      resolve(`3 results for \"${text}\"`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`page shows: ${state.data}`)\n})\n\nkeyword.value = 'react' // the user keeps typing\nawait new Promise((resolve) => setTimeout(resolve, 100)) // wait for both requests to answer\nview.dispose()\nresults.dispose()"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// Fake search API: shorter keywords answer more slowly, and it cannot be cancelled\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`API answered: \"${text}\"`)\n      resolve(`3 results for \"${text}\"`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`page shows: ${state.data}`)\n})\n\nkeyword.value = 'react' // the user keeps typing\nawait new Promise((resolve) => setTimeout(resolve, 100)) // wait for both requests to answer\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -1210,7 +1229,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`re` answers after `react`. The log shows it arriving, but the page stays on the results for `react`. The fetcher read `keyword.value`, so a keyword change makes the `Resource` start a new request and void the old one; even when the old request finishes, it cannot write into `state`."
+                  "text": "`re` answers after `react`. The log shows it arriving, but the page stays on the results for `react`. The fetcher reads `keyword.value` synchronously before returning its Promise, so a keyword change makes the `Resource` start a new request and void the old one; even when the old request finishes, it cannot write into `state`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`view` is an Effect, a reactive side effect. It reads `results.state` while running, so request state changes run it again and update the page. Saving `state` in an ordinary variable gives only a snapshot of that moment; keep the read inside an Effect or a UI framework's state subscription to keep the view up to date. On leaving, dispose `view` first, then `results`, then the input `keyword`, so cleanup cannot trigger another render or request."
                 },
                 {
                   "type": "paragraph",
@@ -1271,7 +1294,7 @@
                     ],
                     [
                       "Snapshot",
-                      "`dehydrate()` exports the data and its remaining lifetime; the other side restores it through `initialSnapshot`"
+                      "The caller can transfer or store the data and remaining lifetime exported by `dehydrate()`, then restore them through `initialSnapshot`"
                     ]
                   ]
                 },
@@ -1399,7 +1422,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. Dependency tracking sees only synchronous reads before the first `await`. Reactive values read after an `await` are not tracked; read them into a local variable first, or move the read into a `Computed`. 2. The fetcher should hand `signal` to I/O that can really be cancelled (for example `fetch(url, { signal })`). Otherwise a cancel only makes the `Resource` ignore the result, and the underlying request still runs to the end. 3. `refetch()` always starts a new request; passive reads (`state`, `promise`, `read()`) start one only when idle or expired. Call `refetch()` or `invalidate()` to force a refresh. 4. Call `dispose()` when the resource is no longer used, or its dependency registrations and running request stay alive. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and a second `dispose()` are safe no-ops. `dispose()` does not dispose the `runtime` passed in. 5. `keepAlive` defaults to `false`. When nobody reads `state`, the `Resource` disconnects from its upstream but keeps the dependency versions and the cache; the next read reuses the old value and Promise when the dependencies did not change and the cache is fresh, and requests again when they changed. Pass `keepAlive: true` to stay connected while nobody watches. 6. Passive reads do not restart after `cancel()`. A cancelled initial load is in the `cancelled` state; a cancelled background refresh keeps the old data and clears `refreshing`. Only an explicit `refetch()` starts again."
+                  "text": "The constructor option `autoStart` defaults to `true`: the first request starts immediately unless `initialSnapshot` is still fresh. With `autoStart: false`, construction does not request, but the first passive read can still start one; a fresh initial snapshot is reused directly."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "1. Dependency tracking sees only synchronous reads before the first `await`. Reactive values read after an `await` are not tracked; read them into a local variable first, or move the read into a `Computed`. The supplied `runtime` decides when dependency changes trigger a refresh; by default, it schedules this work in a microtask. 2. The fetcher should hand `signal` to I/O that can really be cancelled (for example `fetch(url, { signal })`). Otherwise a cancel only makes the `Resource` ignore the result, and the underlying request still runs to the end. 3. `refetch()` always starts a new request; passive reads (`state`, `promise`, `read()`) start one only when idle or expired. Each refresh creates a new generation and aborts the `signal` of the previous generation if it is still running; only the current generation can write its result to state. Call `refetch()` or `invalidate()` to force a refresh. 4. Call `dispose()` when the resource is no longer used, or its dependency registrations and running request stay alive. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and a second `dispose()` are safe no-ops. `dispose()` does not dispose the `runtime` passed in. 5. `keepAlive` defaults to `false`. When nobody reads `state`, the `Resource` disconnects from its upstream but keeps the dependency versions and the cache; the next read reuses the old value and Promise when the dependencies did not change and the cache is fresh, and requests again when they changed. Pass `keepAlive: true` to stay connected while nobody watches. 6. Passive reads do not restart after `cancel()`. Call `cancel()` to stop the current request temporarily while keeping the same resource available for later use. A cancelled initial load is in the `cancelled` state; a cancelled background refresh keeps the old data and clears `refreshing`. Only an explicit `refetch()` starts again."
                 }
               ]
             },
@@ -3953,7 +3980,8 @@
             "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 2, data, ageMs, remainingTtlMs }\n// 通过安全的 JSON 传输通道发送；若内嵌 HTML，必须采用适合 HTML 上下文的编码。\n// 根据已知传输/存储耗时调整 ageMs/remainingTtlMs。\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})",
             "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n})\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标",
             "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n})",
-            "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle：请求函数还没被调用\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle：同一个实例，没有缓存数据\nconsole.log(await value.promise) // 更新的 generation\nvalue.dispose()"
+            "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle：请求函数还没被调用\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle：同一个实例，没有缓存数据\nconsole.log(await value.promise) // 更新的 generation\nvalue.dispose()",
+            "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
           ],
           "members": [
             {
@@ -4549,7 +4577,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
+                  "text": "构造选项 `autoStart` 默认为 `true`：没有仍有效的 `initialSnapshot` 时，构造函数立即发起第一代请求。传 `autoStart: false` 时不在构造期请求，首次被动读取仍可启动；有效的初始快照会直接复用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "1. 依赖追踪只认第一个 `await` 之前的同步读取。 `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。依赖变化何时刷新由传入的 `runtime` 调度决定，默认在微任务中处理。 2. 请求函数要把 `signal` 交给真正可取消的 I/O（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。 每次刷新会创建新的一代，并中止仍在途的上一代的 `signal`；只有当前一代能把结果写入状态。想强制刷新就调用 `refetch()` 或 `invalidate()`。 4. 不再使用时要调用 `dispose()`，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。 5. 默认 `keepAlive: false`。 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。 6. `cancel()` 之后被动读取不会自动重启。 需要暂时停止当前请求、稍后继续使用同一个资源时调用 `cancel()`。正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。"
                 }
               ]
             },
@@ -4564,7 +4596,7 @@
               ]
             }
           ],
-          "usageScore": 392,
+          "usageScore": 394,
           "configuration": [
             {
               "name": "debugName",
@@ -5143,7 +5175,8 @@
             "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nlet version = 0\n\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 10))\n    version++\n    return `价格表 v${version}`\n  },\n  runtime,\n  { staleWhileRevalidate: true } // 刷新期间继续显示旧数据\n)\n\nconst view = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) {\n    console.log(state.refreshing ? `${state.data}（后台刷新中）` : state.data)\n  }\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // 用户点“刷新”\nruntime.flush() // 让副作用立即看到新结果\nview.dispose()\nprices.dispose()",
             "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\n// 服务端：请求一次，把结果和剩余有效期一起放进页面\nconst onServer = new Resource(async () => ({ name: 'Ada' }), createRuntime(), { ttl: 60_000 })\nawait onServer.promise\nconst html = JSON.stringify(onServer.dehydrate())\nonServer.dispose()\n\n// 浏览器：用页面里的快照创建资源\nlet browserRequests = 0\nconst onClient = new Resource(\n  async () => {\n    browserRequests++\n    return { name: 'Ada' }\n  },\n  createRuntime(),\n  { ttl: 60_000, initialSnapshot: JSON.parse(html) }\n)\n\nconst state = onClient.state\nif (state.status === ResourceStatus.success) console.log(`首屏直接显示：${state.data.name}`)\nconsole.log(`浏览器端请求次数：${browserRequests}`)\nonClient.dispose()",
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n})\n\nuserId.value = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}",
-            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
+            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'",
+            "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst keyword = runtime.signal('re')\n\n// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消\nfunction search(text: string): Promise<string> {\n  const delay = text.length < 3 ? 50 : 10\n  return new Promise((resolve) =>\n    setTimeout(() => {\n      console.log(`接口返回：“${text}”`)\n      resolve(`“${text}”的 3 条结果`)\n    }, delay)\n  )\n}\n\nconst results = new Resource(() => search(keyword.value), runtime)\n\nconst view = runtime.effect(() => {\n  const state = results.state\n  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)\n})\n\nkeyword.value = 'react' // 用户继续输入\nawait new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回\nview.dispose()\nresults.dispose()\nkeyword.dispose()"
           ],
           "members": [
             {

@@ -225,6 +225,10 @@
               },
               {
                 "type": "paragraph",
+                "text": "`createStore` 的 `shape` 是带 `this` 推导的 `IStoreDefinition<S>`，只接受同步字段；`options?: ICreateStoreOptions` 用于指定 Runtime 和异步 Action 警告，返回 `IReactiveStore<S>`。异步字段应改用 `createAsyncStore`，等待它返回的 Promise 后再访问已就绪字段。"
+              },
+              {
+                "type": "paragraph",
                 "text": "1. getter 只读。 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。 2. 异步方法只有第一个 `await` 之前的写入在同一个批次里。 `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。 3. `$batch()` 不是事务。 recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。 4. `$dispose()` 先切换状态再释放。 `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。 5. 构造失败会回滚。 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。 6. 导入时不创建默认 Runtime。 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。 7. StoreResource 的值由它持有。 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。 8. 错误身份。 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。"
               },
               {
@@ -1634,6 +1638,10 @@
               "id": "contract-details",
               "heading": "Contract details",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createStore` takes a `shape` typed as `IStoreDefinition<S>` with inferred `this`, accepting synchronous fields only. Its optional `options?: ICreateStoreOptions` selects the Runtime and async Action warnings; the result is `IReactiveStore<S>`. Use `createAsyncStore` for asynchronous fields and await its Promise before reading the ready fields."
+                },
                 {
                   "type": "paragraph",
                   "text": "Every signature, boundary behaviour and error message is in USEGUIDE.en.md. These are the constraints that matter most in use."
@@ -3111,7 +3119,7 @@
               ]
             }
           ],
-          "usageScore": 56,
+          "usageScore": 58,
           "configuration": [
             {
               "name": "runtime",
@@ -3133,9 +3141,9 @@
               "name": "warnAsyncActions",
               "type": "boolean",
               "optional": true,
-              "description": "`warnAsyncActions` — `boolean` — 可选 — `false` — 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\"",
+              "description": "1. getter 只读。 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。 2. 异步方法只有第一个 `await` 之前的写入在同一个批次里。 `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。 3. `$batch()` 不是事务。 recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。 4. `$dispose()` 先切换状态再释放。 `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。 5. 构造失败会回滚。 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。 6. 导入时不创建默认 Runtime。 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。 7. StoreResource 的值由它持有。 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。 8. 错误身份。 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。",
               "descriptionEn": "",
-              "descriptionZh": "`warnAsyncActions` — `boolean` — 可选 — `false` — 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
+              "descriptionZh": "1. getter 只读。 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。 2. 异步方法只有第一个 `await` 之前的写入在同一个批次里。 `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。 3. `$batch()` 不是事务。 recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。 4. `$dispose()` 先切换状态再释放。 `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。 5. 构造失败会回滚。 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。 6. 导入时不创建默认 Runtime。 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。 7. StoreResource 的值由它持有。 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。 8. 错误身份。 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。"
             },
             {
               "name": "mutationPolicy",
@@ -3498,7 +3506,7 @@
               ]
             }
           ],
-          "usageScore": 174,
+          "usageScore": 176,
           "configuration": [
             {
               "name": "runtime",
@@ -4670,7 +4678,7 @@
               ]
             }
           ],
-          "usageScore": 24,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "store-light-index--ICreateStoreOptions"
         },
@@ -5522,7 +5530,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStore:export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "store-light-index--IReactiveStore"
         },
@@ -6010,7 +6018,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/reactive-store.d.ts:IStoreDefinition:export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "store-light-index--IStoreDefinition"
         },
