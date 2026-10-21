@@ -704,9 +704,15 @@ export const capabilityReference: ILibraryReference = {
         'Caller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.',
         '返回调用方拥有的 `ICapabilityHost`，结束后须释放；非法选项在构造完成前抛出附码原生错误。'
       ),
-      exampleIntro: capabilityCases.createCapabilityHost![0]!.problem,
-      example: capabilityCases.createCapabilityHost![0]!.example,
-      exampleResult: capabilityCases.createCapabilityHost![0]!.result,
+      exampleIntro: t(
+        'A tenant persistence service has permission to start. Register its activation callback, inspect the enable result before consuming the business handle, and release the host even if sync fails.',
+        '租户的持久化服务已获准启动。登记激活回调，检查启用结果后再使用业务句柄；即使同步失败，也在最后释放宿主。'
+      ),
+      example: capabilityHostExample,
+      exampleResult: t(
+        'Prints `sync: tenant-42` followed by `disposed: tenant-42`. The host owns the adopted handle and calls its disposer during final cleanup.',
+        '先输出 `sync: tenant-42`，再输出 `disposed: tenant-42`。宿主持有已接纳的句柄，并在最终清理时调用它的释放方法。'
+      ),
       cases: capabilityCases.createCapabilityHost
     },
     snapshotGraphReadiness: {

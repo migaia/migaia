@@ -15,10 +15,12 @@ When data depends on a user id or a set of filters, sending the request is the e
 ## Why choose it
 
 - **An old request cannot write its result, even when the API cannot be cancelled.** By hand, whichever answers last wins; `Resource` gives every request a generation number and writes only the newest generation's result to `state`. [Example](./USEGUIDE.en.md#show-only-the-result-for-the-latest-input)
-- **Dependencies are recorded for you, and several changes in one turn send one request.** By hand, each filter's change handler sends its own request; every reactive value the fetcher reads before its first `await` becomes a dependency, and several changes in the same turn merge into one request on the next microtask. [Example](./USEGUIDE.en.md#change-several-filters-send-one-request)
+- **Dependencies are recorded for you, and several changes in one turn send one request.** By hand, each filter's change handler sends its own request; every reactive value the fetcher reads before its first `await` becomes a dependency, and several changes in the same turn merge into one request on the next microtask by default. [Example](./USEGUIDE.en.md#change-several-filters-send-one-request)
 - **Every reader shares one Promise.** Hand-written de-duplication has to clear the Promise after a failure and fetch again after expiry; the `promise` of one `Resource` returns the same Promise while a request runs and while the cache is fresh. [Example](./USEGUIDE.en.md#several-readers-one-request)
 - **Cancellation has its own state and is never mistaken for a failure.** After `cancel()` the state is `cancelled` and the resource can still `refetch()`; `dispose()` passes the abort on to the underlying request, and waiters receive a native `AbortError`. [Example](./USEGUIDE.en.md#show-cancelled-instead-of-an-error)
 - **Server snapshots carry the remaining lifetime, not a point in time.** The browser keeps counting on its own clock, so the two clocks need not agree, and no request is sent while the snapshot is fresh. [Example](./USEGUIDE.en.md#do-not-request-server-loaded-data-again)
+
+Use `Resource` when an async result depends on a `Signal` or `Computed` and callers need to observe its state, share a request, or refresh cached data. It keeps that reusable state together. For a one-off request without those needs, directly `await` the Promise.
 
 ## Start here
 
@@ -53,6 +55,7 @@ keyword.value = 'react' // the user keeps typing
 await new Promise((resolve) => setTimeout(resolve, 100)) // wait for both requests to answer
 view.dispose()
 results.dispose()
+keyword.dispose()
 ```
 
 Output:
@@ -63,7 +66,9 @@ page shows: 3 results for "react"
 API answered: "re"
 ```
 
-`re` answers after `react`. The log shows it arriving, but the page stays on the results for `react`. The fetcher read `keyword.value`, so a keyword change makes the `Resource` start a new request and void the old one; even when the old request finishes, it cannot write into `state`.
+`re` answers after `react`. The log shows it arriving, but the page stays on the results for `react`. The fetcher reads `keyword.value` synchronously before returning its Promise, so a keyword change makes the `Resource` start a new request and void the old one; even when the old request finishes, it cannot write into `state`.
+
+`view` is an Effect, a reactive side effect. It reads `results.state` while running, so request state changes run it again and update the page. Saving `state` in an ordinary variable gives only a snapshot of that moment; keep the read inside an Effect or a UI framework's state subscription to keep the view up to date. On leaving, dispose `view` first, then `results`, then the input `keyword`, so cleanup cannot trigger another render or request.
 
 Next: more uses are listed in [Find by scenario in the USEGUIDE](./USEGUIDE.en.md#find-by-scenario); to stop network work when the user leaves, see [Stop the running request when the user leaves](./USEGUIDE.en.md#stop-the-running-request-when-the-user-leaves).
 
@@ -101,7 +106,7 @@ Think of a `Resource` as "an async variable that re-requests by itself": the fet
 | Generation | A number per request; only the newest generation's result can be written to `state` |
 | Lifetime (`ttl`) | How long a success stays fresh; defaults to `Infinity`, so only dependency changes or manual refreshes request again |
 | `cancel()` / `dispose()` | Stop this request and keep the resource usable / stop the request and release the whole resource |
-| Snapshot | `dehydrate()` exports the data and its remaining lifetime; the other side restores it through `initialSnapshot` |
+| Snapshot | The caller can transfer or store the data and remaining lifetime exported by `dehydrate()`, then restore them through `initialSnapshot` |
 
 A few terms:
 
@@ -146,12 +151,14 @@ Every signature, boundary behaviour and error code is in [USEGUIDE.en.md](./USEG
 
 ### Lifecycle, errors and boundaries
 
-1. **Dependency tracking sees only synchronous reads before the first `await`.** Reactive values read after an `await` are not tracked; read them into a local variable first, or move the read into a `Computed`.
+The constructor option `autoStart` defaults to `true`: the first request starts immediately unless `initialSnapshot` is still fresh. With `autoStart: false`, construction does not request, but the first passive read can still start one; a fresh initial snapshot is reused directly.
+
+1. **Dependency tracking sees only synchronous reads before the first `await`.** Reactive values read after an `await` are not tracked; read them into a local variable first, or move the read into a `Computed`. The supplied `runtime` decides when dependency changes trigger a refresh; by default, it schedules this work in a microtask.
 2. **The fetcher should hand `signal` to I/O that can really be cancelled** (for example `fetch(url, { signal })`). Otherwise a cancel only makes the `Resource` ignore the result, and the underlying request still runs to the end.
-3. **`refetch()` always starts a new request; passive reads (`state`, `promise`, `read()`) start one only when idle or expired.** Call `refetch()` or `invalidate()` to force a refresh.
+3. **`refetch()` always starts a new request; passive reads (`state`, `promise`, `read()`) start one only when idle or expired.** Each refresh creates a new generation and aborts the `signal` of the previous generation if it is still running; only the current generation can write its result to state. Call `refetch()` or `invalidate()` to force a refresh.
 4. **Call `dispose()` when the resource is no longer used**, or its dependency registrations and running request stay alive. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and a second `dispose()` are safe no-ops. `dispose()` does not dispose the `runtime` passed in.
 5. **`keepAlive` defaults to `false`.** When nobody reads `state`, the `Resource` disconnects from its upstream but keeps the dependency versions and the cache; the next read reuses the old value and Promise when the dependencies did not change and the cache is fresh, and requests again when they changed. Pass `keepAlive: true` to stay connected while nobody watches.
-6. **Passive reads do not restart after `cancel()`.** A cancelled initial load is in the `cancelled` state; a cancelled background refresh keeps the old data and clears `refreshing`. Only an explicit `refetch()` starts again.
+6. **Passive reads do not restart after `cancel()`.** Call `cancel()` to stop the current request temporarily while keeping the same resource available for later use. A cancelled initial load is in the `cancelled` state; a cancelled background refresh keeps the old data and clears `refreshing`. Only an explicit `refetch()` starts again.
 
 ### Error identity
 

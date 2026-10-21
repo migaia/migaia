@@ -142,6 +142,8 @@ pnpm add @migaia/store-light
 
 全部签名、边界行为与错误信息见 [USEGUIDE.md](./USEGUIDE.md)。下面是使用时最需要记住的约束。
 
+`createStore` 的 `shape` 是带 `this` 推导的 `IStoreDefinition<S>`，只接受同步字段；`options?: ICreateStoreOptions` 用于指定 Runtime 和异步 Action 警告，返回 `IReactiveStore<S>`。异步字段应改用 `createAsyncStore`，等待它返回的 Promise 后再访问已就绪字段。
+
 1. **getter 只读。** 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。
 2. **异步方法只有第一个 `await` 之前的写入在同一个批次里。** `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。
 3. **`$batch()` 不是事务。** recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。

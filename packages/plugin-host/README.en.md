@@ -36,6 +36,7 @@ const greeting = definePlugin({
 })
 const [registration] = await host.use(greeting)
 console.log(registration.extensions.greet())
+await host.unUse('greeting')
 await host.dispose()
 ```
 
@@ -241,6 +242,34 @@ Class owners invoke protected runPipeline(value, done) from a domain entry; func
 
 Generator modes drain the current stage before passing its ordinary return value onward. Implicit undefined or GENERATOR_HALT stops the chain. GENERATOR_CONTINUE selects the last yield, or the input if nothing yielded. GENERATOR_UNDEFINED forwards an actual undefined payload only when its type permits it. Async-generator awaits serially; it provides neither streaming fan-out nor onion execution. Import modes, stage types, and these unique symbols directly from middleware-pipeline, and install that dependency directly when importing it.
 
+When returned from a stage, these three symbols control traversal rather than represent business data.
+
+This example uppercases the input `migaia`, then adds square brackets. The first stage returns `GENERATOR_CONTINUE` to pass its last yielded value to the second stage; the second returns the final string directly.
+
+```ts doc-test=run
+import { defineHost } from '@migaia/plugin-host'
+import { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+/** This host owns the two string transformations and their cleanup. */
+const textHost = defineHost<Record<never, never>, string>({
+  host: {
+    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+    pipeline: { mode: MiddlewarePipelineMode.generator }
+  }
+})
+textHost.useGeneratorPipeline(function* (value) {
+  yield value.toUpperCase()
+  return GENERATOR_CONTINUE
+})
+textHost.useGeneratorPipeline(function* (value) {
+  return `[${value}]`
+})
+textHost.runPipeline('migaia', (value) => console.log(value))
+await textHost.dispose()
+```
+
+It prints `[MIGAIA]`: the second stage receives `MIGAIA`, and the completion callback receives the bracketed result. Intermediate yields do not invoke downstream stages individually.
+
 Registering stages while any nested run remains active throws PIPELINE_EXECUTING. A run captures its admitted stages. Host stages and plugin slots follow first-allocation order; disabling, restoring, and replacing retain positions. New runs do not acquire revoked generations; old runs retain their leases until completion or cooperative exit.
 
 All stage modes receive context last; generators receive it second. context.signal is the Host lifecycle signal and aborts when disposal starts. A stage must use it to cancel its own I/O. At stage entry, return, or next dispatch, the runner can stop with HOST_DISPOSING or HOST_DISPOSED; it cannot preempt arbitrary promises. A signal reason and later admission error may have matching semantic identity without being the same object. Ordinary failure wins over simultaneous cancellation; one ordinary failure preserves its object. Async stage/downstream dual failures use AggregateError / PIPELINE_FAILED with [stageError, downstreamError]. Serial async-generator failures from factory, body, or done have no equivalent dual-frame aggregation.
@@ -261,11 +290,11 @@ Cleanup functions run directly. Resource objects prefer asynchronous disposal, t
 
 isManagedHost(value) recognizes Hosts created by this physical package instance. openComposition(host) accepts those identities, including class and functional Hosts; a lookalike or another installed package copy is not sufficient. The identity writer is private, and defineHost accepts no receiver alias.
 
-A composition owner reads revision/getCurrentSnapshot(), captures definitions with createPluginAdmission, reserves opaque positions with createDataOrderSlot(name), then calls prepareAdmissions([{ admission, slot }]). Setup may execute, but candidate extensions, config, Features, and stages remain unpublished. commitPreparedAdmissions is synchronous without user code and rejects stale revisions. discardPreparedAdmissions rolls temporary resources back once. Returned registration tokens identify exact installations rather than whichever plugin currently has a name.
+revision is the Host's committed modification version, not a count of attempted operations. A composition owner reads revision/getCurrentSnapshot(), captures definitions with createPluginAdmission, reserves opaque positions with createDataOrderSlot(name), then calls prepareAdmissions([{ admission, slot }]). Setup may execute, but candidate extensions, config, Features, and stages remain unpublished. commitPreparedAdmissions is synchronous without user code and rejects stale revisions. discardPreparedAdmissions rolls temporary resources back once. Returned registration tokens identify exact installations rather than whichever plugin currently has a name.
 
 Calling createDataOrderSlot reserves its order immediately. Disablement, recovery, and replacement reuse it. Retire it only when a definition is permanently removed or the session ends. prepareUnUseBatch accepts exact tokens in the owner's cleanup order. commitPreparedUnUseBatch(prepared, { beforeCleanup? }) first commits logical revocation, then waits for the fence and generation-specific pipeline leases. beforeCleanup is optional without a default promise; when supplied it completes before cleanup.
 
-Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Observe all physicalCompletion continuations for physical release, or let the outer realm owner terminate its actual execution environment.
+Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Wait for every physicalCompletion continuation to finish before treating physical release as complete, or let the outer realm owner terminate its actual execution environment.
 
 createView(token) exposes only that exact registration's extensions, without Host, config, shared, or mutation capability. Repeated views keep function references and concrete Host receivers. Token views remain valid during disablement; complete Host views reject then and recover their original function references on enablement. Removal revokes both. Foreign or revoked tokens fail closed. Migration: the old root createRegistrationView and IPluginRegistrationReceipt were removed; use composition createView/IRegistrationToken.
 

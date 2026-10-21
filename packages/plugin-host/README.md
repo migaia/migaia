@@ -36,6 +36,7 @@ const greeting = definePlugin({
 })
 const [registration] = await host.use(greeting)
 console.log(registration.extensions.greet())
+await host.unUse('greeting')
 await host.dispose()
 ```
 
@@ -241,6 +242,34 @@ class owner 从领域入口调用 protected runPipeline(value, done)，函数 ha
 
 generator 与 async-generator 都先耗尽当前 stage，普通返回值交给下一步；隐式 undefined 或 GENERATOR_HALT 终止，GENERATOR_CONTINUE 采用最后 yield（零 yield 用输入），GENERATOR_UNDEFINED 才把业务 undefined 继续交付，类型必须允许它。async-generator 串行 await，不是流式 fan-out 或洋葱模式。模式、stage 类型与这三个唯一 symbol 从 middleware-pipeline 直接导入，消费项目应直接安装该包。
 
+把这三个 symbol 作为 stage 返回值时，它们是控制信号，不是业务数据。
+
+下面把输入 `migaia` 转成大写，再加上方括号。第一步返回 `GENERATOR_CONTINUE`，让最后一次 yield 的值进入第二步；第二步直接返回最终字符串。
+
+```ts doc-test=run
+import { defineHost } from '@migaia/plugin-host'
+import { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+/** 这个宿主持有两步字符串转换与它们的释放责任。 */
+const textHost = defineHost<Record<never, never>, string>({
+  host: {
+    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+    pipeline: { mode: MiddlewarePipelineMode.generator }
+  }
+})
+textHost.useGeneratorPipeline(function* (value) {
+  yield value.toUpperCase()
+  return GENERATOR_CONTINUE
+})
+textHost.useGeneratorPipeline(function* (value) {
+  return `[${value}]`
+})
+textHost.runPipeline('migaia', (value) => console.log(value))
+await textHost.dispose()
+```
+
+输出 `[MIGAIA]`：第二个 stage 收到 `MIGAIA`，完成回调收到加上方括号后的结果。中间 yield 不会逐个触发下游。
+
 执行中（含外层尚未结束的嵌套调用）注册新 stage 抛 PIPELINE_EXECUTING。每次运行捕获已准入 stage；slot 按首次分配顺序与 Host stage 排列，禁用、恢复、替换不重排。新运行不再取得已撤销代，旧运行用自己的 lease 完成或协作退出。
 
 四种 stage 的最后参数都有 context（generator 是第二参数），context.signal 是 Host 生命周期信号。dispose 开始时 abort，外部 I/O 仍需 stage 自己消费 signal；runner 在进入、返回、next 等协作检查点以 HOST_DISPOSING 或 HOST_DISPOSED 中止，不Promise强行取消任意 Promise。signal.reason 与稍后准入错误可同码但不保证同一对象。普通业务失败优先于同时取消；单个普通失败保留原对象。async 的 stage 与下游双失败为 AggregateError / PIPELINE_FAILED，errors 固定 [stageError, downstreamError]；async-generator 串行路径无此双帧聚合，factory/body/done 的单失败原样传播。
@@ -261,11 +290,11 @@ cleanupComplete false 不代表资源已释放。cleanupErrors 是当前快照�
 
 `isManagedHost(value)` 探测本物理包实例构造的 Host；`openComposition(host)` 只接受这种身份，不接受伪造对象或另一份包副本的实例。身份登记 writer 不公开，defineHost 不接受 receiver 别名。
 
-composition owner 可读取 revision/getCurrentSnapshot()，通过 createPluginAdmission 捕获定义、createDataOrderSlot(name) 保留 opaque 排序槽，再 prepareAdmissions([{ admission, slot }])。setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开。commitPreparedAdmissions 同步发布、不执行用户代码，revision 已变化则拒绝；discardPreparedAdmissions 对暂存资源只回滚一次。返回 registration token 精确指向那次安装，不按名称误删新代。
+revision 是 Host 已提交修改的版本号，不是尝试操作的次数。composition owner 可读取 revision/getCurrentSnapshot()，通过 createPluginAdmission 捕获定义、createDataOrderSlot(name) 保留 opaque 排序槽，再 prepareAdmissions([{ admission, slot }])。setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开。commitPreparedAdmissions 同步发布、不执行用户代码，revision 已变化则拒绝；discardPreparedAdmissions 对暂存资源只回滚一次。返回 registration token 精确指向那次安装，不按名称误删新代。
 
 createDataOrderSlot 调用即保留顺序；禁用、恢复和 replace 沿用 slot。只有定义永久删除或 session 结束才 retireDataOrderSlot。prepareUnUseBatch 按 owner 的清理顺序接收 exact tokens；commitPreparedUnUseBatch(prepared, { beforeCleanup? }) 先逻辑撤销，再等待 fence 和该代 pipeline lease。beforeCleanup 可选，无默认 Promise，但提供时始终先完成。
 
-托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；要真实释放，应观察全部 physicalCompletion，或由拥有 realm 的外层终止其实际执行环境。
+托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；确认物理释放前，应等待全部 physicalCompletion 延续完成，或由拥有 realm 的外层终止其实际执行环境。
 
 `createView(token)` 返回只含该 exact registration 的 extensions 的窄 view，无 Host、config、shared 或 mutation 能力。相同 token 的函数引用稳定，receiver 为 concrete Host。token view 禁用期间仍有效，完整 Host view 此时拒绝；启用恢复原函数引用，卸载两者均撤销。foreign/撤销 token 失败关闭。迁移：旧根 createRegistrationView 与 IPluginRegistrationReceipt 已移除，使用 composition createView/IRegistrationToken。
 

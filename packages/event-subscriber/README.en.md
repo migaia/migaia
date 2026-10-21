@@ -122,7 +122,11 @@ The root entry provides channels, the Hub and invocation helpers. Import standal
 
 ## Contract details
 
-Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener. The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` names the registration. The returned subscription cancels its registrations and can extend the chain.
+In `createEventChannel<T, R>()`, `T` is the published payload type and `R` is the listener result type. Specifying a result type keeps the same channel subscription model and creates no global task registry.
+
+Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts, with the original payload in `event.value`; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener.
+
+The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` is a caller-chosen label for this registration. The returned subscription cancels its registrations and can extend the chain.
 
 Select value delivery explicitly when only the payload is needed:
 
@@ -143,7 +147,15 @@ Defaults are recursive synchronous dispatch, multiple independent registrations,
 
 Synchronous `publish()` does not await Promises. Synchronous throws become `PUBLISH_FAILED`; late rejection goes to report. Async helpers await settlement and deliver results or rejection. Settled helpers collect listener failures, while invalid channels and task admission still throw synchronously.
 
-Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads.
+`invokeParallelSettled(channel, payload)` returns outcomes in registration order: the `value` in `{ status: 'fulfilled', value }` is the listener's awaited return value; the `reason` in `{ status: 'rejected', reason }` is its original thrown value or rejection reason. These fields describe listener execution, not message-send acknowledgments.
+
+Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads.
+
+With `style: 'on-emit'`, `channel.on(listener)` registers a listener and returns its subscription handle, while `channel.emit(value)` delivers value to the current snapshot under the selected dispatch policy. Under default handle-scoped removal, the handle's `off()` removes only the registrations it owns. `on`, `emit` and `off` are the same functions as `subscribe`, `publish` and `unsubscribe`, respectively; the canonical names remain available.
+
+Import `subscribeOnce`, `subscribeUntil` and `subscribeSubscriber` from `@migaia/event-subscriber/subscriber`. They work only through `channel.subscribe(listener, options?)` without reading style configuration, so they also accept styled channels that retain this method. A styled channel adds naming aliases. Each helper returns a plain `IUnsubscribe`: a synchronous, idempotent cancellation function with no `off`, `dispose`, `unlisten` or chain methods.
+
+An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. The old draft's abstract `EventSubscriber` class, static `EVENT_NAME` and `onCall()` are outside the current public contract; event names are not repeated on subscriber classes.
 
 The Hub fixes its internal channels to the default policies and accepts no channel policy configuration. It does not aggregate listener results; use a channel with a result type when results matter.
 

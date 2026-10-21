@@ -15,10 +15,12 @@
 ## 为什么选它
 
 - **旧请求的结果写不进来，即使底层接口不能取消。** 手写时谁最后返回谁赢；`Resource` 给每次请求一个世代编号，只有最新一代的结果会写入 `state`。[示例](./USEGUIDE.md#只显示最新输入的结果)
-- **依赖自动登记，同一轮改几个条件只发一次请求。** 手写时每个条件的变化回调各发一次请求；请求函数在第一个 `await` 之前读到的响应式值都会成为依赖，同一轮里的多次修改在下一个微任务合并成一次请求。[示例](./USEGUIDE.md#同时改几个条件只发一次请求)
+- **依赖自动登记，同一轮改几个条件只发一次请求。** 手写时每个条件的变化回调各发一次请求；请求函数在第一个 `await` 之前读到的响应式值都会成为依赖，同一轮里的多次修改默认在下一个微任务合并成一次请求。[示例](./USEGUIDE.md#同时改几个条件只发一次请求)
 - **多处读取共享一个 Promise。** 手写去重要自己处理失败后清除、过期后重取；同一个 `Resource` 的 `promise` 在请求进行中和缓存有效时都返回同一个 Promise。[示例](./USEGUIDE.md#多处同时读取只请求一次)
 - **取消有自己的状态，不会被当成失败。** `cancel()` 后状态是 `cancelled`，资源还能 `refetch()`；`dispose()` 会把中止信号传给底层请求，等待方收到原生 `AbortError`。[示例](./USEGUIDE.md#取消后显示已取消而不是错误)
 - **服务端快照带的是剩余有效期，不是时间点。** 浏览器用本地时钟接着计时，两端时钟不一致也不影响，快照仍有效时不发请求。[示例](./USEGUIDE.md#服务端已取到的数据浏览器不再请求)
+
+当异步结果依赖 `Signal` 或 `Computed`，又需要界面观察状态、共享请求或刷新缓存时，用 `Resource` 管理这套可观察、可复用的状态。只加载一次、没有这些需求的请求，直接 `await` 一个 Promise 更简单。
 
 ## 从这里开始
 
@@ -53,6 +55,7 @@ keyword.value = 'react' // 用户继续输入
 await new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回
 view.dispose()
 results.dispose()
+keyword.dispose()
 ```
 
 输出：
@@ -63,7 +66,9 @@ results.dispose()
 接口返回：“re”
 ```
 
-`re` 比 `react` 晚返回，日志里能看到它返回了，但页面停在 `react` 的结果上。请求函数读了 `keyword.value`，关键词一变 `Resource` 就发起新请求，并作废旧的那一次；旧请求即使跑完，也写不进 `state`。
+`re` 比 `react` 晚返回，日志里能看到它返回了，但页面停在 `react` 的结果上。请求函数在返回 Promise 前同步读取了 `keyword.value`，关键词一变 `Resource` 就发起新请求，并作废旧的那一次；旧请求即使跑完，也写不进 `state`。
+
+`view` 是一个 Effect（响应式副作用），执行时读取 `results.state`，所以请求状态变化会让它再次执行并更新页面。把 `state` 保存到普通变量只得到当时的状态快照；要持续更新界面，应在 Effect 或 UI 框架的状态订阅中读取它。结束时先释放 `view`，再释放 `results`，最后释放输入 `keyword`，避免清理过程再次触发渲染或请求。
 
 下一步：更多用法看 [USEGUIDE 的“按场景查找”](./USEGUIDE.md#按场景查找)；要在离开页面时停掉网络请求，看 [离开页面时停掉还在进行的请求](./USEGUIDE.md#离开页面时停掉还在进行的请求)。
 
@@ -101,7 +106,7 @@ void loadProfile('1')
 | 世代（generation） | 每次请求一个编号；只有最新一代的结果能写入 `state` |
 | 有效期（`ttl`） | 成功的数据多久后过期；默认 `Infinity`，只在依赖变化或手动刷新时重新请求 |
 | `cancel()` / `dispose()` | 停掉这一次请求、资源还能用 / 停掉请求并释放整个资源 |
-| 快照 | `dehydrate()` 导出数据和剩余有效期，另一端用 `initialSnapshot` 恢复 |
+| 快照 | 调用方可传输或保存 `dehydrate()` 导出的数据和剩余有效期，再用 `initialSnapshot` 恢复 |
 
 几个说法：
 
@@ -146,12 +151,14 @@ pnpm add @migaia/resource @migaia/reactive
 
 ### 生命周期、错误与边界
 
-1. **依赖追踪只认第一个 `await` 之前的同步读取。** `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。
+构造选项 `autoStart` 默认为 `true`：没有仍有效的 `initialSnapshot` 时，构造函数立即发起第一代请求。传 `autoStart: false` 时不在构造期请求，首次被动读取仍可启动；有效的初始快照会直接复用。
+
+1. **依赖追踪只认第一个 `await` 之前的同步读取。** `await` 之后再读响应式值不会被追踪；需要时先把值读进局部变量，或者把读取挪进一个 `Computed`。依赖变化何时刷新由传入的 `runtime` 调度决定，默认在微任务中处理。
 2. **请求函数要把 `signal` 交给真正可取消的 I/O**（例如 `fetch(url, { signal })`）。否则取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。
-3. **`refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。** 想强制刷新就调用 `refetch()` 或 `invalidate()`。
+3. **`refetch()` 总是发起新请求；被动读取（`state`、`promise`、`read()`）只在 `idle` 或数据过期时才发起。** 每次刷新会创建新的一代，并中止仍在途的上一代的 `signal`；只有当前一代能把结果写入状态。想强制刷新就调用 `refetch()` 或 `invalidate()`。
 4. **不再使用时要调用 `dispose()`**，否则依赖登记和进行中的请求会一直留着。释放后读取数据和发起请求都抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 是安全的空操作。`dispose()` 不会释放传入的 `runtime`。
 5. **默认 `keepAlive: false`。** 没人读取 `state` 时，`Resource` 会和上游断开但保留依赖版本与缓存；下次读取时依赖没变且缓存有效就复用原值和 Promise，依赖变了就重新请求。需要“没人看也保持连接”时传 `keepAlive: true`。
-6. **`cancel()` 之后被动读取不会自动重启。** 正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。
+6. **`cancel()` 之后被动读取不会自动重启。** 需要暂时停止当前请求、稍后继续使用同一个资源时调用 `cancel()`。正在加载的请求被取消后状态是 `cancelled`；后台刷新被取消时保留旧数据并清除 `refreshing`。只有显式 `refetch()` 会重新开始。
 
 ### 错误身份
 

@@ -140,6 +140,8 @@ The package has only the root entry `@migaia/store-light`. Use `@migaia/store-in
 
 ## Contract details
 
+`createStore` takes a `shape` typed as `IStoreDefinition<S>` with inferred `this`, accepting synchronous fields only. Its optional `options?: ICreateStoreOptions` selects the Runtime and async Action warnings; the result is `IReactiveStore<S>`. Use `createAsyncStore` for asynchronous fields and await its Promise before reading the ready fields.
+
 Every signature, boundary behaviour and error message is in [USEGUIDE.en.md](./USEGUIDE.en.md). These are the constraints that matter most in use.
 
 1. **Getters are read-only.** A derived value has no setter, and assigning to it throws `TypeError`; change it only through the fields it reads.

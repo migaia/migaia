@@ -122,7 +122,11 @@ pnpm add @migaia/event-subscriber
 
 ## 契约细节
 
-基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。
+`createEventChannel<T, R>()` 中，`T` 是发布载荷类型，`R` 是监听器结果类型。指定结果类型不会改变 channel 的订阅模型，也不会创建全局任务表。
+
+基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文，原始载荷放在 `event.value`；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。
+
+公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 是调用方给本次登记起的标签；返回的 `subscription` 负责取消并可追加订阅。
 
 只处理 payload 时可显式选择 value：
 
@@ -143,7 +147,15 @@ value 模式保持 payload 身份，不提供 `abort()`、`setTaskId()` 或 `tas
 
 同步 `publish()` 不等待 Promise。同步抛错收集为 `PUBLISH_FAILED`，迟到拒绝交给 report；异步调用工具等待结算，通过返回值或拒绝交付结果。settled 只收集监听器失败，通道与任务准入错误仍同步抛出。
 
-订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。
+`invokeParallelSettled(channel, payload)` 按登记顺序返回结算项：`{ status: 'fulfilled', value }` 的 `value` 是监听器兑现后的返回值；`{ status: 'rejected', reason }` 的 `reason` 是监听器原始的抛错或拒绝原因。这些字段描述监听器执行结果，不是消息发送回执。
+
+订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。
+
+设置 `style: 'on-emit'` 后，`channel.on(listener)` 登记监听器并返回本次订阅的句柄，`channel.emit(value)` 按所选派发策略把 value 交给当前快照中的监听器。默认 handle 取消策略下，句柄的 `off()` 只移除它拥有的登记。`on`、`emit`、`off` 分别与 `subscribe`、`publish`、`unsubscribe` 指向同一函数；canonical（固定原名）方法仍保留。
+
+从 `@migaia/event-subscriber/subscriber` 导入的 `subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` 只通过 `channel.subscribe(listener, options?)` 工作，不读取 style 配置，因此可以接收仍保留该方法的 styled channel（增加命名别名的通道）。它们的返回值固定为普通 `IUnsubscribe`，即同步、幂等的取消函数，不带 `off`、`dispose`、`unlisten` 或订阅链方法。
+
+对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。旧草案中的抽象类 `EventSubscriber`、静态 `EVENT_NAME` 与 `onCall()` 不属于当前公开契约，不把事件名重复存进 class。
 
 Hub 的内部策略固定为上述默认值，不接受单通道策略配置。它不聚合监听器结果；需要返回值时使用带结果类型的 channel。
 

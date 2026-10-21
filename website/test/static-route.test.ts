@@ -604,58 +604,89 @@ test('keeps concrete learning content without the generated reading checklist', 
   const readme = renderedText(
     readFileSync(join(buildRoot, 'zh/docs/resource/readme/index.html'), 'utf8')
   )
-  assert.match(readme, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
-  assert.match(readme, /generation 校验.*?旧结果/s)
+  assert.match(
+    readme,
+    /关键词一变 Resource 就发起新请求.*?旧请求即使跑完，也写不进 state.*?执行时读取 results\.state.*?请求状态变化会让它再次执行并更新页面/s
+  )
+  assert.match(
+    readme,
+    /每次请求一个世代编号，只有最新一代的结果会写入 state.*?旧请求即使跑完，也写不进 state/s
+  )
 })
 
 test('explains request generations, observation, and terminal cleanup', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /构造函数默认 autoStart: true.*?立即创建第一代请求/s)
-  assert.match(text, /switch 读取的是当前快照/)
-  assert.match(text, /Effect.*?框架适配层.*?读取 user\.state/s)
-  assert.match(text, /refetch\(\).*?创建新一代.*?取消仍在途的上一代/s)
-  assert.match(text, /generation 检查.*?防止旧结果覆盖新状态/s)
-  assert.match(text, /dispose\(\) 是终止整个 Resource，不等同于取消一次请求/)
-  assert.match(text, /不会释放外部传入的 runtime/)
+  assert.match(
+    text,
+    /构造选项 autoStart 默认为 true：没有仍有效的 initialSnapshot 时，构造函数立即发起第一代请求/
+  )
+  assert.match(text, /把 state 保存到普通变量只得到当时的状态快照/)
+  assert.match(
+    text,
+    /view 是一个 Effect（响应式副作用），执行时读取 results\.state.*?应在 Effect 或 UI 框架的状态订阅中读取它/s
+  )
+  assert.match(
+    text,
+    /refetch\(\) 总是发起新请求.*?每次刷新会创建新的一代，并中止仍在途的上一代的 signal/s
+  )
+  assert.match(text, /只有当前一代能把结果写入状态/)
+  assert.match(
+    text,
+    /cancel\(\) \/ dispose\(\)\s*停掉这一次请求、资源还能用 \/ 停掉请求并释放整个资源/
+  )
+  assert.match(text, /dispose\(\) 不会释放传入的 runtime/)
   assert.match(text, /RESOURCE_DISPOSED/)
-  assert.match(text, /暂时停止当前请求.*?cancel\(\)/s)
+  assert.match(text, /需要暂时停止当前请求、稍后继续使用同一个资源时调用 cancel\(\)/)
 })
 
 test('shows the complete invalidation and render chain', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /const id = userId\.value/)
-  assert.match(text, /const stopRendering = runtime\.effect/)
-  assert.match(text, /const state = user\.state/)
-  assert.match(text, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
-  assert.match(text, /同一批次内.*?多次写入合并/s)
-  assert.match(text, /idle\/microtask 通道通知 Resource/)
-  assert.match(text, /abort 被取代 generation 的 signal/)
-  assert.match(text, /generation 校验.*?丢弃旧结果/s)
-  assert.match(text, /返回 Promise 之前的同步阶段/)
-  assert.match(text, /先停止渲染 Effect，再终止 Resource，最后释放输入 Signal/)
+  assert.match(text, /new Resource\(\(\) => search\(keyword\.value\), runtime\)/)
+  assert.match(text, /const view = runtime\.effect/)
+  assert.match(text, /const state = results\.state/)
+  assert.match(
+    text,
+    /关键词一变 Resource 就发起新请求.*?旧请求即使跑完，也写不进 state.*?执行时读取 results\.state.*?请求状态变化会让它再次执行并更新页面/s
+  )
+  assert.match(text, /同一轮里的多次修改默认在下一个微任务合并成一次请求/)
+  assert.match(text, /依赖变化何时刷新由传入的 runtime 调度决定，默认在微任务中处理/)
+  assert.match(text, /每次刷新会创建新的一代，并中止仍在途的上一代的 signal/)
+  assert.match(text, /只有最新一代的结果会写入 state.*?旧请求即使跑完，也写不进 state/s)
+  assert.match(text, /请求函数在返回 Promise 前同步读取了 keyword\.value/)
+  assert.match(text, /先释放 view，再释放 results，最后释放输入 keyword/)
+  assert.ok(
+    text.indexOf('view.dispose()') < text.indexOf('results.dispose()') &&
+      text.indexOf('results.dispose()') < text.indexOf('keyword.dispose()')
+  )
 })
 
 test('keeps use cases and direct-await tradeoffs above the example', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /当异步结果依赖 Signal\/Computed/)
-  assert.match(text, /相比直接 await.*?可观察、可复用的状态机/s)
-  assert.match(text, /一次性.*?请求仍应直接 await/s)
-  assert.match(text, /1\. 这是什么/)
-  assert.match(text, /2\. 适合什么场景/)
-  assert.match(text, /3\. 用了之后能得到什么/)
-  assert.match(text, /旧请求不会覆盖新状态/)
-  assert.match(text, /Suspense 友好的读取原语/)
-  assert.match(text, /缓存与后台刷新/)
-  assert.match(text, /SSR\/持久化快照/)
+  assert.match(text, /当异步结果依赖 Signal 或 Computed/)
+  assert.match(text, /可观察、可复用的状态.*?直接 await 一个 Promise 更简单/s)
+  assert.match(text, /只加载一次、没有这些需求的请求，直接 await 一个 Promise 更简单/)
+  assert.match(text, /你可能遇到过/)
+  assert.match(text, /为什么选它/)
+  assert.match(text, /从这里开始/)
+  assert.match(text, /旧请求的结果写不进来，即使底层接口不能取消/)
+  assert.match(text, /按 Suspense 的方式读取（成功返回值、加载中抛 Promise、失败抛错误）/)
+  assert.match(
+    text,
+    /有效期（ttl）.*?成功的数据多久后过期.*?刷新时不清空内容\s*staleWhileRevalidate: true/s
+  )
+  assert.match(
+    text,
+    /服务端快照带的是剩余有效期.*?调用方可传输或保存 dehydrate\(\) 导出的数据和剩余有效期，再用 initialSnapshot 恢复/s
+  )
 
-  const decisionIndex = text.indexOf('2. 适合什么场景')
-  const exampleIndex = text.indexOf('4. 五分钟上手')
+  const decisionIndex = text.indexOf('直接 await 一个 Promise 更简单')
+  const exampleIndex = text.indexOf('从这里开始')
   assert.ok(decisionIndex >= 0 && decisionIndex < exampleIndex)
 })
 
@@ -849,10 +880,10 @@ test('render compute, streaming, and ownership boundaries', () => {
     )
   /** The client owns endpoint cleanup while its request accepts cancellation and transfer options. */
   const adapter = renderedText(readWorker('index', 'WorkerAdapter'))
-  assert.match(adapter, /关闭适配器、等待就绪并关闭端点，从不终止借用线程/)
+  assert.match(adapter, /关闭适配器、等待就绪并关闭端点，不终止借用线程；重复调用返回同一 Promise/)
   assert.match(
     adapter,
-    /可选含中止信号及转移列表对象，默认空，信号透传以合作取消，原生转移可能分离别名/
+    /选项对象默认 \{\}，其中 signal、transfer 均默认 undefined；信号用于协作取消，转移可能分离其他别名视图/
   )
   assert.match(
     renderedText(readWorker('index', 'createWorkerHandler')),
@@ -860,7 +891,7 @@ test('render compute, streaming, and ownership boundaries', () => {
   )
   assert.match(
     renderedText(readWorker('index', 'workerComputed')),
-    /代次取消和重试由资源包标准文档定义/
+    /提供状态、刷新、Promise、取消、缓存导出恢复及销毁；请求代次与重试遵循资源包契约/
   )
   /** API audit a384c4d3 removes serialize aliases and the public transferables helper. */
   assert.match(
@@ -890,19 +921,19 @@ test('render readiness, field layout, and cleanup', () => {
   /** Reads one maintained Store WASM API page. */
   const readStoreWasm = (symbol: string): string =>
     readFileSync(join(buildRoot, 'zh/docs/store-wasm/api/' + symbol + '/index.html'), 'utf8')
-  assert.match(renderedText(readStoreWasm('ensureWasm')), /等待中及成功后保持同一承诺身份/)
+  assert.match(renderedText(readStoreWasm('ensureWasm')), /等待中及成功后复用同一个 Promise/)
   assert.match(renderedText(readStoreWasm('number')), /八字节小端浮点数字段/)
   assert.match(renderedText(readStoreWasm('boolean')), /单字节布尔字段/)
   assert.match(renderedText(readStoreWasm('string')), /四字节长度头/)
   /** MaxBytes and granularity are positional parameters in the current public signatures. */
   assert.match(
     renderedText(readStoreWasm('string')),
-    /maxBytes\?: number — 调用者选择的编码字节容量，默认二百五十六/
+    /maxBytes\?: number — UTF-8 字节容量默认 256，须为 0 至 4294967291 的安全整数/
   )
   assert.match(renderedText(readStoreWasm('array')), /失败尝试回滚内存/)
   assert.match(
     renderedText(readStoreWasm('array')),
-    /granularity\?: number — 调用者选择的每桶下标数/
+    /granularity\?: number — 每桶下标数须为正安全整数，默认 64；设为 1 时逐下标追踪/
   )
   assert.match(
     renderedText(readStoreWasm('record')),
@@ -941,8 +972,11 @@ test('renders maintained guidance without architecture trampoline routes', () =>
     ),
     'utf8'
   )
-  assert.match(architecture, /适用与不适用场景/)
-  assert.match(architecture, /本地、瞬时的事件订阅/)
+  assert.match(architecture, /典型场景/)
+  assert.match(
+    renderedText(architecture),
+    /用于进程内的一对多事件通知[\s\S]*事件是瞬时通知，不提供当前值、重放/
+  )
   /** The package introduction reuses its real purpose instead of a generator instruction. */
   const packagePurpose = api.match(/<meta name="description" content="([^"]+)"/)?.[1]
   assert.ok(packagePurpose)
@@ -973,7 +1007,7 @@ test('renders maintained guidance without architecture trampoline routes', () =>
   assert.match(apiDetail, /<h2>选项<\/h2>/)
   assert.match(apiDetail, /<h2>最小示例<\/h2>/)
   assert.match(renderedText(apiDetail), /channel\.subscribe/)
-  assert.match(renderedText(apiDetail), /jobs\.publish/)
+  assert.match(renderedText(apiDetail), /updates\.publish\(1\)/)
   assert.match(apiDetail, /style 不改变顺序、调度、错误或生命周期语义/)
   assert.match(apiDetail, /subscribe-publish/)
   assert.match(apiDetail, /defineEventApiStyle/)
@@ -988,7 +1022,10 @@ test('renders maintained guidance without architecture trampoline routes', () =>
   assert.doesNotMatch(architecture + api, /本节说明|场景 1|打开完整|This section records/)
 
   for (const [name, expectations] of [
-    ['createEventHub', ['每个事件名在第一次使用时才创建自己的 channel', 'resourceId']],
+    [
+      'createEventHub',
+      ['每个事件名在第一次使用时才创建自己的 channel', "alias: 'orderId'", "readPath: 'data\\.id'"]
+    ],
     /** E3a98b85 removes defineEventApiStyle; custom names use this public type and satisfies. */
     [
       'IEventApiStyleNames',
@@ -1026,8 +1063,18 @@ test('renders maintained guidance without architecture trampoline routes', () =>
         styleOption,
         /<div class="explained-code(?: annotated)?"[^>]*data-code-kind="example"[^>]*>\s*<figure class="code-frame">/
       )
-      for (const behavior of [/style: 'on-emit'/, /events\.on\(/, /events\.emit\(/, /stop\.off\(/])
+      for (const behavior of [
+        /style: 'on-emit'/,
+        /notifications\.on\(/,
+        /notifications\.emit\('Order shipped'\)/,
+        /stop\.off\(/
+      ])
         assert.match(renderedText(styleOption), behavior)
+      assert.match(renderedText(candidateHtml), /events\.on\('changed'/)
+      assert.match(
+        renderedText(candidateHtml),
+        /events\.emit\('changed', \{ data: \{ id: 'order-7' \} \}\)/
+      )
     }
     assert.doesNotMatch(candidateHtml, /配置与任务指南|Declaration:| · [a-f0-9]{8}/)
   }
@@ -1074,21 +1121,38 @@ test('separates signatures, fields, validation, and neighboring APIs', () => {
     'utf8'
   )
 
-  assert.match(capabilityArchitecture, /class="contract-signature"/)
-  assert.match(capabilityArchitecture, /class="contract-field-list"/)
-  assert.match(capabilityArchitecture, /class="contract-field"/)
+  /** Maintained Markdown separates creation, fields and validation without the retired card CSS. */
+  const capabilityText = renderedText(capabilityArchitecture)
+  assert.match(
+    capabilityText,
+    /createCapabilityHost\(context, options\?\) 返回 ICapabilityHost<Context>/
+  )
+  assert.match(
+    capabilityArchitecture,
+    /<table[\s\S]*?<th[^>]*>成员<\/th>[\s\S]*?<th[^>]*>行为与边界<\/th>/
+  )
+  assert.match(
+    capabilityArchitecture,
+    /<tr><td>register\(definition\)<\/td><td>同步登记，不激活；Host 终态或重入窗口内拒绝。<\/td><\/tr>/
+  )
   assert.match(capabilityArchitecture, /class="contract-validation"/)
-  assert.match(capabilityArchitecture, /data-slot="separator"/)
+  assert.match(
+    capabilityArchitecture,
+    /<h3>Host 创建与输入快照<\/h3>[\s\S]*class="contract-validation"[\s\S]*<h3>Host 类型与完整操作<\/h3>[\s\S]*<table class="prose-table">/
+  )
 
   const storeLightArchitecture = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/store-light/readme')),
     'utf8'
   )
   assert.match(
-    storeLightArchitecture,
-    /class="contract-signature-code">\(shape: IStoreDefinition&lt;S&gt;, options\?: ICreateStoreOptions\) =&gt; IReactiveStore&lt;S&gt;<\//
+    renderedText(storeLightArchitecture),
+    /createStore.*shape.*IStoreDefinition<S>.*options\?: ICreateStoreOptions.*返回 IReactiveStore<S>/s
   )
-  assert.match(storeLightArchitecture, /class="contract-signature-description"/)
+  assert.match(
+    renderedText(storeLightArchitecture),
+    /只接受同步字段.*异步字段应改用 createAsyncStore/s
+  )
   assert.doesNotMatch(storeLightArchitecture, /<div class="contract-signature">[\s\S]{0,500}签名：/)
 })
 
@@ -1096,58 +1160,90 @@ test('shows when to enable, consume, disable, and dispose', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/capability/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /type INotificationCenter = ICapabilityHandle/)
-  assert.match(text, /capabilities\.register<INotificationCenter>/)
-  assert.match(text, /const result = await capabilities\.enable\('notificationCenter'\)/)
-  assert.match(text, /capabilities\.handle<INotificationCenter>\('notificationCenter'\)/)
-  assert.match(text, /notifications\?\.show\(message\)/)
-  assert.match(text, /await capabilities\.disable\('notificationCenter'\)/)
-  assert.match(text, /await capabilities\.dispose\(\)/)
-  assert.match(text, /enable\(\) 返回的是状态而不是业务对象/)
-  assert.match(text, /用户关闭抽屉时调用 disable\(\)/)
-  assert.match(text, /配置或权限被撤回时用 setFlag\('notificationCenter', false\)/)
+  assert.match(
+    text,
+    /ICapabilityHandle 的唯一约束是 dispose\(\): void 或 PromiseLike<void>；业务方法由具体能力扩展/
+  )
+  assert.match(text, /host\.register\(\{/)
+  assert.match(text, /\(await host\.enable\('export'\)\)\.status/)
+  assert.match(
+    text,
+    /handle<Handle>\(name\)\s*返回 activate 创建的同一个业务句柄；未启用返回 undefined/
+  )
+  assert.match(text, /等待 enable 结果，只有 enabled 时读取业务 handle/)
+  assert.match(text, /disable\(name\)\s*等待该能力全部在途激活和释放排空/)
+  assert.match(text, /await host\.dispose\(\)/)
+  assert.match(text, /enable\(name\)\s*返回结构化结果/)
+  assert.match(text, /离开页面等待 disable/)
+  assert.match(
+    text,
+    /setFlag\(name, enabled\)\s*只有严格 true 放行；false 同步作废在途激活、撤下已有句柄并开始释放；true 不自动激活/
+  )
 })
 
 test('explains composition terms in reader language', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /这一节只给 Tray.*? 的 Host 适配器维护者看/)
-  assert.match(text, /prepared admission.*数据库事务提交前的暂存区/s)
-  assert.match(text, /Host revision 就是 Host 的修改版本号/)
-  assert.match(text, /安装凭证.*exact receipt/s)
-  assert.match(text, /opaque data-order slot.*Host 内部保存的排序位置/s)
-  assert.match(text, /第一步先让新请求看不到待卸载插件/)
-  assert.match(text, /cleanupComplete: false.*不代表资源已经释放/s)
-  assert.match(text, /仍须等待返回的 physicalCompletion Promise/)
+  assert.match(
+    text,
+    /普通应用使用根入口的 Host、插件、Feature、句柄和错误工具；composition 是单一组合 owner 的窄协议/
+  )
+  assert.match(
+    text,
+    /prepareAdmissions\(\[\{ admission, slot \}\]\).*setup 可在准备期执行，但 extension、config、Feature、stage 暂不公开.*commitPreparedAdmissions 同步发布/s
+  )
+  assert.match(text, /revision 是 Host 已提交修改的版本号，不是尝试操作的次数/)
+  assert.match(text, /registration token 精确指向那次安装，不按名称误删新代/)
+  assert.match(
+    text,
+    /createDataOrderSlot\(name\) 保留 opaque 排序槽.*createDataOrderSlot 调用即保留顺序；禁用、恢复和 replace 沿用 slot/s
+  )
+  assert.match(
+    text,
+    /commitPreparedUnUseBatch\(prepared, \{ beforeCleanup\? \}\) 先逻辑撤销，再等待 fence 和该代 pipeline lease/
+  )
+  assert.match(text, /cleanupComplete false 不代表资源已释放/)
+  assert.match(text, /确认物理释放前，应等待全部 physicalCompletion 延续完成/)
 })
 
 test('uses definePlugin and consumes the committed view', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /import \{ definePlugin, PluginHost \} from '@migaia\/plugin-host'/)
-  assert.match(text, /const upper = definePlugin<ICore, \{ upper\(value: string\): string \}>/)
-  assert.match(text, /const \[handle\] = await host\.use\(upper\)/)
-  assert.match(text, /handle\.extensions\.upper\('migaia'\)/)
-  assert.match(text, /await host\.unUse\('upper'\)/)
-  assert.match(text, /函数形 definePlugin\(name, descriptorFactory\)/)
-  assert.match(text, /definePlugin\(\{ name, config, install, update, dispose \}\)/)
-  assert.match(text, /只会校验并保存定义。它不会执行 descriptor 或 install\(\)/)
-  assert.match(text, /use\(\) 成功后按输入顺序返回插件句柄.*handle/)
+  assert.match(text, /import \{ defineHost, definePlugin \} from '@migaia\/plugin-host'/)
+  assert.match(
+    text,
+    /const greeting = definePlugin\(\{.*name: 'greeting'.*install: \(\) => \(\{ greet: \(\) => '你好' \}\)/s
+  )
+  assert.match(text, /const \[registration\] = await host\.use\(greeting\)/)
+  assert.match(text, /registration\.extensions\.greet\(\)/)
+  assert.match(text, /await host\.unUse\('greeting'\)/)
+  assert.match(text, /definePlugin\(name, descriptorFactory, features\?\) 只捕获定义/)
+  assert.match(text, /对象形 definePlugin\(definition\)/)
+  assert.match(
+    text,
+    /name、install\(core, setupOutput\?\).*config.*update\(next, core\).*dispose\(context\?\)/s
+  )
+  assert.match(text, /只捕获定义。真正安装时同步创建一次 descriptor，再调用其 install\(\)/)
+  assert.match(text, /不在定义时执行安装或 Feature 工厂/)
+  assert.match(text, /use\(\.\.\.plugins\).*按依赖拓扑安装，按原输入顺序返回句柄/s)
 })
 
 test('explains the control signal and transition', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /GENERATOR_CONTINUE 是框架导出的唯一 Symbol 控制信号，不是.*?业务数据/)
-  assert.match(text, /最后一次 yield.*?交给下一 stage/s)
-  assert.match(text, /一次也没有 yield.*?原样转发.*?输入/s)
-  assert.match(text, /第二个 stage 收到 MIGAIA，最终结果是 \[MIGAIA\]/)
-  assert.match(text, /return transformedValue.*?直接把该值交给下一 stage/s)
-  assert.match(text, /GENERATOR_HALT.*?终止整条 pipeline/s)
-  assert.match(text, /GENERATOR_UNDEFINED.*?真正的 undefined.*?继续向下传/s)
+  assert.match(text, /这三个唯一 symbol 从 middleware-pipeline 直接导入/)
+  assert.match(text, /这三个 symbol 作为 stage 返回值时，它们是控制信号，不是业务数据/)
+  assert.match(text, /GENERATOR_CONTINUE.*最后一次 yield 的值进入第二步/s)
+  assert.match(text, /GENERATOR_CONTINUE 采用最后 yield（零 yield 用输入）/)
+  assert.match(text, /textHost\.runPipeline\('migaia', \(value\) => console\.log\(value\)\)/)
+  assert.match(text, /yield value\.toUpperCase\(\)/)
+  assert.match(text, /输出 \[MIGAIA\]：第二个 stage 收到 MIGAIA，完成回调收到加上方括号后的结果/)
+  assert.match(text, /先耗尽当前 stage，普通返回值交给下一步/)
+  assert.match(text, /隐式 undefined 或 GENERATOR_HALT 终止/)
+  assert.match(text, /GENERATOR_UNDEFINED 才把业务 undefined 继续交付，类型必须允许它/)
 })
 
 /**
@@ -1645,10 +1741,13 @@ test('explains the exact subscription, delivery, and removal behavior', () => {
   )
   const text = renderedText(html)
 
-  assert.match(text, /on\(\) 登记监听器，并返回只属于这次订阅的取消句柄 stop/)
-  assert.match(text, /emit\(1\) 同步把值 1 交给当前监听器/)
-  assert.match(text, /stop\.off\(\) 删除这条 registration/)
-  assert.match(text, /只是 subscribe、publish、unsubscribe 的别名/)
+  assert.match(text, /channel\.on\(listener\) 登记监听器并返回本次订阅的句柄/)
+  assert.match(
+    text,
+    /默认采用同步 recursive 派发[\s\S]*channel\.emit\(value\) 按所选派发策略把 value 交给当前快照中的监听器/
+  )
+  assert.match(text, /默认 handle 取消策略下，句柄的 off\(\) 只移除它拥有的登记/)
+  assert.match(text, /on、emit、off 分别与 subscribe、publish、unsubscribe 指向同一函数/)
   assert.doesNotMatch(text, /最后执行这一项操作/)
 })
 
@@ -1659,11 +1758,14 @@ test('uses its subpath and states the style boundary precisely', () => {
   )
   const text = renderedText(html)
 
-  assert.match(text, /from '@migaia\/event-subscriber\/subscriber'/)
-  assert.match(text, /可接收保留该方法的 styled channel/)
-  assert.match(text, /不读取 style 配置/)
-  assert.match(text, /返回值固定为 canonical IUnsubscribe/)
-  assert.match(text, /不会带上 off、dispose、unlisten 等 style alias/)
+  assert.match(
+    text,
+    /从 @migaia\/event-subscriber\/subscriber 导入的 subscribeOnce、subscribeUntil、subscribeSubscriber/
+  )
+  assert.match(text, /可以接收仍保留该方法的 styled channel/)
+  assert.match(text, /只通过 channel\.subscribe\(listener, options\?\) 工作，不读取 style 配置/)
+  assert.match(text, /返回值固定为普通 IUnsubscribe，即同步、幂等的取消函数/)
+  assert.match(text, /不带 off、dispose、unlisten 或订阅链方法/)
 })
 
 test('explains why the legacy class event name was removed', () => {
@@ -1673,13 +1775,16 @@ test('explains why the legacy class event name was removed', () => {
   )
   const text = renderedText(html)
 
-  assert.match(text, /const channel = createEventChannel<number>\(\)/)
-  assert.match(text, /旧草案里的 abstract class EventSubscriber/)
+  assert.match(
+    text,
+    /const updates = createEventChannel<number>\(\{ dispatchPolicy: EventDispatchPolicy\.queued \}\)/
+  )
+  assert.match(text, /旧草案中的抽象类 EventSubscriber/)
   assert.match(text, /静态 EVENT_NAME/)
-  assert.match(text, /那套接口没有进入当前公开契约/)
-  assert.match(text, /IEventSubscriber 只是 \{ handle\(event\) \}/)
-  assert.match(text, /由传给 subscribeSubscriber\(channel, subscriber\) 的 channel 决定/)
-  assert.match(text, /hub\.subscribe\('count', listener\)/)
+  assert.match(text, /onCall\(\) 不属于当前公开契约/)
+  assert.match(text, /对象订阅者只需实现 IEventSubscriber<T, R> 的 handle\(event\)/)
+  assert.match(text, /事件来源由 subscribeSubscriber\(channel, subscriber\) 中的 channel 决定/)
+  assert.match(text, /多事件名称由 Hub 的 subscribe\(key, listener\) 中的 key 决定/)
 })
 
 test('defines the channel, registration, payload, and settled result', () => {
@@ -1689,12 +1794,18 @@ test('defines the channel, registration, payload, and settled result', () => {
   )
   const text = renderedText(html)
 
-  assert.match(text, /const tasks = createEventChannel<IEmailJob, IEmailReceipt>\(\)/)
-  assert.match(text, /\{ taskId: 'email' \}/)
-  assert.match(text, /const job: IEmailJob = \{ recipient: 'ada@example\.com'/)
-  assert.match(text, /tasks 不是特殊类型或全局任务表/)
-  assert.match(text, /job 会成为 listener 收到的 event\.value/)
-  assert.match(text, /result 则明确区分发送成功的 receipt 与发送失败的原因/)
+  assert.match(text, /createEventChannel<T, R>\(\).*T 是发布载荷类型，R 是监听器结果类型/)
+  assert.match(text, /taskId 是调用方给本次登记起的标签/)
+  assert.match(
+    text,
+    /const updates = createEventChannel<\{ id: number \}>\(\)[\s\S]*updates\.publish\(\{ id: 1 \}\)/
+  )
+  assert.match(text, /指定结果类型不会改变 channel 的订阅模型，也不会创建全局任务表/)
+  assert.match(text, /保留事件上下文，原始载荷放在 event\.value/)
+  assert.match(
+    text,
+    /\{ status: 'fulfilled', value \} 的 value 是监听器兑现后的返回值；\{ status: 'rejected', reason \} 的 reason 是监听器原始的抛错或拒绝原因/
+  )
 })
 
 test('import the primary API from its public owner', () => {
@@ -1823,7 +1934,7 @@ test('shows its input object and all result branches', () => {
   assert.match(text, /readLabel\(user, 'email'\).*字段不存在，走业务默认值/s)
   assert.match(text, /readLabel\(user, 'profile'\).*getter 异常被显式上报/s)
   assert.match(text, /profileReads.*1.*没有为了判断结果而重复触发 getter/s)
-  assert.match(text, /user.*第一个参数 value.*普通对象、class 实例/s)
+  assert.match(text, /probeProperty\(value, key\) 的第一个参数 value.*普通对象、class 实例/s)
   assert.match(text, /字段不存在.*读取字段失败.*分开/s)
 })
 
@@ -1866,7 +1977,7 @@ test('explains immutable updates and structural sharing precisely', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /每次 set 都返回新根对象/s)
+  assert.match(text, /set\(\).*值真正变化时才返回新根/s)
   assert.match(text, /next\.user !== data\.user.*路径上的对象被浅拷贝/s)
   assert.match(text, /next\.settings === data\.settings.*未修改分支继续共享引用/s)
   assert.match(text, /immutable.*更新方式.*不会深拷贝整棵树.*不会调用 Object\.freeze/s)
@@ -1881,7 +1992,10 @@ test('demonstrates admission, isolation, and managed successors', () => {
   assert.match(text, /callerOptions\.retry\.attempts = 99.*config\.retry\.attempts.*2/s)
   assert.match(text, /Set 也已复制/s)
   assert.match(text, /WeakMap.*profile 与 limits/s)
-  assert.match(text, /readonlyConfig.*公开读取.*patchConfig.*派生新根.*readConfigPath/s)
+  assert.match(
+    text,
+    /readonlyConfig.*公开读取用它，更新用 patchConfig\(\) 生成下一份受管理配置.*readConfigPath/s
+  )
   assert.match(text, /返回对象没有被冻结.*运行时配置.*不应当作可序列化数据/s)
 })
 
@@ -1903,7 +2017,7 @@ test('explains module scope, singleton limits, and Proxy responsibility', () => 
   const text = renderedText(html)
 
   assert.match(text, /export const getRuntime = once/)
-  assert.match(text, /first === second; \/\/ true/)
+  assert.match(text, /console\.log\(first === second\) \/\/ true/)
   assert.match(text, /每调用一次 once\(fn\) 都会创建一份独立缓存/)
   assert.match(text, /iframe、Worker、Node vm 等不同 realm/)
   assert.match(text, /globalThis\[Symbol\.for\('your-app\/runtime'\)\]/)
@@ -4633,7 +4747,7 @@ test('explains graph tracking, scheduling, and exact cleanup', () => {
   assert.match(text, /Effect → Computed → Signal.*?依赖自动登记/s)
   assert.match(text, /count\.value = 3.*?不会在 setter 内立刻重跑副作用/s)
   assert.match(text, /runtime\.flush\(\).*?同步排空.*?队列/s)
-  assert.match(text, /测试、SSR.*?才显式调用 flush\(\)/s)
+  assert.match(text, /测试、服务端渲染或需要确定提交边界的代码才显式调用 flush\(\)/)
   assert.match(text, /释放顺序按消费者到数据源执行/)
   assert.match(text, /Runtime 本身没有 dispose\(\)/)
   assert.match(text, /Scope.*?统一释放/s)
@@ -5664,11 +5778,21 @@ test('keeps every maintained Storage Web continuation resolvable', () => {
 
 test('explains selection and the real clone boundary', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/storage-web/readme')), 'utf8')
+  const text = renderedText(html)
 
-  assert.match(html, /四者不是同一种格式的别名/)
-  assert.match(html, /真正的复制发生在 IndexedDB\/Memory 的 structured clone/)
-  assert.match(html, /codec 不复制/)
-  assert.match(html, /Date\/Map\/Set\/bytes\/循环引用仍保留/)
+  assert.match(
+    text,
+    /jsonCodec.*output:text.*structuredCodec.*output:structured.*binaryCodec.*output:binary.*selectCodec.*直连、回退或拒绝/s
+  )
+  assert.match(text, /structuredCodec.*encode\/decode 恒等，不复制；真正复制在 record backend/s)
+  assert.match(text, /bytes 复制，record 采用 structuredClone/)
+  assert.match(text, /structuredCodec.*encode\/decode 恒等，不复制.*binaryCodec.*校验后原样返回/s)
+  assert.match(
+    text,
+    /jsonCodec 不保留 Date\/Map\/Set\/bytes 原类型，也不能表示循环。structuredCodec 可交给后端保存可 structured-clone 的内建类型与循环/
+  )
   assert.match(html, /UNSUPPORTED_CAPABILITY/)
-  assert.match(html, /字段校验、版本迁移以及 class 实例重建仍应由 Schema\/Entity 层处理/)
+  assert.match(text, /schema 处理领域表示，codec 处理保存格式，二者不是同一层/)
+  assert.match(text, /不重建 class 业务实例，不做 schema 校验/)
+  assert.match(text, /读取 codec.decode→版本迁移（存储表示）→schema.decode→validate/)
 })
