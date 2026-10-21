@@ -4,7 +4,14 @@
  * for reentrancy. Cleanup failures retain native identity or original cause with their owning code.
  * Defaults remain readable application data; Provider/Registry never dispose the Runtime itself.
  */
-import type { ICaseDoc, ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import type {
+  ICaseDoc,
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  ISymbolDoc,
+  IText
+} from './contract.js'
 import { storeReactCases } from './store-react-cases.js'
 
 /** Constructs one bilingual explanation. */
@@ -88,9 +95,130 @@ const application = { App, dispose: () => registry.disposeAsync() }`
 const configExample = `const config = normalizeStoreConfig({ features: { experimental: { charts: true } } })
 console.log(readStoreFeature(config, 'experimental.charts'))
 assertStoreFeature(config, 'experimental.charts', 'Charts')`
+
+/** A pricing panel waits for the initialization promised by its WASM declaration. */
+const wasmOptionExample = `import { StoreProvider } from '@migaia/store-react'
+
+const pricingConfig = {
+  features: { wasm: true },
+  ready: [initializePricingWasm]
+}
+function PricingApp() {
+  return (
+    <StoreProvider config={pricingConfig}>
+      <PricingTable />
+    </StoreProvider>
+  )
+}`
+
+/** A Store explicitly consumes the preference exposed by normalized application configuration. */
+const featureOptionExample = `import { normalizeStoreConfig, readStoreFeature } from '@migaia/store-react'
+import { createStore } from '@migaia/store-light'
+
+const config = normalizeStoreConfig({
+  features: { experimental: { charts: true } },
+  defaults: { warnAsyncActions: true }
+})
+const invoice = createStore({ total: 0 }, {
+  warnAsyncActions: config.defaults.warnAsyncActions
+})
+if (readStoreFeature(config, 'experimental.charts')) mountInvoiceCharts(invoice)`
+
+/** An application feature guard gives the user an unavailable view instead of opening the panel. */
+const disabledFeatureOptionExample = `import { normalizeStoreConfig, assertStoreFeature } from '@migaia/store-react'
+
+const config = normalizeStoreConfig({ features: { wasm: false } })
+function openPricing() {
+  try {
+    assertStoreFeature(config, 'wasm', 'PricingPanel')
+    openPricingPanel()
+  } catch (error) {
+    showFeatureUnavailable(error)
+  }
+}
+pricingButton.onclick = openPricing`
+
+/** One editor widget transfers its registry's final cleanup to its Provider. */
+const providerOwnershipOptionExample = `import { StoreProvider, createStoreRegistry, createStoreToken } from '@migaia/store-react'
+
+const registry = createStoreRegistry()
+const editorToken = createStoreToken<typeof editorStore>('editor')
+registry.register(editorToken, editorStore, { owned: true })
+function EditorWidget() {
+  return (
+    <StoreProvider registry={registry} runtime={registry.runtime} disposeOnUnmount={true}>
+      <Editor />
+    </StoreProvider>
+  )
+}`
+
+/** A stable configuration keeps asynchronous editor preparation outside the child render. */
+const providerReadyOptionExample = `import { StoreProvider } from '@migaia/store-react'
+
+const editorConfig = {
+  ready: [loadEditorSettings],
+  fallback: <p>Loading editor settings…</p>
+}
+function EditorApp() {
+  return (
+    <StoreProvider config={editorConfig}>
+      <Editor />
+    </StoreProvider>
+  )
+}`
+
+/** Shared inspection cases use real normalized configuration, not partial lookalikes. */
+const featureOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Inspect an enabled application feature', '读取已启用的应用特性'),
+    problem: t(
+      'An invoice screen enables an experimental chart panel and wants its Stores to warn about asynchronous actions. A Provider preference does not configure those Stores automatically. Read the normalized preference when creating the Store, and check the chart flag before mounting its UI.',
+      '发票页面启用实验图表，并希望它的 Store 对异步操作发出警告。Provider 中的偏好不会自动配置这些 Store；创建 Store 时读取归一化偏好，再在挂载图表前检查开关。'
+    ),
+    example: featureOptionExample,
+    result: t(
+      'The invoice chart mounts because its application flag is enabled, and the Store receives the warning preference explicitly.',
+      '发票图表因应用开关已启用而挂载，Store 也显式取得异步操作警告偏好。'
+    ),
+    covers: ['features', 'features.experimental', 'defaults']
+  },
+  {
+    title: t('Reject use of a disabled feature', '拒绝使用已关闭的特性'),
+    problem: t(
+      'A pricing panel requires WASM, but this deployment disables that feature. Opening the panel directly would ignore the application policy. Guard the entry action with assertStoreFeature so the page can explain why the panel is unavailable without loading it.',
+      '定价面板依赖 WASM，但当前部署关闭了这个特性。直接打开面板会忽略应用策略；在入口操作使用 assertStoreFeature，页面便能说明面板为何不可用，而不去加载它。'
+    ),
+    example: disabledFeatureOptionExample,
+    result: t(
+      'Clicking the pricing control shows the unavailable view with FEATURE_DISABLED; the WASM panel never opens.',
+      '点击定价入口会显示带 FEATURE_DISABLED 的不可用界面，不会打开 WASM 面板。'
+    ),
+    covers: ['features']
+  }
+]
+
+/** Provider configuration and lifecycle remain separate decisions. */
+const readyOptionCase: IOptionCaseDoc = {
+  title: t('Wait for initialization before rendering children', '初始化完成后再渲染子树'),
+  problem: t(
+    'An editor needs its saved settings before its controls can render. Rendering immediately could show the wrong initial state. Keep the settings loader in a stable configuration and show a loading view until it finishes, then mount the editor.',
+    '编辑器需要先取得保存的设置，才能显示控件。立即渲染可能展示错误的初始状态；把设置加载函数放入稳定配置，加载完成前显示等待界面，再挂载编辑器。'
+  ),
+  example: providerReadyOptionExample,
+  result: t(
+    'The settings-loading message appears first. The editor appears after the settings load, without rendering against incomplete configuration.',
+    '先显示设置加载提示，设置加载完成后再显示编辑器，避免用不完整配置渲染控件。'
+  ),
+  covers: ['ready', 'fallback']
+}
 /** Features are declarative switches, not automatic implementation installers. */
 const features: Readonly<Record<string, IMemberDoc>> = {
   wasm: {
+    whenToUse: t(
+      'Set true when the subtree uses WASM fields, and supply its initialization barriers in `ready`. This declaration does not initialize WASM. False, including omission, disables the declaration and requires no WASM barrier; true without a barrier creates rejected readiness.',
+      '子树使用 WASM 字段时设为真，并通过 `ready` 提供初始化屏障。这个声明不会初始化 WASM。设为假或省略时关闭声明，不要求 WASM 屏障；设为真却没有屏障时，就绪状态会拒绝。'
+    ),
+    example: wasmOptionExample,
     summary: t(
       'Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.',
       '声明使用网页汇编字段；启用时必须提供至少一个就绪屏障，否则归一化创建拒绝的配置屏障。'
@@ -196,13 +324,19 @@ const normalizedConfig: Readonly<Record<string, IMemberDoc>> = {
       'Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.',
       '无屏障时为空值，否则包含承诺、同步状态查询与错误查询；状态为待完成、就绪或错误，在微任务中更新，错误查询保留拒绝身份。'
     ),
-    example:
-      'const config = normalizeStoreConfig({ ready: [Promise.resolve()] }); await config.ready?.promise; console.log(config.ready?.status(), config.ready?.error())'
+    example: `import { normalizeStoreConfig } from '@migaia/store-react'
+
+const config = normalizeStoreConfig({ ready: [loadEditorSettings] })
+await config.ready?.promise
+mountEditor(config)`
   }
 }
 /** Component props describe ownership independently of readiness. */
 const providerProps: Readonly<Record<string, IMemberDoc>> = {
   children: {
+    example: `import { StoreProvider } from '@migaia/store-react'
+
+const editorView = <StoreProvider children={<Editor />} />`,
     summary: t(
       'React subtree receiving configuration and Registry contexts after readiness succeeds.',
       '就绪成功后接收配置与登记表上下文的组件子树。'
@@ -229,6 +363,11 @@ const providerProps: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   disposeOnUnmount: {
+    whenToUse: t(
+      'Use true for a registry whose lifetime belongs to this mounted widget: its owned registrations are released after the final unmount. Use false when an application shell keeps the registry across remounts and will dispose it itself. Omission chooses true for internal registries and false for supplied registries.',
+      '登记表的生命周期归当前挂载组件所有时设为真：最终卸载后释放自持有登记。应用外壳需要跨重新挂载保留登记表、并自行释放时设为假。省略时，内部登记表默认真，传入的登记表默认假。'
+    ),
+    example: providerOwnershipOptionExample,
     summary: t(
       'Whether final Provider release disposes the registry, its atomStore and owned registrations after a task delay; Runtime remains outside this ownership.',
       '最终提供者释放是否在任务延后后释放登记表、原子存储与自持有登记；运行时不属于此释放责任。'
@@ -249,6 +388,7 @@ const providerProps: Readonly<Record<string, IMemberDoc>> = {
     }
   },
   config: {
+    example: providerReadyOptionExample,
     summary: t(
       'Optional IStoreProviderConfig for feature declarations, readiness, pending fallback and readable defaults.',
       '可选提供者配置，声明特性、就绪屏障、等待界面与可读默认值。'
@@ -492,6 +632,22 @@ export const storeReactReference: ILibraryReference = {
         )
       },
       optionDocs: providerOptionDocs,
+      optionCases: [
+        {
+          title: t('Choose who releases an injected registry', '选择谁来释放注入的登记表'),
+          problem: t(
+            'An embedded editor owns its registered Store and should release it when the widget disappears. An injected registry stays borrowed by default, so a plain unmount would retain it. Explicitly transfer final unmount cleanup to the Provider while keeping the matching runtime identity.',
+            '嵌入式编辑器拥有自己登记的 Store，组件消失后应释放它。注入的登记表默认借用，普通卸载仍会保留它；显式把最终卸载清理交给 Provider，并传入匹配的运行时身份。'
+          ),
+          example: providerOwnershipOptionExample,
+          result: t(
+            'The editor uses the injected registry. After its final unmount, the registry and its owned Store are released; the runtime remains caller-owned.',
+            '编辑器使用注入的登记表；最终卸载后，登记表和它拥有的 Store 被释放，运行时仍归调用方所有。'
+          ),
+          covers: ['registry', 'runtime']
+        },
+        { ...readyOptionCase, covers: ['config'] }
+      ],
       returns: t(
         'React element tree; internal registries default to disposal on final unmount and external registries remain borrowed by default.',
         '返回组件元素树；内部登记表默认在最终卸载后释放，外部登记表默认借用。'
@@ -851,6 +1007,13 @@ export const storeReactReference: ILibraryReference = {
         )
       },
       optionDocs: configOptionDocs,
+      optionCases: [
+        ...featureOptionCases.map((optionCase) => ({
+          ...optionCase,
+          covers: optionCase.covers.filter((field) => field !== 'features.experimental')
+        })),
+        readyOptionCase
+      ],
       returns: t(
         'IStoreConfigValue with ready null or tracked {promise,status(),error()}; malformed configuration throws INVALID_CONFIG.',
         '返回归一化配置，就绪值为空或含承诺及状态、错误查询；格式非法抛无效配置错误。'
@@ -858,6 +1021,7 @@ export const storeReactReference: ILibraryReference = {
       example: configExample
     },
     readStoreFeature: {
+      optionCases: featureOptionCases,
       ...hook(
         'Synchronously reads a normalized feature path without throwing merely because it is disabled.',
         '同步读取归一化特性路径，特性处于关闭状态本身不会引发错误。',
@@ -881,6 +1045,7 @@ export const storeReactReference: ILibraryReference = {
       }
     },
     assertStoreFeature: {
+      optionCases: featureOptionCases,
       ...hook(
         'Throws PROVIDER_REQUIRED for absent config and FEATURE_DISABLED for a disabled path; it does not initialize the requested feature.',
         '配置缺失抛提供者必需错误，路径关闭抛特性未启用错误；不初始化所请求特性。',
@@ -962,6 +1127,56 @@ export const storeReactReference: ILibraryReference = {
           default: t('Omitted: no cause property is supplied.', '省略时不提供原始原因属性。')
         }
       },
+      optionCases: [
+        {
+          title: t('Keep a failed configuration loader', '保留配置加载器的原始失败'),
+          problem: t(
+            'A configuration loader failed and the application needs a Provider-specific message. Without `cause`, creating that message loses the original error and stack. Pass the original error to retain it by identity.',
+            '配置加载器失败后，应用需要补充 Provider 相关消息。不传 `cause` 时，新错误会丢失原始失败及堆栈。传入原始错误即可按身份保留它。'
+          ),
+          example: `import { createStoreReactError, StoreReactErrorCode } from '@migaia/store-react'
+
+async function loadSettings() {
+  try {
+    return await fetchEditorSettings()
+  } catch (cause) {
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      'Unable to load editor settings',
+      { cause }
+    )
+  }
+}
+await loadSettings().catch(showSettingsError)`,
+          result: t(
+            'The page shows an editor-specific failure message, and monitoring can inspect the original loader error through cause.',
+            '页面显示编辑器设置加载失败的消息，监控仍可通过 cause 查看原始加载错误。'
+          ),
+          covers: ['cause']
+        },
+        {
+          title: t('Keep a structured readiness rejection', '保留结构化的就绪拒绝原因'),
+          problem: t(
+            'An initializer rejects with a record instead of an Error. A string message alone cannot preserve that record. The `cause` option accepts the original value without converting it.',
+            '初始化器用记录对象而不是 Error 表示拒绝原因。只有字符串消息无法保留这个记录。`cause` 可直接接收原始值，不做转换。'
+          ),
+          example: `import { createStoreReactError, StoreReactErrorCode } from '@migaia/store-react'
+
+const ready = initializeEditor().catch((cause: unknown) => {
+  throw createStoreReactError(
+    StoreReactErrorCode.readyRejected,
+    'Editor is not ready',
+    { cause }
+  )
+})
+showInitializationState(ready)`,
+          result: t(
+            'The editor shows its initialization failure while the original rejection record remains available to explain which initializer failed.',
+            '编辑器显示初始化失败，原始拒绝记录仍可用于说明哪个初始化步骤失败。'
+          ),
+          covers: ['cause']
+        }
+      ],
       returns: t(
         'Tagged native Error preserving stack and instanceof identity.',
         '返回带身份的原生错误，保留堆栈与运行时类型判断。'

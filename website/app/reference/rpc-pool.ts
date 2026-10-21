@@ -4,12 +4,103 @@
  * Ownership: this package schedules client slots and FIFO waiting; original public Thread and
  * Process Peers own wire calls, native creation, transfer rules, timeouts and supervision.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { runtimeSharedTypes } from './rpc-runtime-shared.js'
 import { rpcPoolCases } from './rpc-pool-cases.js'
 
 /** Creates bilingual prose without sharing fallback language. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Application worker entries provide report rendering through their public Peer factory. */
+const poolOptionExamples = (kind: 'Thread' | 'Process') => ({
+  capacity: `import { create${kind}Pool } from '@migaia/rpc-pool'
+
+type IReportApi = { render(input: { reportId: string }): Promise<string> }
+const pool = await create${kind}Pool<IReportApi>({
+  spawn: new URL('./report-worker.ts', import.meta.url),
+  size: 2,
+  maxQueue: 8
+})
+try {
+  const downloadUrl = await pool.request('render', { reportId })
+  showDownload(downloadUrl)
+} finally {
+  await pool.close()
+}`,
+  idle: `import { create${kind}Pool } from '@migaia/rpc-pool'
+
+type IReportApi = { render(input: { reportId: string }): Promise<string> }
+const pool = await create${kind}Pool<IReportApi>({
+  spawn: new URL('./report-worker.ts', import.meta.url),
+  size: 2,
+  idleTimeoutMs: 30_000,
+  scheduler: backgroundJobs.scheduler
+})
+onReportRequested(async (reportId) => {
+  const downloadUrl = await pool.request('render', { reportId })
+  showDownload(downloadUrl)
+})
+onServiceStopped(() => pool.close())`,
+  probe: `import { create${kind}Pool } from '@migaia/rpc-pool'
+import { defineProbe } from '@migaia/rpc-core/probe'
+
+const probe = defineProbe({
+  stages: ['peer'],
+  emit: (event) => sendPoolEventToMonitoring(event)
+})
+const pool = await create${kind}Pool({
+  spawn: new URL('./report-worker.ts', import.meta.url),
+  size: 2,
+  probe
+})
+onServiceStopped(() => pool.close())`
+})
+
+/** Thread and Process factories share client-slot limits, idle timing and probe forwarding. */
+const poolOptionCases = (kind: 'Thread' | 'Process'): readonly IOptionCaseDoc[] => {
+  const examples = poolOptionExamples(kind)
+  return [
+    {
+      title: t('Bound report generation capacity', '限制报表生成容量'),
+      problem: t(
+        'A report service must not start a new native worker for every request. Its report-worker entry provides a render method through the public Peer factory. `spawn` selects that entry, `size` starts two members, and `maxQueue` limits waiting calls to eight instead of the default 256.',
+        '报表服务不能为每个请求新建原生工作程序。report-worker 入口通过公开 Peer 工厂提供 render 方法。`spawn` 选择该入口，`size` 启动两个成员，`maxQueue` 把等待调用限制为八个，而非默认的 256 个。'
+      ),
+      example: examples.capacity,
+      result: t(
+        'A completed report is shown as a download. Two member slots process calls, up to eight calls wait, and further waiting calls are rejected with QUEUE_FULL.',
+        '报表完成后显示下载入口。两个成员槽处理调用，最多八个调用等待，再增加的等待调用以 QUEUE_FULL 拒绝。'
+      ),
+      covers: ['spawn', 'size', 'maxQueue']
+    },
+    {
+      title: t('Release report workers between bursts', '在请求间歇释放报表工作程序'),
+      problem: t(
+        'Report requests arrive in bursts, so workers should not stay alive through a long quiet period. Without `idleTimeoutMs`, pool members are retained. Use the background-job host scheduler to retire members after 30 seconds of idle time; this scheduler controls only pool idle timers, and new demand recreates missing members.',
+        '报表请求集中到达，长时间空闲时不必一直保留工作程序。不设 `idleTimeoutMs` 时，池会保留成员。用后台任务宿主的调度器在空闲 30 秒后退役成员；这个调度器只控制池的空闲计时器，新请求会重新创建缺少的成员。'
+      ),
+      example: examples.idle,
+      result: t(
+        'Reports still produce download links; after a quiet period idle workers are released and the next request recreates the capacity it needs.',
+        '报表仍生成下载入口；一段时间没有请求后释放空闲工作程序，下一次请求按需重新创建容量。'
+      ),
+      covers: ['idleTimeoutMs', 'scheduler']
+    },
+    {
+      title: t('Send member startup events to monitoring', '把成员启动事件送到监控'),
+      problem: t(
+        'Support needs to see which report workers become ready or disconnect. Without `probe`, this observer receives no member events. The pool forwards the same probe to each member; monitoring can use each event endpointId to tell workers apart.',
+        '支持人员需要看到哪些报表工作程序已经就绪或断开。不传 `probe` 时，这个观察器不会收到成员事件。池把同一个探针传给各成员，监控可用事件中的 endpointId 区分工作程序。'
+      ),
+      example: examples.probe,
+      result: t(
+        'Monitoring receives member lifecycle events from both report workers, identified by endpointId.',
+        '监控收到两个报表工作程序的成员生命周期事件，并用 endpointId 识别各成员。'
+      ),
+      covers: ['probe']
+    }
+  ]
+}
 
 /** A guarded single entry can serve both the parent pool and its spawned Thread children. */
 const threadExample = `import { createThreadPool } from '@migaia/rpc-pool'
@@ -520,6 +611,7 @@ console.log(RpcPoolErrorCode.callAborted)`
         '必填原线程启动来源与池调度限制，池不复制来源或改写子运行时、转移及监督策略。'
       ),
       example: threadExample,
+      optionCases: poolOptionCases('Thread'),
       members: {
         ...commonOptions,
         spawn: {
@@ -528,7 +620,7 @@ console.log(RpcPoolErrorCode.callAborted)`
             '必填原线程启动类型，支持通过守卫复用当前入口的真值、路径、网址对象或原线程启动配置，启动入口经线程连接工厂提供方法，每成员接收完全相同来源。'
           )
         },
-        probe: probeOption
+        probe: { ...probeOption, example: poolOptionExamples('Thread').probe }
       }
     },
     IProcessPoolOptions: {
@@ -537,6 +629,7 @@ console.log(RpcPoolErrorCode.callAborted)`
         '必填原进程启动来源及通用池限制，原运行时、权限、线协议绑定及重启策略仍归进程包拥有。'
       ),
       example: processExample,
+      optionCases: poolOptionCases('Process'),
       members: {
         ...commonOptions,
         spawn: {
@@ -545,7 +638,7 @@ console.log(RpcPoolErrorCode.callAborted)`
             '必填原进程启动类型，支持通过守卫复用当前入口的真值、路径、网址对象或原进程来源配置，程序经进程连接工厂提供方法，池原样转发精确来源。'
           )
         },
-        probe: { ...probeOption, example: processExample }
+        probe: { ...probeOption, example: poolOptionExamples('Process').probe }
       }
     },
     IRpcPoolErrorCode: {

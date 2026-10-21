@@ -88,6 +88,35 @@ const options: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
+/** Application permissions reject a cart mutation before the shared view changes. */
+const guardedCollectionExample = `import { ObservableMap } from '@migaia/store-indexed'
+import { createRuntime } from '@migaia/reactive'
+
+const quantities = new ObservableMap<string, number>([['item-1', 1]], createRuntime(), {
+  mutationGuard: {
+    assertMutationAllowed: () => permissions.assertCanEdit('cart')
+  }
+})
+try {
+  quantities.set(itemId, nextQuantity)
+  renderCart(quantities.snapshot())
+} catch (error) {
+  showReadOnlyMessage(error)
+}`
+/** Feature names make the cart's reactive nodes recognizable in the trace panel. */
+const namedCollectionExample = `import { ObservableArray } from '@migaia/store-indexed'
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({ onTrace: (event) => appendTraceToPanel(event) })
+const rows = new ObservableArray([10], runtime, { debugName: 'cartRows' })
+const view = runtime.effect(() => {
+  renderCartRows(rows.snapshot())
+})
+rows.push(20)
+onCartClosed(() => {
+  view.dispose()
+  rows.dispose()
+})`
 /** Object example shows tracked reading and explicit lifecycle ownership. */
 const objectExample = `const user = new ObservableObject({ name: 'Ada', age: 30 })
 const watch = user.runtime.effect(() => console.log(user.get('name')))
@@ -169,6 +198,63 @@ const errorFactory = (native: string, withCause: boolean): ISymbolDoc => ({
   },
   ...(withCause
     ? {
+        optionCases: [
+          {
+            title: t('Explain why cart rows could not be imported', '说明购物车行导入失败'),
+            problem: t(
+              'A cart importer decodes uploaded rows before adding them to a collection. A short import error should not hide the decoder exception. Keep it in `cause` so monitoring can inspect that exception while the page describes the failed operation.',
+              '购物车导入器先解码上传行，再加入集合。简短的导入提示不应掩盖解码异常。用 `cause` 保留它，页面说明失败操作，监控仍能查看原始异常。'
+            ),
+            example: `import {
+  createStoreIndexed${native === 'Error' ? '' : 'Type'}Error,
+  StoreIndexedErrorCode
+} from '@migaia/store-indexed'
+
+try {
+  await importCartRows(upload)
+} catch (cause) {
+  const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(
+    StoreIndexedErrorCode.invalidOption,
+    'Cart rows could not be imported',
+    { cause }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
+            result: t(
+              'The cart shows an import error, with the original decoder exception retained in monitoring.',
+              '购物车显示导入失败提示，监控记录保留原始解码异常。'
+            ),
+            covers: ['cause']
+          },
+          {
+            title: t('Keep the row rejected by import validation', '保留导入校验拒绝的行详情'),
+            problem: t(
+              'Cart import validation returns the row and field that failed. Converting that record to a message loses the structured details. Keep it in `cause` when reporting the rejected upload.',
+              '购物车导入校验会返回失败的行号和字段。只把记录变成文字会丢失结构化详情。报告上传被拒绝时，把记录保留在 `cause` 中。'
+            ),
+            example: `import {
+  createStoreIndexed${native === 'Error' ? '' : 'Type'}Error,
+  StoreIndexedErrorCode
+} from '@migaia/store-indexed'
+
+const rejection = validateCartRows(upload)
+if (rejection) {
+  const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(
+    StoreIndexedErrorCode.invalidOption,
+    'Cart upload rejected',
+    { cause: rejection }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
+            result: t(
+              'The page reports the rejected upload, and monitoring keeps its row and field details.',
+              '页面提示上传被拒绝，监控中保留对应的行号和字段。'
+            ),
+            covers: ['cause']
+          }
+        ],
         optionDocs: {
           cause: {
             summary: t(
@@ -272,7 +358,35 @@ export const storeIndexedReference: ILibraryReference = {
         'Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission.',
         '所有显式集合类共用的构造策略，提供诊断命名与可选写入接纳。'
       ),
-      members: options
+      members: options,
+      optionCases: [
+        {
+          title: t('Reject edits after permission changes', '权限变化后拒绝编辑'),
+          problem: t(
+            'A collection should stop accepting edits when its page becomes read-only. Without mutationGuard, writes have no extra permission check. A guard throws before changing the collection, so the previous value remains available.',
+            '页面变成只读后，集合应停止接收编辑。不设置 mutationGuard 时，写入没有额外的权限检查。守卫在集合变更前抛错，因此原值仍然保留。'
+          ),
+          example: guardedCollectionExample,
+          result: t(
+            'An edit rejected by the permission policy shows the read-only message and leaves the stored quantity unchanged.',
+            '权限策略拒绝编辑时，页面显示只读提示，已保存数量保持不变。'
+          ),
+          covers: ['mutationGuard']
+        },
+        {
+          title: t('Name collection writes in diagnostics', '为诊断中的集合写入命名'),
+          problem: t(
+            'A support trace panel shows several observable arrays. Their default ObservableArray names do not identify the cart. Set `debugName` to name the cart signals in trace events, so support can locate changes from this view.',
+            '支持追踪面板中有多个响应式数组。默认的 ObservableArray 名称无法识别购物车。用 `debugName` 为追踪事件中的购物车信号命名，支持人员就能定位该视图的变化。'
+          ),
+          example: namedCollectionExample,
+          result: t(
+            'The cart shows both rows, and its changed signals appear under the `cartRows` prefix in the trace panel.',
+            '购物车显示两行数据，追踪面板中变化的信号以 `cartRows` 为前缀。'
+          ),
+          covers: ['debugName']
+        }
+      ]
     },
     IIndexedOperation: {
       summary: t(

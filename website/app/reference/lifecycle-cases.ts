@@ -1,7 +1,443 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Application-owned resources keep release policy separate from UI behavior. */
+export const lifecycleOptionExamples = {
+  scopeReport: `import { createLifecycleScope } from '@migaia/lifecycle'
+
+const scope = createLifecycleScope({
+  errorPolicy: 'report',
+  report: (error) => monitoring.error('Editor cleanup failed', { error })
+})
+scope.own(editorSession, { force: () => editorSession.close() })
+await scope.dispose()
+removeEditorShell()`,
+  syncReport: `import { createSyncLifecycleScope } from '@migaia/lifecycle'
+
+const scope = createSyncLifecycleScope({
+  errorPolicy: 'report',
+  report: (error) => monitoring.error('Shortcut cleanup failed', { error })
+})
+scope.own(shortcuts, { syncSafe: true, force: () => shortcuts.unregister() })
+scope.dispose()
+closeCommandPalette()`,
+  syncCollect: `import { createSyncLifecycleScope } from '@migaia/lifecycle'
+
+const scope = createSyncLifecycleScope({ errorPolicy: 'collect' })
+scope.own(sidePanel, { syncSafe: true, force: () => sidePanel.detach() })
+const failures = scope.dispose()
+showPanelCloseNotice(failures)`,
+  deadline: `import { createLifecycleScope } from '@migaia/lifecycle'
+
+const scope = createLifecycleScope({
+  scheduler: applicationClock,
+  deadlineAt: applicationClock.now() + 2000
+})
+scope.own(draftSession, {
+  graceful: (context) => draftSession.flushAndClose(context),
+  force: () => draftSession.close()
+})
+scope.own(previewSession, {
+  graceful: (context) => previewSession.flushAndClose(context),
+  force: () => previewSession.close()
+})
+await scope.dispose()
+closeEditorWindow()`,
+  provisionalAbort: `import { createProvisionalScope } from '@migaia/lifecycle'
+
+const temporary = createProvisionalScope({ parentSignal: navigation.signal })
+const preview = temporary.own(openPreview(), { force: () => closePreview() })
+try {
+  const image = await loadPreview(preview, { signal: temporary.signal })
+  showPreview(image)
+} finally {
+  await temporary.rollback()
+}`,
+  provisionalCommit: `import { createProvisionalScope } from '@migaia/lifecycle'
+
+const temporary = createProvisionalScope({ parentSignal: navigation.signal })
+const connection = temporary.own(openDocument(), { force: () => closeDocument() })
+try {
+  await connection.ready({ signal: temporary.signal })
+} catch (error) {
+  await temporary.rollback()
+  throw error
+}
+await temporary.commitTo(pageScope)
+showDocument(connection)`,
+  generationCancel: `import { createGenerationController } from '@migaia/lifecycle'
+
+const requests = createGenerationController({
+  scheduler: applicationClock,
+  parentSignal: pageLifetime.signal
+})
+const request = requests.begin({ timeoutMs: 1000 })
+try {
+  const suggestions = await fetchSuggestions(query, { signal: request.signal })
+  if (requests.isCurrent(request.token)) showSuggestions(suggestions)
+} catch (error) {
+  showSearchError(error)
+} finally {
+  requests.complete(request.token)
+}`,
+  superseded: `import { createGenerationController } from '@migaia/lifecycle'
+
+const previews = createGenerationController({
+  onSuperseded: () => showPreviewMessage('A newer image was selected'),
+  report: (error) => monitoring.error('Discarded preview cleanup failed', { error })
+})
+async function selectImage(file: File) {
+  const request = previews.begin()
+  const bitmap = await loadPreviewBitmap(file)
+  if (previews.adopt(request.token, bitmap, (stale) => stale.close()))
+    showPreview(bitmap)
+}
+filePicker.addEventListener('change', () => { void selectImage(selectedFile()) })`,
+  queueTimeout: `import { createMutationQueue } from '@migaia/lifecycle'
+
+const saves = createMutationQueue({
+  queueAdmissionTimeoutMs: 2000,
+  scheduler: applicationClock
+})
+async function saveDraft() {
+  try {
+    await saves.enqueue(() => writeDraft(readEditor()))
+    showSaved()
+  } catch (error) {
+    showSaveRetry(error)
+  }
+}
+saveButton.addEventListener('click', () => { void saveDraft() })`,
+  queueDiagnostic: `import { createMutationQueue } from '@migaia/lifecycle'
+
+const saves = createMutationQueue({
+  scheduler: applicationClock,
+  admissionDiagnosticMs: 500,
+  onAdmissionDiagnostic: (info) => showSaveWaiting(info.owner, info.waitedMs)
+})
+async function saveSettings() {
+  await saves.enqueue(() => persistSettings(settings), { owner: 'appearance-settings' })
+  showSettingsSaved()
+}
+settingsForm.addEventListener('submit', () => { void saveSettings() })`,
+  transactionErrors: `import { createDisposeTransaction } from '@migaia/lifecycle'
+
+const closing = createDisposeTransaction({ kind: 'plan' }, {
+  errorPolicy: 'report',
+  report: (error) => monitoring.error('Presentation cleanup failed', { error })
+})
+await closing.run([
+  { source: 'presenter', descriptor: { force: () => presenter.disconnect() } },
+  { source: 'display', descriptor: { force: () => display.close() } }
+])
+returnToLibrary()`,
+  transactionClock: `import { createDisposeTransaction } from '@migaia/lifecycle'
+
+const closing = createDisposeTransaction({ kind: 'plan' }, {
+  scheduler: applicationClock,
+  deadlineAt: applicationClock.now() + 2000,
+  signal: shutdown.signal
+})
+await closing.run([{
+  source: 'draft-sync',
+  descriptor: {
+    graceful: (context) => draftSync.flushAndDisconnect(context),
+    force: () => draftSync.disconnect()
+  }
+}])
+closeEditorWindow()`,
+  transactionDrain: `import { createDisposeTransaction } from '@migaia/lifecycle'
+
+pageScope.own(editorWorkspace, { force: async (ownerContext) => {
+  const closing = createDisposeTransaction({ kind: 'plan' }, {
+    disposer: ownerContext.disposer,
+    pending: { drain: () => pendingWrites.drain() }
+  })
+  await closing.run([{
+    source: 'document',
+    descriptor: { force: (context) => documentSession.close(context) }
+  }])
+} })
+await pageScope.dispose()
+closeEditorWindow()`,
+  boundedTimeout: `import { boundedWait } from '@migaia/lifecycle'
+
+const upload = saveDraftToCloud(draft)
+const finished = await boundedWait(upload, applicationClock.now() + 2000, {
+  scheduler: applicationClock
+})
+if (finished) showSaved()
+else showBackgroundSaveNotice()`,
+  boundedCleanup: `import { boundedWait } from '@migaia/lifecycle'
+
+const finished = await boundedWait(saveDraftToCloud(draft), closeDeadline, {
+  scheduler: applicationClock,
+  reportCleanup: (error) => monitoring.error('Close timer cleanup failed', { error })
+})
+if (finished) closeEditorWindow()
+else showBackgroundSaveNotice()`,
+  scheduler: `import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+
+const scheduler = resolveSchedulerOption({ scheduler: applicationClock })
+const reminder = scheduler?.schedule(() => showSaveReminder(), 30_000)
+pageLifetime.signal.addEventListener('abort', () => reminder?.cancel(), { once: true })`,
+  schedulerFallback: `import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+const scheduler = resolveSchedulerOption({ scheduler: preferences.scheduler }, systemScheduler)
+const reminder = scheduler.schedule(() => showSaveReminder(), 30_000)
+pageLifetime.signal.addEventListener('abort', () => reminder.cancel(), { once: true })`
+}
+
+/** The release policy serves each application's own close experience. */
+const releaseCases = (sync: boolean): readonly IOptionCaseDoc[] => [
+  {
+    title: t(
+      sync
+        ? 'Close the command palette despite shortcut cleanup failure'
+        : 'Leave the editor while reporting cleanup failures',
+      sync ? '快捷键清理失败时仍关闭命令面板' : '离开编辑器时上报清理失败'
+    ),
+    problem: t(
+      sync
+        ? 'Closing the command palette must unregister its shortcuts. A failing unregister should reach monitoring while allowing the palette to close. Select report and provide its synchronous receiver.'
+        : 'Leaving an editor must release its session and remove the shell. The default throw policy would interrupt that close flow after a cleanup failure. Report the failure to monitoring while allowing the UI to finish closing.',
+      sync
+        ? '关闭命令面板时需要注销快捷键。注销失败应交给监控，同时允许面板关闭。选择report并提供同步接收方。'
+        : '离开编辑器需要释放会话并移除外壳。默认throw策略在清理失败后会中断关闭流程。把失败交给监控，让界面继续完成关闭。'
+    ),
+    example: sync ? lifecycleOptionExamples.syncReport : lifecycleOptionExamples.scopeReport,
+    result: t(
+      sync
+        ? 'The command palette closes, and an unregister failure reaches monitoring.'
+        : 'The editor shell is removed after release; cleanup failures reach monitoring.',
+      sync ? '命令面板关闭，注销失败交给监控。' : '释放后移除编辑器外壳，清理失败交给监控。'
+    ),
+    covers: ['errorPolicy', 'report']
+  },
+  sync
+    ? {
+        title: t('Show a close notice for the side panel', '为侧栏关闭显示提示'),
+        problem: t(
+          'A side panel should explain any detach failure in its own close notice. Collect the failures instead of throwing or sending them directly to a global reporter.',
+          '侧栏需要在自己的关闭提示中解释解除绑定失败。收集失败，而不是抛出或直接交给全局上报器。'
+        ),
+        example: lifecycleOptionExamples.syncCollect,
+        result: t(
+          'The panel close notice can present the collected failures.',
+          '侧栏关闭提示可以展示收集到的失败。'
+        ),
+        covers: ['errorPolicy']
+      }
+    : {
+        title: t('Give the whole editor one flush deadline', '为整个编辑器共用一个刷新截止时刻'),
+        problem: t(
+          'Draft and preview sessions must flush when the editor closes. Giving each a new two-second budget would extend the whole close flow. Share one absolute deadline from the application clock, then force-close sessions that exceed it.',
+          '编辑器关闭时，草稿和预览会话都需要刷新。每项重新给予两秒预算会延长整体关闭流程。使用应用时钟产生同一个绝对截止时刻，超期后强制关闭对应会话。'
+        ),
+        example: lifecycleOptionExamples.deadline,
+        result: t(
+          'The editor closes after both sessions have been released under the shared deadline.',
+          '两个会话在共享截止时刻下释放后，编辑器窗口关闭。'
+        ),
+        covers: ['deadlineAt', 'scheduler']
+      }
+]
+
+/** Each case chooses options for one visible application outcome. */
+export const lifecycleOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  scope: releaseCases(false),
+  syncScope: releaseCases(true),
+  provisional: [
+    {
+      title: t('Cancel and release a temporary image preview', '取消并释放临时图片预览'),
+      problem: t(
+        'A route opens a temporary preview while loading an image. Navigation away must cancel that load. Forward the navigation signal, then always roll back the temporary owner; cancellation itself does not release resources.',
+        '路由加载图片时打开临时预览。离开路由必须取消加载。转发导航信号，并始终回滚临时所有者；取消本身不会释放资源。'
+      ),
+      example: lifecycleOptionExamples.provisionalAbort,
+      result: t(
+        'A completed image appears in the preview. Its temporary resources are released even if navigation cancels loading.',
+        '加载成功时显示预览图片；导航取消加载时，临时资源仍会释放。'
+      ),
+      covers: ['parentSignal']
+    },
+    {
+      title: t('Hand a ready document to the page owner', '把就绪文档交给页面所有者'),
+      problem: t(
+        'Opening a document creates a connection before readiness is known. Navigation can cancel this setup. Roll back a failed setup; after readiness, transfer the connection to the page scope so it survives the temporary setup phase.',
+        '打开文档会在就绪前创建连接，导航可能取消初始化。失败时回滚；就绪后把连接交给页面作用域，让它在临时初始化阶段结束后继续存在。'
+      ),
+      example: lifecycleOptionExamples.provisionalCommit,
+      result: t(
+        'The ready document is displayed and remains owned until the page scope releases it.',
+        '显示就绪文档，连接持续由页面持有，直到页面作用域释放。'
+      ),
+      covers: ['parentSignal']
+    }
+  ],
+  generation: [
+    {
+      title: t('Stop waiting for obsolete search suggestions', '停止等待过期搜索建议'),
+      problem: t(
+        'Search suggestions are useful only while the page remains open and the one-second budget remains. Use the application clock and page lifetime signal, then render only the current request result.',
+        '搜索建议只在页面仍打开且一秒预算未耗尽时有用。使用应用时钟和页面生命周期信号，只展示当前请求结果。'
+      ),
+      example: lifecycleOptionExamples.generationCancel,
+      result: t(
+        'Current suggestions appear; timeout or page closure reaches the search error view.',
+        '显示当前搜索建议；超时或页面关闭时进入搜索错误展示。'
+      ),
+      covers: ['scheduler', 'parentSignal']
+    },
+    {
+      title: t('Discard an older image preview safely', '释放较早返回的图片预览'),
+      problem: t(
+        'An image picker can finish decoding an old selection after a newer selection starts. Adopt only the current bitmap. Tell the user about a discarded preview and send failed bitmap cleanup to monitoring.',
+        '图片选择器可能在新选择开始后才完成旧图片解码。只接纳当前位图，提示用户预览已被替换，并把位图释放失败交给监控。'
+      ),
+      example: lifecycleOptionExamples.superseded,
+      result: t(
+        'Only the current selection is shown; stale bitmaps are released and their cleanup failures are reported.',
+        '只显示当前选择；过期位图被释放，释放失败交给监控。'
+      ),
+      covers: ['onSuperseded', 'report']
+    }
+  ],
+  queue: [
+    {
+      title: t('Offer retry when a draft save waits too long', '草稿保存等待过久时提供重试'),
+      problem: t(
+        'Repeated save clicks must keep their order, but a save waiting behind an earlier write should not wait indefinitely. Give queued saves a two-second admission budget; a rejected save offers retry while an already running write continues.',
+        '连续点击保存需要保持顺序，但排在先前写入之后的保存不能无限等待。给排队保存两秒接纳预算，拒绝后提供重试；已经运行的写入继续执行。'
+      ),
+      example: lifecycleOptionExamples.queueTimeout,
+      result: t(
+        'Successful writes show saved; an overdue waiting save shows the retry control.',
+        '写入成功时显示已保存；等待超期的保存显示重试入口。'
+      ),
+      covers: ['queueAdmissionTimeoutMs', 'scheduler']
+    },
+    {
+      title: t('Explain a slow settings save without dropping it', '解释缓慢的设置保存而不丢弃它'),
+      problem: t(
+        'Appearance settings can wait behind another write, but users need feedback after half a second. Keep the save queued and show its owner and elapsed wait instead of rejecting it.',
+        '外观设置可以等待先前写入，但半秒后用户需要反馈。保留排队保存，显示它的所有者和已等待时间，而不是拒绝它。'
+      ),
+      example: lifecycleOptionExamples.queueDiagnostic,
+      result: t(
+        'A delayed save shows a waiting notice and later confirms the settings were saved.',
+        '延迟的保存显示等待提示，完成后再确认设置已保存。'
+      ),
+      covers: ['admissionDiagnosticMs', 'onAdmissionDiagnostic', 'scheduler']
+    }
+  ],
+  transaction: [
+    {
+      title: t(
+        'Return from a presentation after attempting every cleanup',
+        '尝试全部清理后退出演示'
+      ),
+      problem: t(
+        'Ending a presentation must disconnect the presenter before closing its display. A failure in one cleanup must not prevent trying the other or returning to the library. Report those failures through monitoring.',
+        '结束演示需要先断开演讲者，再关闭显示端。一项清理失败不能阻止另一项尝试，也不能阻止返回资料库。通过监控上报这些失败。'
+      ),
+      example: lifecycleOptionExamples.transactionErrors,
+      result: t(
+        'Both cleanup steps are attempted, then the library is shown; failures reach monitoring.',
+        '两项清理都会尝试，随后显示资料库；失败交给监控。'
+      ),
+      covers: ['errorPolicy', 'report']
+    },
+    {
+      title: t('Flush draft sync within the shutdown budget', '在关闭预算内刷新草稿同步'),
+      problem: t(
+        'Editor shutdown needs to pass its cancellation source and shared two-second deadline into draft-sync cleanup. Use the same application clock for both the deadline and release context; the transaction does not abort the caller-owned shutdown controller.',
+        '编辑器关闭时，需要把取消来源和共享两秒截止时刻传给草稿同步清理。截止时刻和释放上下文使用同一个应用时钟；事务不会中止调用方拥有的关闭控制器。'
+      ),
+      example: lifecycleOptionExamples.transactionClock,
+      result: t(
+        'Draft sync is released before the editor window closes, using the shutdown signal and shared deadline.',
+        '草稿同步使用关闭信号和共享截止时刻释放，之后关闭编辑器窗口。'
+      ),
+      covers: ['signal', 'deadlineAt', 'scheduler']
+    },
+    {
+      title: t('Wait for close-triggered document writes', '等待文档关闭产生的写入'),
+      problem: t(
+        'Closing an editor workspace can start final document writes. Run its nested release with the page owner capability and drain the existing write tracker after releasing the document, so the window does not disappear before those writes settle.',
+        '关闭编辑器工作区可能启动最终文档写入。嵌套释放保留页面所有者能力，并在释放文档后排空已有写入跟踪器，避免写入结算前窗口就消失。'
+      ),
+      example: lifecycleOptionExamples.transactionDrain,
+      result: t(
+        'The editor window closes after document release and the pending writes have settled.',
+        '文档释放且未结写入结算后，编辑器窗口才关闭。'
+      ),
+      covers: ['disposer', 'pending', 'pending.drain']
+    }
+  ],
+  bounded: [
+    {
+      title: t(
+        'Let a slow cloud save continue in the background',
+        '让缓慢的云端保存继续在后台运行'
+      ),
+      problem: t(
+        'A cloud draft save may outlast the two-second foreground wait. Observe it against the application clock and tell the user it continues in the background; boundedWait does not cancel the upload.',
+        '云端草稿保存可能超过两秒前台等待。使用应用时钟观察，并告知用户保存继续在后台运行；boundedWait不会取消上传。'
+      ),
+      example: lifecycleOptionExamples.boundedTimeout,
+      result: t(
+        'A timely save shows saved; a slower one shows the background-save notice.',
+        '及时完成时显示已保存；更慢时显示后台保存提示。'
+      ),
+      covers: ['scheduler']
+    },
+    {
+      title: t('Keep the close decision when timer cleanup fails', '定时器清理失败时保留关闭决定'),
+      problem: t(
+        'Closing an editor waits for a draft save until its existing close deadline. If the application scheduler fails while removing that wait timer, send the cleanup failure to monitoring and preserve the save-versus-deadline decision.',
+        '编辑器关闭时，会等草稿保存到已有关闭截止时刻。应用调度器移除等待定时器失败时，把清理失败交给监控，并保留保存完成或截止时刻胜出的决定。'
+      ),
+      example: lifecycleOptionExamples.boundedCleanup,
+      result: t(
+        'A finished save still closes the window; timer cleanup failures are reported without replacing that decision.',
+        '保存完成仍会关闭窗口；定时器清理失败会上报，不会替换该决定。'
+      ),
+      covers: ['scheduler', 'reportCleanup']
+    }
+  ],
+  scheduler: [
+    {
+      title: t('Schedule reminders on the application clock', '按应用时钟安排保存提醒'),
+      problem: t(
+        'An editor integrates with an application-owned clock. Resolve that scheduler for the save reminder and cancel the reminder when the page ends.',
+        '编辑器需要接入应用拥有的时钟。解析该调度器来安排保存提醒，并在页面结束时取消提醒。'
+      ),
+      example: lifecycleOptionExamples.scheduler,
+      result: t(
+        'The save reminder follows the application clock while the page is active.',
+        '页面活动期间，保存提醒遵循应用时钟。'
+      ),
+      covers: ['scheduler']
+    },
+    {
+      title: t('Keep reminders available without a configured clock', '未配置时钟时仍提供保存提醒'),
+      problem: t(
+        'Optional editor preferences may omit a scheduler. Supply the system scheduler as fallback so reminders still work without requiring a global clock replacement.',
+        '可选编辑器偏好可能没有调度器。提供系统调度器作为后备，让提醒仍可运行，无需替换全局时钟。'
+      ),
+      example: lifecycleOptionExamples.schedulerFallback,
+      result: t(
+        'The editor schedules its reminder with either the selected application clock or the system fallback.',
+        '编辑器使用所选应用时钟或系统后备安排提醒。'
+      ),
+      covers: ['scheduler']
+    }
+  ]
+}
 
 /**
  * Problems each lifecycle API solves, told as a situation, a runnable fix and the observed output.

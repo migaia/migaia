@@ -4,7 +4,14 @@
  * field-mode-constants.ts, resource-state-constants.ts, error-code.ts), README and USEGUIDE on
  * 2026-10-18.
  */
-import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type {
+  ICode,
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  IText,
+  ITypeDoc
+} from './contract.js'
 import { storeLightCases } from './store-light-cases.js'
 
 /** Builds one bilingual text. */
@@ -257,6 +264,181 @@ const resourceOptionFields: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** A cart's asynchronous refresh reports its batching boundary on the request runtime. */
+const storeDiagnosticsExample = `import { createStore } from '@migaia/store-light'
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  onError: (error, context) => reportToMonitoring(error, { phase: context.phase })
+})
+const cart = createStore({
+  items: [] as string[],
+  async refresh() {
+    this.items = await fetchCartItems()
+  }
+}, { runtime, debugName: 'Cart', warnAsyncActions: true })
+await cart.refresh()
+renderCartItems(cart.items)
+onCheckoutClosed(() => cart.$dispose())`
+/** Cart commands keep all writes inside the existing action boundary. */
+const storeMutationExample = `import { createStore } from '@migaia/store-light'
+import { createMutationPolicy } from '@migaia/store-middleware'
+
+const cart = createStore({
+  quantity: 1,
+  addItem() { this.quantity += 1 }
+}, {
+  mutationPolicy: createMutationPolicy('actions-only')
+})
+onAddToCart(() => {
+  cart.addItem()
+  renderQuantity(cart.quantity)
+})
+onCheckoutClosed(() => cart.$dispose())`
+/** A profile session survives brief panel closures, then closes when its cached value is evicted. */
+const resourceCacheExample = `import { createStoreResource } from '@migaia/store-light'
+
+const profile = createStoreResource(({ signal }) => openProfileSession(userId, signal), {
+  runtime: profileRuntime,
+  scheduler: pageHost.scheduler,
+  keepAliveMs: 30_000,
+  dispose: (session) => session.close()
+})
+onProfilePanelMounted(() => {
+  const release = profile.retainResource()
+  showProfilePanel(profile)
+  return release
+})
+onPageClosed(async () => {
+  profile.forceDispose()
+  await profile.whenTerminal()
+})`
+/** The profile registry tracks logical termination while cleanup failures remain visible. */
+const resourceFailureExample = `import { createStoreResource } from '@migaia/store-light'
+
+const profile = createStoreResource(({ signal }) => openProfileSession(userId, signal), {
+  dispose: (session) => session.close(),
+  onError: (error, phase) => reportToMonitoring(error, { feature: 'profile', phase }),
+  onTerminal: () => { profileRegistry.delete(userId) }
+})
+profileRegistry.set(userId, profile)
+showProfilePanel(profile)
+onPageClosed(async () => {
+  profile.forceDispose()
+  await profile.whenTerminal()
+})`
+/** Creation options group diagnostic choices separately from write admission. */
+const storeOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Name a request store and observe async actions', '给请求状态命名并观察异步动作'),
+    problem: t(
+      'A checkout request refreshes its cart from the server. Its store belongs to the request runtime, while debugName identifies the cart nodes. `warnAsyncActions` reports the first Promise-returning action so monitoring can locate code whose writes after await are outside the initial batch; omission produces no warning.',
+      '结账请求要从服务端刷新购物车。存储归属于请求运行时，debugName 用来识别购物车节点。`warnAsyncActions` 上报首次返回 Promise 的动作，让监控定位 await 后已不在初始批次中的写入；省略时不产生该提示。'
+    ),
+    example: storeDiagnosticsExample,
+    result: t(
+      'The cart displays the fetched items, and monitoring receives the async action boundary warning on its first refresh.',
+      '购物车显示获取到的商品，第一次刷新时监控收到异步动作边界提示。'
+    ),
+    covers: ['runtime', 'debugName', 'warnAsyncActions']
+  },
+  {
+    title: t('Require writes to go through actions', '要求写入经过动作'),
+    problem: t(
+      'Several views can access the cart, but quantity changes should go through its addItem command. Without `mutationPolicy`, a view can assign fields directly. The actions-only policy admits the command and rejects writes that bypass its action boundary.',
+      '多个视图可以访问购物车，但数量更新应经过 addItem 命令。不设 `mutationPolicy` 时，视图可以直接给字段赋值。actions-only 策略允许该命令，拒绝绕过动作边界的写入。'
+    ),
+    example: storeMutationExample,
+    result: t(
+      'The add-to-cart command updates the displayed quantity; direct writes from outside an action are rejected by the policy.',
+      '加入购物车命令更新显示数量；动作之外的直接写入会被策略拒绝。'
+    ),
+    covers: ['mutationPolicy']
+  }
+]
+/** Resource configuration keeps cache timing and failure cleanup understandable independently. */
+const resourceOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Keep a profile briefly after the view leaves', '视图离开后短暂保留资料'),
+    problem: t(
+      'Opening a profile session is expensive, and users often reopen the panel soon after closing it. `keepAliveMs` keeps it for 30 seconds after the last holder leaves, rather than the default second. Use the page host clock and profile runtime for this lifetime, then close the session through `dispose` when it is evicted.',
+      '打开资料会话开销较大，用户关闭面板后又常会很快打开。`keepAliveMs` 在最后一个持有者离开后保留 30 秒，而非默认的一秒。用页面宿主的时钟和资料运行时管理这段生命周期，逐出时再由 `dispose` 关闭会话。'
+    ),
+    example: resourceCacheExample,
+    result: t(
+      'Reopening within 30 seconds can reuse the loaded profile session; after eviction the session closes, and page shutdown waits for cleanup.',
+      '30 秒内重新打开可以复用已加载的资料会话；逐出后关闭会话，页面关闭时等待清理完成。'
+    ),
+    covers: ['runtime', 'scheduler', 'keepAliveMs', 'dispose']
+  },
+  {
+    title: t('Report failed cleanup and observe termination', '上报清理失败并观察终止'),
+    problem: t(
+      'The profile registry must drop a resource when its logical lifetime ends, even if closing the session is slow or fails. `onTerminal` removes its registry entry; `onError` forwards a failed close with its dispose phase. Without those callbacks there is no registry update and failures use the runtime reporter. `whenTerminal()` still waits for physical cleanup.',
+      '资料登记表需要在资源逻辑终止时移除它，即使会话关闭很慢或失败。`onTerminal` 移除登记，`onError` 连同 dispose 阶段上报关闭失败。省略这两个回调时不会更新登记表，失败交给运行时报告；`whenTerminal()` 仍负责等待物理清理。'
+    ),
+    example: resourceFailureExample,
+    result: t(
+      'The profile leaves the registry at logical termination, a failed session close reaches monitoring, and page shutdown waits for physical completion.',
+      '资料在逻辑终止时退出登记表，会话关闭失败会送到监控，页面关闭等待物理清理完成。'
+    ),
+    covers: ['dispose', 'onError', 'onTerminal']
+  }
+]
+/** Both native helpers keep caller failures on cause while preserving their own runtime class. */
+const errorOptionCases = (native: 'Error' | 'TypeError'): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Explain why cart state could not be created', '说明购物车状态创建失败'),
+    problem: t(
+      'The checkout creates a cart store from saved input. If initialization fails, a short cart message should not replace the field failure. Keep it in `cause` so monitoring can inspect the original error.',
+      '结账页要从保存输入创建购物车存储。初始化失败时，简短的购物车提示不应取代字段失败。用 `cause` 保留它，监控仍能查看原始错误。'
+    ),
+    example: `import { createStoreLight${native}, StoreLightErrorCode } from '@migaia/store-light'
+
+try {
+  await loadCartStore()
+} catch (cause) {
+  const error = createStoreLight${native}(
+    StoreLightErrorCode.invalidOption,
+    'Cart state could not be created',
+    { cause }
+  )
+  showCartError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The checkout shows a cart initialization error, while monitoring retains the original field failure.',
+      '结账页显示购物车初始化失败，监控记录保留原始字段失败。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep failed inventory setup and rollback details', '保留库存准备和回滚失败详情'),
+    problem: t(
+      'A cart inventory field can fail during setup and again while rolling back. Its initialization failure retains both errors. Keeping that error as `cause` preserves the original group behind the checkout-level explanation.',
+      '购物车库存字段可能在准备时失败，回滚时再次失败。初始化器会合并这些失败。把该错误留在 `cause` 中，结账页可以给出整体说明，同时保留原始错误组。'
+    ),
+    example: `import { createStoreLight${native}, StoreLightErrorCode } from '@migaia/store-light'
+
+try {
+  await createCartWithInventory()
+} catch (cause) {
+  const error = createStoreLight${native}(
+    StoreLightErrorCode.initAndCleanupFailed,
+    'Cart inventory could not be initialized',
+    { cause }
+  )
+  showCartError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The checkout reports inventory setup failure, and monitoring can inspect both setup and rollback failures.',
+      '结账页提示库存准备失败，监控仍能查看准备和回滚两个原始失败。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Reference of `@migaia/store-light`. */
 export const storeLightReference: ILibraryReference = {
   modules: {
@@ -459,6 +641,7 @@ scope.dispose()`
       example: `if (error.code === StoreLightErrorCode.storeNotReady) await storeReady(store)`
     },
     createStoreLightError: {
+      optionCases: errorOptionCases('Error'),
       role: 'operation',
       optionDocs: {
         cause: {
@@ -501,6 +684,7 @@ scope.dispose()`
       example: `throw createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'keepAliveMs must be finite')`
     },
     createStoreLightTypeError: {
+      optionCases: errorOptionCases('TypeError'),
       role: 'operation',
       optionDocs: {
         cause: {
@@ -568,6 +752,7 @@ scope.dispose()`
       members: storeMembers
     },
     ICreateStoreOptions: {
+      optionCases: storeOptionCases,
       summary: t(
         'Options of `createStore` / `createAsyncStore`.',
         '`createStore` / `createAsyncStore` 的创建选项：运行时、名称与写入策略。'
@@ -1029,7 +1214,34 @@ scope.dispose()`,
         'Options of `createStoreResource()`.',
         '`createStoreResource()` 的选项：缓存、清理与上报。'
       ),
-      members: resourceOptionFields
+      optionCases: resourceOptionCases,
+      members: {
+        ...resourceOptionFields,
+        dispose: {
+          ...resourceOptionFields.dispose!,
+          whenToUse: t(
+            'Supply it for loaded objects or functions with a cleanup method other than $dispose. It can return a promise; whenTerminal() waits for physical completion. Omit it to use the value’s $dispose method when present.',
+            '加载对象或函数提供了 $dispose 以外的清理方法时设置。可以返回 Promise；whenTerminal() 等待物理完成。省略时使用值自带的 $dispose（若有）。'
+          ),
+          example: resourceCacheExample
+        },
+        onError: {
+          ...resourceOptionFields.onError!,
+          whenToUse: t(
+            'Set it when a page needs its own load, dispose or listener failure channel. The phase tells which operation failed. Without it, failures go to the runtime reporter.',
+            '页面需要独立接收 load、dispose 或 listener 失败时设置。phase 表示失败发生在哪个操作。省略时交给运行时上报。'
+          ),
+          example: resourceFailureExample
+        },
+        onTerminal: {
+          ...resourceOptionFields.onTerminal!,
+          whenToUse: t(
+            'Set it to remove a resource from an application registry when its logical lifetime ends. It runs once; asynchronous value cleanup can still be pending. Omit it when no terminal notification is needed, and await whenTerminal() for physical completion.',
+            '逻辑生命周期结束时需要从应用登记表移除资源，就设置此回调。它只执行一次，值的异步清理可能仍未完成。不需要终态通知时省略；物理完成使用 whenTerminal() 等待。'
+          ),
+          example: resourceFailureExample
+        }
+      }
     },
     IStoreResourceConfig: {
       summary: t(

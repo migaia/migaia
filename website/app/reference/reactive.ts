@@ -658,6 +658,125 @@ console.log(doubled.deps.size, count.version)`,
         'Options of `createRuntime()`; all fields are optional and fixed at creation.',
         '`createRuntime()` 的选项；全部字段可选，在创建时确定。'
       ),
+      optionCases: [
+        {
+          title: t('Control flush timing in tests', '在测试里掌控冲刷时机'),
+          problem: t(
+            'Effects normally run in a microtask, so a test has to `await` before it can assert, and timestamps differ on every run. Replacing `adapter.scheduleMicrotask` with a plain queue lets the test decide exactly when pending effects run, and fixed `now` / `timestamp` make trace output identical between runs. Entries you leave out keep their defaults.',
+            'effect 默认在微任务里执行，测试只能先 `await` 再断言，而且每次运行的时间戳都不同。把 `adapter.scheduleMicrotask` 换成一个普通队列，测试就能自己决定待执行的 effect 什么时候运行；把 `now` / `timestamp` 固定下来，trace 输出每次都一样。没有传入的项继续使用默认实现。'
+          ),
+          example: {
+            en: `import { createRuntime } from '@migaia/reactive'
+
+const queue: (() => void)[] = []
+const runtime = createRuntime({
+  adapter: { scheduleMicrotask: (task) => queue.push(task), now: () => 0, timestamp: () => 0 }
+})
+const count = runtime.signal(0)
+const seen: number[] = []
+runtime.effect(() => {
+  seen.push(count.value)
+})
+
+count.value = 1
+console.log(seen) // [0] — the rerun is waiting in queue
+queue.splice(0).forEach((task) => task())
+console.log(seen) // [0, 1]`,
+            zh: `import { createRuntime } from '@migaia/reactive'
+
+const queue: (() => void)[] = []
+const runtime = createRuntime({
+  adapter: { scheduleMicrotask: (task) => queue.push(task), now: () => 0, timestamp: () => 0 }
+})
+const count = runtime.signal(0)
+const seen: number[] = []
+runtime.effect(() => {
+  seen.push(count.value)
+})
+
+count.value = 1
+console.log(seen) // [0]：重新执行还在队列里等待
+queue.splice(0).forEach((task) => task())
+console.log(seen) // [0, 1]`
+          },
+          result: t(
+            'The effect reruns only when the test drains the queue, with no `await` and no timers.',
+            'effect 只在测试清空队列时重新执行，不需要 `await`，也不需要计时器。'
+          ),
+          covers: ['adapter']
+        },
+        {
+          title: t(
+            'Render once per frame and stop feedback loops early',
+            '每帧只渲染一次，并尽早拦住互相触发的循环'
+          ),
+          problem: t(
+            "A drag handler can write a signal dozens of times between two frames. With `schedulerStrategy` handing `flush` to `requestAnimationFrame`, effects see only the last value of each frame. Two effects that write each other's input would loop forever; `maxFlushPasses` sets how many reruns one effect gets in a single flush before the runtime gives up, clears the queue and reports `FLUSH_LOOP` to `onError`.",
+            '拖拽处理函数在两帧之间可能写同一个 signal 几十次。用 `schedulerStrategy` 把 `flush` 交给 `requestAnimationFrame`，effect 每帧只看到最后的值。两个 effect 互相写对方读取的值会无限循环；`maxFlushPasses` 规定一次冲刷里同一个 effect 最多重新执行几次，超过后 runtime 放弃这次冲刷、清空队列，并把 `FLUSH_LOOP` 交给 `onError`。'
+          ),
+          example: {
+            en: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  schedulerStrategy: (flush) => requestAnimationFrame(flush),
+  maxFlushPasses: 10,
+  onError: (error, context) => console.error(context.phase, error)
+})
+const width = runtime.signal(100)
+runtime.effect(() => resizePanel(width.value))
+width.value = 200
+width.value = 300 // next frame: resizePanel(300) runs once
+
+const a = runtime.signal(0, { debugName: 'a' })
+const b = runtime.signal(0, { debugName: 'b' })
+runtime.effect(
+  () => {
+    b.value = a.value + 1
+  },
+  { debugName: 'syncB' }
+)
+runtime.effect(
+  () => {
+    a.value = b.value + 1
+  },
+  { debugName: 'syncA' }
+)
+// next frame: async-flush FLUSH_LOOP ... exceeded 10 flush passes`,
+            zh: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  schedulerStrategy: (flush) => requestAnimationFrame(flush),
+  maxFlushPasses: 10,
+  onError: (error, context) => console.error(context.phase, error)
+})
+const width = runtime.signal(100)
+runtime.effect(() => resizePanel(width.value))
+width.value = 200
+width.value = 300 // 下一帧：resizePanel(300) 只执行一次
+
+const a = runtime.signal(0, { debugName: 'a' })
+const b = runtime.signal(0, { debugName: 'b' })
+runtime.effect(
+  () => {
+    b.value = a.value + 1
+  },
+  { debugName: 'syncB' }
+)
+runtime.effect(
+  () => {
+    a.value = b.value + 1
+  },
+  { debugName: 'syncA' }
+)
+// 下一帧：async-flush FLUSH_LOOP ... exceeded 10 flush passes`
+          },
+          result: t(
+            'The panel resizes once per frame with the latest width, and the loop stops after 10 passes with an error that names the dropped effect instead of freezing the tab.',
+            '面板每帧只按最新宽度调整一次；循环在 10 次后停下，报出的错误会写明被丢弃的 effect，而不是让标签页卡死。'
+          ),
+          covers: ['schedulerStrategy', 'maxFlushPasses']
+        }
+      ],
       members: {
         adapter: {
           summary: t(
@@ -677,7 +796,35 @@ console.log(doubled.deps.size, count.version)`,
           default: t(
             'Not set: errors go to `adapter.reportError`.',
             '不设置：错误交给 `adapter.reportError`。'
-          )
+          ),
+          whenToUse: t(
+            'Set it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.',
+            '每个长期存在的 runtime 都应该设置。自动冲刷在微任务里执行，失败的 effect 没有调用方可以抛给；不设置 `onError` 时默认适配器直接丢掉错误，页面只是不再更新。读取 `context.phase` 和 `context.observer?.debugName` 就能知道是哪个 effect 失败。'
+          ),
+          example: {
+            en: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  onError: (error, context) => {
+    // context.phase: 'async-flush' for an automatic flush
+    reportToMonitoring(error, { phase: context.phase, effect: context.observer?.debugName })
+  }
+})
+const user = runtime.signal<{ name: string } | null>({ name: 'Ada' })
+runtime.effect(() => render(user.value!.name), { debugName: 'renderUser' })
+user.value = null // the effect throws in the next microtask; onError receives it`,
+            zh: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  onError: (error, context) => {
+    // 自动冲刷时 context.phase 是 'async-flush'
+    reportToMonitoring(error, { phase: context.phase, effect: context.observer?.debugName })
+  }
+})
+const user = runtime.signal<{ name: string } | null>({ name: 'Ada' })
+runtime.effect(() => render(user.value!.name), { debugName: 'renderUser' })
+user.value = null // effect 在下一个微任务里抛错，由 onError 接收`
+          }
         },
         onTrace: {
           summary: t(
@@ -687,7 +834,55 @@ console.log(doubled.deps.size, count.version)`,
           default: t(
             'Not set: no trace events are produced unless `subscribeTrace` is used.',
             '不设置：除非调用 `subscribeTrace`，否则不产生 trace 事件。'
-          )
+          ),
+          whenToUse: t(
+            'Use it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.',
+            '排查某个 effect 为什么重复执行，或者想让调试面板从第一个节点开始记录时使用。之后再调用 `subscribeTrace` 会漏掉它之前创建的节点的事件；`onTrace` 能全部收到。事件用 `debugName` 标识节点，所以给关心的节点起个名字。'
+          ),
+          example: {
+            en: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  onTrace: (event) => {
+    if (event.type === 'observable-change') console.log('changed', event.observable.debugName)
+    if (event.type === 'observer-run' && event.phase === 'end')
+      console.log('ran', event.observer.debugName, event.durationMs.toFixed(2), 'ms')
+  }
+})
+const name = runtime.signal('Ada', { debugName: 'name' })
+runtime.effect(
+  () => {
+    document.title = name.value
+  },
+  { debugName: 'title' }
+)
+// ran title 0.18 ms
+name.value = 'Grace'
+runtime.flush()
+// changed name
+// ran title 0.02 ms`,
+            zh: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  onTrace: (event) => {
+    if (event.type === 'observable-change') console.log('变化', event.observable.debugName)
+    if (event.type === 'observer-run' && event.phase === 'end')
+      console.log('执行', event.observer.debugName, event.durationMs.toFixed(2), 'ms')
+  }
+})
+const name = runtime.signal('Ada', { debugName: 'name' })
+runtime.effect(
+  () => {
+    document.title = name.value
+  },
+  { debugName: 'title' }
+)
+// 执行 title 0.18 ms
+name.value = 'Grace'
+runtime.flush()
+// 变化 name
+// 执行 title 0.02 ms`
+          }
         },
         maxFlushPasses: {
           summary: t(
@@ -704,7 +899,33 @@ console.log(doubled.deps.size, count.version)`,
           default: t(
             'Uses `adapter.scheduleMicrotask`.',
             '使用适配器的 `adapter.scheduleMicrotask` 微任务调度。'
-          )
+          ),
+          whenToUse: t(
+            'Use it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.',
+            '当很多 computed 同时失去最后一个观察者时使用，例如卸载一个很长的列表，而清理不应该和下一次交互抢时间。传入 `requestIdleCallback` 就把清理挪到浏览器空闲时；在那之前再次读取这个 computed，它就继续保持活跃。'
+          ),
+          example: {
+            en: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  scheduleIdle: (task) => requestIdleCallback(() => task())
+})
+const rows = runtime.signal(loadRows())
+const visible = runtime.computed(() => rows.value.filter((row) => row.visible))
+const list = runtime.effect(() => renderList(visible.value))
+
+list.dispose() // visible has no observer now; its suspension waits for idle time`,
+            zh: `import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  scheduleIdle: (task) => requestIdleCallback(() => task())
+})
+const rows = runtime.signal(loadRows())
+const visible = runtime.computed(() => rows.value.filter((row) => row.visible))
+const list = runtime.effect(() => renderList(visible.value))
+
+list.dispose() // visible 不再有观察者，它的挂起等到浏览器空闲时才执行`
+          }
         },
         schedulerStrategy: {
           summary: t(

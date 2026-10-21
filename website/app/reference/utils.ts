@@ -5,7 +5,7 @@
  * README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero timeout and `start`
  * still schedules a zero-delay deadline; it does not disable the deadline.
  */
-import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { utilsCases } from './utils-cases.js'
 import { utilsFacadeEnums, utilsFacadeSymbols, utilsFacadeTypes } from './utils-facades.js'
 
@@ -14,6 +14,1068 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Short type doc for type-only aliases. */
 const alias = (en: string, zh: string): ITypeDoc => ({ summary: t(en, zh), members: {} })
+
+/** Reader scenarios shared by APIs with the same option contract. */
+const utilsOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  utf8: [
+    {
+      title: t('Reject a damaged import', '拒绝损坏的导入文件'),
+      problem: t(
+        'A spreadsheet importer must reject damaged text before saving rows. The default decoder replaces bad bytes, which can hide damaged cell values. Set fatal to stop the import.',
+        '表格导入不能把损坏文本保存成数据行。默认解码会替换坏字节，单元格的损坏可能被忽略。设置 fatal 后停止这次导入。'
+      ),
+      example: `import { decodeUtf8 } from '@migaia/utils/bytes'
+
+try {
+  const text = decodeUtf8(await readUploadedBytes(), { fatal: true })
+  await importRows(text)
+} catch (error) {
+  showImportError(error)
+}`,
+      result: t(
+        'Damaged text reaches the import error screen instead of being saved as rows.',
+        '损坏文本会显示导入错误，不会保存成数据行。'
+      ),
+      covers: ['fatal']
+    },
+    {
+      title: t('Preview a partially damaged log', '预览部分损坏的日志'),
+      problem: t(
+        'A support tool should show the readable parts of a damaged log. Strict decoding would hide the whole file; fatal: false keeps the readable text.',
+        '客服工具需要查看损坏日志中仍可读的内容。严格解码会拒绝整个文件；fatal: false 保留可读部分。'
+      ),
+      example: `import { decodeUtf8 } from '@migaia/utils/bytes'
+
+const preview = decodeUtf8(new Uint8Array([65, 0xff, 66]), { fatal: false })
+renderLogPreview(preview)`,
+      result: t(
+        'The log preview shows A�B, with a replacement character at the damaged byte.',
+        '日志预览显示 A�B，坏字节的位置显示替换字符。'
+      ),
+      covers: ['fatal']
+    }
+  ],
+  own: [
+    {
+      title: t('Accept bounded dashboard settings', '接收有规模限制的面板配置'),
+      problem: t(
+        'A dashboard accepts nested settings from an editor. Its settings need only four levels; the larger default limit would also admit deeply nested input.',
+        '面板接收编辑器提交的嵌套配置，业务只需要四层。默认上限较大，会接收没有必要的深层输入。'
+      ),
+      example: `import { ownConfig, ConfigProfile } from '@migaia/utils/config'
+
+const settings = ownConfig(editorSettings, {
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
+})
+applyDashboardSettings(settings)`,
+      result: t(
+        'Accepted settings have an independent snapshot; overly deep input is rejected at this boundary.',
+        '接收的配置成为独立快照；层级过深的输入在此处被拒绝。'
+      ),
+      covers: ['profile', 'limits']
+    },
+    {
+      title: t('Keep local toolbar actions', '保存工具栏的本地操作'),
+      problem: t(
+        'A toolbar configuration includes an application callback. The default data profile rejects functions; richRuntime admits this local configuration.',
+        '工具栏配置包含应用回调。默认 data 档位拒绝函数；richRuntime 允许这份进程内配置。'
+      ),
+      example: `import { ownConfig, ConfigProfile } from '@migaia/utils/config'
+
+const toolbar = ownConfig({ onSave: queueDocumentSave }, {
+  profile: ConfigProfile.richRuntime
+})
+registerSaveAction(toolbar.onSave)`,
+      result: t(
+        'The toolbar can register the supplied save action from its owned configuration.',
+        '工具栏可从自己持有的配置中登记保存操作。'
+      ),
+      covers: ['profile']
+    }
+  ],
+  patch: [
+    {
+      title: t('Notify a view after an empty refresh', '空刷新也通知依赖对象身份的视图'),
+      problem: t(
+        'A settings view refreshes when it receives a new root object. An empty patch normally keeps the old identity; disabling reuse gives this refresh a new snapshot.',
+        '设置视图收到新的根对象时才刷新。空补丁默认保留旧身份；关闭复用后，这次刷新会提供新快照。'
+      ),
+      example: `import { ownConfig, patchConfig, ConfigProfile } from '@migaia/utils/config'
+
+const current = ownConfig({ port: 8080 })
+const refreshed = patchConfig(current, {}, {
+  reuseUnchangedRoot: false,
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
+})
+renderSettings(refreshed)`,
+      result: t(
+        'The view receives a fresh settings object while the port remains 8080.',
+        '视图收到新的设置对象，端口值仍为 8080。'
+      ),
+      covers: ['reuseUnchangedRoot', 'profile', 'limits']
+    },
+    {
+      title: t('Replace a local menu action', '替换菜单的本地操作'),
+      problem: t(
+        'A menu snapshot already contains callbacks. Its patch must use the same richRuntime profile; the data profile cannot accept those functions.',
+        '菜单快照已经包含回调。补丁需要继续使用 richRuntime；data 档位不能接收这些函数。'
+      ),
+      example: `import { ownConfig, patchConfig, ConfigProfile } from '@migaia/utils/config'
+
+const profile = ConfigProfile.richRuntime
+const current = ownConfig({ onOpen: openRecentDocument }, { profile })
+const next = patchConfig(current, { onOpen: openDocumentPicker }, { profile })
+registerOpenAction(next.onOpen)`,
+      result: t(
+        'The new menu opens the document picker; the previous snapshot retains its original action.',
+        '新菜单打开文件选择器，旧快照仍保留原来的操作。'
+      ),
+      covers: ['profile']
+    }
+  ],
+  combine: [
+    {
+      title: t('Append navigation without merging tags', '追加导航但替换标签'),
+      problem: t(
+        'An extension adds menu entries but replaces search tags. A global array rule alone cannot express both, so the menu path gets its own rule.',
+        '扩展要追加菜单项，却要替换搜索标签。单一数组策略无法同时表达两者，因此为 menu 路径单独设置规则。'
+      ),
+      example: `import { ownConfig, combineConfig, ConfigProfile } from '@migaia/utils/config'
+
+const settings = combineConfig([
+  ownConfig({ menu: ['home'], tags: ['old'] }),
+  ownConfig({ menu: ['settings'], tags: ['new'] })
+], {
+  strategies: { array: 'replace' },
+  pathRules: [{ prefix: ['menu'], strategies: { array: 'concat' } }],
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
+})
+renderNavigation(settings.menu)
+updateSearchTags(settings.tags)`,
+      result: t(
+        'Navigation contains home and settings; search uses only the new tags.',
+        '导航同时包含 home 和 settings；搜索只使用新标签。'
+      ),
+      covers: ['strategies', 'pathRules', 'profile', 'limits']
+    },
+    {
+      title: t('Protect the deployment port', '保护部署端口'),
+      problem: t(
+        'User settings may replace local actions but must not change the deployment port. The default right-side winner would also replace that port.',
+        '用户配置可以替换本地操作，但不能改变部署端口。默认使用右侧值，也会把这个端口覆盖。'
+      ),
+      example: `import { ownConfig, combineConfig, ConfigProfile } from '@migaia/utils/config'
+
+const profile = ConfigProfile.richRuntime
+const settings = combineConfig([
+  ownConfig({ port: 8080, onReady: showDashboard }, { profile }),
+  ownConfig({ port: 9000, onReady: showWelcome }, { profile })
+], {
+  profile,
+  onConflict: ({ path }) => path[0] === 'port' ? { kind: 'left' } : { kind: 'right' }
+})
+startDashboard(settings)`,
+      result: t(
+        'The dashboard keeps port 8080 and uses the user-selected welcome action.',
+        '面板保留端口 8080，并采用用户选择的欢迎操作。'
+      ),
+      covers: ['profile', 'onConflict']
+    }
+  ],
+  owner: [
+    {
+      title: t('Validate a port before applying it', '应用前校验端口'),
+      problem: t(
+        'An administrator edits a live service port. A negative number is valid data but invalid for this service; validate prevents it from replacing the active setting.',
+        '管理员在线修改服务端口。负数符合数据结构，却不是可用端口；validate 阻止它替换当前设置。'
+      ),
+      example: `import { ConfigOwner, ConfigProfile } from '@migaia/utils/config'
+
+const settings = new ConfigOwner({ port: 8080 }, {
+  validate: (next) => next.port > 0,
+  profile: ConfigProfile.data,
+  limits: { maxDepth: 4 }
+})
+try {
+  settings.set('port', submittedPort)
+} catch (error) {
+  showSettingsError(error)
+}`,
+      result: t(
+        'An invalid port leaves the active port unchanged and displays a settings error.',
+        '非法端口不会改变当前端口，页面会显示设置错误。'
+      ),
+      covers: ['validate', 'profile', 'limits']
+    },
+    {
+      title: t('Keep toolbar failures observable', '把工具栏更新失败送入监控'),
+      problem: t(
+        'A toolbar observes live action settings. If rendering fails, the default reporter rethrows later; an application reporter sends that failure to monitoring.',
+        '工具栏监听操作配置的在线更新。渲染失败时，默认报告器稍后重新抛错；应用报告器把该失败交给监控。'
+      ),
+      example: `import { ConfigOwner, ConfigProfile } from '@migaia/utils/config'
+
+const settings = new ConfigOwner({ onSave: queueDocumentSave }, {
+  profile: ConfigProfile.richRuntime,
+  report: reportToMonitoring
+})
+const stop = settings.watch(renderToolbar)
+settings.set('onSave', queueDocumentCopySave)
+stop()`,
+      result: t(
+        'The toolbar receives the replacement save action; any watcher failure reaches monitoring.',
+        '工具栏收到新的保存操作；监听器失败时，监控会收到错误。'
+      ),
+      covers: ['profile', 'report']
+    }
+  ],
+  normalize: [
+    {
+      title: t('Read error reports during a format migration', '格式迁移时接收旧错误报告'),
+      problem: t(
+        'A support console receives error reports with obsolete fields. The default reject policy blocks the report; ignore drops those fields and records their names for migration work.',
+        '支持控制台会收到带过期字段的错误报告。默认 reject 会拒绝整份报告；ignore 丢弃这些字段，并记录名称供迁移排查。'
+      ),
+      example: `import { normalizeSerializedErrorChain } from '@migaia/utils/error'
+
+const error = normalizeSerializedErrorChain(receivedError, {}, {
+  unknownFields: 'ignore',
+  onUnknownField: (pointer, field) => recordDroppedField(pointer, field)
+})
+renderErrorReport(error)`,
+      result: t(
+        'The console displays the supported error fields and records each discarded field.',
+        '控制台展示受支持的错误字段，并记录每个被丢弃的字段。'
+      ),
+      covers: ['unknownFields', 'onUnknownField']
+    },
+    {
+      title: t('Stop accepting an unexpected error format', '拒绝意外变化的错误格式'),
+      problem: t(
+        'A service boundary must detect changes in a sender format. Keeping unknownFields at reject stops the payload instead of silently discarding new data.',
+        '服务边界需要发现发送格式的变化。把 unknownFields 设为 reject，可拒绝这份数据，避免悄悄丢弃新字段。'
+      ),
+      example: `import { deserializeErrorChain } from '@migaia/utils/error'
+
+try {
+  const error = deserializeErrorChain(receivedError, {}, { unknownFields: 'reject' })
+  showRemoteFailure(error)
+} catch (error) {
+  reportInvalidPayload(error)
+}`,
+      result: t(
+        'Unexpected fields reach the invalid-payload handler before a remote error is displayed.',
+        '意外字段会进入非法数据处理流程，不会作为正常远程错误展示。'
+      ),
+      covers: ['unknownFields']
+    }
+  ],
+  chainReport: [
+    {
+      title: t('Upload a readable portion of a plugin error', '上传插件错误中可读取的部分'),
+      problem: t(
+        'A plugin can supply an error whose properties fail to read. Without report, that read failure stops serialization; a reporter preserves diagnostics while serialization continues.',
+        '插件提供的错误可能有无法读取的属性。未设置 report 时，读取失败会停止序列化；设置报告器后仍可采集其余诊断。'
+      ),
+      example: `import { serializeErrorChain } from '@migaia/utils/error'
+
+const error = serializeErrorChain(pluginFailure, {}, {
+  report: ({ pointer, field, error }) => reportErrorReadFailure(pointer, field, error)
+})
+await uploadErrorReport(error)`,
+      result: t(
+        'The upload retains the readable error data; property-read failures are also reported.',
+        '上传内容保留可读取的错误数据，属性读取失败也会单独上报。'
+      ),
+      covers: ['report']
+    },
+    {
+      title: t('Show a partial failure chain', '展示仍可读取的失败原因链'),
+      problem: t(
+        'A support panel should still show the root failure when a deeper cause cannot be read. A reporter allows the walk to retain readable entries.',
+        '支持面板需要在深层 cause 无法读取时仍展示根失败。报告器让遍历保留已经读到的条目。'
+      ),
+      example: `import { reachErrorChain } from '@migaia/utils/error'
+
+const chain = [...reachErrorChain(pluginFailure, {}, {
+  report: ({ error }) => reportToMonitoring(error)
+})]
+renderFailureChain(chain)`,
+      result: t(
+        'The panel shows the available chain and monitoring receives the property-read failure.',
+        '面板展示可读取的原因链，监控收到属性读取失败。'
+      ),
+      covers: ['report']
+    }
+  ],
+  identify: [
+    {
+      title: t('Explain an order-loading failure', '说明订单加载失败'),
+      problem: t(
+        'An order page needs an application message while support still needs the network failure. Setting message and cause keeps both at the boundary.',
+        '订单页需要业务提示，排查时仍要查看网络失败。设置 message 与 cause，可以同时保留两者。'
+      ),
+      example: `import { IdentifyError } from '@migaia/utils/error'
+
+try {
+  renderOrders(await fetchOrders())
+} catch (cause) {
+  const error = new IdentifyError({ source: '@app/orders', code: 'LOAD_FAILED' }, {
+    message: 'Orders could not be loaded',
+    cause
+  })
+  showOrderError(error.message)
+  reportToMonitoring(error)
+}`,
+      result: t(
+        'The page explains that orders could not load; monitoring can follow cause to the original failure.',
+        '页面提示订单加载失败，监控可沿 cause 找到原始失败。'
+      ),
+      covers: ['message', 'cause']
+    },
+    {
+      title: t('Keep an unavailable response for diagnosis', '保留不可用服务的响应'),
+      problem: t(
+        'An inventory service rejects with a status record rather than an Error. Give the application a readable message and preserve that record on cause.',
+        '库存服务可能用状态记录而非 Error 拒绝。应用需要可读提示，同时在 cause 上保留这份记录。'
+      ),
+      example: `import { IdentifyError } from '@migaia/utils/error'
+
+const error = new IdentifyError({ source: '@app/inventory', code: 'UNAVAILABLE' }, {
+  message: 'Inventory unavailable',
+  cause: { status: 503 }
+})
+showInventoryError(error.message)
+reportToMonitoring(error)`,
+      result: t(
+        'The page shows Inventory unavailable, and the diagnostic record retains status 503.',
+        '页面显示 Inventory unavailable，诊断记录仍保留状态 503。'
+      ),
+      covers: ['message', 'cause']
+    }
+  ],
+  utilsError: [
+    {
+      title: t('Keep the failure behind a settings read', '保留配置读取背后的失败'),
+      problem: t(
+        'A utility extension supplies its own read failure. Omitting cause loses the dependency failure that support needs to diagnose the operation.',
+        '工具扩展提供自己的读取错误。省略 cause 会丢失依赖失败，使排查时无法看到具体原因。'
+      ),
+      example: `import { UtilsError, UtilsErrorCode } from '@migaia/utils/error'
+
+class SettingsReadError extends UtilsError {
+  constructor(cause: unknown) {
+    super(UtilsErrorCode.invalidArgument, 'Cannot read settings', { cause })
+  }
+}
+try {
+  applySettings(await readSettings())
+} catch (cause) {
+  reportToMonitoring(new SettingsReadError(cause))
+}`,
+      result: t(
+        'The settings-read report retains the dependency failure as its cause.',
+        '配置读取报告保留依赖失败作为 cause。'
+      ),
+      covers: ['cause']
+    },
+    {
+      title: t('Keep a rejected import record', '保留被拒绝的导入记录'),
+      problem: t(
+        'A utility extension receives an import rejection with a file name. The cause option preserves that data alongside a readable error.',
+        '工具扩展收到的导入拒绝包含文件名。cause 选项将这份数据与可读错误一起保留。'
+      ),
+      example: `import { UtilsError, UtilsErrorCode } from '@migaia/utils/error'
+
+class ImportError extends UtilsError {
+  constructor(cause: unknown) {
+    super(UtilsErrorCode.invalidArgument, 'Import could not be read', { cause })
+  }
+}
+reportToMonitoring(new ImportError({ file: 'prices.csv', operation: 'decode' }))`,
+      result: t(
+        'The import report keeps the affected file name and failed operation.',
+        '导入报告保留出错文件名及失败操作。'
+      ),
+      covers: ['cause']
+    }
+  ],
+  toError: [
+    {
+      title: t('Give unknown inventory failures a readable message', '为未知库存失败提供可读消息'),
+      problem: t(
+        'An inventory dependency can reject with plain data. The generic fallback does not name the failed operation; message supplies the context.',
+        '库存依赖可能用普通数据拒绝。默认兜底消息不能说明失败操作；message 补充该上下文。'
+      ),
+      example: `import { toError } from '@migaia/utils/error'
+
+try {
+  renderInventory(await fetchInventory())
+} catch (value) {
+  const error = toError(value, { message: 'Inventory unavailable' })
+  showInventoryError(error.message)
+  reportToMonitoring(error)
+}`,
+      result: t(
+        'A non-error rejection becomes a readable failure whose cause still contains the rejected value.',
+        '非错误拒绝值成为可读错误，cause 仍保留原拒绝值。'
+      ),
+      covers: ['message']
+    },
+    {
+      title: t('Keep useful messages from a file reader', '保留文件读取器已有的错误消息'),
+      problem: t(
+        'A shared upload handler receives native errors as well as plain rejections. Its fallback message should describe only values that need wrapping.',
+        '共用上传处理器既接收原生错误，也接收普通拒绝值。兜底消息只需要用于必须包装的值。'
+      ),
+      example: `import { toError } from '@migaia/utils/error'
+
+try {
+  await uploadDocument()
+} catch (value) {
+  showUploadError(toError(value, { message: 'Upload failed' }))
+}`,
+      result: t(
+        'Existing errors keep their own message and identity; plain values receive the Upload failed fallback.',
+        '已有错误保留自己的消息与身份，普通值使用 Upload failed 兜底提示。'
+      ),
+      covers: ['message']
+    }
+  ],
+  walk: [
+    {
+      title: t('Keep the support panel compact', '限制支持面板的展开深度'),
+      problem: t(
+        'A compact support panel shows a failure and its immediate cause. The default depth can expand a much longer chain; maxDepth limits this view.',
+        '紧凑支持面板只展示失败及直接原因。默认深度可展开更长原因链；maxDepth 限制这个视图。'
+      ),
+      example: `import { walkErrorCauses } from '@migaia/utils/error'
+
+const failure = new Error('Request failed', {
+  cause: new Error('Network failed', { cause: 'offline' })
+})
+renderFailureChain(walkErrorCauses(failure, { maxDepth: 1 }))`,
+      result: t(
+        'The panel shows Request failed and Network failed without expanding offline.',
+        '面板展示 Request failed 和 Network failed，不再展开 offline。'
+      ),
+      covers: ['maxDepth']
+    },
+    {
+      title: t('Keep aggregate details out of a banner', '不在错误横幅展开全部细节'),
+      problem: t(
+        'A notification banner needs the summary of a failed batch. A zero depth keeps the aggregate root without expanding every failed item.',
+        '通知横幅只需要失败批次的摘要。最大深度为零时保留聚合根错误，不展开每个失败项。'
+      ),
+      example: `import { walkErrorCauses } from '@migaia/utils/error'
+
+const failure = new AggregateError(importFailures, 'Import failed')
+renderFailureBanner(walkErrorCauses(failure, { maxDepth: 0 }))`,
+      result: t(
+        'The banner receives only the Import failed summary.',
+        '横幅只接收 Import failed 摘要。'
+      ),
+      covers: ['maxDepth']
+    }
+  ],
+  number: [
+    {
+      title: t('Format invoice amounts consistently', '统一账单金额格式'),
+      problem: t(
+        'An invoice must use the same separators and precision on every host. Explicit locales and format avoid relying on the host default.',
+        '账单在不同宿主上需要相同的分隔符与精度。明确 locales 和 format，可避免依赖宿主默认值。'
+      ),
+      example: `import { createNumberFormatter, formatCurrency } from '@migaia/utils/number'
+
+const options = {
+  locales: 'en-US',
+  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+}
+const formatAmount = createNumberFormatter(options)
+renderInvoiceAmount(formatAmount(1234.5))
+renderInvoiceTotal(formatCurrency(1234.5, 'USD', options))`,
+      result: t(
+        'The invoice shows 1,234.50 for the amount and $1,234.50 for its USD total.',
+        '账单数额显示为 1,234.50，美元合计显示为 $1,234.50。'
+      ),
+      covers: ['locales', 'format']
+    },
+    {
+      title: t('Show a dashboard conversion rate', '展示面板转化率'),
+      problem: t(
+        'A dashboard shows conversion rates to one decimal place. Explicit precision keeps rows consistent instead of using the formatter default.',
+        '面板的转化率需要一位小数。明确精度可让各行一致，避免沿用格式器默认值。'
+      ),
+      example: `import { formatPercent } from '@migaia/utils/number'
+
+const label = formatPercent(0.125, {
+  locales: 'en-US',
+  format: { maximumFractionDigits: 1 }
+})
+renderConversionRate(label)`,
+      result: t('The conversion-rate label reads 12.5%.', '转化率标签显示 12.5%。'),
+      covers: ['locales', 'format']
+    }
+  ],
+  path: [
+    {
+      title: t('Explain why imported profile data is unavailable', '说明导入资料为何不可读'),
+      problem: t(
+        'Imported profiles can omit a name, have no parent record, or fail in a getter. Returning undefined alone cannot explain these cases to support.',
+        '导入资料可能缺少姓名、没有父记录，或者在取值函数中失败。只返回 undefined，支持人员无法区分原因。'
+      ),
+      example: `import { createPathAccessor } from '@migaia/utils/object-path'
+
+type IProfile = { user: { name?: string } | null }
+const profile = createPathAccessor<IProfile>(importedProfile, {
+  ifMissing: (probe) => showMissingField(probe.originKey),
+  ifBlocked: (probe) => showUnavailableSection(probe.originKey),
+  ifFailed: (probe) => reportToMonitoring(probe.error)
+})
+renderProfileName(profile.get('user.name'))`,
+      result: t(
+        'The application can distinguish a missing field from an unavailable section and report a failing getter.',
+        '应用可区分缺失字段与不可用分区，并上报取值函数的失败。'
+      ),
+      covers: ['ifMissing', 'ifBlocked', 'ifFailed']
+    },
+    {
+      title: t('Normalize a profile name at the boundary', '在访问边界整理姓名'),
+      problem: t(
+        'A profile form should trim names before saving and display them in capitals. Without hooks, both reads and writes use the supplied text unchanged.',
+        '资料表单需要在保存前去掉姓名首尾空格，展示时转成大写。没有回调时，读写都会原样使用文本。'
+      ),
+      example: `import { createPathAccessor } from '@migaia/utils/object-path'
+
+const profile = createPathAccessor({ name: 'Ada' }, {
+  onSet: (event) => { event.replace(event.value.trim()) },
+  onGet: (event) => { event.replace(event.value.toUpperCase()) }
+})
+profile.set('name', ' Grace ')
+renderProfileName(profile.get('name'))`,
+      result: t(
+        'The stored name is Grace, while the form displays GRACE.',
+        '实际保存的姓名为 Grace，表单展示 GRACE。'
+      ),
+      covers: ['onGet', 'onSet']
+    }
+  ],
+  abortSignal: [
+    {
+      title: t('Give a preview request its own deadline', '为预览请求设置独立截止时间'),
+      problem: t(
+        'A preview belongs to a view but must also stop after two seconds. A combined signal carries either cancellation, with a named reason for its own deadline.',
+        '预览属于一个视图，也必须在两秒后停止。合并信号同时处理两种取消，并为自己的截止时间提供明确原因。'
+      ),
+      example: `import { createAbortTimeoutSignal } from '@migaia/utils/promise'
+
+const deadline = createAbortTimeoutSignal({
+  signal: viewSignal,
+  timeoutMs: 2000,
+  scheduler: previewScheduler,
+  timeoutReason: () => new Error('Preview deadline exceeded'),
+  report: reportToMonitoring
+})
+try {
+  renderPreview(await fetchPreview({ signal: deadline.signal }))
+} finally {
+  deadline.dispose()
+}`,
+      result: t(
+        'The preview stops when its view closes or its deadline expires; timer cleanup remains observable.',
+        '视图关闭或预览超时都会停止请求；定时器清理失败仍可上报。'
+      ),
+      covers: ['signal', 'timeoutMs', 'scheduler', 'timeoutReason', 'report']
+    },
+    {
+      title: t('Release a completed export deadline', '导出完成后释放截止计时器'),
+      problem: t(
+        'A desktop export uses the application scheduler. Once export finishes, its pending deadline should be released; report preserves any timer cleanup failure.',
+        '桌面导出使用应用调度器。导出结束后应释放尚未到期的计时器；report 保留定时器清理失败。'
+      ),
+      example: `import { createAbortTimeoutSignal } from '@migaia/utils/promise'
+
+const deadline = createAbortTimeoutSignal({
+  timeoutMs: 30000,
+  scheduler: exportScheduler,
+  timeoutReason: () => new Error('Export deadline exceeded'),
+  report: reportToMonitoring
+})
+try {
+  await exportDocument({ signal: deadline.signal })
+} finally {
+  deadline.dispose()
+}`,
+      result: t(
+        'A completed export leaves no pending deadline; cleanup failures reach monitoring.',
+        '导出完成后不再保留截止任务；清理失败会交给监控。'
+      ),
+      covers: ['timeoutMs', 'scheduler', 'timeoutReason', 'report']
+    }
+  ],
+  limiter: [
+    {
+      title: t('Serialize document writes', '串行保存文档'),
+      problem: t(
+        'A document connection accepts only one write at a time. Set concurrency to one so a later save waits for the previous save.',
+        '文档连接同一时间只接受一次写入。将 concurrency 设为一，后一次保存会等待前一次结束。'
+      ),
+      example: `import { createConcurrencyLimiter } from '@migaia/utils/promise'
+
+const saves = createConcurrencyLimiter({
+  concurrency: 1,
+  report: reportToMonitoring
+})
+await Promise.all(documents.map((document) => saves.run(() => saveDocument(document))))
+await saves.dispose()`,
+      result: t(
+        'Documents save one at a time; a signal-cleanup failure is sent to monitoring.',
+        '文档逐个保存，信号清理失败会交给监控。'
+      ),
+      covers: ['concurrency', 'report']
+    },
+    {
+      title: t('Bound thumbnail downloads', '限制缩略图下载并发'),
+      problem: t(
+        'A gallery should not start every thumbnail request at once. A limit of four keeps only four tasks active while the remaining requests wait.',
+        '图库不应同时发起所有缩略图请求。上限为四时，只有四项任务可运行，其余请求排队。'
+      ),
+      example: `import { createConcurrencyLimiter } from '@migaia/utils/promise'
+
+const downloads = createConcurrencyLimiter({ concurrency: 4, report: reportToMonitoring })
+try {
+  const thumbnails = await Promise.all(imageIds.map((id) =>
+    downloads.run(() => fetchThumbnail(id), { signal: gallerySignal })
+  ))
+  renderGallery(thumbnails)
+} finally {
+  await downloads.dispose()
+}`,
+      result: t(
+        'The gallery loads thumbnails with bounded concurrency and retains cleanup diagnostics.',
+        '图库在限定并发下加载缩略图，并保留清理诊断。'
+      ),
+      covers: ['concurrency', 'report']
+    }
+  ],
+  race: [
+    {
+      title: t('Cancel a price request when either owner ends', '任一所有者结束时取消价格请求'),
+      problem: t(
+        'A price request belongs to a view and a session. Either should stop waiting; if the dependency fails later, report keeps the failure visible.',
+        '价格请求同时属于视图和会话。任一方结束都应停止等待；依赖稍后失败时，report 仍保留该失败。'
+      ),
+      example: `import { raceWithAbort } from '@migaia/utils/promise'
+
+const prices = await raceWithAbort(() => fetchPrices(), {
+  signals: [viewSignal, sessionSignal],
+  cleanupPolicy: 'reject',
+  report: reportToMonitoring
+})
+renderPrices(prices)`,
+      result: t(
+        'Leaving the view or ending the session cancels the wait; later dependency failures reach monitoring.',
+        '离开视图或结束会话都会取消等待，依赖迟到的失败会交给监控。'
+      ),
+      covers: ['signals', 'cleanupPolicy', 'report']
+    },
+    {
+      title: t('Keep a completed report despite cleanup failure', '清理失败时保留已完成的报表'),
+      problem: t(
+        'A report download should remain usable if its host signal fails to remove a listener. The report cleanup policy keeps the result and sends that cleanup error to monitoring.',
+        '报表已经下载成功时，宿主信号移除监听器失败不应丢掉报表。report 清理策略保留结果，并把清理失败交给监控。'
+      ),
+      example: `import { raceWithAbort } from '@migaia/utils/promise'
+
+const report = await raceWithAbort(() => downloadReport(), {
+  signal: reportSignal,
+  cleanupPolicy: 'report',
+  report: reportToMonitoring
+})
+openReport(report)`,
+      result: t(
+        'A successful report can open even when listener cleanup fails; monitoring still receives the failure.',
+        '监听器清理失败时，成功下载的报表仍可打开；监控仍会收到失败。'
+      ),
+      covers: ['signal', 'cleanupPolicy', 'report']
+    }
+  ],
+  sleep: [
+    {
+      title: t('Delay a refresh without losing its owner', '延后刷新并保留取消能力'),
+      problem: t(
+        'A status page pauses before refreshing. The application scheduler should own that delay, and closing the page should cancel it.',
+        '状态页在刷新前等待片刻。该等待应由应用调度器管理，关闭页面时也能取消。'
+      ),
+      example: `import { sleep } from '@migaia/utils/promise'
+
+await sleep(1000, {
+  signal: pageSignal,
+  scheduler: refreshScheduler,
+  unref: false
+})
+renderStatus(await fetchStatus())`,
+      result: t(
+        'The page refreshes after the delay; closing it cancels the pending wait.',
+        '等待结束后页面刷新，关闭页面会取消尚未结束的等待。'
+      ),
+      covers: ['signal', 'scheduler', 'unref']
+    },
+    {
+      title: t('Let a background reminder stop with either owner', '任一所有者结束时停止后台提醒'),
+      problem: t(
+        'A background reminder belongs to a window and a session. It should stop with either owner and should not keep a Node process alive on its own.',
+        '后台提醒属于窗口和会话。任一所有者结束都应停止等待，它也不应单独阻止 Node 进程退出。'
+      ),
+      example: `import { sleep } from '@migaia/utils/promise'
+
+await sleep(30000, { signals: [windowSignal, sessionSignal], unref: true })
+showReminder()`,
+      result: t(
+        'The reminder appears only if both owners remain active until the delay completes.',
+        '只有两个所有者在等待结束时都仍有效，提醒才会出现。'
+      ),
+      covers: ['signals', 'unref']
+    }
+  ],
+  timeout: [
+    {
+      title: t('Skip an export when its budget is exhausted', '预算耗尽时跳过导出'),
+      problem: t(
+        'An export may reach the queue with no remaining budget. Skip mode avoids starting a lazy operation that cannot finish within its budget.',
+        '导出排到队首时可能已没有剩余预算。skip 模式避免启动已经没有等待预算的惰性操作。'
+      ),
+      example: `import { withTimeout } from '@migaia/utils/promise'
+
+try {
+  const file = await withTimeout(() => buildExport(), {
+    timeoutMs: remainingMs,
+    zeroTimeoutBehavior: 'skip'
+  })
+  offerDownload(file)
+} catch (error) {
+  showExportError(error)
+}`,
+      result: t(
+        'When remainingMs is zero, the export error is shown without starting buildExport.',
+        'remainingMs 为零时显示导出错误，不启动 buildExport。'
+      ),
+      covers: ['timeoutMs', 'zeroTimeoutBehavior']
+    },
+    {
+      title: t('Bound a legacy price request', '限制旧价格接口的等待时间'),
+      problem: t(
+        'A legacy price client cannot observe a cancellation signal. Deadline-only mode bounds the wait, while report preserves a failure that arrives afterward.',
+        '旧价格客户端无法观察取消信号。仅截止模式限制等待时间，report 则保留截止之后才到达的失败。'
+      ),
+      example: `import { withTimeout } from '@migaia/utils/promise'
+
+const prices = await withTimeout(() => fetchLegacyPrices(), {
+  timeoutMs: 2000,
+  signal: viewSignal,
+  scheduler: requestScheduler,
+  unref: true,
+  cooperativeCancellation: false,
+  report: reportToMonitoring
+})
+renderPrices(prices)`,
+      result: t(
+        'The view stops waiting after two seconds or cancellation; later failures still reach monitoring.',
+        '两秒到期或视图取消后停止等待；迟到失败仍会交给监控。'
+      ),
+      covers: ['timeoutMs', 'signal', 'scheduler', 'unref', 'cooperativeCancellation', 'report']
+    },
+    {
+      title: t('Pass cancellation into a price request', '把取消传入价格请求'),
+      problem: t(
+        'A price client accepts a signal and can stop its own work. Cooperative cancellation passes the merged view and session cancellation into that request.',
+        '价格客户端支持 signal，能够自行停止工作。协作取消把视图和会话的合并取消传入该请求。'
+      ),
+      example: `import { withTimeout } from '@migaia/utils/promise'
+
+const prices = await withTimeout(({ signal }) => fetchPrices({ signal }), {
+  timeoutMs: 2000,
+  signals: [viewSignal, sessionSignal],
+  cooperativeCancellation: true,
+  unref: false
+})
+renderPrices(prices)`,
+      result: t(
+        'The request receives cancellation when either owner ends or the deadline expires.',
+        '任一所有者结束或截止时间到期时，请求会收到取消信号。'
+      ),
+      covers: ['timeoutMs', 'signals', 'cooperativeCancellation', 'unref']
+    }
+  ],
+  debounce: [
+    {
+      title: t('Search after typing pauses', '输入停顿后再搜索'),
+      problem: t(
+        'A search box should send the latest query after typing pauses. Trailing-only execution avoids sending the first partial query immediately.',
+        '搜索框应在输入停顿后发送最新查询。只在末端执行，可避免立即发送第一个不完整查询。'
+      ),
+      example: `import { debounce } from '@migaia/utils/scheduler'
+
+const search = debounce(searchProducts, 300, {
+  leading: false,
+  trailing: true,
+  scheduler: searchScheduler
+})
+onSearchInput(search)
+onSearchClosed(() => search.cancel())`,
+      result: t(
+        'Search receives the latest query after a 300 ms pause.',
+        '输入停顿 300 毫秒后，搜索接收最新查询。'
+      ),
+      covers: ['leading', 'trailing', 'scheduler']
+    },
+    {
+      title: t('Save a draft during continuous typing', '持续输入期间也保存草稿'),
+      problem: t(
+        'Continuous typing can postpone a trailing save forever. maxWait bounds that wait, and the document signal cancels pending saves when it closes.',
+        '持续输入可能让末端保存一直推迟。maxWait 限制最长等待，文档关闭时由信号取消待执行保存。'
+      ),
+      example: `import { debounce } from '@migaia/utils/scheduler'
+
+const save = debounce(saveDraft, 500, {
+  leading: true,
+  trailing: true,
+  maxWait: 5000,
+  signal: documentSignal,
+  scheduler: draftScheduler
+})
+onDraftChanged(save)`,
+      result: t(
+        'The first edit saves immediately; further edits save within five seconds even during continuous typing.',
+        '首次编辑立即保存；持续输入期间，后续编辑也会在五秒内保存。'
+      ),
+      covers: ['leading', 'trailing', 'maxWait', 'signal', 'scheduler']
+    }
+  ],
+  throttle: [
+    {
+      title: t('Update a scroll indicator at a steady pace', '限制滚动指示器更新频率'),
+      problem: t(
+        'A scroll indicator needs the newest position without rendering every event. Trailing execution delivers the latest position at the end of each active window.',
+        '滚动指示器需要最新位置，却不必为每个事件渲染。末端执行在每个活动窗口结束时交付最新位置。'
+      ),
+      example: `import { throttle } from '@migaia/utils/scheduler'
+
+const update = throttle(renderScrollPosition, 100, {
+  leading: false,
+  trailing: true,
+  scheduler: scrollScheduler
+})
+onScrollPosition(update)
+onPageClosed(() => update.cancel())`,
+      result: t(
+        'The indicator uses the latest position from each 100 ms activity window.',
+        '指示器使用每个 100 毫秒活动窗口中的最新位置。'
+      ),
+      covers: ['leading', 'trailing', 'scheduler']
+    },
+    {
+      title: t('Stop queued saves when a document closes', '文档关闭后停止待执行保存'),
+      problem: t(
+        'A document saves immediately on the first edit and keeps the latest edit for the end of the window. Passing its signal cancels that pending save when the document closes.',
+        '文档首次编辑时立即保存，后续编辑在窗口末端交付最新值。传入文档信号，可在关闭时取消尚未执行的保存。'
+      ),
+      example: `import { throttle } from '@migaia/utils/scheduler'
+
+const save = throttle(saveDocument, 1000, {
+  leading: true,
+  trailing: true,
+  signal: documentSignal,
+  scheduler: saveScheduler
+})
+onDocumentChanged(save)`,
+      result: t(
+        'The first edit saves immediately; closing the document drops a pending trailing save and ignores later calls.',
+        '首次编辑立即保存，文档关闭后取消待执行的末端保存，并忽略后续调用。'
+      ),
+      covers: ['leading', 'trailing', 'signal', 'scheduler']
+    }
+  ],
+  repeat: [
+    {
+      title: t('Warm a status view with a bounded refresh', '有限次数刷新初始状态'),
+      problem: t(
+        'A status view needs an immediate refresh and one follow-up. Defaults wait before the first run and repeat without a count limit.',
+        '状态视图需要立即刷新，再跟进一次。默认先等待一个间隔，而且不限制执行次数。'
+      ),
+      example: `import { repeat } from '@migaia/utils/scheduler'
+
+const refresh = repeat(refreshStatus, 1000, {
+  immediate: true,
+  maxIterations: 2,
+  onError: 'continue',
+  signal: pageSignal,
+  scheduler: refreshScheduler
+})
+await refresh.done`,
+      result: t(
+        'The view attempts two refreshes, starting immediately, then stops its refresh loop.',
+        '视图从立即刷新开始，尝试两轮后停止刷新循环。'
+      ),
+      covers: ['immediate', 'maxIterations', 'onError', 'signal', 'scheduler']
+    },
+    {
+      title: t('Stop polling after a failed refresh', '刷新失败后停止轮询'),
+      problem: t(
+        'An authenticated status view must stop polling after refresh fails. onError: stop rejects done so the page can show the failure.',
+        '需要认证的状态视图在刷新失败后应停止轮询。onError: stop 让 done 拒绝，页面可据此展示失败。'
+      ),
+      example: `import { repeat } from '@migaia/utils/scheduler'
+
+const refresh = repeat(refreshStatus, 5000, {
+  immediate: false,
+  onError: 'stop',
+  scheduler: refreshScheduler
+})
+try {
+  await refresh.done
+} catch (error) {
+  showRefreshError(error)
+}`,
+      result: t(
+        'A failed refresh stops later polls and displays the original failure.',
+        '一次刷新失败后不再发起后续轮询，并展示原始失败。'
+      ),
+      covers: ['immediate', 'onError', 'scheduler']
+    }
+  ],
+  timeSlice: [
+    {
+      title: t('Keep an import responsive', '分片导入以保持界面响应'),
+      problem: t(
+        'A large row import needs to update progress and give the host time between batches. A small budget and the application clock bound each slice.',
+        '大批数据行导入需要更新进度，并在批次之间给宿主执行机会。较小预算与应用时钟共同限制每个时间片。'
+      ),
+      example: `import { timeSlice } from '@migaia/utils/scheduler'
+
+await timeSlice(importRowsSource, importRow, {
+  budget: 8,
+  strategy: ['timeout'],
+  clock: { now: () => performance.now() },
+  onProgress: ({ processed }) => renderImportProgress(processed)
+})`,
+      result: t(
+        'The import reports processed rows and yields between slices instead of occupying one long loop.',
+        '导入按已处理行数更新进度，并在时间片之间让出宿主，避免单次长循环。'
+      ),
+      covers: ['budget', 'strategy', 'clock', 'clock.now', 'onProgress']
+    },
+    {
+      title: t('Cancel a derived import', '取消正在派生的数据导入'),
+      problem: t(
+        'A user may close the import panel while rows are being converted. Passing the panel signal stops processing at the next item boundary.',
+        '数据行转换期间，用户可能关闭导入面板。传入面板信号可在下一项开始前停止处理。'
+      ),
+      example: `import { timeSliceMap } from '@migaia/utils/scheduler'
+
+const rows = await timeSliceMap(importRowsSource, convertImportRow, {
+  signal: importSignal,
+  strategy: 'timeout'
+})
+renderImportedRows(rows)`,
+      result: t(
+        'Closing the panel cancels conversion before another item starts.',
+        '面板关闭后，不会再开始转换下一项。'
+      ),
+      covers: ['signal', 'strategy']
+    }
+  ],
+  yield: [
+    {
+      title: t('Keep a long import cancellable', '长导入让出宿主时仍支持取消'),
+      problem: t(
+        'An import loop must leave time for host tasks between rows. The import signal also needs to cancel a pending yield.',
+        '导入循环需要在数据行之间给宿主任务执行机会。导入信号也需要能取消尚未完成的让出操作。'
+      ),
+      example: `import { yieldToHost } from '@migaia/utils/scheduler'
+
+for (const row of importRowsSource) {
+  await yieldToHost('timeout', { signal: importSignal })
+  importRow(row)
+}`,
+      result: t(
+        'Host tasks can run between rows; cancellation prevents the next row from being imported.',
+        '宿主任务可在数据行之间执行；取消后不会继续导入下一行。'
+      ),
+      covers: ['signal']
+    },
+    {
+      title: t('Stop a cancelled preview loop', '取消后停止预览循环'),
+      problem: t(
+        'A preview owns a cancellation signal. Checking it at each yield prevents a closed preview from resuming its work.',
+        '预览持有自己的取消信号。每次让出时传入该信号，可阻止已关闭的预览恢复工作。'
+      ),
+      example: `import { yieldToHost } from '@migaia/utils/scheduler'
+
+try {
+  await yieldToHost('timeout', { signal: previewSignal })
+  renderPreviewFrame()
+} catch (error) {
+  handlePreviewCancellation(error)
+}`,
+      result: t(
+        'A cancelled yield enters the cancellation handler instead of rendering another frame.',
+        '让出期间取消会进入取消处理流程，不会再渲染一帧。'
+      ),
+      covers: ['signal']
+    }
+  ],
+  format: [
+    {
+      title: t('Preview an unfinished saved template', '预览尚未填写完整的模板'),
+      problem: t(
+        'Saved mail templates use double brackets. Missing fields should remain visible for editing, while present null values should appear blank.',
+        '保存的邮件模板使用双中括号。缺失字段需要保留供编辑识别，已存在的 null 则应显示为空白。'
+      ),
+      example: `import { format } from '@migaia/utils/string'
+
+const preview = format('[[name]] / [[note]] / [[missing]]', {
+  name: 'Ada', note: null
+}, {
+  placeholder: { open: '[[', close: ']]' },
+  missing: 'preserve',
+  nullish: 'empty'
+})
+renderMailPreview(preview)`,
+      result: t(
+        'The preview shows Ada /  / [[missing]], keeping the unfinished field visible.',
+        '预览显示 Ada /  / [[missing]]，未完成字段仍清晰可见。'
+      ),
+      covers: ['placeholder', 'missing', 'nullish']
+    },
+    {
+      title: t('Reject incomplete published messages', '拒绝发布缺字段的消息'),
+      problem: t(
+        'A publish step must not send an unfinished message. missing: throw stops publication, while nullish: empty blanks optional fields that are present.',
+        '发布步骤不能发送未完成的消息。missing: throw 阻止缺字段发布；nullish: empty 将已存在的可选空值留空。'
+      ),
+      example: `import { format } from '@migaia/utils/string'
+
+try {
+  const message = format('{name}: {note}', recipient, {
+    missing: 'throw',
+    nullish: 'empty'
+  })
+  await publishMessage(message)
+} catch (error) {
+  showTemplateError(error)
+}`,
+      result: t(
+        'A missing recipient field shows a template error and prevents publishing.',
+        '收件人字段缺失时显示模板错误，不会发布消息。'
+      ),
+      covers: ['missing', 'nullish']
+    }
+  ]
+}
 
 /** Shared cancellation controls (`IAsyncControls`) member docs. */
 const asyncControlMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -59,6 +1121,11 @@ const reportText = t(
 /** Unknown-field policy shared by receiving and normalizing serialized error trees. */
 const normalizeOptionDocs: Readonly<Record<string, IMemberDoc>> = {
   unknownFields: {
+    whenToUse: t(
+      'For a deliberate wire migration, ignore drops fields outside the whitelist and onUnknownField records their pointer and name. reject is the default and stops validation. Without the callback, ignore drops silently; a callback throw propagates.',
+      '明确迁移传输格式时，ignore 丢弃白名单外字段，onUnknownField 记录其路径与名称。默认 reject 会停止校验。不设置回调时，ignore 直接丢弃；回调抛错会向外传播。'
+    ),
+    example: utilsOptionCases.normalize![0]!.example,
     summary: t(
       'Policy for fields outside the boundary strategy whitelist.',
       '如何处理边界策略白名单之外的字段。'
@@ -79,6 +1146,11 @@ const normalizeOptionDocs: Readonly<Record<string, IMemberDoc>> = {
     }
   },
   onUnknownField: {
+    whenToUse: t(
+      'Set this callback to audit fields deliberately dropped by unknownFields: ignore. It runs synchronously with pointer and field; reject never calls it. Omit it to discard silently. A thrown callback error escapes.',
+      '需要审计 unknownFields: ignore 丢弃的字段时设置。回调同步收到路径与字段名；reject 不调用它。省略后直接丢弃，不发送通知；回调抛错会向外传播。'
+    ),
+    example: utilsOptionCases.normalize![0]!.example,
     summary: t(
       'Synchronous callback receiving the tree pointer and discarded field name in `ignore` mode; a throw propagates.',
       '`ignore` 模式下同步接收树内路径与被丢弃的字段名；回调抛错会向外传播。'
@@ -93,6 +1165,11 @@ const normalizeOptionDocs: Readonly<Record<string, IMemberDoc>> = {
 /** Both error-tree walkers use the same reporting policy for unsafe property reads. */
 const chainReportOptionDocs: Readonly<Record<string, IMemberDoc>> = {
   report: {
+    whenToUse: t(
+      'Use a reporter when input getters may fail and diagnostics should continue. It receives the original failure and location; a throw stops the walk. Without it, a caught read failure becomes a thrown error-chain violation.',
+      '输入对象的取值函数可能失败，但仍希望继续采集诊断时设置。回调收到原始失败及位置；它抛错会停止处理。不设置时，捕获的读取失败会作为错误链违规错误抛出。'
+    ),
+    example: utilsOptionCases.chainReport![0]!.example,
     summary: t(
       'Synchronous callback receiving `{ pointer, field, error }` when reading input fails; a callback throw propagates.',
       '读取输入失败时同步接收 `{ pointer, field, error }`，用于报告路径、字段和原始错误；回调抛错会向外传播。'
@@ -386,6 +1463,10 @@ isEmptyValue(0) // false`
   },
   symbols: {
     ...utilsFacadeSymbols,
+    yieldToHost: {
+      ...utilsFacadeSymbols.yieldToHost!,
+      optionCases: utilsOptionCases.yield
+    },
     collect: {
       role: 'factory',
       purpose: t(
@@ -457,9 +1538,15 @@ isEmptyValue(0) // false`
       example: `bytesToBase64(new Uint8Array([1, 2, 3])) // 'AQID'`
     },
     decodeUtf8: {
+      optionCases: utilsOptionCases.utf8,
       role: 'operation',
       optionDocs: {
         fatal: {
+          whenToUse: t(
+            'Use true when damaged input must be rejected; false replaces invalid bytes for a preview. Omission uses false. The first example rejects an invalid import.',
+            '导入不能容忍坏字节时设 true；只需要可读预览时设 false，用替换字符保留其余文本。不设置等于 false。首例会拒绝坏字节。'
+          ),
+          example: utilsOptionCases.utf8![0]!.example,
           summary: t(
             'Choose whether malformed byte sequences fail decoding instead of producing replacement characters.',
             '选择格式错误的字节序列应使解码失败，还是生成替换字符。'
@@ -749,6 +1836,7 @@ const next = patchConfig(config, { retries: 3, debug: CONFIG_DELETE })`
 if (failure) throw failure`
     },
     deserializeErrorChain: {
+      optionCases: utilsOptionCases.normalize,
       role: 'operation',
       optionDocs: normalizeOptionDocs,
       purpose: t(
@@ -819,6 +1907,7 @@ if (failure) throw failure`
       example: `if (isUtilsTimeoutError(error)) console.log(error.scope, error.timeoutMs)`
     },
     normalizeSerializedErrorChain: {
+      optionCases: utilsOptionCases.normalize,
       role: 'operation',
       optionDocs: normalizeOptionDocs,
       purpose: t(
@@ -837,6 +1926,7 @@ if (failure) throw failure`
       example: `const tree = normalizeSerializedErrorChain(payload.error)`
     },
     reachErrorChain: {
+      optionCases: utilsOptionCases.chainReport,
       role: 'operation',
       optionDocs: chainReportOptionDocs,
       purpose: t(
@@ -888,6 +1978,7 @@ if (failure) throw failure`
       example: `sanitizeErrorText(message, 1024, true).value`
     },
     serializeErrorChain: {
+      optionCases: utilsOptionCases.chainReport,
       role: 'operation',
       optionDocs: chainReportOptionDocs,
       purpose: t(
@@ -909,6 +2000,7 @@ if (failure) throw failure`
       example: `port.postMessage({ error: serializeErrorChain(error) })`
     },
     toError: {
+      optionCases: utilsOptionCases.toError,
       role: 'operation',
       optionDocs: {
         message: {
@@ -978,6 +2070,7 @@ if (read.threw) report(read.error)`
       example: `throw new UtilsAbortError('用户取消')`
     },
     UtilsError: {
+      optionCases: utilsOptionCases.utilsError,
       role: 'error',
       params: {
         code: t(
@@ -1031,6 +2124,7 @@ if (read.threw) report(read.error)`
       example: `throw new UtilsTimeoutError('operation', 500)`
     },
     walkErrorCauses: {
+      optionCases: utilsOptionCases.walk,
       role: 'operation',
       optionDocs: {
         maxDepth: {
@@ -1472,6 +2566,7 @@ try {
 }`
     },
     createConcurrencyLimiter: {
+      optionCases: utilsOptionCases.limiter,
       role: 'factory',
       cases: utilsCases.createConcurrencyLimiter,
       optionDocs: {
@@ -1541,12 +2636,18 @@ await ready.promise`
       example: `withTimeout(operation, { timeoutMs: 100, report: (error, context) => logger.warn(context.operation, error) })`
     },
     raceWithAbort: {
+      optionCases: utilsOptionCases.race,
       role: 'operation',
       optionDocs: {
         signal: asyncControlMembers.signal!,
         signals: asyncControlMembers.signals!,
         report: promiseReportOption,
         cleanupPolicy: {
+          whenToUse: t(
+            'Use report when a listener-removal failure must not replace the operation outcome; report receives the cleanup error. reject is the default and rejects with cleanup failures, retaining a primary failure first when present.',
+            '监听器移除失败不能替换业务结果时选 report，由报告器接收清理错误。默认 reject 会以清理失败拒绝；已有主失败时把它保留在错误列表首位。'
+          ),
+          example: utilsOptionCases.race![1]!.example,
           summary: t(
             'How listener-removal failures affect the winning operation result.',
             '移除取消监听器失败时，如何处理已经胜出的操作结果。'
@@ -1568,8 +2669,8 @@ await ready.promise`
         }
       },
       purpose: t(
-        'Runs `operation` and rejects as soon as an outside signal aborts (no deadline). The operation receives a signal to stop its own work; a late result after abort goes to `report`.',
-        '执行 `operation`，外部信号一旦中止就立即 reject（不设截止时间）。操作会收到一个信号用来停止自己的工作；中止后才到达的结果交给 `report`。'
+        'Runs `operation` and rejects as soon as an outside signal aborts (no deadline). The operation receives a signal to stop its own work; a late rejection after abort goes to `report`, while late successes are discarded.',
+        '执行 `operation`，外部信号一旦中止就立即 reject（不设截止时间）。操作会收到一个信号用来停止自己的工作；中止后才到达的拒绝交给 `report`，迟到的成功值则被丢弃。'
       ),
       params: {
         operation: t(
@@ -1645,6 +2746,7 @@ await ready.promise`
       example: `const value = await toPromise(() => cache.get('key'))`
     },
     withTimeout: {
+      optionCases: utilsOptionCases.timeout,
       role: 'operation',
       cases: utilsCases.withTimeout,
       optionDocs: {
@@ -1673,6 +2775,11 @@ await ready.promise`
           )
         },
         zeroTimeoutBehavior: {
+          whenToUse: t(
+            'Use skip, the default, to reject a zero budget without invoking work. Use start for immediately completing work: it invokes the operation but still schedules a zero-delay deadline. Positive budgets are unchanged.',
+            '零预算不能启动工作时使用默认 skip。需要允许立即完成的工作时选 start：会调用操作，但仍安排零延迟截止任务。正数预算不受此选项影响。'
+          ),
+          example: utilsOptionCases.timeout![0]!.example,
           summary: t(
             'Whether a zero budget skips the operation or starts it before the zero-delay deadline fires.',
             '零预算时，是跳过操作还是先启动操作再等待零延时截止计时器。'
@@ -1839,6 +2946,95 @@ const text = converted.threw ? '[无法显示]' : converted.value`
   },
   types: {
     ...utilsFacadeTypes,
+    IIdentifyErrorOptions: {
+      ...utilsFacadeTypes.IIdentifyErrorOptions!,
+      optionCases: utilsOptionCases.identify
+    },
+    IConfigOwnerOptions: {
+      ...utilsFacadeTypes.IConfigOwnerOptions!,
+      optionCases: utilsOptionCases.owner,
+      members: {
+        ...utilsFacadeTypes.IConfigOwnerOptions!.members,
+        validate: {
+          ...utilsFacadeTypes.IConfigOwnerOptions!.members!['validate']!,
+          whenToUse: t(
+            'Set a validator when structurally valid settings can still violate a business rule. It runs on construction and once per commit; false or a throw rejects the change. Omission accepts structurally valid snapshots.',
+            '结构合法的配置仍可能违反业务规则时设置。在构造和每次提交时调用；返回 false 或抛错会拒绝修改。省略时接受结构合法的快照。'
+          ),
+          example: utilsOptionCases.owner![0]!.example
+        },
+        report: {
+          ...utilsFacadeTypes.IConfigOwnerOptions!.members!['report']!,
+          whenToUse: t(
+            'Set this callback to route watcher failures to application diagnostics. Other watchers continue when the reporter returns normally. Omission rethrows on a microtask. A reporter throw propagates and stops the notification loop.',
+            '需要把监听器失败转交应用诊断时设置。报告器正常返回后继续通知其他监听器。省略时在微任务重新抛错。报告器自身抛错会向外传播，并停止本次通知。'
+          ),
+          example: utilsOptionCases.owner![1]!.example
+        },
+        profile: {
+          ...utilsFacadeTypes.IConfigOwnerOptions!.members!['profile']!,
+          whenToUse: t(
+            'Choose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.',
+            '配置需要可移植时选 data；包含进程内函数或类时选 richRuntime。不设置使用 data。'
+          ),
+          example: utilsOptionCases.owner![1]!.example
+        }
+      }
+    },
+    IDebounceOptions: {
+      ...utilsFacadeTypes.IDebounceOptions!,
+      optionCases: utilsOptionCases.debounce
+    },
+    IThrottleOptions: {
+      ...utilsFacadeTypes.IThrottleOptions!,
+      optionCases: utilsOptionCases.throttle
+    },
+    IRepeatOptions: {
+      ...utilsFacadeTypes.IRepeatOptions!,
+      optionCases: utilsOptionCases.repeat,
+      members: {
+        ...utilsFacadeTypes.IRepeatOptions!.members,
+        onError: {
+          ...utilsFacadeTypes.IRepeatOptions!.members!['onError']!,
+          whenToUse: t(
+            'Use stop, the default, when a failed iteration invalidates further polling: done rejects with that failure. Use continue for independent iterations; failures go to the host error queue and later iterations still run.',
+            '一轮失败后不应再继续轮询时使用默认 stop，done 会以该失败拒绝。各轮互不依赖时可用 continue；失败交给宿主错误队列，后续轮次继续。'
+          ),
+          example: utilsOptionCases.repeat![1]!.example
+        }
+      }
+    },
+    ITimeSliceOptions: {
+      ...utilsFacadeTypes.ITimeSliceOptions!,
+      optionCases: utilsOptionCases.timeSlice,
+      members: {
+        ...utilsFacadeTypes.ITimeSliceOptions!.members,
+        strategy: {
+          ...utilsFacadeTypes.ITimeSliceOptions!.members!['strategy']!,
+          whenToUse: t(
+            'Choose a supported queue to control yielding: timeout, immediate and messageChannel schedule host tasks; animationFrame runs before the next paint, idleCallback during idle time, and postTask variants select task priority. schedulerYield yields through the host scheduler. promise, microtask and nextTick only use short queues and do not provide a rendering break. An ordered list declares fallbacks; omission uses auto, the first supported host task in its built-in order.',
+            '需要控制让出时机时设置。timeout、immediate、messageChannel 安排宿主任务；animationFrame 在下一次绘制前运行，idleCallback 在空闲时运行，postTask 各项选择任务优先级，schedulerYield 使用宿主调度器让出。promise、microtask、nextTick 只进入短队列，不会提供绘制间隙。列表按顺序尝试回退；省略使用 auto，按内置顺序选择首个受支持的宿主任务。'
+          ),
+          example: utilsOptionCases.timeSlice![0]!.example
+        },
+        onProgress: {
+          ...utilsFacadeTypes.ITimeSliceOptions!.members!['onProgress']!,
+          whenToUse: t(
+            'Set a callback to update import progress after each slice and at completion. A throw stops processing and rejects the run. Omission sends no progress updates.',
+            '需要在每片结束和完成时更新导入进度时设置。回调抛错会停止处理并拒绝本次运行。省略时不发送进度更新。'
+          ),
+          example: utilsOptionCases.timeSlice![0]!.example
+        },
+        'clock.now': {
+          ...utilsFacadeTypes.ITimeSliceOptions!.members!['clock.now']!,
+          whenToUse: t(
+            'Supply a monotonic now function when the application owns the clock or needs reproducible budgets. It measures elapsed work and slice limits; omission uses systemScheduler time.',
+            '应用自带时钟或需要可重复预算时提供单调的 now 函数。它计量已用时间和时间片上限；省略时使用 systemScheduler 的时间。'
+          ),
+          example: utilsOptionCases.timeSlice![0]!.example
+        }
+      }
+    },
     ICollector: {
       summary: t(
         'The lazy query returned by `collect()`. Chained calls describe the query; `result` runs it once and caches it.',
@@ -1890,6 +3086,7 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigCombineOptions: {
+      optionCases: utilsOptionCases.combine,
       scenarios: [
         t(
           'Keep both default and user-supplied menu entries by declaring array concatenation options for combineConfig().',
@@ -1984,6 +3181,11 @@ console.log(menu.items)`
           )
         },
         onConflict: {
+          whenToUse: t(
+            'Use this hook for a domain rule when values cannot be merged. Return left to keep the earlier value, right to accept the later one, delete to remove the key, or value with a replacement. Omission takes the right value; a throw aborts the merge.',
+            '无法自动合并且需要业务规则时设置。返回 left 保留旧值，right 接受新值，delete 删除键，value 携带替换值。不设置采用右侧值；回调抛错会终止合并。'
+          ),
+          example: utilsOptionCases.combine![1]!.example,
           summary: t(
             'Decides values that cannot be merged: return `{ kind: "left" | "right" | "delete" }` or `{ kind: "value", value }`, synchronously.',
             '裁决无法合并的冲突值：同步返回 `{ kind: "left" | "right" | "delete" }` 或 `{ kind: "value", value }`。'
@@ -1991,6 +3193,11 @@ console.log(menu.items)`
           default: t('Not set: the later (right) value wins.', '不设置：后者（右侧）的值胜出。')
         },
         profile: {
+          whenToUse: t(
+            'Choose data for portable values or richRuntime for local callbacks. Every owned source must use that same profile. Omission keeps the first source profile, or data for no sources.',
+            '可移植值选 data，进程内回调选 richRuntime。所有接管来源必须使用同一档位。省略时沿用第一个来源；没有来源时使用 data。'
+          ),
+          example: utilsOptionCases.combine![1]!.example,
           summary: t(
             'Validation profile of the result; must match the sources.',
             '结果使用的校验档位，必须与来源一致。'
@@ -2283,6 +3490,7 @@ console.log(updated.theme, updated.legacyColor)`
       )
     },
     IConfigPatchOptions: {
+      optionCases: utilsOptionCases.patch,
       scenarios: [
         t(
           'Choose a fresh root for an empty patch when a caller needs a separate configuration object.',
@@ -2313,6 +3521,11 @@ console.log(copy === original)`
           default: t('`true`.', '`true`：空补丁直接复用原配置。')
         },
         profile: {
+          whenToUse: t(
+            'Set a profile only to make the existing base profile explicit. data permits portable values; richRuntime also permits functions and classes. Omission keeps the base profile; a different value throws CONFIG_CONFLICT.',
+            '只在需要明确原配置档位时设置。data 接受可移植值，richRuntime 还接受函数和类。省略时沿用原档位；指定不同档位会抛出 CONFIG_CONFLICT。'
+          ),
+          example: utilsOptionCases.patch![1]!.example,
           summary: t(
             'Must equal the profile of `base`, otherwise `CONFIG_CONFLICT`.',
             '必须与 `base` 的档位一致，否则抛 `CONFIG_CONFLICT`。'
@@ -2456,6 +3669,7 @@ console.log(importSettings({ locale: 'zh-CN', pageSize: 20 }))`
       )
     },
     IOwnConfigOptions: {
+      optionCases: utilsOptionCases.own,
       scenarios: [
         t(
           'Reuse a pure-data validation policy with a tighter nesting limit when importing user settings.',
@@ -2477,6 +3691,11 @@ console.log(imported.locale)`
       summary: t('Options of `ownConfig()`.', '`ownConfig()` 的选项：校验档位与规模上限。'),
       members: {
         profile: {
+          whenToUse: t(
+            'Choose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.',
+            '配置需要可移植时选 data；包含进程内函数或类时选 richRuntime。不设置使用 data。'
+          ),
+          example: utilsOptionCases.own![1]!.example,
           summary: t(
             '`data` rejects functions; `richRuntime` allows functions and constructors (in-process only).',
             '`data` 拒绝函数；`richRuntime` 允许函数与构造器（只用于进程内）。'
@@ -3106,6 +4325,7 @@ else if (probe.kind === 'failed') console.error(probe.error)`
       }
     },
     INumberFormatOptions: {
+      optionCases: utilsOptionCases.number,
       scenarios: [
         t(
           'Reuse a locale and decimal precision policy when displaying prices in a table.',
@@ -3662,6 +4882,7 @@ console.log(settings.get('theme.mode')) // 'dark'`
       }
     },
     IPathAccessorOptions: {
+      optionCases: utilsOptionCases.path,
       scenarios: [
         t(
           'Keep a typed read policy that trims a display name whenever a path accessor reads it.',
@@ -3692,6 +4913,11 @@ console.log(profile.get('name'))`
       ),
       members: {
         ifMissing: {
+          whenToUse: t(
+            'Use this hook to record absent path segments. It cannot supply a replacement; a missing read still returns undefined. Omission sends no notification.',
+            '需要记录缺失路径段时设置。它不能提供替换值，缺失读取仍返回 undefined。省略时不发送通知。'
+          ),
+          example: utilsOptionCases.path![0]!.example,
           summary: t(
             'Called when a read finds a missing segment.',
             '读取时遇到缺失的路径段时调用。'
@@ -3702,6 +4928,11 @@ console.log(profile.get('name'))`
           )
         },
         ifBlocked: {
+          whenToUse: t(
+            'Use this hook to distinguish a null or primitive parent from a missing property. The read still returns undefined; omission sends no notification.',
+            '需要把空值或基本值父级造成的阻断与字段缺失区分开时设置。读取仍返回 undefined；省略时不发送通知。'
+          ),
+          example: utilsOptionCases.path![0]!.example,
           summary: t(
             'Called when a read meets a non-object on the way.',
             '读取途中遇到非对象值时调用。'
@@ -3709,6 +4940,11 @@ console.log(profile.get('name'))`
           default: t('Not set.', '不设置：被阻断时只返回 `undefined`。')
         },
         ifFailed: {
+          whenToUse: t(
+            'Use this hook to record a getter or proxy failure at its path. Returning normally still rethrows the original error; omission only removes the notification.',
+            '需要记录取值函数或代理失败的位置时设置。回调正常返回后，读取仍会原样抛出错误；省略只是不发送通知。'
+          ),
+          example: utilsOptionCases.path![0]!.example,
           summary: t(
             'Called when a getter throws during a read.',
             '读取过程中 getter 抛错时调用。'
@@ -3716,6 +4952,11 @@ console.log(profile.get('name'))`
           default: t('Not set: the error is not reported.', '不设置：错误不会被上报。')
         },
         onGet: {
+          whenToUse: t(
+            'Use event.replace to change the value presented by successful reads without changing stored data. Omission returns the stored value unchanged; a thrown hook error propagates.',
+            '成功读取后需要调整展示值时，用 event.replace 替换返回值，不改变保存的数据。省略时返回原值；回调抛错会向外传播。'
+          ),
+          example: utilsOptionCases.path![1]!.example,
           summary: t(
             'Called after each successful `get`; `event.replace(value)` changes the returned value.',
             '每次成功 `get` 后调用；`event.replace(value)` 可改变返回值。'
@@ -3723,6 +4964,11 @@ console.log(profile.get('name'))`
           default: t('Not set.', '不设置：原样返回读取到的值。')
         },
         onSet: {
+          whenToUse: t(
+            'Use event.replace to normalize incoming values before a write. Omission stores the supplied value unchanged; a thrown hook error stops the write.',
+            '写入前需要整理输入值时，用 event.replace 替换待写入值。省略时原样保存；回调抛错会停止写入。'
+          ),
+          example: utilsOptionCases.path![1]!.example,
           summary: t(
             'Called before each `set` is applied; `event.replace(value)` changes the written value.',
             '每次 `set` 生效前调用；`event.replace(value)` 可改变写入的值。'
@@ -4220,6 +5466,7 @@ try {
       }
     },
     IAbortTimeoutSignalOptions: {
+      optionCases: utilsOptionCases.abortSignal,
       scenarios: [
         t(
           'Prepare a combined caller signal and timeout for an adapter that consumes a cancellation signal.',
@@ -4272,6 +5519,11 @@ try {
           default: t('`systemScheduler`.', '`systemScheduler`，宿主原生计时器。')
         },
         timeoutReason: {
+          whenToUse: t(
+            'Use a factory when callers need to recognize the expired budget by reason identity. Its return becomes signal.reason; a thrown value also becomes the reason. Without it, native abort supplies its default reason. No deadline means this factory is not called.',
+            '调用方需要通过 reason 身份区分耗尽的预算时设置。返回值成为 signal.reason；工厂抛出的值也会成为原因。省略时使用原生中止的默认原因。未设截止时间时不会调用此工厂。'
+          ),
+          example: utilsOptionCases.abortSignal![0]!.example,
           summary: t(
             'Builds the abort reason used when the deadline passes.',
             '构造截止时间到达时使用的中止原因。'
@@ -4288,6 +5540,7 @@ try {
       }
     },
     IAsyncControls: {
+      optionCases: utilsOptionCases.sleep,
       scenarios: [
         t(
           'Share one caller signal across several waits without repeating the cancellation options at every call.',
@@ -4873,6 +6126,7 @@ console.log(stampNotice(systemWallClock))`
       }
     },
     IFormatOptions: {
+      optionCases: utilsOptionCases.format,
       scenarios: [
         t(
           'Choose how a display template handles absent fields and null values in one typed options object.',
@@ -4902,6 +6156,11 @@ console.log(format('{name}: {note} {suffix}', { name: 'Ada', note: null }, displ
           default: t('`{ open: "{", close: "}" }`.', '`{ open: "{", close: "}" }`，即花括号。')
         },
         missing: {
+          whenToUse: t(
+            'Use preserve, the default, while editing templates so missing placeholders stay visible. Use empty for optional display fields, or throw to reject publication with FORMAT_VALUE_MISSING. This policy applies to missing paths, not present nullish values.',
+            '编辑模板时使用默认 preserve，让缺失占位符保持可见。可选展示字段用 empty 留空；发布前严格检查用 throw，缺失时抛出 FORMAT_VALUE_MISSING。此策略只处理缺失路径，不处理已存在的空值。'
+          ),
+          example: utilsOptionCases.format![1]!.example,
           summary: t(
             'What happens to a placeholder without a value.',
             '占位符找不到取值时如何处理。'
@@ -4914,6 +6173,11 @@ console.log(format('{name}: {note} {suffix}', { name: 'Ada', note: null }, displ
           }
         },
         nullish: {
+          whenToUse: t(
+            'Use empty, the default, to blank present null and undefined values. Use stringify in diagnostic output to display the words null and undefined. Missing paths follow missing instead.',
+            '已存在的 null 和 undefined 需要留空时使用默认 empty。诊断输出要显示 null 和 undefined 字样时选 stringify。路径缺失由 missing 处理。'
+          ),
+          example: utilsOptionCases.format![0]!.example,
           summary: t(
             'How `null` / `undefined` values are written.',
             '占位符的取值为 `null` / `undefined` 时如何输出。'

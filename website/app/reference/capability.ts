@@ -3,7 +3,7 @@
  * disposal rejects HOST_TRANSITIONING until the first disposal settles; settled repeated disposal
  * returns the original Promise. Graph ownership is documented separately.
  */
-import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityGraphReference } from './capability-graph.js'
 import { capabilityTopologyReference } from './capability-topology.js'
 import { capabilityCases } from './capability-cases.ts'
@@ -296,6 +296,186 @@ const enums: ILibraryReference['enums'] = {
     }
   }
 }
+/** Permission and failure examples run against the public host entry. */
+const hostPermissionExample = `import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'
+
+const host = createCapabilityHost({ tenantId }, {
+  flags: { export: true, admin: false }
+})
+host.register({ name: 'export', activate: ({ tenantId }) => openTenantExporter(tenantId) })
+host.register({ name: 'admin', activate: ({ tenantId }) => openUserAdmin(tenantId) })
+const exported = await host.enable('export')
+if (exported.status === CapabilityEnableStatus.enabled) showExportPanel()
+const admin = await host.enable('admin')
+if (admin.status === CapabilityEnableStatus.gated) disableAdminButton()
+onTenantClosed(() => host.dispose())`
+/** Lazy search startup reports its original failure with the feature name. */
+const hostDiagnosticExample = `import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'
+
+const host = createCapabilityHost(undefined, {
+  flags: { search: true },
+  onError: (name, error) => reportToMonitoring(error, { feature: name })
+})
+host.register({ name: 'search', activate: () => connectSearchService() })
+const result = await host.enable('search')
+if (result.status === CapabilityEnableStatus.failed) showSearchUnavailable(result.error)
+onWorkspaceClosed(() => host.dispose())`
+/** Cache release can report a lost optional statistic without failing graph disposal. */
+const graphDiagnosticExample = `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'
+
+const graph = createCapabilityGraph({ onError: (error) => reportToMonitoring(error) })
+graph.register({
+  id: 'search-cache' as IGraphNodeId,
+  kind: 'cache',
+  dependencies: [],
+  start: () => openSearchCache()
+})
+await graph.ready()
+onWorkspaceClosed(() => graph.dispose())`
+/** A failed search screen returns temporary index custody before reporting rollback diagnostics. */
+const graphRollbackExample = `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'
+
+const graph = createCapabilityGraph({ onError: (error) => reportToMonitoring(error) })
+graph.register({
+  id: 'search-screen' as IGraphNodeId,
+  kind: 'screen',
+  dependencies: [],
+  start: ({ own }) => {
+    const index = openTemporaryIndex()
+    own(index, { force: () => index.close() })
+    return buildSearchScreen(index)
+  }
+})
+try {
+  await graph.ready()
+} catch (error) {
+  showStartupError(error)
+}
+onWorkspaceClosed(() => graph.dispose())`
+/** The report composition owns physical modules and waits for graph leases before release. */
+const dynamicLifecycleExample = `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
+
+type IReportBinding = { moduleId: string }
+const graph = createDynamicCapabilityGraph<IReportBinding>({
+  startBatch: (entries) => reportModules.startBatch(entries),
+  releaseBatch: (entries, fence) => reportModules.releaseBatch(entries, fence),
+  releaseBinding: ({ binding }) => reportModules.releaseBinding(binding)
+})
+await graph.register(reportDefinition, { moduleId: 'monthly-report' })
+await graph.ready()
+onWorkspaceClosed(() => graph.dispose())`
+/** A report module binding failure reaches monitoring after instance release. */
+const dynamicReportExample = `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
+
+type IReportBinding = { moduleId: string }
+const graph = createDynamicCapabilityGraph<IReportBinding>({
+  startBatch: (entries) => reportModules.startBatch(entries),
+  releaseBatch: (entries, fence) => reportModules.releaseBatch(entries, fence),
+  releaseBinding: ({ binding }) => reportModules.releaseBinding(binding),
+  report: (error) => reportToMonitoring(error)
+})
+await graph.register(reportDefinition, { moduleId: 'monthly-report' })
+await graph.ready()
+await graph.dispose()`
+/** Workspace commands may wait briefly for earlier mutations, rather than queue indefinitely. */
+const dynamicAdmissionExample = `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
+
+type IReportBinding = { moduleId: string }
+const graph = createDynamicCapabilityGraph<IReportBinding>({
+  mutationAdmissionMs: 500,
+  startBatch: (entries) => reportModules.startBatch(entries),
+  releaseBatch: (entries, fence) => reportModules.releaseBatch(entries, fence)
+})
+await graph.register(reportDefinition, { moduleId: 'monthly-report' })
+onWorkspaceClosed(() => graph.dispose())`
+/** Host options cover initial permission and monitoring separately. */
+const hostOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Grant only the tenant’s available features', '只开放租户可用的功能'),
+    problem: t(
+      'A tenant can export but cannot administer users. Without flags every feature is gated. Setting true grants permission for a later enable(); false and omitted names remain gated.',
+      '租户可以导出，但不能管理用户。不设置 flags 时全部功能都被禁止。true 只授予之后调用 enable() 的许可；false 和省略的名称仍被禁止。'
+    ),
+    example: hostPermissionExample,
+    result: t(
+      'The export panel opens, while the admin button stays disabled and its capability is never activated.',
+      '导出面板可以打开，管理按钮保持禁用，管理能力不会被激活。'
+    ),
+    covers: ['flags']
+  },
+  {
+    title: t('Send lazy feature failures to monitoring', '把按需功能的失败送到监控'),
+    problem: t(
+      'A lazy search service may fail while activating. Without onError the failure is retained but monitoring receives no callback. The reporter records the feature name while enable() still returns its failed result.',
+      '按需启动的搜索服务可能激活失败。省略 onError 时会保留失败，但不会通知监控回调。上报函数记录功能名，enable() 仍返回失败结果。'
+    ),
+    example: hostDiagnosticExample,
+    result: t(
+      'The workspace shows that search is unavailable, and monitoring receives the original failure with the search feature name.',
+      '工作区提示搜索暂不可用，监控收到原始失败及 search 功能名。'
+    ),
+    covers: ['onError', 'flags']
+  }
+]
+/** Static graph diagnostics distinguish normal teardown from failed-start rollback. */
+const graphOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Report a recoverable teardown diagnostic', '上报可以继续清理的诊断'),
+    problem: t(
+      'The search cache can lose optional statistics while closing. Its release implementation reports this through the supplied release context instead of failing cleanup. `onError` forwards that diagnostic to monitoring; without it, the graph has no external sink.',
+      '搜索缓存关闭时可能丢失可选统计。它的释放实现通过收到的释放上下文报告这件事，而不让清理失败。`onError` 把该诊断送到监控；省略时，图没有外部接收方。'
+    ),
+    example: graphDiagnosticExample,
+    result: t(
+      'The cache can close successfully while monitoring still receives its optional-statistics diagnostic.',
+      '缓存可以成功关闭，监控仍能收到可选统计丢失的诊断。'
+    ),
+    covers: ['onError']
+  },
+  {
+    title: t('Keep rollback failures visible', '让回滚失败保持可见'),
+    problem: t(
+      'The search screen acquires a temporary index before building its view. If view startup fails and closing the index also fails, `onError` keeps the cleanup failure visible while `ready()` still rejects for startup. Omitting the callback loses that external cleanup notification.',
+      '搜索页面先取得临时索引，再创建视图。若视图启动失败，关闭索引也失败，`onError` 让清理失败保持可见，`ready()` 仍因启动失败拒绝。省略回调就不会向外通知这次清理失败。'
+    ),
+    example: graphRollbackExample,
+    result: t(
+      'The page shows the startup failure, and monitoring also receives a failed temporary-index cleanup.',
+      '页面显示启动失败，监控还会收到临时索引清理失败。'
+    ),
+    covers: ['onError']
+  }
+]
+/** Dynamic graph options keep resource ownership with the composition. */
+const dynamicOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Own report instances and their bindings', '持有报表实例及其绑定'),
+    problem: t(
+      'A report workspace loads modules through its existing composition owner. The graph orders nodes but does not call definition.start itself, so `startBatch` delegates physical startup. `releaseBatch` must await the lease fence and release dependents first; `releaseBinding` then returns module-binding custody.',
+      '报表工作区通过已有组合层加载模块。图只安排节点顺序，不会自行调用 definition.start，因此 `startBatch` 委派物理启动。`releaseBatch` 必须等待租约屏障，并先释放消费方；之后 `releaseBinding` 交还模块绑定。'
+    ),
+    example: dynamicLifecycleExample,
+    result: t(
+      'The composition starts the report module and, on workspace closure, releases its instance before returning its module binding.',
+      '组合层启动报表模块；工作区关闭时，先释放实例，再交还模块绑定。'
+    ),
+    covers: ['startBatch', 'releaseBatch', 'releaseBinding']
+  },
+  {
+    title: t('Observe a failed binding release', '观察绑定释放失败'),
+    problem: t(
+      'A report module instance closes, but releasing its module binding can still fail. `report` sends this contained failure to monitoring; without it, no external callback observes the failure. The graph disposal result remains separate.',
+      '报表模块实例已关闭，但交还模块绑定仍可能失败。`report` 把这次受控失败送到监控；省略时没有外部回调观察它。图释放结果保持独立。'
+    ),
+    example: dynamicReportExample,
+    result: t(
+      'Disposal completes, and monitoring receives a failed module-binding release if one occurs.',
+      '释放可以完成，发生模块绑定释放失败时，监控仍能收到它。'
+    ),
+    covers: ['report', 'startBatch', 'releaseBatch', 'releaseBinding']
+  }
+]
+
 /** Public host types and readiness data, including every real result-union member. */
 const types: Record<string, ITypeDoc> = {
   ICapabilityHost: {
@@ -363,6 +543,7 @@ const types: Record<string, ITypeDoc> = {
     }
   },
   ICapabilityHostOptions: {
+    optionCases: hostOptionCases,
     summary: t(
       'Initial permissions and contained diagnostic reporting for one host.',
       '为一个能力宿主配置初始权限与隔离的失败报告接收方。'
@@ -386,7 +567,12 @@ const types: Record<string, ITypeDoc> = {
         default: t(
           'The default is undefined, meaning that no error callback is configured. Omission therefore sends no callback notification, but failures remain recorded. Use host.error(name) to read a recorded failure even when no callback was supplied.',
           '默认值为 undefined（未配置错误接收回调）。省略时不会通过回调通知失败，但失败仍会被记录。即使没有回调，也能通过 host.error(name) 读取已记录的失败。'
-        )
+        ),
+        whenToUse: t(
+          'Set it when activation and cleanup failures need monitoring. The callback receives the registered name and original error. Omitting it keeps failures available through host.error(name) but sends no callback.',
+          '激活和清理失败需要监控时设置。回调接收登记名称和原始错误。省略时仍可用 host.error(name) 查询失败，但不会触发回调。'
+        ),
+        example: hostDiagnosticExample
       }
     }
   },
@@ -544,7 +730,71 @@ export const capabilityReference: ILibraryReference = {
     ...capabilityGraphReference.symbols,
     ...capabilityTopologyReference.symbols
   },
-  types: { ...types, ...capabilityGraphReference.types, ...capabilityTopologyReference.types },
+  types: {
+    ...types,
+    ...capabilityGraphReference.types,
+    ...capabilityTopologyReference.types,
+    ICapabilityGraphOptions: {
+      ...capabilityGraphReference.types!.ICapabilityGraphOptions!,
+      optionCases: graphOptionCases,
+      members: {
+        ...capabilityGraphReference.types!.ICapabilityGraphOptions!.members,
+        onError: {
+          ...capabilityGraphReference.types!.ICapabilityGraphOptions!.members.onError!,
+          whenToUse: t(
+            'Use it to observe recoverable release diagnostics and secondary rollback failures. It does not replace the startup or disposal result. Without it, the graph has no external reporting sink.',
+            '需要观察可恢复的释放诊断和次级回滚失败时设置。它不替换启动或释放结果。省略时，图没有外部报告接收方。'
+          ),
+          example: graphDiagnosticExample
+        }
+      }
+    },
+    IDynamicCapabilityGraphOptions: {
+      ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!,
+      optionCases: dynamicOptionCases,
+      members: {
+        ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members,
+        mutationAdmissionMs: {
+          ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members
+            .mutationAdmissionMs!,
+          example: dynamicAdmissionExample
+        },
+        report: {
+          ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members.report!,
+          whenToUse: t(
+            'Set it when contained startup, cleanup or late failures must reach monitoring. It receives the original error and does not replace graph results. Omission sends no external callback.',
+            '受控的启动、清理或迟到失败需要送到监控时设置。它接收原始错误，不替换图结果。省略时没有外部回调通知。'
+          ),
+          example: dynamicReportExample
+        },
+        startBatch: {
+          ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members.startBatch!,
+          whenToUse: t(
+            'Always supply the physical startup owner. Return one instance for each entry, in the same order, and roll back partial resources if startup fails. There is no default; the graph does not execute definition.start for you.',
+            '必须提供物理启动的拥有者。按传入顺序为每项返回一个实例，启动失败时负责回滚部分资源。没有默认实现；图不会代你执行 definition.start。'
+          ),
+          example: dynamicLifecycleExample
+        },
+        releaseBatch: {
+          ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members.releaseBatch!,
+          whenToUse: t(
+            'Always supply physical cleanup. Wait for fence, then release entries in reverse order so consumers stop before providers. There is no default, and a rejected cleanup rejects the operation.',
+            '必须提供物理清理。先等待 fence，再反序释放，使消费方先于提供方停止。没有默认实现；清理拒绝会使当前操作拒绝。'
+          ),
+          example: dynamicLifecycleExample
+        },
+        releaseBinding: {
+          ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members
+            .releaseBinding!,
+          whenToUse: t(
+            'Set it when a composition binding owns something beyond the graph instance. It runs after instance cleanup on removal, replacement and final disposal. Omit it when relinquishing the binding needs no callback; failures go to report without stopping other bindings.',
+            '组合层绑定拥有图实例之外的资源时设置。移除、替换和最终释放时，它在实例清理后执行。交还绑定无需回调时可省略；失败交给 report，不中断其它绑定的释放。'
+          ),
+          example: dynamicLifecycleExample
+        }
+      }
+    }
+  },
   enums: { ...enums, ...capabilityGraphReference.enums, ...capabilityTopologyReference.enums },
   enhancers: {}
 }

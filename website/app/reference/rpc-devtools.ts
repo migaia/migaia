@@ -8,7 +8,7 @@
  * graphs by rpc-contract. This reference documents only the devtools-owned surfaces and their
  * integration.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { rpcDevtoolsCases } from './rpc-devtools-cases.js'
 
 /** Creates one localized sentence pair. */
@@ -148,6 +148,10 @@ await stream.return()`
 
 /** Native errors at these observation boundaries are routed without changing business results. */
 const onErrorDoc: IMemberDoc = {
+  whenToUse: t(
+    'Set this callback when a diagnostic failure should reach the application monitor. It receives collector, formatter, logger or hub observer failures without replacing a business result. Omission keeps the documented host reporter for the owning component.',
+    '诊断失败需要进入应用监控时，设置这个回调。它接收采集器、格式化器、日志或聚合器观察回调的失败，不替换业务结果。省略时使用所属组件文档中说明的宿主报告函数。'
+  ),
   summary: t(
     'Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.',
     '接收原始诊断错误的同步观察回调，无需返回值；观察回调失败经宿主失败通道报告，不改变远程调用操作结果。'
@@ -190,6 +194,10 @@ const probeOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     '默认不捕获内容，仅观察元数据。'
   ),
   redact: {
+    whenToUse: t(
+      'Set it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.',
+      '显式捕获的内容包含不应保存或记录的数据时，设置此回调。返回替换值，或返回 `undefined` 丢弃内容。省略时原样保留捕获引用；抛错会被报告，并丢弃本次内容。'
+    ),
     summary: t(
       'Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.',
       '接收数字阶段与已捕获内容的同步回调，返回需要保留的替代值；不可保留复用事件视图，采集器在摄取时执行，日志探针在规范发射器执行。'
@@ -213,12 +221,182 @@ const probeOptionMembers: Readonly<Record<string, IMemberDoc>> = {
       '默认无脱敏回调，显式捕获内容保留其原始引用。'
     ),
     example: `import { createRpcDevtools } from '@migaia/rpc-devtools'
-const devtools = createRpcDevtools({ stages: ['message'], capture: ['message'], redact: (_stage, content) => typeof content === 'string' ? '[redacted]' : undefined, onError: (error) => console.error(error) })
-console.log(devtools.describe())
-devtools.close()`
+const devtools = createRpcDevtools({
+  stages: ['envelope'],
+  capture: ['envelope'],
+  redact: (_stage, content) => removeCustomerDetails(content)
+})`
   },
   onError: onErrorDoc
 }
+
+/** Keep the support view small while collecting the calls under investigation. */
+const collectorRetentionOptionExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const devtools = createRpcDevtools({
+  stages: ['message'],
+  methods: ['invoice.preview'],
+  sample: 1,
+  maxEvents: 200,
+  maxInterned: 100
+})
+const invoices = await createBrowserPeer({
+  connect: { sharedWorker: invoiceWorker },
+  probe: devtools
+})
+renderPreview(await invoices.request('invoice.preview', invoice))
+renderTimeline(devtools.query().events)`
+
+/** Project captured envelopes before they are retained or exposed to a support client. */
+const collectorCaptureOptionExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const devtools = createRpcDevtools({
+  stages: ['envelope'],
+  capture: ['envelope'],
+  maxContentBytes: 1024,
+  redact: (_stage, content) => removeCustomerDetails(content),
+  exposeContent: true
+})
+const invoices = await createBrowserPeer({
+  connect: { sharedWorker: invoiceWorker },
+  probe: devtools
+})
+renderPreview(await invoices.request('invoice.preview', invoice))
+renderCapturedMessages(devtools.query().events)`
+
+/** Production monitoring can receive a failed diagnostic projection separately from the invoice. */
+const collectorErrorOptionExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const devtools = createRpcDevtools({
+  stages: ['envelope'],
+  capture: ['envelope'],
+  redact: (_stage, content) => redactPaymentDetails(content),
+  onError: (error) => reportToMonitoring(error)
+})
+const invoices = await createBrowserPeer({
+  connect: { sharedWorker: invoiceWorker },
+  probe: devtools
+})
+renderPreview(await invoices.request('invoice.preview', invoice))`
+
+/** A focused logging session routes invoice settlements to the application's real logger. */
+const logFilterOptionExample = `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const probe = createRpcLogProbe(logger, {
+  stages: ['message'],
+  methods: ['invoice.preview'],
+  sample: 1,
+  slowMs: 250,
+  levels: { slow: 'info' },
+  message: (view) => \`Invoice RPC: \${view.method}\`
+})
+const invoices = await createBrowserPeer({
+  connect: { sharedWorker: invoiceWorker },
+  probe
+})
+renderPreview(await invoices.request('invoice.preview', invoice))`
+
+/** Logical events can carry an application marker without claiming to expose a message payload. */
+const logCaptureOptionExample = `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const probe = createRpcLogProbe(logger, {
+  stages: ['message'],
+  slowMs: 250,
+  content: true,
+  capture: ['message'],
+  redact: () => ({ area: 'invoice-preview' })
+})
+const invoices = await createBrowserPeer({
+  connect: { sharedWorker: invoiceWorker },
+  probe
+})
+renderPreview(await invoices.request('invoice.preview', invoice))`
+
+/** The monitor receives a log destination failure while the page retains its business result. */
+const logErrorOptionExample = `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const probe = createRpcLogProbe(logger, {
+  stages: ['message'],
+  slowMs: 250,
+  onError: (error) => reportToMonitoring(error)
+})
+const invoices = await createBrowserPeer({
+  connect: { sharedWorker: invoiceWorker },
+  probe
+})
+renderPreview(await invoices.request('invoice.preview', invoice))`
+
+/** Uploaded records come from the application's file reader rather than hand-written event views. */
+const hubRetentionOptionExample = `import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
+
+const hub = createRpcDevtoolsHub({ maxEvents: 200 })
+hub.importRecord('invoice-worker', await readRecording(file))
+renderTimeline(hub.timeline())
+onPanelClosed(() => hub.close())`
+
+/** The hub borrows an already connected client for the diagnostic service. */
+const hubLiveOptionExample = `import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
+
+const hub = createRpcDevtoolsHub({
+  realignMs: 10_000,
+  onError: (error) => reportToMonitoring(error)
+})
+hub.on('status', (name, status) => updateTargetStatus(name, status))
+await hub.addTarget('invoice-worker', diagnosticPeer)
+renderTimeline(hub.timeline())
+onPanelClosed(() => hub.close())`
+
+/** Each options group has a few focused, independently runnable scenarios. */
+const collectorOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Keep recent invoice calls in a support view', '在支持面板保留近期发票调用'),
+    problem: t(
+      'An invoice preview sometimes stalls while other worker methods run normally. Recording everything makes the support view noisy. Filter for the preview method, retain every eligible call, and bound the event and name tables so the view remains small during a long investigation.',
+      '发票预览偶尔卡住，工作线程的其他方法却正常。记录全部调用会让支持面板充满无关事件。只筛选预览方法、保留每个符合条件的调用，再限制事件与名称表容量，长时间排查时视图仍保持较小。'
+    ),
+    example: collectorRetentionOptionExample,
+    result: t(
+      'The invoice preview renders normally, while the support timeline keeps the newest selected events without unbounded history growth.',
+      '发票预览正常显示，支持时间线保留最新的所选事件，历史不会无限增长。'
+    ),
+    covers: ['methods', 'sample', 'maxEvents', 'maxInterned']
+  },
+  {
+    title: t('Expose only projected captured content', '只公开经过处理的捕获内容'),
+    problem: t(
+      'Support needs a captured invoice envelope to investigate a malformed request, but customer details must stay out of the panel. Capture envelopes explicitly and project them before storage. Enable service exposure separately so an authorized support client can read the projected content.',
+      '支持人员需要捕获发票封装来排查请求格式问题，但客户详情不能进入面板。显式捕获封装，并在保存前去掉敏感内容；另行开启服务公开，获准的支持客户端才可读取处理后的内容。'
+    ),
+    example: collectorCaptureOptionExample,
+    result: t(
+      'The preview keeps its original invoice data. Local and service queries expose only the projected content, within the configured content budget.',
+      '预览使用原始发票数据，本地和服务查询只公开处理后的内容，并受内容预算限制。'
+    ),
+    covers: ['capture', 'maxContentBytes', 'exposeContent']
+  },
+  {
+    title: t(
+      'Report redactor failures without failing the call',
+      '脱敏失败时报告错误，不让调用失败'
+    ),
+    problem: t(
+      'Payment redaction is part of a support tool and can fail independently of invoice generation. Route that failure to monitoring so support can repair the projection. The failed content is dropped and the invoice remains usable instead of failing with its diagnostic tool.',
+      '支付信息脱敏属于支持工具，可能在发票生成成功时独立失败。把该失败交给监控，支持人员才能修复处理逻辑；失败内容被丢弃，发票仍可使用，不会跟着诊断工具一起失败。'
+    ),
+    example: collectorErrorOptionExample,
+    result: t(
+      'The invoice preview remains visible. If payment redaction fails, monitoring receives the failure and the captured content is omitted.',
+      '发票预览继续显示；支付信息脱敏失败时，监控收到错误，捕获内容被丢弃。'
+    ),
+    covers: ['onError']
+  }
+]
 
 /** Collector-owned APIs; service reuses only methods with identical public inputs. */
 const collectorMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -847,6 +1025,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       members: collectorMembers
     },
     IRpcDevtoolsOptions: {
+      optionCases: collectorOptionCases,
       summary: t(
         'Construction policies for a bounded collector; capacities are captured once, while effective subscriptions can later change through the Core probe setStages API.',
         '有界采集器构造策略，容量一次捕获，生效订阅随后可经核心探针订阅接口修改。'
@@ -854,7 +1033,14 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       example: collectorExample,
       members: {
         ...probeOptionMembers,
+        redact: { ...probeOptionMembers.redact!, example: collectorCaptureOptionExample },
+        onError: { ...onErrorDoc, example: collectorErrorOptionExample },
         stages: {
+          whenToUse: t(
+            'Use `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.',
+            '用 `message` 观察逻辑调用，用 `peer` 观察连接生命周期。需要检查封装、编码、分帧、保护后内容或物理载体时，分别增加 `envelope`、`encoded`、`frame`、`protected` 或 `carrier`。省略时选择消息与连接阶段；选中阶段本身不会开启内容捕获。'
+          ),
+          example: collectorRetentionOptionExample,
           ...f(
             'Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.',
             '核心规范阶段名中的初始订阅，物理阶段需显式选择，选择本身不会开启内容捕获。',
@@ -1391,6 +1577,37 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       }
     },
     IRpcDevtoolsHubOptions: {
+      optionCases: [
+        {
+          title: t('Bound each imported recording', '为每个导入录制设置保留上限'),
+          problem: t(
+            'A support agent opens a long invoice-worker recording in a compact panel. Keeping the default 50000 rows per target is unnecessary for this view. Lower the retention capacity before importing so the panel focuses on recent activity.',
+            '支持人员在小面板打开很长的发票工作线程录制。这个视图不需要默认的每目标 50000 行；导入前降低保留容量，面板便聚焦近期活动。'
+          ),
+          example: hubRetentionOptionExample,
+          result: t(
+            'The timeline shows at most the newest 200 events from the uploaded recording, keeping the support view manageable.',
+            '时间线最多显示上传录制中的最新 200 条事件，支持面板保持易于查看。'
+          ),
+          covers: ['maxEvents']
+        },
+        {
+          title: t(
+            'Realign a live target and report panel failures',
+            '重新对齐实时目标，并报告面板失败'
+          ),
+          problem: t(
+            'An invoice support panel stays open while staff compare activity from several workers. Clock estimates can become stale during that investigation. Refresh alignment periodically and send panel callback failures to monitoring so a broken status widget does not stop target setup.',
+            '支持人员常把发票诊断面板开着，对照多个工作线程的活动。排查期间，最初的时钟估计可能过时。定期重新对齐，并把面板回调失败送入监控，单个状态控件损坏便不会阻止目标准备完成。'
+          ),
+          example: hubLiveOptionExample,
+          result: t(
+            'The live target appears in the panel and its clock estimate refreshes every 10 seconds. Diagnostic failures reach monitoring without replacing invoice results.',
+            '实时目标出现在面板中，时钟估计每 10 秒更新；诊断失败进入监控，不会替换发票结果。'
+          ),
+          covers: ['realignMs', 'onError']
+        }
+      ],
       summary: t(
         'Construction-time per-target capacity, optional periodic clock realignment and failure reporting; no transport or client is created from these settings.',
         '构造期每目标容量、可选周期时钟重对齐及失败报告设置，不据此创建传输或客户端。'
@@ -1415,7 +1632,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
             'Reports failures with host console.error; a supplied callback that throws is reported with the original error in an aggregate.',
             '默认由宿主错误控制台报告，提供的回调抛错时与原始错误一起聚合报告。'
           ),
-          example: hubExample
+          example: hubLiveOptionExample
         }
       }
     },
@@ -1596,6 +1813,50 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       }
     },
     IRpcLogProbeOptions: {
+      optionCases: [
+        {
+          title: t(
+            'Log slow invoice previews with an application label',
+            '用应用名称记录缓慢的发票预览'
+          ),
+          problem: t(
+            'Operations staff need readable entries for invoice previews taking at least 250 ms. Default logging does not include successful slow calls. Set the threshold and route that category to info, while filtering out unrelated methods and connection lifecycle noise.',
+            '运维人员需要查看耗时至少 250 毫秒的发票预览日志。默认日志不包含成功的慢调用；设置阈值并将该分类交给 info，同时筛掉无关方法和连接生命周期噪声。'
+          ),
+          example: logFilterOptionExample,
+          result: t(
+            'The preview renders normally. Successful previews crossing the threshold produce an info entry labeled Invoice RPC: invoice.preview.',
+            '预览正常显示；超过阈值的成功预览产生 info 日志，文本为 Invoice RPC: invoice.preview。'
+          ),
+          covers: ['slowMs', 'methods', 'sample']
+        },
+        {
+          title: t('Attach a safe capture marker to logs', '为日志附加安全的捕获标记'),
+          problem: t(
+            'A shared log destination needs to group slow invoice previews by application area. Logical message events contain no business payload. Capture only that stage and replace its content with a safe area marker, so log consumers can group entries without collecting invoice data.',
+            '共享日志接收端需要按应用区域归类缓慢的发票预览。逻辑消息事件不含业务载荷；只捕获该阶段并将内容替换为安全的区域标记，日志使用方即可归类条目，无需收集发票数据。'
+          ),
+          example: logCaptureOptionExample,
+          result: t(
+            'Slow preview entries carry the invoice-preview area marker, while the page receives its original invoice result.',
+            '慢预览日志带有 invoice-preview 区域标记，页面仍收到原始发票结果。'
+          ),
+          covers: ['content', 'capture']
+        },
+        {
+          title: t('Report a failed log destination', '报告日志接收端失败'),
+          problem: t(
+            'The application logger forwards invoice diagnostics to an external destination that can be unavailable. Route delivery failures to monitoring so operations can repair that destination while users continue viewing their invoices. Without this callback, the failure uses the host reporting channel.',
+            '应用日志器把发票诊断交给可能不可用的外部接收端。将发送失败交给监控，运维便能修复接收端，用户仍可查看发票；省略回调时，失败进入宿主报告通道。'
+          ),
+          example: logErrorOptionExample,
+          result: t(
+            'The invoice preview still appears if the log destination fails; monitoring receives the original diagnostic failure.',
+            '日志接收端失败时，发票预览仍正常显示，监控收到原始诊断失败。'
+          ),
+          covers: ['onError']
+        }
+      ],
       summary: t(
         'Construction-time qualification, capture and logger dispatch policy; only message and peer stages are supported by this first-party log probe.',
         '构造期条件选择、捕获及日志分派策略，此内置日志探针仅支持消息与连接阶段。'
@@ -1603,6 +1864,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       example: logExample,
       members: {
         ...probeOptionMembers,
+        redact: { ...probeOptionMembers.redact!, example: logCaptureOptionExample },
+        onError: { ...onErrorDoc, example: logErrorOptionExample },
         slowMs: f(
           'Finite nonnegative settlement duration threshold for successful slow-call logging.',
           '为成功慢调用记录日志的有限非负毫秒结算阈值。',
@@ -1610,6 +1873,11 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           '默认 `undefined`，成功调用不会按慢调用条件进入日志。'
         ),
         stages: {
+          whenToUse: t(
+            'Select `message` for failed, rejected or slow calls, and `peer` for connection lifecycle. Omission selects both. This log helper accepts no physical stages; selecting stages alone does not enable content capture.',
+            '用 `message` 记录失败、拒绝或慢调用，用 `peer` 记录连接生命周期。省略时选择两者。此日志辅助函数不接收物理阶段；选中阶段本身不会开启内容捕获。'
+          ),
+          example: logFilterOptionExample,
           ...f(
             'Subscribed log stages; only message settlements and peer lifecycle belong to this helper.',
             '订阅日志阶段，此辅助函数仅处理消息结算及连接生命周期。',
@@ -1634,6 +1902,11 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           '默认 `false`，除非显式要求，否则不捕获内容。'
         ),
         levels: {
+          whenToUse: t(
+            'Override individual categories when their default severity does not fit the application. `debug`, `info`, `warn` and `error` choose the corresponding logger method; `off` skips that category. Omitted categories retain their documented defaults.',
+            '默认严重程度不适合应用时，逐分类覆盖。`debug`、`info`、`warn` 与 `error` 分别选择对应日志方法，`off` 跳过该分类。省略的分类保留文档列出的默认级别。'
+          ),
+          example: logFilterOptionExample,
           ...f(
             'Category overrides: failed, rejected, timeout, aborted, slow and lifecycle map to a named sink level or off.',
             '分类覆盖：失败、拒绝、超时、取消、慢调用及生命周期各自映射到命名接收级别或关闭。',
@@ -1664,6 +1937,10 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           }
         },
         message: {
+          whenToUse: t(
+            'Set a formatter when the logger needs application-specific text. Return a string synchronously and read the view only during the callback. Omitting it uses the built-in category message; a thrown error is reported through `onError`.',
+            '日志需要应用专用文本时，设置格式化函数。同步返回字符串，仅在回调期间读取事件视图。省略时使用内置分类消息，抛错通过 `onError` 报告。'
+          ),
           summary: t(
             'Synchronous formatter called only for qualifying enabled events. Receives a reusable Core event view valid during the callback; return a string and never retain the view. Throws are reported through onError.',
             '仅对合格且启用的事件执行同步格式化，接收仅回调期间有效的复用核心事件视图，返回字符串且不可保存视图，抛错经错误观察回调报告。'
@@ -1682,7 +1959,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
             'Stable built-in message for the classified failure, rejection, timeout, abort, slow or lifecycle category.',
             '默认使用失败、拒绝、超时、取消、慢调用或生命周期分类的稳定内置消息。'
           ),
-          example: logExample
+          example: logFilterOptionExample
         }
       }
     },

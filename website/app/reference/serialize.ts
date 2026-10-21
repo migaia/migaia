@@ -8,7 +8,7 @@
  * diagnostics. `collectStream` currently requires an encoder whenever it assembles multiple chunks
  * containing bytes, even if all chunks already carry bytes.
  */
-import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { serializeCases } from './serialize-cases.ts'
 
 /** Creates localized prose without locale fallback. */
@@ -75,6 +75,546 @@ const registry = createSerializeRegistry([jsonPlugin()])
 const chunks = encodeStream(registry, [1, 2, 3], { scheduler: systemScheduler })
 for await (const value of decodeStream(registry, chunks)) console.log(value)
 await registry.dispose()`
+
+/** Reader scenarios use application-owned parsers, streams and clocks. */
+const serializeOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  IJsonCodecOptions: [
+    {
+      title: t('Write an agreed archive revision', '写入约定版本的存档'),
+      problem: t(
+        'The settings archive has an application-selected format revision. The codec requires that revision explicitly; it does not negotiate versions or migrate stored values.',
+        '设置存档使用应用约定的格式版本。编解码器要求明确传入该版本，不会协商版本或迁移保存值。'
+      ),
+      example: `import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const codec = defineJsonCodec({ version: 2 })
+await saveSettingsArchive(codec.encode(editorSettings))`,
+      result: t(
+        'The application saves settings with its version-two codec.',
+        '应用使用第二版编解码器保存设置。'
+      ),
+      covers: ['version']
+    },
+    {
+      title: t('Keep the previous archive reader available', '保留上一版存档读取器'),
+      problem: t(
+        'A deployment still reads archives written by its predecessor. Construct separate codecs for the two revisions and let the application choose by its stored metadata; changing configuration does not relabel an existing codec.',
+        '部署后仍需读取上一版本保存的存档。为两个版本分别创建编解码器，由应用按保存元数据选择；修改配置不会给已有实例重新标记版本。'
+      ),
+      example: `import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const previous = defineJsonCodec({ version: 1 })
+const current = defineJsonCodec({ version: 2 })
+registerArchiveReaders([previous, current])`,
+      result: t(
+        'The application retains readers for both revisions without mutating the earlier codec.',
+        '应用同时保留两个版本的读取器，不修改旧编解码器。'
+      ),
+      covers: ['version']
+    }
+  ],
+  ICborCodecOptions: [
+    {
+      title: t('Write an agreed archive revision', '写入约定版本的存档'),
+      problem: t(
+        'The settings archive has an application-selected format revision. The codec requires that revision explicitly; it does not negotiate versions or migrate stored values.',
+        '设置存档使用应用约定的格式版本。编解码器要求明确传入该版本，不会协商版本或迁移保存值。'
+      ),
+      example: `import { defineCBORCodec } from '@migaia/serialize/codecs/cbor'
+
+const codec = defineCBORCodec({ version: 2 })
+await saveSettingsArchive(codec.encode(editorSettings))`,
+      result: t(
+        'The application saves settings with its version-two codec.',
+        '应用使用第二版编解码器保存设置。'
+      ),
+      covers: ['version']
+    },
+    {
+      title: t('Keep the previous archive reader available', '保留上一版存档读取器'),
+      problem: t(
+        'A deployment still reads archives written by its predecessor. Construct separate codecs for the two revisions and let the application choose by its stored metadata; changing configuration does not relabel an existing codec.',
+        '部署后仍需读取上一版本保存的存档。为两个版本分别创建编解码器，由应用按保存元数据选择；修改配置不会给已有实例重新标记版本。'
+      ),
+      example: `import { defineCBORCodec } from '@migaia/serialize/codecs/cbor'
+
+const previous = defineCBORCodec({ version: 1 })
+const current = defineCBORCodec({ version: 2 })
+registerArchiveReaders([previous, current])`,
+      result: t(
+        'The application retains readers for both revisions without mutating the earlier codec.',
+        '应用同时保留两个版本的读取器，不修改旧编解码器。'
+      ),
+      covers: ['version']
+    }
+  ],
+  IMessagePackCodecOptions: [
+    {
+      title: t('Write an agreed archive revision', '写入约定版本的存档'),
+      problem: t(
+        'The settings archive has an application-selected format revision. The codec requires that revision explicitly; it does not negotiate versions or migrate stored values.',
+        '设置存档使用应用约定的格式版本。编解码器要求明确传入该版本，不会协商版本或迁移保存值。'
+      ),
+      example: `import { defineMessagePackCodec } from '@migaia/serialize/codecs/message-pack'
+
+const codec = defineMessagePackCodec({ version: 2 })
+await saveSettingsArchive(codec.encode(editorSettings))`,
+      result: t(
+        'The application saves settings with its version-two codec.',
+        '应用使用第二版编解码器保存设置。'
+      ),
+      covers: ['version']
+    },
+    {
+      title: t('Keep the previous archive reader available', '保留上一版存档读取器'),
+      problem: t(
+        'A deployment still reads archives written by its predecessor. Construct separate codecs for the two revisions and let the application choose by its stored metadata; changing configuration does not relabel an existing codec.',
+        '部署后仍需读取上一版本保存的存档。为两个版本分别创建编解码器，由应用按保存元数据选择；修改配置不会给已有实例重新标记版本。'
+      ),
+      example: `import { defineMessagePackCodec } from '@migaia/serialize/codecs/message-pack'
+
+const previous = defineMessagePackCodec({ version: 1 })
+const current = defineMessagePackCodec({ version: 2 })
+registerArchiveReaders([previous, current])`,
+      result: t(
+        'The application retains readers for both revisions without mutating the earlier codec.',
+        '应用同时保留两个版本的读取器，不修改旧编解码器。'
+      ),
+      covers: ['version']
+    }
+  ],
+  IProtobufCodecOptions: [
+    {
+      title: t('Encode invoices with the generated binding', '用生成的绑定编码发票'),
+      problem: t(
+        'The application already has its generated InvoiceSchema descriptor. Supply that executable binding separately from the application schema identity and codec revision.',
+        '应用已经拥有生成的 InvoiceSchema 描述符。将可执行绑定与应用模式标识、编解码版本分别传入。'
+      ),
+      example: `import { defineProtobufCodec } from '@migaia/serialize/codecs/protobuf'
+
+const codec = defineProtobufCodec({
+  version: 2,
+  schema: { id: 'invoice', version: 1 },
+  binding: InvoiceSchema
+})
+await sendInvoice(codec.encode(invoice))`,
+      result: t(
+        'The generated binding encodes the invoice; schema version one remains distinct from codec revision two.',
+        '生成的绑定负责编码发票，模式第一版与编解码第二版保持独立。'
+      ),
+      covers: ['version', 'schema', 'binding']
+    },
+    {
+      title: t('Register the saved schema identity', '登记保存格式的模式标识'),
+      problem: t(
+        'An archive catalog routes stored messages by schema identity. Construction snapshots the supplied schema metadata, so later application configuration changes do not change this registered codec.',
+        '存档目录按模式标识路由已保存消息。构造会固定传入的模式元数据，应用后续修改配置不会改变已登记的编解码器。'
+      ),
+      example: `import { defineProtobufCodec } from '@migaia/serialize/codecs/protobuf'
+
+const codec = defineProtobufCodec({
+  version: 1,
+  schema: invoiceSchemaIdentity,
+  binding: InvoiceSchema
+})
+registerSchemaReader(codec.schema, codec)`,
+      result: t(
+        'The catalog keeps the schema identity captured when this reader was created.',
+        '目录保留此读取器创建时取得的模式标识。'
+      ),
+      covers: ['version', 'schema', 'binding']
+    }
+  ],
+  ICollectStreamOptions: [
+    {
+      title: t('Allow an empty notes download', '允许下载空白备注'),
+      problem: t(
+        'A notes export may legitimately contain no chunks. Explicit text mode produces an empty text file instead of treating that result as an export failure.',
+        '备注导出可能没有任何分块。显式 text 模式将其保存为空文本文件，不把它视为导出失败。'
+      ),
+      example: `import { collectStream } from '@migaia/serialize/core'
+
+const notes = await collectStream(noteChunks, new TextEncoder(), {
+  empty: 'text',
+  context: 'optional-notes'
+})
+offerNotesDownload(notes)`,
+      result: t(
+        'An empty source produces an empty notes download; failures carry the optional-notes label.',
+        '空来源产生空白备注下载，失败则携带 optional-notes 标签。'
+      ),
+      covers: ['empty', 'context']
+    },
+    {
+      title: t('Cancel a required export with its request', '随请求取消必需导出'),
+      problem: t(
+        'A required export should not deliver an empty file or keep collecting after its request ends. Reject empty output and forward the request signal.',
+        '必需导出不能交付空文件，也不应在请求结束后继续收集。拒绝空结果，并转交请求信号。'
+      ),
+      example: `import { collectStream } from '@migaia/serialize/core'
+
+try {
+  const file = await collectStream(exportChunks, new TextEncoder(), {
+    empty: 'reject',
+    context: 'invoice-export',
+    signal: requestSignal
+  })
+  offerInvoiceDownload(file)
+} catch (error) {
+  showExportError(error)
+}`,
+      result: t(
+        'A cancelled or empty required export shows an error instead of offering a file.',
+        '取消或空白的必需导出显示错误，不会提供文件。'
+      ),
+      covers: ['empty', 'context', 'signal']
+    }
+  ],
+  IFrameBudgetOptions: [
+    {
+      title: t('Render imported rows in adjustable batches', '按可调整批次渲染导入行'),
+      problem: t(
+        'An import view must share the event loop with other UI work. Set a processing target and item bounds, then use the application clock and yield operation between batches; the target does not interrupt row rendering.',
+        '导入视图需要与其他界面工作共用事件循环。设置处理目标与条目边界，并在批次之间使用应用时钟和让出操作；目标时长不会中断行渲染。'
+      ),
+      example: `import { sliceByFrameBudget } from '@migaia/serialize/core'
+
+for await (const rows of sliceByFrameBudget(importRows, {
+  targetMs: 8,
+  minItems: 10,
+  maxItems: 200,
+  initialItems: 20,
+  scheduler: importScheduler,
+  yieldTo: () => waitForNextPaint()
+})) {
+  appendImportRows(rows)
+}`,
+      result: t(
+        'The view receives ordered batches and yields between them while the batch size adapts to consumer work.',
+        '视图按顺序接收批次，并在批次之间让出执行机会；批次大小按消费开销调整。'
+      ),
+      covers: ['targetMs', 'minItems', 'maxItems', 'initialItems', 'scheduler', 'yieldTo']
+    },
+    {
+      title: t('Stop rendering after the import view closes', '导入视图关闭后停止渲染'),
+      problem: t(
+        'The view already owns its batch policy. Adding its lifetime signal stops later slices when it closes, while rows already displayed remain displayed.',
+        '视图已经持有分批策略。加入其生命周期信号，可在关闭时停止后续切片，已经展示的数据行仍然保留。'
+      ),
+      example: `import { sliceByFrameBudget } from '@migaia/serialize/core'
+
+try {
+  for await (const rows of sliceByFrameBudget(importRows, {
+    ...importBatchOptions,
+    signal: viewSignal
+  })) {
+    appendImportRows(rows)
+  }
+} catch (error) {
+  handleImportStopped(error)
+}`,
+      result: t(
+        'Closing the view stops later batches without undoing the rows it already consumed.',
+        '视图关闭后停止后续批次，不撤销已消费的数据行。'
+      ),
+      covers: ['signal']
+    }
+  ],
+  IEncodeStreamOptions: [
+    {
+      title: t('Write independent export chunks in order', '按顺序写入独立导出分块'),
+      problem: t(
+        'The export owns a registered JSON parser and batch policy. Select that format, label its failures and allow two encodes in flight without changing source order.',
+        '导出已经持有登记的 JSON 解析器与分批策略。选择该格式、标记失败，并允许两个编码操作在途，同时保持源顺序。'
+      ),
+      example: `import { encodeStream } from '@migaia/serialize/core'
+
+for await (const chunk of encodeStream(registry, exportRows, {
+  ...exportBatchOptions,
+  type: 'json',
+  context: 'orders-export',
+  maxInFlight: 2
+})) {
+  await writeExportChunk(chunk)
+}`,
+      result: t(
+        'The writer receives independent encoded arrays in source order, rather than one concatenated JSON document.',
+        '写入器按源顺序接收独立编码数组，而不是一个直接拼接的 JSON 文档。'
+      ),
+      covers: ['type', 'context', 'maxInFlight']
+    },
+    {
+      title: t('Choose an export slice budget', '选择导出的切片预算'),
+      problem: t(
+        'A desktop export should leave time for UI work while encoding many rows. Configure its batch adaptation separately from the output format and request context.',
+        '桌面导出需要在编码大量数据行时给界面执行机会。将批次自适应配置与输出格式、请求上下文分别设置。'
+      ),
+      example: `import { encodeStream } from '@migaia/serialize/core'
+
+for await (const chunk of encodeStream(registry, exportRows, {
+  targetMs: 8,
+  minItems: 10,
+  maxItems: 200,
+  initialItems: 20,
+  scheduler: exportScheduler,
+  yieldTo: () => waitForNextPaint()
+})) {
+  await writeExportChunk(chunk)
+}`,
+      result: t(
+        'Encoding uses bounded adaptive batches and gives the host an opportunity between slices.',
+        '编码使用有界自适应批次，并在切片之间给宿主执行机会。'
+      ),
+      covers: ['targetMs', 'minItems', 'maxItems', 'initialItems', 'scheduler', 'yieldTo']
+    },
+    {
+      title: t('Stop an export when its request ends', '请求结束后停止导出'),
+      problem: t(
+        'A closed request no longer needs encoded rows. Pass its signal so owned stream work can stop; the borrowed registry remains owned by the application.',
+        '请求结束后不再需要编码数据行。传入其信号，让流拥有的工作可以停止；借用的注册表仍由应用持有。'
+      ),
+      example: `import { encodeStream } from '@migaia/serialize/core'
+
+try {
+  for await (const chunk of encodeStream(registry, exportRows, {
+    ...exportBatchOptions,
+    signal: requestSignal
+  })) {
+    await writeExportChunk(chunk)
+  }
+} catch (error) {
+  showExportError(error)
+}`,
+      result: t(
+        'Cancellation stops later chunks and lets the application show the export outcome.',
+        '取消会停止后续分块，应用可展示导出结果。'
+      ),
+      covers: ['signal']
+    }
+  ],
+  decodeStream: [
+    {
+      title: t('Read downloaded invoice chunks', '读取下载的发票分块'),
+      problem: t(
+        'A download identifies its registered format and request lifetime. Decode each chunk with that parser, keeping the download context on failures instead of merging unrelated chunks.',
+        '下载已经确定登记格式与请求生命周期。用该解析器逐块解码，失败时保留下载上下文，不合并彼此独立的分块。'
+      ),
+      example: `import { decodeStream } from '@migaia/serialize/core'
+
+for await (const invoices of decodeStream(registry, downloadChunks, {
+  type: 'json',
+  context: 'invoice-download',
+  signal: requestSignal
+})) {
+  appendDownloadedInvoices(invoices)
+}`,
+      result: t(
+        'The invoice view receives each independent decoded value in download order.',
+        '发票视图按下载顺序接收每个独立解码值。'
+      ),
+      covers: ['type', 'context', 'signal']
+    },
+    {
+      title: t('Handle a cancelled download', '处理已取消的下载'),
+      problem: t(
+        'A route can close while its response is buffered. The route signal stops decoding before another value is delivered, so the closed page does not continue adding invoices.',
+        '响应已缓冲时，路由也可能关闭。路由信号会在交付下一值前停止解码，已关闭页面不再继续追加发票。'
+      ),
+      example: `import { decodeStream } from '@migaia/serialize/core'
+
+try {
+  for await (const invoices of decodeStream(registry, downloadChunks, {
+    type: 'json',
+    context: 'invoice-download',
+    signal: routeSignal
+  })) {
+    appendDownloadedInvoices(invoices)
+  }
+} catch (error) {
+  handleDownloadStopped(error)
+}`,
+      result: t(
+        'A cancelled route receives no further decoded invoices.',
+        '路由取消后不再收到后续解码发票。'
+      ),
+      covers: ['type', 'context', 'signal']
+    }
+  ],
+  IJsonPluginOptions: [
+    {
+      title: t('Save readable settings without session data', '保存可读配置并排除会话数据'),
+      problem: t(
+        'A settings file should be readable in an editor, but session data must stay local. Native JSON replacement selects fields and space sets indentation.',
+        '设置文件需要便于在编辑器中阅读，会话数据却必须留在本地。原生 JSON 替换回调选择字段，space 设置缩进。'
+      ),
+      example: `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'
+
+const registry = createSerializeRegistry([jsonPlugin({
+  replacer: (key, value) => key === 'session' ? undefined : value,
+  space: 2
+})])
+await saveSettingsFile(await registry.encode(editorSettings))
+await registry.dispose()`,
+      result: t(
+        'The saved file has two-space indentation and omits the session field.',
+        '保存文件使用两空格缩进，并省略 session 字段。'
+      ),
+      covers: ['replacer', 'space']
+    },
+    {
+      title: t('Restore the last-saved date from JSON bytes', '从 JSON 字节恢复最后保存时间'),
+      problem: t(
+        'Downloaded settings arrive as bytes and store a date as text. A strict byte decoder rejects damaged UTF-8; the native JSON reviver restores the application date field.',
+        '下载配置以字节形式到达，其中日期保存为文本。严格字节解码器拒绝损坏的 UTF-8，原生 JSON reviver 恢复应用日期字段。'
+      ),
+      example: `import { jsonParser } from '@migaia/serialize/plugins'
+
+const parser = jsonParser({
+  decoder: new TextDecoder('utf-8', { fatal: true }),
+  reviver: (key, value) => key === 'updatedAt' ? new Date(value as string) : value
+})
+const settings = await parser.decode(downloadedSettings, {
+  signal: requestSignal,
+  context: 'editor-settings'
+}) as { updatedAt: Date }
+renderLastSaved(settings.updatedAt)
+await parser.dispose?.()`,
+      result: t(
+        'The editor receives a Date for updatedAt, instead of displaying the raw saved string.',
+        '编辑器取得 Date 类型的 updatedAt，不再直接展示保存的字符串。'
+      ),
+      covers: ['decoder', 'reviver']
+    }
+  ],
+  ISerializeRegistryOptions: [
+    {
+      title: t('Assemble a text header with binary output', '拼装文本头与二进制输出'),
+      problem: t(
+        'An application parser emits a text header followed by byte chunks. Provide the host encoder so the registry can assemble that mixed output; this does not change parser-specific decoding.',
+        '应用解析器先输出文本头，再输出字节分块。提供宿主编码器，让注册表可以拼装混合输出；这不会改变解析器自己的解码策略。'
+      ),
+      example: `import { createSerializeRegistry } from '@migaia/serialize'
+
+const registry = createSerializeRegistry(applicationParsers, {
+  encoder: new TextEncoder()
+})
+await sendReport(await registry.encode(reportData))
+await registry.dispose()`,
+      result: t(
+        'The report contains the encoded header followed by the parser byte payload.',
+        '报表包含编码后的文本头，以及解析器产生的字节载荷。'
+      ),
+      covers: ['encoder']
+    },
+    {
+      title: t('Report cleanup failure outside the close result', '在关闭结果之外处理清理失败'),
+      problem: t(
+        'Parser cleanup may fail after a document closes. The default policy rejects disposal; report is appropriate when the application deliberately handles cleanup diagnostics through monitoring.',
+        '文档关闭后，解析器清理仍可能失败。默认策略使销毁拒绝；应用明确通过监控处理清理诊断时，可使用 report。'
+      ),
+      example: `import { createSerializeRegistry } from '@migaia/serialize'
+
+const registry = createSerializeRegistry(applicationParsers, {
+  cleanup: {
+    policy: 'report',
+    report: (diagnostic) => reportCleanupDiagnostic(diagnostic)
+  }
+})
+onEditorClosed(() => registry.dispose())`,
+      result: t(
+        'A parser cleanup failure reaches monitoring while the report-policy disposal can finish.',
+        '解析器清理失败会交给监控，report 策略的销毁仍可完成。'
+      ),
+      covers: ['cleanup', 'cleanup.policy', 'cleanup.report']
+    },
+    {
+      title: t('Observe work that outlives the editor', '观察超过编辑器生命周期的工作'),
+      problem: t(
+        'A parser can remain pending after the editor closes. The application clock bounds the disposal wait; a timeout callback updates the UI and report preserves a later parser rejection.',
+        '编辑器关闭后，解析器仍可能待定。应用时钟限制销毁等待，超时回调更新界面，report 保留之后才到达的解析器拒绝。'
+      ),
+      example: `import { createSerializeRegistry } from '@migaia/serialize'
+
+const registry = createSerializeRegistry(applicationParsers, {
+  scheduler: applicationScheduler,
+  onDrainTimeout: (diagnostic) => showPendingOperations(diagnostic.pendingCount),
+  report: (error) => reportToMonitoring(error)
+})
+onPreviewRequested(async (value) => {
+  try {
+    renderPreview(await registry.encode(value))
+  } catch (error) {
+    showPreviewError(error)
+  }
+})
+onEditorClosed(() => registry.dispose({
+  deadlineAt: applicationScheduler.now() + 2000
+}))`,
+      result: t(
+        'The editor can finish its bounded close wait, show pending work and still report a later parser failure.',
+        '编辑器可结束限时关闭等待、显示未完成工作，并继续上报迟到的解析器失败。'
+      ),
+      covers: ['scheduler', 'onDrainTimeout', 'report']
+    }
+  ]
+}
+
+/** Application errors retain operation labels, primary failures and cleanup detail. */
+const serializeErrorOptionCases = (name: string, secondary = false): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Explain a saved-settings decode failure', '说明保存配置的解码失败'),
+    problem: t(
+      'The editor needs a readable restore message, while support needs the original decoder failure and the affected operation. Keep cause and a stable context label together.',
+      '编辑器需要可读的恢复提示，支持人员仍需要原始解码失败及受影响操作。将 cause 与稳定的 context 标签一起保留。'
+    ),
+    example: `import { ${name}, SerializeErrorCode } from '@migaia/serialize/core'
+
+try {
+  await decodeSavedSettings(upload)
+} catch (cause) {
+  const error = ${name}(
+    SerializeErrorCode.decodeFailed,
+    'Saved settings rejected',
+    { cause, context: 'editor-settings' }
+  )
+  showSettingsError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The editor explains the failure; monitoring retains the original cause under editor-settings.',
+      '编辑器说明失败，监控在 editor-settings 上下文下保留原始原因。'
+    ),
+    covers: ['cause', 'context']
+  },
+  {
+    title: t('Keep import failure and cleanup detail together', '一起保留导入失败与清理详情'),
+    problem: t(
+      'A settings import can fail before its input resources are released. Keep cleanup failures alongside the primary decode failure so the operator can diagnose both operations.',
+      '设置导入可能在输入资源释放前失败。将清理失败与主要解码失败一起保留，方便操作人员排查两项操作。'
+    ),
+    example: `import { ${name}, SerializeErrorCode } from '@migaia/serialize/core'
+
+try {
+  await importSettings(upload)
+} catch (primary) {
+  const cleanupErrors = await releaseImportInput()
+  const error = ${name}(
+    SerializeErrorCode.decodeFailed,
+    'Settings import failed',
+    {
+      cause: ${secondary ? 'primary' : "new AggregateError([primary, ...cleanupErrors], 'Import and cleanup failed')"},
+      context: 'settings-import'${secondary ? ',\n      errors: cleanupErrors' : ''}
+    }
+  )
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The import report retains the primary failure and input-cleanup failures under one operation label.',
+      '导入报告在同一操作标签下保留主要失败及输入清理失败。'
+    ),
+    covers: secondary ? ['cause', 'context', 'errors'] : ['cause', 'context']
+  }
+]
 
 /** Shared native error identity fields preserve the original runtime error class. */
 const errorMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -172,6 +712,11 @@ const frameMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   yieldTo: {
+    whenToUse: t(
+      'Use a host task or frame callback when consumers must let other work run between slices. The callback returns Promise<void>; rejection stops iteration. Omission schedules a zero-delay task through scheduler and observes cancellation.',
+      '消费者需要在切片之间让其它工作运行时，使用宿主任务或帧回调。回调返回 Promise<void>，拒绝会终止迭代。省略时通过 scheduler 安排零延迟任务，并观察取消。'
+    ),
+    example: serializeOptionCases.IFrameBudgetOptions![0]!.example,
     summary: t(
       'Optional no-argument async callback invoked between slices. Resolve after yielding execution; a throw or rejection stops iteration.',
       '片与片之间调用的无参数异步回调；让出执行权后兑现，抛错或拒绝会终止迭代。'
@@ -184,14 +729,7 @@ const frameMembers: Readonly<Record<string, IMemberDoc>> = {
     default: t(
       'Schedules a zero-delay task with the supplied scheduler; its wait observes cancellation.',
       '默认经注入的调度器安排零延迟任务，等待过程可响应取消。'
-    ),
-    example: `import { sliceByFrameBudget } from '@migaia/serialize/core'
-import { systemScheduler } from '@migaia/utils/scheduler'
-
-for await (const rows of sliceByFrameBudget([1, 2], {
-  scheduler: systemScheduler,
-  yieldTo: () => new Promise((resolve) => systemScheduler.schedule(resolve, 0))
-})) console.log(rows)`
+    )
   },
   signal: {
     summary: t(
@@ -415,6 +953,13 @@ const registryOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   decoder: {
+    example: `import { createSerializeRegistry } from '@migaia/serialize'
+
+const registry = createSerializeRegistry(applicationParsers, {
+  decoder: new TextDecoder('utf-8', { fatal: true })
+})
+await restoreEditorSettings(registry)
+await registry.dispose()`,
     summary: t(
       'Fixed `ITextDecoder` capability captured and validated at construction; JSON plugin byte decoding has its own decoder option.',
       '构造时捕获并校验的固定 `ITextDecoder` 能力；`JSON` 插件的字节解码使用插件自身的解码器选项。'
@@ -425,6 +970,11 @@ const registryOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   cleanup: {
+    whenToUse: t(
+      'Choose throw, the default, when callers should catch parser-disposal failures. Choose report with a required report callback when the application owns a separate cleanup error sink. Both policies keep an earlier primary failure intact.',
+      '调用方需要捕获解析器销毁失败时，选择默认 throw。应用另有清理错误出口时，可选择 report，并提供必需的报告回调。两种策略都保留先前主失败。'
+    ),
+    example: serializeOptionCases.ISerializeRegistryOptions![1]!.example,
     summary: t(
       'Controls parser-disposer failure handling: throw retains cleanup failures in disposal rejection; report sends one diagnostic and preserves the primary outcome.',
       '控制解析器清理失败的处理：抛出策略将清理失败保留在销毁拒绝中，报告策略发送诊断并保留主结果。'
@@ -435,6 +985,11 @@ const registryOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   'cleanup.policy': {
+    whenToUse: t(
+      'Use throw to reject disposal after parser cleanup fails. Use report only with cleanup.report to observe the failure without making it the disposal rejection. Omission of the cleanup object selects throw.',
+      '解析器清理失败后需要使销毁拒绝时选 throw。只有提供 cleanup.report 时才可选 report，在不改变销毁拒绝结果的情况下观察失败。省略 cleanup 对象时选 throw。'
+    ),
+    example: serializeOptionCases.ISerializeRegistryOptions![1]!.example,
     summary: t(
       'Chooses the cleanup error boundary; report requires cleanup.report and never changes an existing primary failure.',
       '选择清理错误边界；报告策略必须提供 `cleanup.report`，不会改变已有的主失败。'
@@ -442,6 +997,11 @@ const registryOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     values: { enum: 'SerializeCleanupPolicy' }
   },
   'cleanup.report': {
+    whenToUse: t(
+      'Provide it when cleanup.policy is report. It receives the registry cleanup diagnostic once and returns void; its own throw is contained. It is unused with throw policy and mandatory with report policy.',
+      'cleanup.policy 为 report 时提供。它接收一次注册表清理诊断，返回空值；自身抛错被限制在观察边界内。throw 策略不使用它，report 策略必须提供它。'
+    ),
+    example: serializeOptionCases.ISerializeRegistryOptions![1]!.example,
     summary: t(
       'Synchronous callback used only by report policy. Receives `d: ISerializeCleanupError` once after cleanup failure, returns nothing; thrown reporter failures are contained.',
       '仅报告策略使用的同步回调；清理失败后接收一次 `d: ISerializeCleanupError`，无需返回值，回调抛错被限制在观察边界内。'
@@ -455,15 +1015,14 @@ const registryOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     returns: t(
       'No return value is used; throwing does not change the disposal result.',
       '不使用返回值；抛错不会改变销毁结果。'
-    ),
-    example: `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'
-
-const registry = createSerializeRegistry([jsonPlugin()], {
-  cleanup: { policy: 'report', report: (d) => console.error(d.source, d.error) }
-})
-await registry.dispose()`
+    )
   },
   onDrainTimeout: {
+    whenToUse: t(
+      'Use it to record pending work when disposal reaches its deadline. It does not cancel an uncooperative parser or prevent cleanup. Without it the deadline still works, but no application observer receives the diagnostic.',
+      '需要记录销毁截止时间到达时的待完成工作量时设置。它不会强行终止忽略取消的解析器，也不阻止清理。省略时截止时间仍生效，但应用观察者不会收到诊断。'
+    ),
+    example: serializeOptionCases.ISerializeRegistryOptions![2]!.example,
     summary: t(
       'Synchronous observer receiving `d: ISerializeTimeoutDiagnostic` when draining reaches its deadline. Returns nothing; thrown observer failures are contained.',
       '排空达到截止时间时接收 `d: ISerializeTimeoutDiagnostic` 的同步观察回调；无需返回值，抛错不会阻断清理。'
@@ -481,24 +1040,22 @@ await registry.dispose()`
     default: t(
       'A fixed no-op observer; deadline behavior remains unchanged.',
       '默认固定空操作观察器，不改变截止时间处理行为。'
-    ),
-    example: `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'
-import { systemScheduler } from '@migaia/utils/scheduler'
-
-const registry = createSerializeRegistry([jsonPlugin()], {
-  onDrainTimeout: (d) => console.log(d.deadlineAt, d.pendingCount)
-})
-await registry.dispose({ deadlineAt: systemScheduler.now() })`
+    )
   },
   report: {
+    whenToUse: t(
+      'Use it for failures that arrive after cancellation or an iterator cleanup boundary. Return void; reporting does not replace the operation result. Without it the fixed no-op reporter drops these diagnostics.',
+      '需要观察取消后或迭代器清理边界之后到达的失败时设置。无需返回值，报告不会替换操作结果。省略时固定空操作报告器丢弃这些诊断。'
+    ),
+    example: serializeOptionCases.ISerializeRegistryOptions![2]!.example,
     summary: t(
       'Callback receiving secondary iterator-cleanup and detached late failures immediately, including after cancellation but before disposal completes; detached `ABORTED` remains observable. No return value changes the operation.',
       '接收次要迭代器清理与脱离后的迟到失败，取消后即报告，无需等到销毁完成；脱离后的 `ABORTED` 仍可观察，返回值不改变操作结果。'
     ),
     params: {
       error: t(
-        'Original failure observed by the registry after a primary result or cleanup boundary.',
-        '注册表在主结果或清理边界之后观察到的原始失败。'
+        'Failure observed at the registry boundary after a primary result or cleanup boundary. Parser failures may be SerializeCodecError values retaining the original failure on cause.',
+        '注册表在主结果或清理边界之后观察到的失败；解析器失败可能由 SerializeCodecError 包装，原始失败保留在 cause 中。'
       )
     },
     returns: t(
@@ -508,17 +1065,18 @@ await registry.dispose({ deadlineAt: systemScheduler.now() })`
     default: t(
       'A fixed no-op reporter; supply a callback when late failure visibility is required.',
       '默认固定空操作报告器；需要观察迟到失败时显式提供回调。'
-    ),
-    example: `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'
-
-const registry = createSerializeRegistry([jsonPlugin()], { report: (error) => console.error(error) })
-await registry.dispose()`
+    )
   }
 }
 
 /** JSON parser callback options retain native JSON callback semantics. */
 const jsonOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   replacer: {
+    whenToUse: t(
+      'Set it when an application field should be omitted or converted before writing native JSON. Returning undefined omits object properties; other returned values replace them. Omission uses native JSON conversion without a callback. The callback is synchronous.',
+      '应用字段需要在写入原生 JSON 前省略或转换时设置。返回 undefined 会省略对象属性，其它返回值替换当前值。省略时只使用原生转换，不调用回调。回调必须同步返回。'
+    ),
+    example: serializeOptionCases.IJsonPluginOptions![0]!.example,
     summary: t(
       'Synchronous native JSON.stringify callback: key is the current property name, including empty root key; value is its current value. Return replacement or undefined to omit an object property; thrown errors reach the parser caller.',
       '传给原生 `JSON.stringify` 的同步回调：`key` 是当前属性名，根值时为空串，`value` 是当前值；返回替代值或用 `undefined` 省略对象属性，抛错传给解析器调用者。'
@@ -540,14 +1098,14 @@ const jsonOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     default: t(
       'No replacer; native JSON serialization decides omission and conversion.',
       '默认无替换回调，由原生 `JSON` 规则决定省略与转换。'
-    ),
-    example: `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'
-
-const registry = createSerializeRegistry([jsonPlugin({ replacer: (key, value) => key === 'secret' ? undefined : value })])
-console.log(await registry.encode({ name: 'demo', secret: 'hidden' }))
-await registry.dispose()`
+    )
   },
   reviver: {
+    whenToUse: t(
+      'Set it when selected parsed fields need application types such as Date. Return a replacement, or undefined to delete the property. Omission keeps ordinary JSON values. It runs only for parsed text or bytes; value chunks pass through.',
+      '已解析字段需要恢复为 Date 等应用类型时设置。返回替代值，或返回 undefined 删除属性。省略时保留普通 JSON 值。只在解析文本或字节时执行，值分块原样通过。'
+    ),
+    example: serializeOptionCases.IJsonPluginOptions![1]!.example,
     summary: t(
       'Synchronous native JSON.parse callback: key is the parsed property name and value is the parsed child. Return a replacement or undefined to remove it; thrown errors reach the parser caller. Value chunks bypass this callback.',
       '传给原生 `JSON.parse` 的同步回调：`key` 是已解析属性名，`value` 是已解析子值；返回替代值或用 `undefined` 删除属性，抛错传给调用者；值分块跳过此回调。'
@@ -569,12 +1127,7 @@ await registry.dispose()`
     default: t(
       'No reviver; parsed JSON values keep their native shapes.',
       '默认无还原回调，解析结果保留原生 `JSON` 形状。'
-    ),
-    example: `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'
-
-const registry = createSerializeRegistry([jsonPlugin({ reviver: (key, value) => key === 'date' ? new Date(value as string) : value })])
-console.log(await registry.decode(['text', '{"date":"2026-10-17T00:00:00Z"}']))
-await registry.dispose()`
+    )
   },
   space: {
     summary: t(
@@ -1275,6 +1828,7 @@ console.log(await collectStream([['text', 'hello'], ['text', ' world']]))`
       cases: serializeCases.encodeStream
     },
     decodeStream: {
+      optionCases: serializeOptionCases.decodeStream!,
       optionDocs: {
         type: {
           summary: t(
@@ -1464,6 +2018,7 @@ const error = new RangeError('invalid size')
 console.log(tagSerializeError(error, SerializeErrorCode.invalidOption) === error)`
     },
     createSerializeError: {
+      optionCases: serializeErrorOptionCases('createSerializeError', true),
       optionDocs: {
         ...nativeErrorOptions,
         errors: {
@@ -1504,6 +2059,7 @@ console.log(tagSerializeError(error, SerializeErrorCode.invalidOption) === error
 console.log(createSerializeError(SerializeErrorCode.registryDisposed, 'registry closed'))`
     },
     createSerializeTypeError: {
+      optionCases: serializeErrorOptionCases('createSerializeTypeError', false),
       optionDocs: nativeErrorOptions,
       role: 'operation',
       purpose: t(
@@ -1531,6 +2087,7 @@ console.log(createSerializeError(SerializeErrorCode.registryDisposed, 'registry 
       example: errorExample
     },
     createSerializeRangeError: {
+      optionCases: serializeErrorOptionCases('createSerializeRangeError', false),
       optionDocs: nativeErrorOptions,
       role: 'operation',
       purpose: t(
@@ -1914,6 +2471,7 @@ console.log(${name})`
       }
     },
     IJsonCodecOptions: {
+      optionCases: serializeOptionCases.IJsonCodecOptions!,
       summary: t(
         'Required native JSON codec options; the caller owns the explicit positive safe integer wire version.',
         '必填原生 `JSON` 编解码器选项，调用者拥有显式正安全整数线格式版本。'
@@ -1922,6 +2480,7 @@ console.log(${name})`
       members: { version: versionMember }
     },
     ICborCodecOptions: {
+      optionCases: serializeOptionCases.ICborCodecOptions!,
       summary: t(
         'Required CBOR codec options containing the explicit wire-format version selected by its owner.',
         '必填 `CBOR` 编解码器选项，包含其拥有者选定的显式线格式版本。'
@@ -1932,6 +2491,7 @@ console.log(codec.version)`,
       members: { version: versionMember }
     },
     IMessagePackCodecOptions: {
+      optionCases: serializeOptionCases.IMessagePackCodecOptions!,
       summary: t(
         'Required MessagePack codec options containing an explicit positive safe integer codec version.',
         '必填 `MessagePack` 编解码器选项，包含显式正安全整数编解码器版本。'
@@ -1942,6 +2502,7 @@ console.log(codec.version)`,
       members: { version: versionMember }
     },
     IProtobufCodecOptions: {
+      optionCases: serializeOptionCases.IProtobufCodecOptions!,
       example: `import { defineProtobufCodec } from '@migaia/serialize/codecs/protobuf'
 import { FileDescriptorProtoSchema } from '@bufbuild/protobuf/wkt'
 const codec = defineProtobufCodec({ version: 1, schema: { id: 'file-descriptor', version: 1 }, binding: FileDescriptorProtoSchema })
@@ -2147,6 +2708,7 @@ console.log(codec.schema.id, codec.schema.version)`,
       members: registryMembers
     },
     IFrameBudgetOptions: {
+      optionCases: serializeOptionCases.IFrameBudgetOptions!,
       example: `import { sliceByFrameBudget } from '@migaia/serialize/core'
 import { systemScheduler } from '@migaia/utils/scheduler'
 for await (const rows of sliceByFrameBudget([1, 2], { scheduler: systemScheduler, targetMs: 8 })) console.log(rows)`,
@@ -2157,6 +2719,7 @@ for await (const rows of sliceByFrameBudget([1, 2], { scheduler: systemScheduler
       members: frameMembers
     },
     IEncodeStreamOptions: {
+      optionCases: serializeOptionCases.IEncodeStreamOptions!,
       example: streamExample,
       summary: t(
         'Frame-budget options plus parser selection, stream context and encoding backpressure. Each slice is encoded independently and output order matches source slice order.',
@@ -2164,6 +2727,10 @@ for await (const rows of sliceByFrameBudget([1, 2], { scheduler: systemScheduler
       ),
       members: {
         ...frameMembers,
+        yieldTo: {
+          ...frameMembers.yieldTo!,
+          example: serializeOptionCases.IEncodeStreamOptions![1]!.example
+        },
         type: {
           summary: t(
             'Registered format tag selected from registry.types or a stored envelope.',
@@ -2197,6 +2764,7 @@ for await (const rows of sliceByFrameBudget([1, 2], { scheduler: systemScheduler
       }
     },
     ICollectStreamOptions: {
+      optionCases: serializeOptionCases.ICollectStreamOptions!,
       example: `import { collectStream } from '@migaia/serialize/core'
 console.log(await collectStream([], undefined, { empty: 'text', context: 'export' }))`,
       summary: t(
@@ -2216,6 +2784,11 @@ console.log(await collectStream([], undefined, { empty: 'text', context: 'export
           )
         },
         empty: {
+          whenToUse: t(
+            'Choose text for optional exports and reject when an empty download is a failure. Omission selects text and returns an empty string chunk.',
+            '可选导出选 text，空下载应视为失败时选 reject。省略时采用 text，返回空字符串分块。'
+          ),
+          example: serializeOptionCases.ICollectStreamOptions![0]!.example,
           summary: t(
             'Chooses whether collecting an empty input stream succeeds or rejects.',
             '选择收集空输入流时正常完成还是拒绝。'
@@ -2238,6 +2811,7 @@ console.log(await collectStream([], undefined, { empty: 'text', context: 'export
       }
     },
     IJsonPluginOptions: {
+      optionCases: serializeOptionCases.IJsonPluginOptions!,
       example: parserExample,
       summary: t(
         'Native JSON parser callbacks, indentation and byte decoder; jsonParser and jsonPlugin consume the same fields without portable codec versioning.',
@@ -2246,6 +2820,7 @@ console.log(await collectStream([], undefined, { empty: 'text', context: 'export
       members: jsonOptionMembers
     },
     ISerializeRegistryOptions: {
+      optionCases: serializeOptionCases.ISerializeRegistryOptions!,
       example: registryExample,
       summary: t(
         'Construction-time capabilities and cleanup observers captured before parser ownership is acquired; invalid shapes use INVALID_OPTION.',

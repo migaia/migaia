@@ -1,4 +1,303 @@
-import type { ICaseDoc } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
+
+/** Localized option stories share complete public-entry programs. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Short application examples keep parent, child, host and artifact ownership separate. */
+export const trayOptionExamples = {
+  registry: `import { createTray } from '@migaia/tray'
+
+const tray = createTray({
+  hosts: [pricingHost] as const,
+  probe: monitoringProbe,
+  report: (error) => reportToMonitoring(error)
+})
+const pricing = await tray.spawn('pricing', { id: 'checkout' })
+renderPrices(await pricing.request('pricing.api.fetchPrices', productIds))
+onCheckoutClosed(() => tray.dispose())`,
+  routing: `import { createTray, defineTrayHost, defineRoutingPolicy } from '@migaia/tray'
+
+const firstReady = defineRoutingPolicy('firstReady', (candidates) => candidates[0]!.id)
+const pricingHost = defineTrayHost({
+  ...pricingHostDefinition,
+  routing: [firstReady] as const
+})
+const tray = createTray({ hosts: [pricingHost] as const, routing: [firstReady] as const })
+await tray.spawn('pricing', { id: 'checkout' })
+const pricing = tray.routing.firstReady(pricingHost)
+renderPrices(await pricing.request('pricing.api.fetchPrices', productIds))
+onCheckoutClosed(() => tray.dispose())`,
+  serveProbe: `import { serveTrayHost } from '@migaia/tray'
+
+await serveTrayHost(pricingHost, {
+  probe: monitoringProbe,
+  report: (error) => reportToMonitoring(error)
+})`,
+  serveReport: `import { serveTrayHost } from '@migaia/tray'
+
+await serveTrayHost(pricingHost, {
+  report: (error) => reportChildFailure('pricing', error)
+})`,
+  hostStrict: `import { createHost } from '@migaia/tray/host'
+
+const host = await createHost({
+  create: () => createApplicationHost(),
+  plugins: [pricingPlugin] as const,
+  mutationAdmissionMs: 1000,
+  quiescenceMs: 1000,
+  shutdown: { mode: 'strict-drain' }
+})
+showPricingPanel(host)
+onCheckoutClosed(async () => {
+  await host.dispose()
+  showCheckoutClosed()
+})`,
+  hostBounded: `import { createHost } from '@migaia/tray/host'
+
+const host = await createHost({
+  ...applicationManagedHostOptions,
+  quiescenceMs: 500,
+  shutdown: { mode: 'bounded' }
+})
+onCheckoutClosed(async () => {
+  const result = await host.dispose()
+  showCheckoutClosed(result.cleanupComplete)
+  await result.physicalCompletion
+})`,
+  hostReport: `import { createHost } from '@migaia/tray/host'
+
+const host = await createHost({
+  ...applicationManagedHostOptions,
+  report: (error) => reportToMonitoring(error)
+})
+onCheckoutClosed(() => host.dispose())`,
+  load: `import { loadIntoHost } from '@migaia/tray/loader'
+
+const result = await loadIntoHost({
+  host: managedHost,
+  source: pricingBundle,
+  loader: bundleLoader,
+  adapter: pricingAdapter,
+  mutation: 'use',
+  timeoutMs: 5000
+})
+if (result.ok) showLoadedPricing(result.view)`,
+  replace: `import { loadIntoHost } from '@migaia/tray/loader'
+
+const result = await loadIntoHost({
+  ...pricingLoadOptions,
+  source: updatedPricingBundle,
+  mutation: 'replace',
+  timeoutMs: false,
+  report: (error) => reportToMonitoring(error)
+})
+if (result.ok) showLoadedPricing(result.view)`,
+  loadCancel: `import { loadIntoHost } from '@migaia/tray/loader'
+
+try {
+  const result = await loadIntoHost({
+    ...pricingLoadOptions,
+    signal: requestSignal,
+    report: (error) => reportToMonitoring(error)
+  })
+  if (result.ok) showLoadedPricing(result.view)
+  else showPricingUnavailable(result.error)
+} catch (error) {
+  showPricingUnavailable(error)
+}`,
+  runtimeStrict: `import { createRuntime } from '@migaia/tray/runtime'
+
+const runtime = createRuntime(managedHost, {
+  shutdown: { mode: 'strict-drain' },
+  report: (error) => reportToMonitoring(error)
+})
+onPriceRequested((ids) => runtime.run('pricing', { timeoutMs: 5000 }, async ({ extensions }) => {
+  renderPrices(await extensions.fetchPrices(ids))
+}))
+onCheckoutClosed(async () => {
+  await runtime.dispose()
+  await managedHost.dispose()
+})`,
+  runtimeBounded: `import { createRuntime } from '@migaia/tray/runtime'
+
+const runtime = createRuntime(managedHost, {
+  shutdown: { mode: 'bounded' },
+  report: (error) => reportToMonitoring(error)
+})
+onPriceRequested((ids) => runtime.run('pricing', { timeoutMs: 5000 }, async ({ extensions }) => {
+  renderPrices(await extensions.fetchPrices(ids))
+}))
+onCheckoutClosed(async () => {
+  const result = await runtime.dispose()
+  showPricingStopped(result.cleanupComplete)
+  await settlePriceRequests()
+  await managedHost.dispose()
+})`
+}
+
+/** Every option story describes one reader-visible checkout situation. */
+export const trayOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  registry: [
+    {
+      title: t('Start the checkout price host', '启动结账页的价格宿主'),
+      problem: t(
+        'The checkout page needs a registered price service before it can spawn an instance. Attach connection observations and background-error reporting when creating the registry, so the support panel can follow its lifetime.',
+        '结账页需要先登记价格服务，才能启动实例。创建注册表时接入连接观察与后台错误报告，让支持面板能跟随其生命周期。'
+      ),
+      example: trayOptionExamples.registry,
+      result: t(
+        'The checkout page displays prices from its registered service and releases the registry when it closes.',
+        '结账页显示已登记服务提供的价格，关闭时释放注册表。'
+      ),
+      covers: ['hosts', 'probe', 'report']
+    },
+    {
+      title: t('Send pricing requests to the first ready instance', '把价格请求发给首个就绪实例'),
+      problem: t(
+        'The application already has a pricing host definition and needs a shared first-ready policy. Register the exact policy on both that host and the parent registry before using its routing namespace.',
+        '应用已经拥有价格宿主定义，需要共用首个就绪实例策略。在宿主和父注册表登记同一个策略，再通过路由命名空间调用。'
+      ),
+      example: trayOptionExamples.routing,
+      result: t(
+        'The checkout page receives prices through the first-ready route.',
+        '结账页通过首个就绪实例路由取得价格。'
+      ),
+      covers: ['hosts', 'routing']
+    }
+  ],
+  serve: [
+    {
+      title: t('Observe pricing in its child entry', '在子端入口观察价格服务'),
+      problem: t(
+        'The price worker starts serving before business requests arrive. Attach its existing monitoring probe at that entry so child-side activity and failures reach the application.',
+        '价格工作程序在业务请求到达前开始服务。在该入口接入已有监控探针，让子端活动与失败进入应用。'
+      ),
+      example: trayOptionExamples.serveProbe,
+      result: t(
+        'The child serves the declared pricing host with monitoring attached from startup.',
+        '子端从启动时就带着监控，服务已声明的价格宿主。'
+      ),
+      covers: ['probe', 'report']
+    },
+    {
+      title: t('Name failures from the pricing worker', '标识价格工作程序的失败'),
+      problem: t(
+        'Several child services share one monitoring destination. Label this child\u2019s serving failures as pricing so operators can find the affected service without parsing a business response.',
+        '多个子端服务共用监控出口。把当前子端的服务失败标为 pricing，让操作人员定位受影响服务，无需解析业务响应。'
+      ),
+      example: trayOptionExamples.serveReport,
+      result: t(
+        'Monitoring receives child failures with the application\u2019s pricing label.',
+        '监控接收带应用 pricing 标签的子端失败。'
+      ),
+      covers: ['report']
+    }
+  ],
+  host: [
+    {
+      title: t('Release checkout plugins before confirming close', '插件释放后再确认结账页关闭'),
+      problem: t(
+        'The checkout page owns a canonical PluginHost and pricing plugins. Construct them through one managed owner, bound mutation admission, and use strict draining when the close screen must wait for actual release.',
+        '结账页拥有规范 PluginHost 及价格插件。通过一个托管所有者构造它们，限制变更接纳；关闭界面需要等待实际释放时使用严格排空。'
+      ),
+      example: trayOptionExamples.hostStrict,
+      result: t(
+        'The pricing panel is available after startup, and the closed screen appears after plugin cleanup.',
+        '启动后价格面板可用，插件清理完成后才显示已关闭界面。'
+      ),
+      covers: [
+        'create',
+        'plugins',
+        'mutationAdmissionMs',
+        'quiescenceMs',
+        'shutdown',
+        'shutdown.mode'
+      ]
+    },
+    {
+      title: t('Show close progress while a plugin finishes', '插件收尾期间展示关闭进度'),
+      problem: t(
+        'A pricing plugin can need more than half a second to release its connection. Use bounded shutdown to show the logical close outcome, then keep waiting for physical completion.',
+        '价格插件释放连接可能需要半秒以上。使用有界关闭先展示逻辑关闭结果，再继续等待物理完成。'
+      ),
+      example: trayOptionExamples.hostBounded,
+      result: t(
+        'The page can show incomplete cleanup after its wait budget and still observe final resource release.',
+        '等待预算耗尽后页面可显示清理未完成，并继续观察资源最终释放。'
+      ),
+      covers: ['quiescenceMs', 'shutdown', 'shutdown.mode']
+    }
+  ],
+  loader: [
+    {
+      title: t('Install a pricing bundle for this checkout', '为当前结账页安装价格包'),
+      problem: t(
+        'The application owns an artifact loader and a pricing adapter. Use them together to turn the selected bundle into a plugin, give the load five seconds, and publish its view only after admission commits.',
+        '应用已有制品加载器及价格适配器。把选中的包转换成插件，给加载五秒时间，并在接纳提交后才展示其视图。'
+      ),
+      example: trayOptionExamples.load,
+      result: t(
+        'The checkout page uses the committed pricing generation; its owner retains the loaded artifact.',
+        '结账页使用已提交的价格代次，其所有者保留加载制品。'
+      ),
+      covers: ['host', 'source', 'loader', 'adapter', 'mutation', 'timeoutMs']
+    },
+    {
+      title: t('Switch checkout to an updated pricing bundle', '切换到更新后的价格包'),
+      problem: t(
+        'A new pricing bundle replaces the installed plugin with the same name. The application deliberately owns the wait without a load deadline, while monitoring keeps secondary release failures visible.',
+        '新价格包需要替换已安装的同名插件。应用明确选择不设加载期限，并由监控保留次要释放失败。'
+      ),
+      example: trayOptionExamples.replace,
+      result: t(
+        'The checkout page receives the updated pricing view after replacement commits.',
+        '替换提交后，结账页取得更新后的价格视图。'
+      ),
+      covers: ['source', 'mutation', 'timeoutMs', 'report']
+    },
+    {
+      title: t('Stop bundle loading with the checkout request', '随结账请求停止包加载'),
+      problem: t(
+        'A checkout request can end while its pricing artifact is loading. Forward the request signal and report secondary cleanup failures, rather than leaving the caller waiting without an outcome.',
+        '价格制品加载期间，结账请求可能结束。转交请求信号并上报次要清理失败，让调用方得到结果。'
+      ),
+      example: trayOptionExamples.loadCancel,
+      result: t(
+        'Successful loading opens the pricing view; cancellation or failure shows unavailable pricing.',
+        '加载成功时打开价格视图，取消或失败时显示价格不可用。'
+      ),
+      covers: ['signal', 'report']
+    }
+  ],
+  runtime: [
+    {
+      title: t('Finish price callbacks before releasing their host', '价格回调结束后再释放宿主'),
+      problem: t(
+        'Active price callbacks borrow exact plugin generations. Keep strict-drain when their results must settle before the checkout releases its managed host. Runtime disposal alone does not own that host.',
+        '活动价格回调借用确切的插件代次。结账页需要等结果落定后才释放托管宿主时，使用严格排空。运行器本身不拥有该宿主。'
+      ),
+      example: trayOptionExamples.runtimeStrict,
+      result: t(
+        'Price callbacks finish before the checkout releases their managed host.',
+        '价格回调结束后，结账页才释放它们使用的托管宿主。'
+      ),
+      covers: ['shutdown', 'shutdown.mode', 'report']
+    },
+    {
+      title: t('Stop new prices while existing requests settle', '停止新计价并等待已有请求落定'),
+      problem: t(
+        'A closing checkout must stop admitting price callbacks immediately, even when existing callbacks ignore cancellation. Bounded disposal returns its snapshot; the application still waits for its tracked requests before releasing the borrowed host.',
+        '结账页关闭时需要立即停止接纳计价回调，即使已有回调忽略取消。有界释放返回快照，应用仍须等待自己跟踪的请求，再释放借用宿主。'
+      ),
+      example: trayOptionExamples.runtimeBounded,
+      result: t(
+        'The page shows pricing stopped while tracked requests settle, then releases the host.',
+        '页面先显示计价已停止，等已跟踪请求落定后再释放宿主。'
+      ),
+      covers: ['shutdown', 'shutdown.mode', 'report']
+    }
+  ]
+}
 
 /** Complete Node examples use real local Graphs and managed PluginHosts. */
 export const trayCases: Readonly<Record<string, readonly ICaseDoc[]>> = {

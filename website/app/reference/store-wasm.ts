@@ -111,7 +111,56 @@ const errorDoc = (native: string, cause = false, aggregate = false) => ({
             ),
             default: t('Omitted: no cause attached.', '默认省略，不附加原因字段。')
           }
-        }
+        },
+        optionCases: [
+          {
+            title: t('Explain an invalid measurement import', '说明测量文件导入失败'),
+            problem: t(
+              'A chart editor imports measurements into WASM fields. If decoding fails, a generic import message hides the decoder failure. Attach it with `cause` so the page can name the failed operation while monitoring still receives the original stack.',
+              '图表编辑器要把测量文件导入 WASM 字段。解码失败时，只有一句导入失败会掩盖解码器的原因。用 `cause` 保留它，页面说明哪项操作失败，监控也能查看原始堆栈。'
+            ),
+            example: `import { createStoreWasm${native}, StoreWasmErrorCode } from '@migaia/store-wasm'
+
+try {
+  await importMeasurements(file)
+} catch (cause) {
+  const error = createStoreWasm${native}(
+    StoreWasmErrorCode.invalidOption,
+    'Measurement import failed',
+    { cause }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
+            result: t(
+              'The editor explains that measurement import failed; the monitoring entry keeps the decoder failure as its cause.',
+              '编辑器提示测量文件导入失败；监控记录仍能沿 cause 找到解码器的原始失败。'
+            ),
+            covers: ['cause']
+          },
+          {
+            title: t('Explain why opening the editor stopped', '说明编辑器为何停止打开'),
+            problem: t(
+              'An editor may stop opening when its route is left. A cancellation message alone loses the reason supplied by the navigation owner. Keeping `signal.reason` in `cause` lets the application report the cancelled operation together with that reason.',
+              '离开路由时，编辑器可能停止打开。只有取消提示会丢失导航方提供的原因。把 `signal.reason` 留在 `cause` 中，应用就能同时记录被取消的操作和原始原因。'
+            ),
+            example: `import { createStoreWasm${native}, StoreWasmErrorCode } from '@migaia/store-wasm'
+
+signal.addEventListener('abort', () => {
+  const error = createStoreWasm${native}(
+    StoreWasmErrorCode.initAborted,
+    'Editor opening cancelled',
+    { cause: signal.reason }
+  )
+  reportToMonitoring(error)
+}, { once: true })`,
+            result: t(
+              'The cancelled editor opening is reported with the navigation reason available on the error cause.',
+              '编辑器打开被取消时会留下记录，错误的 cause 保留导航方给出的原因。'
+            ),
+            covers: ['cause']
+          }
+        ]
       }
     : {}),
   returns: t(

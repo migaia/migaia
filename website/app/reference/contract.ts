@@ -22,6 +22,16 @@
  * - `REF-OPTION` every field of an options/config parameter is documented: summary, `default` for
  *   optional fields, and `values` when the field type is a literal union or an enum-like constant
  *   type.
+ * - `REF-OPTION-CODE` every options field is shown in code. A field whose type is a literal union, an
+ *   enum-like constant or a function carries its own `example` and `whenToUse`; any other field
+ *   either carries its own `example` or is listed in `covers` of an option case (`optionCases`)
+ *   whose example spells the field name. A nested field (`restart.mode`) is also covered by its
+ *   top-level field's own example.
+ * - `REF-OPTION-SCOPE` an option case sets at most 6 fields; a larger options bag gets several cases,
+ *   one per situation.
+ * - `REF-OPTION-READABLE` options examples are reader code: lines of at most 100 characters
+ *   (`CODE-WIDTH`), public entry points only (`CODE-INTERNAL`), and no logging of counts, sizes,
+ *   comparisons or predicates that only prove a check passed (`CODE-EVIDENCE`).
  * - `REF-ENUM` every enum-like constant (object of literal values) has an `enums` entry that explains
  *   each key: when to choose it and what happens.
  * - `REF-TYPE` every exported type/interface/class has a `types` entry with a summary and a doc for
@@ -173,6 +183,11 @@ export type ITypeDoc = Readonly<{
   example?: ICode
   /** Docs of every member on the surface, keyed by member name (overloads share one doc). */
   members: Readonly<Record<string, IMemberDoc>>
+  /**
+   * Configuration cases of an options type, shown above the options table of every API that takes
+   * it. An API's own `optionCases` replace these.
+   */
+  optionCases?: readonly IOptionCaseDoc[]
 }>
 
 /** Documentation of one enum-like constant. */
@@ -199,6 +214,17 @@ export type ICaseDoc = Readonly<{
   result: IText
 }>
 
+/**
+ * One realistic configuration of an options bag: the situation, the code that sets several fields
+ * together, and what the reader observes. Simple fields are explained through these cases instead
+ * of a snippet each, so the reader sees which fields are set together and why.
+ */
+export type IOptionCaseDoc = ICaseDoc &
+  Readonly<{
+    /** Option field names (dotted for nested fields) this example sets and explains. */
+    covers: readonly string[]
+  }>
+
 /** Documentation of one exported runtime symbol (function, class, const). */
 export type ISymbolDoc = Readonly<{
   role: SymbolRole
@@ -215,6 +241,11 @@ export type ISymbolDoc = Readonly<{
   options?: string
   /** Field docs for an anonymous options bag. */
   optionDocs?: Readonly<Record<string, IMemberDoc>>
+  /**
+   * Configuration cases shown above this API's options table. Defaults to `optionCases` of the
+   * `options` type; required for an anonymous options bag whose simple fields lack own examples.
+   */
+  optionCases?: readonly IOptionCaseDoc[]
   /** Minimal runnable example shown first on the page. */
   example?: ICode
   /** Concrete situation explained immediately before the minimal example. */

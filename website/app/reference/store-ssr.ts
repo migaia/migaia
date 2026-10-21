@@ -4,7 +4,7 @@
  * each pending Promise by its own settlement. Trusted state retains live references. Document
  * readers require an injected host. Resource snapshots use the canonical version-2 relative ages.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { reactiveReference } from './reactive.js'
 import { storeSsrCases } from './store-ssr-cases.ts'
 
@@ -77,6 +77,215 @@ scope.register('fixture', createStore({ title: 'Fixed' }, { runtime: scope.runti
 const text = serializeTrustedSSRState(scope.dehydrateTrusted())
 console.log(text)
 await scope.disposeAsync()`
+/** A request's store and scope share one reactive graph. */
+const scopeRuntimeExample = `import { createSSRRequestScope } from '@migaia/store-ssr'
+import { createRuntime } from '@migaia/reactive'
+import { createStore } from '@migaia/store-light'
+
+const runtime = createRuntime()
+const checkout = createStore({ quantity: 1 }, { runtime })
+const scope = createSSRRequestScope({ runtime })
+scope.register('checkout', checkout)
+try {
+  renderCheckoutState(scope.dehydrate())
+} finally {
+  await scope.disposeAsync()
+}`
+/** Request-owned diagnostics attach the HTTP request identity to reactive failures. */
+const scopeRuntimeOptionsExample = `import { createSSRRequestScope } from '@migaia/store-ssr'
+
+const scope = createSSRRequestScope({
+  runtimeOptions: {
+    onError: (error, context) => {
+      reportToMonitoring(error, { requestId, phase: context.phase })
+    }
+  }
+})
+try {
+  await renderCheckout(scope.runtime)
+} finally {
+  await scope.disposeAsync()
+}`
+/** The server writes its own checkout carrier and releases its codec registry. */
+const carrierOptionsExample = `import { createSerializeRegistry } from '@migaia/serialize'
+import { jsonPlugin } from '@migaia/serialize/plugins'
+import { createSSRStateScriptWith } from '@migaia/store-ssr'
+
+const codecs = createSerializeRegistry([jsonPlugin()])
+try {
+  const stateScript = await createSSRStateScriptWith(scope.dehydrate(), {
+    codecs,
+    elementId: 'checkout-state'
+  })
+  sendCheckoutHtml(stateScript)
+} finally {
+  await codecs.dispose()
+}`
+/** The browser reads the matching checkout carrier from its real document. */
+const carrierReadExample = `import { createSerializeRegistry } from '@migaia/serialize'
+import { jsonPlugin } from '@migaia/serialize/plugins'
+import { readSSRStateFromDocumentWith } from '@migaia/store-ssr'
+
+const codecs = createSerializeRegistry([jsonPlugin()])
+try {
+  const state = await readSSRStateFromDocumentWith({
+    codecs,
+    elementId: 'checkout-state',
+    document
+  })
+  if (state) hydrateCheckout(state)
+} finally {
+  await codecs.dispose()
+}`
+/** Encoding follows the HTTP request's existing cancellation signal. */
+const carrierCancellationExample = `import { createSSRStateScriptWith } from '@migaia/store-ssr'
+
+const stateScript = await createSSRStateScriptWith(scope.dehydrate(), {
+  codecs,
+  signal: request.signal
+})
+sendCheckoutHtml(stateScript)`
+/** Decoding follows the current page lifetime instead of outliving navigation. */
+const carrierReadCancellationExample = `import { readSSRStateFromDocumentWith } from '@migaia/store-ssr'
+
+const state = await readSSRStateFromDocumentWith({
+  codecs,
+  document,
+  signal: page.signal
+})
+if (state) hydrateCheckout(state)`
+/** Scope configuration separates supplied runtimes from runtime construction options. */
+const scopeOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Share the request’s existing runtime', '复用请求已有的运行时'),
+    problem: t(
+      'A request already has a reactive runtime for its stores and resources. Without runtime the scope creates another graph, so those objects cannot be registered with it. Supply the same request-owned runtime and omit runtimeOptions.',
+      '请求已经为状态和资源创建了响应式运行时。省略 runtime 会创建另一张图，已有对象无法登记到该作用域。应传入同一个请求运行时，并省略 runtimeOptions。'
+    ),
+    example: scopeRuntimeExample,
+    result: t(
+      'The checkout snapshot includes its registered store, and request cleanup releases that store.',
+      '结账快照包含已登记的存储，请求清理会释放该存储。'
+    ),
+    covers: ['runtime']
+  },
+  {
+    title: t('Attach request context to render diagnostics', '为渲染诊断附加请求上下文'),
+    problem: t(
+      'Several checkout requests can render concurrently, so a reactive failure without its request ID is hard to locate. `runtimeOptions` configures the runtime the scope creates; its onError callback forwards the failure with the current request ID. Omit runtime when choosing this construction path.',
+      '多个结账请求可能同时渲染，没有请求 ID 的响应式失败难以定位。`runtimeOptions` 配置作用域创建的运行时，其中的 onError 把失败和当前请求 ID 一起送到监控。选择这种构造方式时不要再传 runtime。'
+    ),
+    example: scopeRuntimeOptionsExample,
+    result: t(
+      'Reactive render diagnostics reach monitoring with the checkout request ID and failure phase.',
+      '响应式渲染诊断会连同结账请求 ID 和失败阶段送到监控。'
+    ),
+    covers: ['runtimeOptions']
+  }
+]
+/** Server and browser examples keep the carrier identity and cancellation owner explicit. */
+const scriptOptionCases = (read: boolean): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Use the checkout page state element', '使用结账页的状态元素'),
+    problem: read
+      ? t(
+          'The server put checkout state in checkout-state instead of the default __STORE_STATE__. Use the same elementId and a registry with its JSON codec, and inject the browser document. Otherwise the reader cannot find or decode the checkout carrier.',
+          '服务端把结账状态放在 checkout-state，而非默认的 __STORE_STATE__。使用相同的 elementId、包含对应 JSON 编解码器的注册表，并注入浏览器 document。否则读取方无法找到或解码结账状态。'
+        )
+      : t(
+          'The checkout page uses its own state element beside other application content. `elementId` gives its carrier a stable name, and `codecs` chooses the JSON format. The browser must use that same name and codec when reading the state.',
+          '结账页在其它应用内容旁使用自己的状态元素。`elementId` 给载体一个稳定名称，`codecs` 选择 JSON 格式。浏览器读取状态时必须使用相同名称和编解码器。'
+        ),
+    example: read ? carrierReadExample : carrierOptionsExample,
+    result: read
+      ? t(
+          'The browser restores checkout state from checkout-state and passes it to the hydration code.',
+          '浏览器从 checkout-state 恢复结账状态，并交给复水代码。'
+        )
+      : t(
+          'The checkout response includes a safe state script whose ID is checkout-state.',
+          '结账响应包含安全的状态脚本，其 ID 为 checkout-state。'
+        ),
+    covers: read ? ['codecs', 'elementId', 'document'] : ['codecs', 'elementId']
+  },
+  {
+    title: t('Connect codec work to its caller lifetime', '让编解码跟随调用方生命周期'),
+    problem: read
+      ? t(
+          'Navigation can close the checkout page before its state is decoded. Pass the page signal so the registry can reject cancelled decode work; without it, the registry has no caller cancellation signal to observe.',
+          '结账状态尚未解码时，导航可能已经关闭页面。传入页面信号，注册表就能拒绝已取消的解码；省略时，注册表没有调用方取消信号可观察。'
+        )
+      : t(
+          'The client can disconnect before checkout state encoding starts. Forward the HTTP request signal to the codec operation; without it, the registry does not know that the caller has cancelled.',
+          '结账状态开始编码前，客户端可能已断开。把 HTTP 请求信号传给编解码操作；省略时，注册表不知道调用方已经取消。'
+        ),
+    example: read ? carrierReadCancellationExample : carrierCancellationExample,
+    result: read
+      ? t(
+          'A rejected cancelled decode does not reach hydrateCheckout; active pages still receive their state.',
+          '取消导致解码拒绝时，不会执行 hydrateCheckout；仍打开的页面可以继续取得状态。'
+        )
+      : t(
+          'A rejected cancelled encode does not send checkout HTML with its unfinished state carrier.',
+          '取消导致编码拒绝时，不会发送带未完成状态载体的结账 HTML。'
+        ),
+    covers: read ? ['codecs', 'signal', 'document'] : ['codecs', 'signal']
+  }
+]
+/** Error causes preserve the original decoding or entry failures. */
+const errorCauseOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Explain an unreadable checkout carrier', '说明结账状态载体读取失败'),
+    problem: t(
+      'The checkout page cannot decode its server state. A short state-loading message alone hides the decoder failure. Keep it in `cause` so the page can explain the operation and monitoring can inspect the original error.',
+      '结账页无法解码服务端状态。只有简短的状态加载提示会掩盖解码失败。用 `cause` 保留它，页面说明操作，监控仍能查看原始错误。'
+    ),
+    example: `import { createStoreSsrError, StoreSsrErrorCode } from '@migaia/store-ssr'
+
+try {
+  await restoreCheckoutCarrier()
+} catch (cause) {
+  const error = createStoreSsrError(
+    StoreSsrErrorCode.invalidSnapshot,
+    'Checkout state could not be read',
+    { cause }
+  )
+  showCheckoutError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The checkout shows a state-loading error, while monitoring keeps the original decoding failure.',
+      '结账页显示状态加载失败，监控记录保留原始解码失败。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep checkout hydration entry failures', '保留结账复水的条目失败'),
+    problem: t(
+      'Restoring checkout state can fail in more than one registered entry. The page needs a single restoration message, while monitoring needs the original failures. Keeping the hydration error in `cause` preserves its AggregateError entries when several entries fail.',
+      '恢复结账状态时，多个已登记条目可能失败。页面需要一条恢复提示，监控则需要原始失败。把复水错误留在 `cause` 中，多项失败时仍能查看其中的 AggregateError 条目。'
+    ),
+    example: `import { createStoreSsrError, StoreSsrErrorCode } from '@migaia/store-ssr'
+
+try {
+  scope.hydrate(checkoutState)
+} catch (cause) {
+  const error = createStoreSsrError(
+    StoreSsrErrorCode.hydrateFailed,
+    'Checkout state could not be restored',
+    { cause }
+  )
+  showCheckoutError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The checkout shows a restoration error, and monitoring can inspect the original hydration failure and its entry errors.',
+      '结账页显示状态恢复失败，监控仍能查看原始复水失败及其中的条目错误。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Stable keys select separate store/resource namespaces. */
 const key = t(
   'Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.',
@@ -110,7 +319,8 @@ const runtimeMembers: Readonly<Record<string, IMemberDoc>> = {
     default: t(
       'Reactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.',
       '默认使用响应包微任务冲刷、默认宿主适配器及每轮一百次执行上限。'
-    )
+    ),
+    example: scopeRuntimeOptionsExample
   },
   ...Object.fromEntries(
     Object.entries(reactiveReference.types!.IRuntimeOptions.members!).map(([name, doc]) => [
@@ -397,6 +607,7 @@ const errorDoc = (native: string, aggregate = false) => ({
   },
   ...(native === 'Error'
     ? {
+        optionCases: errorCauseOptionCases,
         optionDocs: {
           cause: {
             summary: t(
@@ -712,6 +923,7 @@ console.log(SsrWireType.json, SsrWireType.text, SsrWireType.bytes)`
       members: scopeMembers
     },
     ISSRRequestScopeOptions: {
+      optionCases: scopeOptionCases,
       summary: t('Mutually exclusive Runtime construction choices.', '互斥的运行时构造选择。'),
       members: runtimeMembers,
       example: scopeExample
@@ -945,6 +1157,7 @@ if (cached) profile.hydrate(cached)`
       }
     },
     ISSRScriptOptions: {
+      optionCases: scriptOptionCases(false),
       summary: t(
         'Required registry and optional script encoding controls.',
         '必需注册表与可选脚本编码控制。'
@@ -953,6 +1166,7 @@ if (cached) profile.hydrate(cached)`
       example: codecExample
     },
     ISSRReadOptions: {
+      optionCases: scriptOptionCases(true),
       summary: t(
         'Required registry and explicitly injected document host.',
         '必需注册表与显式文档宿主。'

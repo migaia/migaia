@@ -5,7 +5,13 @@
  * drain, and the default codec reads exact legacy markers while writing the canonical collections
  * representation.
  */
-import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import type {
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  ISymbolDoc,
+  IText
+} from './contract.js'
 import { storePersistCases } from './store-persist-cases.js'
 
 /** Constructs one bilingual explanation. */
@@ -54,6 +60,293 @@ const lightExample = storePersistCases.persist![0]!.example
 const indexedExample = storePersistCases.persistCollection![0]!.example
 /** One writable definition gets one archive and one independent handle. */
 const keyedExample = storePersistCases.persistKeyed![0]!.example
+/** Reader scenarios borrow the application state, storage and timing owners. */
+const persistOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  IPersistUnitOptions: [
+    {
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'The editor must restore its saved state before showing the form. Select an application archive key and borrow its existing storage; the codec reads and writes the complete archive envelope.',
+        '编辑器显示表单前需要恢复保存状态。选择应用存档键并借用现有存储，编解码器负责读写完整存档信封。'
+      ),
+      example: `import { persistUnit } from '@migaia/store-persist'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const handle = persistUnit(draftUnit, {
+  key: 'editor-draft',
+  runtime: draftRuntime,
+  storage: applicationStorage,
+  codec: defaultJsonCodec
+})
+await handle.ready
+renderDraft(draftUnit.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The saved state is restored before rendering; closing the editor waits for persistence cleanup.',
+        '保存状态在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['key', 'storage', 'codec', 'runtime']
+    },
+    {
+      title: t('Upgrade saved data without saving session state', '升级保存数据并排除会话状态'),
+      problem: t(
+        'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
+        '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
+      ),
+      example: `import { persistUnit } from '@migaia/store-persist'
+
+const handle = persistUnit(draftUnit, {
+  ...draftArchiveOptions,
+  version: 2,
+  migrate: (saved, fromVersion) => upgradeDraft(saved, fromVersion),
+  partialize: (state) => ({ text: state.text }),
+  merge: (saved, current) => ({ ...current, ...saved })
+})
+await handle.ready
+renderDraft(draftUnit.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
+        '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
+      ),
+      covers: ['version', 'partialize', 'migrate', 'merge']
+    },
+    {
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persistUnit } from '@migaia/store-persist'
+
+const handle = persistUnit(draftUnit, {
+  ...draftArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
+await handle.ready
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ],
+  IPersistOptions: [
+    {
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'The editor must restore its saved state before showing the form. Select an application archive key and borrow its existing storage; the codec reads and writes the complete archive envelope.',
+        '编辑器显示表单前需要恢复保存状态。选择应用存档键并借用现有存储，编解码器负责读写完整存档信封。'
+      ),
+      example: `import { persist } from '@migaia/store-persist/light'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const handle = persist(draftStore, {
+  key: 'editor-draft',
+  storage: applicationStorage,
+  codec: defaultJsonCodec
+})
+await handle.ready
+renderDraft(draftStore.$plain())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The saved state is restored before rendering; closing the editor waits for persistence cleanup.',
+        '保存状态在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['key', 'storage', 'codec']
+    },
+    {
+      title: t('Upgrade saved data without saving session state', '升级保存数据并排除会话状态'),
+      problem: t(
+        'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
+        '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
+      ),
+      example: `import { persist } from '@migaia/store-persist/light'
+
+const handle = persist(draftStore, {
+  ...draftArchiveOptions,
+  version: 2,
+  migrate: (saved, fromVersion) => upgradeDraft(saved, fromVersion),
+  partialize: (state) => ({ text: state.text })
+})
+await handle.ready
+renderDraft(draftStore.$plain())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
+        '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
+      ),
+      covers: ['version', 'partialize', 'migrate']
+    },
+    {
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persist } from '@migaia/store-persist/light'
+
+const handle = persist(draftStore, {
+  ...draftArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
+await handle.ready
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ],
+  IPersistCollectionOptions: [
+    {
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'The editor must restore its saved state before showing the form. Select an application archive key and borrow its existing storage; the codec reads and writes the complete archive envelope.',
+        '编辑器显示表单前需要恢复保存状态。选择应用存档键并借用现有存储，编解码器负责读写完整存档信封。'
+      ),
+      example: `import { persistCollection } from '@migaia/store-persist/indexed'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const handle = persistCollection(cartRows, {
+  key: 'cart',
+  storage: applicationStorage,
+  codec: defaultJsonCodec
+})
+await handle.ready
+renderCart(cartRows.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The saved state is restored before rendering; closing the editor waits for persistence cleanup.',
+        '保存状态在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['key', 'storage', 'codec']
+    },
+    {
+      title: t('Upgrade saved data without saving session state', '升级保存数据并排除会话状态'),
+      problem: t(
+        'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
+        '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
+      ),
+      example: `import { persistCollection } from '@migaia/store-persist/indexed'
+
+const handle = persistCollection(cartRows, {
+  ...cartArchiveOptions,
+  version: 2,
+  migrate: (saved, fromVersion) => upgradeCartRows(saved, fromVersion),
+  partialize: (rows) => selectSavedCartRows(rows),
+  merge: (saved, current) => mergeCartRows(saved, current)
+})
+await handle.ready
+renderCart(cartRows.snapshot())
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
+        '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
+      ),
+      covers: ['version', 'partialize', 'migrate', 'merge']
+    },
+    {
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persistCollection } from '@migaia/store-persist/indexed'
+
+const handle = persistCollection(cartRows, {
+  ...cartArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
+await handle.ready
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ],
+  IPersistKeyedOptions: [
+    {
+      title: t('Restore one application archive', '恢复一个应用存档'),
+      problem: t(
+        'One user draft needs its own archive namespace and id. Borrow the existing storage and codec so this handle owns persistence without owning the application store.',
+        '用户草稿需要独立的存档命名空间与标识。借用现有存储及编解码器，让句柄持有持久化过程，不取得应用状态容器的所有权。'
+      ),
+      example: `import { persistKeyed } from '@migaia/store-persist/keyed'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const handle = persistKeyed(draftAtoms, draftDefinition, userId, {
+  namespace: 'editor-drafts',
+  storage: applicationStorage,
+  codec: defaultJsonCodec
+})
+await handle.ready
+renderDraft(draftAtoms.peek(draftDefinition))
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'The selected user draft is restored before rendering; closing the editor waits for persistence cleanup.',
+        '所选用户草稿在渲染前恢复，编辑器关闭时等待持久化清理。'
+      ),
+      covers: ['namespace', 'storage', 'codec']
+    },
+    {
+      title: t('Keep session fields out of the archive', '不把会话字段写入存档'),
+      problem: t(
+        'The editor keeps selection state only for this session. Select only text for writes and merge a matching version-two archive into current state. This adapter has no migration callback, so the saved version must already match.',
+        '编辑器只在当前会话保留选择状态。写入时只选择正文，再把版本匹配的第二版存档合入当前状态。此适配器没有迁移回调，保存版本必须事先匹配。'
+      ),
+      example: `import { persistKeyed } from '@migaia/store-persist/keyed'
+
+const handle = persistKeyed(draftAtoms, draftDefinition, userId, {
+  ...draftArchiveOptions,
+  version: 2,
+  partialize: (state) => ({ text: state.text }),
+  merge: (saved, current) => ({ ...current, ...saved })
+})
+await handle.ready
+renderDraft(draftAtoms.peek(draftDefinition))
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'Restored text joins the current session state, while later writes omit session-only fields.',
+        '恢复的正文合入当前会话状态，后续写入不包含会话字段。'
+      ),
+      covers: ['version', 'partialize', 'merge']
+    },
+    {
+      title: t('Save during continuous editing', '持续编辑期间也保存'),
+      problem: t(
+        'Typing keeps restarting a quiet-period save. A maximum wait requests a write even during continuous edits, while the application scheduler owns the timing; storage latency remains separate.',
+        '持续输入会不断重启安静间隔保存。最长等待让连续编辑期间也能请求写入，时间由应用调度器管理；存储延迟仍单独存在。'
+      ),
+      example: `import { persistKeyed } from '@migaia/store-persist/keyed'
+
+const handle = persistKeyed(draftAtoms, draftDefinition, userId, {
+  ...draftArchiveOptions,
+  debounceMs: 500,
+  maxWaitMs: 2000,
+  scheduler: editorScheduler
+})
+await handle.ready
+onEditorClosed(() => handle.disposeAsync())`,
+      result: t(
+        'A pause of 500 ms requests a save; continuous editing requests one within two seconds of the first change.',
+        '停顿 500 毫秒会请求保存，持续编辑则在首次变化后的两秒内请求一次写入。'
+      ),
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ]
+}
+
 /** Canonical options reused only where the public wrapper exposes them. */
 const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   key: { summary: key },
@@ -85,6 +378,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   migrate: {
+    whenToUse: t(
+      'Set it when stored schema versions differ. The callback receives the saved state and its version and must return the current shape synchronously. Without it a mismatch fails; returning a Promise also fails hydration.',
+      '存档版本与当前结构不同时设置。回调接收保存状态及其版本，必须同步返回当前形状。省略时版本不匹配会失败，返回 Promise 也会使恢复失败。'
+    ),
+    example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
       'Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.',
       '版本不一致时同步调用，接收解码后的保存状态与存档版本；抛错或返回可等待对象会使水合失败。'
@@ -109,6 +407,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   partialize: {
+    whenToUse: t(
+      'Use it to keep session-only or derived fields out of storage. It selects each write without changing live memory. Omission stores the complete snapshot. The callback must return synchronously.',
+      '需要从存档排除会话或派生字段时设置。它为每次写入选择内容，不改变内存。省略时保存完整快照，回调必须同步返回。'
+    ),
+    example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
       'Synchronous callback before each write, receiving the latest unit snapshot and selecting its persisted portion. Throws and thenables become write failures.',
       '每次写入前同步调用，接收最新单元快照并选择需要保存的部分；抛错与可等待结果成为写入失败。'
@@ -126,6 +429,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     default: t('Identity: persist the complete snapshot.', '默认原样返回，保存完整快照。')
   },
   merge: {
+    whenToUse: t(
+      'Set it when archived partial state needs shape-specific reconciliation with live state. Return a complete synchronous state. Default plain-object merging preserves edits since attachment; non-object shapes are replaced by the archive.',
+      '保存的部分状态需要按形状与内存协调时设置。必须同步返回完整状态。默认普通对象合并保留接入后发生的修改，其它形状使用存档整体替换。'
+    ),
+    example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
       'Synchronous hydration callback receiving persisted partial state and the latest current state; return the complete state to restore. Throws or thenables fail hydration.',
       '同步水合回调接收保存的部分状态与最新当前状态，返回需要恢复的完整状态；抛错或可等待结果使水合失败。'
@@ -178,18 +486,36 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 /** Collection wrappers infer runtime from the owned source. */
-const collectionOptions = Object.fromEntries(
-  Object.entries(unitOptions).filter(([name]) => name !== 'runtime')
-)
+const collectionOptions: Readonly<Record<string, IMemberDoc>> = {
+  ...Object.fromEntries(Object.entries(unitOptions).filter(([name]) => name !== 'runtime')),
+  migrate: {
+    ...unitOptions.migrate!,
+    example: persistOptionCases.IPersistCollectionOptions![1]!.example
+  },
+  partialize: {
+    ...unitOptions.partialize!,
+    example: persistOptionCases.IPersistCollectionOptions![1]!.example
+  },
+  merge: {
+    ...unitOptions.merge!,
+    example: persistOptionCases.IPersistCollectionOptions![1]!.example
+  }
+}
 /** Light wrappers expose neither a runtime override nor a custom merge. */
-const lightOptions = Object.fromEntries(
-  Object.entries(collectionOptions).filter(([name]) => name !== 'merge')
-)
+const lightOptions: Readonly<Record<string, IMemberDoc>> = {
+  ...Object.fromEntries(Object.entries(collectionOptions).filter(([name]) => name !== 'merge')),
+  migrate: { ...unitOptions.migrate!, example: persistOptionCases.IPersistOptions![1]!.example },
+  partialize: {
+    ...unitOptions.partialize!,
+    example: persistOptionCases.IPersistOptions![1]!.example
+  }
+}
 /** Keyed options use namespace instead of an archive key and expose no migration callback. */
 const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(
     Object.entries(collectionOptions).filter(([name]) => name !== 'key' && name !== 'migrate')
   ),
+  merge: { ...unitOptions.merge!, example: persistOptionCases.IPersistKeyedOptions![1]!.example },
   namespace: {
     summary: t(
       'Required application-selected string prefix; the full key is namespace followed by a colon and the caller id. Missing or nonstring values throw INVALID_OPTION at runtime; clearFamily filters that exact prefix.',
@@ -198,6 +524,7 @@ const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   },
   partialize: {
     ...unitOptions.partialize!,
+    example: persistOptionCases.IPersistKeyedOptions![1]!.example,
     params: {
       value: t(
         'Latest value peeked from the writable definition in AtomStore.',
@@ -298,6 +625,16 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     'await handle.ready\nawait handle.clear()'
   ),
+  disposeAsync: method(
+    'Stops scheduling like dispose, then waits for admitted writes/removals and any final debounce snapshot. It does not wait for borrowed reads or dispose the source, storage or runtime.',
+    '先按 dispose 的方式停止调度，再等待已接纳的写入、移除与最终防抖快照完成；不等待借用的读取，也不释放源状态、存储或运行时。',
+    {},
+    t(
+      'Promise resolving after the write chain settles. A synchronous cleanup failure rejects afterwards; final-write failures remain available on writeError.',
+      '写入链结算后兑现的 Promise。同步清理失败会在此后拒绝，最终写入失败保留在 writeError 中。'
+    ),
+    'await handle.disposeAsync()\nconsole.log(handle.disposed)'
+  ),
   dispose: method(
     'Idempotently stops persistence subscriptions, cancels the debounce timer and aborts active adapter operations. A pending debounce window starts one unawaited final snapshot write. It does not clear business values or dispose the source state.',
     '幂等停止持久化订阅、取消防抖定时器并中止活跃适配器操作；存在待执行防抖窗口时，启动一次不等待的最终快照写入。不清业务值或释放源状态。',
@@ -324,6 +661,57 @@ const handleType = {
   example: lightExample,
   members: handleMembers
 }
+/** Decoder failures and rejected records retain application context. */
+const persistErrorOptionCases = (name: string, envelope = false): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Explain why a saved draft cannot be decoded', '说明保存草稿为何无法解码'),
+    problem: t(
+      'The editor needs a short restore message, while support needs the decoder failure. Preserve that failure on cause instead of replacing it with a new message.',
+      '编辑器需要简短的恢复提示，支持人员仍需要解码器的失败。用 cause 保留它，不要只用新消息替换。'
+    ),
+    example: `import { ${name}${envelope ? '' : ', StorePersistErrorCode'} } from '@migaia/store-persist'
+
+try {
+  await decodeSavedDraft(upload)
+} catch (cause) {
+  const error = ${envelope ? 'new ' : ''}${name}(
+    ${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid,\n    '}'Saved draft could not be decoded',
+    { cause }
+  )
+  showDraftError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The editor explains the restore failure; monitoring can follow cause to the original decoder failure.',
+      '编辑器显示恢复失败，监控可沿 cause 找到原始解码失败。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep the rejected draft details', '保留被拒绝的草稿详情'),
+    problem: t(
+      'An archive validator returns a record identifying a rejected field. Keeping it as cause lets support inspect the key and submitted version while the page shows a short message.',
+      '存档校验器用记录指出被拒绝字段。把记录放入 cause，页面可显示简短提示，支持人员仍能查看键与提交版本。'
+    ),
+    example: `import { ${name}${envelope ? '' : ', StorePersistErrorCode'} } from '@migaia/store-persist'
+
+const rejection = validateSavedDraft(upload)
+if (rejection) {
+  const error = ${envelope ? 'new ' : ''}${name}(
+    ${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid,\n    '}'Saved draft rejected',
+    { cause: rejection }
+  )
+  showDraftError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The page displays a draft error and monitoring retains the complete rejected-input record.',
+      '页面显示草稿错误，监控中保留完整的拒绝输入记录。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Error helpers preserve native objects and cause identity. */
 const errorFactory = (
   name: string,
@@ -362,6 +750,7 @@ const errorFactory = (
   },
   ...(mode === 'options'
     ? {
+        optionCases: persistErrorOptionCases(name),
         optionDocs: {
           cause: {
             summary: t(
@@ -658,6 +1047,7 @@ export const storePersistReference: ILibraryReference = {
       'errors'
     ),
     PersistEnvelopeError: {
+      optionCases: persistErrorOptionCases('PersistEnvelopeError', true),
       role: 'error',
       purpose: t(
         'Native TypeError subclass identifying invalid archive envelopes with this package source and ENVELOPE_INVALID code.',
@@ -742,6 +1132,7 @@ export const storePersistReference: ILibraryReference = {
       }
     },
     IPersistUnitOptions: {
+      optionCases: persistOptionCases.IPersistUnitOptions!,
       summary: t(
         'Complete generic engine configuration, including caller-owned runtime, backend and synchronous state transformation callbacks.',
         '通用引擎完整配置，包含调用方运行时、后端及同步状态转换回调。'
@@ -749,6 +1140,7 @@ export const storePersistReference: ILibraryReference = {
       members: unitOptions
     },
     IPersistOptions: {
+      optionCases: persistOptionCases.IPersistOptions!,
       summary: t(
         'Light adapter options; source runtime is inferred and restoration uses the Store hydration behavior.',
         '轻量适配选项，从源存储取得运行时，恢复使用原存储水合行为。'
@@ -756,6 +1148,7 @@ export const storePersistReference: ILibraryReference = {
       members: lightOptions
     },
     IPersistCollectionOptions: {
+      optionCases: persistOptionCases.IPersistCollectionOptions!,
       summary: t(
         'Collection adapter options; source runtime is inferred and custom shape reconciliation can use merge.',
         '集合适配选项，从源集合取得运行时，可用合并回调定义形状协调。'
@@ -763,6 +1156,7 @@ export const storePersistReference: ILibraryReference = {
       members: collectionOptions
     },
     IPersistKeyedOptions: {
+      optionCases: persistOptionCases.IPersistKeyedOptions!,
       summary: t(
         'One writable definition archive configuration; namespace and explicit id determine the storage key.',
         '单个可写定义存档配置；命名空间与显式标识共同决定存储键。'

@@ -28,6 +28,36 @@ const pipelineScenarios = [
 /** End-to-end example of a pipeline instance. */
 const pipelineExample = middlewarePipelineCases.createPipeline[2].example
 
+/** Async middleware keeps the saving indicator visible until downstream completes. */
+const pipelineModeExample = `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })
+await pipeline.run([async (documentId, next) => {
+  showSavingIndicator()
+  try {
+    await next(documentId)
+  } finally {
+    hideSavingIndicator()
+  }
+}], documentId, async (id) => {
+  await saveDocument(id)
+})`
+
+/** Editor lifetime stops later publish steps and reaches cancellable application I/O. */
+const pipelineLifecycleExample = `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.async,
+  signal: editor.signal,
+  assertActive: () => editor.assertActive()
+})
+await pipeline.run([async (documentId, next, context) => {
+  await uploadAttachments(documentId, context?.signal)
+  await next(documentId)
+}], documentId, async (id) => {
+  await publishDocument(id)
+})`
+
 /** Reference of `@migaia/middleware-pipeline`. */
 export const middlewarePipelineReference: ILibraryReference = {
   modules: {
@@ -223,13 +253,46 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
         'Options of createPipeline(); mode is required. Every public option and control getter is read once for its snapshot; getter failure becomes TypeError/INVALID_OPTION with cause. The validated mode is the value published by the runner.',
         '`createPipeline()` 的选项，`mode` 必填；公开选项与运行控制字段单次读取为快照，读取失败抛保留原始原因的 `TypeError/INVALID_OPTION`；发布模式与已验证值相同。'
       ),
+      optionCases: [
+        {
+          title: t('Wrap an asynchronous operation', '包裹一次异步操作'),
+          problem: t(
+            'A document editor must keep its saving indicator visible until the save finishes. In sync mode, downstream starts only after the stage returns. Async mode lets the outer stage await `next()` and hide the indicator after the save settles.',
+            '文档编辑器需要在保存期间一直显示提示。同步模式会等步骤返回后才开始下游。异步模式允许外层步骤等待 `next()`，保存结束后再隐藏提示。'
+          ),
+          example: pipelineModeExample,
+          result: t(
+            'The saving indicator stays visible while `saveDocument()` runs and is hidden when it settles.',
+            '`saveDocument()` 执行期间显示保存提示，结束后再隐藏。'
+          ),
+          covers: ['mode']
+        },
+        {
+          title: t('Stop work when the host closes', '宿主关闭时停止执行'),
+          problem: t(
+            'An editor can close while attachments upload. Without lifecycle options, the runner may continue to the publish step. `signal` reaches the cancellable upload, and `assertActive` asks the editor to reject work after closure before a later stage starts.',
+            '附件上传时，编辑器可能已经关闭。不设置生命周期选项，执行器仍可能继续发布。`signal` 传给支持取消的上传函数，`assertActive` 让编辑器在关闭后拒绝工作，阻止后续步骤开始。'
+          ),
+          example: pipelineLifecycleExample,
+          result: t(
+            'Closing the editor cancels cooperative uploads and stops the pipeline from starting a later publish step.',
+            '关闭编辑器后，配合信号的上传会取消，执行器不会再启动后续发布步骤。'
+          ),
+          covers: ['signal', 'assertActive']
+        }
+      ],
       members: {
         mode: {
           summary: t(
             'Execution mode of every run. Stages must be written for this mode or converted with `lift()`.',
             '每次运行使用的执行模式。步骤必须按该模式编写，或用 `lift()` 转换。'
           ),
-          values: { enum: 'MiddlewarePipelineMode' }
+          values: { enum: 'MiddlewarePipelineMode' },
+          whenToUse: t(
+            'Choose sync for ordinary transforms, async for stages that await downstream work, generator for synchronous generator stages, or async-generator for asynchronous generators. Generator modes reduce returned values instead of calling next(). mode is required; there is no default.',
+            '普通转换选 sync；需要等待下游的步骤选 async；同步生成器选 generator；异步生成器选 async-generator。生成器模式通过返回值传递结果，不调用 next()。mode 必填，没有默认值。'
+          ),
+          example: pipelineModeExample
         },
         onViolation: {
           summary: t(
@@ -237,14 +300,32 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
             '步骤误用 `next()` 时收到 `duplicate` 或 `late`。误用不会启动第二次下游执行。'
           ),
           default: t('Not set: misuse is ignored silently.', '不设置：误用被静默忽略。'),
-          values: { enum: 'MiddlewarePipelineViolation' }
+          values: { enum: 'MiddlewarePipelineViolation' },
+          whenToUse: t(
+            'Set it when diagnosing a stage that calls next() twice or after returning. duplicate means a repeated call; late means the stage already ended. Both calls are ignored, and without this callback neither is reported.',
+            '排查步骤重复调用 next() 或返回后才调用的问题时设置。duplicate 表示重复调用，late 表示步骤已经结束。两种调用都会被忽略；不设回调时不会报告。'
+          ),
+          example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.async,
+  onViolation: (kind) => reportToMonitoring('document-stage-next', { kind })
+})
+await pipeline.run(editorStages, documentId, async (id) => {
+  await saveDocument(id)
+})`
         },
         assertActive: {
           summary: t(
             'Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.',
             '在进入运行时以及每个步骤之后调用；它抛错时，下一个步骤不会开始。宿主用它在关闭后阻止继续运行。'
           ),
-          default: t('Not set: no lifecycle check.', '不设置：不做生命周期检查。')
+          default: t('Not set: no lifecycle check.', '不设置：不做生命周期检查。'),
+          whenToUse: t(
+            'Use it when the host has a closing flag rather than an AbortSignal. Throw to prevent the next stage from starting. Return normally while the host is active; omitting it skips host lifetime checks.',
+            '宿主用关闭标记而非 AbortSignal 管理生命周期时设置。抛错可阻止下一步骤开始；宿主存活时正常返回。不设置则跳过宿主生命周期检查。'
+          ),
+          example: pipelineLifecycleExample
         },
         signal: {
           summary: t(
@@ -266,12 +347,20 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
             '`MiddlewarePipelineGeneratorSignals`，即导出的三个 `GENERATOR_*` symbol。'
           ),
           example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-const signals = { undefined: Symbol('undefined'), halt: Symbol('halt'), continue: Symbol('continue') }
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator, signals })
-const increment = pipeline.lift((value, next) => { next(value + 1) }, MiddlewarePipelineMode.sync)
-const halt = pipeline.lift(() => {}, MiddlewarePipelineMode.sync)
-pipeline.run([increment], 1, (value) => { console.log(value) })
-pipeline.run([halt], 1, () => { console.log('not reached') })`
+
+const signals = {
+  undefined: Symbol('empty-result'),
+  halt: Symbol('skip-import'),
+  continue: Symbol('continue-import')
+}
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.generator,
+  signals
+})
+pipeline.run([function* (text) {
+  if (!text.trim()) return signals.halt
+  return text.trim()
+}], uploadedText, importDocument)`
         },
         combineStageAndDownstreamError: {
           summary: t(
@@ -281,7 +370,29 @@ pipeline.run([halt], 1, () => { console.log('not reached') })`
           default: t(
             'Not set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors.',
             '不设置：抛出带 `EXECUTION_FAILED` 码的 `AggregateError`，两个错误都在 `errors` 中。'
-          )
+          ),
+          whenToUse: t(
+            'Use it in async mode when a stage fails independently of downstream work and your application needs a specific combined message. Keep both original failures in cause or errors. Without it, the runner creates its own AggregateError; other modes do not use it.',
+            '异步模式中，步骤与下游分别失败，而且应用需要指定合并后的消息时设置。必须通过 cause 或 errors 保留两个原始失败。不设置时由执行器创建 AggregateError；其它模式不使用它。'
+          ),
+          example: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<string>({
+  mode: MiddlewarePipelineMode.async,
+  combineStageAndDownstreamError: (stage, downstream) =>
+    new AggregateError([stage, downstream], 'Publishing and upload cleanup failed')
+})
+try {
+  await pipeline.run([async (id, next) => {
+    try {
+      await next(id)
+    } finally {
+      await closeUploadSession(id)
+    }
+  }], documentId, publishDocument)
+} catch (error) {
+  reportToMonitoring(error)
+}`
         }
       }
     },

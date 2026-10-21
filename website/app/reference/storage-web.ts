@@ -11,6 +11,7 @@ import type {
   IEnhancerDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   ISymbolDoc,
   IText,
   ITypeDoc
@@ -25,9 +26,9 @@ const metrics = defineFeature((core) => ({
   count: async () => (await core.featureExpose.getStore().keys()).length
 }))
 const cachePlugin = definePlugin('cache', (core) => {
-  core.registerStore(memoryStorageHost())
   return {
     install: async () => {
+      core.registerStore(memoryStorageHost())
       await core.getStore().set('user:1', JSON.stringify({ name: 'Ada' }))
       return {
         count: () => core.features.metrics.count(),
@@ -130,6 +131,14 @@ const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
     default: t('`false`.', '`false`：保留旧数据。')
   },
   factory: {
+    example: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'
+
+const store = indexedDbHost({
+  factory: storageEnvironment.indexedDB,
+  keyRange: storageEnvironment.IDBKeyRange
+})
+openEditorPreferences(store)
+onEditorClosed(() => store.dispose())`,
     summary: t(
       'IndexedDB factory for tests (e.g. `fake-indexeddb`).',
       '测试环境使用的 IndexedDB 工厂（例如 `fake-indexeddb`）。'
@@ -140,6 +149,14 @@ const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   keyRange: {
+    example: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'
+
+const store = indexedDbHost({
+  factory: storageEnvironment.indexedDB,
+  keyRange: storageEnvironment.IDBKeyRange
+})
+openEditorPreferences(store)
+onEditorClosed(() => store.dispose())`,
     summary: t(
       '`IDBKeyRange` constructor, passed together with `factory` in tests.',
       '`IDBKeyRange` 构造函数，测试时与 `factory` 一起传入。'
@@ -213,6 +230,272 @@ const store = host.backend('${id}')
 await store.set('theme', 'dark')
 await host.dispose()`
 
+/** Backend examples keep storage layout, cleanup and host identity in separate situations. */
+const backendOptionCases = (
+  kind: string,
+  factory: string,
+  module: string,
+  plugin = false
+): readonly IOptionCaseDoc[] => {
+  /** Selects only the backend entry and optional Host owner used in this example. */
+  const imports = `import { ${factory} } from '@migaia/storage-web/${module}'
+${plugin ? "import { createStorageHost } from '@migaia/storage-web/host'\n" : ''}`
+  /** Shows the backend layout without mixing it with migration or codec choices. */
+  const options =
+    kind === 'memory'
+      ? "  id: 'preferences'"
+      : kind === 'indexed-db'
+        ? "  dbName: 'editor-preferences',\n  kvStoreName: 'preferences',\n  bytesStoreName: 'attachments',\n  recordsStoreName: 'entities'"
+        : kind === 'cookies'
+          ? "  namespace: 'editor',\n  scope: { path: '/editor' },\n  document"
+          : `  namespace: 'editor',\n  storage: window.${kind === 'local-storage' ? 'localStorage' : 'sessionStorage'}`
+  /** Coverage follows the actual option contract for this backend. */
+  const fields =
+    kind === 'memory'
+      ? []
+      : kind === 'indexed-db'
+        ? ['dbName', 'kvStoreName', 'bytesStoreName', 'recordsStoreName']
+        : kind === 'cookies'
+          ? ['namespace', 'scope', 'document']
+          : ['namespace', 'storage']
+  /** Keeps direct-store and plugin ownership explicit in the same reader story. */
+  const open = (configuration: string) =>
+    plugin
+      ? `const host = await createStorageHost({ plugins: [${factory}({
+${configuration}${kind === 'memory' ? '' : ",\n  id: 'preferences'"}
+})] as const })
+const store = host.backend('preferences')`
+      : `const store = ${factory}({
+${configuration}
+})`
+  /** The editor releases whichever owner constructed this store. */
+  const close = `onEditorClosed(() => ${plugin ? 'host' : 'store'}.dispose())`
+  return [
+    {
+      title: t('Save preferences for this editor', '保存当前编辑器的偏好'),
+      problem: t(
+        kind === 'indexed-db'
+          ? 'The editor shares an origin with other tools. Its database and object-store names keep preferences, attachments and entity records in the intended layout.'
+          : kind === 'memory'
+            ? 'The editor needs a temporary preferences backend with an application name. Register that name once and use it when selecting the store.'
+            : 'The editor shares browser storage with other tools. Give its preferences a namespace and use the browser storage belonging to this view; cookies also need the editor path for consistent writes and deletion.',
+        kind === 'indexed-db'
+          ? '编辑器与其他工具共用来源。独立数据库及对象存储名，让偏好、附件和实体记录进入预期布局。'
+          : kind === 'memory'
+            ? '编辑器需要一个具有应用名称的临时偏好后端。登记该名称，并用它选择存储。'
+            : '编辑器与其他工具共用浏览器存储。用命名空间区分偏好，并使用当前视图的浏览器存储；cookie 还需固定编辑器路径，以便一致写入与删除。'
+      ),
+      example: `${imports}
+${open(options)}
+await store.set('theme', selectedTheme)
+applyEditorTheme(await store.get('theme'))
+${close}`,
+      result: t(
+        kind === 'memory'
+          ? 'The editor applies its saved theme for this session and releases the temporary store when closed.'
+          : 'The editor applies its own saved theme; closing the view releases the instance without erasing persistent preferences.',
+        kind === 'memory'
+          ? '编辑器在本次会话应用保存的主题，关闭时释放临时存储。'
+          : '编辑器应用自己的已保存主题，关闭视图释放实例，不清除持久化偏好。'
+      ),
+      covers: [...fields, ...(plugin ? ['id'] : [])]
+    },
+    kind === 'memory'
+      ? {
+          title: t('Keep two temporary workspaces separate', '隔离两个临时工作区'),
+          problem: t(
+            'Two workspace panels each save a theme. Separate plugin ids give each panel its own volatile backend, so one panel does not overwrite the other.',
+            '两个工作区面板都保存主题。不同插件标识让它们各有临时后端，一个面板不会覆盖另一个。'
+          ),
+          example: `${imports}
+const host = await createStorageHost({ plugins: [
+  ${factory}({ id: 'left' }),
+  ${factory}({ id: 'right' })
+] as const })
+await host.backend('left').set('theme', 'dark')
+await host.backend('right').set('theme', 'light')
+renderWorkspaceThemes(
+  await host.backend('left').get('theme'),
+  await host.backend('right').get('theme')
+)
+onEditorClosed(() => host.dispose())`,
+          result: t(
+            'The two panels display different themes for the same logical setting.',
+            '两个面板对同一个逻辑设置显示不同主题。'
+          ),
+          covers: ['id']
+        }
+      : kind === 'indexed-db'
+        ? {
+            title: t('Retire migrated legacy records', '清理已迁移的旧记录'),
+            problem: t(
+              'The deployment no longer needs rollback to the old documents layout. Enable cleanup only at that point; the backend removes the legacy store after a complete migration.',
+              '部署已不再需要回滚到旧 documents 布局。此时才开启清理，后端在完整迁移后删除旧存储。'
+            ),
+            example: `${imports}
+${open("  dbName: 'editor-preferences',\n  cleanupLegacyRecords: true")}
+renderSavedUser(await store.getRecord(['users', selectedUserId]))
+${close}`,
+            result: t(
+              'The editor displays the migrated user record without retaining the obsolete records store.',
+              '编辑器显示迁移后的用户记录，不再保留过时记录存储。'
+            ),
+            covers: ['dbName', 'cleanupLegacyRecords', ...(plugin ? ['id'] : [])]
+          }
+        : {
+            title: t('Keep the deployed physical key format', '保持已部署的物理键格式'),
+            problem: t(
+              'Another view already uses length-prefixed keys for editor preferences. Select the same namespace codec so this view reads that saved theme instead of creating a parallel key format.',
+              '另一个视图已经用长度前缀键保存编辑器偏好。选择相同命名空间编码器，让当前视图读取已有主题，不产生另一套物理键格式。'
+            ),
+            example: `${imports}import { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'
+
+${open("  namespace: 'editor',\n  namespaceCodec: lengthPrefixedNamespaceCodec")}
+applyEditorTheme(await store.get('theme'))
+${close}`,
+            result: t(
+              'Both views address the same saved editor setting.',
+              '两个视图读取同一份已保存编辑器设置。'
+            ),
+            covers: ['namespace', 'namespaceCodec', ...(plugin ? ['id'] : [])]
+          }
+  ]
+}
+
+/** Host examples show application startup separately from late-failure reporting. */
+const hostOptionCases = (classForm: boolean): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Bound storage startup for the editor', '限制编辑器的存储启动时间'),
+    problem: t(
+      'The editor cannot wait indefinitely for storage installation before showing its startup outcome. Use its application clock and a one-second installation budget; later reads have their own lifetime.',
+      '编辑器不能无限等待存储安装才显示启动结果。使用应用时钟与一秒安装预算，之后的读取仍有自己的生命周期。'
+    ),
+    example: `import { ${classForm ? 'StorageHostFacade' : 'createStorageHost'} } from '@migaia/storage-web/host'
+import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
+
+const host = ${classForm ? 'new StorageHostFacade' : 'await createStorageHost'}({
+${classForm ? '' : "  plugins: [memoryBackendPlugin({ id: 'preferences' })] as const,\n"}  installTimeoutMs: 1000,
+  scheduler: storageScheduler
+})
+${classForm ? "const installed = await host.use(memoryBackendPlugin({ id: 'preferences' }))\n" : ''}openEditorPreferences(${classForm ? 'installed' : 'host'}.backend('preferences'))
+onEditorClosed(() => host.dispose())`,
+    result: t(
+      'Successful installation opens editor preferences within the startup budget.',
+      '安装成功后在启动预算内打开编辑器偏好。'
+    ),
+    covers: [...(classForm ? [] : ['plugins']), 'installTimeoutMs', 'scheduler']
+  },
+  {
+    title: t('Keep late startup failures visible', '保留迟到的启动失败'),
+    problem: t(
+      'A remote preferences plugin may reject after its installation has already timed out. Give that later failure a monitoring destination while the editor handles the original startup failure.',
+      '远程偏好插件可能在安装超时后才拒绝。编辑器处理原始启动失败时，仍需把之后的失败交给监控。'
+    ),
+    example: `import { ${classForm ? 'StorageHostFacade' : 'createStorageHost'} } from '@migaia/storage-web/host'
+
+const host = ${classForm ? 'new StorageHostFacade' : 'await createStorageHost'}({
+  ...storageStartupOptions,
+  report: (error) => reportToMonitoring(error)
+})
+try {
+  const installed = await host.use(remotePreferencesPlugin)
+  openEditorPreferences(installed.backend('preferences'))
+} catch (error) {
+  showPreferencesUnavailable(error)
+}
+onEditorClosed(() => host.dispose())`,
+    result: t(
+      'The editor shows unavailable preferences after startup fails, and monitoring receives a later initializer failure.',
+      '启动失败后编辑器显示偏好不可用，之后的初始化失败仍送达监控。'
+    ),
+    covers: ['report']
+  }
+]
+
+/** Entity examples separate normalization, lookup and stored-version migration. */
+const entityOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Save normalized directory names', '保存归一化的通讯录姓名'),
+    problem: t(
+      'Names copied from a form may contain surrounding whitespace. Normalize before encoding and keep read validation enabled so the directory displays clean saved names.',
+      '表单复制的姓名可能带首尾空格。编码前先归一化，并保持读取校验，让通讯录显示整洁的已保存姓名。'
+    ),
+    example: `import { defineEntity } from '@migaia/storage-web/entity'
+import { passthrough } from '@migaia/storage-web/schema'
+import { structuredCodec } from '@migaia/storage-web/serialize'
+
+type IUser = { id: string; name: string }
+const users = defineEntity<IUser>()({
+  name: 'users',
+  key: 'id',
+  schema: {
+    ...passthrough<IUser>(),
+    normalize: async (value) => ({ ...value, name: value.name.trim() })
+  },
+  codec: structuredCodec,
+  validateOnRead: true
+}).connect(directoryStore)
+await users.put(submittedUser)
+renderDirectory(await users.list())`,
+    result: t(
+      'The directory shows names without the form whitespace.',
+      '通讯录显示去掉表单首尾空格的姓名。'
+    ),
+    covers: ['name', 'key', 'schema', 'codec', 'validateOnRead']
+  },
+  {
+    title: t('Find and order directory users by name', '按姓名查找与排序通讯录用户'),
+    problem: t(
+      'The directory needs alphabetical lists and a name lookup. Declare that lookup once; on a backend without native indexes, send fallback explanations to the support panel.',
+      '通讯录需要按姓名排序并查找用户。集中声明查询索引；后端不具备原生索引时，把回退说明交给支持面板。'
+    ),
+    example: `import { defineEntity } from '@migaia/storage-web/entity'
+
+type IUser = { id: string; name: string }
+const users = defineEntity<IUser>()({
+  name: 'users',
+  key: 'id',
+  defaultOrderBy: (left, right) => left.name.localeCompare(right.name),
+  indexes: { byName: { path: 'name' } },
+  onDiagnostic: (message) => showStorageDiagnostic(message)
+}).connect(directoryStore)
+renderDirectory(await users.list())
+showSelectedUser(await users.findBy('byName', selectedName))`,
+    result: t(
+      'The directory is ordered by name, and the selected name opens its matching user.',
+      '通讯录按姓名排序，选中的姓名打开对应用户。'
+    ),
+    covers: ['name', 'key', 'defaultOrderBy', 'indexes', 'onDiagnostic']
+  },
+  {
+    title: t('Read users saved by the previous release', '读取上一版本保存的用户'),
+    problem: t(
+      'Older directory records use fullName, while the current view reads name. A version-two migration transforms the old stored representation before current decoding.',
+      '旧通讯录记录使用 fullName，当前视图读取 name。第二版迁移在当前解码前转换旧的存储表示。'
+    ),
+    example: `import { defineEntity } from '@migaia/storage-web/entity'
+
+type IUser = { id: string; name: string }
+const users = defineEntity<IUser>()({
+  name: 'users',
+  key: 'id',
+  version: 2,
+  migrations: {
+    2: async (previous) => {
+      const old = previous as { id: string; fullName: string }
+      return { id: old.id, name: old.fullName }
+    }
+  }
+}).connect(directoryStore)
+renderDirectory(await users.list())`,
+    result: t(
+      'The current directory displays users from the older saved layout.',
+      '当前通讯录显示旧布局保存的用户。'
+    ),
+    covers: ['name', 'key', 'version', 'migrations']
+  }
+]
+
 /** Live query example. */
 const liveQueryExample: ICode = {
   en: `import { createRuntime } from '@migaia/reactive'
@@ -264,6 +547,7 @@ for (const [prefix, module, id, en, zh, optionsType, reactive] of backends) {
   ] as const) {
     pluginSymbols[name] = {
       role: 'enhancer',
+      optionCases: backendOptionCases(module, name, path, true),
       optionDocs: {
         id: {
           summary: t(
@@ -1006,8 +1290,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
     definePlugin: {
       role: 'factory',
       purpose: t(
-        'Defines a custom backend plugin: `descriptorFactory(core)` must call `core.registerStore(store)` and may return `install` / `expose` APIs; `features` can add a reactive adapter.',
-        '定义自定义后端插件：`descriptorFactory(core)` 必须调用 `core.registerStore(store)`，并可返回 `install` / `expose` API；`features` 可以加入响应式适配器。'
+        'Defines a custom backend plugin: `descriptorFactory(core)` returns the descriptor, whose `install` hook calls `core.registerStore(store)` while installation is active. The descriptor may expose application APIs; `features` can add a reactive adapter.',
+        '定义自定义后端插件：`descriptorFactory(core)` 返回描述对象，由其中的 `install` 钩子在安装活动期间调用 `core.registerStore(store)`。描述对象还可公开应用 API，`features` 可以加入响应式适配器。'
       ),
       params: {
         name: t('Backend id of the plugin.', '该插件的后端 id。'),
@@ -1025,8 +1309,10 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         '可交给 `createStorageHost` / `host.use` 的插件句柄。'
       ),
       example: `const remote = definePlugin('remote', (core) => {
-  core.registerStore(createRemoteStore())
-  return {}
+  return { install: () => {
+    core.registerStore(createRemoteStore())
+    return {}
+  } }
 })`
     },
     defineFeature: {
@@ -1364,6 +1650,7 @@ try {
       }
     },
     ILocalStorageOptions: {
+      optionCases: backendOptionCases('local-storage', 'localStorageHost', 'local-storage'),
       summary: t(
         'Options of `localStorageHost()` and `localStorageBackendPlugin()`.',
         '`localStorageHost()` 与本地存储插件共用的构造选项。'
@@ -1371,6 +1658,7 @@ try {
       members: webStorageFields('localStorage')
     },
     ISessionStorageOptions: {
+      optionCases: backendOptionCases('session-storage', 'sessionStorageHost', 'session-storage'),
       summary: t(
         'Options of `sessionStorageHost()` and `sessionStorageBackendPlugin()`.',
         '`sessionStorageHost()` 与会话存储插件共用的构造选项。'
@@ -1378,6 +1666,7 @@ try {
       members: webStorageFields('sessionStorage')
     },
     ICookiesOptions: {
+      optionCases: backendOptionCases('cookies', 'cookiesHost', 'cookies'),
       summary: t(
         'Options of `cookiesHost()` and the cookie plugins.',
         '`cookiesHost()` 与两个 cookie 插件共用的选项。'
@@ -1399,6 +1688,7 @@ try {
       }
     },
     IIndexedDbOptions: {
+      optionCases: backendOptionCases('indexed-db', 'indexedDbHost', 'indexed-db'),
       summary: t(
         'Options of `indexedDbHost()` and the IndexedDB plugins.',
         '`indexedDbHost()` 与两个 IndexedDB 插件共用的选项。'
@@ -1406,6 +1696,7 @@ try {
       members: indexedDbFields
     },
     IEntityOptions: {
+      optionCases: entityOptionCases,
       summary: t(
         'Options of `defineEntity()`.',
         '`defineEntity()` 的选项：主键、schema、版本与索引。'
@@ -1462,6 +1753,11 @@ try {
           default: t('`true`.', '`true`：读取时也校验。')
         },
         onDiagnostic: {
+          whenToUse: t(
+            'Set a callback when scans, skipped invalid records or backend fallback choices should appear in application diagnostics. It receives explanatory text without changing query results. Omitting it sends diagnostics to console.warn.',
+            '扫描、跳过无效记录或后端回退选择需要进入应用诊断时，设置回调。它接收说明文本，不改变查询结果。省略时诊断输出到 console.warn。'
+          ),
+          example: entityOptionCases[1]!.example,
           summary: t(
             'Receives diagnostic messages (full scans, fallbacks).',
             '接收诊断信息（全表扫描、回退路径等）。'
@@ -1828,6 +2124,7 @@ console.log(byStatus.select({ status: 'ready' }))`
       '用于记录排序的比较函数 `(left, right) => number`。'
     ),
     IStorageHostCreateOptions: {
+      optionCases: hostOptionCases(false),
       summary: t(
         'Options of `createStorageHost()`.',
         '`createStorageHost()` 的选项：初始插件与安装设置。'
@@ -1852,6 +2149,11 @@ console.log(byStatus.select({ status: 'ready' }))`
           default: t('`systemScheduler`.', '`systemScheduler`：宿主原生计时器。')
         },
         report: {
+          whenToUse: t(
+            'Supply a reporter when a timed-out initializer or delayed cleanup can fail after its caller has finished. The callback observes those secondary failures. Omission drops these diagnostics; throwing from it does not replace the installation or disposal result.',
+            '超时初始化器或延迟清理可能在调用方结束后失败时，提供报告回调。它观察这些次级失败。省略时丢弃诊断，回调抛错不会替换安装或释放结果。'
+          ),
+          example: hostOptionCases(false)[1]!.example,
           summary: t(
             'Receives late rejections and cleanup diagnostics.',
             '接收迟到的拒绝与清理诊断。'
@@ -1861,6 +2163,7 @@ console.log(byStatus.select({ status: 'ready' }))`
       }
     },
     IStorageHostOptions: {
+      optionCases: hostOptionCases(true),
       summary: t(
         'Options of `new StorageHostFacade()`.',
         '`new StorageHostFacade()` 的选项：安装超时、时钟与上报。'
@@ -1875,6 +2178,11 @@ console.log(byStatus.select({ status: 'ready' }))`
           default: t('`systemScheduler`.', '`systemScheduler`：宿主原生计时器。')
         },
         report: {
+          whenToUse: t(
+            'Supply a reporter when a timed-out initializer or delayed cleanup can fail after its caller has finished. The callback observes those secondary failures. Omission drops these diagnostics; throwing from it does not replace the installation or disposal result.',
+            '超时初始化器或延迟清理可能在调用方结束后失败时，提供报告回调。它观察这些次级失败。省略时丢弃诊断，回调抛错不会替换安装或释放结果。'
+          ),
+          example: hostOptionCases(true)[1]!.example,
           summary: t(
             'Receives late rejections and cleanup diagnostics.',
             '接收迟到的拒绝与清理诊断。'

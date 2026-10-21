@@ -4,7 +4,7 @@
  * implementations and cache retention have separate owners; source controls behavior where existing
  * package prose remains stale.
  */
-import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { storeKeyedCases } from './store-keyed-cases.js'
 
 /** Creates one bilingual sentence pair. */
@@ -72,6 +72,109 @@ console.log(values.forget('chat-1'))
 values.clear()
 totals.clear()
 store.dispose()`
+
+/** Family options bound definition retention and label room state for diagnostics. */
+const familyOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Bound definition retention in a room editor', '限制房间编辑器保留的定义数量'),
+    problem: t(
+      'A support agent may visit thousands of rooms in one shift. The family normally keeps up to 4096 definitions strongly reachable. Set `maxSize` to 100 when the editor needs a smaller cache; definitions still held by the store remain reusable for their rooms.',
+      '客服一班可能访问上千个房间。定义族默认强保留最多 4096 个定义。编辑器只需要较小缓存时，把 `maxSize` 设为 100；存储仍持有的定义可以继续按房间复用。'
+    ),
+    example: `import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, familyDef } from '@migaia/store-keyed'
+
+const drafts = familyDef((room: string) => ({ room, text: '' }), {
+  maxSize: 100
+})
+const store = createAtomStore(createRuntime())
+onRoomSelected((room) => {
+  renderDraftEditor(store, drafts(room))
+})
+onEditorClosed(() => {
+  store.dispose()
+  drafts.clear()
+})`,
+    result: t(
+      'Room drafts keep their store state while the family strongly retains at most 100 recent definitions.',
+      '房间草稿保留各自在存储中的状态，定义族的强缓存最多保留最近 100 个定义。'
+    ),
+    covers: ['maxSize']
+  },
+  {
+    title: t('Find unread-count state in a diagnostic panel', '在诊断面板找到未读数状态'),
+    problem: t(
+      'A chat application has many definition families, so the default `family` and `derived-family` labels are hard to distinguish. Give unread counts and their badge text separate `debugLabel` values; each generated label also includes the room key.',
+      '聊天应用中有多个定义族，默认的 `family` 和 `derived-family` 标签难以区分。用不同的 `debugLabel` 标识未读数和徽标文字，生成的标签还会附上房间键。'
+    ),
+    example: `import { familyDef, derivedFamilyDef } from '@migaia/store-keyed'
+
+const unread = familyDef(() => 0, { debugLabel: 'chat-unread' })
+const badges = derivedFamilyDef((room: string) => (get) => get(unread(room)), {
+  debugLabel: 'chat-badge'
+})
+showDefinitionInPanel(unread('support'))
+showDefinitionInPanel(badges('support'))`,
+    result: t(
+      'The panel identifies the tokens as `chat-unread[support]` and `chat-badge[support]` instead of generic family labels.',
+      '面板用 `chat-unread[support]` 和 `chat-badge[support]` 标识定义，不再只显示通用族标签。'
+    ),
+    covers: ['debugLabel']
+  }
+]
+
+/** Error helpers retain the original failure behind application-specific context. */
+const errorOptionCases = (name: string): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Explain a draft restoration failure', '说明草稿恢复失败'),
+    problem: t(
+      'The room editor restores saved draft data before showing a form. If restoration fails, a short user message should not replace the storage failure. Preserve it with `cause` so monitoring can find the original stack.',
+      '房间编辑器显示表单前要恢复已保存的草稿。恢复失败时，简短的用户提示不应取代底层读取失败。用 `cause` 保留它，监控就能找到原始堆栈。'
+    ),
+    example: `import { ${name}, StoreKeyedErrorCode } from '@migaia/store-keyed'
+
+try {
+  await restoreRoomDraft(roomId)
+} catch (cause) {
+  const error = ${name}(
+    StoreKeyedErrorCode.invalidOption,
+    'Room draft could not be restored',
+    { cause }
+  )
+  showDraftError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The editor explains that the draft is unavailable, while monitoring retains the underlying storage failure.',
+      '编辑器提示草稿暂不可用，监控记录仍保留底层读取失败。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep the rejected editor setting', '保留被拒绝的编辑器设置'),
+    problem: t(
+      'The editor settings form validates its family cache limit and returns a record naming an invalid field. Flattening it into a message loses the submitted value. Store the record in `cause` so support can inspect the rejected setting.',
+      '编辑器设置表单校验定义族缓存上限，并用记录指出无效字段。只转成文字会丢失提交值。用 `cause` 保留记录，支持人员就能查看被拒绝的设置。'
+    ),
+    example: `import { ${name}, StoreKeyedErrorCode } from '@migaia/store-keyed'
+
+const rejection = validateEditorSettings(formData)
+if (rejection) {
+  const error = ${name}(
+    StoreKeyedErrorCode.invalidOption,
+    'Editor settings rejected',
+    { cause: rejection }
+  )
+  showSettingsError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The settings form stays open with an error, and monitoring keeps the rejected field and submitted value.',
+      '设置表单保留并显示错误，监控中仍能看到被拒绝的字段和提交值。'
+    ),
+    covers: ['cause']
+  }
+]
 
 /** The public cache has no resource lifecycle; callers choose any eviction cleanup. */
 const cacheExample = `import { KeyedSplitCache } from '@migaia/store-keyed/optics'
@@ -1235,6 +1338,7 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
             )
           },
           optionDocs: causeOptions,
+          optionCases: errorOptionCases(name!),
           returns: t(
             `A tagged native ${native}; the caller chooses whether to throw it.`,
             `返回已标记原生 \`${native}\`，由调用者决定是否抛出。`
@@ -1531,6 +1635,7 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
         '两种定义族工厂的构造设置，仅配置有界强保留及诊断命名。'
       ),
       example: familyExample,
+      optionCases: familyOptionCases,
       members: {
         maxSize: f(
           'Positive safe integer maximum number of strongly retained recent tokens; live weak canonical tokens can still be reused after LRU eviction.',

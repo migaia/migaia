@@ -9,6 +9,7 @@ import type {
   IEnumDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   ISymbolDoc,
   IText,
   ITypeDoc
@@ -172,6 +173,148 @@ function checkMember(
   return findings
 }
 
+/** Most option fields one case may set; more than this reads as a field inventory, not a scenario. */
+const MAX_CASE_COVERS = 6
+
+/** Widest code line shown in an options example, so the block reads without horizontal scrolling. */
+const MAX_CODE_WIDTH = 100
+
+/** Package subpaths that are not public reader entry points (`/internal`, `/internal-advanced`). */
+const INTERNAL_IMPORT = /(?:from\s+|import\s*\(\s*)['"]@migaia\/[^'"]*\binternal[^'"]*['"]/
+
+/**
+ * Logged expressions that only prove a check passed (counts, sizes, comparisons, predicates). A
+ * reader example shows a value the reader cares about; verification output belongs in the script
+ * that ran it outside the repository.
+ */
+const EVIDENCE_LOG =
+  /\.length\b|\.size\b|[!=]==|\.every\(|\.some\(|\binstanceof\b|\btypeof\b|\.has\(|\.includes\(/
+
+/**
+ * `REF-OPTION-READABLE`: an options example is reader code, not a verification script. Checks line
+ * width (`CODE-WIDTH`), internal entry points (`CODE-INTERNAL`) and proof-style logging
+ * (`CODE-EVIDENCE`) in every locale variant.
+ */
+function checkReaderCode(code: ICode | undefined, where: string): IFinding[] {
+  if (!code) return []
+  const findings: IFinding[] = []
+  /** Locale variants are checked separately; a shared string is one variant. */
+  const variants =
+    typeof code === 'string'
+      ? [['', code]]
+      : [
+          ['en', code.en],
+          ['zh', code.zh]
+        ]
+  for (const [locale, text] of variants) {
+    const at = locale ? `${where}.${locale}` : where
+    text.split('\n').forEach((line, index) => {
+      if ([...line].length > MAX_CODE_WIDTH)
+        findings.push({
+          rule: 'CODE-WIDTH',
+          where: at,
+          message: `line ${index + 1} is ${[...line].length} characters (max ${MAX_CODE_WIDTH})`
+        })
+    })
+    if (INTERNAL_IMPORT.test(text))
+      findings.push({
+        rule: 'CODE-INTERNAL',
+        where: at,
+        message: 'imports an internal entry point; use the public package entry'
+      })
+    for (const match of text.matchAll(/console\.(?:log|info|debug)\(([^\n]*)\)/g))
+      if (EVIDENCE_LOG.test(match[1]!))
+        findings.push({
+          rule: 'CODE-EVIDENCE',
+          where: at,
+          message: `logs a check instead of a value: ${match[0].slice(0, 60)}`
+        })
+  }
+  return findings
+}
+
+/**
+ * `REF-OPTION-CODE`: every options field is shown in code, by its own example or by an option case
+ * that lists it and spells its name. Literal-union, enum and function fields need their own example
+ * and `whenToUse`, because their effect depends on the value the reader picks.
+ */
+function checkOptionCode(
+  symbol: IApiSymbol,
+  fieldDocs: ReadonlyMap<string, IMemberDoc | undefined>,
+  cases: readonly IOptionCaseDoc[],
+  where: string,
+  symbols: readonly IApiSymbol[]
+): IFinding[] {
+  const findings: IFinding[] = []
+  cases.forEach((item, index) => {
+    const at = `${where}.optionCases[${index}]`
+    findings.push(
+      ...checkText(item.title, `${at}.title`, MIN_ZH_DETAIL),
+      ...checkText(item.problem, `${at}.problem`, MIN_ZH_DETAIL),
+      ...checkText(item.result, `${at}.result`, MIN_ZH_DETAIL),
+      ...checkCode(item.example, `${at}.example`, true),
+      ...checkReaderCode(item.example, `${at}.example`)
+    )
+    if (item.covers.length > MAX_CASE_COVERS)
+      findings.push({
+        rule: 'REF-OPTION-SCOPE',
+        where: at,
+        message: `covers ${item.covers.length} fields (max ${MAX_CASE_COVERS}); split it by scenario`
+      })
+    /** Every code variant must spell each covered field, so the claim is visible in the code. */
+    const variants =
+      typeof item.example === 'string' ? [item.example] : [item.example.en, item.example.zh]
+    for (const name of item.covers) {
+      const leaf = name.split('.').at(-1) ?? name
+      if (!symbol.configuration.some((field) => field.name === name))
+        findings.push({
+          rule: 'REF-OPTION-CODE',
+          where: at,
+          message: `covers unknown field ${name}`
+        })
+      else if (!variants.every((code) => new RegExp(`\\b${leaf}\\b`).test(code)))
+        findings.push({ rule: 'REF-OPTION-CODE', where: at, message: `example never sets ${name}` })
+    }
+  })
+  /** Field names some case covers. */
+  const covered = new Set(cases.flatMap((item) => item.covers))
+  for (const field of symbol.configuration) {
+    const doc = fieldDocs.get(field.name)
+    if (!doc) continue
+    const at = `${where}{${field.name}}`
+    findings.push(...checkReaderCode(doc.example, `${at}.example`))
+    const top = field.name.split('.')[0]!
+    const needsOwn =
+      Boolean(fieldLiteralValues(field.type, symbols)) ||
+      Boolean(doc.values) ||
+      /=>/.test(field.type)
+    if (needsOwn) {
+      if (!doc.example)
+        findings.push({
+          rule: 'REF-OPTION-CODE',
+          where: at,
+          message: 'value-dependent field has no own example'
+        })
+      if (!doc.whenToUse)
+        findings.push({
+          rule: 'REF-OPTION-CODE',
+          where: at,
+          message: 'value-dependent field has no whenToUse'
+        })
+      else findings.push(...checkText(doc.whenToUse, `${at}.whenToUse`, MIN_ZH_DETAIL))
+      continue
+    }
+    const parentExample = top !== field.name && fieldDocs.get(top)?.example
+    if (!doc.example && !parentExample && !covered.has(field.name) && !covered.has(top))
+      findings.push({
+        rule: 'REF-OPTION-CODE',
+        where: at,
+        message: 'field is not shown in any example or option case'
+      })
+  }
+  return findings
+}
+
 /** `REF-OPTION`: checks one options field. */
 function checkOption(
   field: IApiSymbol['configuration'][number],
@@ -277,6 +420,8 @@ function checkSymbol(
     if (!/^(?:void|Promise<void>)$/.test(shape.returns.trim()))
       findings.push(...checkText(doc.returns, `${where}.returns`, MIN_ZH_DETAIL))
   }
+  /** Field docs by field name, read once for the per-field and the code-coverage checks. */
+  const fieldDocs = new Map<string, IMemberDoc | undefined>()
   for (const field of symbol.configuration) {
     const fieldDoc =
       doc.optionDocs?.[field.name] ??
@@ -288,9 +433,18 @@ function checkSymbol(
             api.symbols
           )
         : undefined)
+    fieldDocs.set(field.name, fieldDoc)
     findings.push(
       ...checkOption(field, fieldDoc, `${where}{${field.name}}`, api.symbols, reference)
     )
+  }
+  if (symbol.configuration.length > 0) {
+    /** The API's own cases win; otherwise the options type supplies them. */
+    const cases =
+      doc.optionCases ??
+      (doc.options ? keyed(reference.types, api.module, doc.options)?.optionCases : undefined) ??
+      []
+    findings.push(...checkOptionCode(symbol, fieldDocs, cases, where, api.symbols))
   }
   if (constantMembers(symbol).length > 0) {
     const enumDoc: IEnumDoc | undefined = reference.enums[symbol.name]

@@ -15,6 +15,57 @@ const setup = `import { createStore } from '@migaia/store-light'
 import { createStoreDevTools } from '@migaia/store-devtools'
 const store = createStore({ count: 0 })
 const tools = createStoreDevTools(store)`
+/** A support panel retains recent checkout history without unbounded queues. */
+const capacityOptionsExample = `import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+
+const store = createStore({ quantity: 1 })
+const tools = createStoreDevTools(store, { maxHistory: 50, maxTrace: 200 })
+store.quantity = 2
+tools.record('quantity-updated')
+renderHistory(tools.history)
+renderActions(tools.actions)
+onSupportPanelClosed(() => tools.dispose())`
+/** Diagnostic snapshots redact email before they reach the support view. */
+const cloneOptionsExample = `import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+
+const store = createStore({ name: 'Ada', email: 'ada@example.com' })
+const tools = createStoreDevTools(store, {
+  clone: (state) => ({ ...structuredClone(state), email: '[redacted]' })
+})
+renderSupportSnapshot(tools.history[0]!.state)
+onSupportPanelClosed(() => tools.dispose())`
+/** Selected manual records keep a checkout view focused on business actions. */
+const captureOptionsExample = `import { createStoreDevTools } from '@migaia/store-devtools'
+
+const tools = createStoreDevTools(checkoutStore, { captureRuntimeTrace: false })
+await submitOrder(checkoutStore.$plain())
+tools.recordAction({ name: 'order-submitted' })
+renderActions(tools.actions)
+onSupportPanelClosed(() => tools.dispose())`
+/** Diagnostic times use the same application clock as the support timeline. */
+const clockOptionsExample = `import { createStoreDevTools } from '@migaia/store-devtools'
+
+const tools = createStoreDevTools(checkoutStore, {
+  now: () => supportClock.now()
+})
+tools.recordAction({ name: 'checkout-opened' })
+renderTimeline(tools.actions)`
+/** A capture explanation keeps the original snapshot failure available to monitoring. */
+const captureFailureExample = `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
+
+try {
+  exportSupportSnapshot(tools.record('support-export'))
+} catch (cause) {
+  const error = createStoreDevtoolsError(
+    StoreDevtoolsErrorCode.callbackFailed,
+    'Support snapshot could not be captured',
+    { cause }
+  )
+  showCaptureError(error.message)
+  reportToMonitoring(error)
+}`
 /** Complete session example records, replays and releases only the diagnostic subscription. */
 const session = `${setup}\nconst anchor = tools.record('before-change')\nstore.$batch(draft => { draft.count++ })\ntools.jumpTo(anchor.id)\nconsole.log(tools.history, tools.actions, tools.trace)\ntools.dispose()\nstore.$dispose()`
 /** Public runtime graph handles used without a diagnostic session. */
@@ -173,6 +224,47 @@ const types: Record<string, ITypeDoc> = {
       'Queue limits, runtime capture, clock and snapshot policy fixed when a session is created.',
       '会话创建时固定的队列上限、运行时捕获、时钟与快照策略。'
     ),
+    optionCases: [
+      {
+        title: t('Keep recent checkout history in a small panel', '在小面板保留最近的结账记录'),
+        problem: t(
+          'A support panel stays open throughout a checkout session. Defaults retain 100 state snapshots and 1000 action and trace records. Lower `maxHistory` and `maxTrace` independently to keep only the recent activity the panel needs.',
+          '支持面板会在整个结账会话中保持打开。默认保留 100 份状态快照，以及各 1000 条动作和追踪记录。分别调低 `maxHistory` 和 `maxTrace`，只保留面板需要的近期活动。'
+        ),
+        example: capacityOptionsExample,
+        result: t(
+          'The history view includes the quantity change and retains at most 50 snapshots; actions and trace each retain at most 200 entries.',
+          '历史视图包含数量变更，最多保留 50 份快照；动作和追踪各最多保留 200 条。'
+        ),
+        covers: ['maxHistory', 'maxTrace']
+      },
+      {
+        title: t('Hide email in diagnostic snapshots', '隐藏诊断快照中的邮箱'),
+        problem: t(
+          'Support snapshots should hide email addresses. Default cloning does not redact fields. A custom clone changes the diagnostic copy before capture. Replay also uses this clone, so replayed values follow the same redaction policy.',
+          '支持面板的快照需要隐藏邮箱。默认克隆不会脱敏。自定义 clone 在捕获前修改诊断副本。回放也使用同一个 clone，因此回放值同样遵循此脱敏策略。'
+        ),
+        example: cloneOptionsExample,
+        result: t(
+          'The support view shows `[redacted]` for email; creating the snapshot leaves the checkout store unchanged.',
+          '支持视图中的邮箱显示为 `[redacted]`；创建快照不会改动结账存储。'
+        ),
+        covers: ['clone']
+      },
+      {
+        title: t('Record selected actions only', '只记录选中的动作'),
+        problem: t(
+          'A panel needs selected application actions rather than all events from the shared runtime. Runtime capture is on by default and includes other stores using that runtime. Disable it, then add desired actions with recordAction().',
+          '面板只需要应用选中的动作，不需要共享运行时的全部事件。默认开启的运行时捕获会包含共用该运行时的其它存储。关闭它后，用 recordAction() 添加需要的动作。'
+        ),
+        example: captureOptionsExample,
+        result: t(
+          'The panel shows the manual `order-submitted` record, without automatically collecting runtime activity.',
+          '面板显示手动记录的 `order-submitted`，不自动收集运行时活动。'
+        ),
+        covers: ['captureRuntimeTrace']
+      }
+    ],
     members: {
       maxHistory: {
         ...p(
@@ -195,6 +287,11 @@ const types: Record<string, ITypeDoc> = {
         )
       },
       captureRuntimeTrace: {
+        whenToUse: t(
+          'Keep the default true to inspect events and completed actions across the shared runtime. Choose false for selected manual actions or to avoid that subscription. Store history and recordAction() remain available.',
+          '需要查看共享运行时的事件和已完成动作时保持默认 true。只需要选中的手动动作，或不需要该订阅时选 false。存储历史和 recordAction() 仍可使用。'
+        ),
+        example: captureOptionsExample,
         ...p(
           'False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.',
           '为假时跳过运行时订阅及自动完成动作捕获，仍可手动记录动作。'
@@ -215,6 +312,11 @@ const types: Record<string, ITypeDoc> = {
         }
       },
       now: {
+        whenToUse: t(
+          'Supply your clock when timestamps must match another log or remain fixed across repeated captures. Snapshots and action records call it. Without it, timestamps use Date.now().',
+          '时间戳需要匹配其它日志，或需要固定时间以便重复比较时，传入应用时钟。快照和动作记录都会调用它。不设置则使用 Date.now()。'
+        ),
+        example: clockOptionsExample,
         ...p(
           'Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.',
           '同步无参数时钟，返回应用使用的毫秒时间戳；准备期未归属失败附 `CALLBACK_FAILED`，手动捕获抛出，自动捕获经运行时报告。'
@@ -225,6 +327,11 @@ const types: Record<string, ITypeDoc> = {
         )
       },
       clone: {
+        whenToUse: t(
+          'Set it to redact snapshots or choose how special values are copied. Return a record synchronously; keep required fields if replay is needed. Without it, diagnostic cloning copies values best-effort without redaction.',
+          '需要对快照脱敏，或指定特殊值如何复制时设置。同步返回记录对象；需要回放时保留必需字段。不设置则尽力克隆诊断数据，不做脱敏。'
+        ),
+        example: cloneOptionsExample,
         ...p(
           'Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot and replay cloning classify unowned failures as CALLBACK_FAILED; automatic capture reports them, while manual record and replay throw. Store hydration errors retain their own path. Apply redaction here.',
           '同步 `(state)` 接收 `store.$plain()` 或保留的回放快照并返回诊断副本；快照与回放克隆的未归属失败附 `CALLBACK_FAILED`，自动捕获报告，手动记录与回放抛出。Store 注水错误仍保留自身传播路径，可在此回调脱敏。'
@@ -454,8 +561,48 @@ const symbols: Record<string, ISymbolDoc> = {
       '构造带本包来源与所选语义错误码的原生 `Error`；消息由应用提供，可保留原始原因，不重写堆栈，也不改变原生类型。'
     ),
     params: errorParams,
+    optionCases: [
+      {
+        title: t('Explain a failed support capture', '说明支持快照捕获失败'),
+        problem: t(
+          'A support agent exports a checkout snapshot. If capture fails, a short export error alone hides the clone or clock exception. Keep it in `cause` so the agent sees the failed operation and monitoring retains the original exception.',
+          '支持人员需要导出结账快照。捕获失败时，只有导出提示会掩盖克隆或时钟异常。用 `cause` 保留异常，页面说明失败的操作，监控继续查看原始异常。'
+        ),
+        example: captureFailureExample,
+        result: t(
+          'The support view reports the capture failure, with its original exception available in monitoring.',
+          '支持视图提示捕获失败，监控中仍能查看原始异常。'
+        ),
+        covers: ['cause']
+      },
+      {
+        title: t('Keep rejected snapshot export details', '保留快照导出被拒绝的详情'),
+        problem: t(
+          'The support export policy can reject a snapshot with a record naming the restricted fields. Turning that record into a message loses the field details. Keep it in `cause` when reporting the rejected export.',
+          '支持导出策略可能用记录指出快照中受限制的字段。只把记录变成文字会丢失字段详情。报告导出被拒绝时，把该记录保留在 `cause` 中。'
+        ),
+        example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
+
+const rejection = validateSupportExport(snapshot)
+if (rejection) {
+  const error = createStoreDevtoolsError(
+    StoreDevtoolsErrorCode.callbackFailed,
+    'Support snapshot export rejected',
+    { cause: rejection }
+  )
+  showExportError(error.message)
+  reportToMonitoring(error)
+}`,
+        result: t(
+          'The support view reports the rejected export, and monitoring keeps the restricted-field details.',
+          '支持视图提示导出被拒绝，监控记录保留受限字段详情。'
+        ),
+        covers: ['cause']
+      }
+    ],
     optionDocs: {
       cause: {
+        example: captureFailureExample,
         ...p(
           'Original application failure preserved by identity on Error.cause when supplied and not undefined.',
           '提供且不为 `undefined` 时按原始身份保存在错误原因上的应用失败值。'

@@ -2615,7 +2615,7 @@
           "declarationLine": 27,
           "source": "packages/reactive/dist/runtime/runtime.class.d.ts",
           "purpose": "Creates an isolated reactive runtime: its own dependency graph, version clock and scheduler. Nodes created by one runtime cannot be read by computed values or effects of another (`CROSS_RUNTIME`). Create one per SSR request, per test, or per worker instead of sharing `defaultRuntime`.",
-          "core": "options: Runtime options; all optional, see the options table.\nAn `IRuntime`. Invalid options throw a `TypeError` or `RangeError` with code `INVALID_OPTION`.\nadapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
+          "core": "options: Runtime options; all optional, see the options table.\nAn `IRuntime`. Invalid options throw a `TypeError` or `RangeError` with code `INVALID_OPTION`.\nadapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
           "advanced": "SSR creates one runtime per request so state never leaks between users.\nEach test owns a runtime and calls `flush()` for deterministic effect timing.\nA store library builds collections and resources on `signal` / `computed` / `effect`.\nYou only need local component state: use the framework state instead.",
           "parameters": ["options: IRuntimeOptions (optional)"],
           "parameterDetails": [
@@ -2689,7 +2689,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "options: Runtime options; all optional, see the options table.\nAn `IRuntime`. Invalid options throw a `TypeError` or `RangeError` with code `INVALID_OPTION`.\nadapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
+              "content": "options: Runtime options; all optional, see the options table.\nAn `IRuntime`. Invalid options throw a `TypeError` or `RangeError` with code `INVALID_OPTION`.\nadapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
             },
             {
               "id": "advanced-usage",
@@ -4502,7 +4502,7 @@
           "declarationLine": 168,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Options of `createRuntime()`; all fields are optional and fixed at creation.",
-          "core": "adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
+          "core": "adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -4604,7 +4604,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
+              "content": "adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
             },
             {
               "id": "advanced-usage",
@@ -6017,6 +6017,95 @@
           "fragment": "reactive-extension--claimOwnership"
         },
         {
+          "name": "createBatchedOperation",
+          "kind": "function",
+          "signature": "export declare function createBatchedOperation<TArg, TResult>(runtime: IRuntime, operation: (arg: TArg) => TResult): (arg: TArg) => TResult;",
+          "declarationLine": 30,
+          "source": "packages/reactive/dist/runtime/node-factories.d.ts",
+          "purpose": "Binds one lower-level operation to canonical batch and untracked boundaries. Each invocation receives one argument without creating callback closures; finally/error handling stays in the scheduler, so callers cannot forget a matching endBatch. Public batch/untracked callbacks retain their zero-argument invocation. Business errors keep precedence over final flush failures.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBatchedOperation.",
+          "advanced": "No additional advanced behavior is declared for createBatchedOperation.",
+          "parameters": ["runtime: IRuntime", "operation: (arg: TArg) => TResult"],
+          "parameterDetails": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": false
+            },
+            {
+              "name": "operation",
+              "type": "(arg: TArg) => TResult",
+              "optional": false
+            }
+          ],
+          "returns": "(arg: TArg) => TResult",
+          "errors": ["No documented errors are declared for createBatchedOperation."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBatchedOperation.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "createBatchedOperation",
+          "exportPath": "./extension",
+          "overloadSignatures": [
+            "export declare function createBatchedOperation<TArg, TResult>(runtime: IRuntime, operation: (arg: TArg) => TResult): (arg: TArg) => TResult;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": false
+              },
+              {
+                "name": "operation",
+                "type": "(arg: TArg) => TResult",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["(arg: TArg) => TResult"],
+          "whenToUse": "Use createBatchedOperation when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBatchedOperation does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Binds one lower-level operation to canonical batch and untracked boundaries. Each invocation receives one argument without creating callback closures; finally/error handling stays in the scheduler, so callers cannot forget a matching endBatch. Public batch/untracked callbacks retain their zero-argument invocation. Business errors keep precedence over final flush failures."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBatchedOperation from @migaia/reactive/extension, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBatchedOperation when its function contract and declared inputs match the result you need. Choose a different public symbol when createBatchedOperation does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBatchedOperation."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBatchedOperation."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/reactive/dist/runtime/node-factories.d.ts:createBatchedOperation:export declare function createBatchedOperation<TArg, TResult>(runtime: IRuntime, operation: (arg: TArg) => TResult): (arg: TArg) => TResult;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "reactive-extension--createBatchedOperation"
+        },
+        {
           "name": "createFieldSource",
           "kind": "function",
           "signature": "export declare function createFieldSource(runtime: IRuntime, debugName?: string): IRuntimeFieldSource;",
@@ -6331,6 +6420,136 @@
           "usageScore": 4,
           "configuration": [],
           "fragment": "reactive-extension--createSourceBinding"
+        },
+        {
+          "name": "createStaticObserver",
+          "kind": "function",
+          "signature": "export declare function createStaticObserver(runtime: IRuntime, resolve: () => IStaticSubscriptionSource, callback: () => void, options?: IReactiveNodeOptions): IDisposable;",
+          "declarationLine": 16,
+          "source": "packages/reactive/dist/runtime/static-observer.d.ts",
+          "purpose": "Observes an owner's known single-node read without retracking each stable notification. Source resolution and first admission retain normal tracking for lazy factory reads; an invalidation resolves again. Notifications remain scheduled, ordered and untracked under the caller's existing callback policy. The returned handle exposes disposal only, never mutable graph internals.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStaticObserver.",
+          "advanced": "No additional advanced behavior is declared for createStaticObserver.",
+          "parameters": [
+            "runtime: IRuntime",
+            "resolve: () => IStaticSubscriptionSource",
+            "callback: () => void",
+            "options: IReactiveNodeOptions (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": false
+            },
+            {
+              "name": "resolve",
+              "type": "() => IStaticSubscriptionSource",
+              "optional": false
+            },
+            {
+              "name": "callback",
+              "type": "() => void",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IReactiveNodeOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IDisposable",
+          "errors": ["No documented errors are declared for createStaticObserver."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStaticObserver.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "createStaticObserver",
+          "exportPath": "./extension",
+          "overloadSignatures": [
+            "export declare function createStaticObserver(runtime: IRuntime, resolve: () => IStaticSubscriptionSource, callback: () => void, options?: IReactiveNodeOptions): IDisposable;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": false
+              },
+              {
+                "name": "resolve",
+                "type": "() => IStaticSubscriptionSource",
+                "optional": false
+              },
+              {
+                "name": "callback",
+                "type": "() => void",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IReactiveNodeOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IDisposable"],
+          "whenToUse": "Use createStaticObserver when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createStaticObserver does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Observes an owner's known single-node read without retracking each stable notification. Source resolution and first admission retain normal tracking for lazy factory reads; an invalidation resolves again. Notifications remain scheduled, ordered and untracked under the caller's existing callback policy. The returned handle exposes disposal only, never mutable graph internals."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStaticObserver from @migaia/reactive/extension, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStaticObserver when its function contract and declared inputs match the result you need. Choose a different public symbol when createStaticObserver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStaticObserver."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createStaticObserver."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Identifies discarded pending work when loop protection triggers."
+            }
+          ],
+          "identity": "packages/reactive/dist/runtime/static-observer.d.ts:createStaticObserver:export declare function createStaticObserver(runtime: IRuntime, resolve: () => IStaticSubscriptionSource, callback: () => void, options?: IReactiveNodeOptions): IDisposable;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Identifies discarded pending work when loop protection triggers.",
+              "descriptionEn": "Identifies discarded pending work when loop protection triggers.",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "reactive-extension--createStaticObserver"
         },
         {
           "name": "createTrackedObserver",
@@ -8241,6 +8460,90 @@
           "usageScore": 14,
           "configuration": [],
           "fragment": "reactive-extension--isRuntimeTracking"
+        },
+        {
+          "name": "IStaticSubscriptionSource",
+          "kind": "type",
+          "signature": "export type IStaticSubscriptionSource = { readonly node: IObservable; read(): unknown; };",
+          "declarationLine": 6,
+          "source": "packages/reactive/dist/runtime/static-observer.d.ts",
+          "purpose": "An owner's stable source object reads exactly its one graph node. Resolver work may materialize it.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStaticSubscriptionSource.",
+          "advanced": "No additional advanced behavior is declared for IStaticSubscriptionSource.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStaticSubscriptionSource."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStaticSubscriptionSource.",
+          "examples": [],
+          "members": [
+            {
+              "name": "node",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly node: IObservable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IObservable"
+            },
+            {
+              "name": "read",
+              "kind": "method",
+              "optional": false,
+              "signature": "read(): unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IStaticSubscriptionSource",
+          "exportPath": "./extension",
+          "overloadSignatures": [
+            "export type IStaticSubscriptionSource = { readonly node: IObservable; read(): unknown; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStaticSubscriptionSource when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStaticSubscriptionSource does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "An owner's stable source object reads exactly its one graph node. Resolver work may materialize it."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStaticSubscriptionSource from @migaia/reactive/extension, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStaticSubscriptionSource when its type contract and declared inputs match the result you need. Choose a different public symbol when IStaticSubscriptionSource does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStaticSubscriptionSource."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStaticSubscriptionSource."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/reactive/dist/runtime/static-observer.d.ts:IStaticSubscriptionSource:export type IStaticSubscriptionSource = { readonly node: IObservable; read(): unknown; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "reactive-extension--IStaticSubscriptionSource"
         },
         {
           "name": "ITrackedObserverBinding",

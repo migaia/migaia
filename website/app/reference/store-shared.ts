@@ -6,7 +6,7 @@
  * value. Invalid construction shapes use the native RangeError helper. snapshot guarantees a
  * consistent read per cell, not a transaction across all array elements.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { storeSharedCases } from './store-shared-cases.ts'
 
 /** Builds one localized sentence pair. */
@@ -130,6 +130,110 @@ const arrayOptions: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** Both array entry points expose the same initialization and attachment options. */
+const arrayOptionCases = (name: string): readonly IOptionCaseDoc[] => {
+  const create = `${name === 'SharedInt32Array' ? 'new ' : ''}${name}`
+  return [
+    {
+      title: t('Restore the dashboard counters', '恢复看板计数'),
+      problem: t(
+        'A ticket dashboard restores open and resolved counts, while a new archived count has no saved value. Without `initialValues`, all three begin at zero. Supply the saved prefix to restore the two existing counts and leave the new one at zero.',
+        '工单看板要恢复未解决和已解决计数，新加的归档计数还没有保存值。不传 `initialValues` 时，三个计数都会从零开始。传入已保存的前缀可以恢复已有计数，新加的一项仍为零。'
+      ),
+      example: `import { createRuntime } from '@migaia/reactive'
+import { ${name} } from '@migaia/store-shared'
+
+const counters = ${create}(createRuntime(), 3, {
+  initialValues: [12, 7]
+})
+renderTicketCounts(counters.snapshot())
+onDashboardClosed(() => counters.dispose())`,
+      result: t(
+        'The dashboard opens with 12 open tickets, 7 resolved tickets and no archived tickets.',
+        '看板打开时显示 12 个未解决工单、7 个已解决工单，归档数为零。'
+      ),
+      covers: ['initialValues']
+    },
+    {
+      title: t('Show the same counters in another view', '在另一视图显示同一组计数'),
+      problem: t(
+        'A summary view must read the counters already owned by the dashboard. Without `buffer`, it gets separate storage and misses dashboard updates. Attach the dashboard buffer with the same length, then synchronize the local reader when the application receives a counter update.',
+        '汇总视图需要读取看板已经维护的计数。不传 `buffer` 会创建独立存储，看不到看板更新。以相同长度附着看板缓冲区，并在应用收到计数更新通知时同步本地读者。'
+      ),
+      example: `import { createRuntime } from '@migaia/reactive'
+import { ${name} } from '@migaia/store-shared'
+
+const summary = ${create}(createRuntime(), 3, {
+  buffer: dashboardCounters.buffer
+})
+renderTicketCounts(summary.snapshot())
+onCountersChanged(() => {
+  summary.sync()
+  renderTicketCounts(summary.snapshot())
+})
+onSummaryClosed(() => summary.dispose())`,
+      result: t(
+        'The summary starts with the dashboard counts and shows later changes without resetting the shared data.',
+        '汇总视图直接显示看板已有计数，之后继续显示更新，不会重置共享数据。'
+      ),
+      covers: ['buffer']
+    }
+  ]
+}
+
+/** Error helpers keep application context and the original input failure together. */
+const errorOptionCases = (name: string): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Explain why saved counters could not be restored', '说明保存的计数为何恢复失败'),
+    problem: t(
+      'The dashboard loads saved counters before allocating shared state. If the saved input cannot be read, a new initialization message alone hides the input failure. Keep it in `cause` so the page can explain the operation and monitoring can inspect the original failure.',
+      '看板在创建共享状态前读取已保存计数。输入读取失败时，只创建初始化消息会掩盖原始原因。用 `cause` 保留它，页面说明失败的操作，监控继续查看原始失败。'
+    ),
+    example: `import { ${name}, StoreSharedErrorCode } from '@migaia/store-shared'
+
+try {
+  await restoreDashboardCounters()
+} catch (cause) {
+  const error = ${name}(
+    StoreSharedErrorCode.invalidOption,
+    'Dashboard counters could not be restored',
+    { cause }
+  )
+  showDashboardError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The dashboard shows a restoration error, and the monitoring record retains the saved-input failure.',
+      '看板显示计数恢复失败，监控记录保留保存数据读取失败的原因。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep the details of a rejected counter import', '保留计数导入的拒绝详情'),
+    problem: t(
+      'A counter importer returns a rejection record naming the invalid column. Turning it into a message loses those fields. Pass the record as `cause` so support can find the rejected column while the user sees a short import error.',
+      '计数导入器用拒绝记录指出无效列。只把记录转换为文字会丢失其中的字段。把记录传给 `cause`，用户看到简短导入提示，支持人员仍能找到被拒绝的列。'
+    ),
+    example: `import { ${name}, StoreSharedErrorCode } from '@migaia/store-shared'
+
+const rejection = validateCounterImport(upload)
+if (rejection) {
+  const error = ${name}(
+    StoreSharedErrorCode.invalidOption,
+    'Counter import rejected',
+    { cause: rejection }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
+    result: t(
+      'The user sees why the import stopped; the complete rejection record remains available in monitoring.',
+      '用户知道导入已停止，监控中仍保留完整的拒绝记录。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Package failure codes preserve native class and cause identity. */
 const errorValues = {
   arrayDisposed: t(
@@ -241,6 +345,7 @@ export const storeSharedReference: ILibraryReference = {
         )
       },
       optionDocs: arrayOptions,
+      optionCases: arrayOptionCases('sharedInt32Array'),
       returns: t(
         'SharedInt32Array owned by the caller. Range errors cover invalid options/index/value or short buffers; contention is explicit. Host memory allocation limits may also throw native failures.',
         '返回调用者拥有的共享数组，范围错误覆盖非法选项、下标、值或过短缓冲区，争用显式失败，宿主内存分配限制也可抛原生失败。'
@@ -264,6 +369,7 @@ export const storeSharedReference: ILibraryReference = {
         )
       },
       optionDocs: arrayOptions,
+      optionCases: arrayOptionCases('SharedInt32Array'),
       returns: t(
         'New SharedInt32Array local wrapper with an independent observation cursor for each shared cell. Dispose it when this Runtime no longer reads it; invalid length, header or initialization rejects construction without publishing a usable wrapper.',
         '返回为每个共享格保留独立观察游标的本地数组包装，当前运行时不再读取时应销毁，无效长度、头或初始化在发布可用包装前使构造失败。'
@@ -322,6 +428,7 @@ console.log(StoreSharedErrorCode.bufferTooSmall)`
               default: t('Omitted; no supplied cause is attached.', '默认省略，不附提供的原因。')
             }
           },
+          optionCases: errorOptionCases(name!),
           returns: t(
             `Tagged native ${native} for the caller to return or throw.`,
             `返回供调用者返回或抛出的带码原生 \`${native}\`。`

@@ -1,4 +1,255 @@
-import type { ICaseDoc } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
+
+/** Keeps native Worker option scenarios complete in either language. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Reader snippets use application-owned workers and keep native setup in verification files. */
+export const storeWorkerOptionExamples = {
+  client: `import { WorkerAdapter } from '@migaia/store-worker'
+
+const adapter = new WorkerAdapter(cartWorker, { clientId: 'main', timeoutMs: 1000 })
+renderTotal(await adapter.request<number[], number>(cartPrices))`,
+  timeout: `import { WorkerAdapter } from '@migaia/store-worker'
+
+const adapter = new WorkerAdapter(cartWorker, { timeoutMs: 2000 })
+try {
+  renderTotal(await adapter.request<number[], number>(cartPrices))
+} catch (error) {
+  showRecalculateButton(error)
+}`,
+  handler: `import { createWorkerHandler } from '@migaia/store-worker'
+
+const handle = createWorkerHandler(calculateCartTotal, postToPage, { timeoutMs: 1000 })
+workerScope.addEventListener('message', (event) => {
+  void handle(event.data).catch(reportToMonitoring)
+})`,
+  cache: `import { workerComputed } from '@migaia/store-worker'
+import { ResourceStatus } from '@migaia/resource'
+
+const total = workerComputed<number[], number>(adapter, () => cartPrices.value, {
+  runtime,
+  scheduler: applicationClock,
+  debugName: 'cart-total',
+  ttl: 10_000,
+  staleWhileRevalidate: true
+})
+runtime.effect(() => {
+  const state = total.state
+  if (state.status === ResourceStatus.success)
+    renderTotal(state.data, { updating: state.refreshing ?? false })
+})`,
+  lazy: `import { workerComputed } from '@migaia/store-worker'
+
+const total = workerComputed<number[], number>(adapter, readCartPrices, { autoStart: false })
+summaryPanel.addEventListener('toggle', () => {
+  if (summaryPanel.open) void total.promise.then(renderTotal)
+})`,
+  snapshot: `import { workerComputed } from '@migaia/store-worker'
+
+const total = workerComputed<number[], number>(adapter, readCartPrices, {
+  initialSnapshot: serverTotalSnapshot
+})
+renderTotal(await total.promise)`,
+  retry: `import { workerComputed } from '@migaia/store-worker'
+
+const total = workerComputed<number[], number>(adapter, readCartPrices, {
+  retry: 2,
+  retryDelay: (failureCount) => 500 * failureCount
+})
+renderTotal(await total.promise)`,
+  prefetch: `import { workerComputed } from '@migaia/store-worker'
+
+const nextPage = runtime.signal(2)
+const summary = workerComputed<number[], number>(adapter, () => pagePrices(nextPage.value), {
+  runtime,
+  keepAlive: true
+})
+nextPage.value = 3`,
+  transfer: `import { workerComputed } from '@migaia/store-worker'
+
+const bytes = await readUploadBytes(file)
+const checksum = workerComputed<Uint8Array, number>(adapter, () => bytes, {
+  transfer: (input) => [input.buffer]
+})
+showChecksum(await checksum.promise)`,
+  copyParser: `import { workerParser } from '@migaia/store-worker/serialize/worker'
+
+const parser = workerParser({
+  worker: jsonWorker,
+  type: 'json',
+  clientId: 'main',
+  ownership: 'copy',
+  terminateOnDispose: false
+})
+const bytes = await readUploadBytes(file)
+const value = await parser.decode(['bytes', bytes], {
+  signal: importLifetime.signal,
+  context: 'cart-import'
+})
+renderImportedCart(value)
+await saveOriginalUpload(bytes)
+await parser.dispose?.()`,
+  transferPlugin: `import { createSerializeRegistry } from '@migaia/serialize'
+import { workerPlugin } from '@migaia/store-worker/serialize/worker'
+
+const registry = createSerializeRegistry([workerPlugin({
+  worker: jsonWorker,
+  type: 'json',
+  clientId: 'main',
+  ownership: 'transfer',
+  terminateOnDispose: true
+})])
+const bytes = await readUploadBytes(file)
+const value = await registry.decode(['bytes', bytes], {
+  signal: importLifetime.signal,
+  context: 'cart-import'
+})
+renderImportedCart(value)
+await registry.dispose()`
+}
+
+/** Each option case explains one visible application outcome. */
+export const storeWorkerOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  client: [
+    {
+      title: t('Calculate the cart before checkout continues', '结账继续前算出购物车合计'),
+      problem: t(
+        'A checkout page needs a total from its existing worker before enabling payment. Use the matching main identity and a one-second request deadline so a missing reply does not leave payment waiting forever.',
+        '结账页需要从已有工作线程取得合计，才能启用支付。使用匹配的main身份并设置一秒请求期限，回复丢失时便不会让支付一直等待。'
+      ),
+      example: storeWorkerOptionExamples.client,
+      result: t(
+        'The cart total appears before payment continues; a missing response reaches the request error path after the configured deadline.',
+        '支付继续前显示购物车合计；回复未到达时，请求会在设置的期限后进入错误处理。'
+      ),
+      covers: ['clientId', 'timeoutMs']
+    },
+    {
+      title: t('Offer another calculation after a slow reply', '回复过慢时提供重新计算入口'),
+      problem: t(
+        'A pricing worker may be busy while the customer edits a cart. The page should regain control instead of waiting indefinitely. Bound the client wait and offer a recalculation control when it fails; this does not forcibly stop work in the worker.',
+        '客户编辑购物车时，计价工作线程可能正忙。页面应恢复操作，而不是无限等待。限制客户端等待，并在失败时提供重新计算入口；这不会强行停止工作线程中的计算。'
+      ),
+      example: storeWorkerOptionExamples.timeout,
+      result: t(
+        'A timely total is displayed. Otherwise the page shows a recalculation control while the application retains ownership of the worker.',
+        '及时返回的合计正常显示，否则页面显示重新计算入口，工作线程仍由应用拥有。'
+      ),
+      covers: ['timeoutMs']
+    }
+  ],
+  computed: [
+    {
+      title: t('Keep the previous total visible during refresh', '刷新期间保留上次合计'),
+      problem: t(
+        'A cart summary can reuse a recent calculation, but it should refresh after ten seconds. Switching to an empty loading view makes the total flash. Keep the successful value during refresh and show a small updating indicator on the same application clock.',
+        '购物车摘要可以复用近期计算，但十秒后需要刷新。切到空的等待界面会让合计闪烁；刷新期间保留成功值，并按应用统一时钟显示小型更新提示。'
+      ),
+      example: storeWorkerOptionExamples.cache,
+      result: t(
+        'The summary keeps its previous total while a stale read starts a new calculation, then replaces it when the new total arrives.',
+        '过期读取启动新计算时，摘要继续显示上次合计；新合计返回后再替换。'
+      ),
+      covers: ['runtime', 'scheduler', 'debugName', 'ttl', 'staleWhileRevalidate']
+    },
+    {
+      title: t('Restore a server-computed total', '恢复服务端已经算好的合计'),
+      problem: t(
+        'The server already calculated the cart summary. Starting another worker request on hydration repeats the same work and can show a loading state over correct content. Supply its fresh snapshot to begin with the existing result.',
+        '服务端已经算好购物车摘要。页面恢复时再请求工作线程会重复计算，还可能在正确内容上显示等待状态。传入仍新鲜的快照，直接使用现有结果。'
+      ),
+      example: storeWorkerOptionExamples.snapshot,
+      result: t(
+        'The cart shows the restored total immediately; worker calculation resumes when the snapshot becomes stale or its dependencies change.',
+        '购物车直接显示恢复的合计，快照过期或依赖变化后才重新计算。'
+      ),
+      covers: ['initialSnapshot']
+    },
+    {
+      title: t('Retry a transient pricing failure', '重试短暂的计价失败'),
+      problem: t(
+        'A pricing worker can briefly fail while its supporting data is refreshed. Without retries, the cart summary immediately enters its error view. Allow two extra attempts with increasing waits so short failures can recover without rapid repeated requests.',
+        '计价工作线程更新依赖数据时可能短暂失败。不重试时，购物车摘要会立即显示错误。允许额外尝试两次并逐步增加等待，短暂故障便有机会恢复，也不会连续快速请求。'
+      ),
+      example: storeWorkerOptionExamples.retry,
+      result: t(
+        'The cart continues waiting through the allowed retries and displays the total if a later attempt succeeds.',
+        '允许的重试期间购物车继续等待，后续尝试成功后显示合计。'
+      ),
+      covers: ['retry', 'retryDelay']
+    },
+    {
+      title: t('Prepare the next page summary in the background', '在后台准备下一页摘要'),
+      problem: t(
+        'A report pager wants its next summary ready before the user opens the summary panel. With no observer, default dependency suspension can postpone recalculation until that opening. Keep the input connected so changing the next-page number starts the background work.',
+        '报表分页器希望用户打开摘要面板前，下一页摘要已经准备好。没有观察者时，默认依赖挂起可能把计算推迟到面板打开。保持输入连接，下一页页码变化时便开始后台工作。'
+      ),
+      example: storeWorkerOptionExamples.prefetch,
+      result: t(
+        'Changing the page number starts the next summary calculation while the panel is still closed.',
+        '面板尚未打开时，页码变化便会启动下一页摘要计算。'
+      ),
+      covers: ['keepAlive', 'runtime']
+    },
+    {
+      title: t('Give disposable upload bytes to the worker', '把不再需要的上传字节交给工作线程'),
+      problem: t(
+        'An upload page needs a checksum and will not use its input buffer again. Select that buffer for native transfer instead of retaining ownership. Every alias may detach when the request is sent, so use this only for disposable input.',
+        '上传页需要校验值，之后不会再使用输入缓冲区。选择该缓冲区进行原生转移，并放弃原有所有权。请求发送时所有别名都可能分离，因此只用于可放弃的输入。'
+      ),
+      example: storeWorkerOptionExamples.transfer,
+      result: t(
+        'The checksum appears on the upload page. The original input buffer is no longer available for another operation after transfer.',
+        '上传页显示校验值，转移后的原始输入缓冲区不能再供其他操作使用。'
+      ),
+      covers: ['transfer']
+    },
+    {
+      title: t('Calculate only when the summary panel opens', '摘要面板展开时才计算'),
+      problem: t(
+        'Most visitors never open the optional cart summary. Starting its worker request on every visit wastes work. Leave it idle and request its Promise only when the panel is opened.',
+        '大多数访问者不会打开可选的购物车摘要。每次访问都请求工作线程会浪费计算。让资源保持空闲，只在面板展开时读取它的Promise。'
+      ),
+      example: storeWorkerOptionExamples.lazy,
+      result: t(
+        'Closed panels issue no initial calculation; opening the panel starts work and then displays its total.',
+        '未展开的面板不会发起初始计算；展开后开始计算，再显示合计。'
+      ),
+      covers: ['autoStart']
+    }
+  ],
+  serializer: [
+    {
+      title: t('Keep an uploaded file for validation and archiving', '保留上传文件供校验与归档'),
+      problem: t(
+        'A cart importer decodes an uploaded JSON file and also archives the original bytes. Copy ownership preserves that input. Its JSON worker is shared with other imports, so disposing this parser must release only the borrowed endpoint.',
+        '购物车导入器需要解码JSON文件，还要归档原始字节。复制策略保留这些输入。JSON工作线程还供其他导入使用，因此释放解析器时只能结束借用的端点。'
+      ),
+      example: storeWorkerOptionExamples.copyParser,
+      result: t(
+        'The imported cart is shown and the original upload can still be archived. Parser cleanup leaves the shared worker available.',
+        '导入后的购物车正常显示，原始上传仍可归档，解析器清理后共享工作线程继续可用。'
+      ),
+      covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
+    },
+    {
+      title: t(
+        'Consume a one-off import and retire its worker',
+        '完成一次性导入后关闭专用工作线程'
+      ),
+      problem: t(
+        'A one-off cart import owns a dedicated JSON worker and does not need the uploaded buffer again. Transfer the complete input view and make registry disposal terminate that worker so the import owns its entire lifetime.',
+        '一次性购物车导入拥有专用JSON工作线程，也不再需要上传缓冲区。转移完整输入视图，并让注册表释放时终止工作线程，导入流程便拥有完整生命周期。'
+      ),
+      example: storeWorkerOptionExamples.transferPlugin,
+      result: t(
+        'The imported cart appears, the consumed input bytes detach, and registry disposal requests termination of the dedicated worker.',
+        '导入后的购物车显示出来，已消耗的输入字节分离，注册表释放时请求终止专用工作线程。'
+      ),
+      covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
+    }
+  ]
+}
 
 /** Complete native Node Worker examples shared with both usage guides. */
 export const storeWorkerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {

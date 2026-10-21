@@ -10,6 +10,7 @@ import type {
   IGrantDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   IText,
   ITypeDoc
 } from './contract.js'
@@ -757,6 +758,484 @@ const nested = (
   fields: Readonly<Record<string, IMemberDoc>>,
   keys: readonly string[]
 ) => Object.fromEntries(keys.map((key) => [`${prefix}.${key}`, fields[key] as IMemberDoc]))
+
+/** Application logging scenarios; execution setup belongs to the application. */
+const loggerPluginOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  ILevelPluginConfig: [
+    {
+      title: t('Keep actionable checkout events', '保留结算服务需要处理的日志'),
+      problem: t(
+        'A checkout service produces noisy debug messages and health checks. A warn threshold keeps operational failures; a filter also drops health checks with custom tags.',
+        '结算服务会产生大量调试消息与健康检查。warn 门槛保留需要处理的失败，过滤器再移除使用自定义标签的健康检查。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { level } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [level({ level: 'warn', filters: [(entry) => !entry.context.includes('health')] })]
+})
+log.useSink(sendToSupportPanel)
+log.debug('Connection opened')
+log.warn('Payment retry scheduled')
+log.dispatchRaw({ tag: 'audit', message: 'Health check', context: ['health'] })
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The support panel receives the payment warning and order audit, without debug or health-check noise.',
+        '支持面板收到支付警告和订单审计，不再混入调试消息与健康检查。'
+      ),
+      covers: ['level', 'filters']
+    },
+    {
+      title: t('Defer logs from an input handler', '延后输入回调中的日志输出'),
+      problem: t(
+        'A document editor should finish its input handler before running log sinks. asyncOutput schedules the level-method dispatch through the application runtime manager.',
+        '文档编辑器需要先完成输入回调，再运行日志输出端。asyncOutput 通过应用运行时管理器安排级别方法的分发。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { level } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [level({ asyncOutput: true })]
+})
+log.useSink(sendToSupportPanel)
+onDocumentChanged(() => {
+  log.info('Document changed')
+  renderUnsavedMarker()
+})
+onEditorClosed(() => log.shutdown('manual'))`,
+      result: t(
+        'The input handler returns before its log is dispatched to the support panel.',
+        '输入回调先返回，日志随后再分发给支持面板。'
+      ),
+      covers: ['asyncOutput']
+    }
+  ],
+  IColorPluginConfig: [
+    {
+      title: t('Write plain audit lines to a terminal', '在终端输出不带色码的审计文本'),
+      problem: t(
+        'An operator copies audit lines into a ticket. Explicit pretty output keeps them readable, while color: never avoids terminal escape sequences in the copied text.',
+        '操作人员需要把审计日志复制到工单。显式 pretty 格式保留可读文本，color: never 避免复制时带入终端控制序列。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { color } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [color({ format: 'pretty', color: 'never' })]
+})
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The terminal shows a readable audit line without built-in ANSI colors.',
+        '终端显示可读的审计文本，不带内置 ANSI 色码。'
+      ),
+      covers: ['format', 'color']
+    },
+    {
+      title: t('Highlight audit actions in a compact console', '在紧凑控制台突出审计操作'),
+      problem: t(
+        'An audit console already shows time beside each row. Hide the repeated timestamp and use the application paint function for the custom audit tag and message head.',
+        '审计控制台已经在每行旁显示时间。关闭重复时间戳，并用应用的染色函数处理自定义审计标签与消息开头。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { color } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [color({
+    format: 'pretty',
+    timestamp: false,
+    colorMessage: 'head',
+    colorMap: { audit: highlightAudit }
+  })]
+})
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The console uses the application audit style without adding a second timestamp.',
+        '控制台使用应用的审计样式，不再添加第二个时间戳。'
+      ),
+      covers: ['timestamp', 'colorMessage', 'colorMap']
+    }
+  ],
+  IBatchPluginConfig: [
+    {
+      title: t('Send low-volume audit batches promptly', '及时发送低流量审计批次'),
+      problem: t(
+        'A small audit stream should not wait for the default twenty entries or two seconds. The shared batch feature supplies a queue with a smaller size and wait.',
+        '低流量审计不应等待默认二十条或两秒。共享批处理能力提供较小批次与等待时间的队列。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { batch, type IBatchShared } from '@migaia/logger/plugins'
+
+const log = new Logger(applicationLoggerOptions)
+const [handle] = await log.use(batch({ maxSize: 2, maxWaitMs: 100 }))
+const { createBatcher } = handle!.getFeature('batch') as IBatchShared
+const queue = createBatcher<IAuditEvent>({}, sendAuditBatch)
+queue.push({ action: 'opened' })
+queue.push({ action: 'saved' })
+await queue.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The two audit events are delivered together; a partial batch waits at most 100 ms.',
+        '两条审计事件一起交付；未满批次最多等待 100 毫秒。'
+      ),
+      covers: ['maxSize', 'maxWaitMs']
+    },
+    {
+      title: t('Bound delivery to a slow audit sink', '限制慢审计输出端的交付负担'),
+      problem: t(
+        'An audit sink can send two batches at once but should not accumulate an unlimited backlog. Separate bounds limit active and waiting batches; the flush timeout limits shutdown waiting.',
+        '审计输出端可以同时发送两个批次，却不能无限积压。独立上限限制活动与等待批次，排空时限限制关闭等待。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { batch, type IBatchShared } from '@migaia/logger/plugins'
+
+const log = new Logger(applicationLoggerOptions)
+const [handle] = await log.use(batch({
+  maxConcurrentBatches: 2,
+  maxPendingBatches: 8,
+  flushTimeoutMs: 1000,
+  asyncOutput: false
+}))
+const { createBatcher } = handle!.getFeature('batch') as IBatchShared
+const queue = createBatcher<IAuditEvent>({}, sendAuditBatch)
+queue.push({ action: 'saved' })
+await queue.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'Delivery stays within the selected queue limits; a drain timeout does not cancel a running sink.',
+        '交付遵守所选队列上限，排空超时不会取消正在执行的输出端。'
+      ),
+      covers: ['maxConcurrentBatches', 'maxPendingBatches', 'flushTimeoutMs', 'asyncOutput']
+    }
+  ],
+  IHttpPluginConfig: [
+    {
+      title: t('Send authenticated checkout audit batches', '批量发送经过认证的结算审计'),
+      problem: t(
+        'The collector needs the current session token and an application label. Installing a batch provider lets HTTP combine nearby audit entries instead of sending a request for each entry.',
+        '采集器需要当前会话令牌与应用标识。安装批处理提供者后，HTTP 可合并相邻审计条目，不必每条日志发送一次请求。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { batch, http } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [batch(), http({
+    url: logCollectorUrl,
+    authToken: session.logToken,
+    headers: { 'X-App': 'checkout' },
+    batch: { maxSize: 20, maxWaitMs: 500 }
+  })]
+})
+log.log('audit', 'Checkout opened')
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The collector receives checkout audit entries with the bearer token and application header.',
+        '采集器收到结算审计条目，同时收到 Bearer 令牌和应用请求头。'
+      ),
+      covers: ['url', 'authToken', 'headers', 'batch', 'batch.maxSize', 'batch.maxWaitMs']
+    },
+    {
+      title: t('Bound queued collector uploads', '限制采集器上传积压'),
+      problem: t(
+        'A slow collector should not make upload work grow without bounds. Configure the HTTP batch queue separately from its destination and authentication settings.',
+        '采集器变慢时，上传任务不能无限增长。HTTP 批处理队列的限制与目标地址、认证配置分别设置。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { batch, http } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [batch(), http({
+    url: logCollectorUrl,
+    batch: {
+      maxConcurrentBatches: 1,
+      maxPendingBatches: 8,
+      asyncOutput: false
+    }
+  })]
+})
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'Only one upload batch runs at a time and at most eight batches wait for delivery.',
+        '同一时间只运行一个上传批次，最多八个批次等待交付。'
+      ),
+      covers: ['batch.maxConcurrentBatches', 'batch.maxPendingBatches', 'batch.asyncOutput']
+    },
+    {
+      title: t('Limit waits after collector throttling', '限制采集器限流后的等待'),
+      problem: t(
+        'The collector can respond with 429 and Retry-After. Limit extra attempts and the server-requested delay; a per-request timeout asks cooperative fetch implementations to abort slow attempts.',
+        '采集器可能返回 429 与 Retry-After。限制额外尝试次数及服务端要求的等待；单请求时限要求配合信号的 fetch 中止缓慢请求。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { http } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [http({
+    url: logCollectorUrl,
+    retries: 1,
+    requestTimeoutMs: 2000,
+    maxRetryAfterMs: 1000
+  })]
+})
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'A throttled upload gets at most one additional attempt, with Retry-After capped at one second.',
+        '限流上传最多额外尝试一次，Retry-After 等待最多一秒。'
+      ),
+      covers: ['retries', 'requestTimeoutMs', 'maxRetryAfterMs']
+    }
+  ],
+  IProcessPluginConfig: [
+    {
+      title: t('Keep crash logs during service shutdown', '服务关闭期间保留崩溃日志'),
+      problem: t(
+        'A service needs fatal crash entries and five seconds to drain its logs. The process plugin owns the relevant listeners and releases them at logger shutdown.',
+        '服务需要记录致命崩溃，并留五秒排空日志。进程插件持有相关监听器，日志器关闭时释放。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { process } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [process({ captureCrashes: true, shutdownTimeoutMs: 5000 })]
+})
+await runService(log)
+await log.shutdown('manual')`,
+      result: t(
+        'Crashes enter the logger shutdown path; manual shutdown drains output and releases process listeners.',
+        '崩溃进入日志器关闭流程；手动关闭会排空输出并释放进程监听器。'
+      ),
+      covers: ['captureCrashes', 'shutdownTimeoutMs']
+    },
+    {
+      title: t('Drain final CLI output before exit', '退出命令行前排空最终日志'),
+      problem: t(
+        'A CLI can call process.exit while its async sink still holds a final entry. Interception defers the native exit until the logger has attempted to drain.',
+        '命令行可能在异步输出端仍持有最终日志时调用 process.exit。拦截后延后原生退出，先尝试排空日志。'
+      ),
+      example: `import nodeProcess from 'node:process'
+import { Logger } from '@migaia/logger'
+import { process } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [process({ interceptProcessExit: true })]
+})
+log.useSink(writeCommandLog)
+log.log('info', 'Export finished')
+nodeProcess.exit(0)`,
+      result: t(
+        'The final export entry can drain before the native process exits.',
+        '最终导出日志可在原生进程退出前完成排空。'
+      ),
+      covers: ['interceptProcessExit']
+    }
+  ],
+  IReasoningPluginConfig: [
+    {
+      title: t('Label streaming progress and answers', '为流式进度与回答命名'),
+      problem: t(
+        'A terminal assistant needs separate headings for work in progress and its answer. The default answer has no heading; labels supplies both names.',
+        '终端助手需要分别标识处理进度与回答。默认回答没有标题；labels 可为两个阶段命名。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { reasoning } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [reasoning({ labels: { thinking: 'Planning', response: 'Answer' } })]
+})
+log.thinking('Checking document sections')
+log.endThinking()
+log.response('The document is ready')
+log.endResponse()
+await log.shutdown('manual')`,
+      result: t(
+        'The stream shows Planning and Answer headings; completed text also reaches normal sinks.',
+        '流中显示 Planning 和 Answer 标题，完成的文本也会交给普通输出端。'
+      ),
+      covers: ['labels', 'labels.thinking', 'labels.response']
+    },
+    {
+      title: t('Defer streaming writes from the UI callback', '延后界面回调中的流式写入'),
+      problem: t(
+        'A UI callback should finish before writing streaming text. asyncOutput schedules raw chunks and completed entries through the application manager instead of writing inline.',
+        '界面回调需要在写流式文本之前结束。asyncOutput 通过应用管理器安排原始片段与完成条目，而不在调用中直接写入。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { reasoning } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [reasoning({ asyncOutput: true })]
+})
+onAnswerChunk((text) => {
+  log.response(text)
+  updateAnswerProgress()
+})
+onAnswerComplete(() => log.endResponse())
+onAssistantClosed(() => log.shutdown('manual'))`,
+      result: t(
+        'Answer chunks are written after their UI callback, and ending the phase publishes the completed text.',
+        '回答片段在界面回调之后写入，结束阶段会发布完整文本。'
+      ),
+      covers: ['asyncOutput']
+    }
+  ],
+  IUuidPluginConfig: [
+    {
+      title: t('Show a support correlation id', '显示支持排查用的关联编号'),
+      problem: t(
+        'An operator must find the same audit entry in the console and collector. display includes its generated UUID in rendered output, while sinks retain data.uuid.',
+        '操作人员需要在控制台与采集器中找到同一条审计日志。display 将生成的 UUID 加入展示，输出端仍保留 data.uuid。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { color, uuid } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [uuid({ display: true }), color({ format: 'pretty' })]
+})
+log.useSink(sendToCollector)
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The console shows an entry id that support can use to find the collector record.',
+        '控制台显示条目编号，支持人员可据此查找采集器记录。'
+      ),
+      covers: ['display']
+    },
+    {
+      title: t('Keep the terminal compact but retain correlation', '保持终端紧凑并保留关联信息'),
+      problem: t(
+        'The collector still needs ids, but terminal readers do not need one on every line. display: false hides the rendered id without dropping data.uuid.',
+        '采集器仍需要编号，终端读者却不必每行都看到。display: false 隐藏展示编号，同时保留 data.uuid。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { color, uuid } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [uuid({ display: false }), color({ format: 'pretty' })]
+})
+log.useSink(sendToCollector)
+log.log('audit', 'Order saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'Terminal lines omit the display id while collector entries retain their UUID.',
+        '终端文本省略展示编号，采集器条目仍保留 UUID。'
+      ),
+      covers: ['display']
+    }
+  ],
+  IFilePluginConfig: [
+    {
+      title: t('Batch writes to a local audit file', '批量写入本地审计文件'),
+      problem: t(
+        'A desktop application saves audit entries locally. The file plugin can own a small batch queue without a separate shared batch provider.',
+        '桌面应用在本地保存审计条目。文件插件可独立持有小批处理队列，无需额外共享批处理提供者。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { file } from '@migaia/logger/plugins/file'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [file({ path: auditFilePath, batch: { maxSize: 20, maxWaitMs: 500 } })]
+})
+log.log('audit', 'Document opened')
+log.log('audit', 'Document saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'The selected audit file receives the entries in batches, and shutdown drains pending writes.',
+        '所选审计文件成批收到条目，关闭时排空待写内容。'
+      ),
+      covers: ['path', 'batch', 'batch.maxSize', 'batch.maxWaitMs']
+    },
+    {
+      title: t('Bound a slow file writer backlog', '限制慢文件写入器的积压'),
+      problem: t(
+        'A slow disk should not leave unlimited batches waiting. Bound active and queued batches, and limit how long the logger waits for a drain.',
+        '磁盘变慢时，不应让批次无限等待。限制活动与排队批次，并限制日志器等待排空的时间。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { file } from '@migaia/logger/plugins/file'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  plugins: [file({
+    path: auditFilePath,
+    batch: {
+      maxConcurrentBatches: 1,
+      maxPendingBatches: 8,
+      flushTimeoutMs: 1000,
+      asyncOutput: false
+    }
+  })]
+})
+log.log('audit', 'Document saved')
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'Only one batch writes at a time, with at most eight waiting batches and a one-second flush budget.',
+        '同一时间只写一个批次，最多八个批次排队，排空预算为一秒。'
+      ),
+      covers: [
+        'batch.maxConcurrentBatches',
+        'batch.maxPendingBatches',
+        'batch.flushTimeoutMs',
+        'batch.asyncOutput'
+      ]
+    },
+    {
+      title: t('Rotate after a large batch', '大批次写入后轮转文件'),
+      problem: t(
+        'The application already supplies fileRuntimeManager.fs.rotate. Rotation compares the current batch size, not cumulative file size, so choose limits for the batches being appended.',
+        '应用已经提供 fileRuntimeManager.fs.rotate。轮转比较当前批次大小，而非累计文件大小，因此应按追加批次选择上限。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { file } from '@migaia/logger/plugins/file'
+
+const log = new Logger({
+  ...applicationLoggerOptions,
+  runtimeManager: fileRuntimeManager,
+  plugins: [file({
+    path: auditFilePath,
+    batch: { maxSize: 100 },
+    rotate: { maxBytes: 1_000_000, maxEntries: 100 }
+  })]
+})
+await writeAuditEntries(log)
+await log.flush()
+await log.shutdown('manual')`,
+      result: t(
+        'A batch meeting either threshold is appended and then passed to the application rotation capability.',
+        '批次达到任一上限时先追加，再调用应用提供的轮转能力。'
+      ),
+      covers: ['rotate', 'rotate.maxBytes', 'rotate.maxEntries']
+    }
+  ]
+}
 
 /** Reference of `@migaia/logger`. */
 export const loggerReference: ILibraryReference = {
@@ -1717,6 +2196,7 @@ console.log(storedRetries ?? 2)`
       '`batch()` 通过 Feature 提供的 `createBatcher(config, onBatch)` 工厂函数的类型。'
     ),
     ILevelPluginConfig: {
+      optionCases: loggerPluginOptionCases.ILevelPluginConfig!,
       summary: t(
         'Options of `level()`: minimum level, filters and output scheduling.',
         '`level()` 插件的选项：最低级别、过滤器与输出方式。'
@@ -1730,6 +2210,11 @@ console.log(storedRetries ?? 2)`
       example: `level({ level: 'warn', filters: [(entry) => !entry.context.includes('health')] })`,
       members: {
         level: {
+          whenToUse: t(
+            'Use warn for a production service and debug while diagnosing it. The ordered thresholds are debug, info, warn, error and fatal; each keeps that level and higher standard levels. Omission selects debug. Custom tags still pass through filters.',
+            '生产服务可选 warn，排查问题时选 debug。门槛从低到高为 debug、info、warn、error、fatal；每个值保留本级及更高标准级别。省略时采用 debug，自定义标签仍经过过滤器。'
+          ),
+          example: loggerPluginOptionCases.ILevelPluginConfig![0]!.example,
           summary: t(
             'Minimum standard level; lower standard levels are dropped. Other tags bypass only the threshold and still pass through every filter. Captured at installation; change behavior with setLevel, not config.update alone.',
             '最低标准级别，更低标准级别会被丢弃；其他标签仅跳过门槛，仍经过所有过滤函数。安装时捕获此值，改变行为使用 `setLevel`，不能只提交 `config.update`。'
@@ -1780,6 +2265,7 @@ remove()`,
       members: membersOf(levelMembers)
     },
     IColorPluginConfig: {
+      optionCases: loggerPluginOptionCases.IColorPluginConfig!,
       summary: t(
         'Options of `color()`: colors, format, timestamp and highlighted parts.',
         '`color()` 插件的选项：颜色、格式、时间戳与染色范围。'
@@ -1793,11 +2279,21 @@ remove()`,
       example: `color({ color: 'auto', format: 'auto', timestamp: false, colorMessage: 'head' })`,
       members: {
         color: {
+          whenToUse: t(
+            'Use never when the output consumer cannot display ANSI sequences, or always when it can but lacks terminal detection. auto, the default, checks NO_COLOR, FORCE_COLOR, terminal status and CI. Custom colorMap functions still control their own output.',
+            '输出端不能显示 ANSI 序列时选 never；能显示但不能检测终端时选 always。默认 auto 依次检查 NO_COLOR、FORCE_COLOR、终端状态和持续集成环境。自定义 colorMap 函数仍控制自己的输出。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![0]!.example,
           summary: t('Whether ANSI colors are used.', '控制台输出是否使用 ANSI 颜色。'),
           default: t('`auto`.', '`auto`：根据环境自动决定。'),
           values: { enum: 'LoggerColorMode' }
         },
         format: {
+          whenToUse: t(
+            'Use json for a collector and pretty for a person reading the console. Default auto uses LOG_FORMAT when it is pretty or json; otherwise it chooses pretty in a terminal or CI and json elsewhere.',
+            '日志采集器选 json，人工查看控制台选 pretty。默认 auto 会采用值为 pretty 或 json 的 LOG_FORMAT；否则在终端或持续集成环境选 pretty，其余环境选 json。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![0]!.example,
           summary: t('Output format of each entry.', '每条日志在控制台中的输出格式。'),
           default: t('`auto`.', '`auto`：根据环境自动选择。'),
           values: {
@@ -1820,6 +2316,11 @@ remove()`,
           default: t('`true`.', '`true`：显示时间戳。')
         },
         colorMessage: {
+          whenToUse: t(
+            'Choose head to paint the message, tail for the last argument or an argument-free message, head-tail for both, or all for the message and primitive arguments. none, the default, paints only the tag. Objects and errors keep their native values.',
+            'head 为消息上色；tail 为最后一个参数上色，没有参数时处理消息；head-tail 同时处理两者；all 处理消息和原始类型参数。默认 none 只处理标签。对象和错误保留原生值。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![1]!.example,
           summary: t(
             'Which part of the message and arguments is colored like the tag.',
             '消息与参数中哪一部分按标签颜色上色。'
@@ -1843,6 +2344,11 @@ remove()`,
           }
         },
         colorMap: {
+          whenToUse: t(
+            'Supply a tag-to-function map when custom audit or domain tags need distinctive output. Each function receives text and returns its painted form. Omission retains built-in colors for five standard levels; unmapped custom tags remain unchanged.',
+            '自定义审计或业务标签需要不同显示方式时，提供从标签到函数的映射。每个函数接收文本，返回处理后的文本。省略时只保留五个标准级别的内置颜色，未映射的自定义标签保持原样。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![1]!.example,
           summary: t(
             'Paint function per tag, for custom tags such as `audit`; unknown tags stay uncolored.',
             '按标签指定染色函数，用于 `audit` 等自定义标签；未映射的标签不上色。'
@@ -1852,6 +2358,7 @@ remove()`,
       }
     },
     IBatchPluginConfig: {
+      optionCases: loggerPluginOptionCases.IBatchPluginConfig!,
       summary: t(
         'Options of `batch()` and of the `batch` field of `http()` and `file()`.',
         '`batch()` 以及 `http()`、`file()` 中 `batch` 字段的攒批选项。'
@@ -1945,6 +2452,7 @@ await batcher.flush()`,
       }
     },
     IHttpPluginConfig: {
+      optionCases: loggerPluginOptionCases.IHttpPluginConfig!,
       summary: t(
         'Options of `http()`: endpoint, auth, retries, timeout and batching.',
         '`http()` 插件的选项：目标地址、认证、重试、超时与攒批。'
@@ -1996,7 +2504,10 @@ await batcher.flush()`,
             'Upload queue settings. An earlier or same-batch Feature provider supplies shared batching regardless of input order. Without a provider, this option still creates a bounded local queue forced to maxSize:1 and asyncOutput:false; other queue bounds apply.',
             '本次上传队列设置；已安装或同批的功能提供者按依赖绑定，不受输入顺序限制。没有提供者时此选项仍创建本地有界队列，强制单条大小及同步输出，其余队列边界仍适用。'
           ),
-          default: t('Not set: the `batch()` defaults.', '不设置：使用 `batch()` 的默认设置。')
+          default: t(
+            'With a shared batch provider: its defaults. Without one: direct per-entry delivery.',
+            '有共享批处理提供者时使用其默认设置；没有时逐条直送。'
+          )
         },
         ...nested('batch', batchFields, [
           'maxSize',
@@ -2015,6 +2526,7 @@ await batcher.flush()`,
       }
     },
     IProcessPluginConfig: {
+      optionCases: loggerPluginOptionCases.IProcessPluginConfig!,
       summary: t(
         'Options of `process()`: crash capture, shutdown timeout and exit interception.',
         '`process()` 插件的选项：崩溃捕获、关闭超时与退出拦截。'
@@ -2051,6 +2563,7 @@ await batcher.flush()`,
       }
     },
     IReasoningPluginConfig: {
+      optionCases: loggerPluginOptionCases.IReasoningPluginConfig!,
       summary: t('Options of `reasoning()`.', '`reasoning()` 插件的选项：段落标签与输出方式。'),
       scenarios: [
         t(
@@ -2103,6 +2616,7 @@ log.endResponse()`,
       members: membersOf(reasoningMembers)
     },
     IUuidPluginConfig: {
+      optionCases: loggerPluginOptionCases.IUuidPluginConfig!,
       summary: t(
         'Options of `uuid()`: whether the UUID is shown in output.',
         '`uuid()` 插件的选项：是否在输出中显示 UUID。'
@@ -2125,6 +2639,7 @@ log.endResponse()`,
       }
     },
     IFilePluginConfig: {
+      optionCases: loggerPluginOptionCases.IFilePluginConfig!,
       summary: t(
         'Options of `file()`: file path, batching and rotation.',
         '`file()` 插件的选项：文件路径、攒批与轮转。'

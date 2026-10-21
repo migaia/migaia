@@ -10,7 +10,14 @@
  * Uint8Array-only carrier rejects the default unknown-output framer and the native binary framer's
  * carrier-or-fragment output. Its example stays raw I/O.
  */
-import type { ICode, IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type {
+  ICode,
+  IEnhancerDoc,
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  IText
+} from './contract.js'
 import { runtimePeerOptionMembers } from './rpc-runtime-shared.js'
 import { rpcBrowserCases } from './rpc-browser-cases.js'
 
@@ -655,9 +662,69 @@ const rtcChannelMembers: Readonly<Record<string, IMemberDoc>> = {
   )
 }
 
-/** Browser source fields are shown beside the common Peer options without adding source openers. */
+/** The application supplies the endpoint assembly while Browser retains channel ownership. */
+const endpointFactoryOptionExample = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const prices = await createBrowserPeer({
+  connect: { sharedWorker: priceWorker },
+  self: { name: 'price-page', instanceId: 'instrumented-prices' },
+  endpointFactory: (channel, signal) => openInstrumentedEndpoint(channel, signal)
+})
+renderPrices(await prices.request('prices'))`
+
+/** Notification failures go to the application's monitoring service. */
+const reportOptionExample = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const service = await createBrowserPeer({
+  listen: workerScope,
+  provide: { refreshPrices: () => refreshPrices() },
+  report: (error) => reportToMonitoring(error)
+})`
+
+/** Inherited proxy options stay visible without suggesting retries for direct Peer calls. */
+const proxyHooksExample = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const billing = await createBrowserPeer({
+  connect: { sharedWorker: billingWorker },
+  keyFactory: () => crypto.randomUUID(),
+  retryPort: proxyRetryPort
+})
+const receipt = await billing.request('billing.checkout.submit', cart, {
+  idempotencyKey: checkoutId
+})
+renderReceipt(receipt)`
+
+/** Options of the Peer factory; callbacks retain their own behavior examples. */
 const browserPeerOptions: Readonly<Record<string, IMemberDoc>> = {
   ...runtimePeerOptionMembers,
+  endpointFactory: {
+    ...runtimePeerOptionMembers.endpointFactory!,
+    whenToUse: t(
+      'Use this advanced hook only when the application assembles an endpoint for the acquired channel. Omitting it keeps Core assembly. A thrown error or rejected Promise stops opening and releases the acquired setup.',
+      '仅当应用需要为已取得的通道组装端点时，使用这个高级回调。省略时由 Core 组装。同步抛错或 Promise 拒绝会停止打开并释放准备阶段取得的资源。'
+    ),
+    example: endpointFactoryOptionExample
+  },
+  report: {
+    ...runtimePeerOptionMembers.report!,
+    whenToUse: t(
+      'Set a reporter when notifications or listener work can fail without a waiting caller. It receives those failures without changing ordinary request results. Omitting it uses the default console reporter.',
+      '通知或监听工作可能失败、却没有等待结果的调用方时，设置报告回调。它接收这些失败，不改变普通请求的结果。省略时使用默认控制台报告函数。'
+    ),
+    example: reportOptionExample
+  },
+  keyFactory: {
+    ...runtimePeerOptionMembers.keyFactory!,
+    whenToUse: t(
+      'This inherited hook belongs to advanced remote-proxy retry paths. Direct Browser Peer requests do not call it or generate an idempotency key from it. Omission leaves those direct calls unchanged; use explicit call options when a direct request needs a key.',
+      '这个继承选项用于高级远程代理的重试路径。直接 Browser Peer 请求不会调用它，也不会用它生成幂等键。省略不影响直接请求；直接请求需要键时，应显式传入调用选项。'
+    ),
+    example: proxyHooksExample
+  },
+  retryPort: {
+    ...runtimePeerOptionMembers.retryPort!,
+    example: proxyHooksExample
+  },
   self: {
     ...runtimePeerOptionMembers.self!,
     default: t(
@@ -761,6 +828,148 @@ const browserPeerOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
+
+/** Reader scenarios use application-owned browser objects rather than transport fixtures. */
+const browserPeerOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Let the editor worker ask for the current document', '让编辑器工作线程读取当前文档'),
+    problem: t(
+      'A shared editor worker needs the active document from each page. Without a local method it cannot ask the page for that document. Publish the method and give each tab a distinct diagnostic identity so support can locate the tab involved.',
+      '共享编辑器工作线程需要向各页面读取当前文档。不提供本端方法时，它无法向页面查询。发布读取方法，并给每个标签页不同的诊断身份，方便排查问题时定位相关页面。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const editor = await createBrowserPeer({
+  connect: { sharedWorker: editorWorker },
+  self: { name: 'document-editor', instanceId: tabId },
+  provide: { currentDocument: () => readCurrentDocument() }
+})
+renderPreview(await editor.request('preview'))`,
+    result: t(
+      'The worker can read the active document and return its preview; diagnostics identify the originating editor tab.',
+      '工作线程可以读取当前文档并返回预览，诊断信息能指出发起调用的编辑器标签页。'
+    ),
+    covers: ['connect', 'self', 'provide']
+  },
+  {
+    title: t('Keep image exports within the worker budget', '让图片导出受工作线程预算约束'),
+    problem: t(
+      'An image worker cannot run many memory-heavy exports at once. The default quotas allow more work than this application can afford. A lower provider limit rejects excess work, while the page uses a shorter request deadline to keep its export control responsive.',
+      '图片工作线程无法同时执行很多占用内存的导出任务，默认配额高于应用可承受的数量。降低提供方上限可拒绝多余任务，页面则设置较短的请求期限，避免导出按钮一直等待。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const service = await createBrowserPeer({
+  listen: workerScope,
+  providerLimits: { maxGlobal: 2, maxPerPeer: 1 },
+  provide: { exportImage: (input: IExportInput) => exportImage(input) }
+})
+const exporter = await createBrowserPeer({
+  connect: { sharedWorker: imageWorker },
+  defaultTimeoutMs: 5000
+})
+try {
+  showDownload(await exporter.request('exportImage', selection))
+} catch (error) {
+  showExportError(error)
+}`,
+    result: t(
+      'Each page has at most one accepted export, with two exports across the worker. A slow request returns control to the page after its deadline.',
+      '每个页面最多接纳一个导出，整个工作线程最多同时接纳两个。请求过慢时，页面在期限结束后恢复操作。'
+    ),
+    covers: ['providerLimits', 'defaultTimeoutMs']
+  },
+  {
+    title: t('Declare a checkout method that accepts a replay key', '声明支持重放键的结账方法'),
+    problem: t(
+      'A checkout page may send the same operation again after a lost reply. Its worker needs an explicit method contract before it can use the key to recognize the repeated operation. Without the declaration, a supplied key does not establish that replay policy.',
+      '结账页面在回复丢失后可能再次发送同一次操作。工作线程需要显式方法契约，才能用键识别重复操作；只在调用时提供键，不能代替该重放策略声明。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const service = await createBrowserPeer({
+  listen: workerScope,
+  contract: {
+    schemaVersion: 1,
+    plugin: 'billing',
+    features: {
+      checkout: { methods: { submit: { mode: 'request', idempotent: true } } }
+    }
+  },
+  provide: { billing: { checkout: { submit: (cart: ICart) => submitOrder(cart) } } }
+})`,
+    result: t(
+      'The worker publishes checkout.submit with a declared request mode and keyed replay policy for callers retrying the same checkout.',
+      '工作线程以请求模式发布结账方法，并为重试同一次结账的调用方声明按键重放策略。'
+    ),
+    covers: ['contract']
+  },
+  {
+    title: t('Show RPC activity in a support panel', '在支持面板显示 RPC 活动'),
+    problem: t(
+      'Support staff need to see which preview call is taking time without collecting document contents. With no probe the panel receives no events. A message-stage probe sends method metadata to the panel while the preview still renders normally.',
+      '支持人员需要知道哪个预览调用耗时，却不应收集文档内容。不设置探针时面板收不到事件；消息阶段探针把方法元数据交给面板，预览仍按正常路径显示。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+import { defineProbe } from '@migaia/rpc-core/probe'
+
+const editor = await createBrowserPeer({
+  connect: { sharedWorker: editorWorker },
+  probe: defineProbe({
+    stages: ['message'],
+    emit: (view) => showRpcActivity(view.method)
+  })
+})
+renderPreview(await editor.request('preview'))`,
+    result: t(
+      'The preview appears in the editor and its method activity appears in the support panel without reading the document payload.',
+      '编辑器显示预览，支持面板显示方法活动，无需读取文档载荷。'
+    ),
+    covers: ['probe']
+  },
+  {
+    title: t('Stop a shared service when its owner shuts down', '所属服务关闭时停止接纳页面'),
+    problem: t(
+      'An application starts a SharedWorker listener as part of a larger service. Closing that service must also stop new page connections. Pass its abort signal so the listener and its accepted logical peers end together; native page ports remain caller-owned.',
+      '应用把 SharedWorker 监听作为较大服务的一部分启动。服务关闭后不应继续接纳页面；传入所属服务的中止信号，监听与已接纳的逻辑连接便会一起结束，原生页面端口仍由调用方拥有。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const service = await createBrowserPeer({
+  listen: workerScope,
+  signal: serviceLifetime.signal,
+  provide: { prices: () => readPrices() }
+})
+onServiceShutdown(async () => {
+  serviceLifetime.abort()
+  await service.close()
+})`,
+    result: t(
+      'Service shutdown stops accepting pages and releases existing logical sessions, so the retired service handles no further price calls.',
+      '所属服务关闭时停止接纳页面并释放现有逻辑会话，退役服务不再处理价格查询。'
+    ),
+    covers: ['listen', 'signal']
+  },
+  {
+    title: t('Protect frames on a shared billing channel', '保护共享账单通道中的消息'),
+    problem: t(
+      'A billing deployment already has matching signing and verification functions on both ends. Without authentication, the Peer adds no frame protection. Supply both functions on each side so unsigned or altered frames cannot enter the application endpoint.',
+      '账单服务部署已为两端准备匹配的签名与校验函数。不设置认证时，对端不会增加消息保护；两端都提供这两个函数后，未签名或被修改的消息便不能进入应用端点。'
+    ),
+    example: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+const billing = await createBrowserPeer({
+  connect: { sharedWorker: billingWorker },
+  authentication: { sign: signBillingFrame, verify: verifyBillingFrame }
+})
+renderReceipt(await billing.request('receipt', orderId))`,
+    result: t(
+      'The receipt is shown through the authenticated channel; both ends use the deployment’s matching frame protection functions.',
+      '收据通过认证通道显示，两端使用部署时配好的匹配消息保护函数。'
+    ),
+    covers: ['authentication']
+  }
+]
 
 /** Native Node ports exercise the structural carrier boundary without claiming browser realms. */
 const nativePortIntro = t(
@@ -1002,6 +1211,7 @@ export const rpcBrowserReference: ILibraryReference = {
   },
   types: {
     IRuntimeBrowserPeerOptions: {
+      optionCases: browserPeerOptionCases,
       example: peerExample,
       summary: t(
         'Options of `createBrowserPeer()`: the browser source plus the Core Peer options.',
@@ -1009,6 +1219,10 @@ export const rpcBrowserReference: ILibraryReference = {
       ),
       members: {
         ...runtimePeerOptionMembers,
+        endpointFactory: browserPeerOptions.endpointFactory!,
+        report: browserPeerOptions.report!,
+        keyFactory: browserPeerOptions.keyFactory!,
+        retryPort: browserPeerOptions.retryPort!,
         self: browserPeerOptions.self!,
         provide: browserPeerOptions.provide!,
         defaultTimeoutMs: browserPeerOptions.defaultTimeoutMs!,
@@ -1168,6 +1382,57 @@ export const rpcBrowserReference: ILibraryReference = {
       members: {}
     },
     IWindowMessageTransportOptions: {
+      optionCases: [
+        {
+          title: t('Address a known popup origin', '向已知来源域的弹窗发送消息'),
+          problem: t(
+            'The application already owns a popup and its inbound `window` receiver. Supplying the target and origin makes outgoing delivery explicit; outside a Window-like global, the receiver cannot be inferred. Raw subscriptions preserve source metadata, while endpoint admission uses `sourceProof`.',
+            '应用已持有弹窗及接收消息的 `window`。显式指定目标与来源域，就能确定消息发往何处；不在类 Window 全局环境中时，接收者也必须提供。原始订阅保留来源元数据，端点接纳则使用 `sourceProof`。'
+          ),
+          example: `import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+
+const transport = createWindowMessageTransport({
+  target: popupWindow,
+  receiver: window,
+  targetOrigin: 'https://reports.example'
+})
+const stop = transport.subscribe((message) => {
+  if (transport.sourceProof?.(message.source, message.origin)) renderReport(message.data)
+})
+refreshButton.onclick = () => transport.send({ operation: 'refresh' })
+onReportClosed(stop)`,
+          result: t(
+            'Clicking refresh sends the report request only to the configured origin; incoming report data updates the report view.',
+            '点击刷新时，报告请求只发往指定来源域；收到的报告数据用于更新视图。'
+          ),
+          covers: ['target', 'receiver', 'targetOrigin']
+        },
+        {
+          title: t(
+            'Explicitly allow an unknown destination origin',
+            '显式允许尚未确定的目标来源域'
+          ),
+          problem: t(
+            'A caller-owned window can change origin while retaining its native identity. A wildcard is rejected by default. `allowUnsafeTargetOrigin: true` permits that wildcard and relaxes only the origin check; another window still fails the source check.',
+            '调用方拥有的窗口可能改变来源域，但保持原生窗口身份。默认会拒绝通配来源域。`allowUnsafeTargetOrigin: true` 允许通配符，只放宽来源域检查；其他窗口仍无法通过来源身份检查。'
+          ),
+          example: `import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+
+const transport = createWindowMessageTransport({
+  target: popupWindow,
+  receiver: window,
+  targetOrigin: '*',
+  allowUnsafeTargetOrigin: true
+})
+refreshButton.onclick = () => transport.send({ operation: 'refresh' })
+`,
+          result: t(
+            'The refresh request follows the retained popup across origin changes. Source proof still identifies that popup; raw subscriptions require their own admission check.',
+            '刷新请求可跟随保留的弹窗跨越来源域变化。来源证明仍识别该弹窗；原始订阅仍须自行检查准入。'
+          ),
+          covers: ['target', 'receiver', 'targetOrigin', 'allowUnsafeTargetOrigin']
+        }
+      ],
       example: windowEndpointExample,
       summary: t(
         'Options of `createWindowMessageTransport()`.',
@@ -1271,6 +1536,58 @@ export const rpcBrowserReference: ILibraryReference = {
       }
     },
     IServiceWorkerTransportOptions: {
+      optionCases: [
+        {
+          title: t('Send to the controlling worker', '向当前控制页面的工作线程发送消息'),
+          problem: t(
+            'The application already has a ServiceWorker target and its `navigator.serviceWorker` receiver. Neither is created by this adapter. Pass both to separate outgoing delivery from incoming events; omitting either does not discover or register a worker.',
+            '应用已有 ServiceWorker 目标及 `navigator.serviceWorker` 接收端。适配器不会创建它们。分别传入发送目标与事件接收端；省略字段不会自动查找或注册工作线程。'
+          ),
+          example: `import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+
+const transport = createServiceWorkerTransport({
+  target: serviceWorker,
+  receiver: navigator.serviceWorker
+})
+const stop = transport.subscribe((message) => {
+  if (transport.sourceProof?.(message.source)) showCacheStatus(message.data)
+})
+refreshButton.onclick = () => transport.send({ operation: 'refresh-cache' })
+onPageClosed(stop)`,
+          result: t(
+            'Clicking refresh asks the controlling worker to update its cache; incoming status messages update the page’s cache indicator.',
+            '点击刷新会请求控制页面的工作线程更新缓存，收到的状态消息用于更新页面缓存提示。'
+          ),
+          covers: ['target', 'receiver']
+        },
+        {
+          title: t(
+            'Recognize the same client through another wrapper',
+            '通过不同包装识别同一个客户端'
+          ),
+          problem: t(
+            'A worker receives a wrapper for an already known Client. `peerId` identifies that client when object identity differs. Omission uses `target.id` when available; an explicit id selects the expected Client id rather than accepting every source.',
+            '工作线程可能收到已知 Client 的另一个包装对象。对象身份不同时，`peerId` 用于识别这个客户端。省略时可使用 `target.id`；显式标识只接纳指定 Client，不会放行所有来源。'
+          ),
+          example: `import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+
+const transport = createServiceWorkerTransport({
+  target: client,
+  receiver: workerScope,
+  peerId: client.id
+})
+const stop = transport.subscribe((message) => {
+  if (transport.sourceProof?.(message.source)) handleEditorMessage(message.data)
+})
+transport.send({ operation: 'cache-updated' })
+onClientDisconnected(stop)`,
+          result: t(
+            'The worker accepts messages for the selected Client id and sends cache updates to that client, even when inbound events use another wrapper.',
+            '即使接收事件使用另一个包装对象，工作线程仍按所选 Client id 接纳消息，并向该客户端发送缓存更新。'
+          ),
+          covers: ['target', 'receiver', 'peerId']
+        }
+      ],
       example: serviceExample,
       summary: t(
         'Options of `createServiceWorkerTransport()`.',

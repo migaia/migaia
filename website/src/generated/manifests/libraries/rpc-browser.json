@@ -2418,10 +2418,10 @@
           "name": "createBrowserPeer",
           "kind": "function",
           "signature": "export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
-          "declarationLine": 4,
+          "declarationLine": 14,
           "source": "packages/rpc-browser/dist/browser/peer.d.ts",
           "purpose": "Creates a browser Runtime Peer. Connect resolves after the real handshake/directory exchange; listen returns an accept facade, and each incoming SharedWorker port has its own handshake. Supply exactly one supported source and pair both sides with `createBrowserPeer`.",
-          "core": "options: See `IRuntimeBrowserPeerOptions`. Besides `connect` / `listen` / `signal` it accepts the Core Peer options: `provide` (methods this side offers), `defaultTimeoutMs`, `report`, `probe`, `providerLimits`, `authentication`, `contract`, `self`.\nAn `IRuntimePeer` from `@migaia/rpc-core`: `request` / `notify` / `stream` / `group` / `outcome` call the other side, `on(\"ready\")` observes reconnection, `describe()` reads the directory, `close()` (or `await using`) ends the logical connection without closing the carrier. Typed by `TRemote` when given.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Supply exactly one source: { window, origin, receiver?, allowUnsafeTargetOrigin? }, { sharedWorker }, or { rtcDataChannel }. Select connect or listen, never both.\n`undefined`; listen must then be supplied.\nconnect.window: The actual destination Window with postMessage.\nconnect.origin: Required nonempty destination origin for a Window source; no same-origin default.\nconnect.receiver: The actual owner of inbound message events for the Window source.\nThe global event receiver when available.\nconnect.allowUnsafeTargetOrigin: Explicit wildcard escape; source Window identity is still checked.\n`undefined`; omission rejects a wildcard origin.\nAllow origin \"*\" while retaining the source identity check.\nRequire a concrete destination origin.\nconnect.sharedWorker: A caller-owned SharedWorker or the public { port } configuration.\nconnect.sharedWorker.port: The actual ISharedWorkerPort: postMessage, addEventListener and removeEventListener are required; start is optional. Native Node MessagePort supplies these operations in the runnable examples.\nconnect.rtcDataChannel: An application-established native RTC channel with ordered: true, maxRetransmits: null and maxPacketLifeTime: null; finish signaling and wait for open before connecting.\nlisten: A real SharedWorker connect-event scope, accepting every actual event port independently; it is not exercised by the Node port examples.\n`undefined`; connect must then be supplied.\nsignal: Caller AbortSignal for unfinished connection setup; in listen mode cancellation also closes accepted logical peers without closing borrowed carriers.\n`undefined`; no caller cancellation signal.",
+          "core": "options: See `IRuntimeBrowserPeerOptions`. Besides `connect` / `listen` / `signal` it accepts the Core Peer options: `provide` (methods this side offers), `defaultTimeoutMs`, `report`, `probe`, `providerLimits`, `authentication`, `contract`, `self`.\nAn `IRuntimePeer` from `@migaia/rpc-core`: `request` / `notify` / `stream` / `group` / `outcome` call the other side, `on(\"ready\")` observes reconnection, `describe()` reads the directory, `close()` (or `await using`) ends the logical connection without closing the carrier. Typed by `TRemote` when given.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse this advanced hook only when the application assembles an endpoint for the acquired channel. Omitting it keeps Core assembly. A thrown error or rejected Promise stops opening and releases the acquired setup.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nSet a reporter when notifications or listener work can fail without a waiting caller. It receives those failures without changing ordinary request results. Omitting it uses the default console reporter.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nThis inherited hook belongs to advanced remote-proxy retry paths. Direct Browser Peer requests do not call it or generate an idempotency key from it. Omission leaves those direct calls unchanged; use explicit call options when a direct request needs a key.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Supply exactly one source: { window, origin, receiver?, allowUnsafeTargetOrigin? }, { sharedWorker }, or { rtcDataChannel }. Select connect or listen, never both.\n`undefined`; listen must then be supplied.\nconnect.window: The actual destination Window with postMessage.\nconnect.origin: Required nonempty destination origin for a Window source; no same-origin default.\nconnect.receiver: The actual owner of inbound message events for the Window source.\nThe global event receiver when available.\nconnect.allowUnsafeTargetOrigin: Explicit wildcard escape; source Window identity is still checked.\n`undefined`; omission rejects a wildcard origin.\nAllow origin \"*\" while retaining the source identity check.\nRequire a concrete destination origin.\nconnect.sharedWorker: A caller-owned SharedWorker or the public { port } configuration.\nconnect.sharedWorker.port: The actual ISharedWorkerPort: postMessage, addEventListener and removeEventListener are required; start is optional. Native Node MessagePort supplies these operations in the runnable examples.\nconnect.rtcDataChannel: An application-established native RTC channel with ordered: true, maxRetransmits: null and maxPacketLifeTime: null; finish signaling and wait for open before connecting.\nlisten: A real SharedWorker connect-event scope, accepting every actual event port independently; it is not exercised by the Node port examples.\n`undefined`; connect must then be supplied.\nsignal: Caller AbortSignal for unfinished connection setup; in listen mode cancellation also closes accepted logical peers without closing borrowed carriers.\n`undefined`; no caller cancellation signal.",
           "advanced": "A shop page calls functions inside a payment iframe from another origin.\nOne SharedWorker serves the same cache or socket to every open tab.\nTwo browsers call each other over a WebRTC DataChannel.\nDedicated Workers created by the library: use `@migaia/rpc-threads`.\nService Worker and BroadcastChannel use paired Endpoint transports. WebTransport uses raw byte transport with an external application protocol; this package ships no ready-made compatible Endpoint/framer recipe.",
           "parameters": ["options: IRuntimeBrowserPeerOptions"],
           "parameterDetails": [
@@ -2492,7 +2492,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "options: See `IRuntimeBrowserPeerOptions`. Besides `connect` / `listen` / `signal` it accepts the Core Peer options: `provide` (methods this side offers), `defaultTimeoutMs`, `report`, `probe`, `providerLimits`, `authentication`, `contract`, `self`.\nAn `IRuntimePeer` from `@migaia/rpc-core`: `request` / `notify` / `stream` / `group` / `outcome` call the other side, `on(\"ready\")` observes reconnection, `describe()` reads the directory, `close()` (or `await using`) ends the logical connection without closing the carrier. Typed by `TRemote` when given.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Supply exactly one source: { window, origin, receiver?, allowUnsafeTargetOrigin? }, { sharedWorker }, or { rtcDataChannel }. Select connect or listen, never both.\n`undefined`; listen must then be supplied.\nconnect.window: The actual destination Window with postMessage.\nconnect.origin: Required nonempty destination origin for a Window source; no same-origin default.\nconnect.receiver: The actual owner of inbound message events for the Window source.\nThe global event receiver when available.\nconnect.allowUnsafeTargetOrigin: Explicit wildcard escape; source Window identity is still checked.\n`undefined`; omission rejects a wildcard origin.\nAllow origin \"*\" while retaining the source identity check.\nRequire a concrete destination origin.\nconnect.sharedWorker: A caller-owned SharedWorker or the public { port } configuration.\nconnect.sharedWorker.port: The actual ISharedWorkerPort: postMessage, addEventListener and removeEventListener are required; start is optional. Native Node MessagePort supplies these operations in the runnable examples.\nconnect.rtcDataChannel: An application-established native RTC channel with ordered: true, maxRetransmits: null and maxPacketLifeTime: null; finish signaling and wait for open before connecting.\nlisten: A real SharedWorker connect-event scope, accepting every actual event port independently; it is not exercised by the Node port examples.\n`undefined`; connect must then be supplied.\nsignal: Caller AbortSignal for unfinished connection setup; in listen mode cancellation also closes accepted logical peers without closing borrowed carriers.\n`undefined`; no caller cancellation signal."
+              "content": "options: See `IRuntimeBrowserPeerOptions`. Besides `connect` / `listen` / `signal` it accepts the Core Peer options: `provide` (methods this side offers), `defaultTimeoutMs`, `report`, `probe`, `providerLimits`, `authentication`, `contract`, `self`.\nAn `IRuntimePeer` from `@migaia/rpc-core`: `request` / `notify` / `stream` / `group` / `outcome` call the other side, `on(\"ready\")` observes reconnection, `describe()` reads the directory, `close()` (or `await using`) ends the logical connection without closing the carrier. Typed by `TRemote` when given.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse this advanced hook only when the application assembles an endpoint for the acquired channel. Omitting it keeps Core assembly. A thrown error or rejected Promise stops opening and releases the acquired setup.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nSet a reporter when notifications or listener work can fail without a waiting caller. It receives those failures without changing ordinary request results. Omitting it uses the default console reporter.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nThis inherited hook belongs to advanced remote-proxy retry paths. Direct Browser Peer requests do not call it or generate an idempotency key from it. Omission leaves those direct calls unchanged; use explicit call options when a direct request needs a key.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Supply exactly one source: { window, origin, receiver?, allowUnsafeTargetOrigin? }, { sharedWorker }, or { rtcDataChannel }. Select connect or listen, never both.\n`undefined`; listen must then be supplied.\nconnect.window: The actual destination Window with postMessage.\nconnect.origin: Required nonempty destination origin for a Window source; no same-origin default.\nconnect.receiver: The actual owner of inbound message events for the Window source.\nThe global event receiver when available.\nconnect.allowUnsafeTargetOrigin: Explicit wildcard escape; source Window identity is still checked.\n`undefined`; omission rejects a wildcard origin.\nAllow origin \"*\" while retaining the source identity check.\nRequire a concrete destination origin.\nconnect.sharedWorker: A caller-owned SharedWorker or the public { port } configuration.\nconnect.sharedWorker.port: The actual ISharedWorkerPort: postMessage, addEventListener and removeEventListener are required; start is optional. Native Node MessagePort supplies these operations in the runnable examples.\nconnect.rtcDataChannel: An application-established native RTC channel with ordered: true, maxRetransmits: null and maxPacketLifeTime: null; finish signaling and wait for open before connecting.\nlisten: A real SharedWorker connect-event scope, accepting every actual event port independently; it is not exercised by the Node port examples.\n`undefined`; connect must then be supplied.\nsignal: Caller AbortSignal for unfinished connection setup; in listen mode cancellation also closes accepted logical peers without closing borrowed carriers.\n`undefined`; no caller cancellation signal."
             },
             {
               "id": "advanced-usage",
@@ -2517,7 +2517,7 @@
               "name": "signal",
               "type": "IAdapterDefinitionPeerOptions<unknown>['signal']",
               "optional": true,
-              "description": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers."
+              "description": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers. A listener also retains this signal to close its accepts and sessions; omission installs no caller cancellation source."
             },
             {
               "name": "endpointFactory",
@@ -2529,19 +2529,19 @@
               "name": "self",
               "type": "IRuntimePeerIdentity",
               "optional": true,
-              "description": ""
+              "description": "Optional local identity; omission generates an instance id with the display name peer."
             },
             {
               "name": "provide",
               "type": "IRuntimePeerProvide",
               "optional": true,
-              "description": ""
+              "description": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation."
             },
             {
               "name": "providerLimits",
               "type": "IRpcProviderLimits",
               "optional": true,
-              "description": ""
+              "description": "Provider quotas, defaulting to 256 global and 64 per verified peer."
             },
             {
               "name": "authentication",
@@ -2577,13 +2577,13 @@
               "name": "keyFactory",
               "type": "() => string",
               "optional": true,
-              "description": ""
+              "description": "Optional idempotency key generator; omission uses the canonical identity generator."
             },
             {
               "name": "retryPort",
               "type": "IRemoteRetryPort",
               "optional": true,
-              "description": ""
+              "description": "Optional whole-invocation retry policy; omission sends once."
             }
           ],
           "identity": "packages/rpc-browser/dist/browser/peer.d.ts:createBrowserPeer:export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
@@ -2611,7 +2611,7 @@
               "type": "IAdapterDefinitionPeerOptions<unknown>['signal']",
               "optional": true,
               "description": "signal — 默认无；连接时取消未完成握手，listen 模式持续监听并在取消时关闭监听器及其逻辑 Peer",
-              "descriptionEn": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers.",
+              "descriptionEn": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers. A listener also retains this signal to close its accepts and sessions; omission installs no caller cancellation source.",
               "descriptionZh": "signal — 默认无；连接时取消未完成握手，listen 模式持续监听并在取消时关闭监听器及其逻辑 Peer"
             },
             {
@@ -2627,7 +2627,7 @@
               "type": "IRuntimePeerIdentity",
               "optional": true,
               "description": "self — 缺省 name 为 browser，instanceId 由 Core 生成；身份说明不是授权凭据",
-              "descriptionEn": "",
+              "descriptionEn": "Optional local identity; omission generates an instance id with the display name peer.",
               "descriptionZh": "self — 缺省 name 为 browser，instanceId 由 Core 生成；身份说明不是授权凭据"
             },
             {
@@ -2635,7 +2635,7 @@
               "type": "IRuntimePeerProvide",
               "optional": true,
               "description": "provide — 默认无业务方法；显式函数或嵌套 own-data 方法组，支持异步生成器；不执行配置 getter",
-              "descriptionEn": "",
+              "descriptionEn": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation.",
               "descriptionZh": "provide — 默认无业务方法；显式函数或嵌套 own-data 方法组，支持异步生成器；不执行配置 getter"
             },
             {
@@ -2643,7 +2643,7 @@
               "type": "IRpcProviderLimits",
               "optional": true,
               "description": "providerLimits — 默认 global=256、perPeer=64，由 Core 接纳并发提供方调用",
-              "descriptionEn": "",
+              "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
               "descriptionZh": "providerLimits — 默认 global=256、perPeer=64，由 Core 接纳并发提供方调用"
             },
             {
@@ -2690,16 +2690,16 @@
               "name": "keyFactory",
               "type": "() => string",
               "optional": true,
-              "description": "",
-              "descriptionEn": "",
+              "description": "Optional idempotency key generator; omission uses the canonical identity generator.",
+              "descriptionEn": "Optional idempotency key generator; omission uses the canonical identity generator.",
               "descriptionZh": ""
             },
             {
               "name": "retryPort",
               "type": "IRemoteRetryPort",
               "optional": true,
-              "description": "",
-              "descriptionEn": "",
+              "description": "Optional whole-invocation retry policy; omission sends once.",
+              "descriptionEn": "Optional whole-invocation retry policy; omission sends once.",
               "descriptionZh": ""
             }
           ],
@@ -2709,7 +2709,7 @@
           "name": "IRpcBrowserErrorCode",
           "kind": "type",
           "signature": "export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode];",
-          "declarationLine": 22,
+          "declarationLine": 26,
           "source": "packages/rpc-browser/dist/error-code.d.ts",
           "purpose": "Union of `RpcBrowserErrorCode` values.",
           "core": "Union of `RpcBrowserErrorCode` values.",
@@ -2774,7 +2774,7 @@
           "name": "IRuntimeBrowserConnect",
           "kind": "type",
           "signature": "export type IRuntimeBrowserConnect = IRuntimeBrowserWindowConnect | IRuntimeBrowserSharedWorkerConnect | IRuntimeBrowserRtcConnect;",
-          "declarationLine": 33,
+          "declarationLine": 45,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "Union of the three connect sources: window, SharedWorker, RTC channel.",
           "core": "Union of the three connect sources: window, SharedWorker, RTC channel.",
@@ -2842,8 +2842,8 @@
         {
           "name": "IRuntimeBrowserConnectEvent",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;",
-          "declarationLine": 35,
+          "signature": "export type IRuntimeBrowserConnectEvent = Readonly<{ /** * Each supplied port receives a separate Core handshake and logical connection; ports stay * borrowed. */ ports: readonly ISharedWorkerPort[]; }>;",
+          "declarationLine": 47,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "`connect` event of a SharedWorker scope.",
           "core": "ports: Actual native ports from this connect event; the listener accepts each port independently.",
@@ -2860,7 +2860,7 @@
               "kind": "property",
               "optional": false,
               "signature": "ports: readonly ISharedWorkerPort[];",
-              "description": null,
+              "description": "Each supplied port receives a separate Core handshake and logical connection; ports stay borrowed.",
               "parameterDetails": [],
               "returns": "readonly ISharedWorkerPort[]"
             }
@@ -2869,7 +2869,7 @@
           "aliasOf": "IRuntimeBrowserConnectEvent",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;"
+            "export type IRuntimeBrowserConnectEvent = Readonly<{ /** * Each supplied port receives a separate Core handshake and logical connection; ports stay * borrowed. */ ports: readonly ISharedWorkerPort[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2908,7 +2908,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserConnectEvent:export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserConnectEvent:export type IRuntimeBrowserConnectEvent = Readonly<{ /** * Each supplied port receives a separate Core handshake and logical connection; ports stay * borrowed. */ ports: readonly ISharedWorkerPort[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2917,8 +2917,8 @@
         {
           "name": "IRuntimeBrowserListen",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
-          "declarationLine": 39,
+          "signature": "export type IRuntimeBrowserListen = Readonly<{ /** Register the native connect callback; one scope may have only one active Browser Peer listener. */ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; /** Remove that exact callback when the listener closes; this must not terminate the worker scope. */ removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
+          "declarationLine": 55,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "SharedWorker scope accepted by `listen`.",
           "core": "addEventListener: Registers a `connect` listener on the SharedWorker scope; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: connect.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: connect.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
@@ -2935,7 +2935,7 @@
               "kind": "method",
               "optional": false,
               "signature": "addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void;",
-              "description": null,
+              "description": "Register the native connect callback; one scope may have only one active Browser Peer listener.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -2955,7 +2955,7 @@
               "kind": "method",
               "optional": false,
               "signature": "removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void;",
-              "description": null,
+              "description": "Remove that exact callback when the listener closes; this must not terminate the worker scope.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -2975,7 +2975,7 @@
           "aliasOf": "IRuntimeBrowserListen",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;"
+            "export type IRuntimeBrowserListen = Readonly<{ /** Register the native connect callback; one scope may have only one active Browser Peer listener. */ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; /** Remove that exact callback when the listener closes; this must not terminate the worker scope. */ removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3014,7 +3014,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserListen:export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserListen:export type IRuntimeBrowserListen = Readonly<{ /** Register the native connect callback; one scope may have only one active Browser Peer listener. */ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; /** Remove that exact callback when the listener closes; this must not terminate the worker scope. */ removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3023,11 +3023,11 @@
         {
           "name": "IRuntimeBrowserPeerOptions",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
-          "declarationLine": 44,
+          "signature": "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ /** One borrowed Window, SharedWorker port or reliable ordered RTC channel; excludes listen. */ connect?: IRuntimeBrowserConnect; /** * SharedWorker connect-event scope; returns a listener before any page connects and excludes * connect. */ listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. A listener also retains this signal to close its accepts and sessions; omission * installs no caller cancellation source. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
+          "declarationLine": 66,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "Options of `createBrowserPeer()`: the browser source plus the Core Peer options.",
-          "core": "endpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply.",
+          "core": "endpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse this advanced hook only when the application assembles an endpoint for the acquired channel. Omitting it keeps Core assembly. A thrown error or rejected Promise stops opening and releases the acquired setup.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nSet a reporter when notifications or listener work can fail without a waiting caller. It receives those failures without changing ordinary request results. Omitting it uses the default console reporter.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nThis inherited hook belongs to advanced remote-proxy retry paths. Direct Browser Peer requests do not call it or generate an idempotency key from it. Omission leaves those direct calls unchanged; use explicit call options when a direct request needs a key.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3041,7 +3041,7 @@
               "kind": "property",
               "optional": true,
               "signature": "connect?: IRuntimeBrowserConnect;",
-              "description": null,
+              "description": "One borrowed Window, SharedWorker port or reliable ordered RTC channel; excludes listen.",
               "parameterDetails": [],
               "returns": "IRuntimeBrowserConnect"
             },
@@ -3050,7 +3050,7 @@
               "kind": "property",
               "optional": true,
               "signature": "listen?: IRuntimeBrowserListen;",
-              "description": null,
+              "description": "SharedWorker connect-event scope; returns a listener before any page connects and excludes connect.",
               "parameterDetails": [],
               "returns": "IRuntimeBrowserListen"
             },
@@ -3059,7 +3059,7 @@
               "kind": "property",
               "optional": true,
               "signature": "signal?: IAdapterDefinitionPeerOptions<unknown>['signal'];",
-              "description": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers.",
+              "description": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers. A listener also retains this signal to close its accepts and sessions; omission installs no caller cancellation source.",
               "parameterDetails": [],
               "returns": "IAdapterDefinitionPeerOptions<unknown>['signal']"
             },
@@ -3088,7 +3088,7 @@
               "kind": "property",
               "optional": true,
               "signature": "self?: IRuntimePeerIdentity;",
-              "description": null,
+              "description": "Optional local identity; omission generates an instance id with the display name peer.",
               "parameterDetails": [],
               "returns": "IRuntimePeerIdentity"
             },
@@ -3097,7 +3097,7 @@
               "kind": "property",
               "optional": true,
               "signature": "provide?: IRuntimePeerProvide;",
-              "description": null,
+              "description": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation.",
               "parameterDetails": [],
               "returns": "IRuntimePeerProvide"
             },
@@ -3106,7 +3106,7 @@
               "kind": "property",
               "optional": true,
               "signature": "providerLimits?: IRpcProviderLimits;",
-              "description": null,
+              "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
               "parameterDetails": [],
               "returns": "IRpcProviderLimits"
             },
@@ -3166,7 +3166,7 @@
               "kind": "property",
               "optional": true,
               "signature": "keyFactory?: () => string;",
-              "description": null,
+              "description": "Optional idempotency key generator; omission uses the canonical identity generator.",
               "parameterDetails": [],
               "returns": "() => string"
             },
@@ -3175,7 +3175,7 @@
               "kind": "property",
               "optional": true,
               "signature": "retryPort?: IRemoteRetryPort;",
-              "description": null,
+              "description": "Optional whole-invocation retry policy; omission sends once.",
               "parameterDetails": [],
               "returns": "IRemoteRetryPort"
             }
@@ -3184,7 +3184,7 @@
           "aliasOf": "IRuntimeBrowserPeerOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;"
+            "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ /** One borrowed Window, SharedWorker port or reliable ordered RTC channel; excludes listen. */ connect?: IRuntimeBrowserConnect; /** * SharedWorker connect-event scope; returns a listener before any page connects and excludes * connect. */ listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. A listener also retains this signal to close its accepts and sessions; omission * installs no caller cancellation source. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3214,7 +3214,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "endpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply."
+              "content": "endpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nUse this advanced hook only when the application assembles an endpoint for the acquired channel. Omitting it keeps Core assembly. A thrown error or rejected Promise stops opening and releases the acquired setup.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\n`{ name: \"browser\", instanceId: generated }` when omitted.\nprovide: Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n`30000` ms for request and stream.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nSet a reporter when notifications or listener work can fail without a waiting caller. It receives those failures without changing ordinary request results. Omitting it uses the default console reporter.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nThis inherited hook belongs to advanced remote-proxy retry paths. Direct Browser Peer requests do not call it or generate an idempotency key from it. Omission leaves those direct calls unchanged; use explicit call options when a direct request needs a key.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply."
             },
             {
               "id": "advanced-usage",
@@ -3223,7 +3223,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserPeerOptions:export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserPeerOptions:export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ /** One borrowed Window, SharedWorker port or reliable ordered RTC channel; excludes listen. */ connect?: IRuntimeBrowserConnect; /** * SharedWorker connect-event scope; returns a listener before any page connects and excludes * connect. */ listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. A listener also retains this signal to close its accepts and sessions; omission * installs no caller cancellation source. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3232,8 +3232,8 @@
         {
           "name": "IRuntimeBrowserRtcConnect",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
-          "declarationLine": 29,
+          "signature": "export type IRuntimeBrowserRtcConnect = Readonly<{ /** Use an already-open channel; the factory does not wait for open or close the native channel. */ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
+          "declarationLine": 40,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "`connect` source for an open WebRTC DataChannel.",
           "core": "rtcDataChannel: The channel; it must be ordered and reliable (no `maxRetransmits` / `maxPacketLifeTime`), otherwise `RTC_CHANNEL_UNRELIABLE`.",
@@ -3250,7 +3250,7 @@
               "kind": "property",
               "optional": false,
               "signature": "rtcDataChannel: IRuntimeBrowserRtcDataChannel;",
-              "description": null,
+              "description": "Use an already-open channel; the factory does not wait for open or close the native channel.",
               "parameterDetails": [],
               "returns": "IRuntimeBrowserRtcDataChannel"
             }
@@ -3259,7 +3259,7 @@
           "aliasOf": "IRuntimeBrowserRtcConnect",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;"
+            "export type IRuntimeBrowserRtcConnect = Readonly<{ /** Use an already-open channel; the factory does not wait for open or close the native channel. */ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3298,7 +3298,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserRtcConnect:export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserRtcConnect:export type IRuntimeBrowserRtcConnect = Readonly<{ /** Use an already-open channel; the factory does not wait for open or close the native channel. */ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3307,8 +3307,8 @@
         {
           "name": "IRuntimeBrowserRtcDataChannel",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;",
-          "declarationLine": 23,
+          "signature": "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ /** Must be true for Core's ordered one-to-one Peer protocol. */ ordered: boolean; /** Must be null; a finite retransmission limit does not provide reliable Peer delivery. */ maxRetransmits: number | null; /** Must be null; a packet lifetime limit does not provide reliable Peer delivery. */ maxPacketLifeTime: number | null; }>;",
+          "declarationLine": 31,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "The RTC channel settings a Peer checks before connecting.",
           "core": "send: Sends one message as a JSON string.\nsend.data: The encoded message.\nNothing; the message is queued.\nreadyState: Must be `open` or `closed` when the transport is created.\naddEventListener: Registers a `message / closing / close / error` listener on the channel; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / closing / close / error.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / closing / close / error.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.\nordered: Must be `true`: messages arrive in order.\nmaxRetransmits: Must be `null` (unlimited retransmits).\nmaxPacketLifeTime: Must be `null` (no lifetime limit).",
@@ -3325,7 +3325,7 @@
               "kind": "property",
               "optional": false,
               "signature": "ordered: boolean;",
-              "description": null,
+              "description": "Must be true for Core's ordered one-to-one Peer protocol.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -3334,7 +3334,7 @@
               "kind": "property",
               "optional": false,
               "signature": "maxRetransmits: number | null;",
-              "description": null,
+              "description": "Must be null; a finite retransmission limit does not provide reliable Peer delivery.",
               "parameterDetails": [],
               "returns": "number | null"
             },
@@ -3343,7 +3343,7 @@
               "kind": "property",
               "optional": false,
               "signature": "maxPacketLifeTime: number | null;",
-              "description": null,
+              "description": "Must be null; a packet lifetime limit does not provide reliable Peer delivery.",
               "parameterDetails": [],
               "returns": "number | null"
             },
@@ -3352,7 +3352,7 @@
               "kind": "method",
               "optional": false,
               "signature": "send(data: string): void;",
-              "description": null,
+              "description": "Native string send; the adapter stringifies non-string outgoing messages before delegation.",
               "parameterDetails": [
                 {
                   "name": "data",
@@ -3367,7 +3367,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly readyState: string;",
-              "description": null,
+              "description": "Construct with open, or closed for an already-terminal adapter; connecting/closing rejects.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -3376,7 +3376,7 @@
               "kind": "method",
               "optional": false,
               "signature": "addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
-              "description": null,
+              "description": "Register message delivery and closing/close/error terminal notification.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -3396,7 +3396,7 @@
               "kind": "method",
               "optional": false,
               "signature": "removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
-              "description": null,
+              "description": "Remove the same native callback; adapter cleanup never calls the channel's close method.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -3416,7 +3416,7 @@
           "aliasOf": "IRuntimeBrowserRtcDataChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;"
+            "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ /** Must be true for Core's ordered one-to-one Peer protocol. */ ordered: boolean; /** Must be null; a finite retransmission limit does not provide reliable Peer delivery. */ maxRetransmits: number | null; /** Must be null; a packet lifetime limit does not provide reliable Peer delivery. */ maxPacketLifeTime: number | null; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3455,7 +3455,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserRtcDataChannel:export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserRtcDataChannel:export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ /** Must be true for Core's ordered one-to-one Peer protocol. */ ordered: boolean; /** Must be null; a finite retransmission limit does not provide reliable Peer delivery. */ maxRetransmits: number | null; /** Must be null; a packet lifetime limit does not provide reliable Peer delivery. */ maxPacketLifeTime: number | null; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3464,8 +3464,8 @@
         {
           "name": "IRuntimeBrowserSharedWorkerConnect",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
-          "declarationLine": 17,
+          "signature": "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ /** Existing worker whose port is borrowed; neither the worker nor its port is closed by the Peer. */ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
+          "declarationLine": 24,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "`connect` source for a SharedWorker created by the page.",
           "core": "sharedWorker: The `SharedWorker` (any object with `port`); the page keeps owning it.",
@@ -3482,7 +3482,7 @@
               "kind": "property",
               "optional": false,
               "signature": "sharedWorker: Readonly<{ port: ISharedWorkerPort; }>;",
-              "description": null,
+              "description": "Existing worker whose port is borrowed; neither the worker nor its port is closed by the Peer.",
               "parameterDetails": [],
               "returns": "Readonly<{ port: ISharedWorkerPort; }>"
             }
@@ -3491,7 +3491,7 @@
           "aliasOf": "IRuntimeBrowserSharedWorkerConnect",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;"
+            "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ /** Existing worker whose port is borrowed; neither the worker nor its port is closed by the Peer. */ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3530,7 +3530,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserSharedWorkerConnect:export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserSharedWorkerConnect:export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ /** Existing worker whose port is borrowed; neither the worker nor its port is closed by the Peer. */ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3539,7 +3539,7 @@
         {
           "name": "IRuntimeBrowserWindowConnect",
           "kind": "type",
-          "signature": "export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;",
+          "signature": "export type IRuntimeBrowserWindowConnect = Readonly<{ /** Outbound Window identity; incoming messages must identify this same native target. */ window: IWindowMessageTarget; /** Nonempty destination origin, without a default; '*' also requires the explicit unsafe opt-in. */ origin: string; /** Inbound event owner; omitted uses the current Window-like global, otherwise supply it. */ receiver?: IWindowMessageReceiver; /** * Only true permits '*'; omitted/false still requires an exact origin, and never relaxes source * identity. */ allowUnsafeTargetOrigin?: boolean; }>;",
           "declarationLine": 10,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
           "purpose": "`connect` source for an iframe or popup window.",
@@ -3557,7 +3557,7 @@
               "kind": "property",
               "optional": false,
               "signature": "window: IWindowMessageTarget;",
-              "description": null,
+              "description": "Outbound Window identity; incoming messages must identify this same native target.",
               "parameterDetails": [],
               "returns": "IWindowMessageTarget"
             },
@@ -3566,7 +3566,7 @@
               "kind": "property",
               "optional": false,
               "signature": "origin: string;",
-              "description": null,
+              "description": "Nonempty destination origin, without a default; '*' also requires the explicit unsafe opt-in.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -3575,7 +3575,7 @@
               "kind": "property",
               "optional": true,
               "signature": "receiver?: IWindowMessageReceiver;",
-              "description": null,
+              "description": "Inbound event owner; omitted uses the current Window-like global, otherwise supply it.",
               "parameterDetails": [],
               "returns": "IWindowMessageReceiver"
             },
@@ -3584,7 +3584,7 @@
               "kind": "property",
               "optional": true,
               "signature": "allowUnsafeTargetOrigin?: boolean;",
-              "description": null,
+              "description": "Only true permits '*'; omitted/false still requires an exact origin, and never relaxes source identity.",
               "parameterDetails": [],
               "returns": "boolean"
             }
@@ -3593,7 +3593,7 @@
           "aliasOf": "IRuntimeBrowserWindowConnect",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;"
+            "export type IRuntimeBrowserWindowConnect = Readonly<{ /** Outbound Window identity; incoming messages must identify this same native target. */ window: IWindowMessageTarget; /** Nonempty destination origin, without a default; '*' also requires the explicit unsafe opt-in. */ origin: string; /** Inbound event owner; omitted uses the current Window-like global, otherwise supply it. */ receiver?: IWindowMessageReceiver; /** * Only true permits '*'; omitted/false still requires an exact origin, and never relaxes source * identity. */ allowUnsafeTargetOrigin?: boolean; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3632,7 +3632,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserWindowConnect:export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;",
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserWindowConnect:export type IRuntimeBrowserWindowConnect = Readonly<{ /** Outbound Window identity; incoming messages must identify this same native target. */ window: IWindowMessageTarget; /** Nonempty destination origin, without a default; '*' also requires the explicit unsafe opt-in. */ origin: string; /** Inbound event owner; omitted uses the current Window-like global, otherwise supply it. */ receiver?: IWindowMessageReceiver; /** * Only true permits '*'; omitted/false still requires an exact origin, and never relaxes source * identity. */ allowUnsafeTargetOrigin?: boolean; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3837,7 +3837,7 @@
           "name": "createBroadcastChannelTransport",
           "kind": "function",
           "signature": "export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;",
-          "declarationLine": 3,
+          "declarationLine": 13,
           "source": "packages/rpc-browser/dist/browser/adapters/broadcast-channel.d.ts",
           "purpose": "Creates a transport over a `BroadcastChannel`; every same-origin context on the channel receives the messages.",
           "core": "channel: An open `BroadcastChannel` owned by the caller.\nAn `IRpcTransport`; the caller still closes the channel.\nAfter installation the Endpoint broadcasts to every same-origin context on the channel.",
@@ -3936,7 +3936,7 @@
           "name": "createRtcDataChannelTransport",
           "kind": "function",
           "signature": "export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;",
-          "declarationLine": 10,
+          "declarationLine": 27,
           "source": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts",
           "purpose": "Creates a raw RTC carrier in open or already-terminal closed state; non-string sends are JSON-stringified, while received data is not parsed. MESSAGE_DECODE_FAILED belongs to the Browser Peer projection, not this raw transport.",
           "core": "channel: An `RTCDataChannel` created by the caller, usually from `peerConnection.createDataChannel()`.\nAn `IRpcTransport`; other channel states throw `INVALID_CONFIG`.\nThe application exchanges raw JSON strings through the same real RTC carrier; decoding remains explicit in the paired application protocol.",
@@ -4013,7 +4013,7 @@
         {
           "name": "IRTCDataChannel",
           "kind": "type",
-          "signature": "export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
+          "signature": "export type IRTCDataChannel = { /** Native string send; the adapter stringifies non-string outgoing messages before delegation. */ send(data: string): void; /** Construct with open, or closed for an already-terminal adapter; connecting/closing rejects. */ readonly readyState: string; /** Register message delivery and closing/close/error terminal notification. */ addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; /** Remove the same native callback; adapter cleanup never calls the channel's close method. */ removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts",
           "purpose": "The parts of `RTCDataChannel` the transport uses.",
@@ -4031,7 +4031,7 @@
               "kind": "method",
               "optional": false,
               "signature": "send(data: string): void;",
-              "description": null,
+              "description": "Native string send; the adapter stringifies non-string outgoing messages before delegation.",
               "parameterDetails": [
                 {
                   "name": "data",
@@ -4046,7 +4046,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly readyState: string;",
-              "description": null,
+              "description": "Construct with open, or closed for an already-terminal adapter; connecting/closing rejects.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4055,7 +4055,7 @@
               "kind": "method",
               "optional": false,
               "signature": "addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
-              "description": null,
+              "description": "Register message delivery and closing/close/error terminal notification.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -4075,7 +4075,7 @@
               "kind": "method",
               "optional": false,
               "signature": "removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
-              "description": null,
+              "description": "Remove the same native callback; adapter cleanup never calls the channel's close method.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -4094,7 +4094,7 @@
           "composes": [],
           "exportPath": "./adapters/rtc-data-channel",
           "overloadSignatures": [
-            "export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };"
+            "export type IRTCDataChannel = { /** Native string send; the adapter stringifies non-string outgoing messages before delegation. */ send(data: string): void; /** Construct with open, or closed for an already-terminal adapter; connecting/closing rejects. */ readonly readyState: string; /** Register message delivery and closing/close/error terminal notification. */ addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; /** Remove the same native callback; adapter cleanup never calls the channel's close method. */ removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4133,7 +4133,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts:IRTCDataChannel:export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts:IRTCDataChannel:export type IRTCDataChannel = { /** Native string send; the adapter stringifies non-string outgoing messages before delegation. */ send(data: string): void; /** Construct with open, or closed for an already-terminal adapter; connecting/closing rejects. */ readonly readyState: string; /** Register message delivery and closing/close/error terminal notification. */ addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; /** Remove the same native callback; adapter cleanup never calls the channel's close method. */ removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4162,7 +4162,7 @@
           "name": "createServiceWorkerTransport",
           "kind": "function",
           "signature": "export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
-          "declarationLine": 21,
+          "declarationLine": 38,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
           "purpose": "Creates a page/ServiceWorker carrier whose sourceProof accepts its exact target or actual matching Client id. Raw subscribe retains records; pair `connect` with this transport for Endpoint admission.",
           "core": "An `IRpcTransport` for `createEndpoint()`.\ntarget: ServiceWorker or Client that receives outgoing messages.\nreceiver: Owner of `message` events: `navigator.serviceWorker` in a page, `self` in the worker.\npeerId: Id of the expected remote Client, taken from `client.id` in the worker.\n`target.id` when available.\nAfter installation the Endpoint talks between a page and its Service Worker.",
@@ -4283,8 +4283,8 @@
         {
           "name": "IServiceWorkerMessageReceiver",
           "kind": "type",
-          "signature": "export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
-          "declarationLine": 8,
+          "signature": "export type IServiceWorkerMessageReceiver = { /** Register incoming messages on navigator.serviceWorker or the worker's own event scope. */ addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; /** Remove the exact native callback when the last logical subscription ends. */ removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "declarationLine": 10,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
           "purpose": "Owner of Service Worker `message` events.",
           "core": "addEventListener: Registers a `message` listener on the Service Worker container; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
@@ -4301,7 +4301,7 @@
               "kind": "method",
               "optional": false,
               "signature": "addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
-              "description": null,
+              "description": "Register incoming messages on navigator.serviceWorker or the worker's own event scope.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -4321,7 +4321,7 @@
               "kind": "method",
               "optional": false,
               "signature": "removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
-              "description": null,
+              "description": "Remove the exact native callback when the last logical subscription ends.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -4340,7 +4340,7 @@
           "composes": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
-            "export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
+            "export type IServiceWorkerMessageReceiver = { /** Register incoming messages on navigator.serviceWorker or the worker's own event scope. */ addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; /** Remove the exact native callback when the last logical subscription ends. */ removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4379,7 +4379,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageReceiver:export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageReceiver:export type IServiceWorkerMessageReceiver = { /** Register incoming messages on navigator.serviceWorker or the worker's own event scope. */ addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; /** Remove the exact native callback when the last logical subscription ends. */ removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4388,7 +4388,7 @@
         {
           "name": "IServiceWorkerMessageTarget",
           "kind": "type",
-          "signature": "export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };",
+          "signature": "export type IServiceWorkerMessageTarget = { /** Native send to the chosen ServiceWorker or Client; transfers can detach caller-owned buffers. */ postMessage(message: unknown, transfer?: readonly Transferable[]): void; /** Optional stable Client identity used as the default peerId for cross-realm source wrappers. */ readonly id?: string; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
           "purpose": "ServiceWorker or Client messages are posted to.",
@@ -4406,7 +4406,7 @@
               "kind": "method",
               "optional": false,
               "signature": "postMessage(message: unknown, transfer?: readonly Transferable[]): void;",
-              "description": null,
+              "description": "Native send to the chosen ServiceWorker or Client; transfers can detach caller-owned buffers.",
               "parameterDetails": [
                 {
                   "name": "message",
@@ -4426,7 +4426,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly id?: string;",
-              "description": null,
+              "description": "Optional stable Client identity used as the default peerId for cross-realm source wrappers.",
               "parameterDetails": [],
               "returns": "string"
             }
@@ -4434,7 +4434,7 @@
           "composes": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
-            "export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };"
+            "export type IServiceWorkerMessageTarget = { /** Native send to the chosen ServiceWorker or Client; transfers can detach caller-owned buffers. */ postMessage(message: unknown, transfer?: readonly Transferable[]): void; /** Optional stable Client identity used as the default peerId for cross-realm source wrappers. */ readonly id?: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4473,7 +4473,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageTarget:export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageTarget:export type IServiceWorkerMessageTarget = { /** Native send to the chosen ServiceWorker or Client; transfers can detach caller-owned buffers. */ postMessage(message: unknown, transfer?: readonly Transferable[]): void; /** Optional stable Client identity used as the default peerId for cross-realm source wrappers. */ readonly id?: string; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4483,7 +4483,7 @@
           "name": "IServiceWorkerTransportOptions",
           "kind": "type",
           "signature": "export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */ readonly target: IServiceWorkerMessageTarget; /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */ readonly receiver: IServiceWorkerMessageReceiver; /** Expected remote Client identity; defaults to target.id when that identity is available. */ readonly peerId?: string; };",
-          "declarationLine": 12,
+          "declarationLine": 17,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
           "purpose": "Options of `createServiceWorkerTransport()`.",
           "core": "target: ServiceWorker or Client that receives outgoing messages.\nreceiver: Owner of `message` events: `navigator.serviceWorker` in a page, `self` in the worker.\npeerId: Id of the expected remote Client, taken from `client.id` in the worker.\n`target.id` when available.",
@@ -4594,7 +4594,7 @@
           "name": "createSharedWorkerTransport",
           "kind": "function",
           "signature": "export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
-          "declarationLine": 10,
+          "declarationLine": 25,
           "source": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts",
           "purpose": "Creates a transport over one SharedWorker `MessagePort` and starts the port when listening begins.",
           "core": "port: Page side: `sharedWorker.port`; worker side: a port from the `connect` event.\nAn `IRpcTransport`; the port is borrowed and must be closed by its owner.\nAfter installation the Endpoint talks over one SharedWorker port.",
@@ -4675,7 +4675,7 @@
         {
           "name": "ISharedWorkerPort",
           "kind": "type",
-          "signature": "export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
+          "signature": "export type ISharedWorkerPort = { /** Native structured-clone send; supplied transfers retain the platform's detachment semantics. */ postMessage(message: unknown, transfer?: readonly Transferable[]): void; /** Optional native MessagePort activation, invoked when the first message subscriber attaches. */ start?(): void; /** Register message delivery or native deserialization failure without taking port ownership. */ addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; /** Remove the exact registered callback; final unsubscribe leaves the native port open. */ removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts",
           "purpose": "The `MessagePort` of a SharedWorker connection.",
@@ -4693,7 +4693,7 @@
               "kind": "method",
               "optional": false,
               "signature": "postMessage(message: unknown, transfer?: readonly Transferable[]): void;",
-              "description": null,
+              "description": "Native structured-clone send; supplied transfers retain the platform's detachment semantics.",
               "parameterDetails": [
                 {
                   "name": "message",
@@ -4713,7 +4713,7 @@
               "kind": "method",
               "optional": true,
               "signature": "start?(): void;",
-              "description": null,
+              "description": "Optional native MessagePort activation, invoked when the first message subscriber attaches.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -4722,7 +4722,7 @@
               "kind": "method",
               "optional": false,
               "signature": "addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void;",
-              "description": null,
+              "description": "Register message delivery or native deserialization failure without taking port ownership.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -4742,7 +4742,7 @@
               "kind": "method",
               "optional": false,
               "signature": "removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void;",
-              "description": null,
+              "description": "Remove the exact registered callback; final unsubscribe leaves the native port open.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -4761,7 +4761,7 @@
           "composes": [],
           "exportPath": "./adapters/shared-worker",
           "overloadSignatures": [
-            "export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };"
+            "export type ISharedWorkerPort = { /** Native structured-clone send; supplied transfers retain the platform's detachment semantics. */ postMessage(message: unknown, transfer?: readonly Transferable[]): void; /** Optional native MessagePort activation, invoked when the first message subscriber attaches. */ start?(): void; /** Register message delivery or native deserialization failure without taking port ownership. */ addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; /** Remove the exact registered callback; final unsubscribe leaves the native port open. */ removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4800,7 +4800,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:ISharedWorkerPort:export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:ISharedWorkerPort:export type ISharedWorkerPort = { /** Native structured-clone send; supplied transfers retain the platform's detachment semantics. */ postMessage(message: unknown, transfer?: readonly Transferable[]): void; /** Optional native MessagePort activation, invoked when the first message subscriber attaches. */ start?(): void; /** Register message delivery or native deserialization failure without taking port ownership. */ addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; /** Remove the exact registered callback; final unsubscribe leaves the native port open. */ removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4829,7 +4829,7 @@
           "name": "createWebTransportDatagramTransport",
           "kind": "function",
           "signature": "export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;",
-          "declarationLine": 8,
+          "declarationLine": 24,
           "source": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts",
           "purpose": "Creates a byte transport over WebTransport datagrams; it takes the datagram writer and reader and closes the writer when the transport closes.",
           "core": "datagrams: `session.datagrams` of a `WebTransport` session created by the caller.\nAn `IRpcTransport<Uint8Array>`; the session itself is closed by the caller.\nThe application exchanges actual Uint8Array datagrams with its external server protocol; no Runtime Peer or ready-made compatible Endpoint framing is installed.",
@@ -4906,7 +4906,7 @@
         {
           "name": "IWebTransportDatagrams",
           "kind": "type",
-          "signature": "export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };",
+          "signature": "export type IWebTransportDatagrams = { /** Unlocked outgoing datagram stream; construction immediately acquires its sole writer. */ writable: WritableStream<Uint8Array>; /** Incoming datagram stream; the first subscription acquires the transport-owned reader. */ readable: ReadableStream<Uint8Array>; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts",
           "purpose": "`session.datagrams` of a WebTransport session.",
@@ -4924,7 +4924,7 @@
               "kind": "property",
               "optional": false,
               "signature": "writable: WritableStream<Uint8Array>;",
-              "description": null,
+              "description": "Unlocked outgoing datagram stream; construction immediately acquires its sole writer.",
               "parameterDetails": [],
               "returns": "WritableStream<Uint8Array>"
             },
@@ -4933,7 +4933,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readable: ReadableStream<Uint8Array>;",
-              "description": null,
+              "description": "Incoming datagram stream; the first subscription acquires the transport-owned reader.",
               "parameterDetails": [],
               "returns": "ReadableStream<Uint8Array>"
             }
@@ -4941,7 +4941,7 @@
           "composes": [],
           "exportPath": "./adapters/web-transport",
           "overloadSignatures": [
-            "export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };"
+            "export type IWebTransportDatagrams = { /** Unlocked outgoing datagram stream; construction immediately acquires its sole writer. */ writable: WritableStream<Uint8Array>; /** Incoming datagram stream; the first subscription acquires the transport-owned reader. */ readable: ReadableStream<Uint8Array>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4980,7 +4980,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts:IWebTransportDatagrams:export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts:IWebTransportDatagrams:export type IWebTransportDatagrams = { /** Unlocked outgoing datagram stream; construction immediately acquires its sole writer. */ writable: WritableStream<Uint8Array>; /** Incoming datagram stream; the first subscription acquires the transport-owned reader. */ readable: ReadableStream<Uint8Array>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5009,7 +5009,7 @@
           "name": "createWindowMessageTransport",
           "kind": "function",
           "signature": "export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;",
-          "declarationLine": 20,
+          "declarationLine": 35,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
           "purpose": "Creates a Window postMessage carrier with exact target/origin sourceProof. Raw subscribe preserves all event records; pair it with `connect` for Endpoint admission or use the Browser Peer projection.",
           "core": "An `IRpcTransport` for `createEndpoint()`; `*` as origin without `allowUnsafeTargetOrigin` throws `INVALID_CONFIG`.\ntarget: Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.\nreceiver: Object that receives `message` events.\nThe global scope when it has `addEventListener`.\ntargetOrigin: Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.\n`window.location.origin` when available (same origin).\nallowUnsafeTargetOrigin: Allows `targetOrigin: \"*\"`; the source window is still checked.\n`undefined`: omitted disables `*`.\nAfter installation the Endpoint exchanges messages with one window over `postMessage`, accepting only that window and origin.",
@@ -5093,7 +5093,7 @@
               "name": "targetOrigin",
               "type": "string",
               "optional": true,
-              "description": "Defaults to current window.location.origin when available."
+              "description": "Defaults to current location.origin when available; empty/unavailable origins reject."
             },
             {
               "name": "allowUnsafeTargetOrigin",
@@ -5126,8 +5126,8 @@
               "name": "targetOrigin",
               "type": "string",
               "optional": true,
-              "description": "Defaults to current window.location.origin when available.",
-              "descriptionEn": "Defaults to current window.location.origin when available.",
+              "description": "Defaults to current location.origin when available; empty/unavailable origins reject.",
+              "descriptionEn": "Defaults to current location.origin when available; empty/unavailable origins reject.",
               "descriptionZh": ""
             },
             {
@@ -5144,8 +5144,8 @@
         {
           "name": "IWindowMessageReceiver",
           "kind": "type",
-          "signature": "export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
-          "declarationLine": 7,
+          "signature": "export type IWindowMessageReceiver = { /** Register the adapter's shared native message callback on the receiving realm. */ addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; /** Remove that same callback when the final logical subscription leaves. */ removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "declarationLine": 8,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
           "purpose": "Object whose `message` events are read.",
           "core": "addEventListener: Registers a `message` listener on the receiving window; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
@@ -5162,7 +5162,7 @@
               "kind": "method",
               "optional": false,
               "signature": "addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
-              "description": null,
+              "description": "Register the adapter's shared native message callback on the receiving realm.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -5182,7 +5182,7 @@
               "kind": "method",
               "optional": false,
               "signature": "removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
-              "description": null,
+              "description": "Remove that same callback when the final logical subscription leaves.",
               "parameterDetails": [
                 {
                   "name": "type",
@@ -5201,7 +5201,7 @@
           "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
-            "export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
+            "export type IWindowMessageReceiver = { /** Register the adapter's shared native message callback on the receiving realm. */ addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; /** Remove that same callback when the final logical subscription leaves. */ removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5240,7 +5240,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageReceiver:export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageReceiver:export type IWindowMessageReceiver = { /** Register the adapter's shared native message callback on the receiving realm. */ addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; /** Remove that same callback when the final logical subscription leaves. */ removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5249,7 +5249,7 @@
         {
           "name": "IWindowMessageTarget",
           "kind": "type",
-          "signature": "export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
+          "signature": "export type IWindowMessageTarget = { /** Perform native structured-clone delivery; an explicit transfer list can detach its buffers. */ postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
           "purpose": "Window-like object messages are posted to.",
@@ -5267,7 +5267,7 @@
               "kind": "method",
               "optional": false,
               "signature": "postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void;",
-              "description": null,
+              "description": "Perform native structured-clone delivery; an explicit transfer list can detach its buffers.",
               "parameterDetails": [
                 {
                   "name": "message",
@@ -5291,7 +5291,7 @@
           "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
-            "export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };"
+            "export type IWindowMessageTarget = { /** Perform native structured-clone delivery; an explicit transfer list can detach its buffers. */ postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5330,7 +5330,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageTarget:export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageTarget:export type IWindowMessageTarget = { /** Perform native structured-clone delivery; an explicit transfer list can detach its buffers. */ postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5339,8 +5339,8 @@
         {
           "name": "IWindowMessageTransportOptions",
           "kind": "type",
-          "signature": "export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
-          "declarationLine": 11,
+          "signature": "export type IWindowMessageTransportOptions = { /** Required outgoing target and exact native identity used by sourceProof. */ readonly target: IWindowMessageTarget; /** Omitted uses a Window-like global; required outside a realm with addEventListener. */ readonly receiver?: IWindowMessageReceiver; /** Defaults to current location.origin when available; empty/unavailable origins reject. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
+          "declarationLine": 15,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
           "purpose": "Options of `createWindowMessageTransport()`.",
           "core": "target: Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.\nreceiver: Object that receives `message` events.\nThe global scope when it has `addEventListener`.\ntargetOrigin: Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.\n`window.location.origin` when available (same origin).\nallowUnsafeTargetOrigin: Allows `targetOrigin: \"*\"`; the source window is still checked.\n`undefined`: omitted disables `*`.",
@@ -5357,7 +5357,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly target: IWindowMessageTarget;",
-              "description": null,
+              "description": "Required outgoing target and exact native identity used by sourceProof.",
               "parameterDetails": [],
               "returns": "IWindowMessageTarget"
             },
@@ -5366,7 +5366,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly receiver?: IWindowMessageReceiver;",
-              "description": null,
+              "description": "Omitted uses a Window-like global; required outside a realm with addEventListener.",
               "parameterDetails": [],
               "returns": "IWindowMessageReceiver"
             },
@@ -5375,7 +5375,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly targetOrigin?: string;",
-              "description": "Defaults to current window.location.origin when available.",
+              "description": "Defaults to current location.origin when available; empty/unavailable origins reject.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -5392,7 +5392,7 @@
           "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
-            "export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };"
+            "export type IWindowMessageTransportOptions = { /** Required outgoing target and exact native identity used by sourceProof. */ readonly target: IWindowMessageTarget; /** Omitted uses a Window-like global; required outside a realm with addEventListener. */ readonly receiver?: IWindowMessageReceiver; /** Defaults to current location.origin when available; empty/unavailable origins reject. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5431,7 +5431,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageTransportOptions:export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageTransportOptions:export type IWindowMessageTransportOptions = { /** Required outgoing target and exact native identity used by sourceProof. */ readonly target: IWindowMessageTarget; /** Omitted uses a Window-like global; required outside a realm with addEventListener. */ readonly receiver?: IWindowMessageReceiver; /** Defaults to current location.origin when available; empty/unavailable origins reject. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

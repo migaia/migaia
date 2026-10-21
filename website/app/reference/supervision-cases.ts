@@ -684,3 +684,907 @@ budget.close()`
     }
   ]
 }
+
+/** Short application snippets; validation contexts stay outside the repository. */
+export const supervisionOptionExamples = {
+  basic: `import { createUnitBudget } from '@migaia/supervision'
+import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1 })
+const formatter = createCoroutineSupervisor({
+  id: 'document-formatter',
+  budget,
+  spec: { task: runFormatter },
+  report: reportToMonitoring
+})
+showFormatterState((await formatter.start()).state)
+onEditorClosed(async () => {
+  await formatter.dispose()
+  budget.close()
+})`,
+  ready: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  ready: async (handle, signal) => {
+    await checkFormatter(await handle.exposed, signal)
+  },
+  startupTimeoutMs: 2000,
+  scheduler: applicationScheduler
+})
+showFormatterState((await supervisor.start()).state)`,
+  stop: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  report: reportToMonitoring,
+  stop: {
+    beforeTerminate: (handle, signal, remainingMs) =>
+      flushPendingWrites(handle, signal, remainingMs()),
+    drainTimeoutMs: 2000,
+    exitTimeoutMs: 1000,
+    reapTimeoutMs: 1000
+  }
+})
+await supervisor.start()
+onEditorClosed(() => supervisor.stop())`,
+  restart: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: {
+    mode: 'on-failure',
+    initialDelayMs: 250,
+    factor: 2,
+    maxDelayMs: 5000
+  }
+})
+showFormatterState((await supervisor.start()).state)`,
+  terminal: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { maxRestarts: 3, windowMs: 60000 },
+  terminalPolicy: { mode: 'cooldown', afterMs: 30000 }
+})
+await supervisor.start()`,
+  health: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  health: {
+    check: (handle, signal) => checkFormatter(handle, signal),
+    intervalMs: 5000,
+    timeoutMs: 1000,
+    failureThreshold: 2
+  }
+})
+await supervisor.start()`,
+  isolation: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  requires: ['fault-isolation'],
+  isolation: 'best-effort'
+})
+showRuntimeGuarantees(supervisor.inspect().degraded)`,
+  heartbeat: `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  heartbeat: {
+    timeoutMs: 10000,
+    intervalMs: 2000,
+    failureThreshold: 2
+  }
+})
+await supervisor.start()`,
+  budgetQueue: `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  kind: 'process',
+  maxUnits: 2,
+  parent: applicationProcessBudget,
+  overflow: 'queue',
+  queueTimeoutMs: 5000,
+  scheduler: applicationScheduler
+})
+startPreviewQueue(budget)`,
+  budgetRate: `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  kind: 'process',
+  maxUnits: 2,
+  overflow: 'reject',
+  launchRate: { max: 4, windowMs: 1000 }
+})
+startPreviewQueue(budget)`,
+  custom: `import { createSupervisor } from '@migaia/supervision'
+
+const formatter = createSupervisor({
+  id: 'document-formatter',
+  launcher: documentLauncher,
+  profile: documentProfile,
+  spec: documentSpec,
+  budget: documentBudget,
+  report: reportToMonitoring
+})
+showFormatterState((await formatter.start()).state)
+onEditorClosed(() => formatter.dispose())`,
+  customHooks: `import { createSupervisor } from '@migaia/supervision'
+
+const supervisor = createSupervisor({
+  ...documentOptions,
+  hooks: {
+    afterLaunch: (handle) => attachFormatterDiagnostics(handle),
+    inspectUnit: (handle) => describeFormatter(handle)
+  }
+})
+await supervisor.start()
+renderFormatterDiagnostics(supervisor.inspect())`,
+  processOutput: `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  output: {
+    tailBytes: 4096,
+    onChunk: (stream, bytes) => appendRendererOutput(stream, bytes)
+  }
+})
+await supervisor.start()
+onPreviewClosed(() => supervisor.dispose())`,
+  processUsage: `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  usage: { intervalMs: 2000, failureThreshold: 3 }
+})
+await supervisor.start()`,
+  registry: `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  registry: { port: processRegistry, namespace: 'preview-renderers' },
+  wallClock: { timestamp: () => Date.now() }
+})
+await supervisor.start()`,
+  prewarm: `import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
+
+const pool = createPrewarmPool({ ...rendererOptions, size: 1, idleTimeoutMs: 30000 })
+await waitForIdleRenderer(pool)
+const renderer = createProcessSupervisor({ ...rendererOptions, prewarm: pool })
+showPreviewState((await renderer.start()).state)
+onPreviewClosed(async () => {
+  await renderer.dispose()
+  await pool.dispose()
+})`,
+  prewarmDisabled: `import { createPrewarmPool } from '@migaia/supervision/process'
+
+const pool = createPrewarmPool({ ...rendererOptions, size: 0 })
+registerPreviewPool(pool)`,
+  prewarmPolicy: `import { createPrewarmPool } from '@migaia/supervision/process'
+
+const pool = createPrewarmPool({
+  ...rendererOptions,
+  size: 1,
+  startupTimeoutMs: 3000,
+  idleTimeoutMs: 30000,
+  exitTimeoutMs: 1000,
+  reapTimeoutMs: 1000,
+  scheduler: applicationScheduler
+})
+registerPreviewPool(pool)`,
+  thread: `import { createUnitBudget } from '@migaia/supervision'
+import { createThreadSupervisor } from '@migaia/supervision/threads'
+
+const worker = createThreadSupervisor({
+  ...imageWorkerOptions,
+  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+  requires: ['termination'],
+  isolation: 'required'
+})
+showImageWorkerState((await worker.start()).state)
+onImageEditorClosed(() => worker.dispose())`,
+  threadHealth: `import { createThreadSupervisor } from '@migaia/supervision/threads'
+
+const supervisor = createThreadSupervisor({
+  ...imageWorkerOptions,
+  ready: (handle, signal) => checkImageWorker(handle, signal),
+  startupTimeoutMs: 2000
+})
+showImageWorkerState((await supervisor.start()).state)`,
+  threadMonitor: `import { createThreadSupervisor } from '@migaia/supervision/threads'
+
+const supervisor = createThreadSupervisor({
+  ...imageWorkerOptions,
+  health: {
+    check: (handle, signal) => checkImageWorker(handle, signal),
+    intervalMs: 5000,
+    timeoutMs: 1000,
+    failureThreshold: 2
+  }
+})
+await supervisor.start()`,
+  guard: `import { createParentLossGuard } from '@migaia/supervision/process'
+
+const guard = createParentLossGuard({
+  shutdown: (signal) => flushChildWrites(signal),
+  exit: (code) => exitChild(code),
+  report: reportToMonitoring,
+  graceMs: 2000,
+  scheduler: applicationScheduler
+})
+onParentDisconnected(() => guard.trigger())`,
+  guardFailure: `import { createParentLossGuard } from '@migaia/supervision/process'
+
+const guard = createParentLossGuard({
+  shutdown: (signal) => closeChildResources(signal),
+  exit: (code) => exitChild(code),
+  report: reportToMonitoring
+})
+onParentDisconnected(() => guard.trigger())`,
+  reclaim: `import { reclaimOrphanProcesses } from '@migaia/supervision/process'
+
+const recovery = await reclaimOrphanProcesses({
+  registry: processRegistry,
+  namespace: 'preview-renderers',
+  launcher: rendererLauncher,
+  report: reportToMonitoring
+})
+showRecoverySummary(recovery)`,
+  reclaimFailure: `import { reclaimOrphanProcesses } from '@migaia/supervision/process'
+
+const recovery = await reclaimOrphanProcesses({
+  registry: processRegistry,
+  namespace: 'preview-renderers',
+  launcher: rendererLauncher,
+  report: (error) => showRecoveryWarning(error)
+})
+showRecoverySummary(recovery)`
+}
+/** Each option field can be copied without a complete supervisor demonstration. */
+export const supervisionOptionFieldExamples: Readonly<Record<string, string>> = {
+  'base.id': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  id: 'document-formatter'
+})`,
+  'base.report': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  report: reportToMonitoring
+})`,
+  'base.ready': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  ready: (handle, signal) => checkFormatter(handle, signal)
+})`,
+  'base.startupTimeoutMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  startupTimeoutMs: 2000
+})`,
+  'base.scheduler': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  scheduler: applicationScheduler
+})`,
+  'base.restart': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { mode: 'on-failure', initialDelayMs: 250 }
+})`,
+  'base.restart.mode': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { mode: 'on-failure' }
+})`,
+  'base.restart.initialDelayMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { initialDelayMs: 250 }
+})`,
+  'base.restart.factor': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { factor: 2 }
+})`,
+  'base.restart.maxDelayMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { maxDelayMs: 5000 }
+})`,
+  'base.restart.maxRestarts': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { maxRestarts: 3 }
+})`,
+  'base.restart.windowMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  restart: { windowMs: 60000 }
+})`,
+  'base.terminalPolicy': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  terminalPolicy: { mode: 'cooldown', afterMs: 30000 }
+})`,
+  'base.terminalPolicy.mode': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  terminalPolicy: { mode: 'stay' }
+})`,
+  'base.terminalPolicy.afterMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  terminalPolicy: { mode: 'cooldown', afterMs: 30000 }
+})`,
+  'base.stop': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  stop: { beforeTerminate: (handle, signal) => flushPendingWrites(handle, signal) }
+})`,
+  'base.stop.beforeTerminate': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  stop: { beforeTerminate: (handle, signal) => flushPendingWrites(handle, signal) }
+})`,
+  'base.stop.drainTimeoutMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  stop: { drainTimeoutMs: 2000 }
+})`,
+  'base.stop.exitTimeoutMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  stop: { exitTimeoutMs: 1000 }
+})`,
+  'base.stop.reapTimeoutMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  stop: { reapTimeoutMs: 1000 }
+})`,
+  'base.health': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  health: { check: (handle, signal) => checkFormatter(handle, signal) }
+})`,
+  'base.health.check': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  health: { check: (handle, signal) => checkFormatter(handle, signal) }
+})`,
+  'base.health.intervalMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  health: { check: (handle, signal) => checkFormatter(handle, signal), intervalMs: 5000 }
+})`,
+  'base.health.timeoutMs': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  health: { check: (handle, signal) => checkFormatter(handle, signal), timeoutMs: 1000 }
+})`,
+  'base.health.failureThreshold': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  health: { check: (handle, signal) => checkFormatter(handle, signal), failureThreshold: 2 }
+})`,
+  'base.isolation': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  isolation: 'best-effort'
+})`,
+  'base.requires': `import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+
+const supervisor = createCoroutineSupervisor({
+  ...formatterOptions,
+  requires: ['fault-isolation'],
+  isolation: 'best-effort'
+})`,
+  'launch.launcher': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  launcher: rendererLauncher
+})`,
+  'launch.spec': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  spec: rendererSpec
+})`,
+  'launch.budget': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  budget: rendererBudget
+})`,
+  'process.usage': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  usage: { intervalMs: 2000, failureThreshold: 3 }
+})`,
+  'process.usage.intervalMs': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  usage: { intervalMs: 2000 }
+})`,
+  'process.usage.failureThreshold': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  usage: { failureThreshold: 3 }
+})`,
+  'process.output': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  output: { tailBytes: 4096, onChunk: (stream, bytes) => appendRendererOutput(stream, bytes) }
+})`,
+  'process.output.tailBytes': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  output: { tailBytes: 4096 }
+})`,
+  'process.output.onChunk': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  output: { onChunk: (stream, bytes) => appendRendererOutput(stream, bytes) }
+})`,
+  'process.registry': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  registry: { port: processRegistry, namespace: 'preview-renderers' }
+})`,
+  'process.registry.port': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  registry: { port: processRegistry, namespace: 'preview-renderers' }
+})`,
+  'process.registry.namespace': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  registry: { port: processRegistry, namespace: 'preview-renderers' }
+})`,
+  'process.prewarm': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  prewarm: rendererPool
+})`,
+  'process.wallClock': `import { createProcessSupervisor } from '@migaia/supervision/process'
+
+const supervisor = createProcessSupervisor({
+  ...rendererOptions,
+  wallClock: { timestamp: () => Date.now() }
+})`,
+  'budget.kind': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  kind: 'process'
+})`,
+  'budget.maxUnits': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  maxUnits: 2
+})`,
+  'budget.overflow': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  overflow: 'queue'
+})`,
+  'budget.queueTimeoutMs': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  queueTimeoutMs: 5000
+})`,
+  'budget.launchRate': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  launchRate: { max: 4, windowMs: 1000 }
+})`,
+  'budget.launchRate.max': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  launchRate: { max: 4, windowMs: 1000 }
+})`,
+  'budget.launchRate.windowMs': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  launchRate: { max: 4, windowMs: 1000 }
+})`,
+  'budget.parent': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  parent: applicationProcessBudget
+})`,
+  'budget.scheduler': `import { createUnitBudget } from '@migaia/supervision'
+
+const budget = createUnitBudget({
+  ...previewBudgetOptions,
+  scheduler: applicationScheduler
+})`
+}
+/** Reader scenarios keep host ownership and policies in separate situations. */
+export const supervisionOptionCases = {
+  common: [
+    {
+      title: t('Own a formatter for one editor', '为一个编辑器持有格式化任务'),
+      problem: t(
+        'An editor needs one formatter with a recognizable diagnostic name. Give it its own budget and task, report contained failures, and release it when the editor closes.',
+        '编辑器需要一个能在诊断中辨认的格式化任务。为它提供预算与任务，接收受控失败，并在编辑器关闭时释放。'
+      ),
+      example: supervisionOptionExamples.basic,
+      result: t(
+        'The editor shows formatter readiness and releases its task when it closes.',
+        '编辑器显示格式化任务的就绪状态，关闭时释放任务。'
+      ),
+      covers: ['id', 'budget', 'spec', 'report']
+    },
+    {
+      title: t('Wait for a usable formatter', '等格式化服务真正可用'),
+      problem: t(
+        'Starting a formatter task does not prove its service is usable. A ready callback waits for its published service and handshake; the startup deadline bounds the whole attempt.',
+        '格式化任务启动不代表服务已经可用。ready 等待服务发布并完成握手；启动截止时间限制整轮尝试。'
+      ),
+      example: supervisionOptionExamples.ready,
+      result: t(
+        'The editor sees ready only after its service check completes; a slow attempt cannot wait forever.',
+        '服务检查完成后编辑器才看到 ready；启动过慢不会无限等待。'
+      ),
+      covers: ['ready', 'startupTimeoutMs', 'scheduler']
+    },
+    {
+      title: t('Flush writes before stopping', '停止前写完待处理内容'),
+      problem: t(
+        'Closing an editor should flush pending formatter writes before termination. Without beforeTerminate that drain is skipped; separate limits bound draining, graceful exit and forced recovery.',
+        '关闭编辑器时，应先写完格式化任务的待处理内容。不设置 beforeTerminate 会跳过排空；各阶段时限分别限制排空、优雅退出和强制回收。'
+      ),
+      example: supervisionOptionExamples.stop,
+      result: t(
+        'The close path attempts to flush writes before stopping; a failed flush is reported while retirement continues.',
+        '关闭流程先尝试写完待处理内容；写入失败会上报，退役仍会继续。'
+      ),
+      covers: [
+        'report',
+        'stop',
+        'stop.beforeTerminate',
+        'stop.drainTimeoutMs',
+        'stop.exitTimeoutMs',
+        'stop.reapTimeoutMs'
+      ]
+    }
+  ],
+  core: [
+    {
+      title: t('Use the application execution boundary', '使用应用已有的执行边界'),
+      problem: t(
+        'An application already has a launcher and execution profile for its document service. Pass those owners to createSupervisor instead of implementing a second launch lifecycle.',
+        '应用已经有文档服务的启动器与执行策略。将这些现有所有者传给 createSupervisor，无需再实现一套启动生命周期。'
+      ),
+      example: supervisionOptionExamples.custom,
+      result: t(
+        'The editor starts and disposes its existing document service through one supervisor.',
+        '编辑器通过同一个监督器启动和释放现有文档服务。'
+      ),
+      covers: ['id', 'launcher', 'profile', 'spec', 'budget', 'report']
+    },
+    {
+      title: t('Attach formatter diagnostics', '附加格式化服务诊断'),
+      problem: t(
+        'A formatter needs application diagnostics attached only after launch. Hooks use the launched handle and contribute a description to inspect without owning another service.',
+        '格式化服务需要在启动后附加应用诊断。钩子使用已启动句柄，并为 inspect 提供描述，不另行持有服务。'
+      ),
+      example: supervisionOptionExamples.customHooks,
+      result: t(
+        'The diagnostic panel receives the application description of the running formatter.',
+        '诊断面板收到运行中格式化服务的应用描述。'
+      ),
+      covers: ['hooks']
+    }
+  ],
+  budget: [
+    {
+      title: t('Share the application process limit', '共用应用进程总上限'),
+      problem: t(
+        'Preview jobs need a local limit as well as the application-wide process limit. A parent budget applies both; a queued preview waits at most five seconds for capacity.',
+        '预览任务既需要本地上限，也需要遵守应用进程总上限。父预算让两者同时生效；排队预览最多等待五秒。'
+      ),
+      example: supervisionOptionExamples.budgetQueue,
+      result: t(
+        'Preview jobs cannot exceed either capacity limit, and waiting for a slot has a deadline.',
+        '预览任务不能超过任一容量上限，等待名额也有明确截止时间。'
+      ),
+      covers: ['kind', 'maxUnits', 'parent', 'overflow', 'queueTimeoutMs', 'scheduler']
+    },
+    {
+      title: t('Limit bursts of renderer starts', '限制渲染进程突发启动'),
+      problem: t(
+        'Short-lived renderers can restart rapidly even with a small concurrency limit. A launch-rate window limits new grants after old jobs have released their slots.',
+        '即使并发上限较小，短命渲染进程仍可能快速重启。启动速率窗口会在旧任务归还名额后继续限制新授予。'
+      ),
+      example: supervisionOptionExamples.budgetRate,
+      result: t(
+        'At most four starts are granted per second, and full capacity is rejected immediately.',
+        '每秒最多授予四次启动，容量已满时立即拒绝。'
+      ),
+      covers: [
+        'kind',
+        'maxUnits',
+        'overflow',
+        'launchRate',
+        'launchRate.max',
+        'launchRate.windowMs'
+      ]
+    }
+  ],
+  coroutine: [
+    {
+      title: t('Notice a stalled document task', '发现停滞的文档任务'),
+      problem: t(
+        'The document task reports progress through heartbeat, but can stall without returning. A watchdog observes heartbeat age; without it a pending task has no progress deadline.',
+        '文档任务通过 heartbeat 报告进度，却可能一直待定而不返回。看门狗观察心跳年龄；没有它时，待定任务没有进度截止时间。'
+      ),
+      example: supervisionOptionExamples.heartbeat,
+      result: t(
+        'Two consecutive observations of a heartbeat older than ten seconds retire the stalled task.',
+        '连续两次观察到心跳超过十秒未更新后，停滞任务会退役。'
+      ),
+      covers: [
+        'heartbeat',
+        'heartbeat.timeoutMs',
+        'heartbeat.intervalMs',
+        'heartbeat.failureThreshold'
+      ]
+    }
+  ],
+  process: [
+    {
+      title: t('Read renderer output without retaining it all', '查看渲染输出而不全量保留'),
+      problem: t(
+        'A preview service writes long logs. The default keeps 64 KiB per stream; a smaller tail bounds retained output while onChunk streams drained bytes to the support panel.',
+        '预览服务会写很长的日志。默认每条流保留 64 KiB；较小尾部限制留存，onChunk 把已排空字节持续送给支持面板。'
+      ),
+      example: supervisionOptionExamples.processOutput,
+      result: t(
+        'The panel sees incoming output while each diagnostic tail retains at most 4096 bytes.',
+        '面板持续看到输出，每条诊断尾部最多保留 4096 字节。'
+      ),
+      covers: ['output', 'output.tailBytes', 'output.onChunk']
+    },
+    {
+      title: t('Choose the memory sampling cadence', '选择内存采样节奏'),
+      problem: t(
+        'rendererOptions already includes a monitored memory limit and a launcher that samples RSS. Sampling every two seconds reduces polling, while three rejected samples mark the process unhealthy; a successful over-limit sample still acts immediately.',
+        'rendererOptions 已包含受监测的内存限制，启动器能采样常驻内存。两秒一次可减少轮询；连续三次采样拒绝使进程不健康，成功越限样本仍会立即生效。'
+      ),
+      example: supervisionOptionExamples.processUsage,
+      result: t(
+        'The renderer uses the selected sampling cadence without changing its configured memory limit.',
+        '渲染进程按指定节奏采样，不改变已配置的内存限制。'
+      ),
+      covers: ['usage', 'usage.intervalMs', 'usage.failureThreshold']
+    },
+    {
+      title: t('Keep renderer ownership across parent runs', '跨父进程运行保留渲染器所有权'),
+      problem: t(
+        'A restarted preview parent must recover only its own children. A durable application registry records identities under a preview namespace; wallClock supplies their launch timestamps.',
+        '预览父进程重启后只能恢复自己的子进程。应用持久注册表在预览命名空间记录身份，wallClock 提供启动时间戳。'
+      ),
+      example: supervisionOptionExamples.registry,
+      result: t(
+        'Renderer ownership records carry the preview namespace and real launch time for later recovery.',
+        '渲染器所有权记录包含预览命名空间及真实启动时间，供后续恢复使用。'
+      ),
+      covers: ['registry', 'registry.port', 'registry.namespace', 'wallClock']
+    },
+    {
+      title: t('Adopt an already warm renderer', '接管已经预热的渲染器'),
+      problem: t(
+        'A preview request should reuse an idle renderer. Pool and supervisor share rendererOptions, including the same launcher, spec and budget; otherwise the warm process cannot be adopted.',
+        '预览请求需要复用空闲渲染器。池与监督器共用 rendererOptions 中同一启动器、规格和预算，否则不能接管预热进程。'
+      ),
+      example: supervisionOptionExamples.prewarm,
+      result: t(
+        'Once the application has observed an idle renderer, start adopts it for the preview and both owners close afterward.',
+        '应用观察到空闲渲染器后，start 将其接管用于预览，结束后关闭两方所有者。'
+      ),
+      covers: ['prewarm']
+    }
+  ],
+  prewarm: [
+    {
+      title: t('Keep one renderer ready for a preview', '提前保留一个可用渲染器'),
+      problem: t(
+        'A preview server needs one idle renderer rather than a new process for every request. The shared rendererOptions keep warm capacity inside the same process budget as active work.',
+        '预览服务需要一个空闲渲染器，避免每次请求现起进程。共享 rendererOptions 让空闲容量与活动任务使用同一进程预算。'
+      ),
+      example: supervisionOptionExamples.prewarm,
+      result: t(
+        'One warm renderer can be transferred into a preview; unused capacity expires after thirty seconds.',
+        '一个预热渲染器可转交预览使用；未使用的空闲容量在三十秒后退役。'
+      ),
+      covers: ['size', 'idleTimeoutMs']
+    },
+    {
+      title: t('Bound warm-renderer startup and retirement', '限制预热渲染器的启动与退役时间'),
+      problem: t(
+        'A preview pool should not wait indefinitely for a slow startup or shutdown. Its application scheduler applies separate startup, idle, graceful-exit and forced-recovery deadlines.',
+        '预览池不能无限等待缓慢启动或关闭。应用调度器分别限制启动、空闲保留、优雅退出和强制回收时间。'
+      ),
+      example: supervisionOptionExamples.prewarmPolicy,
+      result: t(
+        'Warm processes have bounded startup and retention, with separate one-second retirement phase limits.',
+        '预热进程的启动与保留都有时限，两个退役阶段分别限时一秒。'
+      ),
+      covers: [
+        'size',
+        'startupTimeoutMs',
+        'idleTimeoutMs',
+        'exitTimeoutMs',
+        'reapTimeoutMs',
+        'scheduler'
+      ]
+    },
+    {
+      title: t('Disable idle renderers in a small deployment', '小规模部署关闭空闲渲染器'),
+      problem: t(
+        'A low-traffic deployment uses the same pool wiring but cannot reserve an idle process. Setting the required size to zero keeps the pool without launching warm children.',
+        '低流量部署使用相同的池接线，却不能预留空闲进程。将必填 size 设为零，可保留池对象而不启动预热子进程。'
+      ),
+      example: supervisionOptionExamples.prewarmDisabled,
+      result: t(
+        'The registered pool holds no idle renderer or process-budget lease.',
+        '登记的池不会持有空闲渲染器，也不占用进程预算租约。'
+      ),
+      covers: ['size']
+    }
+  ],
+  thread: [
+    {
+      title: t('Require native worker termination', '要求原生工作线程可终止'),
+      problem: t(
+        'An image editor must be able to retire its worker. Required isolation checks the application launcher guarantees before launch, rather than silently accepting cooperative-only termination.',
+        '图像编辑器必须能够退役工作线程。严格隔离在启动前检查应用启动器的保证，不会静默接受仅协作终止。'
+      ),
+      example: supervisionOptionExamples.thread,
+      result: t(
+        'The image worker starts only with the requested guarantees and closes with its editor.',
+        '图像工作线程只在具备所需保证时启动，并随编辑器关闭。'
+      ),
+      covers: ['budget', 'requires', 'isolation']
+    },
+    {
+      title: t('Wait for the image worker handshake', '等待图像工作线程握手'),
+      problem: t(
+        'Worker creation does not prove its image service is ready. An application handshake must finish within two seconds before callers can use it.',
+        '创建线程不代表图像服务已经就绪。应用握手须在两秒内完成，调用方随后才能使用。'
+      ),
+      example: supervisionOptionExamples.threadHealth,
+      result: t(
+        'The editor sees ready only after the worker handshake succeeds.',
+        '工作线程握手成功后，编辑器才看到 ready。'
+      ),
+      covers: ['ready', 'startupTimeoutMs']
+    },
+    {
+      title: t('Detect an unresponsive image worker', '发现失去响应的图像工作线程'),
+      problem: t(
+        'An image worker can stay alive while its service stops responding. Periodic application checks detect that condition; without health, no such monitor is installed.',
+        '图像线程可能仍存活，服务却已失去响应。周期应用检查可发现这种情况；没有 health 就不会安装该监测。'
+      ),
+      example: supervisionOptionExamples.threadMonitor,
+      result: t(
+        'Two consecutive failed checks invalidate readiness and enter the existing restart policy.',
+        '连续两次检查失败会使就绪状态失效，并进入既有重启策略。'
+      ),
+      covers: [
+        'health',
+        'health.check',
+        'health.intervalMs',
+        'health.timeoutMs',
+        'health.failureThreshold'
+      ]
+    }
+  ],
+  guard: [
+    {
+      title: t('Flush child writes after parent disconnect', '父连接断开后写完子进程待处理内容'),
+      problem: t(
+        'The child owns the parent-disconnect event. Wire it to the guard so pending writes get a bounded shutdown attempt before the application exit callback runs.',
+        '子进程应用持有父连接断开事件。将事件接入守卫，可在应用退出回调执行前，给待处理写入一次限时关闭机会。'
+      ),
+      example: supervisionOptionExamples.guard,
+      result: t(
+        'Parent disconnect starts one shutdown; completion requests a clean exit and deadline expiry requests a failure exit.',
+        '父连接断开后只启动一次关闭；完成时请求正常退出，到期则请求失败退出。'
+      ),
+      covers: ['shutdown', 'exit', 'report', 'graceMs', 'scheduler']
+    },
+    {
+      title: t('Report shutdown failures before exit', '退出前报告关闭失败'),
+      problem: t(
+        'Closing child resources can reject. The required reporter preserves that failure, while the application exit callback prevents the disconnected child from waiting forever.',
+        '子进程资源关闭可能拒绝。必填报告器保留失败，应用退出回调让失去父连接的子进程不会无限等待。'
+      ),
+      example: supervisionOptionExamples.guardFailure,
+      result: t(
+        'A rejected shutdown reaches monitoring and requests exit code one.',
+        '关闭拒绝会交给监控，并请求退出码一。'
+      ),
+      covers: ['shutdown', 'exit', 'report']
+    }
+  ],
+  reclaim: [
+    {
+      title: t('Recover preview children from a previous run', '恢复上轮运行遗留的预览子进程'),
+      problem: t(
+        'A preview parent restarts with durable records of its children. The namespace limits recovery to previews, while the application launcher verifies process identity before termination.',
+        '预览父进程重启后读取子进程的持久记录。命名空间把恢复限制在预览服务，应用启动器则在终止前核对进程身份。'
+      ),
+      example: supervisionOptionExamples.reclaim,
+      result: t(
+        'The application receives a recovery summary for its preview namespace; reused process IDs are not blindly terminated.',
+        '应用收到预览命名空间的恢复摘要，不会盲目终止已复用的进程编号。'
+      ),
+      covers: ['registry', 'namespace', 'launcher', 'report']
+    },
+    {
+      title: t('Show a registry outage during recovery', '恢复时展示注册表不可用'),
+      problem: t(
+        'An unavailable registry must not lead to blind cleanup. A failed list is collected and reported, so the application can warn the operator without probing or deleting unknown records.',
+        '注册表不可用时不能盲目清理。列举失败会被收集并上报，应用可提示操作人员，不会探测或删除未知记录。'
+      ),
+      example: supervisionOptionExamples.reclaimFailure,
+      result: t(
+        'A list failure shows a recovery warning and leaves process ownership unchanged.',
+        '列举失败时显示恢复警告，进程所有权不变。'
+      ),
+      covers: ['registry', 'namespace', 'launcher', 'report']
+    }
+  ]
+}
+supervisionOptionCases.core.unshift(...supervisionOptionCases.common)
+supervisionOptionCases.coroutine.unshift(...supervisionOptionCases.common)
+supervisionOptionCases.process.unshift(...supervisionOptionCases.common.slice(1))

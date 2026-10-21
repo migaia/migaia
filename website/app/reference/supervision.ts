@@ -4,7 +4,12 @@
  * parent leases release first. Coroutine heartbeat.intervalMs defaults to timeoutMs and its
  * failureThreshold defaults to one, distinct from health-check and process-sampling defaults.
  */
-import { supervisionCases } from './supervision-cases.js'
+import {
+  supervisionCases,
+  supervisionOptionCases,
+  supervisionOptionFieldExamples as fieldExamples,
+  supervisionOptionExamples as optionExamples
+} from './supervision-cases.js'
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 
 /** Keeps both locales on every reader-facing node. */
@@ -1200,6 +1205,90 @@ domains.SupervisionErrorText = {
   ),
   values: errors
 }
+/** Each common field has a short example at its own configuration boundary. */
+for (const [field, doc] of Object.entries(base)) {
+  Object.assign(doc, { example: fieldExamples['base.' + field] })
+}
+Object.assign(report, {
+  whenToUse: t(
+    'Supply a synchronous nonthrowing sink for contained failures. A failed drain is reported while retirement continues. Reporting does not retry work or complete shutdown; this callback is required.',
+    '提供同步、不抛错的失败接收器。排空失败会上报，退役仍继续。上报不会重试工作，也不会代替完成关闭；此回调为必填项。'
+  ),
+  example: optionExamples.stop
+})
+Object.assign(scheduler, { example: fieldExamples['base.scheduler'] })
+Object.assign(base.ready!, {
+  whenToUse: t(
+    'Set ready when creating a handle does not yet make its service usable. Resolve after the handshake; rejection fails startup and follows restart policy. Omit it to accept launch completion as readiness.',
+    '创建句柄后服务仍需握手时设置 ready。握手成功后兑现，拒绝会使启动失败并沿重启策略处理。省略时启动完成就视为就绪。'
+  )
+})
+Object.assign(base['restart.mode']!, {
+  whenToUse: t(
+    'Use on-failure to retry crashes but stop after normal completion. never disables automatic retries; always also restarts normal exits. Omission selects on-failure. The task follows the configured backoff when a startup attempt fails.',
+    '崩溃后需要重试、正常结束后应停止时使用 on-failure。never 关闭自动重试，always 也会重启正常退出。省略时使用 on-failure。启动尝试失败后，任务按所配置的退避策略处理。'
+  )
+})
+Object.assign(base['terminalPolicy.mode']!, {
+  whenToUse: t(
+    'Choose stay when an operator must intervene after restart exhaustion. cooldown reopens admission after afterMs. Omitting terminalPolicy keeps the stay behavior. Disposal permanently closes either policy.',
+    '重启耗尽后需要人工介入时选择 stay；cooldown 在 afterMs 后重新准入。省略 terminalPolicy 时保持等待。释放则永久关闭任一种策略。'
+  )
+})
+for (const field of ['stop', 'stop.beforeTerminate'])
+  Object.assign(base[field]!, {
+    whenToUse: t(
+      'Set beforeTerminate to drain pending application work before termination. Resolve after flushing; rejection is reported and retirement continues. drainTimeoutMs, exitTimeoutMs and reapTimeoutMs bound separate phases. Omit the callback to skip draining; omitted phase limits are 5000 ms.',
+      '终止前需要排空应用待处理工作时设置 beforeTerminate。写完后兑现，拒绝会上报但继续退役。drainTimeoutMs、exitTimeoutMs 和 reapTimeoutMs 分别限制不同阶段。省略回调就跳过排空，省略阶段时限则各为 5000 毫秒。'
+    )
+  })
+for (const field of ['health', 'health.check'])
+  Object.assign(base[field]!, {
+    whenToUse: t(
+      'Set health for a service that can become unresponsive without exiting. check resolves on success; rejection or timeout counts toward failureThreshold. Reaching that threshold invalidates readiness. Omit health for no periodic checks; coroutine heartbeat cannot coexist with it.',
+      '服务可能不退出却失去响应时设置 health。check 成功时兑现，拒绝或超时累计到 failureThreshold。达到阈值后使就绪状态失效。省略时不执行周期检查，协程心跳不能与它同时配置。'
+    )
+  })
+Object.assign(base.isolation!, {
+  whenToUse: t(
+    'Keep required, the default, when requested capabilities must be enforced or monitored; weaker declarations fail construction. Choose best-effort only when weaker guarantees are acceptable. This coroutine cannot isolate faults, so its additional fault-isolation requirement appears in degraded diagnostics.',
+    '要求能力均由强制或监测保证时，保留默认 required；声明较弱会使构造失败。只有能接受较弱保证时才选择 best-effort。本协程无法隔离故障，额外要求的 fault-isolation 会出现在降级诊断中。'
+  )
+})
+for (const [field, doc] of Object.entries(launchFields))
+  Object.assign(doc, {
+    example: fieldExamples['launch.' + field]
+  })
+for (const [field, doc] of Object.entries(processFields)) {
+  if (field === 'launcher' || field === 'spec' || field === 'budget') continue
+  Object.assign(doc, {
+    example: fieldExamples['process.' + field]
+  })
+}
+for (const field of ['output', 'output.onChunk'])
+  Object.assign(processFields[field]!, {
+    whenToUse: t(
+      'Set output to keep smaller diagnostic tails, and onChunk to observe drained bytes as they arrive. The synchronous observer returns void; a throw is reported without stopping the drain. Omission keeps 65536 bytes per stream and installs no observer. The observer sees arriving bytes while the retained tail is bounded.',
+      '需要更小的诊断尾部时设置 output，需要随到随看排空字节时设置 onChunk。同步观察者返回空值，抛错会上报而不停止排空。省略时每条流保留 65536 字节，不安装观察者。观察者收到到达的字节，留存尾部仍受大小限制。'
+    )
+  })
+for (const [field, doc] of Object.entries(budgetOptions))
+  Object.assign(doc, {
+    example: fieldExamples['budget.' + field]
+  })
+Object.assign(budgetOptions.overflow!, {
+  whenToUse: t(
+    'Use reject for immediate overload feedback: full capacity returns full. queue waits in FIFO order until a slot or queueTimeoutMs; omission currently queues too. The parent-budget example queues for at most five seconds; the rate example rejects overload immediately.',
+    '需要立即反馈过载时使用 reject，容量满返回 full。queue 按先进先出等待名额或 queueTimeoutMs，当前省略也会排队。父预算示例最多排队五秒，速率示例立即拒绝过载。'
+  )
+})
+Object.assign(budgetOptions.launchRate!, {
+  whenToUse: t(
+    'Configure max and windowMs to limit rapid starts even after prior slots are released. false disables that sliding grant window but retains maxUnits. Omission allows eight grants in 1000 ms. The example permits four grants per second.',
+    '前次名额已释放后仍需限制快速启动时，配置 max 与 windowMs。false 关闭滑动授予窗口，仍保留 maxUnits 并发限制。省略时 1000 毫秒允许八次授予。示例每秒允许四次授予。'
+  )
+})
+
 /** Complete bilingual surface for the core and its three profile entry points. */
 export const reference: ILibraryReference = {
   modules: {
@@ -1343,16 +1432,31 @@ export const reference: ILibraryReference = {
         'Creates an idempotent parent-loss trigger that runs one cancellable shutdown and requests exit code zero on success or one on failure or deadline.',
         '创建幂等父进程丢失触发器，执行一次可取消关闭；成功请求退出码零，失败或截止请求退出码一。'
       ),
+      optionCases: supervisionOptionCases.guard,
       optionDocs: {
-        shutdown: p(
-          'Application shutdown callback receives the guard cancellation signal and returns a PromiseLike resolving after cleanup. A throw or rejection is reported, then requests forced exit.',
-          '应用关闭回调接收守卫取消信号，返回清理结束后兑现的承诺；抛错或拒绝会上报并请求强制退出。'
-        ),
-        exit: p(
-          'Application synchronous exit callback receives ParentLossExitCode zero on shutdown completion or one on failure/deadline; its own throws propagate.',
-          '应用同步退出回调接收 `ParentLossExitCode`：关闭完成为零，失败或截止为一；自身抛错直接传播。'
-        ),
-        report,
+        shutdown: {
+          example: optionExamples.guard,
+          whenToUse: t(
+            'Provide the cleanup to run once on parent loss. Resolve within graceMs for exit zero; throw or reject for exit one and reporting. This callback is required.',
+            '提供父进程丢失后只执行一次的清理。graceMs 内兑现则退出码为零，抛错或拒绝则上报并请求一。此回调必填。'
+          ),
+          ...p(
+            'Application shutdown callback receives the guard cancellation signal and returns a PromiseLike resolving after cleanup. A throw or rejection is reported, then requests forced exit.',
+            '应用关闭回调接收守卫取消信号，返回清理结束后兑现的承诺；抛错或拒绝会上报并请求强制退出。'
+          )
+        },
+        exit: {
+          example: optionExamples.guard,
+          whenToUse: t(
+            'Provide the child runtime exit operation. Zero means cleanup completed; one means failure or deadline. Here a recorder shows the request. The callback is required and its own throws propagate.',
+            '提供子进程运行时的退出操作。零代表清理完成，一代表失败或截止。此处用记录器展示请求。回调必填，自身抛错会传播。'
+          ),
+          ...p(
+            'Application synchronous exit callback receives ParentLossExitCode zero on shutdown completion or one on failure/deadline; its own throws propagate.',
+            '应用同步退出回调接收 `ParentLossExitCode`：关闭完成为零，失败或截止为一；自身抛错直接传播。'
+          )
+        },
+        report: { ...report, example: optionExamples.guardFailure },
         graceMs: p(
           'Finite positive shutdown deadline in scheduler milliseconds; expiry aborts shutdown before requesting forced exit.',
           '关闭截止时间的调度器毫秒数，须为有限正数；到期先中止关闭再请求强制退出。',
@@ -1380,6 +1484,7 @@ export const reference: ILibraryReference = {
         'Scans one durable namespace and probes fingerprints before reclaiming prior processes. Only original live identities are terminated; reused PIDs only lose stale records.',
         '扫描持久命名空间并先检查指纹再恢复旧进程；只终止原始存活身份，已复用编号仅移除旧记录。'
       ),
+      optionCases: supervisionOptionCases.reclaim,
       optionDocs: {
         registry: p(
           'Application-owned durable IProcessRegistry supplies namespace records and removes only successfully reclaimed entries.',
@@ -1390,7 +1495,14 @@ export const reference: ILibraryReference = {
           'Application runtime launcher must implement probe(record) and terminateRecord(record); fingerprint checks precede every actual termination.',
           '应用运行启动器必须实现 `probe(record)` 和 `terminateRecord(record)`；每次实际终止前先检查指纹。'
         ),
-        report
+        report: {
+          ...report,
+          example: optionExamples.reclaimFailure,
+          whenToUse: t(
+            'Record recovery failures without throwing. A failed listing reports ORPHAN_RECLAIM_FAILED and leaves every record untouched. Reporting is required; it does not retry recovery.',
+            '记录恢复失败且不抛错。列举失败会上报 ORPHAN_RECLAIM_FAILED，保留所有记录。上报为必填项，不会代替重试恢复。'
+          )
+        }
       },
       params: {
         options: t(
@@ -1415,6 +1527,7 @@ export const reference: ILibraryReference = {
     IProcessBudget: budgetType,
     IThreadBudget: budgetType,
     IUnitBudgetOptions: {
+      optionCases: supervisionOptionCases.budget,
       summary: t(
         'Application configuration for one concurrency budget and optional same-kind parent.',
         '应用为单个并发预算及可选同种父预算提供的配置。'
@@ -1422,6 +1535,7 @@ export const reference: ILibraryReference = {
       members: budgetOptions
     },
     ISupervisorBaseOptions: {
+      optionCases: supervisionOptionCases.common,
       summary: t(
         'Shared readiness, restart, drain and health policy used by every execution profile.',
         '所有执行单元策略共用的就绪、重启、排空及健康配置。'
@@ -1429,6 +1543,7 @@ export const reference: ILibraryReference = {
       members: base
     },
     ISupervisorOptions: {
+      optionCases: supervisionOptionCases.core,
       summary: t(
         'Custom unit construction policy joining runtime adapter, profile and application ownership.',
         '连接运行时适配器、单元策略及应用所有权的自定义单元构造配置。'
@@ -1436,15 +1551,21 @@ export const reference: ILibraryReference = {
       members: {
         ...base,
         ...launchFields,
-        profile: p(
-          'Application-supplied `IUnitProfile` owns validation, required capabilities, termination and exit classification.',
-          '应用提供的 `IUnitProfile` 负责校验、必需能力、终止及退出分类。'
-        ),
-        hooks: p(
-          'Optional `ISupervisionHooks` supplied by the outer adapter for adoption, attachment and diagnostics.',
-          '外层适配器提供的可选 `ISupervisionHooks`，用于接管、附加和诊断。',
-          t('Absent: no adapter extension hooks run.', '默认不设置，不运行适配扩展钩子。')
-        )
+        profile: {
+          example: optionExamples.custom,
+          ...p(
+            'Application-supplied `IUnitProfile` owns validation, required capabilities, termination and exit classification.',
+            '应用提供的 `IUnitProfile` 负责校验、必需能力、终止及退出分类。'
+          )
+        },
+        hooks: {
+          example: optionExamples.customHooks,
+          ...p(
+            'Optional `ISupervisionHooks` supplied by the outer adapter for adoption, attachment and diagnostics.',
+            '外层适配器提供的可选 `ISupervisionHooks`，用于接管、附加和诊断。',
+            t('Absent: no adapter extension hooks run.', '默认不设置，不运行适配扩展钩子。')
+          )
+        }
       }
     },
     IUnitIdentity: {
@@ -2077,6 +2198,7 @@ export const reference: ILibraryReference = {
       }
     },
     ICoroutineSupervisorOptions: {
+      optionCases: supervisionOptionCases.coroutine,
       summary: t(
         'Cooperative task policy with optional heartbeat monitoring; heartbeat and health cannot coexist.',
         '协作任务配置及可选心跳监测；心跳与健康检查不能同时配置。'
@@ -2085,11 +2207,14 @@ export const reference: ILibraryReference = {
         ...base,
         spec: launchFields.spec,
         budget: launchFields.budget,
-        heartbeat: p(
-          'Optional heartbeat-age watchdog observing task progress rather than native health.',
-          '可选心跳年龄看门狗，观察任务推进而非原生健康状态。',
-          t('Absent: no heartbeat watchdog is installed.', '默认不设置，不安装心跳看门狗。')
-        ),
+        heartbeat: {
+          example: optionExamples.heartbeat,
+          ...p(
+            'Optional heartbeat-age watchdog observing task progress rather than native health.',
+            '可选心跳年龄看门狗，观察任务推进而非原生健康状态。',
+            t('Absent: no heartbeat watchdog is installed.', '默认不设置，不安装心跳看门狗。')
+          )
+        },
         'heartbeat.timeoutMs': p(
           'Finite positive maximum scheduler age since the last explicit or iterator heartbeat.',
           '距上次显式或迭代心跳的最大调度器时长，须为有限正毫秒数。'
@@ -2212,6 +2337,7 @@ export const reference: ILibraryReference = {
       }
     },
     IProcessSupervisorOptions: {
+      optionCases: supervisionOptionCases.process,
       summary: t(
         'Process profile construction with optional usage monitoring, output tails, registry and prewarm adoption.',
         '进程策略构造配置，包括可选用量监测、输出尾部、注册表和预热接管。'
@@ -2219,6 +2345,7 @@ export const reference: ILibraryReference = {
       members: { ...base, ...processFields }
     },
     IPrewarmPoolOptions: {
+      optionCases: supervisionOptionCases.prewarm,
       summary: t(
         'Bounded idle-process ownership policy using the same budget and launcher as consumers.',
         '使用与消费方相同预算和启动器的有界空闲进程所有权配置。'
@@ -2247,8 +2374,8 @@ export const reference: ILibraryReference = {
           '未使用预热句柄退役前的最大空闲保留时长，须有限且非负；零表示立即到期。',
           t('`60000` milliseconds of idle retention.', '默认空闲最多保留 `60000` 毫秒。')
         ),
-        exitTimeoutMs: base['stop.exitTimeoutMs'],
-        reapTimeoutMs: base['stop.reapTimeoutMs']
+        exitTimeoutMs: { ...base['stop.exitTimeoutMs'], example: optionExamples.prewarmPolicy },
+        reapTimeoutMs: { ...base['stop.reapTimeoutMs'], example: optionExamples.prewarmPolicy }
       }
     },
     IPrewarmPool: {
@@ -2775,6 +2902,7 @@ export const reference: ILibraryReference = {
       }
     },
     IThreadSupervisorOptions: {
+      optionCases: supervisionOptionCases.thread,
       summary: t(
         'Native worker construction policy sharing the core readiness and lifecycle commands.',
         '原生工作线程构造策略，共用核心就绪和生命周期命令。'

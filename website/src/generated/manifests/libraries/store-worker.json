@@ -2487,7 +2487,7 @@
           "name": "createStoreWorkerAggregateError",
           "kind": "function",
           "signature": "export declare function createStoreWorkerAggregateError(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string): AggregateError;",
-          "declarationLine": 10,
+          "declarationLine": 18,
           "source": "packages/store-worker/dist/errors.d.ts",
           "purpose": "Creates native AggregateError with source @migaia/store-worker and selected code, preserving native type, stack and original failure reachability.",
           "core": "code: Actual failure value from StoreWorkerErrorCode.\nerrors: Original failures retained in AggregateError.errors in caller order.\nmessage: Caller-provided readable diagnostic message.\nTagged error object returned without throwing it; inspect source and code together.",
@@ -2635,7 +2635,7 @@
           "name": "createStoreWorkerError",
           "kind": "function",
           "signature": "export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
-          "declarationLine": 6,
+          "declarationLine": 11,
           "source": "packages/store-worker/dist/errors.d.ts",
           "purpose": "Creates native Error with source @migaia/store-worker and selected code, preserving native type, stack and original failure reachability.",
           "core": "code: Actual failure value from StoreWorkerErrorCode.\nmessage: Caller-provided readable diagnostic message.\nTagged error object returned without throwing it; inspect source and code together.\ncause: Non-undefined original failure attached unchanged as cause.\nOmitted: no cause attached.",
@@ -2799,7 +2799,7 @@
           "name": "createWorkerHandler",
           "kind": "function",
           "signature": "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
-          "declarationLine": 31,
+          "declarationLine": 68,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "Registers one worker-side computation with the canonical RPC provider. Pair it with WorkerAdapter; connect returned callback to host message delivery explicitly.",
           "core": "compute: Synchronous or async callback (payload: Input, {signal: INativeAbortSignal}) returning Output or Promise<Output>. Reads/throws/rejections follow RPC provider handling; check signal cooperatively for long work.\npostMessage: Synchronous callback receiving raw reply/control envelopes, normally message => workerGlobal.postMessage(message); return void, host send errors follow transport failure handling.\nCallable IManagedRpcHandler: await handler(rawMessage) for delivery, then close/dispose for endpoint cleanup. Compute failures are replies, while initialization/delivery failures can reject the callback.\ntimeoutMs: Forwarded endpoint option; this provider helper does not apply it as a compute execution deadline. Set request deadline on the main-side adapter.\nundefined: no endpoint request deadline is supplied.",
@@ -2923,7 +2923,7 @@
           "name": "IByteOwnership",
           "kind": "type",
           "signature": "export type IByteOwnership = (typeof WorkerByteOwnership)[keyof typeof WorkerByteOwnership];",
-          "declarationLine": 34,
+          "declarationLine": 39,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "Value union copy or transfer from WorkerByteOwnership; policy selection never proves exclusive ownership of a buffer.",
           "core": "Value union copy or transfer from WorkerByteOwnership; policy selection never proves exclusive ownership of a buffer.",
@@ -2987,8 +2987,8 @@
         {
           "name": "IManagedRpcHandler",
           "kind": "type",
-          "signature": "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same * promise. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };",
-          "declarationLine": 9,
+          "signature": "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };",
+          "declarationLine": 11,
           "source": "packages/store-worker/dist/managed-rpc-handler.d.ts",
           "purpose": "Callable (message: unknown) => Promise<void> from either handler factory. Message is raw event.data; it awaits readiness and delivery, not compute completion. Terminal calls resolve without delivery; init/delivery failures reject. Attach host listener yourself and remove it yourself at teardown.",
           "core": "pendingCount: Count of managed message callback invocations awaiting endpoint readiness/delivery and one microtask; this is not provider computation concurrency or unfinished RPC requests.\ndisposed: True after close/dispose starts; later message invocations resolve without delivery.\nclose: Idempotently stops new managed message delivery synchronously; does not unregister host onmessage or release endpoint/resources.\nVoid once unavailable; endpoint cleanup still requires dispose.\ndispose: Closes, awaits readiness, then unsubscribes provider routes and disposes the endpoint. Repeated/concurrent calls share one Promise. It does not terminate the Worker or dispose the supplied parser.\nStable Promise<void>; endpoint initialization and cleanup failures reject.",
@@ -3005,7 +3005,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dispose(): Promise<void>;",
-              "description": "Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup failures reject the promise instead of being swallowed. Repeated calls return the same promise.",
+              "description": "Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup failures reject the promise instead of being swallowed. Repeated calls return the same promise. This does not detach the caller's native message listener or dispose a supplied serialization parser; those resources remain with their owner.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             },
@@ -3023,7 +3023,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly pendingCount: number;",
-              "description": null,
+              "description": "Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -3032,7 +3032,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly disposed: boolean;",
-              "description": null,
+              "description": "Terminal admission marker, set synchronously before asynchronous endpoint cleanup.",
               "parameterDetails": [],
               "returns": "boolean"
             }
@@ -3041,7 +3041,7 @@
           "aliasOf": "IManagedRpcHandler",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same * promise. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };"
+            "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };"
           ],
           "overloadParameterDetails": [[], []],
           "overloadReturns": [],
@@ -3080,7 +3080,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/managed-rpc-handler.d.ts:IManagedRpcHandler:export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same * promise. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };",
+          "identity": "packages/store-worker/dist/managed-rpc-handler.d.ts:IManagedRpcHandler:export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -3090,7 +3090,7 @@
           "name": "IStoreWorkerErrorCode",
           "kind": "type",
           "signature": "export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];",
-          "declarationLine": 49,
+          "declarationLine": 50,
           "source": "packages/store-worker/dist/error-code.d.ts",
           "purpose": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions.",
           "core": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions.",
@@ -3200,11 +3200,11 @@
         {
           "name": "IWorkerComputedOptions",
           "kind": "type",
-          "signature": "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };",
-          "declarationLine": 36,
+          "signature": "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */ readonly runtime?: IRuntime; /** Optional synchronous transfer-list selector per input; omitted means no explicit transfer list. */ readonly transfer?: (input: Input) => readonly unknown[]; };",
+          "declarationLine": 77,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "Resource IResourceOptions plus Runtime selection and per-fetch transfer callback; known fields are read once before Resource ownership and auto-start.",
-          "core": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries.",
+          "core": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries.\nSet it when the caller can give up native buffer ownership after sending an input. Return a synchronous transfer list; aliases can detach even if the request later fails. Omission sends no explicit list.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3218,7 +3218,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly runtime?: IRuntime;",
-              "description": null,
+              "description": "Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource.",
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -3227,7 +3227,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly transfer?: (input: Input) => readonly unknown[];",
-              "description": null,
+              "description": "Optional synchronous transfer-list selector per input; omitted means no explicit transfer list.",
               "parameterDetails": [],
               "returns": "(input: Input) => readonly unknown[]"
             }
@@ -3235,7 +3235,7 @@
           "composes": ["IResourceOptions"],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };"
+            "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */ readonly runtime?: IRuntime; /** Optional synchronous transfer-list selector per input; omitted means no explicit transfer list. */ readonly transfer?: (input: Input) => readonly unknown[]; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3265,7 +3265,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries."
+              "content": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries.\nSet it when the caller can give up native buffer ownership after sending an input. Return a synchronous transfer list; aliases can detach even if the request later fails. Omission sends no explicit list."
             },
             {
               "id": "advanced-usage",
@@ -3274,7 +3274,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerComputedOptions:export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };",
+          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerComputedOptions:export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */ readonly runtime?: IRuntime; /** Optional synchronous transfer-list selector per input; omitted means no explicit transfer list. */ readonly transfer?: (input: Input) => readonly unknown[]; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3284,7 +3284,7 @@
           "name": "IWorkerDiagnosticType",
           "kind": "type",
           "signature": "export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType];",
-          "declarationLine": 33,
+          "declarationLine": 37,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "The single literal worker, used as default codec diagnostic and plugin format label.",
           "core": "The single literal worker, used as default codec diagnostic and plugin format label.",
@@ -3349,7 +3349,7 @@
           "name": "IWorkerPort",
           "kind": "type",
           "signature": "export type IWorkerPort = IWebWorkerLikePort;",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "Alias of rpc-core/adapters/web-worker IWebWorkerLikePort; dedicated Worker, MessagePort and compatible listener-based hosts implement this external protocol.",
           "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.message: Raw envelope received from the transport.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.",
@@ -3686,8 +3686,8 @@
         {
           "name": "WorkerAdapter",
           "kind": "class",
-          "signature": "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }",
-          "declarationLine": 8,
+          "signature": "export declare class WorkerAdapter { #private; /** * Borrows port and captures client options once; options default to an empty object. clientId * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default, * leaving requests without an application deadline. Invalid options throw locally; endpoint setup * failures surface through request/dispose rather than making the constructor async. */ constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); /** Whether close/dispose has fenced new requests, independently of cleanup completion. */ get disposed(): boolean; /** * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a * static expectation rather than runtime schema validation. Captures optional signal and transfer * once before asynchronous admission; both default to undefined. Transfer is explicit and may * detach listed buffers when sent, without establishing zero-copy payload delivery. Invalid * options or terminal admission reject, as do RPC/remote failures. Cancellation asks a * cooperative provider to stop and does not undo completed effects or forcibly terminate it. */ request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. The borrowed physical port/Worker remains caller-owned. */ dispose(): Promise<void>; }",
+          "declarationLine": 19,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "Creates a main-side client that asynchronously initializes a canonical worker endpoint; requests await readiness automatically. Pair it with createWorkerHandler on the worker. It borrows the supplied Worker and never terminates it.",
           "core": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nundefined: no default request deadline is supplied.",
@@ -3724,7 +3724,7 @@
               "kind": "get",
               "optional": false,
               "signature": "get disposed(): boolean;",
-              "description": null,
+              "description": "Whether close/dispose has fenced new requests, independently of cleanup completion.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -3733,7 +3733,7 @@
               "kind": "method",
               "optional": false,
               "signature": "request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>;",
-              "description": null,
+              "description": "Waits for endpoint setup and the remote computation, returning its decoded result; Output is a static expectation rather than runtime schema validation. Captures optional signal and transfer once before asynchronous admission; both default to undefined. Transfer is explicit and may detach listed buffers when sent, without establishing zero-copy payload delivery. Invalid options or terminal admission reject, as do RPC/remote failures. Cancellation asks a cooperative provider to stop and does not undo completed effects or forcibly terminate it.",
               "parameterDetails": [
                 {
                   "name": "payload",
@@ -3762,7 +3762,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dispose(): Promise<void>;",
-              "description": "Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls return the same promise.",
+              "description": "Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls return the same promise. The borrowed physical port/Worker remains caller-owned.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             }
@@ -3770,7 +3770,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }"
+            "export declare class WorkerAdapter { #private; /** * Borrows port and captures client options once; options default to an empty object. clientId * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default, * leaving requests without an application deadline. Invalid options throw locally; endpoint setup * failures surface through request/dispose rather than making the constructor async. */ constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); /** Whether close/dispose has fenced new requests, independently of cleanup completion. */ get disposed(): boolean; /** * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a * static expectation rather than runtime schema validation. Captures optional signal and transfer * once before asynchronous admission; both default to undefined. Transfer is explicit and may * detach listed buffers when sent, without establishing zero-copy payload delivery. Invalid * options or terminal admission reject, as do RPC/remote failures. Cancellation asks a * cooperative provider to stop and does not undo completed effects or forcibly terminate it. */ request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. The borrowed physical port/Worker remains caller-owned. */ dispose(): Promise<void>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -3835,7 +3835,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }",
+          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; /** * Borrows port and captures client options once; options default to an empty object. clientId * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default, * leaving requests without an application deadline. Invalid options throw locally; endpoint setup * failures surface through request/dispose rather than making the constructor async. */ constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); /** Whether close/dispose has fenced new requests, independently of cleanup completion. */ get disposed(): boolean; /** * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a * static expectation rather than runtime schema validation. Captures optional signal and transfer * once before asynchronous admission; both default to undefined. Transfer is explicit and may * detach listed buffers when sent, without establishing zero-copy payload delivery. Invalid * options or terminal admission reject, as do RPC/remote failures. Cancellation asks a * cooperative provider to stop and does not undo completed effects or forcibly terminate it. */ request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. The borrowed physical port/Worker remains caller-owned. */ dispose(): Promise<void>; }",
           "guidance": [],
           "usageScore": 138,
           "configuration": [
@@ -3861,8 +3861,8 @@
         {
           "name": "WorkerByteOwnership",
           "kind": "const",
-          "signature": "export declare const WorkerByteOwnership: { readonly copy: 'copy'; readonly transfer: 'transfer'; };",
-          "declarationLine": 6,
+          "signature": "export declare const WorkerByteOwnership: { /** Default policy: do not place an input buffer in the native transfer list. */ readonly copy: 'copy'; /** Request transfer for full exclusive ArrayBuffer-backed byte views; other views are copied. */ readonly transfer: 'transfer'; };",
+          "declarationLine": 7,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "Input byte transfer-list policy constants. Native transfer ownership risks remain even though current portable conversion does not promise zero-copy.",
           "core": "copy: Select no transfer entries; the original input remains caller-owned.\ntransfer: Select a complete ordinary ArrayBuffer; native send can detach all aliases and failed work does not restore it.",
@@ -3879,7 +3879,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly copy: 'copy';",
-              "description": null,
+              "description": "Default policy: do not place an input buffer in the native transfer list.",
               "parameterDetails": [],
               "returns": "'copy'"
             },
@@ -3888,7 +3888,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly transfer: 'transfer';",
-              "description": null,
+              "description": "Request transfer for full exclusive ArrayBuffer-backed byte views; other views are copied.",
               "parameterDetails": [],
               "returns": "'transfer'"
             }
@@ -3897,7 +3897,7 @@
           "aliasOf": "WorkerByteOwnership",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const WorkerByteOwnership: { readonly copy: 'copy'; readonly transfer: 'transfer'; };"
+            "export declare const WorkerByteOwnership: { /** Default policy: do not place an input buffer in the native transfer list. */ readonly copy: 'copy'; /** Request transfer for full exclusive ArrayBuffer-backed byte views; other views are copied. */ readonly transfer: 'transfer'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3936,7 +3936,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerByteOwnership:export declare const WorkerByteOwnership: { readonly copy: 'copy'; readonly transfer: 'transfer'; };",
+          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerByteOwnership:export declare const WorkerByteOwnership: { /** Default policy: do not place an input buffer in the native transfer list. */ readonly copy: 'copy'; /** Request transfer for full exclusive ArrayBuffer-backed byte views; other views are copied. */ readonly transfer: 'transfer'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3946,10 +3946,10 @@
           "name": "workerComputed",
           "kind": "function",
           "signature": "export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Input, Output>): Resource<Output>;",
-          "declarationLine": 40,
+          "declarationLine": 94,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "Constructs a standard Resource whose fetcher selects input synchronously and sends through the adapter. Input reads before returning establish reactive dependencies. It never disposes the adapter or Worker.",
-          "core": "adapter: WorkerAdapter instance returned by its constructor; the caller retains disposal ownership.\nselectInput: Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.\nResource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries.",
+          "core": "adapter: WorkerAdapter instance returned by its constructor; the caller retains disposal ownership.\nselectInput: Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.\nResource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries.\nSet it when the caller can give up native buffer ownership after sending an input. Return a synchronous transfer list; aliases can detach even if the request later fails. Omission sends no explicit list.",
           "advanced": "",
           "parameters": [
             "adapter: WorkerAdapter",
@@ -4031,7 +4031,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "adapter: WorkerAdapter instance returned by its constructor; the caller retains disposal ownership.\nselectInput: Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.\nResource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries."
+              "content": "adapter: WorkerAdapter instance returned by its constructor; the caller retains disposal ownership.\nselectInput: Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.\nResource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.\ntransfer: Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.\nundefined: no native transfer entries.\nSet it when the caller can give up native buffer ownership after sending an input. Return a synchronous transfer list; aliases can detach even if the request later fails. Omission sends no explicit list."
             },
             {
               "id": "advanced-usage",
@@ -4205,7 +4205,7 @@
         {
           "name": "WorkerDiagnosticType",
           "kind": "const",
-          "signature": "export declare const WorkerDiagnosticType: { readonly worker: 'worker'; };",
+          "signature": "export declare const WorkerDiagnosticType: { /** Default parser name and serializer diagnostic type when no format label is supplied. */ readonly worker: 'worker'; };",
           "declarationLine": 2,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "Default worker parser name, registry format and codec diagnostic type when no explicit type is provided.",
@@ -4223,7 +4223,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly worker: 'worker';",
-              "description": null,
+              "description": "Default parser name and serializer diagnostic type when no format label is supplied.",
               "parameterDetails": [],
               "returns": "'worker'"
             }
@@ -4232,7 +4232,7 @@
           "aliasOf": "WorkerDiagnosticType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const WorkerDiagnosticType: { readonly worker: 'worker'; };"
+            "export declare const WorkerDiagnosticType: { /** Default parser name and serializer diagnostic type when no format label is supplied. */ readonly worker: 'worker'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4271,7 +4271,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerDiagnosticType:export declare const WorkerDiagnosticType: { readonly worker: 'worker'; };",
+          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerDiagnosticType:export declare const WorkerDiagnosticType: { /** Default parser name and serializer diagnostic type when no format label is supplied. */ readonly worker: 'worker'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4300,7 +4300,7 @@
           "name": "createSerializeWorkerHandler",
           "kind": "function",
           "signature": "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;",
-          "declarationLine": 52,
+          "declarationLine": 78,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Installs a supplied parser on the worker and handles decode responses and bounded encode streams. Pair with workerPlugin or workerParser; attach returned handler to host messages. Parser lifetime remains caller-owned.",
           "core": "parser: ISerializeParser from @migaia/serialize/plugins or a compatible implementation. encode(value,{signal,context}) may return chunk, iterable or async iterable; decode(chunk,context) returns a value or Promise. Worker sets context to serialize-worker; parser failures use only canonical RPC rejection, retaining name, message, stack, source, code, cause and aggregate errors. Already-delivered chunks remain available before the stream reports failure.\npost: Synchronous host callback receiving raw message and optional readonly transfer list; return void, normally forward to worker-global postMessage. Native send failures follow RPC transport policy.\nIManagedRpcHandler callable with raw host event.data, plus close/dispose/pendingCount/disposed. Invalid or inaccessible factory parser members are INVALID_OPTION: native failures retain identity/class/stack, complete foreign identities remain unchanged, and untaggable failures remain on cause. Encode uses two initial credits and acknowledgements. Stream failure is a canonical RPC rejection; an iterator.return failure is attached with the primary first in the reachable error chain. Handler disposal does not call parser.dispose.",
@@ -4455,8 +4455,8 @@
         {
           "name": "IWorkerLike",
           "kind": "type",
-          "signature": "export type IWorkerLike = IWebWorkerLikePort & { terminate?(): void; };",
-          "declarationLine": 10,
+          "signature": "export type IWorkerLike = IWebWorkerLikePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };",
+          "declarationLine": 11,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "IWebWorkerLikePort plus optional terminate; parser disposal borrows it by default and terminates only when explicitly requested.",
           "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.message: Raw envelope received from the transport.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.\nterminate: Optional synchronous no-argument host cleanup callback; called after endpoint cleanup only when terminateOnDispose is true, even if endpoint cleanup failed.\nVoid; a failure rejects disposal alone or joins CLEANUP_FAILED AggregateError.",
@@ -4473,7 +4473,7 @@
               "kind": "method",
               "optional": true,
               "signature": "terminate?(): void;",
-              "description": null,
+              "description": "Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked.",
               "parameterDetails": [],
               "returns": "void"
             }
@@ -4481,7 +4481,7 @@
           "composes": ["IWebWorkerLikePort"],
           "exportPath": "./serialize/worker",
           "overloadSignatures": [
-            "export type IWorkerLike = IWebWorkerLikePort & { terminate?(): void; };"
+            "export type IWorkerLike = IWebWorkerLikePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4520,7 +4520,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerLike:export type IWorkerLike = IWebWorkerLikePort & { terminate?(): void; };",
+          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerLike:export type IWorkerLike = IWebWorkerLikePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -4529,11 +4529,11 @@
         {
           "name": "IWorkerPluginOptions",
           "kind": "type",
-          "signature": "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively * owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };",
-          "declarationLine": 13,
+          "signature": "export type IWorkerPluginOptions = { /** Required message port; borrowed unless terminateOnDispose explicitly requests host termination. */ readonly worker: IWorkerLike; /** * Local registry format/parser label, default worker; actual encode/decode behavior comes from * the remote parser. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default (false). Cleanup attempts optional terminate even when endpoint cleanup fails. */ readonly terminateOnDispose?: boolean; /** * Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an * exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent * transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input * before retrying; this policy does not establish zero-copy portable payload delivery. */ readonly ownership?: IByteOwnership; /** Local RPC endpoint id, default main; it is a captured string rather than an id factory. */ readonly clientId?: string; };",
+          "declarationLine": 16,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Serializer worker endpoint, format label, byte policy and explicit optional termination ownership.",
-          "core": "worker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.",
+          "core": "worker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nUse the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -4547,7 +4547,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly worker: IWorkerLike;",
-              "description": null,
+              "description": "Required message port; borrowed unless terminateOnDispose explicitly requests host termination.",
               "parameterDetails": [],
               "returns": "IWorkerLike"
             },
@@ -4556,7 +4556,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly type?: string;",
-              "description": "Names the format registered in the registry. It must match the encoding used by the worker.",
+              "description": "Local registry format/parser label, default worker; actual encode/decode behavior comes from the remote parser.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4565,7 +4565,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly terminateOnDispose?: boolean;",
-              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default.",
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default (false). Cleanup attempts optional terminate even when endpoint cleanup fails.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -4574,7 +4574,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly ownership?: IByteOwnership;",
-              "description": "Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively owned and no longer used after handoff.",
+              "description": "Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input before retrying; this policy does not establish zero-copy portable payload delivery.",
               "parameterDetails": [],
               "returns": "IByteOwnership"
             },
@@ -4583,7 +4583,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly clientId?: string;",
-              "description": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`).",
+              "description": "Local RPC endpoint id, default main; it is a captured string rather than an id factory.",
               "parameterDetails": [],
               "returns": "string"
             }
@@ -4591,7 +4591,7 @@
           "composes": [],
           "exportPath": "./serialize/worker",
           "overloadSignatures": [
-            "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively * owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };"
+            "export type IWorkerPluginOptions = { /** Required message port; borrowed unless terminateOnDispose explicitly requests host termination. */ readonly worker: IWorkerLike; /** * Local registry format/parser label, default worker; actual encode/decode behavior comes from * the remote parser. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default (false). Cleanup attempts optional terminate even when endpoint cleanup fails. */ readonly terminateOnDispose?: boolean; /** * Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an * exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent * transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input * before retrying; this policy does not establish zero-copy portable payload delivery. */ readonly ownership?: IByteOwnership; /** Local RPC endpoint id, default main; it is a captured string rather than an id factory. */ readonly clientId?: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4621,7 +4621,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "worker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID."
+              "content": "worker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nUse the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID."
             },
             {
               "id": "advanced-usage",
@@ -4630,7 +4630,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerPluginOptions:export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively * owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };",
+          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerPluginOptions:export type IWorkerPluginOptions = { /** Required message port; borrowed unless terminateOnDispose explicitly requests host termination. */ readonly worker: IWorkerLike; /** * Local registry format/parser label, default worker; actual encode/decode behavior comes from * the remote parser. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default (false). Cleanup attempts optional terminate even when endpoint cleanup fails. */ readonly terminateOnDispose?: boolean; /** * Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an * exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent * transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input * before retrying; this policy does not establish zero-copy portable payload delivery. */ readonly ownership?: IByteOwnership; /** Local RPC endpoint id, default main; it is a captured string rather than an id factory. */ readonly clientId?: string; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -4640,10 +4640,10 @@
           "name": "workerParser",
           "kind": "function",
           "signature": "export declare function workerParser(options: IWorkerPluginOptions): ISerializeParser;",
-          "declarationLine": 43,
+          "declarationLine": 55,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Creates a main-side ISerializeParser over a borrowed Worker endpoint. Pair with createSerializeWorkerHandler using a compatible worker parser; the name is a local label, not negotiation.",
-          "core": "ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. No parser timeoutMs option exists; use context.signal for cancellation. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.",
+          "core": "ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. No parser timeoutMs option exists; use context.signal for cancellation. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nUse the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.",
           "advanced": "",
           "parameters": ["options: IWorkerPluginOptions"],
           "parameterDetails": [
@@ -4701,7 +4701,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. No parser timeoutMs option exists; use context.signal for cancellation. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID."
+              "content": "ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. No parser timeoutMs option exists; use context.signal for cancellation. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nUse the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID."
             },
             {
               "id": "advanced-usage",
@@ -4720,25 +4720,25 @@
               "name": "type",
               "type": "string",
               "optional": true,
-              "description": "Names the format registered in the registry. It must match the encoding used by the worker."
+              "description": "Local registry format/parser label, default worker; actual encode/decode behavior comes from the remote parser."
             },
             {
               "name": "terminateOnDispose",
               "type": "boolean",
               "optional": true,
-              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default."
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default (false). Cleanup attempts optional terminate even when endpoint cleanup fails."
             },
             {
               "name": "ownership",
               "type": "IByteOwnership",
               "optional": true,
-              "description": "Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively owned and no longer used after handoff."
+              "description": "Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input before retrying; this policy does not establish zero-copy portable payload delivery."
             },
             {
               "name": "clientId",
               "type": "string",
               "optional": true,
-              "description": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`)."
+              "description": "Local RPC endpoint id, default main; it is a captured string rather than an id factory."
             }
           ],
           "identity": "packages/store-worker/dist/serialize/worker.d.ts:workerParser:export declare function workerParser(options: IWorkerPluginOptions): ISerializeParser;",
@@ -4758,7 +4758,7 @@
               "type": "string",
               "optional": true,
               "description": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。",
-              "descriptionEn": "Names the format registered in the registry. It must match the encoding used by the worker.",
+              "descriptionEn": "Local registry format/parser label, default worker; actual encode/decode behavior comes from the remote parser.",
               "descriptionZh": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。"
             },
             {
@@ -4766,7 +4766,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。",
-              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default.",
+              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default (false). Cleanup attempts optional terminate even when endpoint cleanup fails.",
               "descriptionZh": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。"
             },
             {
@@ -4774,7 +4774,7 @@
               "type": "IByteOwnership",
               "optional": true,
               "description": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。",
-              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively owned and no longer used after handoff.",
+              "descriptionEn": "Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input before retrying; this policy does not establish zero-copy portable payload delivery.",
               "descriptionZh": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。"
             },
             {
@@ -4782,7 +4782,7 @@
               "type": "string",
               "optional": true,
               "description": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。",
-              "descriptionEn": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`).",
+              "descriptionEn": "Local RPC endpoint id, default main; it is a captured string rather than an id factory.",
               "descriptionZh": "`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。"
             }
           ],
@@ -4792,10 +4792,10 @@
           "name": "workerPlugin",
           "kind": "const",
           "signature": "export declare const workerPlugin: (options: IWorkerPluginOptions) => ISerializePlugin;",
-          "declarationLine": 44,
+          "declarationLine": 62,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Wraps workerParser as {type: parser.name, parser} for createSerializeRegistry. Pair with createSerializeWorkerHandler on the worker; registry disposal owns parser cleanup.",
-          "core": "ISerializePlugin from serialize with local format label and parser; no extra format detection, negotiation or Worker ownership is added.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.",
+          "core": "ISerializePlugin from serialize with local format label and parser; no extra format detection, negotiation or Worker ownership is added.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nUse the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -4839,7 +4839,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "ISerializePlugin from serialize with local format label and parser; no extra format detection, negotiation or Worker ownership is added.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID."
+              "content": "ISerializePlugin from serialize with local format label and parser; no extra format detection, negotiation or Worker ownership is added.\nworker: Required IWorkerLike, normally an application-created dedicated Worker with message/error/messageerror listener methods and optional terminate. It stays caller-owned unless termination is explicitly enabled.\ntype: Caller-selected registry format label, which must match the worker parser semantics; used as parser.name and plugin.type, not format negotiation.\nworker, the default diagnostic and registry format label.\nterminateOnDispose: Whether parser disposal calls worker.terminate after endpoint cleanup, even if that cleanup fails. The optional terminate callback is synchronous and takes no arguments.\nFalse: cleanup retires only the borrowed endpoint.\nownership: Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.\ncopy: selects no transfer list for the input bytes.\nUse the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID."
             },
             {
               "id": "advanced-usage",
@@ -4858,25 +4858,25 @@
               "name": "type",
               "type": "string",
               "optional": true,
-              "description": "Names the format registered in the registry. It must match the encoding used by the worker."
+              "description": "Local registry format/parser label, default worker; actual encode/decode behavior comes from the remote parser."
             },
             {
               "name": "terminateOnDispose",
               "type": "boolean",
               "optional": true,
-              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default."
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default (false). Cleanup attempts optional terminate even when endpoint cleanup fails."
             },
             {
               "name": "ownership",
               "type": "IByteOwnership",
               "optional": true,
-              "description": "Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively owned and no longer used after handoff."
+              "description": "Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input before retrying; this policy does not establish zero-copy portable payload delivery."
             },
             {
               "name": "clientId",
               "type": "string",
               "optional": true,
-              "description": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`)."
+              "description": "Local RPC endpoint id, default main; it is a captured string rather than an id factory."
             }
           ],
           "identity": "packages/store-worker/dist/serialize/worker.d.ts:workerPlugin:export declare const workerPlugin: (options: IWorkerPluginOptions) => ISerializePlugin;",
@@ -4896,7 +4896,7 @@
               "type": "string",
               "optional": true,
               "description": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。",
-              "descriptionEn": "Names the format registered in the registry. It must match the encoding used by the worker.",
+              "descriptionEn": "Local registry format/parser label, default worker; actual encode/decode behavior comes from the remote parser.",
               "descriptionZh": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。"
             },
             {
@@ -4904,7 +4904,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。",
-              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default.",
+              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default (false). Cleanup attempts optional terminate even when endpoint cleanup fails.",
               "descriptionZh": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。"
             },
             {
@@ -4912,7 +4912,7 @@
               "type": "IByteOwnership",
               "optional": true,
               "description": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。",
-              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively owned and no longer used after handoff.",
+              "descriptionEn": "Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input before retrying; this policy does not establish zero-copy portable payload delivery.",
               "descriptionZh": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。"
             },
             {
@@ -4920,7 +4920,7 @@
               "type": "string",
               "optional": true,
               "description": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。",
-              "descriptionEn": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`).",
+              "descriptionEn": "Local RPC endpoint id, default main; it is a captured string rather than an id factory.",
               "descriptionZh": "`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。"
             }
           ],

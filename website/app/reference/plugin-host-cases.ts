@@ -1,7 +1,305 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
 /** Pairs explanations while keeping each public-entry example independently runnable. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Each example shows one application choice, shared by the two public construction forms. */
+const hostConfigurationExample = (
+  functional: boolean,
+  scenario: 'pipeline' | 'queue' | 'diagnostic' | 'cleanup'
+): string => {
+  /** Expands only the Host policy owned by the selected application situation. */
+  const configuration = {
+    pipeline: `execution: applicationExecution,
+    identity: { name: 'draft-editor' },
+    pipeline: { mode: 'async' }`,
+    queue: `execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 2000 },
+    queueAdmissionTimeoutMs: 1000,
+    scheduler: editorScheduler`,
+    diagnostic: `execution: applicationExecution,
+    queueAdmissionDiagnosticMs: 500,
+    scheduler: editorScheduler,
+    diagnostic: (message, code, error) => showPluginDiagnostic(message, code, error),
+    onDiagnosticFailure: (error) => reportToMonitoring(error)`,
+    cleanup: `execution: applicationExecution,
+    disposeStepTimeoutMs: 1000,
+    scheduler: editorScheduler`
+  }[scenario]
+  /** Application callbacks keep validation controls outside published snippets. */
+  const body = {
+    pipeline: `host.useAsyncPipeline(async (text, next) => {
+  showSavingIndicator()
+  try {
+    await next(text.trim())
+  } finally {
+    hideSavingIndicator()
+  }
+})
+${functional ? 'await host.runPipeline(draftText, saveDocument)' : 'await host.save(draftText)'}
+onEditorClosed(() => host.dispose())`,
+    queue: `onExportEnabled(async () => {
+  try {
+    await host.use(exportPlugin)
+    showExportReady()
+  } catch (error) {
+    showExportUnavailable(error)
+  }
+})
+onEditorClosed(() => host.dispose())`,
+    diagnostic: `await host.use(exportPlugin)
+showExportReady()
+onEditorClosed(() => host.dispose())`,
+    cleanup: `await host.use(autoSavePlugin)
+onEditorClosed(async () => {
+  const result = await host.dispose()
+  showEditorClosed(result.cleanupComplete)
+  await result.physicalCompletion
+})`
+  }[scenario]
+  return `import { ${functional ? 'defineHost' : 'PluginHost'} } from '@migaia/plugin-host'
+${
+  !functional && scenario === 'pipeline'
+    ? `
+class DraftHost extends PluginHost<Record<string, never>, string> {
+  save(text: string) { return this.runPipeline(text, saveDocument) }
+}
+`
+    : ''
+}
+const host = ${functional ? 'defineHost<Record<string, never>, string>({ host: {' : `new ${scenario === 'pipeline' ? 'DraftHost' : 'PluginHost<Record<string, never>>'}({`}
+    ${configuration}
+${functional ? '} })' : '})'}
+${body}`
+}
+
+/** Field examples share application context rather than embedding validation fixtures. */
+export const pluginHostOptionExamples = {
+  classPipeline: hostConfigurationExample(false, 'pipeline'),
+  classQueue: hostConfigurationExample(false, 'queue'),
+  classDiagnostic: hostConfigurationExample(false, 'diagnostic'),
+  classCleanup: hostConfigurationExample(false, 'cleanup'),
+  functionPipeline: hostConfigurationExample(true, 'pipeline'),
+  functionQueue: hostConfigurationExample(true, 'queue'),
+  functionDiagnostic: hostConfigurationExample(true, 'diagnostic'),
+  functionCleanup: hostConfigurationExample(true, 'cleanup'),
+  domain: `import { defineHost } from '@migaia/plugin-host'
+
+const host = defineHost({
+  host: applicationHostOptions,
+  surface: { apiVersion: '1.0' },
+  domainCore: () => ({ baseUrl: '/api' })
+})
+const [products] = await host.use({
+  name: 'products',
+  install: (core) => ({ load: () => fetchProducts(core.baseUrl) })
+})
+showApiVersion(host.apiVersion)
+renderProducts(await products.extensions.load())
+onEditorClosed(() => host.dispose())`,
+  disposal: `import { defineHost } from '@migaia/plugin-host'
+
+const host = defineHost({
+  host: applicationHostOptions,
+  dispose: async (next) => {
+    showClosingScreen()
+    const result = await next()
+    renderCleanupStatus(result)
+    return result
+  }
+})
+await host.use(autoSavePlugin)
+onEditorClosed(() => host.dispose())`,
+  translation: `import { defineHost } from '@migaia/plugin-host'
+
+const host = defineHost({
+  host: applicationHostOptions,
+  translateDisposalError: translateDomainDisposalError
+})
+onEditorClosed(() => host.dispose())`,
+  error: `import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'
+
+try {
+  await startInventoryService()
+} catch (cause) {
+  const error = new PluginHostError(
+    PluginHostErrorCode.pluginInstallFailed,
+    'Inventory could not start',
+    { cause, detail: { plugin: 'inventory' } }
+  )
+  showInventoryUnavailable(error.message)
+  reportToMonitoring(error)
+}`,
+  configError: `import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'
+
+const rejected = validateCartSettings(submittedSettings)
+if (rejected) {
+  const error = new PluginHostError(
+    PluginHostErrorCode.invalidConfigValue,
+    'Cart settings rejected',
+    { cause: rejected, detail: { plugin: 'cart', path: 'quantity' } }
+  )
+  showCartSettingsError(error.message)
+  reportToMonitoring(error)
+}`
+}
+
+/** Prefixes preserve the distinct public contracts without expanding one case beyond its topic. */
+const hostConfigurationCases = (functional: boolean): readonly IOptionCaseDoc[] => {
+  /** Functional options nest the same Host fields under host. */
+  const prefix = functional ? 'host.' : ''
+  /** Both construction forms preserve their own runnable public call. */
+  const examples = functional
+    ? {
+        pipeline: pluginHostOptionExamples.functionPipeline,
+        queue: pluginHostOptionExamples.functionQueue,
+        diagnostic: pluginHostOptionExamples.functionDiagnostic,
+        cleanup: pluginHostOptionExamples.functionCleanup
+      }
+    : {
+        pipeline: pluginHostOptionExamples.classPipeline,
+        queue: pluginHostOptionExamples.classQueue,
+        diagnostic: pluginHostOptionExamples.classDiagnostic,
+        cleanup: pluginHostOptionExamples.classCleanup
+      }
+  /** Maps the shared story to the receiving option type without invented fields. */
+  const covers = (fields: readonly string[]) => [
+    ...(functional ? ['host'] : []),
+    ...fields.map((field) => prefix + field)
+  ]
+  return [
+    {
+      title: t('Keep the saving indicator around downstream work', '保存完成后再关闭等待提示'),
+      problem: t(
+        'The draft editor must keep its saving indicator visible until downstream saving finishes. Async mode lets the outer stage await that work, and the host name ties related diagnostics to this editor.',
+        '草稿编辑器需要在下游保存完成前保持等待提示。异步模式让外层步骤等待这项工作，宿主名称将相关诊断归到当前编辑器。'
+      ),
+      example: examples.pipeline,
+      result: t(
+        'The trimmed draft is saved before the saving indicator disappears.',
+        '去掉首尾空格的草稿保存完成后，等待提示才消失。'
+      ),
+      covers: covers(['identity', 'identity.name', 'pipeline', 'pipeline.mode'])
+    },
+    {
+      title: t('Bound interactive export-plugin changes', '限制交互式导出插件变更'),
+      problem: t(
+        'A user enabling export needs an outcome instead of an indefinitely queued or running installation. Set separate admission, active-change and shutdown-drain budgets on the editor clock; these do not preempt JavaScript.',
+        '用户启用导出时，需要得到结果，不能无限等待排队或安装。在编辑器时钟上分别限制接纳、活动变更和关闭排空；这些预算不会抢占 JavaScript。'
+      ),
+      example: examples.queue,
+      result: t(
+        'The editor either enables export or shows why the change could not complete within its budget.',
+        '编辑器启用导出，或显示变更为何未能在预算内完成。'
+      ),
+      covers: covers([
+        'execution',
+        'execution.mutationTimeoutMs',
+        'execution.pipelineDrainTimeoutMs',
+        'queueAdmissionTimeoutMs',
+        'scheduler'
+      ])
+    },
+    {
+      title: t(
+        'Explain slow plugin changes without rejecting them',
+        '提示缓慢的插件变更并继续等待'
+      ),
+      problem: t(
+        'The editor is willing to wait for a plugin change, but should explain a queue wait after half a second. Show host diagnostics in the panel and give a failed diagnostic receiver its own monitoring destination.',
+        '编辑器愿意继续等待插件变更，但排队半秒后应给出说明。把宿主诊断显示在面板，并为诊断接收器自身的失败提供监控出口。'
+      ),
+      example: examples.diagnostic,
+      result: t(
+        'Waiting changes remain eligible to install; diagnostics and receiver failures have visible destinations.',
+        '等待中的变更仍可安装，诊断及接收器失败都有可见出口。'
+      ),
+      covers: covers([
+        'diagnostic',
+        'onDiagnosticFailure',
+        'queueAdmissionDiagnosticMs',
+        'scheduler'
+      ])
+    },
+    {
+      title: t('Close the editor while cleanup finishes', '编辑器关闭后继续等待清理'),
+      problem: t(
+        'An autosave resource can take longer than one second to close. Bound each ordinary cleanup step so the editor can show its logical close outcome, then await physicalCompletion for remaining cleanup.',
+        '自动保存资源可能超过一秒才关闭。限制每个普通清理步骤，让编辑器先展示逻辑关闭结果，再通过 physicalCompletion 等待剩余清理。'
+      ),
+      example: examples.cleanup,
+      result: t(
+        'The editor shows its close outcome without losing the completion of slower cleanup.',
+        '编辑器展示关闭结果，同时仍等待较慢清理的最终完成。'
+      ),
+      covers: covers(['disposeStepTimeoutMs', 'scheduler'])
+    }
+  ]
+}
+
+/** Functional application hooks remain separate from Host timing and reporting policy. */
+export const pluginHostOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  host: hostConfigurationCases(false),
+  functional: [
+    ...hostConfigurationCases(true),
+    {
+      title: t('Give product plugins the application API', '为商品插件提供应用 API'),
+      problem: t(
+        'The product view exposes an API revision to consumers, while installed product plugins need a base URL for requests. Put public application data on surface and installation capabilities in domainCore.',
+        '商品视图需要向使用者公开 API 版本，已安装商品插件则需要请求地址。公开应用数据放在 surface，安装能力放在 domainCore。'
+      ),
+      example: pluginHostOptionExamples.domain,
+      result: t(
+        'The view displays its API revision and loads products through the plugin’s application base URL.',
+        '视图显示 API 版本，并通过插件取得的应用地址加载商品。'
+      ),
+      covers: ['host', 'surface', 'domainCore']
+    },
+    {
+      title: t(
+        'Show application shutdown around canonical cleanup',
+        '围绕规范清理展示应用关闭状态'
+      ),
+      problem: t(
+        'The editor should switch to a closing screen before plugin cleanup starts, then show the structured cleanup outcome. Wrap disposal and return the result of exactly one next call.',
+        '编辑器应在插件清理前切换到关闭界面，再显示结构化清理结果。包装释放，恰好调用一次 next 并返回其结果。'
+      ),
+      example: pluginHostOptionExamples.disposal,
+      result: t(
+        'The closing screen appears before cleanup and then receives its result.',
+        '清理开始前出现关闭界面，之后界面收到清理结果。'
+      ),
+      covers: ['host', 'dispose']
+    }
+  ],
+  error: [
+    {
+      title: t('Explain inventory startup failure', '说明库存服务启动失败'),
+      problem: t(
+        'The inventory panel needs a readable unavailable message, while support needs the original startup failure and plugin name. Preserve that cause alongside structured detail.',
+        '库存面板需要可读的不可用提示，支持人员则需要原始启动失败及插件名称。将 cause 与结构化 detail 一起保留。'
+      ),
+      example: pluginHostOptionExamples.error,
+      result: t(
+        'The panel explains the failure and monitoring retains its original cause and inventory context.',
+        '面板说明失败，监控保留原始原因与库存插件上下文。'
+      ),
+      covers: ['detail']
+    },
+    {
+      title: t('Identify rejected cart settings', '指出被拒绝的购物车设置'),
+      problem: t(
+        'A settings form can reject a structured value rather than throw an Error. Keep that rejection record and the affected plugin path so the form and support can explain the same failure.',
+        '设置表单可能拒绝结构化值，而非抛 Error。保留拒绝记录及受影响插件路径，让表单与支持人员解释同一失败。'
+      ),
+      example: pluginHostOptionExamples.configError,
+      result: t(
+        'The settings form shows the rejection while monitoring retains the rejected record and quantity path.',
+        '设置表单显示拒绝提示，监控保留被拒绝记录与 quantity 路径。'
+      ),
+      covers: ['detail']
+    }
+  ]
+}
 
 /** Installation, dependency and cleanup scenarios use only the published root entry. */
 export const pluginHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {

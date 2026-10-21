@@ -8,7 +8,11 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { resourceReference } from './resource.js'
-import { storeWorkerCases } from './store-worker-cases.js'
+import {
+  storeWorkerCases,
+  storeWorkerOptionCases,
+  storeWorkerOptionExamples
+} from './store-worker-cases.js'
 
 /** Localized source-backed behavior. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -118,6 +122,11 @@ const computedOptions: Readonly<Record<string, IMemberDoc>> = {
     default: t('Zero extra attempts; no automatic retry.', '默认零次额外尝试，不自动重试。')
   },
   retryDelay: {
+    whenToUse: t(
+      'Use a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.',
+      '短暂故障可用固定毫秒数；逐次延长等待时用同步回调。failureCount 从一开始。省略时立即重试；retry 还必须允许下一次尝试。'
+    ),
+    example: storeWorkerOptionExamples.retry,
     summary: t(
       'Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.',
       '每次获准重试前等待的有限非负毫秒数，也可用同步回调 `retryDelay(failureCount, error)` 返回毫秒数；次数从 `1` 开始，错误为原始失败。抛错、无效数字或类 Promise 对象会使资源失败，延迟期间仍可取消。'
@@ -138,6 +147,11 @@ const computedOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   transfer: {
+    whenToUse: t(
+      'Set it when the caller can give up native buffer ownership after sending an input. Return a synchronous transfer list; aliases can detach even if the request later fails. Omission sends no explicit list.',
+      '调用方发送输入后可以放弃原生缓冲区所有权时设置。同步返回转移列表；即使请求之后失败，别名也可能已分离。省略时不提供显式列表。'
+    ),
+    example: storeWorkerOptionExamples.transfer,
     summary: t(
       'Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.',
       '资源取值器同步选出输入后，将其交给此回调并取得本次原生转移列表；抛错会使资源取值失败，不支持 Promise 结果。转移可能分离调用方数据，不保证全程零拷贝。'
@@ -181,6 +195,11 @@ const pluginOptions: Readonly<Record<string, IMemberDoc>> = {
     default: t('False: cleanup retires only the borrowed endpoint.', '默认假，清理仅结束借用端点。')
   },
   ownership: {
+    whenToUse: t(
+      'Use the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.',
+      '调用方还需要输入时使用默认 copy。仅在视图完整覆盖且可放弃普通 ArrayBuffer 时选 transfer。局部视图和共享缓冲区回退为空转移列表；转移可能分离所有别名。'
+    ),
+    example: storeWorkerOptionExamples.transferPlugin,
     summary: t(
       'Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.',
       '输入字节的转移列表策略，转移仅选择完整覆盖普通缓冲区的字节视图，局部视图及共享缓冲区回退空列表，原生转移可使所有别名分离且后续失败不恢复，当前可移植编码仍生成文本值。'
@@ -260,6 +279,50 @@ const errorDoc = (aggregate = false) => ({
   },
   ...(!aggregate
     ? {
+        optionCases: [
+          {
+            title: t('Keep an earlier exception', '保留先前异常'),
+            problem: t(
+              'Preparing a cart calculation can fail before the worker is ready. The page needs a useful message, while monitoring still needs the original exception to locate the failed preparation step. Preserve it as the cause.',
+              '工作线程就绪前，购物车计算的准备步骤可能失败。页面需要可读消息，监控也需要原始异常来定位出错步骤；把它保留为 cause。'
+            ),
+            example: `import { createStoreWorkerError, StoreWorkerErrorCode } from '@migaia/store-worker'
+
+try {
+  await prepareCartWorker()
+} catch (cause) {
+  showWorkerError(createStoreWorkerError(
+    StoreWorkerErrorCode.invalidOption,
+    'Unable to prepare cart calculation',
+    { cause }
+  ))
+}`,
+            result: t(
+              'The cart shows a preparation failure while its original exception remains available through cause.',
+              '购物车显示计算准备失败，仍可通过 cause 查看原始异常。'
+            ),
+            covers: ['cause']
+          },
+          {
+            title: t('Keep structured input details', '保留结构化输入详情'),
+            problem: t(
+              'A cart validator returns the rejected field and value as a record. The error view needs that record to highlight the input. Keep it as the cause rather than converting it into a message.',
+              '购物车校验器用记录返回被拒绝的字段与值。错误界面需要这份记录来标出输入框；把它保留为 cause，而不是压成消息。'
+            ),
+            example: `import { createStoreWorkerError, StoreWorkerErrorCode } from '@migaia/store-worker'
+
+showWorkerError(createStoreWorkerError(
+  StoreWorkerErrorCode.invalidOption,
+  'Cart input is invalid',
+  { cause: validationFailure }
+))`,
+            result: t(
+              'The error view can identify the rejected cart field from the original validation details.',
+              '错误界面可以从原始校验详情中识别被拒绝的购物车字段。'
+            ),
+            covers: ['cause']
+          }
+        ],
         optionDocs: {
           cause: {
             summary: t(
@@ -338,6 +401,7 @@ export const storeWorkerReference: ILibraryReference = {
         )
       },
       optionDocs: clientOptions,
+      optionCases: storeWorkerOptionCases.client,
       returns: t(
         'New WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.',
         '返回已启动异步端点初始化的适配器，请求自动等待初始化，重复销毁复用清理 Promise；无效选项或读取失败同步抛 `INVALID_OPTION`，端点初始化失败经请求或销毁观察。'
@@ -367,6 +431,7 @@ export const storeWorkerReference: ILibraryReference = {
       },
       optionDocs: {
         timeoutMs: {
+          example: storeWorkerOptionExamples.handler,
           summary: t(
             'Forwarded endpoint option; this provider helper does not apply it as a compute execution deadline. Set request deadline on the main-side adapter.',
             '透传端点选项，此提供者辅助不把它应用为计算执行截止期限，请在主端适配器设置请求期限。'
@@ -602,6 +667,7 @@ worker.terminate()`
         '资源选项加运行时选择及每次取值转移回调，在资源拥有对象及自动启动前一次读取已知字段。'
       ),
       example: computeExample,
+      optionCases: storeWorkerOptionCases.computed,
       members: computedOptions
     },
     IWorkerPort: {
@@ -639,6 +705,7 @@ worker.terminate()`
         '序列化工作端点、格式标签、字节策略及显式可选终止所有权。'
       ),
       example: codecExample,
+      optionCases: storeWorkerOptionCases.serializer,
       members: pluginOptions
     },
     IWorkerFailureEvent: {

@@ -10,7 +10,14 @@
  * readThreadBootstrap().peerId the parent address, but both launchers write the launched handle
  * fingerprint there. Runtime parent identity lives separately in Core bootstrap.
  */
-import type { ICode, ILibraryReference, IMemberDoc, IText, ISymbolDoc } from './contract.js'
+import type {
+  ICode,
+  ILibraryReference,
+  IMemberDoc,
+  IText,
+  ISymbolDoc,
+  IOptionCaseDoc
+} from './contract.js'
 import { rpcThreadsCases } from './rpc-threads-cases.js'
 import {
   runtimePeerOptionMembers,
@@ -163,7 +170,7 @@ const threadSpawnMembers: Readonly<Record<string, IMemberDoc>> = {
 }
 
 /** Node launch fields shared by direct and runtime-resource launcher factories. */
-const nodeLauncherOptions = {
+const nodeLauncherOptions: Record<string, IMemberDoc> = {
   runtimeApi: {
     summary: t(
       'Advanced `IRuntimePeerSourceContext` supplied by the Core source owner; per-launch held metadata takes precedence over this configured context.',
@@ -907,7 +914,661 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** Reader snippets use application-owned report sessions and public thread entries. */
+const threadOptionExamples = {
+  peerSpawn: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({
+  spawn: new URL('./report-worker.js', import.meta.url),
+  self: { name: 'report-screen', instanceId: screenId },
+  provide: { progress: { update: showReportProgress } },
+  report: reportToMonitoring
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+}`,
+  peerConnect: `import { createThreadPeer, createNodeThreadChannel } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({
+  self: { name: 'report-screen', instanceId: screenId },
+  connect: async (context) => createNodeThreadChannel(reportPort, reportWorkerId, {
+    scheduler: systemScheduler,
+    capabilities: context.capabilities
+  })
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+  reportPort.close()
+}`,
+  peerListen: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({ listen: acceptReportChannel })
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+  await closeReportSession()
+}`,
+  peerEndpoint: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({
+  connect: openReportChannel,
+  endpointFactory: (channel, signal) => assembleReportEndpoint(channel, signal)
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+  await closeReportSession()
+}`,
+  peerPolicy: `import { createThreadPeer } from '@migaia/rpc-threads'
+import { defineProbe } from '@migaia/rpc-core/probe'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({
+  connect: openReportChannel,
+  provide: { catalog: { lookup: readProduct } },
+  providerLimits: { maxGlobal: 4, maxPerPeer: 2 },
+  probe: defineProbe({ stages: ['message'], emit: sendReportTrace }),
+  defaultTimeoutMs: 2000,
+  contract: catalogContract
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+  await closeReportSession()
+}`,
+  peerRetry: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({
+  spawn: new URL('./report-worker.js', import.meta.url),
+  keyFactory: createReportCallId,
+  retryPort: reportRetryPolicy
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+}`,
+  peerAuthentication: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+type IReportApi = { reports: { render(id: string): string } }
+const worker = await createThreadPeer<IReportApi>({
+  connect: openSignedReportChannel,
+  authentication: reportSessionAuthentication
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+  await closeReportSession()
+}`,
+  pluginSpawn: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  spawn: new URL('./report-worker.js', import.meta.url),
+  provide: { progress: { update: showReportProgress } },
+  expose: [],
+  self: { name: 'report-screen', instanceId: screenId },
+  report: reportToMonitoring
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+}`,
+  pluginPolicy: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  connect: openReportChannel,
+  provide: { catalog: { lookup: readProduct } },
+  providerLimits: { maxGlobal: 4, maxPerPeer: 2 },
+  defaultTimeoutMs: 2000,
+  contract: catalogContract
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+  await closeReportSession()
+}`,
+  pluginListen: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  listen: acceptReportChannel
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+  await closeReportSession()
+}`,
+  pluginEndpoint: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  connect: openReportChannel,
+  endpointFactory: (channel, signal) => assembleReportEndpoint(channel, signal)
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+  await closeReportSession()
+}`,
+  pluginRetry: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  spawn: new URL('./report-worker.js', import.meta.url),
+  keyFactory: createReportCallId,
+  retryPort: reportRetryPolicy
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+}`,
+  pluginHost: `import { createThreadPlugin } from '@migaia/rpc-threads'
+
+const plugin = createThreadPlugin({
+  name: 'report-manager',
+  connect: openReportChannel,
+  expose: ['host'],
+  host: workspaceHost,
+  catalog: reportPluginCatalog,
+  resolvePlugin: resolveReportPlugin
+})
+try {
+  await workspaceHost.use(plugin)
+  showReportManagerReady()
+} finally {
+  await workspaceHost.dispose()
+  await closeReportSession()
+}`,
+  pluginAuthentication: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  connect: openSignedReportChannel,
+  authentication: reportSessionAuthentication
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+  await closeReportSession()
+}`,
+  pluginProbe: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineProbe } from '@migaia/rpc-core/probe'
+import { defineHost } from '@migaia/plugin-host'
+
+type IReportApi = { reports: { render(id: string): string } }
+const plugin = createThreadPlugin<IReportApi>({
+  name: 'reports',
+  connect: openReportChannel,
+  probe: defineProbe({ stages: ['message'], emit: sendReportTrace })
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: reportHostOptions
+})
+try {
+  await host.use(plugin)
+  showDownload(await host.thread!.request('reports', 'reports.render', reportId))
+} finally {
+  await host.dispose()
+  await closeReportSession()
+}`,
+  webChannel: `import { createThreadPeer, createWebThreadChannel } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+type IReportApi = { reports: { render(id: string): string } }
+reportPort.start()
+const worker = await createThreadPeer<IReportApi>({
+  self: { name: 'report-screen', instanceId: screenId },
+  connect: async (context) => createWebThreadChannel(reportPort, reportWorkerId, {
+    scheduler: systemScheduler,
+    capabilities: context.capabilities
+  })
+})
+try {
+  showDownload(await worker.request('reports.render', reportId))
+} finally {
+  await worker.close()
+  reportPort.close()
+}`,
+  nodeLauncher: `import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
+
+const session = await openNodeReportSession((context) => createNodeThreadLauncher({
+  runtimeApi: context,
+  execArgv: []
+}))
+try {
+  showDownload(await session.peer.request('reports.render', reportId))
+} finally {
+  await session.close()
+}`,
+  nodeAdapterLauncher: `import { createAdapterNodeThreadLauncher } from '@migaia/rpc-threads'
+
+const session = await openNodeReportSession((context) => createAdapterNodeThreadLauncher(
+  nodeRuntime,
+  { runtimeApi: context, execArgv: [] }
+))
+try {
+  showDownload(await session.peer.request('reports.render', reportId))
+} finally {
+  await session.close()
+}`,
+  webLauncher: `import { createWebThreadLauncher } from '@migaia/rpc-threads'
+
+const session = await openWebReportSession((context) => createWebThreadLauncher({
+  Worker: ReportWorker,
+  report: reportToMonitoring,
+  runtimeApi: context
+}))
+try {
+  showDownload(await session.peer.request('reports.render', reportId))
+} finally {
+  await session.close()
+}`,
+  webGlobalLauncher: `import { createWebThreadLauncher } from '@migaia/rpc-threads'
+
+const session = await openWebReportSession((context) => createWebThreadLauncher({
+  report: reportToMonitoring,
+  runtimeApi: context
+}))
+try {
+  showDownload(await session.peer.request('reports.render', reportId))
+} finally {
+  await session.close()
+}`
+}
+/** Cases follow the source owner already selected by the report application. */
+const threadOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  peer: [
+    {
+      title: t('Show progress while a report is rendered', '报表生成期间显示进度'),
+      problem: t(
+        'A report screen needs a dedicated worker and progress updates. spawn owns that worker; provide publishes the screen callback under a stable self identity. report sends background failures to application monitoring instead of the default console sink.',
+        '报表页需要独立线程生成文件，并在页面显示进度。spawn 持有该线程，provide 发布进度回调，self 标识当前页面。report 把后台失败交给应用监控；省略时使用默认控制台出口。'
+      ),
+      example: threadOptionExamples.peerSpawn,
+      result: t(
+        'The download appears when rendering finishes. The worker can update the progress display through progress.update; closing the peer requests worker termination.',
+        '文件生成后显示下载入口。线程可通过 progress.update 更新进度；关闭连接会请求终止线程。'
+      ),
+      covers: ['spawn', 'self', 'provide', 'report']
+    },
+    {
+      title: t('Reuse the desktop report worker', '复用桌面应用已有的报表线程'),
+      problem: t(
+        'The desktop shell already owns a report worker and gives this screen its MessagePort and worker identity. connect wraps that port rather than starting another worker. The screen closes its borrowed port after closing the peer.',
+        '桌面外壳已经持有报表线程，并把 MessagePort 和线程身份交给页面。connect 包装该端口，避免再次启动线程。页面关闭连接后，再释放自己持有的端口。'
+      ),
+      example: threadOptionExamples.peerConnect,
+      result: t(
+        'The existing worker renders the requested report and the screen shows its download link.',
+        '已有线程生成指定报表，页面显示下载入口。'
+      ),
+      covers: ['connect']
+    },
+    {
+      title: t('Accept a report session from the shell', '接受外壳送来的报表会话'),
+      problem: t(
+        'The shell initiates a report session when the user opens the export screen. acceptReportChannel accepts that real channel, so the screen selects listen instead of starting or connecting a second session. closeReportSession releases the application-owned ports.',
+        '用户打开导出页面时，由外壳发起报表会话。acceptReportChannel 接收真实通道，因此页面使用 listen，避免另起或再连接一个会话。closeReportSession 释放应用持有的端口。'
+      ),
+      example: threadOptionExamples.peerListen,
+      result: t(
+        'The accepted session supplies the report download, then its application owner releases the ports.',
+        '接收的会话提供报表下载，随后由应用拥有者释放端口。'
+      ),
+      covers: ['listen']
+    },
+    {
+      title: t('Reuse the application’s report endpoint assembly', '复用应用已有的报表端点组装'),
+      problem: t(
+        'The desktop application already has a public Core endpoint builder for its report channel. endpointFactory delegates to that builder with the acquired channel and construction signal. Omitting it uses the standard runtime endpoint.',
+        '桌面应用已有基于公开 Core API 的报表端点组装函数。endpointFactory 将取得的通道与构造信号交给它。省略时使用标准运行时端点。'
+      ),
+      example: threadOptionExamples.peerEndpoint,
+      result: t(
+        'The report screen uses the application’s endpoint and shows the rendered file’s download link.',
+        '报表页通过应用端点取得生成文件，并显示下载入口。'
+      ),
+      covers: ['connect', 'endpointFactory']
+    },
+    {
+      title: t(
+        'Keep report catalog lookups within the screen’s budget',
+        '限制报表线程对商品目录的查询'
+      ),
+      problem: t(
+        'A report worker reads product details back from the screen. Limit those callbacks to four overall and two per peer, and use catalogContract to declare that service. A two-second call default and message trace help the export screen handle a slow report; omission keeps the standard limits, 30-second default and no observer.',
+        '报表线程需要反向查询页面的商品资料。页面将此类查询限制为总计四个、每个对端两个，并用 catalogContract 声明服务。两秒默认等待及消息追踪供导出页处理慢报表；省略时使用标准上限、三十秒等待且没有观察者。'
+      ),
+      example: threadOptionExamples.peerPolicy,
+      result: t(
+        'The worker can fetch product data through catalog.lookup, and the completed report becomes downloadable while message activity reaches the application trace sink.',
+        '线程可通过 catalog.lookup 查询商品，完成后显示报表下载，消息活动交给应用追踪出口。'
+      ),
+      covers: ['connect', 'provide', 'providerLimits', 'probe', 'defaultTimeoutMs', 'contract']
+    },
+    {
+      title: t('Use the export service’s retry policy', '使用导出服务已有的重试策略'),
+      problem: t(
+        'The export service already owns reportRetryPolicy. A managed spawned peer can delegate requests to that policy and use createReportCallId for automatically keyed idempotent methods. The worker declares reports.render idempotent. Borrowed direct connect/listen calls do not use these proxy hooks.',
+        '导出服务已有 reportRetryPolicy。托管 spawn 连接可把请求派发交给该策略，并用 createReportCallId 为幂等方法自动生成键。线程将 reports.render 声明为幂等；借用的直接 connect/listen 调用不读取这些代理钩子。'
+      ),
+      example: threadOptionExamples.peerRetry,
+      result: t(
+        'The report request follows the application dispatch policy and its returned file is shown as a download.',
+        '报表请求按应用策略派发，返回文件后显示下载入口。'
+      ),
+      covers: ['spawn', 'keyFactory', 'retryPort']
+    }
+  ],
+  plugin: [
+    {
+      title: t('Give the export plugin a progress callback', '为导出插件提供进度回调'),
+      problem: t(
+        'An export screen installs its report worker through PluginHost. Register it as reports and publish only progress.update; an empty expose list adds no Host methods. self identifies the screen, and report routes background failures to monitoring.',
+        '导出页通过 PluginHost 安装报表线程，登记名为 reports，只发布 progress.update。空 expose 不增加 Host 方法，self 标识页面，report 将后台失败交给监控。'
+      ),
+      example: threadOptionExamples.pluginSpawn,
+      result: t(
+        'The installed reports outlet returns a downloadable report and can call back to update the screen’s progress.',
+        '已安装的 reports 出口返回可下载报表，并可回调页面更新进度。'
+      ),
+      covers: ['name', 'spawn', 'provide', 'expose', 'self', 'report']
+    },
+    {
+      title: t(
+        'Share a bounded catalog with an installed report worker',
+        '给已安装的报表线程提供有上限的目录查询'
+      ),
+      problem: t(
+        'The report plugin needs product data from its Host screen. Its local catalog service uses an explicit contract and small concurrency limits, while a two-second call default bounds the screen’s wait for rendering. Without these settings the usual provider and call defaults apply.',
+        '报表插件需要从宿主页面查询商品。页面以显式契约和较小并发上限提供本地目录服务，并将生成请求的默认等待设为两秒；省略时使用通常的提供方及调用默认值。'
+      ),
+      example: threadOptionExamples.pluginPolicy,
+      result: t(
+        'The installed report worker can read the catalog and return a file for the screen’s download link.',
+        '安装后的报表线程可读取目录，并返回文件供页面显示下载入口。'
+      ),
+      covers: ['name', 'connect', 'provide', 'providerLimits', 'defaultTimeoutMs', 'contract']
+    },
+    {
+      title: t('Install the shell’s incoming report session', '安装外壳发起的报表会话'),
+      problem: t(
+        'The desktop shell sends an existing report session to an export panel managed by PluginHost. listen accepts that session without starting another worker. The application retains native port ownership and closes it after disposing the Host.',
+        '桌面外壳把已有报表会话送到由 PluginHost 管理的导出面板。listen 接收该会话，避免再启动线程。应用继续持有原生端口，并在释放 Host 后关闭端口。'
+      ),
+      example: threadOptionExamples.pluginListen,
+      result: t(
+        'The reports outlet renders the selected report through the accepted session and shows the download.',
+        'reports 出口通过接收的会话生成选定报表，并显示下载入口。'
+      ),
+      covers: ['name', 'listen']
+    },
+    {
+      title: t('Install with the desktop endpoint builder', '用桌面应用的端点组装函数安装插件'),
+      problem: t(
+        'The desktop application already assembles report endpoints with public Core APIs. endpointFactory reuses that builder during plugin installation and receives the construction signal. Omitting it selects normal runtime endpoint assembly.',
+        '桌面应用已有通过公开 Core API 组装报表端点的函数。endpointFactory 在插件安装期间复用该函数，并传入构造信号。省略时选择通常的运行时端点组装。'
+      ),
+      example: threadOptionExamples.pluginEndpoint,
+      result: t(
+        'After installation, the reports outlet renders the file through the application’s endpoint.',
+        '安装完成后，reports 出口通过应用端点生成文件。'
+      ),
+      covers: ['name', 'connect', 'endpointFactory']
+    },
+    {
+      title: t('Keep plugin calls on the export retry policy', '让插件调用沿用导出重试策略'),
+      problem: t(
+        'A workspace already has reportRetryPolicy for export requests. Install a managed spawned plugin to use that dispatch owner and createReportCallId for automatically keyed idempotent methods. The worker declares reports.render idempotent; borrowed direct sources do not consume these hooks.',
+        '工作区已有处理导出请求的 reportRetryPolicy。安装托管 spawn 插件可沿用其派发逻辑，并用 createReportCallId 为幂等方法自动生成键。线程将 reports.render 声明为幂等；借用的直接来源不读取这些钩子。'
+      ),
+      example: threadOptionExamples.pluginRetry,
+      result: t(
+        'The reports outlet uses the existing application policy and shows the returned report as a download.',
+        'reports 出口使用已有应用策略，返回报表后显示下载入口。'
+      ),
+      covers: ['name', 'spawn', 'keyFactory', 'retryPort']
+    },
+    {
+      title: t('Let the report manager install approved extensions', '允许报表管理器安装获准扩展'),
+      problem: t(
+        'A workspace lets its report-manager worker request approved local export extensions. workspaceHost is the same Host that installs this plugin; reportPluginCatalog lists the allowed contracts and resolveReportPlugin returns their local definitions. Only explicit host exposure publishes those controls.',
+        '工作区允许 report-manager 线程申请安装获准的本地导出扩展。workspaceHost 是安装本插件的同一个 Host，reportPluginCatalog 列出允许的契约，resolveReportPlugin 返回对应本地定义。只有显式公开 host 才发布这些控制。'
+      ),
+      example: threadOptionExamples.pluginHost,
+      result: t(
+        'The report manager becomes ready with access to the declared Host controls and catalog.',
+        '报表管理器就绪，可使用已声明的 Host 控制和目录。'
+      ),
+      covers: ['name', 'connect', 'expose', 'host', 'catalog', 'resolvePlugin']
+    }
+  ],
+  channel: [
+    {
+      title: t('Use the desktop shell’s report port', '使用桌面外壳的报表端口'),
+      problem: t(
+        'A desktop export panel receives a real Node MessagePort from its shell. Its channel uses systemScheduler and forwards Core’s actual capability proposal, so the existing report session keeps the negotiated features. Omitting capabilities selects the fixed basic profile.',
+        '桌面导出面板从外壳取得真实 Node MessagePort。通道使用 systemScheduler，并转交 Core 的实际能力提议，让已有报表会话沿用协商后的功能。省略 capabilities 时选择固定基础能力。'
+      ),
+      example: threadOptionExamples.peerConnect,
+      result: t(
+        'The report travels through the shell’s port and its download appears in the panel.',
+        '报表通过外壳端口传递，面板显示下载入口。'
+      ),
+      covers: ['scheduler', 'capabilities']
+    },
+    {
+      title: t('Open a report port in a web panel', '在网页面板打开报表端口'),
+      problem: t(
+        'A web export panel receives an EventTarget-style MessagePort for an existing worker. Start delivery, then pass Core’s capabilities and systemScheduler into the channel. The panel owns this native port and closes it after the peer.',
+        '网页导出面板取得已有线程的 EventTarget 风格 MessagePort。先启动消息投递，再把 Core 能力提议及 systemScheduler 交给通道。面板持有原生端口，并在关闭连接后释放端口。'
+      ),
+      example: threadOptionExamples.webChannel,
+      result: t(
+        'The worker supplies the report download through the started port. Channel setup adds no actual-exit observation.',
+        '线程通过已启动的端口提供报表下载，通道组装不会增加实际退出观察。'
+      ),
+      covers: ['scheduler', 'capabilities']
+    }
+  ],
+  nodeLauncher: [
+    {
+      title: t('Keep a report worker free of parent debug flags', '避免报表线程继承父端调试参数'),
+      problem: t(
+        'A Node export service starts its controller with debugging flags. openNodeReportSession owns the native handle, passes its real Core source context to this callback, and waits for exit on close. execArgv [] prevents the report worker from inheriting controller flags; omission preserves native inheritance.',
+        'Node 导出服务用调试参数启动控制进程。openNodeReportSession 持有原生句柄，把真实 Core 来源上下文交给回调，并在关闭时等待退出。execArgv [] 避免报表线程继承控制端参数；省略时保持原生继承。'
+      ),
+      example: threadOptionExamples.nodeLauncher,
+      result: t(
+        'The report worker renders the download, then the session owner closes the peer and waits for the worker to exit.',
+        '报表线程生成下载文件，随后会话拥有者关闭连接并等待线程退出。'
+      ),
+      covers: ['runtimeApi', 'execArgv']
+    },
+    {
+      title: t(
+        'Use the desktop adapter’s native thread loader',
+        '使用桌面适配器已有的原生线程加载器'
+      ),
+      problem: t(
+        'The desktop adapter already owns nodeRuntime, its native worker_threads loader. Reuse it with the actual Core context supplied by openNodeReportSession and clear inherited controller flags for report workers. The helper owns handle teardown.',
+        '桌面适配器已有负责加载原生 worker_threads 的 nodeRuntime。复用该加载器，并传入 openNodeReportSession 提供的真实 Core 上下文，同时清除报表线程继承的控制端参数。辅助函数负责句柄释放。'
+      ),
+      example: threadOptionExamples.nodeAdapterLauncher,
+      result: t(
+        'The adapted worker returns the report file, and its session owner waits for actual exit.',
+        '适配后的线程返回报表文件，会话拥有者等待实际退出。'
+      ),
+      covers: ['runtimeApi', 'execArgv']
+    }
+  ],
+  webLauncher: [
+    {
+      title: t(
+        'Use the web shell’s report Worker constructor',
+        '使用网页外壳提供的报表 Worker 构造函数'
+      ),
+      problem: t(
+        'A web shell supplies ReportWorker as its module Worker constructor. openWebReportSession owns the Worker, opens its channel and provides the actual Core context. Inject that constructor and route native background errors to monitoring; omitting Worker reads the global constructor at launch time.',
+        '网页外壳提供模块 Worker 构造函数 ReportWorker。openWebReportSession 持有 Worker、打开通道并提供真实 Core 上下文。注入该构造函数，并将原生后台错误交给监控；省略 Worker 时在启动阶段读取全局构造函数。'
+      ),
+      example: threadOptionExamples.webLauncher,
+      result: t(
+        'The module worker returns the report download. Closing the session requests termination; this platform provides no actual-exit receipt.',
+        '模块线程返回报表下载。关闭会话会请求终止；此平台没有实际退出回执。'
+      ),
+      covers: ['Worker', 'report', 'runtimeApi']
+    },
+    {
+      title: t(
+        'Send global Worker diagnostics to export monitoring',
+        '将全局 Worker 的诊断交给导出监控'
+      ),
+      problem: t(
+        'The export page already has a global Worker constructor, so it only supplies the required diagnostic sink and real Core context. openWebReportSession retains native ownership and requests termination when its session closes.',
+        '导出页已有全局 Worker 构造函数，因此只需提供必填诊断出口和真实 Core 上下文。openWebReportSession 保留原生归属，并在会话关闭时请求终止。'
+      ),
+      example: threadOptionExamples.webGlobalLauncher,
+      result: t(
+        'The global Worker renders a downloadable report, then its owner requests termination after closing the peer.',
+        '全局 Worker 生成可下载报表，随后拥有者在关闭连接后请求终止。'
+      ),
+      covers: ['report', 'runtimeApi']
+    }
+  ]
+}
+/** Usage belongs to this Thread entry and does not mutate shared runtime documentation. */
+const threadPeerUsageMembers = {
+  ...threadPeerOptionMembers,
+  report: {
+    ...threadPeerOptionMembers.report!,
+    whenToUse: t(
+      'Set a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.',
+      '应用需要把后台或隔离失败与请求拒绝分开记录时设置。省略时使用 defaultRpcReporter 和 console.error；它不会让失败请求成功。'
+    ),
+    example: threadOptionExamples.peerSpawn
+  },
+  endpointFactory: {
+    ...threadPeerOptionMembers.endpointFactory!,
+    whenToUse: t(
+      'Use it only when the application already owns advanced endpoint assembly for the acquired channel. The callback receives the construction signal and must return a real IRemoteServeEndpoint. Failure rolls back construction; omission uses canonical assembly.',
+      '仅当应用已有取得通道后的高级端点组装逻辑时设置。回调接收构造信号，必须返回真实 IRemoteServeEndpoint。失败回滚构造；省略时使用规范组装。'
+    ),
+    example: threadOptionExamples.peerEndpoint
+  },
+  authentication: {
+    ...threadPeerOptionMembers.authentication!,
+    whenToUse: t(
+      'Use the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.',
+      '报表会话两端要求认证消息时，使用该会话已有的签名及校验策略。openSignedReportChannel 提供匹配的对端配置。省略时不增加认证中间件。'
+    ),
+    example: threadOptionExamples.peerAuthentication
+  },
+  keyFactory: {
+    ...threadPeerOptionMembers.keyFactory!,
+    whenToUse: t(
+      'Use it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.',
+      '需要为可重试调用生成键的托管代理路径使用此项。借用的直接 connect/listen Peer 不读取它。省略时代理路径使用 defaultRpcId，直接调用选项中的键保持原语义。'
+    ),
+    example: threadOptionExamples.peerRetry
+  }
+}
+/** Plugin-specific callback examples run through Host installation. */
+const threadPluginUsageMembers = {
+  ...threadPluginOptionMembers,
+  ...threadPeerUsageMembers,
+  report: { ...threadPeerUsageMembers.report, example: threadOptionExamples.pluginSpawn },
+  endpointFactory: {
+    ...threadPeerUsageMembers.endpointFactory,
+    example: threadOptionExamples.pluginEndpoint
+  },
+  keyFactory: { ...threadPeerUsageMembers.keyFactory, example: threadOptionExamples.pluginRetry },
+  authentication: {
+    ...threadPeerUsageMembers.authentication,
+    example: threadOptionExamples.pluginAuthentication
+  },
+  probe: {
+    ...threadPeerOptionMembers.probe!,
+    whenToUse: t(
+      'Connect the export monitor when a report plugin needs message activity observations. The callback forwards events to the application sink; omission installs no observer.',
+      '报表插件需要追踪消息活动时接入导出监控。回调把事件交给应用出口；省略时不安装观察者。'
+    ),
+    example: threadOptionExamples.pluginProbe
+  }
+}
+nodeLauncherOptions.runtimeApi = {
+  ...nodeLauncherOptions.runtimeApi!,
+  example: threadOptionExamples.nodeLauncher
+}
+nodeLauncherOptions.execArgv = {
+  ...nodeLauncherOptions.execArgv!,
+  example: threadOptionExamples.nodeLauncher
+}
 /** Reference of `@migaia/rpc-threads`. */
+/** Node adapter aliases share the same public option group as the advanced launcher. */
+if (platformSymbols['adapters/node:createNodeThreadLauncher'])
+  platformSymbols['adapters/node:createNodeThreadLauncher'] = {
+    ...platformSymbols['adapters/node:createNodeThreadLauncher'],
+    optionCases: threadOptionCases.nodeLauncher
+  }
 export const rpcThreadsReference: ILibraryReference = {
   modules: {
     index: {
@@ -1068,6 +1729,7 @@ export const rpcThreadsReference: ILibraryReference = {
     createAdapterNodeThreadLauncher: {
       role: 'factory',
       optionDocs: nodeLauncherOptions,
+      optionCases: threadOptionCases.nodeLauncher,
       purpose: t(
         'Creates a Node Worker launcher over a custom `worker_threads` resource (`IThreadRuntimeResource`); for adapter authors and tests.',
         '基于自定义的 `worker_threads` 资源（`IThreadRuntimeResource`）创建 Node Worker launcher；面向适配器作者与测试。'
@@ -1241,25 +1903,26 @@ console.log(event)`
     },
     ...runtimePairedTypes('thread'),
     IRuntimeThreadPeerOptions: {
+      optionCases: threadOptionCases.peer,
       summary: t(
         'Options of `createThreadPeer()`: the Worker source plus the Core Peer options.',
         '`createThreadPeer()` 的选项：Worker 来源以及 Core Peer 的通用选项。'
       ),
       example: transferExample,
       members: {
-        ...threadPeerOptionMembers,
+        ...threadPeerUsageMembers,
         authentication: {
-          ...threadPeerOptionMembers.authentication!,
-          example: transferExample
+          ...threadPeerUsageMembers.authentication
         }
       }
     },
     IRuntimeThreadPluginOptions: {
+      optionCases: threadOptionCases.plugin,
       summary: t(
         'Options of `createThreadPlugin()`.',
         '`createThreadPlugin()` 的选项：连接名称、来源、提供与公开的方法。'
       ),
-      members: threadPluginOptionMembers
+      members: threadPluginUsageMembers
     },
     IRuntimeThreadShortSpawn: {
       summary: t(
@@ -1400,6 +2063,7 @@ try {
       }
     },
     IThreadChannelOptions: {
+      optionCases: threadOptionCases.channel,
       summary: t(
         'Options of channel constructors and factories.',
         '通道构造函数与通道工厂的选项。'
@@ -1487,8 +2151,27 @@ try {
       }
     },
     IWebThreadLauncherOptions: {
+      optionCases: threadOptionCases.webLauncher,
       summary: t('Options of Web-style launchers.', 'Web 风格 launcher 的选项：构造函数与上报。'),
-      members: webLauncherOptionMembers
+      members: {
+        ...webLauncherOptionMembers,
+        Worker: {
+          ...webLauncherOptionMembers.Worker!,
+          whenToUse: t(
+            'Inject the actual module Worker constructor when the host does not expose it globally or an application supplies its own runtime. Omission reads global Worker only when launch starts; this does not add exit observation.',
+            '宿主没有全局构造函数，或应用自选运行时时，注入真实模块 Worker 构造函数。省略时只在启动时读取全局 Worker，不会增加退出观察。'
+          ),
+          example: threadOptionExamples.webLauncher
+        },
+        report: {
+          ...webLauncherOptionMembers.report!,
+          whenToUse: t(
+            'Always supply the native launcher diagnostic sink. It receives background Worker errors; there is no default callback. The owner must still close the peer and request Worker termination.',
+            '必须提供原生启动器诊断出口。它接收 Worker 后台错误，没有默认回调。拥有者仍须关闭 Peer 并请求终止 Worker。'
+          ),
+          example: threadOptionExamples.webLauncher
+        }
+      }
     },
     IWebThreadHandle: {
       summary: t(

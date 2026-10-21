@@ -3483,6 +3483,12 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/extension/IStaticSubscriptionSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/extension/ITrackedObserverBinding",
       "locale": "en",
       "domain": "docs",
@@ -3513,6 +3519,12 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/extension/createBatchedOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/extension/createFieldSource",
       "locale": "en",
       "domain": "docs",
@@ -3526,6 +3538,12 @@
     },
     {
       "path": "/en/docs/reactive/api/extension/createSourceBinding",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/createStaticObserver",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
@@ -19989,6 +20007,12 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/api/extension/IStaticSubscriptionSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/api/extension/ITrackedObserverBinding",
       "locale": "zh",
       "domain": "docs",
@@ -20019,6 +20043,12 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/api/extension/createBatchedOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/api/extension/createFieldSource",
       "locale": "zh",
       "domain": "docs",
@@ -20032,6 +20062,12 @@
     },
     {
       "path": "/zh/docs/reactive/api/extension/createSourceBinding",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/createStaticObserver",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
