@@ -1,5 +1,4 @@
-import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
-import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import { createThreadPeer, createWebThreadChannelFactory, isThreadChild } from '@migaia/rpc-threads'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
@@ -12,8 +11,8 @@ if (await isThreadChild()) {
   const requested = Object.values(RpcCapability).filter(
     (capability) => capability !== RpcCapability.stream
   )
-  /** The canonical native channel factory receives the actual launcher-created handle. */
-  const factory = createNodeThreadChannelFactory({
+  /** The canonical Web channel factory receives the actual launcher-created handle. */
+  const factory = createWebThreadChannelFactory({
     scheduler: systemScheduler,
     capabilities: requested
   })

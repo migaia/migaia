@@ -81,13 +81,11 @@ export function createAdapterNodeThreadLauncher(
   const configuredRuntimeApi = options.runtimeApi
   /** The selected flag list is stable per launcher while each native construction receives a copy. */
   const configuredExecArgv = options.execArgv
-  /** Bun supplies exit observation but not V8 heap limits or the optional Node ELU metric. */
-  const bun = Boolean(Reflect.get(globalThis, 'Bun'))
   return {
     capabilities: Object.freeze({
       termination: 'enforced',
       'exit-observation': 'enforced',
-      'heap-limit': bun ? 'unsupported' : 'enforced'
+      'heap-limit': 'enforced'
     }),
     async launch(input, context) {
       /** Per-launch metadata cannot leak across concurrent uses of a caller-owned launcher. */
@@ -224,7 +222,7 @@ export function createAdapterNodeThreadLauncher(
             if (worker.threadId === -1) return {}
             /** Shared PID is identity only; ELU has an independently labelled activity unit. */
             const elu =
-              !bun && typeof worker.performance?.eventLoopUtilization === 'function'
+              typeof worker.performance?.eventLoopUtilization === 'function'
                 ? worker.performance.eventLoopUtilization()
                 : undefined
             return {

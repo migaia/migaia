@@ -4,7 +4,6 @@ import {
 } from '@migaia/rpc-core/adapter/internal-advanced'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { threadRuntimeResource } from './runtime-resource.js'
-import type { IThreadNativeRuntimeModule } from './runtime-types.js'
 import type { IThreadWebPort } from './types.js'
 
 /** A child guard and its automatic Peer share Core's one original raw bootstrap owner. */
@@ -45,20 +44,6 @@ export function threadChildResource(port: IThreadWebPort): IAdapterMessageResour
 }
 
 /**
- * Read Bun's real worker_threads bootstrap synchronously. Web Workers must attach their raw capture
- * before any await, while worker_threads children already receive their input in workerData.
- */
-export function threadBunNativeParent(): IThreadNativeRuntimeModule | undefined {
-  if (!Reflect.get(globalThis, 'Bun')) return undefined
-  /** The host-owned builtin snapshot avoids an asynchronous gap before Web message capture. */
-  const native = process.getBuiltinModule('node:worker_threads') as IThreadNativeRuntimeModule
-  return native.parentPort !== null &&
-    rpcMessageCapabilityControl.readInitial(native.workerData).valid
-    ? native
-    : undefined
-}
-
-/**
  * Read the library launcher's existing bootstrap in the actual child runtime. Await this guard
  * before self-spawning: a Web child must first receive its parent's initial message. This
  * identifies a branch only; Core still performs the original capability admission. Node checks the
@@ -66,7 +51,6 @@ export function threadBunNativeParent(): IThreadNativeRuntimeModule | undefined 
  * missing bootstrap rather than granting an unrelated Worker a library-child identity.
  */
 export async function isThreadChild(): Promise<boolean> {
-  if (threadBunNativeParent()) return true
   /** Web bootstrap remains buffered by the same held resource later used by createThreadPeer. */
   const parent = threadWebParent()
   if (parent) {

@@ -25,11 +25,13 @@ describe('Web Worker platform error cancellation', () => {
           hostAlive: true,
           preventCalls: [1],
           reports: 1,
-          termination: 'unsupported',
+          termination: runtime === 'deno' ? 'unsupported' : 'enforced',
           resourceSampler: 'undefined'
         })
         expect(receipt.nativePosts).toBeGreaterThan(0)
         if (runtime === 'deno') expect(receipt.prevented).toEqual([true])
+        /** Bun's close event settles exited with a numeric code after terminate. */
+        if (runtime === 'bun') expect(receipt.exitCode).toEqual(expect.any(Number))
       },
       15_000
     )

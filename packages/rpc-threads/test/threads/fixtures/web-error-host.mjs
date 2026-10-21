@@ -60,9 +60,12 @@ if (deno) assert.deepEqual(prevented, [true])
 assert.equal(reported.length, 1)
 assert.ok(posted.length > 0)
 assert.ok(posted.every((transfer) => transfer === undefined))
-assert.equal(launcher.capabilities.termination, 'unsupported')
+/** Bun's native close event is an actual-exit receipt; Deno's Worker offers none. */
+assert.equal(launcher.capabilities.termination, deno ? 'unsupported' : 'enforced')
 assert.equal(handle.sampleUsage, undefined, 'this native Worker has no local isolate sampler')
 handle.terminate()
+/** On Bun the terminated Worker must settle exited from its close event. */
+const exit = deno ? undefined : await handle.exited
 console.log(
   JSON.stringify({
     runtime: deno ? `deno ${Deno.version.deno}` : `bun ${Bun.version}`,
@@ -72,9 +75,10 @@ console.log(
     reports: reported.length,
     nativePosts: posted.length,
     termination: launcher.capabilities.termination,
+    exitCode: exit?.code,
     resourceSampler: typeof handle.sampleUsage
   })
 )
-// Unsupported exit observation is not promoted to an actual-exit receipt by fixture shutdown.
+// Deno's unsupported exit observation is not promoted to an actual-exit receipt by shutdown.
 if (deno) Deno.exit(0)
 else process.exit(0)

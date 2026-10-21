@@ -5,7 +5,7 @@ import type { IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
 import type { IRuntimePeerOptions } from '@migaia/rpc-core/remote'
 import { createAutomaticWebThreadPeer } from './automatic-peer.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtime-peer.js'
-import { threadBunNativeParent, threadWebParent } from './child.js'
+import { threadWebParent } from './child.js'
 import { expandThreadSpawn, isShortThreadSpawn } from './short-spawn.js'
 import { captureThreadTask } from './adapter.js'
 import { defaultRpcReporter } from '@migaia/rpc-core'
@@ -29,11 +29,7 @@ export function createThreadPeer(
 ): Promise<object> {
   /** SDK capture performs the original early timeout admission before any native discovery. */
   const task = captureThreadTask(options)
-  /** Bun's native bootstrap takes priority over its compatibility Web globals. */
-  const nativeParent = threadBunNativeParent()
-  if (nativeParent)
-    return openNodeThreadTask(options, nativeParent.parentPort, nativeParent.workerData, task)
-  /** The actual Worker global selects automatic discovery; capture attaches without an await. */
+  /** The actual Worker global selects automatic discovery; bootstrap still grants the connection. */
   const parent = threadWebParent()
   if (parent) return createAutomaticWebThreadPeer(options, parent, task)
   if (isShortThreadSpawn(options.spawn))

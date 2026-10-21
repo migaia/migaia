@@ -40,7 +40,7 @@ export async function expandThreadSpawn(
     typeof options.spawn === 'object' && !isUrlObject(options.spawn)
       ? (options.spawn as IRuntimeThreadShortSpawn)
       : { entry: options.spawn as true | IUrlLike }
-  /** Bun uses its worker_threads exit contract rather than the Web launcher's pending exit. */
+  /** Bun's Node compatibility globals must never select Node's launcher ahead of Bun's adapter. */
   const bun = Reflect.get(globalThis, 'Bun')
   /** Deno mainModule is already an exact absolute module URL. */
   const deno = Reflect.get(globalThis, 'Deno') as { mainModule?: string } | undefined
@@ -94,13 +94,13 @@ export async function expandThreadSpawn(
   /** Channel construction remains owned by the existing runtime adapter. */
   let channelFactory = source.channelFactory
   if (!launcher || !channelFactory) {
-    if (deno || !node) {
-      /** Browser and Deno Workers retain their unsupported actual-exit capability. */
+    if (bun || deno || !node) {
+      /** The single Web owner declares each host's own exit capability; only Bun observes close. */
       const adapter = await import('./adapters/web.js')
       launcher ??= adapter.createWebThreadLauncher({ report })
       channelFactory ??= adapter.createWebThreadChannelFactory({ scheduler })
     } else {
-      /** Node and Bun share the existing native Worker construction and exit observation owner. */
+      /** Node's public adapter keeps native Worker construction and exit observation canonical. */
       const adapter = await import('./adapters/node.js')
       launcher ??=
         runtime === threadRuntimeResource

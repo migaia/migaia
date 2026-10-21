@@ -28,10 +28,10 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
 
-/** Web handles expose preparation but never counterfeit an unsupported actual-exit receipt. */
+/** Web handles expose preparation; only Bun's native close event settles an actual-exit receipt. */
 export type IWebThreadHandle = IThreadHandle &
   Readonly<{
-    /** Actual EventTarget message port; it does not supply an actual-exit receipt. */
+    /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */
     port: IThreadWebPort
     /** Original readiness/control Promise; resolves only after the corresponding child ACK. */
     prepared: Promise<void | readonly string[]>
@@ -54,7 +54,7 @@ const webPreparations = new WeakMap<
 
 /** Structural constructors admit actual runtime Workers and controlled adapter fixtures. */
 export type IWebThreadWorker = IThreadWebPort & {
-  /** Request termination; this EventTarget API supplies no independently observable actual exit. */
+  /** Request termination; only Bun follows it with a `close` event carrying the exit code. */
   terminate(): void
 }
 /** Platform runtime injection does not strengthen unsupported lifecycle capabilities. */
@@ -72,18 +72,25 @@ let sequence = 0
 /**
  * Create a module-Worker launcher with required report and optional constructor/runtime context. It
  * validates portable data/absolute URL before acquisition and waits for child preparation when
- * opening a channel. termination, exit-observation and heap-limit remain unsupported: terminate()
- * is not an exit receipt, exited stays pending, and supervision may retain an abandoned lease.
- * Failure after acquisition attempts every owned listener/resource/Worker cleanup and retains the
- * original primary together with secondary cleanup errors.
+ * opening a channel. On Bun, the Worker emits a nonstandard `close` event with the exit code once
+ * the thread has stopped; Bun's own worker_threads `exit` is derived from the same event, so
+ * termination and exit-observation are enforced there and exited settles from it. Elsewhere both
+ * remain unsupported: terminate() is not an exit receipt, exited stays pending, and supervision may
+ * retain an abandoned lease. heap-limit is unsupported on every host. Failure after acquisition
+ * attempts every owned listener/resource/Worker cleanup and retains the original primary together
+ * with secondary cleanup errors.
  */
 export function createAdapterWebThreadLauncher(
   options: IWebThreadLauncherOptions
 ): IThreadLauncher<IAdapterWebThreadHandle> {
+  /** Bun is the only Web Worker host whose close event reports an actual thread exit. */
+  const exitObservable = Boolean(Reflect.get(globalThis, 'Bun'))
+  /** Capability level shared by termination and exit-observation for this host. */
+  const exitLevel = exitObservable ? 'enforced' : 'unsupported'
   return {
     capabilities: Object.freeze({
-      termination: 'unsupported',
-      'exit-observation': 'unsupported',
+      termination: exitLevel,
+      'exit-observation': exitLevel,
       'heap-limit': 'unsupported'
     }),
     async launch(input, context) {
@@ -106,7 +113,7 @@ export function createAdapterWebThreadLauncher(
         : undefined
       /** Worker lifecycle hooks attach synchronously before the host can deliver events. */
       const worker = new Constructor(entry, { type: 'module', name: spec.name })
-      /** A terminate request has no effect on the independently unsupported exited Promise. */
+      /** A terminate request never settles exited; only the native close event does on Bun. */
       let terminating = false
       /** Only the opt-in protocol transfers a bounded cold receive owner to core. */
       let resource: IAdapterMessageResource | undefined
@@ -130,8 +137,23 @@ export function createAdapterWebThreadLauncher(
         rejectPrepared = undefined
         worker.terminate()
       }
-      /** Unsupported actual-exit observation stays the original never-settled native handle Promise. */
-      const exited = new Promise<never>(() => undefined)
+      /** Last native failure, attached to the exit status as the node launcher does. */
+      let failure: unknown
+      /**
+       * Bun settles from its native close event; other hosts keep the never-settled Promise because
+       * they offer no actual-exit observation.
+       */
+      const exited = exitObservable
+        ? new Promise<{ code: number; error?: unknown }>((resolve) => {
+            /** Bun emits close exactly once per Worker, after the thread has stopped. */
+            worker.addEventListener(ThreadEvent.close, (event: { code?: number }) =>
+              resolve({
+                code: event.code ?? 0,
+                ...(failure === undefined ? {} : { error: failure })
+              })
+            )
+          })
+        : new Promise<never>(() => undefined)
       /** The same raw launch message enters Worker I/O and Core's held-resource control operation. */
       const initialMessage = {
         kind: ThreadBootstrap.data,
@@ -142,6 +164,7 @@ export function createAdapterWebThreadLauncher(
       /** The original native error callback has an identity that rollback and terminate can remove. */
       const onError = (event: { preventDefault(): void; error?: unknown }): void => {
         event.preventDefault()
+        failure = event.error ?? event
         /** Core already settled runtime control with this same observed native cause. */
         if (!bootstrap)
           rejectPrepared?.(
