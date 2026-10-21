@@ -12,6 +12,7 @@ import type {
   IText,
   ITypeDoc
 } from './contract.js'
+import { microHubCases } from './micro-hub-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -382,37 +383,7 @@ createMicroHub({ plugins: [state()] })`
         'Every app on the page can now call `getMicroHub().connect(name)` and get a handle of the same shape.',
         '页面上的每个应用都可以调用 `getMicroHub().connect(name)`，拿到形状相同的句柄。'
       ),
-      cases: [
-        {
-          title: t('Keep one hub across Module Federation remotes', '让各个联邦子应用共用一个 hub'),
-          problem: t(
-            'Each remote bundles its own copy of a store, so state written by one remote never reaches another. Declaring the package as a singleton and creating the hub only in the shell gives every app the same instance; a second `createMicroHub` call fails loudly instead of silently splitting state.',
-            '每个子应用各自打包一份状态库，一个子应用写入的状态到不了另一个。把本包声明为单例，并且只在主应用中创建 hub，所有应用就拿到同一个实例；再次调用 `createMicroHub` 会直接报错，而不是悄悄把状态分成两份。'
-          ),
-          example: {
-            en: `// webpack / rspack Module Federation config of the shell and every remote
-shared: { '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.1' } }
-
-// shell bootstrap
-createMicroHub({ plugins: [events(), state()] })
-
-// any remote
-const app = getMicroHub().connect('product')`,
-            zh: `// 主应用和每个子应用的 webpack / rspack 联邦模块配置
-shared: { '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.1' } }
-
-// 主应用启动时
-createMicroHub({ plugins: [events(), state()] })
-
-// 任意子应用
-const app = getMicroHub().connect('product')`
-          },
-          result: t(
-            'All remotes connect to the same hub; a remote that tries to create another one gets `HUB_ALREADY_CREATED`.',
-            '所有子应用连到同一个 hub；试图再创建一个的子应用会得到 `HUB_ALREADY_CREATED`。'
-          )
-        }
-      ],
+      cases: microHubCases.createMicroHub,
       scenarios: [
         t(
           'Several Module Federation remotes or Web Component child apps on one page share state, events and requests.',
@@ -440,7 +411,8 @@ const app = getMicroHub().connect('product')`
         'The current `IMicroHub`. Throws `HUB_NOT_CREATED` when the shell has not created it yet or it has been disposed.',
         '当前的 `IMicroHub`。主应用尚未创建或已经释放时抛 `HUB_NOT_CREATED`。'
       ),
-      example: `const app = getMicroHub().connect('product')`
+      example: `const app = getMicroHub().connect('product')`,
+      cases: microHubCases.getMicroHub
     },
     defineContract: {
       role: 'factory',
@@ -463,37 +435,7 @@ const app = getMicroHub().connect('product')`
         '冻结的 `IContract`。名字非法、版本不是正整数、或某部分成员类型不对时抛 `INVALID_OPTION`（`TypeError`）。'
       ),
       example: cartContract,
-      cases: [
-        {
-          title: t('Catch incompatible deployments', '发现不兼容的部署'),
-          problem: t(
-            "The cart team ships a new state shape while the product remote still runs the old one. Without a version, both apps read each other's data wrongly and nothing reports it. Bumping `version` makes the hub reject the older app at `use()`.",
-            '购物车团队发布了新的状态结构，商品子应用还在用旧结构。没有版本号时，两边会错误地读取对方的数据，而且没有任何报错。提升 `version` 后，旧应用在 `use()` 时就会被拒绝。'
-          ),
-          example: {
-            en: `export const cart = defineContract('cart', { version: 2, state: { lines: [] as ILine[] } })
-
-// in a remote still built against version 1
-try {
-  app.use(cartV1)
-} catch (error) {
-  reportIncompatible(error)
-}`,
-            zh: `export const cart = defineContract('cart', { version: 2, state: { lines: [] as ILine[] } })
-
-// 仍按版本 1 构建的子应用中
-try {
-  app.use(cartV1)
-} catch (error) {
-  reportIncompatible(error)
-}`
-          },
-          result: t(
-            'The second registration with another version throws `CONTRACT_VERSION_MISMATCH` instead of mixing data.',
-            '以不同版本再次登记会抛 `CONTRACT_VERSION_MISMATCH`，不会把数据混在一起。'
-          )
-        }
-      ]
+      cases: microHubCases.defineContract
     },
     event: {
       role: 'operation',
@@ -520,7 +462,8 @@ try {
       example: `defineContract('cart', {
   version: 1,
   requests: { checkout: request<{ coupon?: string }, { orderId: string }>() }
-})`
+})`,
+      cases: microHubCases.request
     },
     keyed: {
       role: 'operation',
@@ -536,7 +479,8 @@ try {
   version: 1,
   state: { products: keyed<IProduct>() },
   commands: { rename: (s, id: string, name: string) => ({ products: { [id]: { ...s.products.get(id)!, name } } }) }
-})`
+})`,
+      cases: microHubCases.keyed
     },
     resource: {
       role: 'operation',
@@ -679,7 +623,8 @@ if (status === MicroResourceStatus.success) render(data)`
       ),
       returns: t('An `IMicroPlugin` of kind `events`.', '种类为 `events` 的 `IMicroPlugin`。'),
       options: 'IEventsOptions',
-      example: `createMicroHub({ plugins: [events({ publishBudget: 1000 })] })`
+      example: `createMicroHub({ plugins: [events({ publishBudget: 1000 })] })`,
+      cases: microHubCases.events
     },
     state: {
       role: 'enhancer',
@@ -688,7 +633,8 @@ if (status === MicroResourceStatus.success) render(data)`
         '创建状态能力插件。契约中声明了 `state`、`computed` 或 `commands` 时，在主应用里把它放进 `createMicroHub({ plugins })`。'
       ),
       returns: t('An `IMicroPlugin` of kind `state`.', '种类为 `state` 的 `IMicroPlugin`。'),
-      example: `createMicroHub({ plugins: [state()] })`
+      example: `createMicroHub({ plugins: [state()] })`,
+      cases: microHubCases.state
     },
     persist: {
       role: 'enhancer',
@@ -701,7 +647,8 @@ if (status === MicroResourceStatus.success) render(data)`
         '种类为 `persist`、依赖 `state` 的 `IMicroPlugin`。'
       ),
       options: 'IPersistOptions',
-      example: persistExample
+      example: persistExample,
+      cases: microHubCases.persist
     },
     resources: {
       role: 'enhancer',
