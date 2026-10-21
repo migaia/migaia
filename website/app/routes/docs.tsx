@@ -311,8 +311,84 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
     optionTranslations: hasAuthoredSymbol ? undefined : optionTranslations,
     optionFallbacks: hasAuthoredSymbol ? undefined : optionFallbacks,
     selectedTypeFragment: selectedType?.fragment,
-    // Runtime articles never render the module overview; module and type routes still need it.
-    reference: selectedSymbol && reference ? { ...reference, modules: {} } : reference
+    reference:
+      selectedSymbol && reference
+        ? renderedSymbolReference(reference, selectedSymbol, selectedModule, [
+            ...(selectedApi?.symbols ?? []),
+            ...content.apis.flatMap((entry) => entry.symbols)
+          ])
+        : reference
+  }
+}
+
+/** Keeps only authored entries the selected runtime article reads, including nested field docs. */
+function renderedSymbolReference(
+  reference: ILocalizedReference,
+  symbol: IApiSymbol,
+  module: string,
+  symbols: readonly IApiSymbol[]
+): ILocalizedReference {
+  /** Use the article's instance selection so compact type links do not pull in unrelated guides. */
+  const { ownGuide, ownSurface, instances, symbolDoc } = referenceInstanceContent(
+    symbol,
+    module,
+    symbols,
+    reference
+  )
+  /** Visible surfaces own member prose, nested fields, and member parameter type explanations. */
+  const surfaces = [...(ownSurface ? [ownSurface] : []), ...instances.map(({ surface }) => surface)]
+  /** Root parameters whose fields are already in the options table are not expanded again. */
+  const optionNames = new Set(symbol.configuration.map((field) => field.name.split('.')[0]))
+  /** Match the root parameter renderer rather than carrying the hidden options-bag guide. */
+  const parameterTypes = (callableShape(symbol)?.parameters ?? symbol.parameterDetails).flatMap(
+    (parameter) =>
+      parameterFieldsDocFor(reference, module, parameter, optionNames)
+        ? [parameterTypeName(parameter.type)]
+        : []
+  )
+  /** Direct type lookups made by the article, its option rows, and its instance members. */
+  const typeNames = new Set([
+    symbol.name,
+    ...surfaces.flatMap((surface) => surface.owners),
+    ...instances.map(({ type }) => type.name),
+    ...parameterTypes,
+    ...surfaces.flatMap((surface) =>
+      surface.members.flatMap((member) =>
+        member.parameterDetails.map((parameter) => parameterTypeName(parameter.type))
+      )
+    )
+  ])
+  /** A composed instance can display its base guide even when its declaration is only a link. */
+  const visibleGuides = new Set([
+    ...(ownSurface && ownGuide ? [ownGuide] : []),
+    ...instances.flatMap(({ guide }) => (guide ? [guide] : []))
+  ])
+  if (symbolDoc?.optionsType) {
+    typeNames.add(symbolDoc.optionsType)
+    for (const field of symbol.configuration)
+      resolveFieldDoc(
+        symbolDoc.optionsType,
+        field.name.replace(/^options\./, ''),
+        (name) => {
+          typeNames.add(name)
+          return instanceGuideFor(reference, module, name)?.members
+        },
+        symbols
+      )
+  }
+  /** Qualified reference keys share a declaration name with the unqualified lookup fallback. */
+  const bare = (key: string) => key.slice(key.lastIndexOf(':') + 1)
+  return {
+    ...reference,
+    modules: {},
+    symbols: Object.fromEntries(
+      Object.entries(reference.symbols).filter(([key]) => bare(key) === symbol.name)
+    ),
+    types: Object.fromEntries(
+      Object.entries(reference.types).filter(
+        ([key, guide]) => typeNames.has(bare(key)) || visibleGuides.has(guide)
+      )
+    )
   }
 }
 
@@ -2178,6 +2254,7 @@ function ClassMemberReference({
                     parameters={member.parameterDetails}
                     parameterTypeDoc={parameterTypeDoc}
                     resultType={member.returns}
+                    shownExample={guide?.example}
                     showUsage={firstOverload}
                   />
                   {firstOverload ? (
@@ -2236,6 +2313,22 @@ function parameterTypeName(type: string): string {
   const withoutUndefined = type.replace(/\s*\|\s*undefined\s*$/, '').trim()
   const unwrapped = withoutUndefined.match(/^Readonly<([\s\S]+)>$/)?.[1] ?? withoutUndefined
   return unwrapped.match(/^([A-Za-z_$][\w$]*)(?:<[\s\S]*>)?$/)?.[1] ?? unwrapped
+}
+
+/** Resolves parameter fields only when the options table does not already explain all of them. */
+function parameterFieldsDocFor(
+  reference: ILocalizedReference | undefined,
+  module: string,
+  parameter: { readonly type: string } | undefined,
+  optionNames: ReadonlySet<string>
+): ILocalizedTypeDoc | undefined {
+  /** Named parameter types own their field meanings. */
+  const typeDoc = parameter
+    ? instanceGuideFor(reference, module, parameterTypeName(parameter.type))
+    : undefined
+  /** Dotted entries are subordinate to their top-level field. */
+  const fields = Object.keys(typeDoc?.members ?? {}).filter((name) => !name.includes('.'))
+  return fields.length > 0 && fields.every((name) => optionNames.has(name)) ? undefined : typeDoc
 }
 
 /**
@@ -2411,6 +2504,7 @@ function ReferenceMemberDetails({
   parameters = [],
   parameterTypeDoc,
   resultType,
+  shownExample,
   showDefault = true,
   showValues = true,
   showUsage = true
@@ -2425,6 +2519,8 @@ function ReferenceMemberDetails({
   /** Resolves a documented object type so a parameter of that type lists its fields in place. */
   readonly parameterTypeDoc?: (typeName: string) => ILocalizedTypeDoc | undefined
   readonly resultType?: string
+  /** An enclosing instance guide already owns this complete program. */
+  readonly shownExample?: string
   readonly showDefault?: boolean
   readonly showValues?: boolean
   readonly showUsage?: boolean
@@ -2542,7 +2638,7 @@ function ReferenceMemberDetails({
           </div>
         ) : null}
       </dl>
-      {showUsage && doc?.example ? (
+      {showUsage && doc?.example && doc.example !== shownExample ? (
         <CodeBlock
           code={doc.example}
           label={label(`${name} example`, `${name} 示例`)}
@@ -3127,17 +3223,6 @@ function SingleApiReference({
   /** Nested anonymous fields retain their authored contracts when extraction lists only the parent. */
   /** Top-level option names already explained field by field in the options section below. */
   const optionNames = new Set(configuration.map((field) => field.name.split('.')[0]))
-  /**
-   * Documented object type of one parameter, so its fields list under the parameter. A parameter
-   * whose fields the options section already explains is not expanded a second time.
-   */
-  const parameterFieldsDoc = (parameter: { readonly type: string } | undefined) => {
-    const typeDoc = parameter
-      ? instanceGuideFor(reference, api.module, parameterTypeName(parameter.type))
-      : undefined
-    const fields = Object.keys(typeDoc?.members ?? {}).filter((name) => !name.includes('.'))
-    return fields.length > 0 && fields.every((name) => optionNames.has(name)) ? undefined : typeDoc
-  }
   /** Option cases of this API, falling back to the cases of its options type. */
   const optionCases =
     symbolDoc && symbolDoc.optionCases.length > 0
@@ -3335,7 +3420,12 @@ function SingleApiReference({
                           <ParameterTypeFields
                             library={library.slug}
                             locale={locale}
-                            typeDoc={parameterFieldsDoc(parameter)}
+                            typeDoc={parameterFieldsDocFor(
+                              reference,
+                              api.module,
+                              parameter,
+                              optionNames
+                            )}
                           />
                         </li>
                       )
@@ -4807,20 +4897,19 @@ function DomainLibrary({
                   ? topic
                   : library.slug)}
           </h1>
-          <p className="lede">
-            <InlineText
-              library={library.slug}
-              locale={locale}
-              text={
-                journey?.lede ??
-                (locale === 'zh'
-                  ? (LIBRARY_ARCHITECTURE_LEDES_ZH[
-                      library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
-                    ] ?? libraryReferenceDescription(locale, library.slug))
-                  : libraryReferenceDescription(locale, library.slug))
-              }
-            />
-          </p>
+          <ReferenceParagraphs
+            className="lede"
+            library={library.slug}
+            locale={locale}
+            text={
+              journey?.lede ??
+              (locale === 'zh'
+                ? (LIBRARY_ARCHITECTURE_LEDES_ZH[
+                    library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
+                  ] ?? libraryReferenceDescription(locale, library.slug))
+                : libraryReferenceDescription(locale, library.slug))
+            }
+          />
           {topic === 'index' ? <LibraryBand library={library} locale={locale} /> : null}
           {journey ? (
             <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
@@ -5220,10 +5309,10 @@ function CodeBlock({
   const isOutput = normalizedLanguage === 'text'
   /** Reader-facing source with each public symbol imported from its narrowest owner. */
   const normalizedCode = isTypeScript ? normalizeExampleImports(code) : code
-  /** Type layout changes whitespace only; examples keep their authored comments. */
+  /** Type declarations omit source JSDoc already explained by localized prose; examples keep it. */
   const documentedCode =
     signature || commentaryContext?.kind === 'signature'
-      ? formatTypeSignature(normalizedCode)
+      ? formatTypeSignature(withoutDocComments(normalizedCode))
       : normalizedCode
   /** Authored example text is preserved without synthesized annotations. */
   const commentary = explain

@@ -26527,7 +26527,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     en: {
       title:
         'Store Light: write state as a plain object, and fields, derived values and methods react',
-      lede: 'For object state such as forms, settings or a session, hand-written code has to recompute derived values and notify the page at every change, and remember to clean up on the way out. `@migaia/store-light` takes the object as you would write it: fields become reactive values, getters become derived values that update themselves, methods become actions that publish once, and the store adds subscription, persistence and disposal. It also has an async value container that releases loaded objects such as connections or decoders when nobody uses them.',
+      lede: 'For object state such as forms, settings or a session, hand-written code has to recompute derived values and notify the page at every change, and remember to clean up on the way out.\n\n`@migaia/store-light` takes the object as you would write it: fields become reactive values, getters become derived values that update themselves, methods become actions that publish once, and the store adds subscription, persistence and disposal. It also has an async value container that releases loaded objects such as connections or decoders when nobody uses them.',
       document: {
         sections: [
           {
@@ -39927,7 +39927,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Utils: get timeouts, retries, concurrency and error tracing right',
-      lede: '"Add a timeout", "retry on failure", "do not send too many requests at once", "initialize only once": each looks like a few lines of code, yet hand-written versions miss the edges. The request keeps running after the timeout, retries hammer the server harder, and after a few layers of wrapping nobody can tell what the original error was. `@migaia/utils` handles those edges. Each group of tools lives under its own subpath for import on demand, and none of it depends on browser-only or Node-only APIs, so it runs in any JavaScript runtime.',
+      lede: '"Add a timeout", "retry on failure", "do not send too many requests at once", "initialize only once": each looks like a few lines of code, yet hand-written versions miss the edges. The request keeps running after the timeout, retries hammer the server harder, and after a few layers of wrapping nobody can tell what the original error was.\n\n`@migaia/utils` handles those edges. Each group of tools lives under its own subpath for import on demand, and none of it depends on browser-only or Node-only APIs, so it runs in any JavaScript runtime.',
       document: {
         sections: [
           {
@@ -60536,7 +60536,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Resource: async data that refreshes with its inputs and can be cancelled',
-      lede: 'When data depends on a user id or a set of filters, sending the request is the easy part. The hard part is everything around it: a slow old request answers late and overwrites the new result, a request keeps running after the user leaves, a refresh blanks the content before showing it again. `@migaia/resource` gives all of that to one `Resource`. You write how to load the data; it keeps only the newest result, cancels outdated requests, caches, retries and produces server-rendering snapshots. It sends no requests itself: `fetch`, RPC or a database client is your choice.',
+      lede: 'When data depends on a user id or a set of filters, sending the request is the easy part. The hard part is everything around it: a slow old request answers late and overwrites the new result, a request keeps running after the user leaves, a refresh blanks the content before showing it again.\n\n`@migaia/resource` gives all of that to one `Resource`. You write how to load the data; it keeps only the newest result, cancels outdated requests, caches, retries and produces server-rendering snapshots. It sends no requests itself: `fetch`, RPC or a database client is your choice.',
       document: {
         sections: [
           {
@@ -61771,7 +61771,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Reactive: when a value changes, dependent computations and effects update',
-      lede: 'Totals, filtered lists and badge counts on a page are all derived from other data. Syncing them by hand at every place that changes the data eventually misses one; notifying on every single write makes the page flash half-updated values. `@migaia/reactive` uses Signals (writable values), Computeds (derived values) and Effects (work to do when values change) to record who depends on whom, and updates only what a change really affects. It depends on no UI framework, runs in browsers, Node and Workers, and the store packages are built on it.',
+      lede: 'Totals, filtered lists and badge counts on a page are all derived from other data. Syncing them by hand at every place that changes the data eventually misses one; notifying on every single write makes the page flash half-updated values.\n\n`@migaia/reactive` uses Signals (writable values), Computeds (derived values) and Effects (work to do when values change) to record who depends on whom, and updates only what a change really affects. It depends on no UI framework, runs in browsers, Node and Workers, and the store packages are built on it.',
       document: {
         sections: [
           {
