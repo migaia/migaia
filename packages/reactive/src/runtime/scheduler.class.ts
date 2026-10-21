@@ -208,15 +208,24 @@ export class Scheduler {
     if (this.#flushing) return 'deferred'
     this.#flushing = true
     try {
-      const executions = new Map<IFlushable, number>()
+      /** Single-pass flushes need no ledger; repeat work seeds first-pass counts lazily. */
+      let executions: Map<IFlushable, number> | undefined
+      /** The first queue snapshot already owns the exact first execution membership. */
+      let firstBatch: IFlushable[] | undefined
       const errors: unknown[] = []
       while (this.#queued.size) {
         const batch = [...this.#queued]
         this.#queued.clear()
+        if (firstBatch === undefined) firstBatch = batch
+        else if (executions === undefined) {
+          executions = new Map()
+          for (const item of firstBatch) executions.set(item, 1)
+        }
         for (let index = 0; index < batch.length; index++) {
           const item = batch[index]
-          const executionCount = (executions.get(item) ?? 0) + 1
-          executions.set(item, executionCount)
+          /** Runtime admission guarantees a positive budget, so first-pass count one is safe. */
+          const executionCount = executions === undefined ? 1 : (executions.get(item) ?? 0) + 1
+          executions?.set(item, executionCount)
           if (executionCount > this.#maxFlushPasses) {
             // Keep the unprocessed batch suffix alongside reentrant work in the diagnostic ledger.
             const dropped = [...batch.slice(index), ...this.#queued]
@@ -265,12 +274,22 @@ export class Scheduler {
    * business failure.
    */
   runBatched<T>(fn: () => T): T {
+    return this.#runBatched(fn, undefined, false)
+  }
+
+  /** Runs one bound internal operation without allocating a callback closure for its argument. */
+  runBatchedWith<TArg, TResult>(fn: (arg: TArg) => TResult, arg: TArg): TResult {
+    return this.#runBatched(fn, arg, true)
+  }
+
+  /** Shares error priority and final flushing while retaining the public callback's zero arguments. */
+  #runBatched<TArg, T>(fn: (arg: TArg) => T, arg: TArg, withArgument: boolean): T {
     this.batchDepth++
     let fnError: unknown
     let hasFnError = false
     let result: T
     try {
-      result = fn()
+      result = withArgument ? fn(arg) : (fn as () => T)()
       const inspection = inspectCallbackThenable(result)
       if ('error' in inspection) {
         throw tagReactiveError(

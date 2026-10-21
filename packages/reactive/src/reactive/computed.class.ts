@@ -76,7 +76,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     return this.#disposed
   }
   get observed(): boolean {
-    return !this.#disposed && this.subs.size > 0
+    return !this.#disposed && this.#subs.size > 0
   }
   // Disposal removes all upstream dependency edges and clears downstream subscribers.
   // Reading a disposed `Computed` throws instead of returning a stale cache that no longer updates.
@@ -294,19 +294,19 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.#scheduleSuspension()
   }
   #scheduleSuspension(): void {
-    if (this.#keepAlive || this.subs.size > 0) return
+    if (this.#keepAlive || this.#subs.size > 0) return
     const generation = ++this.#suspensionGeneration
     // 走 runtime 的 idle 通道而不是裸 queueMicrotask：写死之后这条回收路径不受
     // 任何配置控制。刻意不复用 flush 策略——同步 flush 是合法配置，若共用，
     // 一次读完就立刻断上游边，同 tick 内第二次读会白算一遍。
     this.#internals.deferIdle(() => {
-      if (generation === this.#suspensionGeneration && this.subs.size === 0) {
+      if (generation === this.#suspensionGeneration && this.#subs.size === 0) {
         this.#suspend()
       }
     })
   }
   #suspend(): void {
-    if (this.#keepAlive || this.#disposed || this.subs.size > 0) return
+    if (this.#keepAlive || this.#disposed || this.#subs.size > 0) return
     this.#suspensionGeneration++
     // Keep the version snapshot so the next read can reuse the cache when no dependency changed.
     this.#internals.tracker.suspendDependencies(this)

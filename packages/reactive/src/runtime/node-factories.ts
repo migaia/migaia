@@ -1,4 +1,5 @@
 import { internalsOf } from './internals.js'
+import { runReactiveCallbackWith } from '../errors.js'
 import { DependencyTracker } from './dependency-tracker.class.js'
 import type {
   IObservable,
@@ -49,4 +50,25 @@ export function isAnyRuntimeTracking(): boolean {
 /** Invalidates downstream bindings while preserving this exact observable's cache and upstream. */
 export function invalidateObservable(runtime: IRuntime, observable: IObservable): void {
   internalsOf(runtime).tracker.disconnectObservable(observable, 'invalidate')
+}
+
+/**
+ * Binds one lower-level operation to canonical batch and untracked boundaries. Each invocation
+ * receives one argument without creating callback closures; finally/error handling stays in the
+ * scheduler, so callers cannot forget a matching endBatch. Public batch/untracked callbacks retain
+ * their zero-argument invocation. Business errors keep precedence over final flush failures.
+ */
+export function createBatchedOperation<TArg, TResult>(
+  runtime: IRuntime,
+  operation: (arg: TArg) => TResult
+): (arg: TArg) => TResult {
+  /** Capture services once while retaining the runtime ownership check at capability creation. */
+  const services = internalsOf(runtime)
+  /** Tracking restoration precedes callback error admission, exactly as Runtime.untracked does. */
+  const untracked = (arg: TArg): TResult => services.tracker.untrackedWith(operation, arg)
+  /** Preserve the inner Runtime.untracked callback boundary without allocating per invocation. */
+  const execute = (arg: TArg): TResult => runReactiveCallbackWith(untracked, arg)
+  /** Preserve batch flushing and its own outer Runtime.batch callback error boundary. */
+  const batched = (arg: TArg): TResult => services.scheduler.runBatchedWith(execute, arg)
+  return (arg: TArg): TResult => runReactiveCallbackWith(batched, arg)
 }
