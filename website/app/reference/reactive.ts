@@ -481,6 +481,31 @@ assertSingleRuntimeCopy()`
       ),
       example: `if (ownerOf(node) !== runtime) throw new Error('不属于当前 runtime')`
     },
+    createBatchedOperation: {
+      role: 'factory',
+      purpose: t(
+        'Wraps a one-argument operation so every call runs inside `runtime.batch()` and `runtime.untracked()`: writes are flushed once at the end, reads do not subscribe the caller, and errors follow the same rules as those two methods. A store calls it once at setup for hot write paths such as `set(definition, value)`, instead of creating new closures for `batch(() => untracked(() => ...))` on every call.',
+        '把一个单参数操作包装起来，让每次调用都在 `runtime.batch()` 和 `runtime.untracked()` 里执行：写入在结束时统一刷新，读取不会让调用方建立订阅，出错时的处理与这两个方法一致。store 在初始化时为 `set(definition, value)` 这类高频写入调用一次，之后每次调用不再像 `batch(() => untracked(() => ...))` 那样新建闭包。'
+      ),
+      params: {
+        runtime: runtimeParam,
+        operation: t(
+          'Operation that receives the call argument; it may read and write nodes of this runtime.',
+          '接收调用参数的操作，可以读写这个 runtime 的节点。'
+        )
+      },
+      returns: t(
+        'A function with the same argument and result as `operation`.',
+        '参数和返回值与 `operation` 相同的函数。'
+      ),
+      example: `import { createBatchedOperation } from '@migaia/reactive/extension'
+
+const applyPatch = createBatchedOperation(runtime, (patch: ICartPatch) => {
+  items.value = patch.items
+  total.value = patch.total
+})
+applyPatch(nextCart) // 订阅者只收到一次通知`
+    },
     createFieldSource: {
       role: 'factory',
       purpose: t(
@@ -524,6 +549,36 @@ binding.commit(capture) // 提交期`
       returns: t('An `IRuntimeSourceBinding`.', '一个节点绑定 `IRuntimeSourceBinding`。'),
       example: `const binding = createSourceBinding(node)
 binding.source.commit(() => store.set(next))`
+    },
+    createStaticObserver: {
+      role: 'factory',
+      purpose: t(
+        'Subscribes `callback` to a source whose node is known in advance, such as one atom of a store. The first read and every re-resolution run with normal tracking, so lazy creation inside `resolve` keeps its dependencies. After that, a change only compares the version of that one node and does not record dependencies again. `resolve` is called again when the node is invalidated, for example after `invalidateObservable()` switches the route. The first admission does not call `callback`; later notifications run in scheduler order.',
+        '让 `callback` 订阅一个事先知道节点的数据源，例如 store 里的某个 atom。第一次读取和每次重新解析都按普通方式追踪，所以 `resolve` 里懒创建节点时读到的依赖仍会保留。之后值变化时只比较这一个节点的版本，不再重新收集依赖。节点失效时（例如 `invalidateObservable()` 切换了路由）会再次调用 `resolve`。首次接入不会调用 `callback`；之后的通知按调度顺序执行。'
+      ),
+      params: {
+        runtime: runtimeParam,
+        resolve: t(
+          'Returns the `IStaticSubscriptionSource` to observe; called on admission and again after each invalidation.',
+          '返回要观察的 `IStaticSubscriptionSource`；首次接入时调用，每次失效后再调用。'
+        ),
+        callback: t('Runs after the source value changes.', '数据源的值变化后执行。'),
+        options: t('`debugName` for traces and errors.', '用于 trace 与错误信息的 `debugName`。')
+      },
+      options: 'IReactiveNodeOptions',
+      returns: t(
+        'An `IDisposable`; `dispose()` removes the subscription and is idempotent.',
+        '一个 `IDisposable`；`dispose()` 取消订阅，重复调用没有副作用。'
+      ),
+      example: `import { createStaticObserver } from '@migaia/reactive/extension'
+
+const subscription = createStaticObserver(
+  runtime,
+  () => cartSource,
+  () => renderCartBadge(store.get(cartAtom)),
+  { debugName: 'cart-badge' }
+)
+subscription.dispose() // 页面卸载时`
     },
     createTrackedObserver: {
       role: 'factory',
@@ -1087,6 +1142,15 @@ name.value = 'Linus' // 不再输出`,
         'Ownership contract shared by nodes and sources: `dispose()` is idempotent and `disposed` reports the state.',
         '节点与数据源共用的所有权约定：`dispose()` 可重复调用，`disposed` 反映释放状态。'
       ),
+      scenarios: [
+        t(
+          'Releasing a subscription returned by `createStaticObserver()` when its view unmounts.',
+          '视图卸载时释放 `createStaticObserver()` 返回的订阅。'
+        )
+      ],
+      example: `const subscription = createStaticObserver(runtime, () => cartSource, renderBadge)
+subscription.dispose()
+console.log(subscription.disposed) // true`,
       members: { dispose: nodeBase.dispose!, disposed: nodeBase.disposed! }
     },
     IDisposer: {
@@ -1117,7 +1181,8 @@ name.value = 'Linus' // 不再输出`,
           default: t(
             'Not set: the node shows only its numeric id.',
             '不设置：节点只以数字编号显示。'
-          )
+          ),
+          example: `runtime.effect(() => renderCart(cart.value), { debugName: 'cart-view' })`
         }
       }
     },
@@ -1437,6 +1502,40 @@ console.log(binding.version, binding.subs.size)`,
           summary: t(
             '`track` / `notify` / `commit` / `dispose` bound to this node.',
             '绑定到这个节点、不能改指其它节点的 `track` / `notify` / `commit` / `dispose` 操作。'
+          )
+        }
+      }
+    },
+    IStaticSubscriptionSource: {
+      summary: t(
+        'What `createStaticObserver()` observes: one graph node plus a function that reads exactly that node. Return the same object for as long as the node stays valid.',
+        '`createStaticObserver()` 观察的对象：一个图节点，加上一个只读取这个节点的函数。节点有效期间应一直返回同一个对象。'
+      ),
+      scenarios: [
+        t(
+          'A store adapter that exposes each atom as a known source for its subscriptions.',
+          '把每个 atom 作为固定数据源交给订阅使用的 store 适配层。'
+        )
+      ],
+      example: `const source: IStaticSubscriptionSource = {
+  node: atomNode,
+  read: () => atomNode.value
+}`,
+      members: {
+        node: {
+          summary: t(
+            'The node whose version is compared on each notification.',
+            '每次通知时比较其版本的节点。'
+          )
+        },
+        read: {
+          summary: t(
+            'Reads the current value of `node`; it may create the node lazily on the first call.',
+            '读取 `node` 的当前值；第一次调用时可以懒创建节点。'
+          ),
+          returns: t(
+            'The current value; the observer only uses the read to record the version.',
+            '当前值；观察者读取它只是为了记录版本。'
           )
         }
       }

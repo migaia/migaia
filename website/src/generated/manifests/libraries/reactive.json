@@ -3116,7 +3116,7 @@
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Ownership contract shared by nodes and sources: `dispose()` is idempotent and `disposed` reports the state.",
           "core": "dispose: Releases the node: removes its dependency edges and stops notifications. Calling it again does nothing.\nNothing; afterwards `disposed` is `true` and reading the node throws `NODE_DISPOSED`.\ndisposed: `true` after `dispose()`; a disposed node can no longer be read or written.",
-          "advanced": "",
+          "advanced": "Releasing a subscription returned by `createStaticObserver()` when its view unmounts.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -3156,7 +3156,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Releasing a subscription returned by `createStaticObserver()` when its view unmounts.",
           "notUse": "",
           "sections": [
             {
@@ -3187,7 +3187,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Releasing a subscription returned by `createStaticObserver()` when its view unmounts."
             }
           ],
           "declaredConfiguration": [],
@@ -6022,9 +6022,9 @@
           "signature": "export declare function createBatchedOperation<TArg, TResult>(runtime: IRuntime, operation: (arg: TArg) => TResult): (arg: TArg) => TResult;",
           "declarationLine": 30,
           "source": "packages/reactive/dist/runtime/node-factories.d.ts",
-          "purpose": "Binds one lower-level operation to canonical batch and untracked boundaries. Each invocation receives one argument without creating callback closures; finally/error handling stays in the scheduler, so callers cannot forget a matching endBatch. Public batch/untracked callbacks retain their zero-argument invocation. Business errors keep precedence over final flush failures.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBatchedOperation.",
-          "advanced": "No additional advanced behavior is declared for createBatchedOperation.",
+          "purpose": "Wraps a one-argument operation so every call runs inside `runtime.batch()` and `runtime.untracked()`: writes are flushed once at the end, reads do not subscribe the caller, and errors follow the same rules as those two methods. A store calls it once at setup for hot write paths such as `set(definition, value)`, instead of creating new closures for `batch(() => untracked(() => ...))` on every call.",
+          "core": "runtime: A runtime created by `createRuntime()` (or `defaultRuntime`). Other objects throw `NOT_RUNTIME_OWNED`.\noperation: Operation that receives the call argument; it may read and write nodes of this runtime.\nA function with the same argument and result as `operation`.",
+          "advanced": "",
           "parameters": ["runtime: IRuntime", "operation: (arg: TArg) => TResult"],
           "parameterDetails": [
             {
@@ -6039,8 +6039,8 @@
             }
           ],
           "returns": "(arg: TArg) => TResult",
-          "errors": ["No documented errors are declared for createBatchedOperation."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBatchedOperation.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -6064,13 +6064,13 @@
             ]
           ],
           "overloadReturns": ["(arg: TArg) => TResult"],
-          "whenToUse": "Use createBatchedOperation when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createBatchedOperation does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Binds one lower-level operation to canonical batch and untracked boundaries. Each invocation receives one argument without creating callback closures; finally/error handling stays in the scheduler, so callers cannot forget a matching endBatch. Public batch/untracked callbacks retain their zero-argument invocation. Business errors keep precedence over final flush failures."
+              "content": "Wraps a one-argument operation so every call runs inside `runtime.batch()` and `runtime.untracked()`: writes are flushed once at the end, reads do not subscribe the caller, and errors follow the same rules as those two methods. A store calls it once at setup for hot write paths such as `set(definition, value)`, instead of creating new closures for `batch(() => untracked(() => ...))` on every call."
             },
             {
               "id": "getting-started",
@@ -6090,12 +6090,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBatchedOperation."
+              "content": "runtime: A runtime created by `createRuntime()` (or `defaultRuntime`). Other objects throw `NOT_RUNTIME_OWNED`.\noperation: Operation that receives the call argument; it may read and write nodes of this runtime.\nA function with the same argument and result as `operation`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createBatchedOperation."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -6427,9 +6427,9 @@
           "signature": "export declare function createStaticObserver(runtime: IRuntime, resolve: () => IStaticSubscriptionSource, callback: () => void, options?: IReactiveNodeOptions): IDisposable;",
           "declarationLine": 16,
           "source": "packages/reactive/dist/runtime/static-observer.d.ts",
-          "purpose": "Observes an owner's known single-node read without retracking each stable notification. Source resolution and first admission retain normal tracking for lazy factory reads; an invalidation resolves again. Notifications remain scheduled, ordered and untracked under the caller's existing callback policy. The returned handle exposes disposal only, never mutable graph internals.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStaticObserver.",
-          "advanced": "No additional advanced behavior is declared for createStaticObserver.",
+          "purpose": "Subscribes `callback` to a source whose node is known in advance, such as one atom of a store. The first read and every re-resolution run with normal tracking, so lazy creation inside `resolve` keeps its dependencies. After that, a change only compares the version of that one node and does not record dependencies again. `resolve` is called again when the node is invalidated, for example after `invalidateObservable()` switches the route. The first admission does not call `callback`; later notifications run in scheduler order.",
+          "core": "runtime: A runtime created by `createRuntime()` (or `defaultRuntime`). Other objects throw `NOT_RUNTIME_OWNED`.\nresolve: Returns the `IStaticSubscriptionSource` to observe; called on admission and again after each invalidation.\ncallback: Runs after the source value changes.\noptions: `debugName` for traces and errors.\nAn `IDisposable`; `dispose()` removes the subscription and is idempotent.\ndebugName: Label used in trace events and error messages.\nNot set: the node shows only its numeric id.",
+          "advanced": "",
           "parameters": [
             "runtime: IRuntime",
             "resolve: () => IStaticSubscriptionSource",
@@ -6459,8 +6459,8 @@
             }
           ],
           "returns": "IDisposable",
-          "errors": ["No documented errors are declared for createStaticObserver."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStaticObserver.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -6494,13 +6494,13 @@
             ]
           ],
           "overloadReturns": ["IDisposable"],
-          "whenToUse": "Use createStaticObserver when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStaticObserver does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Observes an owner's known single-node read without retracking each stable notification. Source resolution and first admission retain normal tracking for lazy factory reads; an invalidation resolves again. Notifications remain scheduled, ordered and untracked under the caller's existing callback policy. The returned handle exposes disposal only, never mutable graph internals."
+              "content": "Subscribes `callback` to a source whose node is known in advance, such as one atom of a store. The first read and every re-resolution run with normal tracking, so lazy creation inside `resolve` keeps its dependencies. After that, a change only compares the version of that one node and does not record dependencies again. `resolve` is called again when the node is invalidated, for example after `invalidateObservable()` switches the route. The first admission does not call `callback`; later notifications run in scheduler order."
             },
             {
               "id": "getting-started",
@@ -6520,12 +6520,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStaticObserver."
+              "content": "runtime: A runtime created by `createRuntime()` (or `defaultRuntime`). Other objects throw `NOT_RUNTIME_OWNED`.\nresolve: Returns the `IStaticSubscriptionSource` to observe; called on admission and again after each invalidation.\ncallback: Runs after the source value changes.\noptions: `debugName` for traces and errors.\nAn `IDisposable`; `dispose()` removes the subscription and is idempotent.\ndebugName: Label used in trace events and error messages.\nNot set: the node shows only its numeric id."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStaticObserver."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -8467,14 +8467,14 @@
           "signature": "export type IStaticSubscriptionSource = { readonly node: IObservable; read(): unknown; };",
           "declarationLine": 6,
           "source": "packages/reactive/dist/runtime/static-observer.d.ts",
-          "purpose": "An owner's stable source object reads exactly its one graph node. Resolver work may materialize it.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStaticSubscriptionSource.",
-          "advanced": "No additional advanced behavior is declared for IStaticSubscriptionSource.",
+          "purpose": "What `createStaticObserver()` observes: one graph node plus a function that reads exactly that node. Return the same object for as long as the node stays valid.",
+          "core": "node: The node whose version is compared on each notification.\nread: Reads the current value of `node`; it may create the node lazily on the first call.\nThe current value; the observer only uses the read to record the version.",
+          "advanced": "A store adapter that exposes each atom as a known source for its subscriptions.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStaticSubscriptionSource."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStaticSubscriptionSource.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -8504,13 +8504,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IStaticSubscriptionSource when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStaticSubscriptionSource does not match the required inputs or return contract.",
+          "whenToUse": "A store adapter that exposes each atom as a known source for its subscriptions.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "An owner's stable source object reads exactly its one graph node. Resolver work may materialize it."
+              "content": "What `createStaticObserver()` observes: one graph node plus a function that reads exactly that node. Return the same object for as long as the node stays valid."
             },
             {
               "id": "getting-started",
@@ -8530,12 +8530,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStaticSubscriptionSource."
+              "content": "node: The node whose version is compared on each notification.\nread: Reads the current value of `node`; it may create the node lazily on the first call.\nThe current value; the observer only uses the read to record the version."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStaticSubscriptionSource."
+              "content": "A store adapter that exposes each atom as a known source for its subscriptions."
             }
           ],
           "declaredConfiguration": [],
