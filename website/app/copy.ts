@@ -48,6 +48,10 @@ export const WebsiteCopy = {
     missingEntry: 'This entry does not exist.',
     missingEntryBody: 'Choose a current library from the index to continue.',
     browse: 'Browse',
+    pageUnavailable: 'That page is not available.',
+    pageUnavailableBody: 'The path does not map to a current library or documented topic.',
+    browseDocs: 'Browse Docs',
+    languageHome: 'Language home',
     domainTitle: {
       docs: 'Find the API you need',
       guides: 'Reach a practical result.',
@@ -104,6 +108,10 @@ export const WebsiteCopy = {
     missingEntry: '该入口不存在。',
     missingEntryBody: '请从索引中选择当前可用的类库继续。',
     browse: '浏览',
+    pageUnavailable: '这个页面不存在。',
+    pageUnavailableBody: '这个地址没有对应的类库或文档主题。',
+    browseDocs: '浏览文档',
+    languageHome: '返回首页',
     domainTitle: {
       docs: '找到你需要的 API',
       guides: '完成一个可验证的实际结果。',
