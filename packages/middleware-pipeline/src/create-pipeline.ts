@@ -31,7 +31,11 @@ import {
   type IMiddlewarePipelineViolation
 } from './state-constants.js'
 
-/** Stage selected by one concrete middleware mode. */
+/**
+ * Stage shape for the selected mode. Sync/async stages receive a next callback; generator stages
+ * yield candidates and return a terminal value or control signal. Custom TSignals remain separate
+ * from TValue so control symbols do not widen the payload type.
+ */
 export type IMiddlewarePipelineStage<
   TMode extends IMiddlewarePipelineMode,
   TValue,
@@ -48,7 +52,11 @@ export type IMiddlewarePipelineSyncMode =
   | typeof MiddlewarePipelineMode.sync
   | typeof MiddlewarePipelineMode.generator
 
-/** Terminal callback selected by one concrete middleware mode. */
+/**
+ * Receives the final value only when every stage continues; an empty stage list also calls done.
+ * Sync/generator callbacks finish synchronously. Async modes await the returned promise. The
+ * optional context is supplied only when this run has an effective abort signal.
+ */
 export type IMiddlewarePipelineDone<
   TMode extends IMiddlewarePipelineMode,
   TValue
@@ -56,11 +64,18 @@ export type IMiddlewarePipelineDone<
   ? (value: TValue, context?: IMiddlewarePipelineContext) => void
   : (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>
 
-/** Execution result selected by one concrete middleware mode. */
+/**
+ * Run returns void for sync/generator and Promise<void> for async/async-generator. Final payloads
+ * go to done, not this return value; failure throws or rejects according to mode.
+ */
 export type IMiddlewarePipelineRunResult<TMode extends IMiddlewarePipelineMode> =
   TMode extends IMiddlewarePipelineSyncMode ? void : Promise<void>
 
-/** Source modes that can be lifted into one target middleware mode. */
+/**
+ * Allowed lift sources: sync accepts sync; async accepts sync/async; generator accepts
+ * sync/generator; async-generator accepts sync/generator/async-generator. Other directions would
+ * lose semantics.
+ */
 export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode> = {
   readonly sync: 'sync'
   readonly async: 'sync' | 'async'
@@ -68,39 +83,76 @@ export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode>
   readonly 'async-generator': 'sync' | 'generator' | 'async-generator'
 }[TMode]
 
-/** Shared construction options for every middleware mode. */
+/**
+ * Construction options captured once for a reusable runner. mode is required; every other field is
+ * optional. Malformed modes, callbacks, or generator signals throw INVALID_OPTION at construction.
+ * Signal structure is admitted when run starts, within that mode's synchronous or async boundary.
+ */
 export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{
   /**
-   * Selects the execution algebra for every run; stages must match this mode or be lifted
-   * explicitly.
+   * Required execution mode: sync, async, generator, or async-generator. Determines stage shape,
+   * downstream timing, and whether run throws synchronously or returns a promise.
    */
   readonly mode: TMode
-  /** Reports duplicate or late next calls without starting a second downstream traversal. */
+  /**
+   * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts
+   * downstream again.
+   */
   readonly onViolation?: IMiddlewarePipelineViolationHandler
-  /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */
+  /**
+   * Optional host lifetime assertion at entry and after successful stages. Async onion frames also
+   * check while returning, even after done ran; a later failure does not undo completed side
+   * effects.
+   */
   readonly assertActive?: () => void
-  /** Default cooperative abort signal; a run-level signal overrides it. */
+  /**
+   * Optional default cooperative signal. A supplied run-level signal overrides it; none is created
+   * by default.
+   */
   readonly signal?: IAbortSignal
-  /** Optional generator sentinel set; all three sentinel identities must be distinct. */
+  /**
+   * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals.
+   * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction.
+   */
   readonly signals?: IGeneratorMiddlewareSignals
   /**
-   * Combines simultaneous asynchronous stage and downstream failures while retaining both
-   * originals.
+   * Optional async-onion dual-failure policy, called with stage failure first and downstream
+   * second. Without it, independent failures become EXECUTION_FAILED with both on
+   * AggregateError.errors. A returned custom error must retain both originals through cause/errors;
+   * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object
+   * is not combined twice.
    */
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
 }>
 
-/** Stateless runner returned by `createPipeline`. */
+/**
+ * Immutable runner whose mode and configuration are reusable across independent run calls. It owns
+ * no host lifecycle, controller, event history, or shared mutable execution state.
+ */
 export type IMiddlewarePipeline<
   TMode extends IMiddlewarePipelineMode,
   TValue,
   TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
 > = Readonly<{
+  /** Fixed construction mode; changing caller-owned options does not change it. */
   readonly mode: TMode
+  /**
+   * Adapts an allowed source stage to this runner's mode. Same-mode lifting returns the same
+   * function; unsupported directions throw INVALID_OPTION. Lifted sync stages keep next as a local
+   * value submission, so code after next still runs before downstream and a throw prevents
+   * downstream entry.
+   */
   lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(
     stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>,
     from: TFrom
   ): IMiddlewarePipelineStage<TMode, TValue, TSignals>
+  /**
+   * Runs a snapshot of stages from value, calling done only if the sequence continues to the end.
+   * control.signal optionally overrides the construction signal. An effective signal is supplied to
+   * callbacks as context; cancellation is cooperative and never detaches already-started work.
+   * Sync/generator failures throw; async modes reject after their started work settles. Original
+   * failures retain identity where attachable, otherwise remain reachable through the error chain.
+   */
   run(
     stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[],
     value: TValue,
@@ -323,7 +375,18 @@ const runForMode = (
   }
 }
 
-/** Creates a stateless sync pipeline with a value type chosen by its caller. */
+/**
+ * Creates an immutable, reusable middleware runner with an explicitly selected execution mode. Use
+ * sync for linear value submission, async for awaitable onion-style before/after work, and
+ * generator modes when a stage chooses continuation from its final return or last yielded value.
+ * Each run snapshots its stage sequence and owns its own execution state.
+ *
+ * Mode is required. Violation reporting defaults to a no-op; assertions, a default signal, and an
+ * error combiner are absent unless supplied. Generator controls default to the exported symbol set.
+ * Options and custom signals are read once. Invalid options throw TypeError/INVALID_OPTION during
+ * construction. run later throws synchronously in sync/generator modes or rejects in async modes.
+ * Final values are delivered through done, not as the return value of run.
+ */
 export function createPipeline<TValue>(
   options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>
 ): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>
