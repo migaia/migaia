@@ -41,5 +41,7 @@ COPY docker/Caddyfile /etc/caddy/Caddyfile
 # too), but assets stay at build/client/; their URLs are /migaia/assets and /migaia/pagefind.
 COPY --from=build /website/build/client/migaia /srv/migaia
 COPY --from=build /website/build/client/assets /srv/migaia/assets
+# The SPA shell for paths with no prerendered page; the Caddyfile serves it on every 404.
+COPY --from=build /website/build/client/index.html /srv/migaia/__spa-fallback.html
 EXPOSE 8080
 ENTRYPOINT ["/usr/bin/caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
