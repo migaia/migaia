@@ -297,102 +297,97 @@ const enums: ILibraryReference['enums'] = {
   }
 }
 /** Permission and failure examples run against the public host entry. */
-const hostPermissionExample = `import { createCapabilityHost } from '@migaia/capability'
+const hostPermissionExample = `import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'
 
-const host = createCapabilityHost(undefined, { flags: { export: true, admin: false } })
-for (const name of ['export', 'admin']) {
-  host.register({ name, activate: () => ({ dispose() {} }) })
-}
-console.log((await host.enable('export')).status, (await host.enable('admin')).status)
-await host.dispose()`
-/** Host diagnostics preserve the activation failure while notifying monitoring code. */
-const hostDiagnosticExample = `import { createCapabilityHost } from '@migaia/capability'
+const host = createCapabilityHost({ tenantId }, {
+  flags: { export: true, admin: false }
+})
+host.register({ name: 'export', activate: ({ tenantId }) => openTenantExporter(tenantId) })
+host.register({ name: 'admin', activate: ({ tenantId }) => openUserAdmin(tenantId) })
+const exported = await host.enable('export')
+if (exported.status === CapabilityEnableStatus.enabled) showExportPanel()
+const admin = await host.enable('admin')
+if (admin.status === CapabilityEnableStatus.gated) disableAdminButton()
+onTenantClosed(() => host.dispose())`
+/** Lazy search startup reports its original failure with the feature name. */
+const hostDiagnosticExample = `import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'
 
-const failures: string[] = []
 const host = createCapabilityHost(undefined, {
   flags: { search: true },
-  onError: (name, error) => { failures.push(name); console.log(error instanceof Error) }
+  onError: (name, error) => reportToMonitoring(error, { feature: name })
 })
-host.register({ name: 'search', activate: () => { throw new Error('search unavailable') } })
-console.log((await host.enable('search')).status)
-console.log(failures)
-await host.dispose()`
-/** Static graph cleanup can report recoverable failures without rejecting disposal. */
+host.register({ name: 'search', activate: () => connectSearchService() })
+const result = await host.enable('search')
+if (result.status === CapabilityEnableStatus.failed) showSearchUnavailable(result.error)
+onWorkspaceClosed(() => host.dispose())`
+/** Cache release can report a lost optional statistic without failing graph disposal. */
 const graphDiagnosticExample = `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'
 
-const errors: unknown[] = []
-const graph = createCapabilityGraph({ onError: (error) => { errors.push(error) } })
+const graph = createCapabilityGraph({ onError: (error) => reportToMonitoring(error) })
 graph.register({
-  id: 'cache' as IGraphNodeId, kind: 'cache', dependencies: [],
-  start: () => ({ value: 'ready', release: ({ report }) => { report(new Error('cache stats lost')) } })
+  id: 'search-cache' as IGraphNodeId,
+  kind: 'cache',
+  dependencies: [],
+  start: () => openSearchCache()
 })
 await graph.ready()
-await graph.dispose()
-console.log(graph.state, errors.length)`
-/** Rollback diagnostics remain separate from the startup failure awaited by the caller. */
+onWorkspaceClosed(() => graph.dispose())`
+/** A failed search screen returns temporary index custody before reporting rollback diagnostics. */
 const graphRollbackExample = `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'
 
-const errors: unknown[] = []
-const graph = createCapabilityGraph({ onError: (error) => { errors.push(error) } })
+const graph = createCapabilityGraph({ onError: (error) => reportToMonitoring(error) })
 graph.register({
-  id: 'screen' as IGraphNodeId, kind: 'screen', dependencies: [],
+  id: 'search-screen' as IGraphNodeId,
+  kind: 'screen',
+  dependencies: [],
   start: ({ own }) => {
-    own({}, { force: () => { throw new Error('temporary cleanup failed') } })
-    throw new Error('screen failed')
+    const index = openTemporaryIndex()
+    own(index, { force: () => index.close() })
+    return buildSearchScreen(index)
   }
 })
-try { await graph.ready() } catch { console.log(graph.state) }
-console.log(errors.length)
-try { await graph.dispose() } catch {}`
-/** The composition owns physical startup, lease-aware teardown and binding release. */
+try {
+  await graph.ready()
+} catch (error) {
+  showStartupError(error)
+}
+onWorkspaceClosed(() => graph.dispose())`
+/** The report composition owns physical modules and waits for graph leases before release. */
 const dynamicLifecycleExample = `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
-import type { IGraphNodeId } from '@migaia/capability/graph'
 
-const released: string[] = []
-const graph = createDynamicCapabilityGraph<string>({
-  mutationAdmissionMs: 100,
-  startBatch: (entries) => entries.map((entry) => ({
-    value: entry.binding,
-    release: () => { released.push(String(entry.id)) }
-  })),
-  releaseBatch: async (entries, fence) => {
-    await fence
-    for (const entry of [...entries].reverse()) {
-      await entry.instance.release({ nodeId: entry.id, signal: new AbortController().signal, report: console.error })
-    }
-  },
-  releaseBinding: ({ binding }) => { released.push(binding) }
+type IReportBinding = { moduleId: string }
+const graph = createDynamicCapabilityGraph<IReportBinding>({
+  startBatch: (entries) => reportModules.startBatch(entries),
+  releaseBatch: (entries, fence) => reportModules.releaseBatch(entries, fence),
+  releaseBinding: ({ binding }) => reportModules.releaseBinding(binding)
 })
-await graph.register({
-  id: 'cache' as IGraphNodeId, kind: 'cache', dependencies: [],
-  start: () => ({ value: 'recipe', release() {} })
-}, 'cache-v1')
+await graph.register(reportDefinition, { moduleId: 'monthly-report' })
 await graph.ready()
-await graph.dispose()
-console.log(released)`
-/** Binding cleanup failure is reported after instance cleanup without rejecting disposal. */
+onWorkspaceClosed(() => graph.dispose())`
+/** A report module binding failure reaches monitoring after instance release. */
 const dynamicReportExample = `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
-import type { IGraphNodeId } from '@migaia/capability/graph'
 
-const errors: unknown[] = []
-const graph = createDynamicCapabilityGraph<string>({
-  report: (error) => { errors.push(error) },
-  startBatch: (entries) => entries.map((entry) => ({ value: entry.binding, release() {} })),
-  releaseBatch: async (entries, fence) => {
-    await fence
-    for (const entry of [...entries].reverse()) {
-      await entry.instance.release({ nodeId: entry.id, signal: new AbortController().signal, report: console.error })
-    }
-  },
-  releaseBinding: () => { throw new Error('binding cleanup failed') }
+type IReportBinding = { moduleId: string }
+const graph = createDynamicCapabilityGraph<IReportBinding>({
+  startBatch: (entries) => reportModules.startBatch(entries),
+  releaseBatch: (entries, fence) => reportModules.releaseBatch(entries, fence),
+  releaseBinding: ({ binding }) => reportModules.releaseBinding(binding),
+  report: (error) => reportToMonitoring(error)
 })
-await graph.register({
-  id: 'cache' as IGraphNodeId, kind: 'cache', dependencies: [],
-  start: () => ({ value: 'recipe', release() {} })
-}, 'cache-v1')
+await graph.register(reportDefinition, { moduleId: 'monthly-report' })
 await graph.ready()
-await graph.dispose()
-console.log(graph.state, errors.length)`
+await graph.dispose()`
+/** Workspace commands may wait briefly for earlier mutations, rather than queue indefinitely. */
+const dynamicAdmissionExample = `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
+
+type IReportBinding = { moduleId: string }
+const graph = createDynamicCapabilityGraph<IReportBinding>({
+  mutationAdmissionMs: 500,
+  startBatch: (entries) => reportModules.startBatch(entries),
+  releaseBatch: (entries, fence) => reportModules.releaseBatch(entries, fence)
+})
+await graph.register(reportDefinition, { moduleId: 'monthly-report' })
+onWorkspaceClosed(() => graph.dispose())`
 /** Host options cover initial permission and monitoring separately. */
 const hostOptionCases: readonly IOptionCaseDoc[] = [
   {
@@ -403,8 +398,8 @@ const hostOptionCases: readonly IOptionCaseDoc[] = [
     ),
     example: hostPermissionExample,
     result: t(
-      'The two attempts print enabled gated. Only export activates.',
-      '两次尝试输出 enabled gated，只有 export 被激活。'
+      'The export panel opens, while the admin button stays disabled and its capability is never activated.',
+      '导出面板可以打开，管理按钮保持禁用，管理能力不会被激活。'
     ),
     covers: ['flags']
   },
@@ -415,7 +410,10 @@ const hostOptionCases: readonly IOptionCaseDoc[] = [
       '按需启动的搜索服务可能激活失败。省略 onError 时会保留失败，但不会通知监控回调。上报函数记录功能名，enable() 仍返回失败结果。'
     ),
     example: hostDiagnosticExample,
-    result: t('It prints true, failed, then ["search"].', '依次输出 true、failed 和 ["search"]。'),
+    result: t(
+      'The workspace shows that search is unavailable, and monitoring receives the original failure with the search feature name.',
+      '工作区提示搜索暂不可用，监控收到原始失败及 search 功能名。'
+    ),
     covers: ['onError', 'flags']
   }
 ]
@@ -424,26 +422,26 @@ const graphOptionCases: readonly IOptionCaseDoc[] = [
   {
     title: t('Report a recoverable teardown diagnostic', '上报可以继续清理的诊断'),
     problem: t(
-      'Losing optional cache statistics should be visible without failing teardown. Pass onError to receive release context.report() diagnostics; omission installs no external sink.',
-      '可选的缓存统计丢失需要可见，但不应使清理失败。onError 接收释放上下文 report() 发出的诊断；省略时没有外部接收方。'
+      'The search cache can lose optional statistics while closing. Its release implementation reports this through the supplied release context instead of failing cleanup. `onError` forwards that diagnostic to monitoring; without it, the graph has no external sink.',
+      '搜索缓存关闭时可能丢失可选统计。它的释放实现通过收到的释放上下文报告这件事，而不让清理失败。`onError` 把该诊断送到监控；省略时，图没有外部接收方。'
     ),
     example: graphDiagnosticExample,
     result: t(
-      'The graph reaches terminal and records one diagnostic.',
-      '图进入 terminal，记录一条诊断。'
+      'The cache can close successfully while monitoring still receives its optional-statistics diagnostic.',
+      '缓存可以成功关闭，监控仍能收到可选统计丢失的诊断。'
     ),
     covers: ['onError']
   },
   {
     title: t('Keep rollback failures visible', '让回滚失败保持可见'),
     problem: t(
-      'Startup fails after acquiring a temporary resource, and rolling it back also fails. onError receives the secondary cleanup failure while ready() rejects for startup. Without it, no external callback receives that cleanup diagnostic.',
-      '启动在取得临时资源后失败，回滚也失败。onError 接收次级清理失败，ready() 仍因启动失败而拒绝。省略时没有外部回调接收这条清理诊断。'
+      'The search screen acquires a temporary index before building its view. If view startup fails and closing the index also fails, `onError` keeps the cleanup failure visible while `ready()` still rejects for startup. Omitting the callback loses that external cleanup notification.',
+      '搜索页面先取得临时索引，再创建视图。若视图启动失败，关闭索引也失败，`onError` 让清理失败保持可见，`ready()` 仍因启动失败拒绝。省略回调就不会向外通知这次清理失败。'
     ),
     example: graphRollbackExample,
     result: t(
-      'It prints failed and records the rollback diagnostic.',
-      '输出 failed，并记录回滚诊断。'
+      'The page shows the startup failure, and monitoring also receives a failed temporary-index cleanup.',
+      '页面显示启动失败，监控还会收到临时索引清理失败。'
     ),
     covers: ['onError']
   }
@@ -451,28 +449,28 @@ const graphOptionCases: readonly IOptionCaseDoc[] = [
 /** Dynamic graph options keep resource ownership with the composition. */
 const dynamicOptionCases: readonly IOptionCaseDoc[] = [
   {
-    title: t('Own the cache instance and its binding', '持有缓存实例及其绑定'),
+    title: t('Own report instances and their bindings', '持有报表实例及其绑定'),
     problem: t(
-      'A composition must build and release its physical resources. startBatch and releaseBatch are required; the graph never calls definition.start itself. Awaiting fence delays teardown until leases drain. releaseBinding then returns binding custody. mutationAdmissionMs rejects ordinary mutations that wait over 100 ms in the queue; omission leaves waiting unbounded.',
-      '组合层必须构建和释放物理资源。startBatch 和 releaseBatch 必填，图不会自行调用 definition.start。等待 fence 会把清理推迟到租约归零之后。releaseBinding 随后交还绑定。mutationAdmissionMs 拒绝排队超过 100 毫秒的普通修改；省略时排队没有期限。'
+      'A report workspace loads modules through its existing composition owner. The graph orders nodes but does not call definition.start itself, so `startBatch` delegates physical startup. `releaseBatch` must await the lease fence and release dependents first; `releaseBinding` then returns module-binding custody.',
+      '报表工作区通过已有组合层加载模块。图只安排节点顺序，不会自行调用 definition.start，因此 `startBatch` 委派物理启动。`releaseBatch` 必须等待租约屏障，并先释放消费方；之后 `releaseBinding` 交还模块绑定。'
     ),
     example: dynamicLifecycleExample,
     result: t(
-      'Cleanup records ["cache", "cache-v1"]: instance first, binding second.',
-      '清理记录为 ["cache", "cache-v1"]，先实例，后绑定。'
+      'The composition starts the report module and, on workspace closure, releases its instance before returning its module binding.',
+      '组合层启动报表模块；工作区关闭时，先释放实例，再交还模块绑定。'
     ),
-    covers: ['mutationAdmissionMs', 'startBatch', 'releaseBatch', 'releaseBinding']
+    covers: ['startBatch', 'releaseBatch', 'releaseBinding']
   },
   {
     title: t('Observe a failed binding release', '观察绑定释放失败'),
     problem: t(
-      'Instance cleanup succeeds but a composition binding fails to close. report keeps that contained failure visible; without it, no external reporter is called. The failure does not replace the completed graph disposal.',
-      '实例清理成功，但组合层绑定关闭失败。report 让这个受控失败保持可见；省略时不调用外部接收方。这个失败不会替换已经完成的图释放结果。'
+      'A report module instance closes, but releasing its module binding can still fail. `report` sends this contained failure to monitoring; without it, no external callback observes the failure. The graph disposal result remains separate.',
+      '报表模块实例已关闭，但交还模块绑定仍可能失败。`report` 把这次受控失败送到监控；省略时没有外部回调观察它。图释放结果保持独立。'
     ),
     example: dynamicReportExample,
     result: t(
-      'Disposal resolves in terminal with one reported error.',
-      '释放成功完成，状态为 terminal，并上报一条错误。'
+      'Disposal completes, and monitoring receives a failed module-binding release if one occurs.',
+      '释放可以完成，发生模块绑定释放失败时，监控仍能收到它。'
     ),
     covers: ['report', 'startBatch', 'releaseBatch', 'releaseBinding']
   }
@@ -756,6 +754,11 @@ export const capabilityReference: ILibraryReference = {
       optionCases: dynamicOptionCases,
       members: {
         ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members,
+        mutationAdmissionMs: {
+          ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members
+            .mutationAdmissionMs!,
+          example: dynamicAdmissionExample
+        },
         report: {
           ...capabilityGraphReference.types!.IDynamicCapabilityGraphOptions!.members.report!,
           whenToUse: t(
