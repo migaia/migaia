@@ -19,6 +19,8 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   lifecycle:
     '让关闭、取消和替换在并发下也不出错：按顺序释放资源、只采用最新请求的结果、限时等待进行中的工作。',
   logger: '将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。',
+  'micro-hub':
+    '让同一页面里的多个微前端应用共享状态、事件和请求：每份状态有明确的 owner，应用卸载时一次释放干净。',
   'middleware-pipeline':
     '把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。',
   'plugin-host': '为库或应用安装和卸载插件，配置共享能力与处理步骤，并在安装失败时回滚。',
@@ -62,6 +64,8 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
     'Keep shutdown, cancellation and replacement correct under concurrency: release resources in order, accept only the latest result, and wait for work in flight with a deadline.',
   logger:
     'Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.',
+  'micro-hub':
+    'Let micro-frontend apps on one page share state, events, and requests, with one owner per piece of state and a clean release when an app unmounts.',
   'middleware-pipeline':
     'Combine processing steps into synchronous, asynchronous, or generator middleware pipelines and stop or cancel processing when needed.',
   'plugin-host':

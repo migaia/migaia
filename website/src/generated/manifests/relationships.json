@@ -18602,6 +18602,3546 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--defineContract",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--defineContract",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--defineContract",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--defineContract",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--defineContract",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--defineContract",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--event",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--event",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--event",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--event",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--event",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--event",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContract",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContract",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContract",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContract",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContract",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContract",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractView",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractView",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IContractView",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IContractView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IEventView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IEventView",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IEventView",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IEventView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IEventView",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IEventView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IReadable",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IReadable",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IReadable",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IReadable",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IReadable",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IReadable",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStateView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStateView",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStateView",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStateView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--IStateView",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--IStateView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--keyed",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--keyed",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--keyed",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--keyed",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--keyed",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--keyed",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--request",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--request",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--request",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--request",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--request",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--request",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/en/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHub",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--createMicroHubTypeError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--defineContract",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--defineContract",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--defineContract",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--defineContract",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--defineContract",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--defineContract",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--event",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--event",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--event",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--event",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--event",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--event",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--getMicroHub",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--ICommitResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IComputedView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContract",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContract",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContract",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContract",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContract",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContract",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractSpec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypes",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractTypesOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractView",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractView",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IContractView",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IContractView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--ICreateMicroHubOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IEventMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IEventView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IEventView",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IEventView",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IEventView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IEventView",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IEventView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedReadable",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IKeyedSnapshot",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroApp",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHub",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroHubErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroPlugin",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceFetcher",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IMicroResourceView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedContract",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnedEventView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IOwnOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IReadable",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IReadable",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IReadable",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IReadable",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IReadable",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IReadable",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IRequestMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IRequestOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IResourceMarker",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStatePatch",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStateValues",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStateView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStateView",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStateView",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStateView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--IStateView",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--IStateView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--keyed",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--keyed",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--keyed",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--keyed",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--keyed",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--keyed",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MICRO_HUB_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroCapability",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroHubErrorText",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--MicroResourceStatus",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--request",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--request",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--request",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--request",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--request",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--request",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/zh/docs/micro-hub/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/events",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events",
+      "to": "/en/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/events",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events",
+      "to": "/en/docs/micro-hub/api/events#micro-hub-events--events",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events#micro-hub-events--events",
+      "to": "/en/docs/micro-hub/api/events",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events#micro-hub-events--events",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/events#micro-hub-events--events",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events#micro-hub-events--events",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/events#micro-hub-events--events",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events",
+      "to": "/en/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "to": "/en/docs/micro-hub/api/events",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/events",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events",
+      "to": "/zh/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/events",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events",
+      "to": "/zh/docs/micro-hub/api/events#micro-hub-events--events",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events#micro-hub-events--events",
+      "to": "/zh/docs/micro-hub/api/events",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events#micro-hub-events--events",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/events#micro-hub-events--events",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events#micro-hub-events--events",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/events#micro-hub-events--events",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events",
+      "to": "/zh/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "to": "/zh/docs/micro-hub/api/events",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/events#micro-hub-events--IEventsOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/persist",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist",
+      "to": "/en/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/persist",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist",
+      "to": "/en/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "to": "/en/docs/micro-hub/api/persist",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist",
+      "to": "/en/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "to": "/en/docs/micro-hub/api/persist",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/persist",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist",
+      "to": "/zh/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/persist",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist",
+      "to": "/zh/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "to": "/zh/docs/micro-hub/api/persist",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/persist#micro-hub-persist--IPersistOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist",
+      "to": "/zh/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "to": "/zh/docs/micro-hub/api/persist",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/persist#micro-hub-persist--persist",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/resource",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/resource",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/resource",
+      "to": "/en/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/resource",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/resource",
+      "to": "/en/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "to": "/en/docs/micro-hub/api/resource",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/resource",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/resource",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/resource",
+      "to": "/zh/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/resource",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/resource",
+      "to": "/zh/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "to": "/zh/docs/micro-hub/api/resource",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/resource#micro-hub-resource--resources",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/state",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state",
+      "to": "/en/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/state",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "to": "/en/docs/micro-hub/api/state",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--state",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--state",
+      "to": "/en/docs/micro-hub/api/state",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--state",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--state",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--state",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--state",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "to": "/en/docs/micro-hub/api/state",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/state",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state",
+      "to": "/zh/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/state",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "to": "/zh/docs/micro-hub/api/state",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--IStateDriver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--state",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--state",
+      "to": "/zh/docs/micro-hub/api/state",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--state",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--state",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--state",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--state",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "to": "/zh/docs/micro-hub/api/state",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/state#micro-hub-state--stateDriverOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/web-component",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component",
+      "to": "/en/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/web-component",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "to": "/en/docs/micro-hub/api/web-component",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "to": "/en/docs/micro-hub/api/web-component",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "to": "/en/docs/micro-hub/api/web-component",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "to": "/en/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/micro-hub/getting-started",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "to": "/en/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/micro-hub",
+      "to": "/en/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/web-component",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component",
+      "to": "/zh/docs/micro-hub",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/web-component",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "to": "/zh/docs/micro-hub/api/web-component",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--consumeMicroApp",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "to": "/zh/docs/micro-hub/api/web-component",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--MICRO_APP_CONTEXT",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "to": "/zh/docs/micro-hub/api/web-component",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "to": "/zh/docs/micro-hub/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/micro-hub/getting-started",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "to": "/zh/docs/micro-hub",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/micro-hub",
+      "to": "/zh/docs/micro-hub/api/web-component#micro-hub-web-component--provideMicroApp",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/en/docs/middleware-pipeline/api",
       "to": "/en/docs/middleware-pipeline/getting-started",
       "type": "api-guide"

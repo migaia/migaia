@@ -48,7 +48,7 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('guarded property read convergence', () => {
-  it('removes the dedicated try blocks and keeps one implementation', () => {
+  it('keeps the shared primitive and the allocation-free then inspection exception', () => {
     const predecessor = `function safeRead(value: unknown, key: PropertyKey) {
       try {
         if (value === null) return undefined
@@ -67,9 +67,13 @@ describe('guarded property read convergence', () => {
     ]
     for (const path of targets) {
       const source = readFileSync(resolve(repositoryRoot, path), 'utf8')
-      // The multi-operation abort subscription policy owns this inline read.
+      // Abort admission and the explicitly optimized then inspection own these single reads.
       const excludedRead =
-        path === 'packages/resource/src/resource.class.ts' ? 'signal.aborted' : undefined
+        path === 'packages/resource/src/resource.class.ts'
+          ? 'signal.aborted'
+          : path === 'packages/utils/src/function.ts'
+            ? '(value as { then?: unknown }).then'
+            : undefined
       expect(hasSingleReadTry(source, excludedRead), path).toBe(false)
       if (path.endsWith('scheduler.class.ts')) {
         expect(source).toContain('probeThenable(')

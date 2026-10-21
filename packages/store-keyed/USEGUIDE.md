@@ -348,6 +348,20 @@ store.set(writableDerivedDef, ...customArgs) // 走 write(get, set, ...args)
 - 目标解析为 `derived`（只读）：抛 `TypeError('[store] atom override resolved to a read-only definition')`——正常情况下 TypeScript 类型已经挡住了直接传只读定义，这条路径主要在 override 把一个可写定义路由到只读目标时触发。
 - 目标解析为 `writable-derived`：调用 `write(store.get, store.set, ...args)`，返回值就是 `write` 的返回值。
 
+一次写多个源定义时用 `store.setMany`：
+
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
+store.setMany([
+  [countDef, (previous) => previous + 1],
+  [nameDef, 'Ada']
+])
+```
+
+- 只接受源定义（`atomDef`、`atomDefFactory`）。任何一项经 override 解析到非源定义时抛 `OVERRIDE_CONTRACT`。
+- 先解析全部条目、按顺序执行全部更新函数，最后才统一写入。所以只要有一项被拒绝，或者某个更新函数抛错，所有定义都保持原值，订阅者也不会收到通知。
+- 同一个定义出现多次时，后一项的更新函数收到前一项算出的值，结果与逐个 `set` 相同。更新函数如果读取其它定义，读到的是这次调用之前的值。
+- 写入在一个批次里完成，订阅者只通知一轮。
+
 ### 3.3 订阅
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
@@ -356,7 +370,7 @@ const unsubscribe = store.sub(doubledDef, () => {
 })
 ```
 
-`store.sub(def, onChange)` 内部用一个 `Effect` 订阅，而不是把底层节点直接交给调用方——实例化策略（何时建 Signal/Computed、是否惰性）因此可以自由演进而不破坏订阅者。首次运行只建立依赖、不触发 `onChange`；此后每次依赖变化都会在 `runtime.untracked()` 里调用 `onChange`，`onChange` 内抛出的异常会被捕获并交给 `runtime.reportError(error, { phase: 'subscription-listener' })`，不会中断其它订阅者或让 Effect 失效。返回的 `unsubscribe` 幂等，可以安全多次调用。
+`store.sub(def, onChange)` 内部用 reactive 的静态观察者订阅这一个节点，而不是把底层节点直接交给调用方——实例化策略（何时建 Signal/Computed、是否惰性）因此可以自由演进而不破坏订阅者。首次运行只建立依赖、不触发 `onChange`；此后每次依赖变化都会在 `runtime.untracked()` 里调用 `onChange`，`onChange` 内抛出的异常会被捕获并交给 `runtime.reportError(error, { phase: 'subscription-listener' })`，不会中断其它订阅者，也不会让这个订阅失效。返回的 `unsubscribe` 幂等，可以安全多次调用。
 
 <a id="34-override覆盖"></a>
 

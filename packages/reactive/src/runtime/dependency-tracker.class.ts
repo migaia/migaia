@@ -15,19 +15,18 @@ import {
 import {
   mutableSubs as mutableNodeSubs,
   mutableDeps as mutableNodeDeps,
-  mutableDepVersions as mutableNodeVersions
+  mutableDepVersions as mutableNodeVersions,
+  snapshotSubs,
+  invalidateSubsSnapshot
 } from './node-internals.js'
 
 function mutableSubs(observable: IObservable): Set<IObserver> {
   return mutableNodeSubs(observable, observable.subs)
 }
 
-/** Snapshots nonempty subscribers before callbacks can reconnect edges under a synchronous flush. */
+/** Preserves the notification-entry snapshot even when extension markDirty callbacks reconnect. */
 export function markSubscribers(observable: IObservable): void {
-  /** Read metadata once; an idle source needs neither an iterator nor a snapshot allocation. */
-  const subscribers = observable.subs
-  if (subscribers.size === 0) return
-  for (const subscriber of Array.from(subscribers)) subscriber.markDirty()
+  for (const subscriber of snapshotSubs(observable, observable.subs)) subscriber.markDirty()
 }
 
 // 一次追踪的临时帧：fn 执行期间读到的依赖先攒在 nextDeps，不碰正式依赖边。
@@ -181,8 +180,10 @@ export class DependencyTracker {
   /** Disconnects all dependency edges for an observer during disposal. */
   clearDependencies(observer: IObserver): void {
     this.#suspendedTopology.delete(observer)
-    for (const dep of observer.deps) this.#unsubscribe(dep, observer)
-    mutableNodeDeps(observer, observer.deps).clear()
+    /** Kernel traversal uses the registered Set rather than the public readonly view. */
+    const dependencies = mutableNodeDeps(observer, observer.deps)
+    for (const dep of dependencies) this.#unsubscribe(dep, observer)
+    dependencies.clear()
     mutableNodeVersions(observer, observer.depVersions).clear()
   }
 
@@ -194,10 +195,12 @@ export class DependencyTracker {
    * without dependency edges (never attached or already suspended) is left unchanged.
    */
   suspendDependencies(observer: IObserver): void {
-    if (observer.deps.size === 0) return
+    /** Suspension reads the canonical Set once without exposing it to its owner. */
+    const dependencies = mutableNodeDeps(observer, observer.deps)
+    if (dependencies.size === 0) return
     /** Topology tokens at suspension, compared by `revalidate`. */
     const topology = new Map<IObservable, object | undefined>()
-    for (const dep of observer.deps) topology.set(dep, this.#topologyTokens.get(dep))
+    for (const dep of dependencies) topology.set(dep, this.#topologyTokens.get(dep))
     this.#suspendedTopology.set(observer, topology)
     for (const dep of topology.keys()) this.#unsubscribe(dep, observer)
     mutableNodeDeps(observer, observer.deps).clear()
@@ -224,7 +227,7 @@ export class DependencyTracker {
   revalidate(observer: IObserver): boolean {
     const topology = this.#suspendedTopology.get(observer)
     try {
-      for (const [dep, recordedVersion] of observer.depVersions) {
+      for (const [dep, recordedVersion] of mutableNodeVersions(observer, observer.depVersions)) {
         if (
           topology !== undefined &&
           (this.#terminalObservables.has(dep) ||
@@ -239,7 +242,8 @@ export class DependencyTracker {
       // A dependency evaluation failure is reproduced by the caller's re-evaluation, not lost.
       return false
     }
-    if (topology !== undefined) this.#commit(observer, new Set(observer.depVersions.keys()))
+    if (topology !== undefined)
+      this.#commit(observer, new Set(mutableNodeVersions(observer, observer.depVersions).keys()))
     return true
   }
 
@@ -262,7 +266,8 @@ export class DependencyTracker {
     if (reason === 'dispose') {
       this.#terminalObservables.add(observable)
     }
-    const observers = [...observable.subs]
+    const observers = [...mutableSubs(observable)]
+    invalidateSubsSnapshot(observable)
     mutableSubs(observable).clear()
     for (const observer of observers) {
       mutableNodeDeps(observer, observer.deps).delete(observable)
@@ -432,25 +437,29 @@ export class DependencyTracker {
   }
 
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {
+    /** Capture raw collections once; readonly views remain the external diagnostic boundary. */
+    const dependencies = mutableNodeDeps(observer, observer.deps)
+    /** Version updates and membership checks share this canonical Map. */
+    const depVersions = mutableNodeVersions(observer, observer.depVersions)
     // A suspended observer has no `deps` but keeps its `depVersions` snapshot; the size check
     // sends it through the full path, which subscribes again and replaces the snapshot.
-    if (observer.deps.size === nextDeps.size && observer.depVersions.size === nextDeps.size) {
+    if (dependencies.size === nextDeps.size && depVersions.size === nextDeps.size) {
       let sameTopology = true
       for (const dep of nextDeps) {
-        if (!observer.deps.has(dep)) {
+        if (!dependencies.has(dep)) {
           sameTopology = false
           break
         }
       }
       if (sameTopology) {
-        const versions = mutableNodeVersions(observer, observer.depVersions)
+        const versions = depVersions
         for (const dep of nextDeps) versions.set(dep, dep.version)
         return
       }
     }
     this.#suspendedTopology.delete(observer)
     /** Stable pre-commit dependency snapshot; lifecycle callbacks may mutate the live view. */
-    const prevDeps = new Set(observer.deps)
+    const prevDeps = new Set(dependencies)
     /** Reverse edges added by this commit; terminal rollback removes only these edges. */
     const newSubscriptions: IObservable[] = []
     for (const dep of prevDeps) {
@@ -476,12 +485,12 @@ export class DependencyTracker {
       this.#rollbackTerminalCommit(observer, newSubscriptions)
       return
     }
-    const mutableDeps = mutableNodeDeps(observer, observer.deps)
+    const mutableDeps = dependencies
     mutableDeps.clear()
     for (const dep of nextDeps) mutableDeps.add(dep)
     const versions = new Map<IObservable, number>()
     for (const dep of nextDeps) versions.set(dep, dep.version)
-    const mutableVersions = mutableNodeVersions(observer, observer.depVersions)
+    const mutableVersions = depVersions
     mutableVersions.clear()
     for (const [dep, version] of versions) mutableVersions.set(dep, version)
   }
@@ -500,8 +509,11 @@ export class DependencyTracker {
     this.#assertObservableOwner(observable)
     assertReactiveOwnedBy(observer, this.#runtime, 'observer')
     const runtime = internalsOf(this.#runtime)
-    const wasUnobserved = observable.subs.size === 0
-    mutableSubs(observable).add(observer)
+    /** The same raw Set supplies admission and the previous observation state. */
+    const subscribers = mutableSubs(observable)
+    const wasUnobserved = subscribers.size === 0
+    subscribers.add(observer)
+    invalidateSubsSnapshot(observable)
     if (wasUnobserved) {
       try {
         observable.onObserved?.()
@@ -538,7 +550,10 @@ export class DependencyTracker {
 
   #unsubscribe(observable: IObservable, observer: IObserver): void {
     this.#assertObservableOwner(observable)
-    if (!mutableSubs(observable).delete(observer)) return
+    /** Deletion invalidates the snapshot before any user lifecycle callback runs. */
+    const subscribers = mutableSubs(observable)
+    if (!subscribers.delete(observer)) return
+    invalidateSubsSnapshot(observable)
     const runtime = internalsOf(this.#runtime)
     if (runtime.traceEnabled()) {
       emitTraceSafely(
@@ -562,7 +577,7 @@ export class DependencyTracker {
         })
       )
     }
-    if (observable.subs.size === 0) {
+    if (subscribers.size === 0) {
       try {
         observable.onUnobserved?.()
       } catch (error) {
@@ -584,19 +599,34 @@ export class DependencyTracker {
    * callbacks.
    */
   untracked<R>(fn: () => R): R {
+    return this.#runUntracked(fn, undefined, false)
+  }
+
+  /** Executes a bound operation with one argument without allocating an untracked closure. */
+  untrackedWith<TArg, R>(fn: (arg: TArg) => R, arg: TArg): R {
+    return this.#runUntracked(fn, arg, true)
+  }
+
+  /** Owns tracking-context restoration for both public callbacks and argument-bound operations. */
+  #runUntracked<TArg, R>(fn: (arg: TArg) => R, arg: TArg, withArgument: boolean): R {
     this.#stack.push(null)
     const prevTracker = swapActiveTracker(this)
     try {
-      return fn()
+      return withArgument ? fn(arg) : (fn as () => R)()
     } finally {
       this.#stack.pop()
       activeTracker = prevTracker
     }
   }
 
+  /** Reattaches a known single dependency after callback-triggered invalidation or route release. */
+  commitKnownDependency(observer: IObserver, observable: IObservable): void {
+    this.#commit(observer, new Set([observable]))
+  }
+
   /** Checks whether dependencies change after lazily pulling them to settle their versions. */
   hasStaleDependencies(observer: IObserver): boolean {
-    for (const [dep, recordedVersion] of observer.depVersions) {
+    for (const [dep, recordedVersion] of mutableNodeVersions(observer, observer.depVersions)) {
       dep.pull?.()
       if (dep.version !== recordedVersion) return true
     }

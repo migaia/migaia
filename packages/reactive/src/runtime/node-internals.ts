@@ -5,6 +5,13 @@ import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 
 const sets = new WeakMap<object, Set<IObserver>>()
+/** Unobserved notifications share one private empty result without retaining any graph node. */
+const EMPTY_SUBSCRIBERS: readonly IObserver[] = []
+/**
+ * Cached entry snapshots are invalidated by the canonical tracker before any edge mutation
+ * callback.
+ */
+const subscriberSnapshots = new WeakMap<object, readonly IObserver[]>()
 const depSets = new WeakMap<object, Set<object>>()
 const versionMaps = new WeakMap<object, Map<object, number>>()
 const versions = new WeakMap<object, { value: number }>()
@@ -113,6 +120,25 @@ export function assertGraphNodeUnregistered(node: object): void {
 export function registerSubs(node: object, subs: Set<IObserver>): ReadonlySet<IObserver> {
   sets.set(node, subs)
   return new ReadonlySetView(subs)
+}
+
+/** Returns the current entry snapshot; stable topology performs no per-notification allocation. */
+export function snapshotSubs(node: object, fallback: ReadonlySet<IObserver>): readonly IObserver[] {
+  /** Extensions can synchronously reconnect during markDirty, so the live set must not escape here. */
+  const source = mutableSubs(node, fallback)
+  if (source.size === 0) return EMPTY_SUBSCRIBERS
+  /** Cache the native Set snapshot, bypassing readonly-view iteration in the kernel. */
+  let snapshot = subscriberSnapshots.get(node)
+  if (snapshot === undefined) {
+    snapshot = Array.from(source)
+    subscriberSnapshots.set(node, snapshot)
+  }
+  return snapshot
+}
+
+/** Drops retained observers before changed membership can invoke lifecycle or diagnostic callbacks. */
+export function invalidateSubsSnapshot(node: object): void {
+  subscriberSnapshots.delete(node)
 }
 
 export function mutableSubs(node: object, fallback: ReadonlySet<IObserver>): Set<IObserver> {

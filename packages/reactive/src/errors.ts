@@ -47,8 +47,22 @@ import { ReactiveErrorText } from './error-text.js'
  * this generic callback boundary must not probe or replace them.
  */
 export function runReactiveCallback<T>(callback: () => T): T {
+  return runReactiveCallbackArgument(callback, undefined, false)
+}
+
+/** Applies the same callback error policy to a stable argument-bound internal operation. */
+export function runReactiveCallbackWith<TArg, T>(callback: (arg: TArg) => T, arg: TArg): T {
+  return runReactiveCallbackArgument(callback, arg, true)
+}
+
+/** Shared admission keeps original error identities and the public callback's zero arguments. */
+function runReactiveCallbackArgument<TArg, T>(
+  callback: (arg: TArg) => T,
+  arg: TArg,
+  withArgument: boolean
+): T {
   try {
-    return callback()
+    return withArgument ? callback(arg) : (callback as () => T)()
   } catch (error) {
     if (error !== null && (typeof error === 'object' || typeof error === 'function')) {
       if (!isNativeErrorValue(error)) throw error

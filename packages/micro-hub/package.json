@@ -1,0 +1,82 @@
+{
+  "name": "@migaia/micro-hub",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Singleton micro-frontend hub: contract-first shared state, owner-scoped events and requests, plugin-based persistence for Module Federation and Web Components.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "default": "./dist/events/index.js"
+    },
+    "./state": {
+      "types": "./dist/state/index.d.ts",
+      "default": "./dist/state/index.js"
+    },
+    "./persist": {
+      "types": "./dist/persist/index.d.ts",
+      "default": "./dist/persist/index.js"
+    },
+    "./resource": {
+      "types": "./dist/resource/index.d.ts",
+      "default": "./dist/resource/index.js"
+    },
+    "./web-component": {
+      "types": "./dist/web-component/index.d.ts",
+      "default": "./dist/web-component/index.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "bench": "pnpm run build && vitest run --config vite.bench.config.ts"
+  },
+  "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/reactive": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/store-keyed": "workspace:^",
+    "@migaia/store-persist": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/resource": "workspace:^",
+    "@migaia/storage-web": "workspace:^",
+    "mitt": "3.0.1",
+    "nanostores": "1.5.5",
+    "typescript": "^7.0.2",
+    "vite": "8.1.1",
+    "vitest": "4.1.10",
+    "zustand": "5.0.15"
+  },
+  "peerDependencies": {
+    "@migaia/resource": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@migaia/resource": {
+      "optional": true
+    }
+  }
+}
