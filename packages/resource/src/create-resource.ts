@@ -1,4 +1,5 @@
-import { defaultRuntime, type IRuntime } from '@migaia/reactive'
+import type { IRuntime } from '@migaia/reactive'
+import { getDefaultRuntime } from '@migaia/reactive/extension'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
@@ -70,8 +71,11 @@ export function createResource<T>(
 ): Resource<T> {
   if (typeof setup !== 'function')
     throw setupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
-  /** Options split once: the runtime is ours, everything else belongs to `Resource`. */
-  const { runtime = defaultRuntime, ...resourceOptions } = options
+  /**
+   * Options split once: the runtime is ours, everything else belongs to `Resource`. The shared
+   * default is acquired here, on first use, so importing this package never constructs a runtime.
+   */
+  const { runtime = getDefaultRuntime(), ...resourceOptions } = options
   /** Controller whose signal the setup context exposes. */
   const controller = new AbortController()
   /** Cleanups registered during setup, in registration order. */
