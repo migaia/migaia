@@ -260,9 +260,10 @@ test('generated projections contain no volatile metadata', () => {
   assert.equal(relationshipManifest.version, 1)
   /**
    * Five RPC runtime owners replace the former single package, adding exactly four libraries; the
-   * separate rpc-pool package adds one more, and rpc-devtools adds the observation contracts.
+   * separate rpc-pool package adds one more, rpc-devtools adds the observation contracts, and
+   * micro-hub adds the shared micro-frontend contract and communication library.
    */
-  assert.equal(libraryManifest.libraries.length, 33)
+  assert.equal(libraryManifest.libraries.length, 34)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -793,7 +794,10 @@ test('keeps maintained runtime examples and rejects generated casts', () => {
     | { examples: string[] }
     | undefined
   assert.ok(channel)
-  assert.match(channel.examples[0] ?? '', /createEventChannel<[^>]+>\(\)/)
+  assert.match(
+    channel.examples[0] ?? '',
+    /createEventChannel<[^>]+>\(\{\s*dispatchPolicy:\s*EventDispatchPolicy\.queued\s*\}\)/
+  )
   assert.match(channel.examples[0] ?? '', /\.subscribe\(/)
   assert.match(channel.examples[0] ?? '', /\.publish\(/)
 })
