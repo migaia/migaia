@@ -37,6 +37,11 @@ type IKeyedField = {
   readonly keyed: true
   readonly at: (id: string) => IWritableAtomDefinition<unknown>
   readonly ids: IWritableAtomDefinition<readonly string[]>
+  /**
+   * Membership is indexed by the frozen ids snapshot, so preview and failed patches cannot
+   * desynchronize it.
+   */
+  readonly memberships: WeakMap<readonly string[], ReadonlySet<string>>
 }
 
 /** Per-contract state slot owned by the state driver. */
@@ -44,6 +49,8 @@ type IStateSlot = {
   readonly fields: ReadonlyMap<string, IPlainField | IKeyedField>
   readonly revision: IWritableAtomDefinition<number>
   readonly computedDefs: ReadonlyMap<string, IAtomDefinition<unknown>>
+  /** Commands share one untracked accessor object; tracked derivations keep fresh result identities. */
+  readonly commandValues: Record<string, unknown>
 }
 
 /** Members the state driver exposes to the persist driver. */
@@ -114,7 +121,8 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
             maxSize: Number.MAX_SAFE_INTEGER,
             debugLabel: label
           }),
-          ids: atomDefFactory(() => NO_IDS, `${label}.ids`)
+          ids: atomDefFactory(() => NO_IDS, `${label}.ids`),
+          memberships: new WeakMap<readonly string[], ReadonlySet<string>>()
         })
       } else {
         fields.set(name, {
@@ -137,7 +145,11 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
       )
     }
     /** Completed slot. */
-    const slot: IStateSlot = { ...partial, computedDefs }
+    const slot: IStateSlot = {
+      ...partial,
+      computedDefs,
+      commandValues: stateValues(partial, peek)
+    }
     entry.slots.set(MicroCapability.state, slot)
     return slot
   }
@@ -254,27 +266,39 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
       }
       /** Current id list; replaced by a new frozen array only when membership changes. */
       const ids = store.peek(field.ids)
-      /** Membership after all entries of this keyed patch have been prepared. */
-      let nextIds: string[] | undefined
+      /** The index belongs to this exact snapshot even if patch getters reenter commands. */
+      const indexed = field.memberships.get(ids)
+      /** Existing-value updates reuse this Set while membership keeps the same ids reference. */
+      const members = indexed ?? new Set(ids)
+      if (!indexed) field.memberships.set(ids, members)
+      /** Removed ids are filtered once, preserving the remaining relative order. */
+      let removed: Set<string> | undefined
+      /** New ids retain patch enumeration order after all previously present ids. */
+      let added: string[] | undefined
       for (const [id, item] of Object.entries(value as Record<string, unknown>)) {
-        const present = (nextIds ?? ids).includes(id)
+        const present = members.has(id)
         if (item === undefined) {
           if (!present) continue
           writes.push([field.at(id), undefined])
-          nextIds = (nextIds ?? [...ids]).filter((existing) => existing !== id)
+          if (!removed) removed = new Set()
+          removed.add(id)
         } else {
           writes.push([field.at(id), prepareValue(name, item)])
-          if (!present) (nextIds ??= [...ids]).push(id)
+          if (!present) (added ??= []).push(id)
         }
       }
-      if (nextIds) writes.push([field.ids, Object.freeze(nextIds)])
+      if (removed || added) {
+        /** The prepared id list is not published if a later patch field fails validation. */
+        const nextIds = removed ? ids.filter((id) => !removed.has(id)) : [...ids]
+        if (added) for (const id of added) nextIds.push(id)
+        writes.push([field.ids, Object.freeze(nextIds)])
+      }
     }
     /** Revision after this commit; preparation above can fail without changing any atom. */
     const revision = store.peek(slot.revision) + 1
-    runtime.batch(() => {
-      for (const [def, value] of writes) store.set(def, value)
-      store.set(slot.revision, revision)
-    })
+    writes.push([slot.revision, revision])
+    // This driver creates only source definitions; the general family type also admits derived writes.
+    store.setMany(writes as Parameters<IAtomStore['setMany']>[0])
     return revision
   }
 
@@ -298,7 +322,7 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
         }
         /** Patch computed from current committed state. */
         const patch = (fn as (state: unknown, ...rest: unknown[]) => unknown)(
-          stateValues(slot, peek),
+          slot.commandValues,
           ...args
         )
         /** Capture then once and observe rejected async results before rejecting this command. */

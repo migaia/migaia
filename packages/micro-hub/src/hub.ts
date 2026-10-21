@@ -261,7 +261,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
     const trackIn = (owner: ISyncLifecycleScope, release: () => void): (() => void) => {
       /** Identity under which the release is owned by the scope. */
       const token = {}
-      owner.own(token, { syncSafe: true, force: () => release() })
+      owner.own(token, { syncSafe: true, force: release })
       return () => {
         if (owner.release(token)) release()
       }

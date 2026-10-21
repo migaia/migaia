@@ -383,6 +383,34 @@ describe('app and contract lifecycle', () => {
     expect(() => app.own(contract)).not.toThrow()
   })
 
+  it('keeps repeated tracking of one release function independently idempotent', () => {
+    /** The same callback can belong to two independently removable registrations. */
+    const release = vi.fn()
+    /** Plugin-owned handles expose repeated track calls through the existing capability seam. */
+    const stops: (() => void)[] = []
+    hub = createMicroHub({
+      plugins: [
+        capability({
+          own: (owner) => {
+            stops.push(owner.track(release), owner.track(release))
+            return {}
+          }
+        })
+      ]
+    })
+    /** Owner teardown must retain whichever registration has not been stopped. */
+    const owned = hub
+      .connect('tracked-owner')
+      .own(defineContract('tracked-release', { version: 1 }))
+    stops[1]!()
+    stops[1]!()
+    expect(release).toHaveBeenCalledTimes(1)
+    owned.release()
+    expect(release).toHaveBeenCalledTimes(2)
+    stops[0]!()
+    expect(release).toHaveBeenCalledTimes(2)
+  })
+
   it('disconnects synchronously, returns one promise, and permits immediate remount', async () => {
     hub = createMicroHub({ plugins: [state(), events()] })
     /** Contract used to verify old subscriptions cannot survive remount. */

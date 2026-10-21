@@ -18,6 +18,125 @@ afterEach(async () => {
 })
 
 describe('state capability', () => {
+  it('retains accessor shape and isolates mutable keyed readers across command reads', () => {
+    /** Saved readers remain live while each keyed access keeps its own mutable wrapper. */
+    const captured: {
+      readonly count: number
+      readonly rows: { get(id: string): number | undefined; readonly ids: readonly string[] }
+    }[] = []
+    /** Command reads exercise the reused untracked accessor object. */
+    const contract = defineContract('accessor-shape', {
+      version: 1,
+      state: { count: 0, rows: keyed<number>() },
+      commands: {
+        capture: (current) => {
+          captured.push(current)
+          return {}
+        },
+        put: () => ({ count: 1, rows: { a: 2 } })
+      }
+    })
+    hub = createMicroHub({ plugins: [state()] })
+    /** Owner uses public commands so freeze and revision semantics stay on the supported path. */
+    const view = hub.connect('owner').own(contract)
+    view.commands.capture()
+    expect(Object.keys(captured[0]!)).toEqual(['count', 'rows'])
+    expect(Object.isFrozen(captured[0])).toBe(true)
+    expect(Object.getOwnPropertyDescriptor(captured[0]!, 'count')).toMatchObject({
+      enumerable: true,
+      configurable: false,
+      get: expect.any(Function)
+    })
+    /** Mutating one returned wrapper cannot replace another access's reader. */
+    const rows = captured[0]!.rows
+    rows.get = () => 99
+    expect(captured[0]!.rows).not.toBe(rows)
+    view.commands.put()
+    view.commands.capture()
+    expect(captured[0]!.count).toBe(1)
+    expect(captured[1]!.rows.get('a')).toBe(2)
+    expect(captured[0]!.rows.ids).toBe(view.state.rows.ids.get())
+    expect(view.revision.get()).toBe(3)
+  })
+
+  it('keeps keyed preview and tracked derivations on their own readers', async () => {
+    /** Unrelated writes must not create dependencies merely by constructing accessors. */
+    const computed = vi.fn((current: { rows: { get(id: string): number | undefined } }) =>
+      current.rows.get('a')
+    )
+    /** Unobserved reads exercise store preview before a subscription commits the graph. */
+    const contract = defineContract('keyed-readers', {
+      version: 1,
+      state: { count: 0, rows: keyed<number>() },
+      computed: { row: computed },
+      commands: {
+        put: (_current, value: number) => ({ rows: { a: value } }),
+        unrelated: () => ({ count: 1 })
+      }
+    })
+    hub = createMicroHub({ plugins: [state()] })
+    /** Both derivation forms first read without a live subscription. */
+    const view = hub.connect('owner').own(contract)
+    /** Selection readers must retain the same keyed dependency as contract computed values. */
+    const selection = view.select((current) => current.rows.get('a'))
+    expect(view.computed.row.get()).toBeUndefined()
+    expect(selection.get()).toBeUndefined()
+    /** Callbacks distinguish real keyed changes from unrelated plain-field writes. */
+    const onComputed = vi.fn()
+    /** Independent selection callback proves both consumers establish their own graph. */
+    const onSelected = vi.fn()
+    view.computed.row.subscribe(onComputed)
+    selection.subscribe(onSelected)
+    view.commands.put(2)
+    await Promise.resolve()
+    expect(view.computed.row.get()).toBe(2)
+    expect(selection.get()).toBe(2)
+    expect(onComputed).toHaveBeenCalledTimes(1)
+    expect(onSelected).toHaveBeenCalledTimes(1)
+    /** Existing computed invocation count must remain stable after an unread-field commit. */
+    const calls = computed.mock.calls.length
+    view.commands.unrelated()
+    await Promise.resolve()
+    expect(view.computed.row.get()).toBe(2)
+    expect(selection.get()).toBe(2)
+    expect(computed).toHaveBeenCalledTimes(calls)
+    expect(onComputed).toHaveBeenCalledTimes(1)
+    expect(onSelected).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['computed', 'select'] as const)(
+    '%s notifies when its returned accessor changes',
+    async (kind) => {
+      /** Reading all fields then returning the supplied object is a valid pure derivation. */
+      const snapshot = (current: { readonly count: number }) => {
+        Object.values(current)
+        return current
+      }
+      /** The accessor identity must still change when a tracked field causes recomputation. */
+      const contract = defineContract('returned-accessor', {
+        version: 1,
+        state: { count: 0 },
+        computed: { value: snapshot },
+        commands: { update: () => ({ count: 1 }) }
+      })
+      hub = createMicroHub({ plugins: [state()] })
+      /** Both public derivation entry points use the same state reader behavior. */
+      const view = hub.connect('owner').own(contract)
+      /** A pre-subscription preview must not become the reused tracked accessor. */
+      const readable = kind === 'computed' ? view.computed.value : view.select(snapshot)
+      /** Each dependency change must preserve the prior notification contract. */
+      const listener = vi.fn()
+      readable.subscribe(listener)
+      /** The tracked accessor before the command is the identity to replace. */
+      const before = readable.get()
+      view.commands.update()
+      await Promise.resolve()
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(readable.get()).not.toBe(before)
+      expect(readable.get().count).toBe(1)
+    }
+  )
+
   it('clones initial objects and keeps frozen snapshots stable', () => {
     /** Caller-owned initial value must stay mutable and independent of committed state. */
     const initial = { count: 0 }
@@ -72,9 +191,9 @@ describe('state capability', () => {
     /** Readable values must already be committed when either callback runs. */
     const view = hub.connect('owner').own(contract)
     /** Records snapshots seen by the first field's listener. */
-    const left = vi.fn(() => [view.state.left.get(), view.state.right.get()])
+    const left = vi.fn(() => [view.state.left.get(), view.state.right.get(), view.revision.get()])
     /** Records snapshots seen by the second field's listener. */
-    const right = vi.fn(() => [view.state.left.get(), view.state.right.get()])
+    const right = vi.fn(() => [view.state.left.get(), view.state.right.get(), view.revision.get()])
     view.state.left.subscribe(left)
     view.state.right.subscribe(right)
     view.commands.replace()
@@ -83,8 +202,8 @@ describe('state capability', () => {
     await Promise.resolve()
     expect(left).toHaveBeenCalledTimes(1)
     expect(right).toHaveBeenCalledTimes(1)
-    expect(left.mock.results[0].value).toEqual([1, 2])
-    expect(right.mock.results[0].value).toEqual([1, 2])
+    expect(left.mock.results[0].value).toEqual([1, 2, 1])
+    expect(right.mock.results[0].value).toEqual([1, 2, 1])
   })
 
   it('allows only the current owner and declared writers', () => {
@@ -456,6 +575,42 @@ describe('state capability', () => {
     view.commands.remove('missing')
     await Promise.resolve()
     expect(onIds).toHaveBeenCalledTimes(3)
+  })
+
+  it('preserves keyed order and membership after a rejected multi-id patch', () => {
+    /** A failing entity must leave both the committed ids and the membership index unchanged. */
+    const contract = defineContract('keyed-membership', {
+      version: 1,
+      state: { rows: keyed<number | Uint8Array>() },
+      commands: {
+        patch: (_current, rows: Record<string, number | Uint8Array | undefined>) => ({ rows })
+      }
+    })
+    hub = createMicroHub({ plugins: [state()] })
+    /** One patch may interleave replacements, insertions and deletions. */
+    const view = hub.connect('owner').own(contract)
+    view.commands.patch({ a: 1, b: 2, c: 3 })
+    view.commands.patch({ b: undefined, d: 4, a: 9, missing: undefined })
+    expect(view.state.rows.ids.get()).toEqual(['a', 'c', 'd'])
+    expect(Object.isFrozen(view.state.rows.ids.get())).toBe(true)
+    /** Replacements and absent deletions retain the public membership snapshot. */
+    const ids = view.state.rows.ids.get()
+    view.commands.patch({ a: 10, missing: undefined })
+    expect(view.state.rows.ids.get()).toBe(ids)
+    expect(() =>
+      view.commands.patch({ a: undefined, e: 5, broken: new Uint8Array([1]) })
+    ).toThrowError(
+      expect.objectContaining({
+        code: MicroHubErrorCode.invalidOption,
+        cause: expect.any(TypeError)
+      })
+    )
+    expect(view.state.rows.ids.get()).toBe(ids)
+    expect(view.state.rows.at('a').get()).toBe(10)
+    expect(view.state.rows.at('e').get()).toBeUndefined()
+    view.commands.patch({ a: undefined, e: 5 })
+    expect(view.state.rows.ids.get()).toEqual(['c', 'd', 'e'])
+    expect(view.revision.get()).toBe(4)
   })
 
   it('retains state and removes old subscriptions when ownership disconnects', async () => {
