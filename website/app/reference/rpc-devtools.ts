@@ -8,7 +8,7 @@
  * graphs by rpc-contract. This reference documents only the devtools-owned surfaces and their
  * integration.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { rpcDevtoolsCases } from './rpc-devtools-cases.js'
 
 /** Creates one localized sentence pair. */
@@ -148,6 +148,10 @@ await stream.return()`
 
 /** Native errors at these observation boundaries are routed without changing business results. */
 const onErrorDoc: IMemberDoc = {
+  whenToUse: t(
+    'Set this callback when a diagnostic failure should reach the application monitor. It receives collector, formatter, logger or hub observer failures without replacing a business result. Omission keeps the documented host reporter for the owning component.',
+    '诊断失败需要进入应用监控时，设置这个回调。它接收采集器、格式化器、日志或聚合器观察回调的失败，不替换业务结果。省略时使用所属组件文档中说明的宿主报告函数。'
+  ),
   summary: t(
     'Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.',
     '接收原始诊断错误的同步观察回调，无需返回值；观察回调失败经宿主失败通道报告，不改变远程调用操作结果。'
@@ -190,6 +194,10 @@ const probeOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     '默认不捕获内容，仅观察元数据。'
   ),
   redact: {
+    whenToUse: t(
+      'Set it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.',
+      '显式捕获的内容包含不应保存或记录的数据时，设置此回调。返回替换值，或返回 `undefined` 丢弃内容。省略时原样保留捕获引用；抛错会被报告，并丢弃本次内容。'
+    ),
     summary: t(
       'Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.',
       '接收数字阶段与已捕获内容的同步回调，返回需要保留的替代值；不可保留复用事件视图，采集器在摄取时执行，日志探针在规范发射器执行。'
@@ -219,6 +227,208 @@ devtools.close()`
   },
   onError: onErrorDoc
 }
+
+/** Every collector/log example receives real Core observations from an in-memory connection. */
+const observedOptionExample = (setup: string, body: string, cleanup = ''): string =>
+  `import { createEndpoint, connect } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { probePlugin } from '@migaia/rpc-core/probe'
+${setup}
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({
+  id: 'server', transport: right, middlewares: [connect()],
+  provider: { double: (context) => context.success((context.data as number) * 2), echo: (context) => context.success(context.data) }
+})
+const client = await createEndpoint({ id: 'client', transport: left, middlewares: [connect(), probePlugin(probe)] })
+try {
+${body}
+} finally {
+  await Promise.all([client.dispose(), server.dispose()])
+  ${cleanup}
+  left.close()
+}`
+
+/** Retention and method filters apply to actual emitted calls rather than hand-written event views. */
+const collectorRetentionOptionExample = observedOptionExample(
+  `import { createRpcDevtools } from '@migaia/rpc-devtools'
+const devtools = createRpcDevtools({ stages: ['message'], methods: ['double'], sample: 1, maxEvents: 2, maxInterned: 100 })
+const probe = devtools`,
+  `  await client.send('server', 'echo', 'ignored')
+  for (const value of [1, 2, 3]) await client.send('server', 'double', value)
+  const page = devtools.query()
+  console.log(page.events.length, page.events.every((event) => event.method === 'double'))
+  console.log(devtools.stats().methods.find((row) => row.method === 'double')?.calls)`,
+  'devtools.close()'
+)
+
+/** Local capture and remote exposure are two explicit choices. */
+const collectorCaptureOptionExample = observedOptionExample(
+  `import { createRpcDevtools } from '@migaia/rpc-devtools'
+import type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'
+const masked = { hidden: true }
+const devtools = createRpcDevtools({
+  stages: ['envelope'], capture: ['envelope'], maxContentBytes: 1024,
+  redact: () => masked, exposeContent: true
+})
+const probe = devtools`,
+  `  console.log(await client.send('server', 'echo', 'private input'))
+  console.log(devtools.query().events.some((event) => event.content === masked))
+  const service = devtools.service as unknown as IRpcDevtoolsServiceApi
+  console.log(service.query().events.some((event) => JSON.stringify(event.content) === JSON.stringify(masked)))`,
+  'devtools.close()'
+)
+
+/** A redactor failure is diagnostic and does not replace the RPC result. */
+const collectorErrorOptionExample = observedOptionExample(
+  `import { createRpcDevtools } from '@migaia/rpc-devtools'
+const failure = new Error('redactor unavailable')
+const reports: unknown[] = []
+const devtools = createRpcDevtools({
+  stages: ['envelope'], capture: ['envelope'],
+  redact: () => { throw failure },
+  onError: (error) => { reports.push(error) }
+})
+const probe = devtools`,
+  `  console.log(await client.send('server', 'double', 3))
+  console.log(reports.length > 0)
+  console.log(devtools.query().events.every((event) => event.content === undefined))`,
+  'devtools.close()'
+)
+
+/** A complete structural logger keeps all output local to the example. */
+const optionLogger = `const messages: string[] = []
+const contents: unknown[] = []
+const logger = {
+  debug: (message: string, fields: object) => { messages.push(message); contents.push(Reflect.get(fields, 'content')) },
+  info: (message: string, fields: object) => { messages.push(message); contents.push(Reflect.get(fields, 'content')) },
+  warn: (message: string, fields: object) => { messages.push(message); contents.push(Reflect.get(fields, 'content')) },
+  error: (message: string, fields: object) => { messages.push(message); contents.push(Reflect.get(fields, 'content')) }
+}`
+
+/** Zero threshold makes successful message settlement qualify without waiting on a timer. */
+const logFilterOptionExample = observedOptionExample(
+  `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+${optionLogger}
+const probe = createRpcLogProbe(logger, {
+  stages: ['message'], methods: ['double'], sample: 1, slowMs: 0,
+  levels: { slow: 'info', lifecycle: 'off' },
+  message: (view) => 'RPC:' + view.method
+})`,
+  `  console.log(await client.send('server', 'double', 3))
+  console.log(messages.length > 0, messages.every((message) => message === 'RPC:double'))`
+)
+
+/** Capture is projected before the logger receives an independent fields object. */
+const logCaptureOptionExample = observedOptionExample(
+  `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+${optionLogger}
+const masked = { hidden: true }
+const probe = createRpcLogProbe(logger, {
+  stages: ['message', 'peer'], content: true, capture: ['message'], slowMs: 0,
+  levels: { lifecycle: 'off' }, redact: () => masked
+})`,
+  `  console.log(await client.send('server', 'echo', 'private input'))
+  console.log(contents.length > 0, contents.every((content) => content === masked))`
+)
+
+/** Actual logger failures take the reporting path while successful requests still resolve. */
+const logErrorOptionExample = observedOptionExample(
+  `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+const failure = new Error('log destination unavailable')
+const reports: unknown[] = []
+const logger = { debug() {}, info() {}, error() {}, warn() { throw failure } }
+const probe = createRpcLogProbe(logger, { stages: ['message'], slowMs: 0, onError: (error) => { reports.push(error) } })`,
+  `  console.log(await client.send('server', 'double', 3))
+  console.log(reports.length > 0, reports.every((error) => error === failure))`
+)
+
+/** Offline retention is independent for each named target. */
+const hubRetentionOptionExample = `import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
+import { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'
+
+const text = encodeRpcDevtoolsRecord({ header: RpcDevtoolsRecordFormat, events: [1, 2, 3].map((seq) => ({
+  seq, at: seq, endpointId: 'worker', stage: 'message' as const, direction: 'outbound' as const
+})) })
+const hub = createRpcDevtoolsHub({ maxEvents: 2 })
+hub.importRecord('worker-log', text)
+console.log(hub.timeline().map((entry) => entry.event.seq))
+await hub.close()`
+
+/** A local public service adapter makes periodic alignment observable through describe requests. */
+const hubLiveOptionExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
+import type { IRpcDevtoolsQuery } from '@migaia/rpc-devtools/contract'
+
+const devtools = createRpcDevtools()
+let descriptions = 0
+let realigned!: () => void
+const alignment = new Promise<void>((resolve) => { realigned = resolve })
+const client = {
+  request: async (method: string, payload?: unknown) => {
+    if (method === 'query') return devtools.query(payload as IRpcDevtoolsQuery)
+    if (method === 'stats') return devtools.stats()
+    descriptions += 1
+    if (descriptions === 10) realigned()
+    return devtools.describe()
+  },
+  stream: (_method: string, payload?: unknown) => devtools.watch(payload as Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>)
+}
+const failure = new Error('status panel unavailable')
+const reports: unknown[] = []
+const hub = createRpcDevtoolsHub({ realignMs: 5, onError: (error) => { reports.push(error) } })
+hub.on('status', () => { throw failure })
+await hub.addTarget('local', client)
+await alignment
+console.log(descriptions >= 10)
+console.log(reports.length > 0, reports.every((error) => error === failure))
+await hub.close()
+devtools.close()`
+
+/** Each options group has a few focused, independently runnable scenarios. */
+const collectorOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Keep recent calls with complete sampling', '完整采样并只保留近期调用'),
+    problem: t(
+      'A focused investigation needs every `double` call but only two recent event rows. `methods` excludes unrelated calls, `sample: 1` keeps all eligible identities, and `maxEvents` bounds history without reducing cumulative statistics. `maxInterned` reserves a reader name table for this small view.',
+      '专项排查需要每个 `double` 调用，但只保留最近两条事件。`methods` 排除无关调用，`sample: 1` 保留所有符合条件的调用身份，`maxEvents` 限制历史长度而不减少累计统计。`maxInterned` 为这个小视图设置读取时的名称表容量。'
+    ),
+    example: collectorRetentionOptionExample,
+    result: t(
+      'Prints `2 true`, then `3`: history is bounded, only selected methods remain, and all three completed calls are counted.',
+      '输出 `2 true`，然后输出 `3`：历史有界，仅保留选中方法，三个已完成调用仍全部计入统计。'
+    ),
+    covers: ['methods', 'sample', 'maxEvents', 'maxInterned']
+  },
+  {
+    title: t('Expose only projected captured content', '只公开经过处理的捕获内容'),
+    problem: t(
+      'Metadata alone cannot explain a bad payload. `capture` opts envelope content in; `redact` replaces it before storage. `maxContentBytes` bounds content in the main ring. Service readers receive content only with `exposeContent: true`; that setting is separate from local capture.',
+      '只有元数据无法解释错误载荷。`capture` 显式开启封装内容捕获，`redact` 在保存前替换内容。`maxContentBytes` 限制主环内容字节量。服务读取者只有在 `exposeContent: true` 时才能取得内容；这与本地捕获是两个独立设置。'
+    ),
+    example: collectorCaptureOptionExample,
+    result: t(
+      'The call returns `private input`, while both local and service queries find the masked object. The application result is unchanged.',
+      '调用返回 `private input`，本地查询与服务查询都只找到替换后的对象。应用结果保持不变。'
+    ),
+    covers: ['capture', 'maxContentBytes', 'exposeContent']
+  },
+  {
+    title: t(
+      'Report redactor failures without failing the call',
+      '脱敏失败时报告错误，不让调用失败'
+    ),
+    problem: t(
+      'A redactor can fail while business work succeeds. `onError` lets the diagnostic owner receive that failure. Without a supplied callback, it reaches the host failure channel; failed redaction drops content rather than changing the RPC result.',
+      '业务工作成功时，脱敏函数仍可能失败。`onError` 让诊断拥有者收到这个失败。省略回调时，失败进入宿主报告通道；脱敏失败会丢弃内容，不改变 RPC 结果。'
+    ),
+    example: collectorErrorOptionExample,
+    result: t(
+      'Prints `6`, `true`, `true`: the request succeeds, diagnostics report a failure, and failed content is absent.',
+      '输出 `6`、`true`、`true`：请求成功，诊断报告了失败，失败内容未被保留。'
+    ),
+    covers: ['onError']
+  }
+]
 
 /** Collector-owned APIs; service reuses only methods with identical public inputs. */
 const collectorMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -847,6 +1057,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       members: collectorMembers
     },
     IRpcDevtoolsOptions: {
+      optionCases: collectorOptionCases,
       summary: t(
         'Construction policies for a bounded collector; capacities are captured once, while effective subscriptions can later change through the Core probe setStages API.',
         '有界采集器构造策略，容量一次捕获，生效订阅随后可经核心探针订阅接口修改。'
@@ -854,7 +1065,14 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       example: collectorExample,
       members: {
         ...probeOptionMembers,
+        redact: { ...probeOptionMembers.redact!, example: collectorCaptureOptionExample },
+        onError: { ...onErrorDoc, example: collectorErrorOptionExample },
         stages: {
+          whenToUse: t(
+            'Use `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.',
+            '用 `message` 观察逻辑调用，用 `peer` 观察连接生命周期。需要检查封装、编码、分帧、保护后内容或物理载体时，分别增加 `envelope`、`encoded`、`frame`、`protected` 或 `carrier`。省略时选择消息与连接阶段；选中阶段本身不会开启内容捕获。'
+          ),
+          example: collectorRetentionOptionExample,
           ...f(
             'Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.',
             '核心规范阶段名中的初始订阅，物理阶段需显式选择，选择本身不会开启内容捕获。',
@@ -1391,6 +1609,37 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       }
     },
     IRpcDevtoolsHubOptions: {
+      optionCases: [
+        {
+          title: t('Bound each imported recording', '为每个导入录制设置保留上限'),
+          problem: t(
+            'A small timeline needs only the newest two rows from each target. The default retains up to 50000 per target. Set `maxEvents` for the intended view; importing a longer file keeps the newest rows within that target capacity.',
+            '小型时间线只需要每个目标的最新两行。默认每目标最多保留 50000 行。按视图需求设置 `maxEvents`，导入更长文件时只保留目标容量内的最新行。'
+          ),
+          example: hubRetentionOptionExample,
+          result: t(
+            'The timeline prints `[2, 3]`; the first event no longer belongs to retained history.',
+            '时间线输出 `[2, 3]`，第一条事件已不在保留历史中。'
+          ),
+          covers: ['maxEvents']
+        },
+        {
+          title: t(
+            'Realign a live target and report panel failures',
+            '重新对齐实时目标，并报告面板失败'
+          ),
+          problem: t(
+            'A long-running view needs updated clock estimates. Without `realignMs`, alignment happens only when the target is registered. A positive period repeats the five-sample alignment. `onError` receives status-listener failures so a broken panel does not stop target setup.',
+            '长期运行的视图需要更新时钟估计。不设置 `realignMs` 时，只在目标注册时对齐。正的毫秒周期会重复五次采样的对齐过程。`onError` 接收状态监听器的失败，损坏的面板不会阻止目标准备完成。'
+          ),
+          example: hubLiveOptionExample,
+          result: t(
+            'Prints `true`, then `true true`: a second alignment ran, and panel failures reached the configured reporter by identity.',
+            '输出 `true`，然后输出 `true true`：第二轮对齐已执行，面板失败按原身份交给了报告回调。'
+          ),
+          covers: ['realignMs', 'onError']
+        }
+      ],
       summary: t(
         'Construction-time per-target capacity, optional periodic clock realignment and failure reporting; no transport or client is created from these settings.',
         '构造期每目标容量、可选周期时钟重对齐及失败报告设置，不据此创建传输或客户端。'
@@ -1415,7 +1664,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
             'Reports failures with host console.error; a supplied callback that throws is reported with the original error in an aggregate.',
             '默认由宿主错误控制台报告，提供的回调抛错时与原始错误一起聚合报告。'
           ),
-          example: hubExample
+          example: hubLiveOptionExample
         }
       }
     },
@@ -1596,6 +1845,47 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       }
     },
     IRpcLogProbeOptions: {
+      optionCases: [
+        {
+          title: t('Log every completed call to one method', '记录指定方法的每个已完成调用'),
+          problem: t(
+            'During a focused investigation, ordinary successful calls must appear too. `slowMs: 0` includes them, `methods` chooses one method, and `sample: 1` retains every eligible identity. Message-only stages avoid lifecycle output. `levels` and `message` select the destination and readable text.',
+            '专项排查时，也需要记录普通成功调用。`slowMs: 0` 将它们纳入，`methods` 选中一个方法，`sample: 1` 保留每个符合条件的身份。只选消息阶段可避免生命周期日志。`levels` 与 `message` 分别选择输出级别和可读文本。'
+          ),
+          example: logFilterOptionExample,
+          result: t(
+            'Prints `6`, then `true true`; the logger receives the selected calls with `RPC:double` text.',
+            '输出 `6`，然后输出 `true true`；日志对象收到选中的调用，文本为 `RPC:double`。'
+          ),
+          covers: ['slowMs', 'methods', 'sample']
+        },
+        {
+          title: t('Attach a safe capture marker to logs', '为日志附加安全的捕获标记'),
+          problem: t(
+            'A logger needs a safe marker when capture is enabled. `content` enables capture when no explicit selection exists; explicit `capture` narrows it to the selected subscribed stages. Current logical message and peer events carry no payload content. This redactor returns a marker rather than claiming to inspect a business payload.',
+            '日志对象需要在开启捕获时附加安全标记。没有显式列表时，`content` 开启捕获；显式 `capture` 将范围缩小到选中的已订阅阶段。当前逻辑消息与连接事件不携带载荷内容。本例脱敏函数返回标记，并不检查业务载荷。'
+          ),
+          example: logCaptureOptionExample,
+          result: t(
+            'The call returns `private input`; captured logger content contains only the masked object.',
+            '调用返回 `private input`，日志中的捕获内容只有替换后的对象。'
+          ),
+          covers: ['content', 'capture']
+        },
+        {
+          title: t('Report a failed log destination', '报告日志接收端失败'),
+          problem: t(
+            'The log destination can fail while the RPC succeeds. Set `onError` to receive that original failure; omitting it sends the failure to the host reporting channel. The diagnostic failure does not replace the method result.',
+            'RPC 成功时，日志接收端仍可能失败。设置 `onError` 可收到原始失败；省略时进入宿主报告通道。诊断失败不会替换方法结果。'
+          ),
+          example: logErrorOptionExample,
+          result: t(
+            'Prints `6`, then `true true`: the call succeeds and the reporter receives the original log failure.',
+            '输出 `6`，然后输出 `true true`：调用成功，报告回调收到原始日志失败。'
+          ),
+          covers: ['onError']
+        }
+      ],
       summary: t(
         'Construction-time qualification, capture and logger dispatch policy; only message and peer stages are supported by this first-party log probe.',
         '构造期条件选择、捕获及日志分派策略，此内置日志探针仅支持消息与连接阶段。'
@@ -1603,6 +1893,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       example: logExample,
       members: {
         ...probeOptionMembers,
+        redact: { ...probeOptionMembers.redact!, example: logCaptureOptionExample },
+        onError: { ...onErrorDoc, example: logErrorOptionExample },
         slowMs: f(
           'Finite nonnegative settlement duration threshold for successful slow-call logging.',
           '为成功慢调用记录日志的有限非负毫秒结算阈值。',
@@ -1610,6 +1902,11 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           '默认 `undefined`，成功调用不会按慢调用条件进入日志。'
         ),
         stages: {
+          whenToUse: t(
+            'Select `message` for failed, rejected or slow calls, and `peer` for connection lifecycle. Omission selects both. This log helper accepts no physical stages; selecting stages alone does not enable content capture.',
+            '用 `message` 记录失败、拒绝或慢调用，用 `peer` 记录连接生命周期。省略时选择两者。此日志辅助函数不接收物理阶段；选中阶段本身不会开启内容捕获。'
+          ),
+          example: logFilterOptionExample,
           ...f(
             'Subscribed log stages; only message settlements and peer lifecycle belong to this helper.',
             '订阅日志阶段，此辅助函数仅处理消息结算及连接生命周期。',
@@ -1634,6 +1931,11 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           '默认 `false`，除非显式要求，否则不捕获内容。'
         ),
         levels: {
+          whenToUse: t(
+            'Override individual categories when their default severity does not fit the application. `debug`, `info`, `warn` and `error` choose the corresponding logger method; `off` skips that category. Omitted categories retain their documented defaults.',
+            '默认严重程度不适合应用时，逐分类覆盖。`debug`、`info`、`warn` 与 `error` 分别选择对应日志方法，`off` 跳过该分类。省略的分类保留文档列出的默认级别。'
+          ),
+          example: logFilterOptionExample,
           ...f(
             'Category overrides: failed, rejected, timeout, aborted, slow and lifecycle map to a named sink level or off.',
             '分类覆盖：失败、拒绝、超时、取消、慢调用及生命周期各自映射到命名接收级别或关闭。',
@@ -1664,6 +1966,10 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           }
         },
         message: {
+          whenToUse: t(
+            'Set a formatter when the logger needs application-specific text. Return a string synchronously and read the view only during the callback. Omitting it uses the built-in category message; a thrown error is reported through `onError`.',
+            '日志需要应用专用文本时，设置格式化函数。同步返回字符串，仅在回调期间读取事件视图。省略时使用内置分类消息，抛错通过 `onError` 报告。'
+          ),
           summary: t(
             'Synchronous formatter called only for qualifying enabled events. Receives a reusable Core event view valid during the callback; return a string and never retain the view. Throws are reported through onError.',
             '仅对合格且启用的事件执行同步格式化，接收仅回调期间有效的复用核心事件视图，返回字符串且不可保存视图，抛错经错误观察回调报告。'
@@ -1682,7 +1988,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
             'Stable built-in message for the classified failure, rejection, timeout, abort, slow or lifecycle category.',
             '默认使用失败、拒绝、超时、取消、慢调用或生命周期分类的稳定内置消息。'
           ),
-          example: logExample
+          example: logFilterOptionExample
         }
       }
     },
