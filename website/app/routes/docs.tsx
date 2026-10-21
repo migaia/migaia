@@ -2325,6 +2325,12 @@ function NestedFieldDocs({
                 values={fieldDoc.values}
               />
             ) : null}
+            {fieldDoc.whenToUse ? (
+              <div>
+                {locale === 'zh' ? '何时使用：' : 'When to use: '}
+                <InlineText library={library} locale={locale} text={fieldDoc.whenToUse} />
+              </div>
+            ) : null}
             {fieldDoc.example ? (
               <CodeBlock
                 code={fieldDoc.example}
