@@ -57,4 +57,40 @@ describe('thenable guarded-read policy', () => {
     expect(inspectThenable(proxy)).toEqual({ error: failure })
     expect(traps).toEqual(['then', 'then'])
   })
+
+  it('preserves inspection descriptors and original getter failures', () => {
+    /** Empty results keep their absent-property shape and frozen prototype contract. */
+    const empty = inspectThenable(
+      Object.defineProperty({}, String.fromCharCode(116, 104, 101, 110), { value: 42 })
+    )
+    expect(Reflect.ownKeys(empty)).toEqual([])
+    expect(Object.getOwnPropertyDescriptors(empty)).toEqual({})
+    expect(Object.getPrototypeOf(empty)).toBe(Object.prototype)
+    expect(Object.isFrozen(empty)).toBe(true)
+    /** Captured methods remain non-enumerable, non-configurable and non-writable. */
+    const then = () => undefined
+    const present = inspectThenable(
+      Object.defineProperty({}, String.fromCharCode(116, 104, 101, 110), { value: then })
+    )
+    expect(Object.getOwnPropertyDescriptor(present, 'then')).toEqual({
+      value: then,
+      enumerable: false,
+      configurable: false,
+      writable: false
+    })
+    const failure = new Error('getter failed')
+    const failed = inspectThenable(
+      Object.defineProperty({}, String.fromCharCode(116, 104, 101, 110), {
+        get: () => {
+          throw failure
+        }
+      })
+    )
+    expect(Object.getOwnPropertyDescriptor(failed, 'error')).toEqual({
+      value: failure,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    })
+  })
 })

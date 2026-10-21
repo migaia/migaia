@@ -37,6 +37,9 @@ export type IThenableInspection =
 type IAbsentThenProperty = Readonly<Record<'then', undefined>>
 type IPresentThenProperty = Readonly<Record<'then', (resolve: unknown, reject: unknown) => void>>
 
+/** Non-thenable inspection has no own properties; sharing retains the existing frozen shape. */
+const ABSENT_THEN_INSPECTION = Object.freeze({}) as IAbsentThenProperty
+
 /** Returns a function that always returns the same stable value. */
 export const noop = (): undefined => undefined
 
@@ -75,12 +78,15 @@ export function assimilateCapturedThen<T>(
 /** Reads a callback result's then property once for synchronous-contract enforcement. */
 export function inspectThenable(value: unknown): IThenableInspection {
   if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
-    return Object.freeze({}) as IAbsentThenProperty
-  /** The only read of then; output shape and descriptor stay unchanged. */
-  const read = tryReadProperty(value as { then?: unknown }, 'then')
-  if (read.threw) return { error: read.error }
-  const then = read.value
-  if (typeof then !== 'function') return Object.freeze({}) as IAbsentThenProperty
+    return ABSENT_THEN_INSPECTION
+  /** Read then once without allocating the intermediate guarded-read result. */
+  let then: unknown
+  try {
+    then = (value as { then?: unknown }).then
+  } catch (error) {
+    return { error }
+  }
+  if (typeof then !== 'function') return ABSENT_THEN_INSPECTION
   const inspection = {} as IPresentThenProperty
   Object.defineProperty(inspection, String.fromCharCode(116, 104, 101, 110), { value: then })
   return inspection
