@@ -1,17 +1,123 @@
-# `@migaia/store-light`
+# @migaia/store-light
 
-普通对象状态的响应式门面：给它一个对象字面量，普通字段自动变 `Signal`，`get` 访问器自动变惰性缓存的 `Computed`，方法自动变自动 batch 的 `Action`。开发者只写"对象 / getter / 方法"，看不到 signal/computed/batch 这些底层概念。同一个包里还内置一个独立能力——`StoreResource`：Suspense 安全的异步值容器，处理"加载中/就绪/失败/正在关闭/已释放"整套状态机。
+[English](./README.en.md)
 
-## 适用与不适用场景
+表单、设置、会话这类对象状态，手写时要在每个修改点记得重算派生值、通知界面，退出时还要记得清理。`@migaia/store-light` 直接接收你平时写的对象：普通字段变成响应式值，getter 变成自动更新的派生值，方法变成一次发布的 Action，并提供订阅、持久化和释放。它还带一个异步值容器 `createStoreResource`，负责在没人使用时释放加载到的连接、解码器这类对象。它建立在 `@migaia/reactive` 之上，不依赖任何 UI 框架。
 
-**适用**：表单/设置/会话信息等中小型对象状态；需要"字段自动响应式"而不想手写 Signal；需要异步派生数据的 Suspense 安全渲染；需要跨 Runtime 隔离（SSR 每请求、单测、多 root 互不串状态）；需要接入自定义字段类型（如 WASM 字段）的扩展点。
+## 你可能遇到过
 
-**不适用**：
+- **派生值漏更新**：改了商品列表，忘了同时更新合计和摘要。根因是派生值靠人在每个修改点手动重算。
+- **监听者看到写了一半的状态**：一个方法先改列表再改合计，监听者在两次写入之间运行，看到新列表配旧合计。根因是每次写入都单独通知。
+- **恢复设置时数据悄悄丢失**：升级后恢复本地保存的设置，旧字段写进了状态，或者新版本没有的字段被丢掉也没人发现。根因是持久化用 `Object.assign` 之类的方法，给什么就拷什么。
+- **退出后还显示上一个用户的数据**：会话状态已经不用了，某个没清理的回调还在读它。根因是普通对象不知道自己已经被释放。
+- **异步加载的对象没有关**：组件卸载后连接、解码器还开着；重新加载后旧的那个一直留在内存里。根因是没人负责记录谁还在用它、何时该关。
 
-- 列表或高频增删的集合状态使用 `@migaia/store-indexed`。
-- 需要按稳定业务 key 寻址时使用 `@migaia/store-keyed`。
-- 需要持久化时使用 `@migaia/store-persist`；需要 React hooks 时使用 `@migaia/store-react`。
-- `store-light` 只负责对象状态和异步资源。响应式内核、资源释放、内部事件与通用工具分别由 `@migaia/reactive`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils` 提供。
+## 为什么选它
+
+- **写普通对象就行。** 常见的响应式写法要把每个字段包成 signal、每个派生值包成 computed；这里字段、getter、方法自动变成响应式值、派生值和 Action，状态仍然长得像它描述的对象。[示例](./USEGUIDE.md#写普通对象就得到响应式状态)
+- **Action 在返回时一次发布。** 一个方法里的多次写入在方法返回时一起通知，监听者看不到写了一半的状态。[示例](./USEGUIDE.md#写普通对象就得到响应式状态)
+- **持久化只取能恢复的字段。** `$plain()` 只返回可写字段；`$hydrate()` 只写回已有字段，并可以报告或拒绝未知字段。[示例](./USEGUIDE.md#只保存能恢复的字段)
+- **释放后的访问立即报错。** `$dispose()` 之后读写字段、调用方法都抛 `STORE_DISPOSED`，过期的读取方会在读取处报错，而不是显示旧数据。[示例](./USEGUIDE.md#读取已释放的-store-会明确报错)
+- **异步值有明确的主人。** `createStoreResource` 记录持有者，最后一个持有者离开 `keepAliveMs` 后释放值；重新加载时等新值发布后才释放旧值，每个值只释放一次。[示例](./USEGUIDE.md#重新加载时旧值只释放一次)
+
+## 从这里开始
+
+下面用购物车演示：列表、合计和摘要放在一个普通对象里，`add` 同时改两个字段。用 Node 24 直接运行。
+
+```ts doc-test=run
+import { createStore } from '@migaia/store-light'
+
+const cart = createStore({
+  items: [] as string[],
+  total: 0,
+  // getter 自动变成派生值：items 或 total 变了，它跟着变
+  get summary() {
+    return `${this.items.length} 件，共 ${this.total} 元`
+  },
+  // 方法自动变成 Action：里面的多次写入合并成一次通知
+  add(name: string, price: number) {
+    this.items = [...this.items, name]
+    this.total += price
+  }
+})
+
+const stop = cart.$subscribe(() => console.log(`通知：${cart.summary}`))
+
+cart.add('键盘', 300)
+cart.add('鼠标', 100)
+await Promise.resolve() // 通知在微任务里发出
+
+stop()
+await cart.$dispose()
+```
+
+输出：
+
+```text
+通知：1 件，共 300 元
+通知：2 件，共 400 元
+```
+
+`summary` 是普通 getter，读到的 `items` 和 `total` 变了它就重算。每次调用 `add` 只收到一次通知，通知时两个字段都已更新。
+
+下一步：更多用法看 [USEGUIDE 的“按场景查找”](./USEGUIDE.md#按场景查找)；要加载之后需要释放的异步值，看 [没人使用之后自动释放异步值](./USEGUIDE.md#没人使用之后自动释放异步值)。
+
+## 手写时的隐患
+
+下面是常见的手写状态对象。它能跑，但有三个隐患（只用于说明，不必运行）：
+
+```ts doc-test=check
+const listeners = new Set<() => void>()
+const cart = {
+  items: [] as string[],
+  total: 0,
+  summary: '',
+  add(name: string, price: number) {
+    this.items = [...this.items, name]
+    // 隐患 1：每次写入都单独通知，监听者在这里看到的是新列表配旧合计
+    listeners.forEach((listener) => listener())
+    this.total += price
+    // 隐患 2：派生值要手动重算；另一个修改列表的方法漏写这一行，摘要就是旧的
+    this.summary = `${this.items.length} 件，共 ${this.total} 元`
+    listeners.forEach((listener) => listener())
+  }
+}
+
+// 隐患 3：没有释放的概念；退出登录后，忘了取消的监听者还能读到上一个用户的数据
+listeners.add(() => console.log(cart.summary))
+cart.add('键盘', 300)
+```
+
+用 `createStore` 时，摘要写成 getter，读到的字段变了就自动重算；方法里的写入在方法返回时一起发布；`$dispose()` 之后任何访问都会报错。
+
+## 三分钟心智模型
+
+`createStore` 把对象的每个属性按写法归类：
+
+| 你写的 | 变成 | 一句话 |
+| --- | --- | --- |
+| 普通值 `count: 0` | 响应式值 | 读取时登记依赖，写入时通知 |
+| getter `get doubled()` | 派生值 | 只在被读取时计算，读到的字段变了才重算；只读 |
+| 方法 `increment()` | Action | 一次调用里的写入在返回时一起发布；方法里读字段不会让调用方订阅它们 |
+| `raw(value)` | 原样字段 | 函数也当作数据保存，可读可写 |
+| 自定义字段（FieldBuilder） | 扩展字段 | 交给扩展创建，例如 WASM 支撑的字段 |
+
+几个说法：
+
+- **`$` API**：`$subscribe`、`$batch`、`$set`、`$plain`、`$hydrate`、`$own`、`$dispose` 等方法挂在 store 上，不可枚举，不会和你的字段混在一起；定义里不能用这些名字。
+- **Runtime**：所有节点属于同一个 `@migaia/reactive` Runtime。默认用共享的那个；服务端渲染、测试需要隔离时传 `options.runtime`。
+- **StoreResource**：独立于对象 store 的异步值容器。值由它持有，持有者（`retainResource()`、渲染中锁定的版本）都离开后才释放。
+
+## 典型场景
+
+| 场景 | 怎么组合 | 详细说明 |
+| --- | --- | --- |
+| 表单、购物车、设置面板 | `createStore` + getter + 方法 | [USEGUIDE](./USEGUIDE.md#写普通对象就得到响应式状态) |
+| 保存到本地存储、升级后恢复 | `$plain()` + `$hydrate(partial, { unknown })` | [USEGUIDE](./USEGUIDE.md#只保存能恢复的字段) |
+| 退出登录、页面销毁 | `$dispose()`，外部资源用 `$own()` 一起释放 | [USEGUIDE](./USEGUIDE.md#读取已释放的-store-会明确报错) |
+| 存回调、外部实例 | `raw()` | [USEGUIDE](./USEGUIDE.md#把回调保存成可替换的字段) |
+| 连接、解码器等加载后要释放的值 | `createStoreResource` + `retainResource()` | [USEGUIDE](./USEGUIDE.md#没人使用之后自动释放异步值) |
+| 只允许在方法里改字段 | `mutationPolicy` | [USEGUIDE](./USEGUIDE.md#7-写入守卫imutationguard--imutationpolicy) |
 
 ## 安装
 
@@ -19,410 +125,32 @@
 pnpm add @migaia/store-light
 ```
 
-## 目录
-
-- [Store 创建](#store-创建)
-- [`$`-API：读写、订阅、持久化、释放](#api)
-- [`raw`：原样值字段](#raw)
-- [FieldBuilder：自定义字段扩展协议](#fieldbuilder)
-- [StoreResource：Suspense 安全的异步值容器](#storeresource)
-- [高阶组合示例](#高阶组合示例)
-- [构建门禁](#构建门禁)
-
-完整签名、边界行为与错误码，见 [USEGUIDE.md](./USEGUIDE.md)。
-
----
-
-<a id="store-创建"></a>
-
-## Store 创建
-
-```ts
-import { createStore, createAsyncStore, storeReady } from '@migaia/store-light'
-```
-
-**`createStore`｜10 秒上手** —— 普通值变 Signal，`get` 变 Computed，方法变 Action：
-
-```ts
-const store = createStore({
-  count: 0,
-  get doubled() {
-    return this.count * 2 // Computed，依赖 count
-  },
-  increment() {
-    this.count += 1 // Action：方法体自动 batch + untracked
-  }
-})
-
-store.count // 0
-store.doubled // 0
-store.increment()
-store.count // 1
-```
-
-签名：`(shape: IStoreDefinition<S>, options?: ICreateStoreOptions) => IReactiveStore<S>`。`shape` 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（`mode: 'async'` 或历史无 `mode` 的 Builder）会在构造阶段直接抛错，提示改用 `createAsyncStore`。
-
-`options: ICreateStoreOptions` 全部字段：
-
-- `runtime?: IRuntime` —— 默认 `defaultRuntime`；显式隔离运行时（SSR 每请求、单测、多 root 互不串状态）
-- `debugName?: string` —— 默认 `'Store'`；仅用作内部节点 `debugName` 前缀，不参与语义
-- `warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示"只有首个 await 之前的写入被自动 batch"
-- `mutationPolicy?: IMutationPolicy` —— 默认无；接入 MobX 风格的严格写入守卫（见 [USEGUIDE §7](./USEGUIDE.md#7-写入守卫imutationguard--imutationpolicy)）
-
-**`createAsyncStore`｜10 秒上手** —— 定义里含异步 `FieldBuilder` 时使用，返回的 Promise resolve 时全部字段已就绪：
-
-```ts
-const store = await createAsyncStore({
-  count: 0,
-  wasmField: someAsyncFieldBuilder() // mode: 'async'
-})
-```
-
-参数与 `createStore` 相同（`shape`、`options?: ICreateStoreOptions`），区别只在于接受异步 `FieldBuilder` 且返回 `Promise<IReactiveStore<S>>`。
-
-纯 Signal/Computed Store 不创建异步 lifecycle scope 或初始化 AbortController。原生节点按相邻注册段同步逆序释放；FieldBuilder、订阅与 `$own` 外部资源沿用 lifecycle scope，并保持混合注册的 LIFO。`$dispose()` 始终返回同一个完成 Promise。
-
-**`storeReady`｜3 秒上手** —— 取任意 Store 的就绪 Promise：
-
-```ts
-await storeReady(store)
-```
-
-单参数 `store: object`（必填），无其他选项；传入非 Store 对象抛 `[store] store has no asynchronous initialization`。
-
----
-
-<a id="api"></a>
-
-## `$`-API：读写、订阅、持久化、释放
-
-`$`-前缀方法挂载为不可枚举属性，直接在 `createStore` 返回值上调用，无需额外 import。
-
-**`store.$snapshot()`｜3 秒上手** —— 全字段（含 computed/wasm）一次性快照，要求 Store 已就绪：
-
-```ts
-store.$snapshot() // { count: 1, doubled: 2 }
-```
-
-无参数、无选项；异步字段未就绪时抛 `[store] store is pending; ...`。
-
-**`store.$subscribe(fn, options?)`｜5 秒上手** —— 粗粒度订阅，读取 signal、computed 与 wasm source 建立订阅（首次订阅会求值 computed getter）：
-
-```ts
-const unsubscribe = store.$subscribe(() => console.log('changed'), { fireImmediately: true })
-```
-
-第二参数 `ISubscribeOptions` 全部字段：`fireImmediately?: boolean`（默认 `false`，为 `true` 时订阅建立后立即调用一次 `fn`）。返回值 `IDisposer`（调用即退订）。
-
-**`store.$batch(recipe)`｜5 秒上手** —— 一个 batch 里改多个字段，只触发一次通知（不是事务，中途抛错不回滚）：
-
-```ts
-store.$batch((draft) => {
-  draft.count = 10
-})
-```
-
-单参数 `recipe: (draft: IStoreShape<S>) => void`（必填），无其他选项。
-
-**`store.$set(patch)`｜3 秒上手** —— 低层批量赋值，编译期只接受可写 signal 字段：
-
-```ts
-store.$set({ count: 5 })
-```
-
-单参数 `patch: IWritableStorePatch<S>`（必填）；运行期发现 key 不对应任何 signal 会抛 `[store] field is not settable: ${key}`。
-
-**`store.$plain()`｜3 秒上手** —— 只取可持久化的标量 signal 字段（排除 computed/wasm/方法），不要求 Store 已就绪：
-
-```ts
-store.$plain() // { count: 1 }
-```
-
-无参数、无选项。
-
-**`store.$hydrate(partial, options?)`｜5 秒上手** —— 宽松写回 signal 字段（持久化恢复用）：
-
-```ts
-store.$hydrate({ count: 42, unknownKey: 'x' })
-```
-
-参数：`partial: Record<string, unknown>`（必填）；第二参数 `IHydrateOptions` 全部字段：
-
-- `unknown?: 'ignore' | 'report' | 'strict'` —— 默认 `'ignore'`；`'strict'` 遇到未知 key 抛错；`'report'` 对每个未知 key 调用一次 `onUnknown`
-- `onUnknown?: (key: string) => void` —— 配合 `unknown: 'report'` 使用
-
-每次水合只读取一次这两个选项；未知字段复用同一个回调及原 options receiver。选项 getter 失败会以 `INVALID_OPTION` 保留原始 cause，并在写入任何字段前拒绝。
-
-**`store.$own(resource)`｜5 秒上手** —— 把外部资源纳入本 Store 的所有权作用域，`$dispose()` 时一并释放：
-
-```ts
-const owned = store.$own(someDisposableResource)
-```
-
-单参数 `resource: T extends IDisposable`（必填），无其他选项；资源必须未归属或已归属本 Runtime，跨 Runtime 直接拒绝。
-
-**`store.$dispose()`｜3 秒上手** —— 释放全部内部节点，之后用户字段读写和受守卫方法调用抛 `[store] store is disposed`：
-
-```ts
-await store.$dispose()
-```
-
-无参数；返回 `Promise<void>`，多次调用返回同一个 Promise。`$disposed`（只读 getter）、`$runtime`（`IRuntime`）、`$async`（`boolean`，是否含异步字段）无需调用，直接读属性。后两者是可写 data 属性，不提供只读保证；修改属性不会迁移闭包所属 Runtime。重复 `$dispose()` 与这些终态查询仍可使用。
-
----
-
-<a id="raw"></a>
-
-## `raw`：原样值字段
-
-```ts
-import { raw, isRaw } from '@migaia/store-light'
-```
-
-**`raw`｜5 秒上手** —— 让一个函数值当普通可读写字段存，而不是被误判为 Action：
-
-```ts
-const store = createStore({
-  onSubmit: raw((data: FormData) => console.log(data))
-})
-store.onSubmit = (data) => save(data) // 可读可写可整体替换
-```
-
-单参数 `value: T`（必填），无其他选项；返回 `IRaw<T>`。
-
-**`isRaw`｜3 秒上手** —— 类型守卫，单参数 `value: unknown`，无其他选项：
-
-```ts
-isRaw(raw(() => {})) // true
-```
-
----
-
-<a id="fieldbuilder"></a>
-
-## FieldBuilder：自定义字段扩展协议
-
-```ts
-import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'
-import type {
-  IFieldBuilder,
-  IFieldContext,
-  IFieldSource,
-  IMutationGuard,
-  IMutationPolicy
-} from '@migaia/store-light'
-```
-
-Store 定义协议，扩展去实现——`store-light` 不知道任何具体字段类型，`@migaia/store-wasm` 等包基于此协议接入自定义字段（如 WASM 支撑的字段）。
-
-**`isFieldBuilder`｜3 秒上手**（单参数 `value: unknown`，无选项）：
-
-```ts
-isFieldBuilder(someValue) // 是否为 IFieldBuilder（sync/async/legacy 任一形态）
-```
-
-**`FIELD_BUILDER`｜3 秒上手** —— 品牌 symbol，供自定义 Builder 实现打标，不单独调用：
-
-```ts
-const myBuilder: IFieldBuilder<MyField> = {
-  [FIELD_BUILDER]: true,
-  mode: 'sync',
-  create(context: IFieldContext) {
-    /* ... */
-  }
-}
-```
-
-完整的 `IFieldContext`/`IFieldSource` 接口、`IMutationGuard`/`IMutationPolicy` 协议与一个从零实现的自定义同步字段示例，见 [USEGUIDE §6-7](./USEGUIDE.md#6-fieldbuilder自定义字段扩展协议)。
-
----
-
-<a id="storeresource"></a>
-
-## StoreResource：Suspense 安全的异步值容器
-
-```ts
-import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'
-```
-
-**`createStoreResource`｜10 秒上手** —— 独立于对象 facade 的异步值容器，`read()` 在 `loading` 时抛出 Promise（React Suspense 协议）：
-
-```ts
-const userResource = createStoreResource(
-  async ({ signal }) => {
-    const res = await fetch('/api/user', { signal })
-    return res.json()
-  },
-  { keepAliveMs: 30_000 }
-)
-
-userResource.preload() // 提前触发加载
-// 组件渲染路径中：const user = userResource.read(); // loading 时 throw Promise
-```
-
-第二参数 `IStoreResourceOptions<T>` 全部字段（也可作为第一参数对象形式 `{ load, ...options }` 传入）：
-
-- `runtime?: IRuntime` - owns idle cleanup and diagnostics; defaults to the lazy shared Runtime.
-- `scheduler?: IScheduler` - owns cache and provisional-capture timers; defaults to `systemScheduler`, admitted once at creation.
-- `keepAliveMs?: number` —— 默认 `1000`；无持有者之后缓存值继续存活的毫秒数，必须是有限非负数
-- `dispose?: (value: T) => void | PromiseLike<void>` —— 自定义清理；提供后值必须是引用类型，否则抛 `TypeError`；不提供时若值自带 `$dispose` 方法会自动调用
-- `onError?: (error: unknown, phase: 'load' | 'dispose' | 'listener') => void` —— 观察三个阶段的失败
-- `onTerminal?: () => void` —— 资源到达终态时调用一次
-
-**`createStoreResourceScope`｜5 秒上手** —— 统一管理一组资源的释放：
-
-```ts
-const scope = createStoreResourceScope()
-const profile = scope.resource((ctx) => fetchProfile(ctx.signal))
-scope.dispose() // 强制释放该 scope 内全部资源，不等待持有者
-```
-
-无入参；返回 `{ resource(factory, options?), dispose() }`，`resource()` 原样委托 `createStoreResource()`。
-
-`StoreResource` 完整状态机（idle/loading/ready/failed/closing/disposed）、`read`/`retain*`/`captureVersion`/`commitCapture`/`whenTerminal`/`subscribe`/`getSnapshot` 等全部方法签名，见 [USEGUIDE §8](./USEGUIDE.md#8-storeresourcesuspense-安全的异步值容器)。
-
----
-
-<a id="高阶组合示例"></a>
-
-## 高阶组合示例
-
-### 1. 严格写入守卫 + 异步资源：用户设置面板
-
-本地字段用 action-only 守卫，远端用户资料用 `StoreResource` 异步加载，组件卸载时统一释放。
-
-```ts
-import { createStore, createStoreResourceScope } from '@migaia/store-light'
-import { createMutationPolicy } from '@migaia/store-middleware'
-
-const settingsStore = createStore(
-  {
-    theme: 'light' as 'light' | 'dark',
-    setTheme(theme: 'light' | 'dark') {
-      this.theme = theme
-    }
-  },
-  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }
-)
-
-const scope = createStoreResourceScope()
-const profileResource = scope.resource(
-  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),
-  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }
-)
-
-function teardown() {
-  scope.dispose()
-  void settingsStore.$dispose()
-}
-```
-
-### 2. `$hydrate` + `$plain`：往返持久化快照
-
-```ts
-const store = createStore({ count: 0, name: 'guest' })
-const snapshot = store.$plain() // { count: 0, name: 'guest' }
-localStorage.setItem('state', JSON.stringify(snapshot))
-
-const restored = JSON.parse(localStorage.getItem('state') ?? '{}')
-store.$hydrate(restored, {
-  unknown: 'report',
-  onUnknown: (key) => console.warn('unknown field', key)
-})
-```
-
-### 3. `$own` 把外部资源纳入 Store 生命周期
-
-```ts
-import { createStore } from '@migaia/store-light'
-
-const store = createStore({ items: [] as string[] })
-const timer = setInterval(() => console.log('poll'), 1_000)
-let disposed = false
-// $own 接收 IDisposable（dispose() + disposed），典型资源是 collection 等外部结构
-const poller = store.$own({
-  get disposed() {
-    return disposed
-  },
-  dispose() {
-    if (disposed) return
-    disposed = true
-    clearInterval(timer)
-  }
-})
-// poller 会在 store.$dispose() 时一并释放，无需单独管理
-```
-
-### 4. 自定义 FieldBuilder 接入 Store
-
-```ts
-import {
-  createStore,
-  FIELD_BUILDER,
-  type IFieldBuilder,
-  type IFieldContext
-} from '@migaia/store-light'
-import type { IDisposable } from '@migaia/reactive'
-
-type ICounterField = IDisposable & { value: number }
-
-function counterField(initial: number): IFieldBuilder<ICounterField> {
-  return {
-    [FIELD_BUILDER]: true,
-    mode: 'sync',
-    create({ createSource }: IFieldContext): ICounterField {
-      const source = createSource('CounterField')
-      let value = initial
-      let disposed = false
-      return {
-        get value() {
-          source.track()
-          return value
-        },
-        set value(v) {
-          source.commit(() => {
-            value = v
-          })
-        },
-        get disposed() {
-          return disposed
-        },
-        dispose() {
-          if (disposed) return
-          disposed = true
-          source.dispose()
-        }
-      }
-    }
-  }
-}
-
-const store = createStore({ counter: counterField(0) })
-store.counter.value // 0
-```
-
----
-
-<a id="构建门禁"></a>
-
-## 构建门禁
-
-```bash
-pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run build
-```
-
-浏览器集成路径另跑：
-
-```bash
-pnpm run typecheck:e2e && pnpm run test:e2e
-```
-
-单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。
-
-Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime.
-
-StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity. No host console or global reportError fallback is used.
-
-### Canonical async resource ownership
-
-`createStoreResource` is a value-ownership adapter over `@migaia/resource`: one owner for requests/data/Promise/cancellation, with StoreLight render captures, version leases and exactly-once disposal layered above it. Pending reads share the original canonical Promise<T>. Retry immediately rejects a superseded Promise with Resource REQUEST_ABORTED/native AbortError, including ignored-abort loaders; their eventual owned values still get cleaned. Failed refresh retains stale data. StoreResourceDataKind is removed along with the duplicate controller. See USEGUIDE for migration and lease behavior. Runtime defaults stay lazy on import.
+包只有根入口 `@migaia/store-light`。列表或频繁增删的集合用 `@migaia/store-indexed`，按稳定业务 key 寻址用 `@migaia/store-keyed`；持久化和 React 绑定分别由 `@migaia/store-persist` 和 `@migaia/store-react` 提供。
+
+## 常用 API
+
+| API | 做什么 |
+| --- | --- |
+| `createStore(shape, options?)` | 用普通对象创建 store；定义里不能有异步字段 |
+| `createAsyncStore(shape, options?)` | 定义里有异步初始化的字段时使用，返回的 Promise 完成时字段都已就绪 |
+| `store.$subscribe(fn)` / `store.$batch(recipe)` | 订阅任意字段变化 / 把多次写入合并成一次通知 |
+| `store.$plain()` / `store.$hydrate(partial, options?)` | 取可持久化的字段 / 写回保存的字段 |
+| `store.$dispose()` | 释放 store；之后的访问抛 `STORE_DISPOSED` |
+| `createStoreResource(factory, options?)` | 创建按持有者释放的异步值 |
+
+## 契约细节
+
+全部签名、边界行为与错误信息见 [USEGUIDE.md](./USEGUIDE.md)。下面是使用时最需要记住的约束。
+
+1. **getter 只读。** 派生值没有 setter，给它赋值会抛 `TypeError`；只能通过它读取的字段间接改变。
+2. **异步方法只有第一个 `await` 之前的写入在同一个批次里。** `await` 之后的写入要放进 `$batch()`。开启 `warnAsyncActions` 后，Action 第一次返回 thenable 时会经 Runtime 报告 `ACTION_BATCH_BOUNDARY`。Action 保留方法原本的返回值或 Promise。
+3. **`$batch()` 不是事务。** recipe 中途抛错不会回滚已经完成的写入；`$hydrate()` 也一样。
+4. **`$dispose()` 先切换状态再释放。** `$disposed` 在释放任何资源之前就变成 `true`；之后读写字段、调用方法抛 `STORE_DISPOSED`，`$disposed`、`$runtime`、`$async` 和再次 `$dispose()` 仍可用。所有调用返回同一个 Promise，它在所有内部节点和 `$own()` 登记的资源释放完成后才完成。
+5. **构造失败会回滚。** 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。
+6. **导入时不创建默认 Runtime。** 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。
+7. **StoreResource 的值由它持有。** 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。
+8. **错误身份。** 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。
+
+请求、数据、取消和共享 Promise 由 `@migaia/resource` 的一个实例负责，StoreResource 只在其上加值的所有权、渲染 capture、版本租约和恰好一次的释放。迁移说明（`StoreResourceDataKind`、`StoreResourceKind`、`retain()` 的移除）见 USEGUIDE 末尾。
+
+**不适合的场景**：列表或频繁增删的集合、需要按 id 寻址的实体、需要索引查询的数据，分别用 store-indexed、store-keyed 等包。

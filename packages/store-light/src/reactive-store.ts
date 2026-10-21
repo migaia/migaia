@@ -107,6 +107,11 @@ type IBuilderKeys<S> = {
   [K in keyof S]-?: S[K] extends IFieldBuilder<IDisposable> ? K : never
 }[keyof S]
 
+/**
+ * Public shape of a store built from definition `S`: builders become the fields they create,
+ * `raw()` values become plain fields, methods keep their signatures and getters keep their value
+ * types.
+ */
 export type IStoreShape<S> = {
   readonly [K in IBuilderKeys<S>]: S[K] extends IFieldBuilder<infer F> ? F : never
 } & {
@@ -136,22 +141,33 @@ type ISettableKey<S> = {
         : K
 }[IWritableKeys<S>]
 
+/**
+ * Partial patch accepted by `$set()`: only writable value fields, never getters, builders or
+ * methods.
+ */
 export type IWritableStorePatch<S> = Partial<
   Pick<IStoreShape<S>, ISettableKey<S> & keyof IStoreShape<S>>
 >
 
+/** Options of `$subscribe()`. */
 export type ISubscribeOptions = {
   // Defaults to `false`. When `true`, calls the listener once immediately after subscribing.
   fireImmediately?: boolean
 }
 
+/** Options of `$hydrate()`, read once per call before any field is written. */
 export type IHydrateOptions = {
-  /** Unknown keys are ignored by default for backwards-compatible partial hydration. */
+  /**
+   * What to do with keys the store has no writable field for: `ignore` (default) skips them,
+   * `report` calls `onUnknown` for each one, `strict` rejects the whole input before writing.
+   */
   readonly unknown?: 'ignore' | 'report' | 'strict'
+  /** Called once per skipped key when `unknown` is `report`. */
   readonly onUnknown?: (key: string) => void
 }
 
 // Runtime APIs use the `$` prefix and non-enumerable properties to avoid collisions with user fields.
+/** The non-enumerable `$` methods and properties every store carries next to its fields. */
 export type IReactiveStoreApi<S> = {
   // Owns all nodes in this store. React adapters create effects in the same runtime to share the graph.
   // The interface exposes the capabilities callers need without requiring a concrete runtime class.
@@ -196,6 +212,7 @@ export type IReactiveStoreApi<S> = {
   $dispose(): Promise<void>
 }
 
+/** A store: the resolved fields of definition `S` plus the `$` API. */
 export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>
 
 /**
@@ -207,6 +224,7 @@ export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>
  */
 export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>
 
+/** Options shared by `createStore()` and `createAsyncStore()`. */
 export type ICreateStoreOptions = {
   /**
    * Isolates the runtime explicitly. Defaults to `defaultRuntime`.
@@ -215,6 +233,7 @@ export type ICreateStoreOptions = {
    * branding and ownership are validated; an arbitrary structural `IRuntime` is not a SPI.
    */
   runtime?: IRuntime
+  /** Prefix of internal node names in diagnostics (`${debugName}.${key}`); defaults to `'Store'`. */
   debugName?: string
   // Explicitly enables diagnostics. Defaults to `false`; the library does not infer build mode from `process` or `import.meta`.
   warnAsyncActions?: boolean
@@ -933,8 +952,10 @@ export function storeReady(store: object): Promise<void> {
 }
 
 /**
- * Main synchronous creation contract. It rejects FieldBuilders before their create() method can
- * start I/O; use createAsyncStore for async definitions.
+ * Creates a store from a plain object: values become reactive fields, getters derived values and
+ * methods actions that publish their writes once when they return. Rejects async FieldBuilders
+ * before their create() method can start I/O; use createAsyncStore for async definitions. Invalid
+ * definitions throw `INVALID_OPTION` or `SYNC_FIELD_REQUIRED` after rolling back created nodes.
  */
 export function createStore<S extends Record<string, unknown>>(
   shape: IStoreDefinition<S> & {
