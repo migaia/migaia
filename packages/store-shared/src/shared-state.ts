@@ -52,8 +52,8 @@ const SPIN_LIMIT = 1 << 16
 
 /**
  * Sustained contention window, in milliseconds, before a seqlock read or lock acquisition throws
- * `CONTENTION_LIMIT`. A preempted writer resumes well within it; a seq that stays odd for this long
- * means the writer abandoned the lock.
+ * `CONTENTION_LIMIT`. Persistent competition, a delayed writer or an abandoned lock can all exhaust
+ * this window; reaching it alone does not identify which writer condition occurred.
  */
 const CONTENTION_TIMEOUT_MS = 1000
 
@@ -368,12 +368,22 @@ function watchSlot(
   return { start: loop, stop }
 }
 
+/**
+ * One shared int32 value with a local reactive source owned by the supplied Runtime. Pass its
+ * buffer to a separate wrapper in another Runtime or Worker; the wrappers share bytes, not
+ * subscriptions. Local writes publish immediately, while remote graph updates need a value read,
+ * sync() or an active watch(). Dispose each wrapper when its local observers are done.
+ */
 export class SharedInt32Signal implements IObservable, IDisposable {
+  /** Runtime whose graph tracks this wrapper and receives watch-loop diagnostics. */
   readonly runtime: IRuntime
+  /** Shared ABI storage to pass to another wrapper; disposing this wrapper does not erase it. */
   readonly buffer: SharedArrayBuffer
   /** Canonical source metadata and graph operations bound to this exact SAB node. */
   readonly #binding: IRuntimeSourceBinding
+  /** Live read-only subscription view maintained by the Runtime; consumers must not mutate it. */
   readonly subs: ReadonlySet<IObserver>
+  /** Local reactive graph version, distinct from the shared 64-bit seqlock version. */
   get version(): number {
     return this.#binding.version
   }
@@ -383,6 +393,12 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   #disposed = false
   #stopWatching?: IDisposer
 
+  /**
+   * Creates a 32-byte shared signal initialized to initialValue, which defaults to zero, or
+   * attaches to an existing compatible buffer without reading or overwriting initialValue. New
+   * values must be int32 integers. Invalid input or ABI headers throw INVALID_OPTION, undersized
+   * buffers throw BUFFER_TOO_SMALL, and a shared value that cannot settle throws CONTENTION_LIMIT.
+   */
   constructor(runtime: IRuntime, initialValue = 0, buffer?: SharedArrayBuffer) {
     if (buffer !== undefined && !isSharedBuffer(buffer)) {
       throw createStoreSharedRangeError(
@@ -425,10 +441,17 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     this.subs = this.#binding.subs
   }
 
+  /** Whether this local wrapper has been disposed; reading this flag remains valid afterward. */
   get disposed(): boolean {
     return this.#disposed
   }
 
+  /**
+   * Reads a consistent shared value, publishes a newly observed remote version and tracks this
+   * source in the current reactive computation. Synchronous publication may itself change the
+   * value, so the returned value is reread after publication. Throws SIGNAL_DISPOSED after disposal
+   * or CONTENTION_LIMIT if a consistent shared read cannot complete.
+   */
   get value(): number {
     this.#assertActive()
     /** Reuse a stable seqlock snapshot; publication may synchronously run a writer. */
@@ -438,6 +461,12 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     return changed ? this.#read().value : snapshot.value
   }
 
+  /**
+   * Commits an int32 value, wakes remote waiters and notifies local graph observers. An unchanged
+   * value does none of these. Invalid values throw INVALID_OPTION; disposal and sustained lock
+   * contention throw SIGNAL_DISPOSED and CONTENTION_LIMIT respectively. Graph notification can fail
+   * after the shared write and remote wakeup have already committed.
+   */
   set value(next: number) {
     this.#assertActive()
     const normalized = asInt32(next, 'shared signal value')
@@ -460,7 +489,9 @@ export class SharedInt32Signal implements IObservable, IDisposable {
    * Pulls remote writes into this `Runtime`.
    *
    * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can
-   * poll from their own message loop.
+   * poll from their own message loop. Returns true when this reader's observed shared version
+   * changes, false otherwise; it does not track a dependency. Throws SIGNAL_DISPOSED after disposal
+   * or CONTENTION_LIMIT when the shared read remains unstable.
    */
   sync(): boolean {
     this.#assertActive()
@@ -479,7 +510,12 @@ export class SharedInt32Signal implements IObservable, IDisposable {
    * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without
    * manual `sync()` polling.
    *
-   * Returns a stop function. `dispose()` also stops the loop.
+   * The first call also reconciles existing remote writes synchronously. Its optional scheduler
+   * defaults to systemScheduler and owns zero-delay rearming, not the native wait itself. Repeated
+   * calls while active return the same stop function and retain that scheduler. Stop is idempotent,
+   * wakes a pending waiter and permits a later watch() to start a new loop; dispose() stops it too.
+   * Throws ENV_UNSUPPORTED without waitAsync or SIGNAL_DISPOSED after disposal. Loop failures go to
+   * runtime.reportError; ordinary sync() polling remains available without waitAsync.
    */
   watch(scheduler?: IScheduler): IDisposer {
     this.#assertActive()
@@ -506,17 +542,34 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     return disposer
   }
 
+  /**
+   * Reads current shared bytes consistently without tracking, advancing the observed cursor or
+   * notifying observers. A remote value can therefore be visible here while isStale() stays true.
+   * Throws SIGNAL_DISPOSED after disposal or CONTENTION_LIMIT when the read cannot settle.
+   */
   peek(): number {
     this.#assertActive()
     return this.#read().value
   }
 
+  /** Reactive observation hook; this signal keeps its resources independent of subscriber count. */
   onObserved(): void {}
+  /** Reactive unsubscription hook; it does not stop an explicitly owned watch loop. */
   onUnobserved(): void {}
+  /**
+   * Compares the current shared version with this reader's observed version without publishing or
+   * tracking. It remains callable after disposal, but an unsettled read can throw
+   * CONTENTION_LIMIT.
+   */
   isStale(): boolean {
     return this.#read().version !== this.#observedSharedVersion
   }
 
+  /**
+   * Idempotently stops this wrapper's watcher and disconnects its reactive source. Dispose local
+   * effects first if they would otherwise reread the source while it disconnects. Shared storage
+   * and other wrappers remain usable; value, peek(), sync() and watch() now throw SIGNAL_DISPOSED.
+   */
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
@@ -537,6 +590,13 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   }
 }
 
+/**
+ * Creates a SharedInt32Signal in the supplied Runtime. initialValue defaults to zero for a new
+ * 32-byte buffer and is ignored when attaching a compatible buffer. The returned wrapper owns its
+ * local graph source and watcher, so dispose it separately from other wrappers over the same bytes.
+ * Construction failures follow the SharedInt32Signal constructor's validation and contention
+ * rules.
+ */
 export const sharedInt32 = (
   runtime: IRuntime,
   initialValue = 0,
@@ -670,12 +730,16 @@ class SharedInt32ArrayCell implements IObservable {
 
 /**
  * Fixed-layout, index-granular shared state for Workers. Each element owns a value/seq pair in the
- * SharedArrayBuffer, so changing one conversation slot does not invalidate readers of every other
- * slot.
+ * SharedArrayBuffer, so a write notifies only local reactive readers of that index. Each wrapper
+ * owns independent synchronization cursors; sync() or watch() publishes remote writes to its graph.
+ * The array supports int32 cells, not general objects or atomic transactions across several cells.
  */
 export class SharedInt32Array implements IDisposable {
+  /** Runtime that owns this wrapper, its lazily materialized cells and watch diagnostics. */
   readonly runtime: IRuntime
+  /** Shared ABI storage; attach another wrapper with the same length to share these cells. */
   readonly buffer: SharedArrayBuffer
+  /** Fixed number of int32 cells, including zero; it cannot be resized through this wrapper. */
   readonly length: number
   #valueView: Int32Array
   #versionView: BigInt64Array
@@ -687,11 +751,21 @@ export class SharedInt32Array implements IDisposable {
   #disposed = false
   #stopWatching?: IDisposer
 
+  /**
+   * Creates a zero-filled shared array, or attaches to a compatible buffer with the same length.
+   * length must be a nonnegative integer whose layout fits the typed-array capacity. New-buffer
+   * initialValues consumes at most length int32 values and closes the iterator at that prefix; zero
+   * length consumes none. Attaching ignores initialValues and preserves shared data. Invalid
+   * options, lengths, values or ABI headers throw INVALID_OPTION; small buffers throw
+   * BUFFER_TOO_SMALL. Option-read and initial-iterator failures remain reachable through cause.
+   */
   constructor(
     runtime: IRuntime,
     length: number,
     options: {
+      /** Existing compatible array storage; omission allocates a new zero-filled layout. */
       readonly buffer?: SharedArrayBuffer
+      /** Optional prefix for new storage only; remaining cells stay zero and the tail is not read. */
       readonly initialValues?: Iterable<number>
     } = {}
   ) {
@@ -794,10 +868,16 @@ export class SharedInt32Array implements IDisposable {
     claimOwnership(this, runtime)
   }
 
+  /** Whether this local wrapper has been disposed; metadata remains readable afterward. */
   get disposed(): boolean {
     return this.#disposed
   }
 
+  /**
+   * Reads one consistent cell. Inside a reactive computation it lazily materializes that index's
+   * source, reconciles its version and tracks it; outside tracking it reads without a cell or graph
+   * publication. Throws ARRAY_DISPOSED, INDEX_OUT_OF_RANGE or CONTENTION_LIMIT when applicable.
+   */
   get(index: number): number {
     this.#assertIndex(index)
     if (!isRuntimeTracking(this.runtime)) {
@@ -806,6 +886,11 @@ export class SharedInt32Array implements IDisposable {
     return this.#cell(index).read()
   }
 
+  /**
+   * Writes an int32 cell, publishes its shared generation and notifies only its existing local
+   * index observers. An equal value is a no-op. Throws ARRAY_DISPOSED, INDEX_OUT_OF_RANGE,
+   * INVALID_OPTION or CONTENTION_LIMIT; local graph failure can occur after the write committed.
+   */
   set(index: number, value: number): void {
     this.#assertIndex(index)
     const cell = this.#cells.get(index)
@@ -827,7 +912,11 @@ export class SharedInt32Array implements IDisposable {
    * odd locked version. The operation reads a consistent value, computes outside the lock, and
    * writes with that value as its expectation. It retries if another writer changes the value. The
    * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side
-   * effects in the callback.
+   * effects in the callback. Returns the committed value, or the observed value if unchanged.
+   * Invalid indexes/results throw INDEX_OUT_OF_RANGE/INVALID_OPTION, disposal throws ARRAY_DISPOSED
+   * and exhausted retries throw CONTENTION_LIMIT. Callback errors keep a complete foreign identity;
+   * unclassified extensible native errors receive UPDATE_FAILED in place, while other thrown values
+   * remain reachable through cause. A callback failure itself never leaves the write lock held.
    */
   update(index: number, update: (current: number) => number): number {
     this.#assertIndex(index)
@@ -861,7 +950,11 @@ export class SharedInt32Array implements IDisposable {
    * Scans remote writes and notifies only affected index observers.
    *
    * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can
-   * poll from their message loop.
+   * poll from their message loop. Omitting index compares the shared generation, returning zero
+   * without a scan when unchanged, otherwise scanning all cells in one Runtime batch. The returned
+   * count includes changed cells without observers; each wrapper consumes only its own cursor. A
+   * supplied index checks only that cell and returns zero or one. Throws ARRAY_DISPOSED,
+   * INDEX_OUT_OF_RANGE for an invalid supplied index, or CONTENTION_LIMIT for an unsettled cell.
    */
   sync(index?: number): number {
     this.assertActive()
@@ -899,7 +992,12 @@ export class SharedInt32Array implements IDisposable {
    * Starts an `Atomics.waitAsync` loop for the whole array.
    *
    * It waits on the generation epoch instead of creating a waiter for every cell. After waking,
-   * `sync()` scans cells and notifies observers only for cells that changed.
+   * sync() scans cells and notifies observers only for cells that changed. The first call also
+   * reconciles missed writes synchronously. scheduler defaults to systemScheduler for zero-delay
+   * rearming; an active loop retains the first scheduler and returns the same stop function on
+   * repeated calls. Stop is idempotent and a later watch() can start a new loop. Throws
+   * ARRAY_DISPOSED after disposal or ENV_UNSUPPORTED without waitAsync; there is no silent polling
+   * fallback. Loop failures are reported through this Runtime, and dispose() also stops the loop.
    */
   watch(scheduler?: IScheduler): IDisposer {
     this.assertActive()
@@ -926,6 +1024,12 @@ export class SharedInt32Array implements IDisposable {
     return disposer
   }
 
+  /**
+   * Copies all current values into a new ordinary Int32Array without tracking or publishing. Each
+   * cell is read consistently, but concurrent writes can occur between cells: the result is not an
+   * atomic whole-array snapshot. Mutating the copy cannot alter shared storage. Throws
+   * ARRAY_DISPOSED after disposal or CONTENTION_LIMIT if a cell cannot settle.
+   */
   snapshot(): Int32Array {
     this.assertActive()
     const result = new Int32Array(this.length)
@@ -935,6 +1039,12 @@ export class SharedInt32Array implements IDisposable {
     return result
   }
 
+  /**
+   * Idempotently stops this local watcher and disconnects all materialized index sources. Dispose
+   * dependent effects first if they would reread during disconnection. High-level reads, writes,
+   * synchronization and watch calls then throw ARRAY_DISPOSED; shared bytes and other wrappers are
+   * unaffected. Low-level cell primitives do not perform this lifecycle check automatically.
+   */
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
@@ -944,6 +1054,7 @@ export class SharedInt32Array implements IDisposable {
     }
   }
 
+  /** Throws ARRAY_DISPOSED when composing low-level operations on a closed wrapper. */
   assertActive(): void {
     if (this.#disposed) {
       throw createStoreSharedError(
@@ -953,9 +1064,16 @@ export class SharedInt32Array implements IDisposable {
     }
   }
 
-  /** Reads one cell consistently, with its value and version from the same observation. */
+  /**
+   * Reads one cell consistently, returning a value and shared bigint version from the same
+   * observation. Extension code must supply a valid index and enforce the lifecycle itself; this
+   * primitive neither validates them nor tracks or publishes. Contention can throw
+   * CONTENTION_LIMIT. Prefer get() for checked application reads.
+   */
   readCell(index: number): {
+    /** The cell's int32 value in this completed shared read. */
     readonly value: number
+    /** Even shared seqlock sequence for that value, distinct from a local graph version. */
     readonly version: bigint
   } {
     return readConsistent(this.#valueView, this.#versionView, this.#valueSlot(index), index)
@@ -963,7 +1081,11 @@ export class SharedInt32Array implements IDisposable {
 
   /**
    * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or
-   * the expected value does not match.
+   * the expected value does not match. Omitting expected means an unconditional write. The caller
+   * owns active/index/int32 validation and publication: after a changed write, call notifyWaiters()
+   * then sync(index) to notify an existing local source. This primitive does not do either step or
+   * advance observed cursors. Lock contention can throw CONTENTION_LIMIT; prefer set()/update()
+   * unless composing that complete protocol.
    */
   writeCell(index: number, value: number, expected?: number): bigint | undefined {
     const version = writeLocked(
@@ -977,14 +1099,24 @@ export class SharedInt32Array implements IDisposable {
     return version
   }
 
-  /** Advance the shared 64-bit generation and wake every independent reader cursor. */
+  /**
+   * Advances the shared 64-bit generation and wakes array watchers after a low-level committed
+   * write. It neither publishes local sources nor consumes this reader's cursor; use sync(index)
+   * afterward for local publication. Extension code owns lifecycle checks and must not use this as
+   * a replacement for actually committing a cell write.
+   */
   notifyWaiters(): void {
     // Publishing this write does not mean this reader scanned other remote cells in the generation.
     Atomics.add(this.#generationView, 0, 1n)
     Atomics.notify(this.#generationView as never, 0)
   }
 
-  /** Keep array-level pull bookkeeping aligned with local cell writes. */
+  /**
+   * Copies one cell version into this reader's array-level cursor without validation or graph
+   * publication. It is a bookkeeping primitive for extension code that already published the
+   * change; copying it before sync(index) would hide that change from the existing local source.
+   * Ordinary low-level writes should use notifyWaiters() then sync(index) instead.
+   */
   recordObservedVersion(index: number, version: bigint): void {
     this.#observedVersions[index] = version
   }
@@ -1023,11 +1155,19 @@ export class SharedInt32Array implements IDisposable {
   }
 }
 
+/**
+ * Creates a SharedInt32Array in the supplied Runtime, sharing an existing compatible buffer or
+ * allocating fixed-length zero-filled int32 storage. options defaults to an empty object; a new
+ * buffer can consume an initialValues prefix, while attachment ignores it. Dispose the returned
+ * local wrapper independently of other readers. Validation follows the class constructor.
+ */
 export const sharedInt32Array = (
   runtime: IRuntime,
   length: number,
   options?: {
+    /** Compatible shared array storage with the same length; omission allocates new storage. */
     readonly buffer?: SharedArrayBuffer
+    /** Optional new-buffer prefix; stops after length entries, leaving missing entries zero. */
     readonly initialValues?: Iterable<number>
   }
 ): SharedInt32Array => new SharedInt32Array(runtime, length, options)

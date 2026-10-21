@@ -1,9 +1,9 @@
 /**
  * Declares the public error codes for `@migaia/store-shared` in one place.
  *
- * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/store-shared'`. Throw sites use these constants instead of inline
- * literals.
+ * Package-owned failures use the pair `(source, code)`, with source `@migaia/store-shared`.
+ * Complete foreign updater identities retain their original owner instead of being relabeled. Throw
+ * sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -15,14 +15,17 @@ export const StoreSharedErrorCode = {
    */
   updateFailed: 'UPDATE_FAILED',
   /**
-   * `SharedInt32Array` is read or written after `dispose()`.
+   * A high-level `SharedInt32Array` read, write, synchronization or watch operation runs after
+   * dispose(), or an extension explicitly checks assertActive(). Unchecked low-level cell
+   * primitives do not perform that lifecycle check themselves.
    *
    * Create a new array instead of reusing the disposed instance.
    */
   arrayDisposed: 'ARRAY_DISPOSED',
 
   /**
-   * `SharedInt32Signal` is read or written after `dispose()`.
+   * A `SharedInt32Signal` value read/write, peek(), sync() or watch() runs after dispose().
+   * Metadata and isStale() do not use this active check.
    *
    * Create a new signal instead of reusing the disposed instance.
    */
@@ -36,7 +39,8 @@ export const StoreSharedErrorCode = {
   bufferTooSmall: 'BUFFER_TOO_SMALL',
 
   /**
-   * A `SharedInt32Array` index is outside `[0, length)`.
+   * A checked `SharedInt32Array` get(), set(), update() or sync(index) receives a noninteger index
+   * or an index outside `[0, length)`. Low-level cell primitives require their caller to validate.
    *
    * Correct the index. This is a permanent input error.
    */
@@ -47,8 +51,9 @@ export const StoreSharedErrorCode = {
    * sustained contention window (about 1 s, after spin rounds with backoff), or `update()` keeps
    * losing the write race for its whole spin limit.
    *
-   * A writer may have crashed while holding the lock, leaving a deadlock that cannot recover.
-   * Rebuild the buffer.
+   * This can reflect continuing competition, a delayed writer or a writer that abandoned a held
+   * lock; the code alone does not distinguish them. Reduce contention or investigate the writer. If
+   * a writer permanently left the lock odd, replace the buffer rather than forcing it unlocked.
    */
   contentionLimit: 'CONTENTION_LIMIT',
 
@@ -69,4 +74,5 @@ export const StoreSharedErrorCode = {
   invalidOption: 'INVALID_OPTION'
 } as const
 
+/** Public package-owned failure identities, for branching together with STORE_SHARED_SOURCE. */
 export type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode]
