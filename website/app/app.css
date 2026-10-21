@@ -1216,6 +1216,11 @@ svg {
   color: var(--text-strong);
 }
 
+/* Static/instance member groups sit one level under the member section. */
+.page-toc a.toc-subentry {
+  padding-left: calc(var(--space-3) * 2);
+}
+
 .page-toc a.active {
   border-left-color: var(--accent-default);
   box-shadow: inset 1px 0 0 var(--accent-default);
@@ -2066,6 +2071,13 @@ table.option-reference .option-behavior p:last-child {
 .class-member-entry {
   border-bottom: 1px solid var(--border-default);
   padding: var(--space-5) 0;
+  scroll-margin-top: calc(var(--header-height) + var(--space-6));
+}
+
+/* Static/instance group titles, outline targets above each member list. */
+.member-group-heading {
+  font-size: 1.25rem;
+  margin: var(--space-8) 0 var(--space-3);
   scroll-margin-top: calc(var(--header-height) + var(--space-6));
 }
 

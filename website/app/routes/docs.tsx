@@ -1232,7 +1232,11 @@ function RightRail({
       {sections.map((section) => {
         const href = symbol ? `#${symbol.fragment}--${section}` : `#${section}`
         return (
-          <a key={section} href={href}>
+          <a
+            key={section}
+            href={href}
+            className={section.startsWith('members-') ? 'toc-subentry' : undefined}
+          >
             {section === 'module-guidance'
               ? locale === 'zh'
                 ? '阅读路径'
@@ -1248,7 +1252,11 @@ function RightRail({
                     ? referenceSectionLabel(
                         locale,
                         section,
-                        symbol.kind === 'type' || symbol.kind === 'interface'
+                        symbol.kind === 'type' ||
+                          symbol.kind === 'interface' ||
+                          // A class with static members titles its member section "Members".
+                          (section === 'members' &&
+                            sections.some((entry) => entry.startsWith('members-static-')))
                       )
                     : moduleReferenceSectionLabel(locale, section)}
           </a>
@@ -1335,6 +1343,10 @@ function referenceSections(
   )
   /** An authored enhancer renders its own installation section. */
   const hasInstalledCapabilities = Boolean(reference?.enhancers[symbol.name])
+  /** The member section, followed by one entry per static/instance group when statics exist. */
+  const memberSections = ownSurface
+    ? ['members', ...classMemberGroups(ownSurface.members).map(({ key }) => `members-${key}`)]
+    : []
   /** Audited pages derive their inventory from the reference doc alone. */
   if (symbolDoc)
     return [
@@ -1347,7 +1359,7 @@ function referenceSections(
         ? ['configuration']
         : []),
       ...(hasInstalledCapabilities ? ['installed'] : []),
-      ...(ownSurface ? ['members'] : []),
+      ...memberSections,
       ...(instances.length > 0 ? ['instance'] : []),
       ...(scenarios.length > 0 || symbolDoc.avoid.length > 0 ? ['scenarios'] : []),
       'related-apis',
@@ -1359,7 +1371,7 @@ function referenceSections(
     ...(hasInstalledCapabilities ? ['installed'] : []),
     ...(constantMembers(symbol).length > 0 ? ['values'] : []),
     ...(symbol.configuration.length > 0 || guide?.options.length ? ['configuration'] : []),
-    ...(ownSurface ? ['members'] : []),
+    ...memberSections,
     ...(instances.length > 0 ? ['instance'] : []),
     ...(symbol.errors.some(
       (error) => error.trim() && !error.startsWith('No documented errors are declared for ')
@@ -1921,6 +1933,52 @@ function InstalledCapabilities({
 }
 
 /**
+ * Member groups of a class that declares static members, in reading order. Each key is the suffix
+ * of the group's anchor (`<fragment>--members-<key>`) and of its outline section
+ * (`members-<key>`).
+ */
+const MEMBER_GROUPS = [
+  {
+    key: 'static-properties',
+    isStatic: true,
+    method: false,
+    en: 'Static properties',
+    zh: '静态属性'
+  },
+  { key: 'static-methods', isStatic: true, method: true, en: 'Static methods', zh: '静态方法' },
+  {
+    key: 'instance-properties',
+    isStatic: false,
+    method: false,
+    en: 'Instance properties',
+    zh: '实例属性'
+  },
+  { key: 'instance-methods', isStatic: false, method: true, en: 'Instance methods', zh: '实例方法' }
+] as const
+
+/** True when the declaration line carries `static`; the generator keeps modifiers in `signature`. */
+function isStaticMember(member: IApiMember): boolean {
+  return /^(?:(?:public|abstract|override|readonly|declare)\s+)*static\b/.test(member.signature)
+}
+
+/**
+ * Returns the non-empty member groups of a surface, or an empty list when it has no static member,
+ * so plain instance surfaces keep one flat list. Accessors count as properties.
+ */
+function classMemberGroups(members: readonly IApiMember[]) {
+  if (!members.some(isStaticMember)) return []
+  return MEMBER_GROUPS.flatMap((group) => {
+    /** Members in declaration order, kept with their surface index so entry ids stay stable. */
+    const entries = members.flatMap((member, index) =>
+      isStaticMember(member) === group.isStatic && (member.kind === 'method') === group.method
+        ? [{ member, index }]
+        : []
+    )
+    return entries.length > 0 ? [{ ...group, entries }] : []
+  })
+}
+
+/**
  * Renders every public instance method and property of one instance surface: a class, an
  * object-shaped type, or the result type a factory returns. For an audited library every sentence
  * comes from its reference (`memberDoc`); declaration comments are never shown in their place, so a
@@ -1983,10 +2041,20 @@ function ClassMemberReference({
   const sectionId = id ?? `${symbol.fragment}--members`
   /** Locale labels used by every member entry. */
   const label = (en: string, zh: string) => (locale === 'zh' ? zh : en)
+  /** Static and instance groups; empty when the surface has only instance members. */
+  const groups = classMemberGroups(members)
   return (
     <section className="section-block compact api-class-members" id={sectionId}>
-      <p className="eyebrow">{eyebrow ?? label('Instance capabilities', '实例能力')}</p>
-      <h2>{heading ?? label('Instance API', '实例 API')}</h2>
+      <p className="eyebrow">
+        {eyebrow ??
+          (groups.length > 0
+            ? label('Static and instance members', '静态与实例成员')
+            : label('Instance capabilities', '实例能力'))}
+      </p>
+      <h2>
+        {heading ??
+          (groups.length > 0 ? label('Members', '成员') : label('Instance API', '实例 API'))}
+      </h2>
       {guide ? (
         <div className="instance-guide">
           <ReferenceParagraphs library={api.library} locale={locale} text={guide.summary} />
@@ -2022,67 +2090,93 @@ function ClassMemberReference({
           ))}
         </p>
       ) : null}
+      {(groups.length > 0
+        ? groups
+        : [
+            {
+              key: '',
+              en: '',
+              zh: '',
+              entries: members.map((member, index) => ({ member, index }))
+            }
+          ]
+      ).map((group) => (
+        <Fragment key={group.key}>
+          {group.key ? (
+            <h3 className="member-group-heading" id={`${sectionId}-${group.key}`}>
+              {label(group.en, group.zh)}
+            </h3>
+          ) : null}
+          <div className="option-reference class-member-reference">
+            {group.entries.map(({ member, index }) => {
+              /** Reference doc for this member; overloads share it. */
+              const doc = memberDoc?.(member.name) ?? guide?.members[member.name]
+              /** Usage notes and the snippet render once, on the first overload within the group. */
+              const firstOverload =
+                group.entries.find((candidate) => candidate.member.name === member.name)?.index ===
+                index
+              /** Reference text, or the declaration comment only outside audited libraries. */
+              const description = firstOverload
+                ? (doc?.summary ?? (strict ? undefined : (member.description ?? undefined)))
+                : undefined
+              return (
+                <section
+                  className="option-entry class-member-entry"
+                  id={`${id ? `${id}-` : `${symbol.fragment}--member-`}${optionAnchor(member.name)}-${index + 1}`}
+                  key={`${member.signature}:${index}`}
+                >
+                  <div className="option-heading">
+                    <h3>
+                      <code>{member.name}</code>
+                    </h3>
+                    <span className="option-requirement">
+                      {isStaticMember(member)
+                        ? member.kind === 'method'
+                          ? label('Static method', '静态方法')
+                          : label('Static property', '静态属性')
+                        : member.kind === 'method'
+                          ? label('Method', '方法')
+                          : member.kind === 'property'
+                            ? label('Property', '属性')
+                            : member.kind}
+                    </span>
+                  </div>
+                  {description ? (
+                    <ReferenceParagraphs library={api.library} locale={locale} text={description} />
+                  ) : null}
+                  <CodeBlock
+                    code={withoutDocComments(member.signature)}
+                    signature
+                    label={label(`${member.name} signature`, `${member.name} 签名`)}
+                    locale={locale}
+                  />
+                  <ReferenceMemberDetails
+                    api={api}
+                    doc={doc}
+                    libraryApis={libraryApis}
+                    locale={locale}
+                    method={member.kind === 'method'}
+                    name={member.name}
+                    parameters={member.parameterDetails}
+                    parameterTypeDoc={parameterTypeDoc}
+                    resultType={member.returns}
+                    showUsage={firstOverload}
+                  />
+                  {firstOverload ? (
+                    <NestedFieldDocs
+                      entries={nestedDocs?.(member.name) ?? []}
+                      library={api.library}
+                      locale={locale}
+                      symbols={api.symbols}
+                    />
+                  ) : null}
+                </section>
+              )
+            })}
+          </div>
+        </Fragment>
+      ))}
       <div className="option-reference class-member-reference">
-        {members.map((member, index) => {
-          /** Reference doc for this member; overloads share it. */
-          const doc = memberDoc?.(member.name) ?? guide?.members[member.name]
-          /** Usage notes and the snippet render once, on the first overload. */
-          const firstOverload =
-            members.findIndex((candidate) => candidate.name === member.name) === index
-          /** Reference text, or the declaration comment only outside audited libraries. */
-          const description = firstOverload
-            ? (doc?.summary ?? (strict ? undefined : (member.description ?? undefined)))
-            : undefined
-          return (
-            <section
-              className="option-entry class-member-entry"
-              id={`${id ? `${id}-` : `${symbol.fragment}--member-`}${optionAnchor(member.name)}-${index + 1}`}
-              key={`${member.signature}:${index}`}
-            >
-              <div className="option-heading">
-                <h3>
-                  <code>{member.name}</code>
-                </h3>
-                <span className="option-requirement">
-                  {member.kind === 'method'
-                    ? label('Method', '方法')
-                    : member.kind === 'property'
-                      ? label('Property', '属性')
-                      : member.kind}
-                </span>
-              </div>
-              {description ? (
-                <ReferenceParagraphs library={api.library} locale={locale} text={description} />
-              ) : null}
-              <CodeBlock
-                code={withoutDocComments(member.signature)}
-                signature
-                label={label(`${member.name} signature`, `${member.name} 签名`)}
-                locale={locale}
-              />
-              <ReferenceMemberDetails
-                api={api}
-                doc={doc}
-                libraryApis={libraryApis}
-                locale={locale}
-                method={member.kind === 'method'}
-                name={member.name}
-                parameters={member.parameterDetails}
-                parameterTypeDoc={parameterTypeDoc}
-                resultType={member.returns}
-                showUsage={firstOverload}
-              />
-              {firstOverload ? (
-                <NestedFieldDocs
-                  entries={nestedDocs?.(member.name) ?? []}
-                  library={api.library}
-                  locale={locale}
-                  symbols={api.symbols}
-                />
-              ) : null}
-            </section>
-          )
-        })}
         {documentedOnly.map(([name, doc]) => (
           <section
             className="option-entry class-member-entry"
@@ -5342,6 +5436,9 @@ function referenceSectionLabel(locale: ILocale, section: string, type = false): 
     signature: ['Type signature', '类型签名'],
     'core-usage': ['Contract', '参数、返回与边界']
   }
+  /** Static/instance member groups share their labels with the group headings. */
+  const group = MEMBER_GROUPS.find(({ key }) => section === `members-${key}`)
+  if (group) return locale === 'zh' ? group.zh : group.en
   const label = labels[section]
   return label ? label[locale === 'zh' ? 1 : 0] : localizedSection(locale, section)
 }
