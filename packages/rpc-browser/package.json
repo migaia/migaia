@@ -13,7 +13,9 @@
     "dist",
     "schema",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -57,7 +59,7 @@
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
-    "fmt": "oxfmt src test vitest.config.ts",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
@@ -66,10 +68,6 @@
   "dependencies": {
     "@migaia/utils": "workspace:^"
   },
-  "peerDependencies": {
-    "@migaia/rpc-core": "workspace:*"
-  },
-  "peerDependenciesMeta": {},
   "devDependencies": {
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-core": "workspace:*",
@@ -83,6 +81,10 @@
     "vite": "8.1.1",
     "vitest": "^4.1.10"
   },
+  "peerDependencies": {
+    "@migaia/rpc-core": "workspace:*"
+  },
+  "peerDependenciesMeta": {},
   "engines": {
     "node": ">=18"
   }
