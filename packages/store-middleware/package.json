@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-middleware",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Store mutation policy and middleware pipeline.",
   "license": "MIT",
