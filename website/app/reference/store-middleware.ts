@@ -840,34 +840,46 @@ export const storeMiddlewareReference: ILibraryReference = {
       role: 'operation',
       optionCases: [
         {
-          title: t('Keep an earlier exception', '保留先前异常'),
+          title: t('Add context to a failed cart snapshot', '为购物车快照失败补充上下文'),
           problem: t(
-            'A more specific middleware error should retain the failure that triggered it. Pass cause; omission leaves no original cause.',
-            '更具体的中间件错误需要保留触发它的失败。传入 cause；省略时不附原始原因。'
+            'A cart snapshot fails inside an application capture function. Monitoring needs the cart context as well as the original failure to find the broken capture step. Keep that failure on cause rather than replacing it with only a new message.',
+            '应用捕获函数无法生成购物车快照。监控既需要购物车上下文，也需要原始失败来定位出错步骤。把原始失败放在 cause 上，避免只剩新消息。'
           ),
           example: `import { createStoreMiddlewareError, StoreMiddlewareErrorCode } from '@migaia/store-middleware'
-const cause = new TypeError('snapshot invalid')
-const error = createStoreMiddlewareError(StoreMiddlewareErrorCode.callbackFailed, 'capture failed', { cause })
-console.log(error.cause === cause)`,
+
+try {
+  await captureCartSnapshot()
+} catch (cause) {
+  const error = createStoreMiddlewareError(
+    StoreMiddlewareErrorCode.callbackFailed,
+    'Unable to capture the cart',
+    { cause }
+  )
+  reportToMonitoring(error)
+}`,
           result: t(
-            'Prints true; the original exception remains reachable.',
-            '输出 true；仍可找到原始异常。'
+            'Monitoring receives a cart-specific failure with the original snapshot error still reachable through cause.',
+            '监控收到购物车相关失败，仍可通过 cause 查看原始快照错误。'
           ),
           covers: ['cause']
         },
         {
-          title: t('Keep structured failure details', '保留结构化失败详情'),
+          title: t('Show the rejected cart field', '显示购物车中被拒绝的字段'),
           problem: t(
-            'An application can report a structured failure value instead of Error. cause retains that value without converting it to message text.',
-            '应用可能返回结构化失败值，而非 Error。cause 保留该值，无需转为消息文本。'
+            'The cart form validator returns a record naming the field and rejected quantity. The error view needs those values to highlight the input. Retain the validation record as the cause instead of flattening it into message text.',
+            '购物车表单校验器返回字段名与被拒绝数量的记录。错误界面需要这些值来标出输入框。把校验记录保留为 cause，避免将它压成消息文本。'
           ),
           example: `import { createStoreMiddlewareError, StoreMiddlewareErrorCode } from '@migaia/store-middleware'
-const cause = { field: 'quantity', value: -1 }
-const error = createStoreMiddlewareError(StoreMiddlewareErrorCode.invalidOption, 'invalid quantity', { cause })
-console.log(error.cause === cause)`,
+
+const error = createStoreMiddlewareError(
+  StoreMiddlewareErrorCode.invalidOption,
+  'Cart quantity is invalid',
+  { cause: validationFailure }
+)
+showCartError(error)`,
           result: t(
-            'Prints true; the details retain their identity.',
-            '输出 true；详情保留原有身份。'
+            'The cart shows an actionable error while its original field and rejected value remain available to the error handler.',
+            '购物车显示可处理的错误，错误处理器仍可取得原始字段与被拒绝的值。'
           ),
           covers: ['cause']
         }

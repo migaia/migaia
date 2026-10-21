@@ -3,193 +3,178 @@ import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 /** Keeps each localized explanation beside one complete public-entry example. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
-/** Complete option examples exercise the Store host rather than a generic PluginHost. */
+/** Application snippets keep host configuration separate from validation fixtures. */
 export const storeMiddlewareOptionExamples = {
-  state: `import { createRuntime } from '@migaia/reactive'
-import { createStoreMiddlewareHost, createMutationPolicy, createReduxDevToolsAdapter, type IReduxDevToolsMessage } from '@migaia/store-middleware'
-let state = { count: 0 }
-const runtime = createRuntime()
-const mutationPolicy = createMutationPolicy('actions-only')
+  state: `import { createStoreMiddlewareHost, createReduxDevToolsAdapter } from '@migaia/store-middleware'
+
 const host = createStoreMiddlewareHost({
   identity: { name: 'cart' },
-  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  execution: pluginExecution,
   pipeline: { mode: 'sync' },
-  runtime, mutationPolicy,
-  getState: () => state,
-  applyState: (next) => { state = next }
+  runtime,
+  getState: () => cart,
+  applyState: (next) => {
+    cart = next
+    renderCart(cart)
+  }
 })
-let receive: (message: IReduxDevToolsMessage) => void = () => {}
-await host.connectDevTools(createReduxDevToolsAdapter({
-  init: (_state: typeof state) => {},
-  send: (_action: unknown, _state: typeof state) => {},
-  subscribe: (listener) => { receive = listener; return () => {} }
-}, runtime))
-receive({ type: 'DISPATCH', payload: { type: 'JUMP_TO_STATE' }, state: '{"count":3}' })
-console.log(host.identity.name, host.pipelineMode, state.count)
-await host.dispose()`,
-  queue: `import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/testing'
-import { createStoreMiddlewareHost } from '@migaia/store-middleware'
-const scheduler = createManualScheduler()
+await host.connectDevTools(createReduxDevToolsAdapter(reduxConnection, runtime))`,
+  queue: `import { createStoreMiddlewareHost } from '@migaia/store-middleware'
+
 const host = createStoreMiddlewareHost({
-  runtime: createRuntime(), getState: () => ({ count: 0 }),
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  queueAdmissionTimeoutMs: 20, scheduler
+  runtime,
+  getState: readCart,
+  execution: pluginExecution,
+  queueAdmissionTimeoutMs: 1000,
+  scheduler: applicationScheduler
 })
-await host.use({ name: 'cart', install: () => ({ ready: true }) })
-console.log(host.identity.name, host.pipelineMode)
-await host.dispose()`,
-  diagnostic: `import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/testing'
-import { createStoreMiddlewareHost } from '@migaia/store-middleware'
-const scheduler = createManualScheduler()
-const failures: string[] = []
+try {
+  await host.use(discountPlugin)
+  showDiscountControls()
+} catch (error) {
+  showPluginError(error)
+}`,
+  diagnostic: `import { createStoreMiddlewareHost } from '@migaia/store-middleware'
+
 const host = createStoreMiddlewareHost({
-  runtime: createRuntime(), getState: () => ({ count: 0 }),
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  queueAdmissionDiagnosticMs: 10, scheduler,
-  diagnostic: () => { throw new Error('diagnostic unavailable') },
-  onDiagnosticFailure: (error) => { failures.push((error as Error).message) }
+  runtime,
+  getState: readCart,
+  execution: pluginExecution,
+  queueAdmissionDiagnosticMs: 100,
+  diagnostic: (event) => updatePluginStatus(event),
+  onDiagnosticFailure: (error) => reportToMonitoring(error)
 })
-let late = () => {}
-host.usePipeline((event, next) => { late = () => { next(event) } })
-host.recordState('cart/update', { count: 0 }, { count: 1 })
-late()
-console.log(failures)
-await host.dispose()`,
-  cleanup: `import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/testing'
-import { createStoreMiddlewareHost } from '@migaia/store-middleware'
-const scheduler = createManualScheduler()
-const started = Promise.withResolvers<void>()
-const release = Promise.withResolvers<void>()
+await host.use(discountPlugin)`,
+  cleanup: `import { createStoreMiddlewareHost } from '@migaia/store-middleware'
+
 const host = createStoreMiddlewareHost({
-  runtime: createRuntime(), getState: () => ({ count: 0 }),
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  disposeStepTimeoutMs: 10, scheduler
+  runtime,
+  getState: readCart,
+  execution: pluginExecution,
+  disposeStepTimeoutMs: 1000
 })
-await host.use({ name: 'slow', install: () => ({}), dispose: () => {
-  started.resolve(); return release.promise
-} })
-const closing = host.dispose()
-await started.promise
-scheduler.advance(11)
-const result = await closing
-console.log(result.cleanupComplete)
-release.resolve()
+await host.use(autosavePlugin)
+const result = await host.dispose()
+if (!result.cleanupComplete) showCleanupPending()
 await result.physicalCompletion`,
+  policy: `import { createStore } from '@migaia/store-light'
+import { createStoreMiddlewareHost, createMutationPolicy } from '@migaia/store-middleware'
+
+const mutationPolicy = createMutationPolicy('actions-only')
+const cart = createStore({ quantity: 1 }, { mutationPolicy })
+const host = createStoreMiddlewareHost({
+  runtime: cart.$runtime,
+  getState: () => ({ quantity: cart.quantity }),
+  execution: pluginExecution,
+  mutationPolicy
+})
+host.runAction('cart/setQuantity', () => { cart.quantity = 2 })
+renderCart(cart)`,
   binding: `import { createStore } from '@migaia/store-light'
 import { bindStoreMiddleware, createMutationPolicy } from '@migaia/store-middleware'
+
 const mutationPolicy = createMutationPolicy('actions-only')
-const store = createStore({ count: 0 }, { mutationPolicy })
-const host = bindStoreMiddleware(store, {
+const cart = createStore({ quantity: 1 }, { mutationPolicy })
+const host = bindStoreMiddleware(cart, {
   execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
   mutationPolicy
 })
-host.runAction('cart/set', () => { store.count = 2 })
-console.log(store.count)
-await host.dispose()
-store.$dispose()`,
+host.runAction('cart/setQuantity', () => { cart.quantity = 2 })
+renderCart(cart)`,
   capture: `import { createStore } from '@migaia/store-light'
 import { bindStoreMiddleware, loggerMiddleware } from '@migaia/store-middleware'
-const store = createStore({ count: 0, email: 'ada@example.com' })
-const host = bindStoreMiddleware(store, {
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+
+const cart = createStore({ quantity: 1, email: customerEmail })
+const host = bindStoreMiddleware(cart, {
+  execution: pluginExecution,
   actionPrefix: 'cart/',
   clone: (state) => ({ ...structuredClone(state), email: '[redacted]' })
 })
-const names: string[] = []
-let captured: unknown
-await host.use(loggerMiddleware((event, state) => {
-  captured = state
-  if (event.type === 'action' && event.phase === 'end') names.push(event.name)
-}))
-store.$runtime.runTracedAction('other/save', () => {})
-store.$runtime.runTracedAction('cart/save', () => {})
-console.log(names, (captured as { email: unknown }).email, store.email)
-await host.dispose()
-store.$dispose()`
+await host.use(loggerMiddleware((event, state) => sendToSupportPanel(event, state)))
+host.runAction('cart/setQuantity', () => { cart.quantity = 2 })
+renderCart(cart)`
 }
 
-/** Related option fields stay together in small, observable Store workflows. */
+/** Each case serves one application workflow and covers at most six option fields. */
 export const storeMiddlewareOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
   host: [
     {
-      title: t('Connect application state', '接入应用状态'),
+      title: t('Restore a cart from DevTools', '从 DevTools 恢复购物车状态'),
       problem: t(
-        'A custom state source needs a host for reads and DevTools replacements. runtime and getState are required; applyState enables replacements. Give diagnostics a name and share the mutation policy with guarded consumers. Store pipelines always run synchronously.',
-        '自定义状态来源需要宿主提供读取和 DevTools 状态替换。runtime 与 getState 必填；applyState 启用替换。为诊断命名，并与受保护的使用者共享写入策略。存储流水线始终同步运行。'
+        'A cart uses application-owned state rather than a Store. Support still needs to inspect it and replay a saved state. A read callback alone cannot apply a DevTools jump; supply the writer too, and render the replacement immediately through the synchronous host pipeline.',
+        '购物车使用应用自己的状态对象，没有采用 Store。支持人员仍需查看它并恢复保存的状态。只有读取器无法应用 DevTools 跳转；同时提供写入器，并通过同步宿主流水线立即显示替换后的状态。'
       ),
       example: storeMiddlewareOptionExamples.state,
       result: t(
-        'Prints cart sync 3; the replacement reaches the application state.',
-        '输出 cart sync 3；替换值已写入应用状态。'
+        'A DevTools state jump replaces the live cart and redraws the cart view. Diagnostics identify this host as cart.',
+        'DevTools 状态跳转会替换当前购物车并重绘视图，诊断信息以 cart 标识这个宿主。'
       ),
-      covers: [
-        'runtime',
-        'getState',
-        'applyState',
-        'mutationPolicy',
-        'identity',
-        'identity.name',
-        'execution',
-        'execution.mutationTimeoutMs',
-        'execution.pipelineDrainTimeoutMs',
-        'pipeline',
-        'pipeline.mode'
-      ]
+      covers: ['runtime', 'getState', 'applyState', 'identity', 'execution', 'pipeline']
     },
     {
-      title: t('Set an admission budget for interactive changes', '为交互式变更设置接纳预算'),
+      title: t('Keep a plugin toggle from waiting forever', '避免插件开关无限等待'),
       problem: t(
-        'An interactive host should reject a queued change that waits longer than 20 ms. Without queueAdmissionTimeoutMs, waiting is unlimited. This configures that budget and installs one immediately available plugin; it does not interrupt an install that already started.',
-        '交互式宿主需要拒绝排队超过 20 毫秒的变更。不设置 queueAdmissionTimeoutMs 时，等待没有上限。这里配置预算并安装一个可以立即开始的插件；预算不会中断已经开始的安装。'
+        'A checkout settings screen installs a discount plugin while another plugin change may be running. Unlimited queue waiting leaves its control busy indefinitely. Set a one-second admission budget and share the application scheduler so the control can report a delayed change on the same clock as the rest of the screen.',
+        '结账设置页安装优惠插件时，另一个插件变更可能还在执行。无限排队会让控件一直忙碌。设置一秒接纳预算，并复用应用调度器，控件便能按页面统一时钟报告等待过久的变更。'
       ),
       example: storeMiddlewareOptionExamples.queue,
       result: t(
-        'Prints DEFAULT sync; the immediately admitted plugin installs successfully. No queue timeout occurs in this run.',
-        '输出 DEFAULT sync；立即接纳的插件安装成功。本次运行没有发生排队超时。'
+        'An admitted discount plugin enables its controls. A change that waits too long reaches the error view instead of leaving the toggle busy.',
+        '被接纳的优惠插件会启用控件；等待过久的变更进入错误界面，开关不会一直显示忙碌。'
       ),
       covers: ['queueAdmissionTimeoutMs', 'scheduler']
     },
     {
-      title: t('Keep a failing diagnostic sink observable', '观察诊断接收方自身的失败'),
+      title: t('Explain slow plugin changes in the settings screen', '在设置页提示缓慢的插件变更'),
       problem: t(
-        'The diagnostic channel receives late next() calls and long queue waits. queueAdmissionDiagnosticMs changes the wait-warning threshold from 1000 ms to 10 ms without rejecting queued work. onDiagnosticFailure receives a failing diagnostic callback. This example triggers that same channel with a late next() call.',
-        '诊断通道接收迟到的 next() 调用和长时间排队提示。queueAdmissionDiagnosticMs 把等待提示阈值从 1000 毫秒改为 10 毫秒，不拒绝排队工作。onDiagnosticFailure 接收诊断回调自身的失败。这里用迟到的 next() 调用触发同一通道。'
+        'A checkout settings screen gathers diagnostics from its plugin host. It needs queue-wait hints earlier than the default threshold, and failures in its status widget must stay visible. Send host diagnostics to that widget and give the widget’s own failures a separate monitoring destination.',
+        '结账设置页集中显示插件宿主诊断。它需要比默认阈值更早显示排队提示，也不能丢失状态控件自身的失败。把宿主诊断交给状态区，再为状态区自身的失败设置独立监控出口。'
       ),
       example: storeMiddlewareOptionExamples.diagnostic,
       result: t(
-        "Prints ['diagnostic unavailable']; failure of the diagnostic callback reaches the configured receiver.",
-        "输出 ['diagnostic unavailable']；诊断回调的失败交给配置的接收方。"
+        'Long queue waits appear in the settings status view. A broken status callback is reported while plugin operations keep their own results.',
+        '长时间排队会显示在设置页状态区；状态回调损坏时会上报错误，插件操作仍保留自身结果。'
       ),
-      covers: ['queueAdmissionDiagnosticMs', 'diagnostic', 'onDiagnosticFailure', 'scheduler']
+      covers: ['queueAdmissionDiagnosticMs', 'diagnostic', 'onDiagnosticFailure']
     },
     {
-      title: t('Bound one slow cleanup step', '限制单个慢速清理步骤'),
+      title: t('Close the editor while autosave finishes', '关闭编辑器时等待自动保存收尾'),
       problem: t(
-        'A plugin disposer may keep waiting after its screen closes. disposeStepTimeoutMs limits the ordinary cleanup wait; the default is 5000 ms and false removes the limit. The underlying Promise remains owned until it settles.',
-        '页面关闭后，插件释放函数可能仍在等待。disposeStepTimeoutMs 限制普通清理等待；默认为 5000 毫秒，false 关闭限制。底层 Promise 仍被持有，直到它结算。'
+        'An autosave plugin may need more time to release its work after the editor closes. The screen should stop blocking after one second but still track physical completion. Set a cleanup-step budget and keep the returned completion Promise until the save cleanup really ends.',
+        '编辑器关闭后，自动保存插件可能还需要时间释放工作。页面应在一秒后停止阻塞，同时继续跟踪实际完成。设置单步清理预算，并保留返回的完成 Promise，直到保存清理真正结束。'
       ),
       example: storeMiddlewareOptionExamples.cleanup,
       result: t(
-        'Prints false while physical cleanup is pending; resolving release finishes physicalCompletion.',
-        '物理清理未完成时输出 false；放行后 physicalCompletion 完成。'
+        'The page can show cleanup pending after the ordinary wait ends, then remove that hint once physical cleanup completes.',
+        '普通等待结束后，页面可显示“正在清理”，实际清理完成后再移除提示。'
       ),
-      covers: ['disposeStepTimeoutMs', 'scheduler']
+      covers: ['disposeStepTimeoutMs']
+    },
+    {
+      title: t('Let a custom host update a guarded cart', '让自定义宿主更新受保护的购物车'),
+      problem: t(
+        'A cart permits writes only inside actions, but a custom host has its own mutation policy by default. Its action would not authorize the guarded cart. Give both the same policy object so the host action can update the quantity under the cart’s existing guard.',
+        '购物车只允许在动作内写入，自定义宿主默认却使用自己的写入策略，因此宿主动作不能授权这个购物车。让两者复用同一策略对象，宿主动作便能在现有守卫下更新数量。'
+      ),
+      example: storeMiddlewareOptionExamples.policy,
+      result: t(
+        'The quantity changes to two inside the host action and the cart view updates without relaxing the Store guard.',
+        '数量在宿主动作内变为二，购物车视图随之更新，无需放宽 Store 的写入守卫。'
+      ),
+      covers: ['mutationPolicy']
     }
   ],
   binding: [
     {
-      title: t('Share a strict Store policy', '共享严格的 Store 策略'),
+      title: t('Share the cart’s action guard with its binding', '让绑定复用购物车的动作守卫'),
       problem: t(
-        'A Store guarded by actions-only must use the exact same mutation policy as its binding. Otherwise host.runAction does not grant that Store permission. Required execution budgets bound plugin changes and draining.',
-        '采用 actions-only 守卫的 Store 必须与绑定使用同一个写入策略对象。否则 host.runAction 不会授予该 Store 写入许可。必填执行预算限制插件变更和排空。'
+        'A diagnostic binding also runs cart commands. If it uses a different policy object, those commands cannot write an actions-only Store. Share the Store policy when binding so quantity changes remain inside the same action boundary.',
+        '诊断绑定也需要执行购物车命令。使用不同策略对象时，这些命令无法写入只允许动作写入的 Store。绑定时复用 Store 策略，数量变更便处在同一个动作边界内。'
       ),
       example: storeMiddlewareOptionExamples.binding,
       result: t(
-        'Prints 2; the shared policy permits this action.',
-        '输出 2；共享策略允许这次动作。'
+        'The cart view shows quantity two after the binding action, with the existing write guard still active.',
+        '绑定动作结束后，购物车显示数量二，原有写入守卫仍然生效。'
       ),
       covers: [
         'execution',
@@ -199,15 +184,15 @@ export const storeMiddlewareOptionCases: Readonly<Record<string, readonly IOptio
       ]
     },
     {
-      title: t('Filter actions and redact snapshots', '筛选动作并脱敏快照'),
+      title: t('Show cart diagnostics without customer email', '显示购物车诊断时隐藏客户邮箱'),
       problem: t(
-        'A support panel needs cart actions and snapshots without email addresses. Without actionPrefix, all runtime actions are forwarded; default cloning does not redact. clone changes diagnostic snapshots, while actionPrefix filters action names only.',
-        '支持面板需要购物车动作和隐藏邮箱的快照。不设 actionPrefix 时转发全部运行时动作；默认克隆不会脱敏。clone 修改诊断快照，actionPrefix 只筛选动作名。'
+        'A support panel needs cart action names and snapshots but must not receive the customer email. Default copying does not redact it, and forwarding every runtime action adds noise. Filter for cart actions and project the snapshot before sending it to support.',
+        '支持面板需要购物车动作名与快照，但不能收到客户邮箱。默认复制不会脱敏，转发全部运行时动作也会增加噪声。只筛选购物车动作，并在交给支持面板前处理快照。'
       ),
       example: storeMiddlewareOptionExamples.capture,
       result: t(
-        "Prints ['cart/save'], [redacted], and the live ada@example.com address.",
-        "输出 ['cart/save']、[redacted] 和存活存储中的 ada@example.com。"
+        'The support panel receives cart actions with redacted email, while the live cart keeps the original address and updated quantity.',
+        '支持面板收到购物车动作及已脱敏邮箱，当前购物车仍保留原始邮箱与更新后的数量。'
       ),
       covers: ['actionPrefix', 'clone']
     }
