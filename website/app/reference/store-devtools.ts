@@ -15,6 +15,39 @@ const setup = `import { createStore } from '@migaia/store-light'
 import { createStoreDevTools } from '@migaia/store-devtools'
 const store = createStore({ count: 0 })
 const tools = createStoreDevTools(store)`
+/** Bounded diagnostic history and action queues use the application's timestamp source. */
+const capacityOptionsExample = `import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+const store = createStore({ count: 0 })
+const tools = createStoreDevTools(store, { maxHistory: 2, maxTrace: 1, now: () => 100 })
+tools.record('first')
+tools.record('second')
+tools.recordAction({ name: 'save' })
+tools.recordAction({ name: 'submit' })
+console.log(tools.history.map((entry) => entry.label))
+console.log(tools.actions.map((entry) => [entry.name, entry.timestamp]))
+tools.dispose()
+store.$dispose()`
+/** Only diagnostic snapshots receive the application's redaction policy. */
+const cloneOptionsExample = `import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+const store = createStore({ name: 'Ada', email: 'ada@example.com' })
+const tools = createStoreDevTools(store, {
+  clone: (state) => ({ ...structuredClone(state), email: '[redacted]' })
+})
+console.log(tools.history[0]!.state.email, store.email)
+tools.dispose()
+store.$dispose()`
+/** Manual action recording remains available without a runtime trace subscription. */
+const captureOptionsExample = `import { createStore } from '@migaia/store-light'
+import { createStoreDevTools } from '@migaia/store-devtools'
+const store = createStore({ count: 0 })
+const tools = createStoreDevTools(store, { captureRuntimeTrace: false })
+store.$runtime.runTracedAction('increment', () => { store.count++ })
+tools.recordAction({ name: 'save' })
+console.log(tools.trace.length, tools.actions.map((entry) => entry.name))
+tools.dispose()
+store.$dispose()`
 /** Complete session example records, replays and releases only the diagnostic subscription. */
 const session = `${setup}\nconst anchor = tools.record('before-change')\nstore.$batch(draft => { draft.count++ })\ntools.jumpTo(anchor.id)\nconsole.log(tools.history, tools.actions, tools.trace)\ntools.dispose()\nstore.$dispose()`
 /** Public runtime graph handles used without a diagnostic session. */
@@ -173,6 +206,47 @@ const types: Record<string, ITypeDoc> = {
       'Queue limits, runtime capture, clock and snapshot policy fixed when a session is created.',
       '会话创建时固定的队列上限、运行时捕获、时钟与快照策略。'
     ),
+    optionCases: [
+      {
+        title: t('Keep a short, repeatable capture', '保留短而可重复的诊断记录'),
+        problem: t(
+          'A small panel needs only the latest two snapshots and the latest action. Defaults retain 100 snapshots and 1000 actions. Set both limits independently and fix now() when comparing captures from repeated runs.',
+          '小面板只需要最近两份快照和最后一个动作。默认会保留 100 份快照和 1000 个动作。分别设置两个上限；需要比较重复运行的结果时，用 now() 固定时间戳。'
+        ),
+        example: capacityOptionsExample,
+        result: t(
+          "History contains first and second; actions contains only ['submit', 100].",
+          "历史只保留 first、second；动作只保留 ['submit', 100]。"
+        ),
+        covers: ['maxHistory', 'maxTrace', 'now']
+      },
+      {
+        title: t('Hide email in diagnostic snapshots', '隐藏诊断快照中的邮箱'),
+        problem: t(
+          'Support snapshots should hide email addresses. Default cloning does not redact fields. A custom clone changes the diagnostic copy before capture. Replay also uses this clone, so replayed values follow the same redaction policy.',
+          '支持面板的快照需要隐藏邮箱。默认克隆不会脱敏。自定义 clone 在捕获前修改诊断副本。回放也使用同一个 clone，因此回放值同样遵循此脱敏策略。'
+        ),
+        example: cloneOptionsExample,
+        result: t(
+          'The snapshot prints [redacted]; the live store still prints ada@example.com.',
+          '快照输出 [redacted]；存活的存储仍输出 ada@example.com。'
+        ),
+        covers: ['clone']
+      },
+      {
+        title: t('Record selected actions only', '只记录选中的动作'),
+        problem: t(
+          'A panel needs selected application actions rather than all events from the shared runtime. Runtime capture is on by default and includes other stores using that runtime. Disable it, then add desired actions with recordAction().',
+          '面板只需要应用选中的动作，不需要共享运行时的全部事件。默认开启的运行时捕获会包含共用该运行时的其它存储。关闭它后，用 recordAction() 添加需要的动作。'
+        ),
+        example: captureOptionsExample,
+        result: t(
+          'trace is empty; actions contains only save, without the automatic increment action.',
+          'trace 为空；actions 只包含 save，没有自动捕获的 increment 动作。'
+        ),
+        covers: ['captureRuntimeTrace']
+      }
+    ],
     members: {
       maxHistory: {
         ...p(
@@ -195,6 +269,11 @@ const types: Record<string, ITypeDoc> = {
         )
       },
       captureRuntimeTrace: {
+        whenToUse: t(
+          'Keep the default true to inspect events and completed actions across the shared runtime. Choose false for selected manual actions or to avoid that subscription. Store history and recordAction() remain available.',
+          '需要查看共享运行时的事件和已完成动作时保持默认 true。只需要选中的手动动作，或不需要该订阅时选 false。存储历史和 recordAction() 仍可使用。'
+        ),
+        example: captureOptionsExample,
         ...p(
           'False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.',
           '为假时跳过运行时订阅及自动完成动作捕获，仍可手动记录动作。'
@@ -215,6 +294,11 @@ const types: Record<string, ITypeDoc> = {
         }
       },
       now: {
+        whenToUse: t(
+          'Supply your clock when timestamps must match another log or remain fixed across repeated captures. Snapshots and action records call it. Without it, timestamps use Date.now().',
+          '时间戳需要匹配其它日志，或需要固定时间以便重复比较时，传入应用时钟。快照和动作记录都会调用它。不设置则使用 Date.now()。'
+        ),
+        example: capacityOptionsExample,
         ...p(
           'Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.',
           '同步无参数时钟，返回应用使用的毫秒时间戳；准备期未归属失败附 `CALLBACK_FAILED`，手动捕获抛出，自动捕获经运行时报告。'
@@ -225,6 +309,11 @@ const types: Record<string, ITypeDoc> = {
         )
       },
       clone: {
+        whenToUse: t(
+          'Set it to redact snapshots or choose how special values are copied. Return a record synchronously; keep required fields if replay is needed. Without it, diagnostic cloning copies values best-effort without redaction.',
+          '需要对快照脱敏，或指定特殊值如何复制时设置。同步返回记录对象；需要回放时保留必需字段。不设置则尽力克隆诊断数据，不做脱敏。'
+        ),
+        example: cloneOptionsExample,
         ...p(
           'Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot and replay cloning classify unowned failures as CALLBACK_FAILED; automatic capture reports them, while manual record and replay throw. Store hydration errors retain their own path. Apply redaction here.',
           '同步 `(state)` 接收 `store.$plain()` 或保留的回放快照并返回诊断副本；快照与回放克隆的未归属失败附 `CALLBACK_FAILED`，自动捕获报告，手动记录与回放抛出。Store 注水错误仍保留自身传播路径，可在此回调脱敏。'
@@ -454,8 +543,46 @@ const symbols: Record<string, ISymbolDoc> = {
       '构造带本包来源与所选语义错误码的原生 `Error`；消息由应用提供，可保留原始原因，不重写堆栈，也不改变原生类型。'
     ),
     params: errorParams,
+    optionCases: [
+      {
+        title: t('Keep the snapshot exception', '保留快照异常'),
+        problem: t(
+          'Add an operation-specific explanation without losing the original exception. Pass cause to preserve it; otherwise the new error has no cause property.',
+          '添加具体操作的失败说明，同时保留原始异常。传入 cause 可保留它；否则新错误没有 cause 属性。'
+        ),
+        example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
+const cause = new TypeError('snapshot invalid')
+const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, 'capture failed', { cause })
+console.log(error.cause === cause)`,
+        result: t(
+          'Prints true; the original TypeError remains reachable.',
+          '输出 true；仍能找到原始 TypeError。'
+        ),
+        covers: ['cause']
+      },
+      {
+        title: t('Keep structured capture details', '保留结构化捕获详情'),
+        problem: t(
+          'An application may report a details object instead of throwing Error. cause accepts this value directly, so the caller does not need to parse the error message.',
+          '应用可能返回详情对象，而非抛出 Error。cause 可以直接接收这个值，调用方无需解析错误消息。'
+        ),
+        example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
+const cause = { operation: 'record', recordId: 'draft-7' }
+const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, 'capture failed', { cause })
+console.log(error.cause === cause)`,
+        result: t(
+          'Prints true; cause is the original details object.',
+          '输出 true；cause 是原始详情对象。'
+        ),
+        covers: ['cause']
+      }
+    ],
     optionDocs: {
       cause: {
+        example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
+const cause = new TypeError('snapshot invalid')
+const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, 'capture failed', { cause })
+console.log(error.cause === cause)`,
         ...p(
           'Original application failure preserved by identity on Error.cause when supplied and not undefined.',
           '提供且不为 `undefined` 时按原始身份保存在错误原因上的应用失败值。'
