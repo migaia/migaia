@@ -4,7 +4,14 @@
  * field-mode-constants.ts, resource-state-constants.ts, error-code.ts), README and USEGUIDE on
  * 2026-10-18.
  */
-import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type {
+  ICode,
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  IText,
+  ITypeDoc
+} from './contract.js'
 import { storeLightCases } from './store-light-cases.js'
 
 /** Builds one bilingual text. */
@@ -257,6 +264,173 @@ const resourceOptionFields: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** Store options expose async action diagnostics on an isolated runtime. */
+const storeDiagnosticsExample = `import { createStore } from '@migaia/store-light'
+import { createRuntime } from '@migaia/reactive'
+
+const warnings: unknown[] = []
+const runtime = createRuntime({ onError: (error) => { warnings.push(error) } })
+const cart = createStore({
+  count: 0,
+  async refresh() { this.count += 1; await Promise.resolve() }
+}, { runtime, debugName: 'Cart', warnAsyncActions: true })
+await cart.refresh()
+await cart.refresh()
+console.log(cart.count, warnings.length)
+await cart.$dispose()`
+/** Strict mutation policy admits store actions and refuses an unscoped direct assignment. */
+const storeMutationExample = `import { createStore } from '@migaia/store-light'
+import { createMutationPolicy } from '@migaia/store-middleware'
+
+const cart = createStore({ count: 0, increment() { this.count += 1 } }, {
+  mutationPolicy: createMutationPolicy('actions-only')
+})
+try { cart.count = 5 }
+catch (error) { console.log((error as { code: string }).code) }
+cart.increment()
+console.log(cart.count)
+await cart.$dispose()`
+/** A manual clock makes the cache retention period visible without wall-clock waiting. */
+const resourceCacheExample = `import { createStoreResource } from '@migaia/store-light'
+import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/testing'
+
+const runtime = createRuntime()
+const scheduler = createManualScheduler()
+const released: string[] = []
+const profile = createStoreResource(() => ({ name: 'Ada' }), {
+  runtime, scheduler, keepAliveMs: 100,
+  dispose: (value) => { released.push(value.name) }
+})
+const release = profile.retainResource()
+try { profile.read() } catch (pending) {
+  if (!(pending instanceof Promise)) throw pending
+  await pending
+}
+console.log(profile.read().name)
+release()
+scheduler.advance(99)
+console.log(released.length)
+scheduler.advance(1)
+console.log(released)
+profile.forceDispose()
+await profile.whenTerminal()`
+/** Resource reporting and logical termination remain observable when value cleanup fails. */
+const resourceFailureExample = `import { createStoreResource } from '@migaia/store-light'
+
+const phases: string[] = []
+let terminal = false
+const profile = createStoreResource(() => ({ name: 'Ada' }), {
+  dispose: () => { throw new Error('profile close failed') },
+  onError: (_error, phase) => { phases.push(phase) },
+  onTerminal: () => { terminal = true }
+})
+const release = profile.retainResource()
+try { profile.read() } catch (pending) {
+  if (!(pending instanceof Promise)) throw pending
+  await pending
+}
+profile.forceDispose()
+release()
+await profile.whenTerminal()
+console.log(phases, terminal)`
+/** Creation options group diagnostic choices separately from write admission. */
+const storeOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Name a request store and observe async actions', '给请求状态命名并观察异步动作'),
+    problem: t(
+      'A request needs its own graph, and its refresh method returns a Promise. runtime isolates that graph, debugName labels internal nodes, and warnAsyncActions reports the first async action boundary. Without that flag there is no warning; writes after await still need their own batch.',
+      '请求需要独立的依赖图，刷新方法还会返回 Promise。runtime 隔离依赖图，debugName 为内部节点命名，warnAsyncActions 上报首次异步动作边界。省略该开关时没有提示；await 后的写入仍需自行批量更新。'
+    ),
+    example: storeDiagnosticsExample,
+    result: t(
+      'Two refresh calls set count to 2 and produce one warning.',
+      '两次刷新后 count 为 2，共产生一条提示。'
+    ),
+    covers: ['runtime', 'debugName', 'warnAsyncActions']
+  },
+  {
+    title: t('Require writes to go through actions', '要求写入经过动作'),
+    problem: t(
+      'A cart should only change through its methods. Without mutationPolicy direct assignment is allowed. The actions-only policy rejects that assignment while the increment action remains allowed.',
+      '购物车应只通过自身方法更新。省略 mutationPolicy 时可以直接赋值。actions-only 策略拒绝直接赋值，但允许 increment 动作修改。'
+    ),
+    example: storeMutationExample,
+    result: t(
+      'The direct write reports ACTION_SCOPE_REQUIRED. increment() then sets count to 1.',
+      '直接写入报 ACTION_SCOPE_REQUIRED；随后 increment() 把 count 改为 1。'
+    ),
+    covers: ['mutationPolicy']
+  }
+]
+/** Resource configuration keeps cache timing and failure cleanup understandable independently. */
+const resourceOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Keep a profile briefly after the view leaves', '视图离开后短暂保留资料'),
+    problem: t(
+      'A profile panel can reopen shortly after closing. keepAliveMs retains its loaded value after the last holder releases it; zero would evict immediately and the default waits 1000 ms. scheduler supplies this resource’s clock, runtime owns deferred work, and dispose closes the cached object when it is evicted.',
+      '资料面板关闭后可能很快再次打开。keepAliveMs 在最后一个持有者释放后暂存已加载值；零会立即逐出，默认等待 1000 毫秒。scheduler 提供该资源的时钟，runtime 负责延后工作，dispose 在逐出时关闭缓存对象。'
+    ),
+    example: resourceCacheExample,
+    result: t(
+      'It prints Ada, then 0 at 99 ms, then ["Ada"] at 100 ms.',
+      '先输出 Ada；99 毫秒时输出 0，100 毫秒时输出 ["Ada"]。'
+    ),
+    covers: ['runtime', 'scheduler', 'keepAliveMs', 'dispose']
+  },
+  {
+    title: t('Report failed cleanup and observe termination', '上报清理失败并观察终止'),
+    problem: t(
+      'A loaded object has a custom close operation that can fail. dispose supplies that cleanup, onError captures its dispose phase, and onTerminal marks logical termination. Without onError failures go to the runtime reporter. Without onTerminal no extra terminal callback runs; await whenTerminal() for physical completion.',
+      '已加载对象有可能失败的自定义关闭操作。dispose 提供清理，onError 接收 dispose 阶段，onTerminal 标记逻辑终止。省略 onError 时失败交给运行时上报；省略 onTerminal 时不调用额外终态回调。物理完成仍需等待 whenTerminal()。'
+    ),
+    example: resourceFailureExample,
+    result: t(
+      'Cleanup reports ["dispose"], the terminal flag is true, and whenTerminal() resolves.',
+      '清理上报 ["dispose"]，终态标志为 true，whenTerminal() 成功完成。'
+    ),
+    covers: ['dispose', 'onError', 'onTerminal']
+  }
+]
+/** Both native helpers keep caller failures on cause while preserving their own runtime class. */
+const errorOptionCases = (native: 'Error' | 'TypeError'): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Keep the original field failure', '保留原始字段失败'),
+    problem: t(
+      'A custom field builder adds context to a failure. A new message alone loses the original object; cause keeps it reachable for diagnostics. Omission creates no explicit cause.',
+      '自定义字段构建器需要为失败添加上下文。仅有新消息会丢失原始对象；cause 保留它供诊断使用。省略时不附加显式原因。'
+    ),
+    example: `import { createStoreLight${native}, StoreLightErrorCode } from '@migaia/store-light'
+
+const cause = new Error('field unavailable')
+const error = createStoreLight${native}(StoreLightErrorCode.invalidOption, 'Could not create field', { cause })
+console.log(error instanceof ${native}, error.cause === cause)`,
+    result: t(
+      'Both the native-class check and cause identity check print true.',
+      '原生类别检查和原因身份检查都输出 true。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Retain several initialization failures', '保留多个初始化失败'),
+    problem: t(
+      'A field setup and its cleanup both fail. Keeping their AggregateError as cause preserves both objects under the new contextual error.',
+      '字段准备和随后的清理都失败。把两者的 AggregateError 作为 cause，可在新上下文错误下保留两个原始对象。'
+    ),
+    example: `import { createStoreLight${native}, StoreLightErrorCode } from '@migaia/store-light'
+
+const failures = [new Error('setup failed'), new Error('cleanup failed')]
+const cause = new AggregateError(failures, 'field initialization failed')
+const error = createStoreLight${native}(StoreLightErrorCode.initAndCleanupFailed, 'Could not initialize field', { cause })
+console.log(error.cause === cause, cause.errors.length)`,
+    result: t(
+      'The cause identity check is true and the group retains two failures.',
+      '原因身份检查为 true，聚合错误保留两个失败。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Reference of `@migaia/store-light`. */
 export const storeLightReference: ILibraryReference = {
   modules: {
@@ -459,6 +633,7 @@ scope.dispose()`
       example: `if (error.code === StoreLightErrorCode.storeNotReady) await storeReady(store)`
     },
     createStoreLightError: {
+      optionCases: errorOptionCases('Error'),
       role: 'operation',
       optionDocs: {
         cause: {
@@ -501,6 +676,7 @@ scope.dispose()`
       example: `throw createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'keepAliveMs must be finite')`
     },
     createStoreLightTypeError: {
+      optionCases: errorOptionCases('TypeError'),
       role: 'operation',
       optionDocs: {
         cause: {
@@ -568,6 +744,7 @@ scope.dispose()`
       members: storeMembers
     },
     ICreateStoreOptions: {
+      optionCases: storeOptionCases,
       summary: t(
         'Options of `createStore` / `createAsyncStore`.',
         '`createStore` / `createAsyncStore` 的创建选项：运行时、名称与写入策略。'
@@ -1029,7 +1206,34 @@ scope.dispose()`,
         'Options of `createStoreResource()`.',
         '`createStoreResource()` 的选项：缓存、清理与上报。'
       ),
-      members: resourceOptionFields
+      optionCases: resourceOptionCases,
+      members: {
+        ...resourceOptionFields,
+        dispose: {
+          ...resourceOptionFields.dispose!,
+          whenToUse: t(
+            'Supply it for loaded objects or functions with a cleanup method other than $dispose. It can return a promise; whenTerminal() waits for physical completion. Omit it to use the value’s $dispose method when present.',
+            '加载对象或函数提供了 $dispose 以外的清理方法时设置。可以返回 Promise；whenTerminal() 等待物理完成。省略时使用值自带的 $dispose（若有）。'
+          ),
+          example: resourceCacheExample
+        },
+        onError: {
+          ...resourceOptionFields.onError!,
+          whenToUse: t(
+            'Set it when a page needs its own load, dispose or listener failure channel. The phase tells which operation failed. Without it, failures go to the runtime reporter.',
+            '页面需要独立接收 load、dispose 或 listener 失败时设置。phase 表示失败发生在哪个操作。省略时交给运行时上报。'
+          ),
+          example: resourceFailureExample
+        },
+        onTerminal: {
+          ...resourceOptionFields.onTerminal!,
+          whenToUse: t(
+            'Set it to remove a resource from an application registry when its logical lifetime ends. It runs once; asynchronous value cleanup can still be pending. Omit it when no terminal notification is needed, and await whenTerminal() for physical completion.',
+            '逻辑生命周期结束时需要从应用登记表移除资源，就设置此回调。它只执行一次，值的异步清理可能仍未完成。不需要终态通知时省略；物理完成使用 whenTerminal() 等待。'
+          ),
+          example: resourceFailureExample
+        }
+      }
     },
     IStoreResourceConfig: {
       summary: t(
