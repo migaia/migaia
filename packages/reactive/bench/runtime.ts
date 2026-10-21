@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { cpus, loadavg } from 'node:os'
 import { PerformanceObserver } from 'node:perf_hooks'
+import { Session } from 'node:inspector'
+import { writeHeapSnapshot } from 'node:v8'
 /** Each invocation uses immutable dist capsules with no primary-checkout resolution. */
 const [mode, left, right, output, selection = 'all'] = process.argv.slice(2)
 /** Collection starts before module load and warmup, then drains twice before final output. */
@@ -136,8 +138,503 @@ function fixture(api: any, scenario: string, instrumented: boolean): any {
     }
   }
 }
+
+/** A phase-zero fixture keeps observable work identical between counting and timing rounds. */
+type IEdgeFixture = {
+  update: (next: number) => void
+  inspect: (operations: number, last: number) => Record<string, unknown>
+  dispose: () => void
+}
+
+/** Classifies fixture failures without exposing credential-like values in diagnostic text. */
+function edgeFailure(error: unknown): Record<string, unknown> {
+  /** Package diagnostics are optional on native assertion errors. */
+  const failure = error as any
+  return {
+    source: failure?.source ?? null,
+    code: failure?.code ?? null,
+    name: failure?.name ?? null,
+    reason: failure?.reason ?? null,
+    message: String(failure?.message ?? error).replace(
+      /(?:token|secret|password)=[^\s]+/gi,
+      '<REDACTED>'
+    )
+  }
+}
+
+/** Builds only supported public graph operations; counters never run in timing callbacks. */
+function edgeFixture(
+  reactive: any,
+  storeApi: any,
+  scenario: string,
+  instrumented: boolean
+): IEdgeFixture {
+  /** Runtime reports invalidate evidence rather than disappearing into the default reporter. */
+  const errors: unknown[] = []
+  /** Each fixture owns an isolated runtime, including lifecycle and subscription cleanup. */
+  const runtime = reactive.createRuntime({ onError: (error: unknown) => errors.push(error) })
+  /** Scenario width is also the number of nodes created per lifecycle operation. */
+  const count = Number(scenario.split(':')[1] ?? 1)
+  /** Listener order is retained completely in the separate evidence round. */
+  const sequence: number[] = []
+  /** Only evidence callbacks increment listener work. */
+  let calls = 0
+  /** Only evidence computed callbacks increment derivation work. */
+  let derivations = 0
+  /** Only the evidence update wrapper increments the measured entry-point count. */
+  let executions = 0
+  /** Final observed result prevents dead-code elimination in both kinds of round. */
+  let value = 0
+  /** Persistent graph nodes are released by the fixture after each sample. */
+  const owned: any[] = []
+  /** Effects are released before their sources to avoid terminal-source notifications. */
+  const effects: any[] = []
+  /** Lifecycle evidence retains one terminal pair for post-timing disposal assertions. */
+  let terminal: any[] = []
+  /** Store lifecycle belongs to this fixture and is never shared between samples. */
+  let store: any
+  /** The expected listener fanout is fixed by graph construction. */
+  let listenersPerOperation = 1
+  /** The expected derivation count excludes initial graph materialization. */
+  let derivationsPerOperation = 0
+  /** Scenario updates never include assertions or evidence serialization. */
+  let operation: (next: number) => void
+  /** Expected values are checked after the measured interval. */
+  let expected: (last: number) => number = (last) => last
+  /** One observer records its output through the same assignment in both rounds. */
+  const listen = (read: () => number, index: number): any => {
+    /** Select counting once at construction, outside the hot callback. */
+    const effect = runtime.effect(
+      instrumented
+        ? () => {
+            value = read()
+            calls++
+            sequence.push(index)
+          }
+        : () => {
+            value = read()
+          }
+    )
+    effects.push(effect)
+    return effect
+  }
+  /** Derived reads share the same user function without a counter in timing rounds. */
+  const derive = (read: () => number): any => {
+    /** Ownership includes intermediates in deep and diamond graphs. */
+    const node = runtime.computed(
+      instrumented
+        ? () => {
+            derivations++
+            return read()
+          }
+        : read
+    )
+    owned.push(node)
+    return node
+  }
+  if (scenario.startsWith('lifecycle:')) {
+    listenersPerOperation = count
+    expected = (last) => last + count - 1
+    operation = (next) => {
+      /** One operation includes construction and disposal of the complete requested graph. */
+      const signals = Array.from({ length: count }, (_, index) => runtime.signal(next + index))
+      /** Local observers cannot escape beyond disposal except for the final terminal assertion. */
+      const observers = signals.map((signal, index) =>
+        runtime.effect(
+          instrumented
+            ? () => {
+                value = signal.value
+                calls++
+                sequence.push(index)
+              }
+            : () => {
+                value = signal.value
+              }
+        )
+      )
+      for (const observer of observers) observer.dispose()
+      for (const signal of signals) signal.dispose()
+      terminal = [signals[count - 1], observers[count - 1]]
+    }
+  } else if (scenario.startsWith('store-sub:')) {
+    store = storeApi.createAtomStore(runtime)
+    /** Atom materialization is outside the interval measuring subscription establishment/release. */
+    const definitions = Array.from({ length: count }, () => storeApi.atomDef(0))
+    for (const definition of definitions) store.get(definition)
+    listenersPerOperation = 0
+    expected = () => 0
+    /** No store writes occur: subscription listeners correctly execute zero times. */
+    const listener = instrumented
+      ? () => {
+          calls++
+          sequence.push(0)
+        }
+      : () => undefined
+    operation = () => {
+      /** Each unsubscribe belongs to the matching newly established static observer. */
+      const stops = definitions.map((definition) => store.sub(definition, listener))
+      for (const stop of stops) stop()
+    }
+  } else {
+    /** Fan-in updates all inputs within one batch; other graphs share one writable source. */
+    const signals = Array.from({ length: scenario.startsWith('fanin:') ? count : 1 }, () =>
+      runtime.signal(0)
+    )
+    owned.push(...signals)
+    if (scenario.startsWith('fanout:')) {
+      listenersPerOperation = count
+      for (let i = 0; i < count; i++) listen(() => signals[0].value, i)
+    } else if (scenario.startsWith('fanin:')) {
+      /** Exactly one derived node owns the wide input dependency set. */
+      const sink = derive(() => signals.reduce((sum, signal) => sum + signal.value, 0))
+      listen(() => sink.value, 0)
+      derivationsPerOperation = 1
+      expected = (last) => last * count
+    } else if (scenario === 'conditional') {
+      /** Switching parity changes one data dependency while preserving the gate dependency. */
+      const alternate = [runtime.signal(10), runtime.signal(20)]
+      owned.push(...alternate)
+      /** Repeated gate reads deliberately exercise duplicate dependency tracking. */
+      const sink = derive(() => alternate[signals[0].value % 2].value + signals[0].value)
+      listen(() => sink.value, 0)
+      derivationsPerOperation = 1
+      expected = (last) => last + (last % 2 ? 20 : 10)
+    } else if (scenario.startsWith('deep:')) {
+      /** Capture each predecessor before moving the tail to avoid a self-referential closure. */
+      let tail = signals[0]
+      for (let i = 0; i < count; i++) {
+        /** Each layer adds one to the single source value. */
+        const previous = tail
+        tail = derive(() => previous.value + 1)
+      }
+      listen(() => tail.value, 0)
+      derivationsPerOperation = count
+      expected = (last) => last + count
+    } else if (scenario === 'diamond') {
+      /** Both arms feed one join, which must derive once per update. */
+      const first = derive(() => signals[0].value + 1)
+      /** A distinct second arm preserves the diamond topology. */
+      const second = derive(() => signals[0].value + 2)
+      /** The join consumes both updated arms before notifying the single listener. */
+      const sink = derive(() => first.value + second.value)
+      listen(() => sink.value, 0)
+      derivationsPerOperation = 3
+      expected = (last) => last * 2 + 3
+    } else {
+      assert.equal(scenario, 'single')
+      listen(() => signals[0].value, 0)
+    }
+    operation = scenario.startsWith('fanin:')
+      ? (next) =>
+          runtime.batch(() => {
+            for (const signal of signals) signal.value = next
+          })
+      : (next) => {
+          signals[0].value = next
+          runtime.flush()
+        }
+  }
+  // Initial materialization is setup rather than a measured update.
+  calls = 0
+  derivations = 0
+  sequence.length = 0
+  return {
+    update: instrumented
+      ? (next) => {
+          executions++
+          operation(next)
+        }
+      : operation,
+    inspect(operations, last) {
+      assert.equal(errors.length, 0, JSON.stringify(errors.map(edgeFailure)))
+      assert.equal(value, expected(last))
+      for (const node of terminal) assert.equal(node.disposed, true)
+      if (instrumented) {
+        assert.equal(executions, operations)
+        assert.equal(calls, operations * listenersPerOperation)
+        assert.equal(derivations, operations * derivationsPerOperation)
+      }
+      return {
+        operations,
+        executions: instrumented ? executions : null,
+        calls: instrumented ? calls : null,
+        derivations: instrumented ? derivations : null,
+        sequence: instrumented ? sequence : null,
+        finalValue: value,
+        creates: scenario.startsWith('lifecycle:') ? operations * count * 2 : null,
+        subscriptions: scenario.startsWith('store-sub:') ? operations * count : null,
+        disposals: scenario.startsWith('lifecycle:')
+          ? operations * count * 2
+          : scenario.startsWith('store-sub:')
+            ? operations * count
+            : null
+      }
+    },
+    dispose() {
+      for (const effect of effects) effect.dispose()
+      for (let i = owned.length - 1; i >= 0; i--) owned[i].dispose()
+      store?.dispose()
+      terminal = []
+    }
+  }
+}
+
+/** Promisifies inspector transport without using the profiler clock for latency samples. */
+function edgePost(
+  session: Session,
+  method: string,
+  parameters: Record<string, unknown> = {}
+): Promise<any> {
+  return new Promise((resolveResponse, reject) => {
+    session.post(method, parameters, (error, result) => {
+      if (error) reject(error)
+      else resolveResponse(result)
+    })
+  })
+}
+
+/** Profiles a warmed, uninstrumented fixture in its own round, separate from latency samples. */
+async function edgeProfile(reactive: any, storeApi: any, scenario: string): Promise<void> {
+  /** One profile instance cannot retain the timing sample graph. */
+  const measured = edgeFixture(reactive, storeApi, scenario, false)
+  /** Large lifecycle operations already include substantial construction work per iteration. */
+  const warmup = scenario.includes('10000') ? 2 : 500
+  /** Fixed work avoids polluting profiler self time with a per-operation clock read. */
+  const profileIterations: Record<string, number> = {
+    single: 1000000,
+    conditional: 500000,
+    'fanin:100': 100000,
+    'fanout:100': 50000,
+    'deep:100': 25000,
+    diamond: 250000,
+    'lifecycle:10000': 20,
+    'store-sub:10000': 50
+  }
+  /** Unknown selections are rejected rather than producing an empty profile. */
+  const iterations = profileIterations[scenario]
+  assert.ok(iterations, 'Missing fixed profile iteration count for ' + scenario)
+  for (let i = 1; i <= warmup; i++) measured.update(i)
+  /** Inspector self time is derived later from the emitted raw profile. */
+  const session = new Session()
+  session.connect()
+  try {
+    await edgePost(session, 'Profiler.enable')
+    await edgePost(session, 'Profiler.setSamplingInterval', { interval: 100 })
+    await edgePost(session, 'Profiler.start')
+    for (let i = warmup + 1; i <= warmup + iterations; i++) measured.update(i)
+    /** The profiler's clock and samples remain raw attribution data. */
+    const { profile } = await edgePost(session, 'Profiler.stop')
+    /** Profile paths are adjacent to the caller's append-only evidence file. */
+    const profilePath = output + '.' + scenario.replace(':', '-') + '.cpuprofile'
+    writeFileSync(profilePath, JSON.stringify(profile))
+    measured.inspect(warmup + iterations, warmup + iterations)
+    emit({
+      type: 'profile',
+      scenario,
+      label: 'A',
+      profilePath,
+      iterations,
+      profileDurationUs: profile.endTime - profile.startTime,
+      samples: profile.samples?.length ?? 0
+    })
+  } finally {
+    session.disconnect()
+    measured.dispose()
+  }
+}
+
+/** Saves identified native graph collections without treating whole-graph heap deltas as edge cost. */
+async function edgeHeap(reactive: any): Promise<void> {
+  assert.equal(typeof global.gc, 'function', 'edge-heap requires --expose-gc')
+  /** Raw snapshots live next to the JSON evidence, in a directory unique to this invocation. */
+  const directory = output + '.snapshots'
+  mkdirSync(directory, { recursive: true })
+  /** Each call releases its graph before the next graph is allocated. */
+  function graphSnapshot(dependencies: number): void {
+    global.gc!()
+    global.gc!()
+    /** Baseline bytes are context only; edge estimates must inspect collection backing tables. */
+    const before = process.memoryUsage().heapUsed
+    /** One runtime owns all nodes in this snapshot. */
+    const runtime = reactive.createRuntime()
+    /** Ten thousand source nodes have stable names through the named global root. */
+    const signals = Array.from({ length: 10000 }, () => runtime.signal(0))
+    /** Every observer uses exactly one or five adjacent sources, with no shared callback state. */
+    const effects = signals.map((_, index) =>
+      runtime.effect(() => {
+        for (let j = 0; j < dependencies; j++) void signals[(index + j) % signals.length].value
+      })
+    )
+    /**
+     * Matching array indices map each public view to its owner's native private collection.
+     * Snapshot consumers follow Effect.#deps/#depVersions and Signal.#subs, then their tables;
+     * readonly views are not themselves counted as native Set/Map edge storage.
+     */
+    const collectionOwners = effects.map((effect, index) => ({
+      observer: effect,
+      depsView: effect.deps,
+      depVersionsView: effect.depVersions,
+      source: signals[index],
+      subsView: signals[index].subs
+    }))
+    ;(globalThis as any).__edgeHeap = {
+      kind: 'graph',
+      dependencies,
+      runtime,
+      signals,
+      effects,
+      collectionOwners
+    }
+    for (const effect of effects) {
+      assert.equal(effect.deps.size, dependencies)
+      assert.equal(effect.depVersions.size, dependencies)
+    }
+    global.gc!()
+    global.gc!()
+    /** The post-GC value excludes snapshot-generation allocations. */
+    const heapUsed = process.memoryUsage().heapUsed
+    /** Each dependency width gets an independent snapshot for marginal table analysis. */
+    const snapshotPath = writeHeapSnapshot(
+      resolve(directory, 'graph-edge' + dependencies + '.heapsnapshot')
+    )
+    emit({
+      type: 'heapSnapshot',
+      kind: 'graph',
+      dependencies,
+      snapshotPath,
+      heapUsed,
+      heapDelta: heapUsed - before,
+      signals: signals.length,
+      observers: effects.length,
+      edges: effects.length * dependencies,
+      root: '__edgeHeap',
+      nativeCollectionPaths: ['observer.#deps', 'observer.#depVersions', 'source.#subs'],
+      edgeBytes: null,
+      note: 'Whole-graph heapDelta is context only; compute edge storage from snapshot collection tables.'
+    })
+    for (const effect of effects) effect.dispose()
+    for (const signal of signals) signal.dispose()
+    ;(globalThis as any).__edgeHeap = undefined
+  }
+  for (const dependencies of [1, 5]) {
+    graphSnapshot(dependencies)
+    await new Promise(setImmediate)
+    await new Promise(setImmediate)
+  }
+  global.gc!()
+  global.gc!()
+  /** Synthetic Link storage is deliberately measured without retaining an actual runtime graph. */
+  const before = process.memoryUsage().heapUsed
+  /** Shared inert endpoints model pointer slots without conflating node or runtime sizes. */
+  const endpoints = [{}, {}]
+  /** Four pointer fields and two endpoints follow the proposed seven-field object shape. */
+  const links = Array.from({ length: 40000 }, () => ({
+    dep: endpoints[0],
+    sub: endpoints[1],
+    version: 0,
+    depPrev: null,
+    depNext: null,
+    subPrev: null,
+    subNext: null
+  }))
+  ;(globalThis as any).__edgeHeap = { kind: 'synthetic-link', endpoints, links }
+  global.gc!()
+  global.gc!()
+  /** Heap delta remains auxiliary; the snapshot's object self_size supplies the Link estimate. */
+  const heapUsed = process.memoryUsage().heapUsed
+  /** No actual graph is retained by this final snapshot's named root. */
+  const snapshotPath = writeHeapSnapshot(resolve(directory, 'synthetic-links.heapsnapshot'))
+  emit({
+    type: 'heapSnapshot',
+    kind: 'synthetic-link',
+    snapshotPath,
+    heapUsed,
+    heapDelta: heapUsed - before,
+    links: links.length,
+    root: '__edgeHeap',
+    fields: ['dep', 'sub', 'version', 'depPrev', 'depNext', 'subPrev', 'subNext'],
+    note: 'Use per-object shallow self_size; this is an estimate, not an implemented graph.'
+  })
+  ;(globalThis as any).__edgeHeap = undefined
+}
 try {
-  if (mode === 'memory' || mode === 'memory-one') {
+  if (mode === 'edge' || mode === 'edge-heap') {
+    /** A/A capsules contain the same accepted main revision but remain independently linked. */
+    const variants = { A: await load(left!, 'reactive'), B: await load(right!, 'reactive') }
+    /**
+     * Loading both stores before measurement keeps import and module initialization outside
+     * samples.
+     */
+    const stores = { A: await load(left!, 'store-keyed'), B: await load(right!, 'store-keyed') }
+    for (const label of ['A', 'B'] as const)
+      variants[label].createRuntime({
+        onError: (error: unknown) => emit({ type: 'setupDiagnostic', label, ...edgeFailure(error) })
+      })
+    if (mode === 'edge-heap') await edgeHeap(variants.A)
+    else {
+      /** Selection remains compatible with existing comma-separated scenario arguments. */
+      const scenarios =
+        selection === 'all'
+          ? [
+              'single',
+              'conditional',
+              'fanin:100',
+              'fanout:100',
+              'deep:100',
+              'diamond',
+              'lifecycle:10000',
+              'store-sub:10000'
+            ]
+          : selection.split(',')
+      for (const scenario of scenarios) {
+        /** Expensive full-graph lifecycle operations require only one complete operation per sample. */
+        const iterations = scenario.includes('10000') ? 1 : scenario.includes('100') ? 1000 : 5000
+        /** Every timed sample gets independent warmup; counting rounds use the same measured width. */
+        const warmup = scenario.includes('10000') ? 1 : 500
+        for (const label of ['A', 'B'] as const) {
+          /** One independent counting round proves the work for this exact sample configuration. */
+          const evidence = edgeFixture(variants[label], stores[label], scenario, true)
+          for (let i = 1; i <= iterations; i++) evidence.update(i)
+          emit({
+            type: 'evidence',
+            label,
+            scenario,
+            ...evidence.inspect(iterations, iterations)
+          })
+          evidence.dispose()
+        }
+        for (let group = 0; group < 2; group++)
+          for (let pair = 0; pair < 6; pair++)
+            for (const label of (group + pair) % 2
+              ? (['B', 'A'] as const)
+              : (['A', 'B'] as const)) {
+              /** Timing state has no listener, derivation, sequence or execution counters. */
+              const measured = edgeFixture(variants[label], stores[label], scenario, false)
+              for (let i = 1; i <= warmup; i++) measured.update(i)
+              /** Latency uses an independent monotonic clock outside the profiled round. */
+              const start = process.hrtime.bigint()
+              for (let i = warmup + 1; i <= warmup + iterations; i++) measured.update(i)
+              /** Stop the clock before assertions, disposal and JSON serialization. */
+              const elapsed = process.hrtime.bigint() - start
+              measured.inspect(warmup + iterations, warmup + iterations)
+              measured.dispose()
+              emit({
+                type: 'sample',
+                group,
+                pair,
+                label,
+                scenario,
+                iterations,
+                warmup,
+                nsPerOperation: Number(elapsed) / iterations,
+                evidence: { type: 'evidence', label, scenario, operations: iterations },
+                operationsPerSample: scenario.includes('10000') ? 10000 : 1
+              })
+            }
+        await edgeProfile(variants.A, stores.A, scenario)
+      }
+    }
+  } else if (mode === 'memory' || mode === 'memory-one') {
     /**
      * Scope each retained graph in a function so predecessor locals cannot inflate the next
      * baseline.
@@ -424,9 +921,10 @@ try {
   const value = error as any
   emit({
     type: 'failure',
-    source: value?.source,
-    code: value?.code,
-    name: value?.name,
+    source: value?.source ?? null,
+    code: value?.code ?? null,
+    name: value?.name ?? null,
+    reason: value?.reason ?? null,
     message: String(value?.message).replace(/(?:token|secret|password)=[^ ]+/gi, '<REDACTED>')
   })
   throw error
