@@ -7,6 +7,7 @@
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { utilsCases } from './utils-cases.js'
+import { utilsFacadeEnums, utilsFacadeSymbols, utilsFacadeTypes } from './utils-facades.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -384,6 +385,7 @@ isEmptyValue(0) // false`
     }
   },
   symbols: {
+    ...utilsFacadeSymbols,
     collect: {
       role: 'factory',
       purpose: t(
@@ -1836,6 +1838,7 @@ const text = converted.threw ? '[无法显示]' : converted.value`
     }
   },
   types: {
+    ...utilsFacadeTypes,
     ICollector: {
       summary: t(
         'The lazy query returned by `collect()`. Chained calls describe the query; `result` runs it once and caches it.',
@@ -5137,6 +5140,7 @@ console.log(displayCell(false), displayCell(0), displayCell(null))`
     }
   },
   enums: {
+    ...utilsFacadeEnums,
     UtilsErrorCode: {
       summary: t(
         'Stable error codes of `@migaia/utils` and what to do about each.',
@@ -5222,6 +5226,22 @@ console.log(displayCell(false), displayCell(0), displayCell(null))`
         formatValueMissing: t(
           '`FORMAT_VALUE_MISSING`: a placeholder has no value with `missing: "throw"`.',
           '`FORMAT_VALUE_MISSING`：在 `missing: "throw"` 时某个占位符没有取值。'
+        ),
+        configParseFailed: t(
+          '`CONFIG_PARSE_FAILED`: `ConfigOwner.from()` got a non-string or invalid JSON; the parser `SyntaxError` is on `cause`. Fix the source text.',
+          '`CONFIG_PARSE_FAILED`：`ConfigOwner.from()` 收到的不是字符串或不是合法 JSON；解析器的 `SyntaxError` 保存在 `cause` 上。需要修正源文本。'
+        ),
+        configSourceFailed: t(
+          '`CONFIG_SOURCE_FAILED`: the source of `ConfigOwner.fromAsync()` rejected or threw; the original failure is on `cause`. Retry the source or fall back to defaults.',
+          '`CONFIG_SOURCE_FAILED`：`ConfigOwner.fromAsync()` 的来源拒绝或抛错；原始失败保存在 `cause` 上。可以重试来源或改用默认配置。'
+        ),
+        configValueMissing: t(
+          '`CONFIG_VALUE_MISSING`: `ConfigOwner.require()` or `select()` found no value at the path. Add it to the config source or read it with `getOr()`.',
+          '`CONFIG_VALUE_MISSING`：`ConfigOwner.require()` 或 `select()` 在路径上找不到值。需要在配置来源中补上它，或改用 `getOr()` 读取。'
+        ),
+        configValidationFailed: t(
+          '`CONFIG_VALIDATION_FAILED`: the `ConfigOwner` validator threw or returned `false`; the previous snapshot stays committed and the validator error is on `cause`.',
+          '`CONFIG_VALIDATION_FAILED`：`ConfigOwner` 的校验函数抛错或返回 `false`；之前的快照保持不变，校验错误保存在 `cause` 上。'
         ),
         numberFormatInvalid: t(
           '`NUMBER_FORMAT_INVALID`: `Intl` rejected the locale, options, currency or value.',

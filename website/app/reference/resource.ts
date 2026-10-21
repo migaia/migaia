@@ -1,9 +1,10 @@
 /**
  * Reference documentation of `@migaia/resource`. Rules: `app/reference/contract.ts`. Verified
  * against `packages/resource/src` (resource.class.ts, state-constants.ts, error-code.ts, errors.ts)
- * and README on 2026-10-17.
+ * and README on 2026-10-17; `createResource`, `mutate`, `subscribe` and `select` verified against
+ * create-resource.ts and resource.class.ts on 2026-10-21.
  */
-import type { ILibraryReference, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { resourceCases } from './resource-cases.js'
 
 /** Builds one bilingual text. */
@@ -93,6 +94,135 @@ const stateReturns = t(
   '一个 `IResourceState` 快照：按 `status` 分支（`idle`、`pending`、带 `data` 的 `success`、带 `error` 的 `error` / `cancelled`）。'
 )
 
+/** `createResource()` example, also used by the setup types. */
+const createResourceExample = {
+  en: `import { createResource, ResourceStatus } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const userId = runtime.signal('1')
+
+const user = createResource(
+  ({ onDispose }) => {
+    // setup runs once: open long-lived things here and register their cleanup
+    const socket = new WebSocket('/live')
+    onDispose(() => socket.close())
+    return ({ signal }) => fetch(\`/api/users/\${userId.value}\`, { signal }).then((r) => r.json())
+  },
+  { runtime, ttl: 30_000 }
+)
+
+const stop = user.subscribe((state) => {
+  if (state.status === ResourceStatus.success) console.log(state.data)
+})
+
+user.mutate((previous) => ({ ...previous, name: 'Ada' })) // optimistic update
+stop()
+user.dispose() // closes the socket`,
+  zh: `import { createResource, ResourceStatus } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const userId = runtime.signal('1')
+
+const user = createResource(
+  ({ onDispose }) => {
+    // setup 只执行一次：在这里打开长期资源并登记清理
+    const socket = new WebSocket('/live')
+    onDispose(() => socket.close())
+    return ({ signal }) => fetch(\`/api/users/\${userId.value}\`, { signal }).then((r) => r.json())
+  },
+  { runtime, ttl: 30_000 }
+)
+
+const stop = user.subscribe((state) => {
+  if (state.status === ResourceStatus.success) console.log(state.data)
+})
+
+user.mutate((previous) => ({ ...previous, name: 'Ada' })) // 乐观更新
+stop()
+user.dispose() // 同时关闭 socket`
+}
+
+/** Field docs of `IResourceOptions`, shared with `ICreateResourceOptions`. */
+const resourceOptionMembers: Readonly<Record<string, IMemberDoc>> = {
+  debugName: {
+    summary: t(
+      'Label shown in reactive diagnostics and in request error context.',
+      '显示在响应式诊断信息与请求错误上下文中的标签。'
+    ),
+    default: t('Not set: diagnostics show no label.', '不设置：诊断信息中不显示标签。')
+  },
+  ttl: {
+    summary: t(
+      'Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.',
+      '成功值的有效毫秒数；正的有限值过期后读取会重新验证。`0` 与 `Infinity` 禁用时间过期，但依赖变化（含休眠期间的变化）仍触发新请求。必须不小于 0 或为 `Infinity`。'
+    ),
+    default: t(
+      '`Infinity`: fresh until a dependency changes or `refetch()` is called.',
+      '`Infinity`：一直新鲜，直到依赖变化或调用 `refetch()`。'
+    )
+  },
+  autoStart: {
+    summary: t('Start the first request in the constructor.', '是否在构造时就发起第一次请求。'),
+    default: t(
+      '`true`: starts immediately unless the initial snapshot is fresh.',
+      '`true`：立即启动；若初始快照仍新鲜，则直接保持成功状态，不调用加载函数。'
+    )
+  },
+  staleWhileRevalidate: {
+    summary: t(
+      'Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.',
+      '刷新期间继续显示已过期的成功数据（`refreshing` 为 `true`），而不是切换为 `pending`。'
+    ),
+    default: t(
+      '`false`: an expired value is replaced by `pending`.',
+      '`false`：过期后切换为 `pending`。'
+    )
+  },
+  retry: {
+    summary: t(
+      'Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.',
+      '失败后的重试策略：额外尝试次数（非负整数），或逐次决定是否重试的 `(failureCount, error) => boolean`。为 Suspense 抛出的 Promise 不算失败。策略抛错或返回非法值时产生 `INVALID_OPTION`，触发它的加载失败仍可沿 `cause` 或 `errors` 找到；已有外部身份保留。'
+    ),
+    default: t('`0`: no retry.', '`0`：首次请求失败后不再重试。')
+  },
+  retryDelay: {
+    summary: t(
+      'Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.',
+      '每次重试前等待的毫秒数，或用于退避的 `(failureCount, error) => 毫秒`。回调抛错或返回非法值时，通过 `cause` 或 `errors` 保留加载失败；策略错误附 `INVALID_OPTION`，已有外部身份除外。'
+    ),
+    default: t('`0`: retry immediately.', '`0`：立即重试。')
+  },
+  keepAlive: {
+    summary: t(
+      'Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.',
+      '没有任何读取 `state` 的观察者时也保持上游依赖连接，继续跟踪变化。'
+    ),
+    default: t(
+      '`false`: unobserved resources disconnect upstream.',
+      '`false`：无观察者时断开上游依赖。'
+    )
+  },
+  initialSnapshot: {
+    summary: t(
+      'Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.',
+      '来自 `dehydrate()`（服务端渲染或持久化）的成功快照，作为初始状态；过期时会重新验证。'
+    ),
+    default: t('Not set: start from `idle`.', '不设置：从 `idle` 开始。')
+  },
+  scheduler: {
+    summary: t(
+      'Clock and timers for `ttl`, `updatedAt`, `expiresAt` and retry delays; inject a manual scheduler in tests.',
+      '用于 `ttl`、`updatedAt`、`expiresAt` 与重试等待的时钟和计时器；测试时可注入手动调度器。'
+    ),
+    default: t(
+      '`systemScheduler` from `@migaia/utils/scheduler`.',
+      '使用 `@migaia/utils/scheduler` 的 `systemScheduler` 提供系统时钟和计时器。'
+    )
+  }
+}
+
 /** Reference of `@migaia/resource`. */
 export const resourceReference: ILibraryReference = {
   modules: {
@@ -105,6 +235,41 @@ export const resourceReference: ILibraryReference = {
     }
   },
   symbols: {
+    createResource: {
+      role: 'factory',
+      purpose: t(
+        'Functional way to build a `Resource`. `setup` runs once, synchronously, with the runtime, scheduler, an abort signal and `onDispose`; it returns the fetcher, and the data type is inferred from it. Cleanups registered with `onDispose` run in reverse order on `dispose()`. If setup throws, returns a non-function (`RESOURCE_SETUP_INVALID`) or the options are invalid, the signal aborts and the registered cleanups run before the original error is rethrown, with cleanup failures attached through `errors`.',
+        '函数式构建 `Resource`。`setup` 只同步执行一次，拿到运行时、调度器、中止信号和 `onDispose`，返回加载函数，数据类型由加载函数推导。用 `onDispose` 登记的清理在 `dispose()` 时按逆序执行。若 `setup` 抛错、返回的不是函数（`RESOURCE_SETUP_INVALID`）或选项不合法，会先中止信号并执行已登记的清理，再重新抛出原始错误，清理失败通过 `errors` 附加。'
+      ),
+      params: {
+        setup: t(
+          'Function `(context) => fetcher` called once; see `IResourceSetupContext` for what it receives. Register cleanups synchronously inside it.',
+          '只调用一次的函数 `(context) => fetcher`；它收到的内容见 `IResourceSetupContext`。清理需要在其中同步登记。'
+        )
+      },
+      returns: t(
+        'A `Resource` with the inferred data type; it owns the setup cleanups.',
+        '按推导出的数据类型创建的 `Resource`，并负责执行 `setup` 登记的清理。'
+      ),
+      options: 'ICreateResourceOptions',
+      example: createResourceExample,
+      scenarios: [
+        t(
+          'A resource that needs long-lived helpers (a socket, a subscription, a cache) created once and closed together with it.',
+          '资源需要一次性创建的长期辅助对象（套接字、订阅、缓存），并在资源释放时一起关闭。'
+        ),
+        t(
+          'Application code that wants the default runtime without passing it around.',
+          '应用代码希望直接使用默认运行时，而不用到处传递它。'
+        )
+      ],
+      avoid: [
+        t(
+          'Nothing to set up or clean up and a runtime already at hand: `new Resource(fetcher, runtime)` is just as short.',
+          '既不需要准备也不需要清理、手里已有运行时：直接 `new Resource(fetcher, runtime)` 同样简短。'
+        )
+      ]
+    },
     Resource: {
       role: 'factory',
       purpose: t(
@@ -351,6 +516,66 @@ const clientUser = new Resource(fetchUser, clientRuntime, { initialSnapshot: sna
           returns: t('Nothing; a forced refresh is scheduled.', '无返回值；已安排一次强制刷新。'),
           example: `// 由运行时调用，例如 userId.dispose() 之后`
         },
+        mutate: {
+          summary: t(
+            'Replaces the visible data locally (optimistic update, server push, cache write). Any in-flight request is superseded so its late result cannot overwrite this value, and a new TTL window starts. An updater receives the current success data or `undefined`; function-typed data must be passed through an updater.',
+            '在本地替换可见数据（乐观更新、服务端推送、写缓存）。进行中的请求被取代，晚到的结果不会覆盖这个值，并开始新的有效期。更新函数会收到当前成功数据或 `undefined`；数据本身是函数时必须通过更新函数传入。'
+          ),
+          params: {
+            next: t(
+              'New data, or an `IResourceUpdater` `(previous) => next`; an updater throw leaves the state unchanged.',
+              '新数据，或更新函数 `IResourceUpdater`（`(previous) => next`）；更新函数抛错时状态保持不变。'
+            )
+          },
+          returns: t(
+            'This resource, for chaining; after `dispose()` it throws `RESOURCE_DISPOSED`.',
+            '本资源本身，便于链式调用；在 `dispose()` 之后调用会抛出 `RESOURCE_DISPOSED`。'
+          ),
+          example: `todos.mutate((list = []) => [...list, draft])`
+        },
+        subscribe: {
+          summary: t(
+            'Delivers the current state now and after every change to code that does not run inside the reactive graph (plain scripts, devtools, Node). Subscribing counts as observation, so it can start and keep requests alive. Listener throws are reported through `runtime.reportError` and do not stop delivery.',
+            '把当前状态立即交给监听函数，之后每次变化再交一次，适合不在响应式图里运行的代码（普通脚本、调试工具、Node）。订阅算作观察，因此可能启动并保持请求。监听函数抛错时通过 `runtime.reportError` 报告，不会中断后续通知。'
+          ),
+          params: {
+            listener: t(
+              'Function `(state) => void` receiving each `IResourceState`; a non-function throws `INVALID_OPTION`.',
+              '函数 `(state) => void`，接收每个 `IResourceState`；不是函数时抛出 `INVALID_OPTION`。'
+            )
+          },
+          returns: t(
+            'An idempotent unsubscribe function; `dispose()` unsubscribes automatically.',
+            '可重复调用的取消订阅函数；`dispose()` 时会自动取消。'
+          ),
+          example: `const stop = user.subscribe((state) => render(state))`
+        },
+        select: {
+          summary: t(
+            'Creates a reactive value derived from the success data; it is `undefined` while the resource is not in `success`, and it is disposed together with the resource.',
+            '创建一个由成功数据派生的响应式值；资源不在 `success` 状态时为 `undefined`，并随资源一起释放。'
+          ),
+          params: {
+            selector: t(
+              'Function `(data) => result`; a non-function throws `INVALID_OPTION`.',
+              '函数 `(data) => result`；不是函数时抛出 `INVALID_OPTION`。'
+            )
+          },
+          returns: t(
+            'An `IReactiveComputed` from `@migaia/reactive`; read it through `value` inside effects.',
+            '`@migaia/reactive` 的 `IReactiveComputed`；在副作用中通过 `value` 读取。'
+          ),
+          example: `const count = todos.select((list) => list.length)
+runtime.effect(() => console.log(count.value))`
+        },
+        '[Symbol.dispose]': {
+          summary: t(
+            'Same as `dispose()`, so a `using` declaration ends the resource when its block exits.',
+            '与 `dispose()` 相同，使 `using` 声明在代码块结束时终止资源。'
+          ),
+          returns: t('Nothing; the resource is terminal.', '无返回值；资源已终止。'),
+          example: `using user = createResource(() => loadUser)`
+        },
         dispose: {
           summary: t(
             'Ends the resource: cancels the request, removes dependencies and subscriptions. Calling it again does nothing; afterwards data reads and operations throw `RESOURCE_DISPOSED`, while `disposed`, `refreshing` and `observed` stay readable. The runtime is not disposed.',
@@ -360,6 +585,86 @@ const clientUser = new Resource(fetchUser, clientRuntime, { initialSnapshot: sna
           example: `onUnmount(() => user.dispose())`
         }
       }
+    },
+    ICreateResourceOptions: {
+      summary: t(
+        'Options of `createResource()`: every `IResourceOptions` field plus the runtime.',
+        '`createResource()` 的选项：包含 `IResourceOptions` 的全部字段，另加运行时。'
+      ),
+      members: {
+        ...resourceOptionMembers,
+        runtime: {
+          summary: t(
+            'Reactive runtime from `createRuntime()` that owns the resource graph; the signals the fetcher reads must belong to it.',
+            '由 `createRuntime()` 创建、拥有该资源依赖图的响应式运行时；加载函数读取的信号必须属于它。'
+          ),
+          default: t(
+            '`defaultRuntime` from `@migaia/reactive`.',
+            '使用 `@migaia/reactive` 导出的默认运行时 `defaultRuntime`。'
+          )
+        }
+      }
+    },
+    IResourceSetup: {
+      summary: t(
+        'Setup callback of `createResource()`: called once with an `IResourceSetupContext`, returns the fetcher.',
+        '`createResource()` 的准备函数：以 `IResourceSetupContext` 调用一次，返回加载函数。'
+      ),
+      members: {}
+    },
+    IResourceSetupContext: {
+      summary: t(
+        'What `createResource()` hands to its setup callback; the context is frozen and closes when setup returns.',
+        '`createResource()` 交给准备函数的上下文；该对象已冻结，并在准备函数返回后关闭。'
+      ),
+      example: createResourceExample,
+      members: {
+        runtime: {
+          summary: t(
+            'Runtime that owns the resource graph: `options.runtime` or `defaultRuntime`.',
+            '拥有资源依赖图的运行时：即 `options.runtime`，未提供时为 `defaultRuntime`。'
+          )
+        },
+        scheduler: {
+          summary: t(
+            'Scheduler the resource uses for TTL and retry timing: `options.scheduler` or `systemScheduler`.',
+            '资源用于有效期和重试计时的调度器：即 `options.scheduler`，未提供时为 `systemScheduler`。'
+          )
+        },
+        signal: {
+          summary: t(
+            'Aborts when the resource is disposed or setup fails; pass it to listeners and long-lived work started in setup.',
+            '资源释放或准备失败时中止；把它传给准备阶段启动的监听和长期任务。'
+          )
+        },
+        debugName: {
+          summary: t(
+            'Diagnostic name from `options.debugName`, or `undefined`.',
+            '来自 `options.debugName` 的诊断名称；未设置时为 `undefined`。'
+          )
+        },
+        onDispose: {
+          summary: t(
+            'Registers a synchronous cleanup that runs in reverse order on `dispose()`, or right away when setup fails. Calling it after setup returned throws `RESOURCE_SETUP_CLOSED`.',
+            '登记一个同步清理函数，在 `dispose()` 时按逆序执行，准备失败时立即执行。准备函数返回后再调用会抛出 `RESOURCE_SETUP_CLOSED`。'
+          ),
+          params: {
+            cleanup: t(
+              'Synchronous function, for example `() => socket.close()`; a non-function throws `RESOURCE_SETUP_INVALID`.',
+              '同步函数，例如 `() => socket.close()`；不是函数时抛出 `RESOURCE_SETUP_INVALID`。'
+            )
+          },
+          returns: t('The same context, for chaining.', '同一个上下文对象，便于链式调用。'),
+          example: `ctx.onDispose(() => socket.close()).onDispose(() => timer.cancel())`
+        }
+      }
+    },
+    IResourceUpdater: {
+      summary: t(
+        'Updater `(previous) => next` accepted by `mutate()`; `previous` is the current success data or `undefined`.',
+        '`mutate()` 接受的更新函数 `(previous) => next`；`previous` 是当前成功数据或 `undefined`。'
+      ),
+      members: {}
     },
     IResourceCacheSnapshot: {
       summary: t(
@@ -461,86 +766,7 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
         'Options of `new Resource()`: caching, retries, start-up and snapshots.',
         '`new Resource()` 的选项：缓存、重试、启动方式与快照。'
       ),
-      members: {
-        debugName: {
-          summary: t(
-            'Label shown in reactive diagnostics and in request error context.',
-            '显示在响应式诊断信息与请求错误上下文中的标签。'
-          ),
-          default: t('Not set: diagnostics show no label.', '不设置：诊断信息中不显示标签。')
-        },
-        ttl: {
-          summary: t(
-            'Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.',
-            '成功值的有效毫秒数；正的有限值过期后读取会重新验证。`0` 与 `Infinity` 禁用时间过期，但依赖变化（含休眠期间的变化）仍触发新请求。必须不小于 0 或为 `Infinity`。'
-          ),
-          default: t(
-            '`Infinity`: fresh until a dependency changes or `refetch()` is called.',
-            '`Infinity`：一直新鲜，直到依赖变化或调用 `refetch()`。'
-          )
-        },
-        autoStart: {
-          summary: t(
-            'Start the first request in the constructor.',
-            '是否在构造时就发起第一次请求。'
-          ),
-          default: t(
-            '`true`: starts immediately unless the initial snapshot is fresh.',
-            '`true`：立即启动；若初始快照仍新鲜，则直接保持成功状态，不调用加载函数。'
-          )
-        },
-        staleWhileRevalidate: {
-          summary: t(
-            'Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.',
-            '刷新期间继续显示已过期的成功数据（`refreshing` 为 `true`），而不是切换为 `pending`。'
-          ),
-          default: t(
-            '`false`: an expired value is replaced by `pending`.',
-            '`false`：过期后切换为 `pending`。'
-          )
-        },
-        retry: {
-          summary: t(
-            'Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.',
-            '失败后的重试策略：额外尝试次数（非负整数），或逐次决定是否重试的 `(failureCount, error) => boolean`。为 Suspense 抛出的 Promise 不算失败。策略抛错或返回非法值时产生 `INVALID_OPTION`，触发它的加载失败仍可沿 `cause` 或 `errors` 找到；已有外部身份保留。'
-          ),
-          default: t('`0`: no retry.', '`0`：首次请求失败后不再重试。')
-        },
-        retryDelay: {
-          summary: t(
-            'Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.',
-            '每次重试前等待的毫秒数，或用于退避的 `(failureCount, error) => 毫秒`。回调抛错或返回非法值时，通过 `cause` 或 `errors` 保留加载失败；策略错误附 `INVALID_OPTION`，已有外部身份除外。'
-          ),
-          default: t('`0`: retry immediately.', '`0`：立即重试。')
-        },
-        keepAlive: {
-          summary: t(
-            'Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.',
-            '没有任何读取 `state` 的观察者时也保持上游依赖连接，继续跟踪变化。'
-          ),
-          default: t(
-            '`false`: unobserved resources disconnect upstream.',
-            '`false`：无观察者时断开上游依赖。'
-          )
-        },
-        initialSnapshot: {
-          summary: t(
-            'Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.',
-            '来自 `dehydrate()`（服务端渲染或持久化）的成功快照，作为初始状态；过期时会重新验证。'
-          ),
-          default: t('Not set: start from `idle`.', '不设置：从 `idle` 开始。')
-        },
-        scheduler: {
-          summary: t(
-            'Clock and timers for `ttl`, `updatedAt`, `expiresAt` and retry delays; inject a manual scheduler in tests.',
-            '用于 `ttl`、`updatedAt`、`expiresAt` 与重试等待的时钟和计时器；测试时可注入手动调度器。'
-          ),
-          default: t(
-            '`systemScheduler` from `@migaia/utils/scheduler`.',
-            '使用 `@migaia/utils/scheduler` 的 `systemScheduler` 提供系统时钟和计时器。'
-          )
-        }
-      }
+      members: resourceOptionMembers
     },
     IResourceRetryPolicy: {
       summary: t(
@@ -659,6 +885,14 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
         fetchFailed: t(
           '`FETCH_FAILED`: final unclassified fetch failure after retries. Native errors keep identity when writable; immutable errors and primitive values stay reachable through `cause`. Existing foreign source/code is preserved.',
           '`FETCH_FAILED`：重试结束后的未分类加载失败。可修改的原生错误保留身份；不可修改错误及原始值保留在 `cause`。已有外部来源与错误码保持不变。'
+        ),
+        setupInvalid: t(
+          '`RESOURCE_SETUP_INVALID`: `createResource()` got a non-function setup, or setup returned a non-function; registered cleanups already ran. Return a fetcher from setup.',
+          '`RESOURCE_SETUP_INVALID`：`createResource()` 收到的准备函数不是函数，或准备函数返回的不是函数；已登记的清理已经执行。需要让准备函数返回加载函数。'
+        ),
+        setupClosed: t(
+          '`RESOURCE_SETUP_CLOSED`: `onDispose()` was called after setup returned, for example from an async callback; register cleanups synchronously during setup.',
+          '`RESOURCE_SETUP_CLOSED`：准备函数返回后才调用 `onDispose()`，例如在异步回调中调用；需要在准备阶段同步登记清理。'
         ),
         suspenseProbeFailed: t(
           '`SUSPENSE_PROBE_FAILED`: a value thrown by the fetcher has a throwing `then` getter; both errors are kept in `errors`.',
