@@ -4,6 +4,7 @@ import { attachErrorIdentity } from './error.js'
 
 /** Property keys accepted by tuple paths. */
 export type IObjectPathSegment = string | number | symbol
+/** Read-only tuple path of string, number or symbol segments, e.g. `['list', 0, 'name']`. */
 export type IObjectPathTuple = readonly IObjectPathSegment[]
 
 type IStringKey<T> = Extract<keyof T, string>
@@ -92,12 +93,14 @@ export type IObjectPathWriteValue<
   P extends IObjectPath<T> | IObjectPathTuple
 > = IObjectPathWritableLeaf<IObjectPathValue<T, P>>
 
+/** Probe result when the whole path resolved; `value` is typed by the path. */
 export type IPathValueProbe<T, P extends IObjectPathInput<T>> = {
   readonly kind: 'value'
   readonly originKey: P
   readonly segments: IObjectPathTuple
   readonly value: IObjectPathValue<T, P>
 }
+/** Probe result when a property on the path does not exist; `failedAt` is the 0-based segment. */
 export type IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
   readonly kind: 'missing'
   readonly originKey: P
@@ -107,6 +110,7 @@ export type IPathMissingProbe<P extends string | IObjectPathTuple = string | IOb
   readonly resolvedPath: IObjectPathTuple
   readonly parent: unknown
 }
+/** Probe result when a value on the path is not an object, so the walk cannot go deeper. */
 export type IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
   readonly kind: 'blocked'
   readonly originKey: P
@@ -116,6 +120,7 @@ export type IPathBlockedProbe<P extends string | IObjectPathTuple = string | IOb
   readonly resolvedPath: IObjectPathTuple
   readonly parent: unknown
 }
+/** Probe result when reading a segment threw; `error` is the original thrown value. */
 export type IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
   readonly kind: 'failed'
   readonly originKey: P
@@ -126,6 +131,7 @@ export type IPathFailedProbe<P extends string | IObjectPathTuple = string | IObj
   readonly parent: unknown
   readonly error: unknown
 }
+/** Discriminated result of `probeObjectPath`: `value`, `missing`, `blocked` or `failed`. */
 export type IPathProbe<T, P extends IObjectPathInput<T>> =
   | IPathValueProbe<T, P>
   | IPathMissingProbe<P>
@@ -159,6 +165,10 @@ export type IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>
   replace(value: IObjectPathWriteValue<T, P>): void
 }
 
+/**
+ * Hooks of `createPathAccessor`: diagnostics for missing / blocked / failed paths and read / write
+ * transforms.
+ */
 export type IPathAccessorOptions<T> = {
   readonly ifMissing?: (probe: IPathMissingProbe) => void
   readonly ifBlocked?: (probe: IPathBlockedProbe) => void
@@ -167,6 +177,10 @@ export type IPathAccessorOptions<T> = {
   readonly onSet?: (event: IStringSetEvent<T> | ITupleSetEvent<T>) => void
 }
 
+/**
+ * Stateful path accessor whose `value` advances to the new immutable root after each successful
+ * `set`.
+ */
 export type IPathAccessor<T> = {
   readonly value: T
   get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined
@@ -282,7 +296,11 @@ export function probeObjectPathSegments<T, const P extends IObjectPathTupleFor<T
   return probeParsedObjectPath(object, segments, segments)
 }
 
-/** Reads one path; missing/blocked paths yield undefined while getter failures remain observable. */
+/**
+ * Reads the value at a string or tuple path. A missing property or a non-object on the way returns
+ * `undefined`; a getter that throws rethrows its original error. Invalid paths throw
+ * `OBJECT_PATH_INVALID`.
+ */
 export function get<T, const P extends IObjectPathInput<T>>(
   object: T,
   path: P
@@ -304,7 +322,12 @@ function cloneContainer(value: object, replacedKey: IObjectPathSegment): object 
   return Object.defineProperties(target, descriptors)
 }
 
-/** Performs an immutable path update with structural sharing and missing-container creation. */
+/**
+ * Returns a new root with the value at `path` replaced, copying only the objects on the path and
+ * reusing every other branch; the input stays unchanged. Missing containers are created (`[]` for a
+ * number key, `{}` otherwise). An `Object.is`-equal value returns the input itself. A primitive in
+ * the way throws `OBJECT_PATH_INVALID`.
+ */
 export function set<T, const P extends IObjectPathInput<T>>(
   object: T,
   path: P,

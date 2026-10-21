@@ -105,4 +105,5 @@ export const UtilsErrorCode = {
   numberFormatInvalid: 'NUMBER_FORMAT_INVALID'
 } as const
 
+/** Value union of `UtilsErrorCode`; compare an error's `code` against these values. */
 export type IUtilsErrorCode = (typeof UtilsErrorCode)[keyof typeof UtilsErrorCode]

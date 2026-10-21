@@ -109,7 +109,11 @@ export function observeThenableRejection(
   }
 }
 
-/** Memoizes a synchronous function, including its first thrown result. */
+/**
+ * Wraps a synchronous function so its body runs only on the first call; later calls return the
+ * first result or rethrow the first error. Calling the wrapper again from inside the running body
+ * throws `REENTRANT_CALL`. Each `once(fn)` has its own cache.
+ */
 export function once<T extends (...args: never[]) => unknown>(functionValue: T): T {
   let state: 'idle' | 'running' | 'done' = 'idle'
   let result: unknown
@@ -143,7 +147,12 @@ export function once<T extends (...args: never[]) => unknown>(functionValue: T):
   }) as T
 }
 
-/** Memoizes one asynchronous invocation and preserves exact Promise identity. */
+/**
+ * Wraps an async function so the first call starts it and every call, including concurrent ones,
+ * returns that same Promise. A first rejection is remembered too and the function never runs again;
+ * put retries inside `functionValue` when needed. A non-thenable result rejects with
+ * `INVALID_ARGUMENT`.
+ */
 export function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T> {
   let promise: Promise<T> | undefined
   return () => {

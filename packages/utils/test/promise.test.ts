@@ -1041,6 +1041,49 @@ describe('promise primitives', () => {
     expect(reports).toEqual([late])
   })
 
+  it('does not report an operation that rejects with its own cancellation reason after timeout', async () => {
+    const scheduler = createManualScheduler()
+    const reports: unknown[] = []
+    // Cooperative operations such as `fetch(url, { signal })` reject with `signal.reason`.
+    const pending = withTimeout(
+      ({ signal }) =>
+        new Promise<never>((_, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        ),
+      { timeoutMs: 1, scheduler, report: (error) => reports.push(error) }
+    )
+    scheduler.advance(1)
+    await expect(pending).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(reports).toEqual([])
+  })
+
+  it('does not report an operation that rejects with its own cancellation reason after abort', async () => {
+    const reports: unknown[] = []
+    const controller = new AbortController()
+    const acknowledge = ({ signal }: { readonly signal: AbortSignal }) =>
+      new Promise<never>((_, reject) =>
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+      )
+    const raced = raceWithAbort(acknowledge, {
+      signal: controller.signal,
+      report: (error) => reports.push(error)
+    })
+    const retried = retry(acknowledge, {
+      maxAttempts: 1,
+      signal: controller.signal as never,
+      shouldRetry: () => false,
+      report: (error) => reports.push(error)
+    })
+    controller.abort(new Error('user left'))
+    await expect(raced).rejects.toMatchObject({ code: 'ABORTED' })
+    await expect(retried).rejects.toMatchObject({ code: 'ABORTED' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(reports).toEqual([])
+  })
+
   it('propagates external abort to the timeout operation signal', async () => {
     const controller = new AbortController()
     let observed = false
