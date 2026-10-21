@@ -33,6 +33,7 @@ const apiManifest = JSON.parse(
       readonly name: string
       readonly fragment: string
       readonly kind: string
+      readonly routeSlug?: string
       readonly sections: readonly { readonly id: string; readonly content: string }[]
     }[]
   }[]
@@ -124,9 +125,10 @@ function stableLeftRail(html: string): string {
 
 /** Produces the semantic public path segment for one runtime symbol. */
 function apiSymbolPath(
-  symbol: { readonly kind: string; readonly name: string },
+  symbol: { readonly kind: string; readonly name: string; readonly routeSlug?: string },
   siblings: readonly { readonly kind: string; readonly name: string }[]
 ): string {
+  if (symbol.routeSlug) return symbol.routeSlug
   const collisions = siblings.filter(
     (candidate) =>
       candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')

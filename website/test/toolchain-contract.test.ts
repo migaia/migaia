@@ -9,6 +9,8 @@ import {
 } from '../app/api-guides.js'
 import type { IApi } from '../app/content-contract.js'
 import { findGuideJourney } from '../app/guide-journeys.js'
+import { referenceFor } from '../app/reference/index.js'
+import { resolveFieldDoc } from '../app/reference/surface.js'
 import { parseSelectedLibrary, replaceOwnedEntries } from '../scripts/generate/signatures.js'
 
 /** Root directory used for all website-owned contract observations. */
@@ -23,6 +25,34 @@ const generatedApiManifest = JSON.parse(
 )
 /** Typed subset of generated API facts required by documentation acceptance. */
 const generatedApis = generatedApiManifest.apis as readonly IApi[]
+
+/** Reads the same anonymous or named option documentation used by the reference renderer. */
+function referenceOptionSummary(
+  api: IApi,
+  symbol: IApi['symbols'][number],
+  fieldName: string,
+  locale: 'en' | 'zh'
+): string | undefined {
+  /** Package-owned reference text is canonical for audited libraries. */
+  const reference = referenceFor(api.library)
+  /** Module-qualified symbols take precedence over a shared bare-name entry. */
+  const doc = reference?.symbols[`${api.module}:${symbol.name}`] ?? reference?.symbols[symbol.name]
+  /** Extracted options prefixes do not change the authored field identity. */
+  const name = fieldName.replace(/^options\./, '')
+  return (
+    doc?.optionDocs?.[name] ??
+    (doc?.options
+      ? resolveFieldDoc(
+          doc.options,
+          name,
+          (type) => (reference?.types[`${api.module}:${type}`] ?? reference?.types[type])?.members,
+          generatedApis
+            .filter((entry) => entry.library === api.library)
+            .flatMap((entry) => entry.symbols)
+        )
+      : undefined)
+  )?.summary[locale]
+}
 
 test('validates bounded writer selection before generation', () => {
   assert.equal(parseSelectedLibrary([]), null)
@@ -414,6 +444,7 @@ test('gives every public configuration field a readable contract', () => {
         assert.ok(field.type.length > 0, `${api.id}#${symbol.name}.${field.name} has no type`)
         /** Match the rendered option reference, including maintained fields outside the task guide. */
         const description =
+          referenceOptionSummary(api, symbol, field.name, 'en') ||
           findOptionTranslation(api.library, api.module, symbol.name, field.name, 'en') ||
           findApiGuide(api.library, api.module, symbol.name, 'en')?.options.find(
             (option) => option.name === field.name
@@ -712,6 +743,7 @@ test('gives every runtime option a Chinese explanation', () => {
       for (const field of symbol.configuration)
         assert.ok(
           field.descriptionZh ||
+            referenceOptionSummary(api, symbol, field.name, 'zh') ||
             findOptionTranslation(api.library, api.module, symbol.name, field.name, 'zh') ||
             findApiGuide(api.library, api.module, symbol.name, 'zh')?.options.find(
               (option) => option.name === field.name
@@ -730,6 +762,7 @@ test('closes both locales for every runtime option', () => {
         for (const field of symbol.configuration)
           assert.ok(
             guide?.options.some((option) => option.name === field.name && option.description) ||
+              referenceOptionSummary(api, symbol, field.name, locale) ||
               (locale === 'en' ? field.descriptionEn : field.descriptionZh) ||
               findOptionTranslation(api.library, api.module, symbol.name, field.name, locale),
             `${api.id}#${symbol.name}.${field.name} has no ${locale} explanation`

@@ -583,6 +583,10 @@ try {
             '被包装的原始错误；可以通过 `error.cause` 找到它，最初的失败不会丢失。'
           ),
           default: t('Not set: the error has no `cause`.', '不设置：错误没有 `cause`。'),
+          whenToUse: t(
+            'Pass the caught failure when adding a hub error code to it, so callers can inspect the original error by identity.',
+            '捕获失败后需要补充 hub 错误码时传入，使调用方仍能按对象身份找到原始错误。'
+          ),
           example: `createMicroHubError(MicroHubErrorCode.ownerGone, message, { cause: failure })`
         }
       },
@@ -619,7 +623,11 @@ try {
             '被包装的原始错误；可以通过 `error.cause` 找到它，最初的失败不会丢失。'
           ),
           default: t('Not set: the error has no `cause`.', '不设置：错误没有 `cause`。'),
-          example: `createMicroHubError(MicroHubErrorCode.ownerGone, message, { cause: failure })`
+          whenToUse: t(
+            'Pass the caught validation failure when callers need both the native TypeError and its original cause.',
+            '包装参数校验失败、且调用方需要保留原生 TypeError 和原始失败时传入。'
+          ),
+          example: `createMicroHubTypeError(MicroHubErrorCode.invalidOption, message, { cause: failure })`
         }
       },
       purpose: t(
