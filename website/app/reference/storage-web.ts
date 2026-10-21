@@ -11,6 +11,7 @@ import type {
   IEnhancerDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   ISymbolDoc,
   IText,
   ITypeDoc
@@ -25,9 +26,9 @@ const metrics = defineFeature((core) => ({
   count: async () => (await core.featureExpose.getStore().keys()).length
 }))
 const cachePlugin = definePlugin('cache', (core) => {
-  core.registerStore(memoryStorageHost())
   return {
     install: async () => {
+      core.registerStore(memoryStorageHost())
       await core.getStore().set('user:1', JSON.stringify({ name: 'Ada' }))
       return {
         count: () => core.features.metrics.count(),
@@ -213,6 +214,198 @@ const store = host.backend('${id}')
 await store.set('theme', 'dark')
 await host.dispose()`
 
+/** Each built-in factory is exercised through its own public entry and actual store operations. */
+const backendOptionCases = (
+  kind: string,
+  factory: string,
+  module: string,
+  plugin = false
+): readonly IOptionCaseDoc[] => {
+  const fields =
+    kind === 'memory'
+      ? []
+      : kind === 'indexed-db'
+        ? [
+            'dbName',
+            'kvStoreName',
+            'bytesStoreName',
+            'recordsStoreName',
+            'cleanupLegacyRecords',
+            'factory',
+            'keyRange'
+          ]
+        : kind === 'cookies'
+          ? ['namespace', 'namespaceCodec', 'scope', 'document']
+          : ['storage', 'namespace', 'namespaceCodec']
+  const options = (namespace: string, id?: string): string => {
+    const ownId = id ? `id: '${id}', ` : ''
+    if (kind === 'memory') return `{ ${ownId} }`
+    if (kind === 'indexed-db')
+      return `{ ${ownId}dbName: '${namespace}', kvStoreName: 'preferences', bytesStoreName: 'attachments', recordsStoreName: 'entities', cleanupLegacyRecords: false, factory: indexedDB, keyRange: IDBKeyRange }`
+    if (kind === 'cookies')
+      return `{ ${ownId}namespace: '${namespace}', namespaceCodec: lengthPrefixedNamespaceCodec, scope: { path: '/', secure: true, sameSite: 'lax' }, document }`
+    return `{ ${ownId}storage: window.${kind === 'local-storage' ? 'localStorage' : 'sessionStorage'}, namespace: '${namespace}', namespaceCodec: lengthPrefixedNamespaceCodec }`
+  }
+  const imports = `import { ${factory} } from '@migaia/storage-web/${module}'
+${kind === 'memory' || kind === 'indexed-db' ? '' : "import { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'\n"}${plugin ? "import { createStorageHost } from '@migaia/storage-web/host'\n" : ''}`
+  const single = plugin
+    ? `const host = await createStorageHost({ plugins: [${factory}(${options('editor-preferences', 'preferences')})] as const })
+const store = host.backend('preferences')`
+    : `const store = ${factory}(${options('editor-preferences')})`
+  const pair = plugin
+    ? `const host = await createStorageHost({ plugins: [
+  ${factory}(${options('editor-left', 'left')}),
+  ${factory}(${options('editor-right', 'right')})
+] as const })
+const left = host.backend('left')
+const right = host.backend('right')`
+    : `const left = ${factory}(${options('editor-left')})
+const right = ${factory}(${options('editor-right')})`
+  return [
+    {
+      title: t('Give editor preferences their own storage', '为编辑器偏好指定独立存储'),
+      problem: t(
+        kind === 'indexed-db'
+          ? 'The editor shares an IndexedDB environment with other applications. Explicit database and object-store names keep its layout separate. The injected factory and key-range constructor belong to the same environment. Keeping cleanupLegacyRecords false retains migrated legacy storage for rollback.'
+          : kind === 'memory'
+            ? 'An application needs a backend named preferences rather than the default memory id. Set id when installing it, then use that exact id for lookup. The host owns this volatile store.'
+            : 'The editor shares browser storage with other applications. Explicit namespace and namespaceCodec define which physical keys belong to it. Supply the intended Storage or cookie document; cookie scope is used consistently for writes and deletion.',
+        kind === 'indexed-db'
+          ? '编辑器与其他应用共用 IndexedDB 环境。显式数据库名与对象存储名将其布局隔离。注入的工厂及键范围构造器来自同一环境。保持 cleanupLegacyRecords 为假，可保留迁移后的旧存储，便于回滚。'
+          : kind === 'memory'
+            ? '应用需要名为 preferences 的后端，而不是默认 memory 标识。安装时设置 id，查询时使用同一个标识。宿主拥有这份易失存储。'
+            : '编辑器与其他应用共用浏览器存储。显式 namespace 与 namespaceCodec 确定哪些物理键属于它。传入预期的 Storage 或 cookie 文档，cookie 作用域会一致用于写入与删除。'
+      ),
+      example: `${imports}
+${single}
+try {
+  await store.set('theme', 'dark')
+  console.log(await store.get('theme'))
+} finally {
+  await ${plugin ? 'host' : 'store'}.dispose()
+}`,
+      result: t(
+        kind === 'memory'
+          ? 'Prints `dark` from the configured volatile backend. The host releases its store on disposal.'
+          : 'Prints `dark` from the configured backend. Disposal releases this instance without clearing its persisted data.',
+        kind === 'memory'
+          ? '从指定的易失后端输出 `dark`，宿主释放时会清理这份存储。'
+          : '从指定后端输出 `dark`。释放只关闭当前实例，不清空持久化数据。'
+      ),
+      covers: [...fields, ...(plugin ? ['id'] : [])]
+    },
+    {
+      title: t('Use the same logical key in separate editors', '让两个编辑器分别使用同一个逻辑键'),
+      problem: t(
+        kind === 'memory'
+          ? 'Two memory plugins need separate registrations even though both store a theme key. Give each a distinct id; duplicate ids cannot identify two backends in one host.'
+          : 'Two editor instances both store theme. Default shared names would put them in the same storage space. Use separate namespaces or database names; plugins also need distinct registration ids.',
+        kind === 'memory'
+          ? '两个内存插件都保存 theme 键，但需要独立登记。分别指定不同 id；重复标识无法在同一宿主中表示两个后端。'
+          : '两个编辑器实例都保存 theme。共用默认名称会让它们进入同一存储空间。使用不同命名空间或数据库名，插件还需要不同的登记标识。'
+      ),
+      example: `${imports}
+${pair}
+try {
+  await left.set('theme', 'dark')
+  await right.set('theme', 'light')
+  console.log(await left.get('theme'), await right.get('theme'))
+} finally {
+  ${plugin ? 'await host.dispose()' : 'await Promise.all([left.dispose(), right.dispose()])'}
+}`,
+      result: t(
+        'Prints `dark light`: each backend reads its own value for the same logical key.',
+        '输出 `dark light`：两个后端分别读到自己保存的同名逻辑键。'
+      ),
+      covers: [...fields, ...(plugin ? ['id'] : [])]
+    }
+  ]
+}
+
+/** Host settings configure the installation owner, independently of backend storage settings. */
+const hostOptionCases = (classForm: boolean): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Install a named backend within an application budget', '在应用预算内安装具名后端'),
+    problem: t(
+      'The application wants one second for storage installation and uses the standard clock explicitly. `installTimeoutMs` covers the installation batch, not later reads. The factory accepts initial plugins; the class starts empty and installs them with use.',
+      '应用为存储安装留出一秒，并显式选用标准时钟。`installTimeoutMs` 限制安装批次，不限制之后的读取。工厂接收初始插件，类形式先创建空宿主，再通过 use 安装。'
+    ),
+    example: `import { ${classForm ? 'StorageHostFacade' : 'createStorageHost'} } from '@migaia/storage-web/host'
+import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+${classForm ? "const host = new StorageHostFacade({ installTimeoutMs: 1000, scheduler: systemScheduler })\nawait host.use(memoryBackendPlugin({ id: 'cache' }))" : "const host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'cache' })] as const, installTimeoutMs: 1000, scheduler: systemScheduler })"}
+console.log(host.backends().size)
+await host.dispose()`,
+    result: t(
+      'Prints `1` after installation completes. Disposing the host releases its installed backend.',
+      '安装完成后输出 `1`。释放宿主会清理已安装后端。'
+    ),
+    covers: [...(classForm ? [] : ['plugins']), 'installTimeoutMs', 'scheduler']
+  },
+  {
+    title: t(
+      'Observe work that rejects after installation timed out',
+      '观察安装超时后才发生的拒绝'
+    ),
+    problem: t(
+      'A backend initializer can outlive its installation deadline. The original installation already failed, so a later rejection needs a separate observer. `report` receives that diagnostic; omitting it drops these diagnostics.',
+      '后端初始化器可能超过安装截止时间才结束。原安装已经失败，之后的拒绝需要独立观察者。`report` 接收这类诊断，省略时会丢弃它们。'
+    ),
+    example: `import { ${classForm ? 'StorageHostFacade' : 'createStorageHost'}, definePlugin } from '@migaia/storage-web/host'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+
+let rejectWork!: (error: unknown) => void
+const work = new Promise<void>((_resolve, reject) => { rejectWork = reject })
+let reported!: () => void
+const reportReady = new Promise<void>((resolve) => { reported = resolve })
+const reports: unknown[] = []
+const host = ${classForm ? 'new StorageHostFacade' : 'await createStorageHost'}({
+  installTimeoutMs: 100,
+  report: (error) => { reports.push(error); reported() }
+})
+const slow = definePlugin('slow', (core) => {
+  return { install: async () => { core.registerStore(memoryStorageHost()); await work; return {} } }
+})
+try { await host.use(slow) }
+catch (error) { console.log(Reflect.get(error as object, 'code')) }
+rejectWork(new Error('initializer failed late'))
+await reportReady
+console.log(reports.length > 0)
+await host.dispose()`,
+    result: t(
+      'Prints `BACKEND_INSTALL_FAILED`, then `true`: the timed-out installation fails once and the later rejection is reported.',
+      '输出 `BACKEND_INSTALL_FAILED`，然后输出 `true`：超时安装已经失败，之后的拒绝另行报告。'
+    ),
+    covers: ['report']
+  }
+]
+
+/** Entity configuration demonstrates normalization, encoding, ordering and fallback diagnostics. */
+const entityOptionExample = `import { defineEntity } from '@migaia/storage-web/entity'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { passthrough } from '@migaia/storage-web/schema'
+import { structuredCodec } from '@migaia/storage-web/serialize'
+
+type IUser = { id: string; name: string }
+const store = memoryStorageHost()
+const diagnostics: string[] = []
+const users = defineEntity<IUser>()({
+  name: 'users', key: 'id',
+  schema: { ...passthrough<IUser>(), normalize: async (value: IUser) => ({ ...value, name: value.name.trim() }) },
+  codec: structuredCodec, validateOnRead: true,
+  defaultOrderBy: (left, right) => left.name.localeCompare(right.name),
+  indexes: { byName: { path: 'name' } },
+  onDiagnostic: (message) => { diagnostics.push(message) }
+}).connect(store)
+try {
+  await users.put({ id: 'b', name: 'Grace' })
+  await users.put({ id: 'a', name: ' Ada ' })
+  console.log((await users.list()).map((user) => user.name).join(','))
+  console.log((await users.findBy('byName', 'Ada'))?.id)
+  console.log(diagnostics.length > 0)
+} finally { await store.dispose() }`
+
 /** Live query example. */
 const liveQueryExample: ICode = {
   en: `import { createRuntime } from '@migaia/reactive'
@@ -264,6 +457,7 @@ for (const [prefix, module, id, en, zh, optionsType, reactive] of backends) {
   ] as const) {
     pluginSymbols[name] = {
       role: 'enhancer',
+      optionCases: backendOptionCases(module, name, path, true),
       optionDocs: {
         id: {
           summary: t(
@@ -1006,8 +1200,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
     definePlugin: {
       role: 'factory',
       purpose: t(
-        'Defines a custom backend plugin: `descriptorFactory(core)` must call `core.registerStore(store)` and may return `install` / `expose` APIs; `features` can add a reactive adapter.',
-        '定义自定义后端插件：`descriptorFactory(core)` 必须调用 `core.registerStore(store)`，并可返回 `install` / `expose` API；`features` 可以加入响应式适配器。'
+        'Defines a custom backend plugin: `descriptorFactory(core)` returns the descriptor, whose `install` hook calls `core.registerStore(store)` while installation is active. The descriptor may expose application APIs; `features` can add a reactive adapter.',
+        '定义自定义后端插件：`descriptorFactory(core)` 返回描述对象，由其中的 `install` 钩子在安装活动期间调用 `core.registerStore(store)`。描述对象还可公开应用 API，`features` 可以加入响应式适配器。'
       ),
       params: {
         name: t('Backend id of the plugin.', '该插件的后端 id。'),
@@ -1025,8 +1219,10 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         '可交给 `createStorageHost` / `host.use` 的插件句柄。'
       ),
       example: `const remote = definePlugin('remote', (core) => {
-  core.registerStore(createRemoteStore())
-  return {}
+  return { install: () => {
+    core.registerStore(createRemoteStore())
+    return {}
+  } }
 })`
     },
     defineFeature: {
@@ -1364,6 +1560,7 @@ try {
       }
     },
     ILocalStorageOptions: {
+      optionCases: backendOptionCases('local-storage', 'localStorageHost', 'local-storage'),
       summary: t(
         'Options of `localStorageHost()` and `localStorageBackendPlugin()`.',
         '`localStorageHost()` 与本地存储插件共用的构造选项。'
@@ -1371,6 +1568,7 @@ try {
       members: webStorageFields('localStorage')
     },
     ISessionStorageOptions: {
+      optionCases: backendOptionCases('session-storage', 'sessionStorageHost', 'session-storage'),
       summary: t(
         'Options of `sessionStorageHost()` and `sessionStorageBackendPlugin()`.',
         '`sessionStorageHost()` 与会话存储插件共用的构造选项。'
@@ -1378,6 +1576,7 @@ try {
       members: webStorageFields('sessionStorage')
     },
     ICookiesOptions: {
+      optionCases: backendOptionCases('cookies', 'cookiesHost', 'cookies'),
       summary: t(
         'Options of `cookiesHost()` and the cookie plugins.',
         '`cookiesHost()` 与两个 cookie 插件共用的选项。'
@@ -1399,6 +1598,7 @@ try {
       }
     },
     IIndexedDbOptions: {
+      optionCases: backendOptionCases('indexed-db', 'indexedDbHost', 'indexed-db'),
       summary: t(
         'Options of `indexedDbHost()` and the IndexedDB plugins.',
         '`indexedDbHost()` 与两个 IndexedDB 插件共用的选项。'
@@ -1406,6 +1606,22 @@ try {
       members: indexedDbFields
     },
     IEntityOptions: {
+      optionCases: [
+        {
+          title: t('Normalize and query named user records', '归一化并查询具名用户记录'),
+          problem: t(
+            'User names need trimming before storage and alphabetical display order. `schema` owns domain normalization, `codec` owns the stored representation, and read validation stays enabled. A declared name index supports lookup; on a backend without native indexes, diagnostics explain the fallback scan.',
+            '用户名需要在保存前去除首尾空格，并按字母排序显示。`schema` 负责领域归一化，`codec` 负责存储表示，并保持读取校验开启。姓名索引支持查询；后端没有原生索引时，诊断回调说明回退扫描。'
+          ),
+          example: entityOptionExample,
+          result: t(
+            'Prints `Ada,Grace`, `a`, then `true`: names are normalized and sorted, lookup succeeds, and fallback diagnostics are observable.',
+            '输出 `Ada,Grace`、`a`，然后输出 `true`：姓名被归一化并排序，查询成功，回退诊断可被观察。'
+          ),
+          covers: ['name', 'key', 'schema', 'codec', 'validateOnRead', 'defaultOrderBy', 'indexes']
+        },
+        { ...storageWebCases.defineEntity![2]!, covers: ['name', 'key', 'version', 'migrations'] }
+      ],
       summary: t(
         'Options of `defineEntity()`.',
         '`defineEntity()` 的选项：主键、schema、版本与索引。'
@@ -1462,6 +1678,11 @@ try {
           default: t('`true`.', '`true`：读取时也校验。')
         },
         onDiagnostic: {
+          whenToUse: t(
+            'Set a callback when scans, skipped invalid records or backend fallback choices should appear in application diagnostics. It receives explanatory text without changing query results. Omitting it sends diagnostics to console.warn.',
+            '扫描、跳过无效记录或后端回退选择需要进入应用诊断时，设置回调。它接收说明文本，不改变查询结果。省略时诊断输出到 console.warn。'
+          ),
+          example: entityOptionExample,
           summary: t(
             'Receives diagnostic messages (full scans, fallbacks).',
             '接收诊断信息（全表扫描、回退路径等）。'
@@ -1828,6 +2049,7 @@ console.log(byStatus.select({ status: 'ready' }))`
       '用于记录排序的比较函数 `(left, right) => number`。'
     ),
     IStorageHostCreateOptions: {
+      optionCases: hostOptionCases(false),
       summary: t(
         'Options of `createStorageHost()`.',
         '`createStorageHost()` 的选项：初始插件与安装设置。'
@@ -1852,6 +2074,11 @@ console.log(byStatus.select({ status: 'ready' }))`
           default: t('`systemScheduler`.', '`systemScheduler`：宿主原生计时器。')
         },
         report: {
+          whenToUse: t(
+            'Supply a reporter when a timed-out initializer or delayed cleanup can fail after its caller has finished. The callback observes those secondary failures. Omission drops these diagnostics; throwing from it does not replace the installation or disposal result.',
+            '超时初始化器或延迟清理可能在调用方结束后失败时，提供报告回调。它观察这些次级失败。省略时丢弃诊断，回调抛错不会替换安装或释放结果。'
+          ),
+          example: hostOptionCases(false)[1]!.example,
           summary: t(
             'Receives late rejections and cleanup diagnostics.',
             '接收迟到的拒绝与清理诊断。'
@@ -1861,6 +2088,7 @@ console.log(byStatus.select({ status: 'ready' }))`
       }
     },
     IStorageHostOptions: {
+      optionCases: hostOptionCases(true),
       summary: t(
         'Options of `new StorageHostFacade()`.',
         '`new StorageHostFacade()` 的选项：安装超时、时钟与上报。'
@@ -1875,6 +2103,11 @@ console.log(byStatus.select({ status: 'ready' }))`
           default: t('`systemScheduler`.', '`systemScheduler`：宿主原生计时器。')
         },
         report: {
+          whenToUse: t(
+            'Supply a reporter when a timed-out initializer or delayed cleanup can fail after its caller has finished. The callback observes those secondary failures. Omission drops these diagnostics; throwing from it does not replace the installation or disposal result.',
+            '超时初始化器或延迟清理可能在调用方结束后失败时，提供报告回调。它观察这些次级失败。省略时丢弃诊断，回调抛错不会替换安装或释放结果。'
+          ),
+          example: hostOptionCases(true)[1]!.example,
           summary: t(
             'Receives late rejections and cleanup diagnostics.',
             '接收迟到的拒绝与清理诊断。'
