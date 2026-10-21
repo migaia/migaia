@@ -4,12 +4,99 @@
  * Ownership: this package schedules client slots and FIFO waiting; original public Thread and
  * Process Peers own wire calls, native creation, transfer rules, timeouts and supervision.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { runtimeSharedTypes } from './rpc-runtime-shared.js'
 import { rpcPoolCases } from './rpc-pool-cases.js'
 
 /** Creates bilingual prose without sharing fallback language. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Both native pool kinds expose the same scheduling options through their public factories. */
+const poolOptionExamples = (kind: 'Thread' | 'Process') => {
+  const childCheck = kind === 'Thread' ? 'await isThreadChild()' : 'isProcessChild()'
+  const packageName = kind === 'Thread' ? 'rpc-threads' : 'rpc-process'
+  return {
+    capacity: `import { create${kind}Pool } from '@migaia/rpc-pool'
+import { create${kind}Peer, is${kind}Child } from '@migaia/${packageName}'
+import { defineProbe } from '@migaia/rpc-core/probe'
+
+type IWorkerApi = { double(value: number): number }
+if (${childCheck}) {
+  await create${kind}Peer({ provide: { double: (value: number) => value * 2 } })
+} else {
+  const lifecycle: string[] = []
+  const probe = defineProbe({
+    stages: ['peer'],
+    emit: (event) => { if (event.lifecycle) lifecycle.push(event.lifecycle) }
+  })
+  const pool = await create${kind}Pool<IWorkerApi>({ spawn: true, size: 2, maxQueue: 8, probe })
+  try {
+    console.log(await pool.request('double', 21))
+    console.log(pool.stats().targetSize, pool.stats().memberCount, lifecycle.includes('ready'))
+  } finally {
+    await pool.close()
+  }
+}`,
+    idle: `import { create${kind}Pool } from '@migaia/rpc-pool'
+import { create${kind}Peer, is${kind}Child } from '@migaia/${packageName}'
+import { createManualScheduler } from '@migaia/utils/testing'
+
+type IWorkerApi = { identity(): string }
+if (${childCheck}) {
+  const identity = crypto.randomUUID()
+  await create${kind}Peer({ provide: { identity: () => identity } })
+} else {
+  const scheduler = createManualScheduler()
+  const pool = await create${kind}Pool<IWorkerApi>({
+    spawn: true,
+    size: 1,
+    idleTimeoutMs: 1000,
+    scheduler
+  })
+  try {
+    const before = await pool.request('identity')
+    scheduler.advance(1001)
+    const after = await pool.request('identity')
+    console.log(before !== after, pool.stats().targetSize)
+  } finally {
+    await pool.close()
+  }
+}`
+  }
+}
+
+/** Shared scenarios keep the Thread and Process option sets in sync without unknown covers. */
+const poolOptionCases = (kind: 'Thread' | 'Process'): readonly IOptionCaseDoc[] => {
+  const examples = poolOptionExamples(kind)
+  return [
+    {
+      title: t('Choose capacity and observe member startup', '选择容量并观察成员启动'),
+      problem: t(
+        'A service needs two independent members and at most eight waiting calls. size and spawn are required. maxQueue defaults to 256, and without probe member lifecycle events are not sent to this observer. The child guard lets one entry publish methods in children and create the pool only in the parent.',
+        '服务需要两个独立成员，最多允许八个调用等待。size 和 spawn 必填。maxQueue 默认为 256；不传 probe 时，不会向这个观察器发送成员生命周期事件。子程序判断让同一个入口在子程序中发布方法，只在父程序中创建池。'
+      ),
+      example: examples.capacity,
+      result: t(
+        'Prints 42, then 2 2 true. Two members are acquired, and the probe has observed readiness. Waiting calls beyond eight are rejected with QUEUE_FULL.',
+        '先输出 42，再输出 2 2 true。池已取得两个成员，探针已观察到就绪。超过八个等待调用时，以 QUEUE_FULL 拒绝。'
+      ),
+      covers: ['spawn', 'size', 'maxQueue', 'probe']
+    },
+    {
+      title: t('Release idle members and recreate them on demand', '释放空闲成员并按需重建'),
+      problem: t(
+        'A bursty service should release unused members between bursts. Without idleTimeoutMs, the pool does not retire idle members. A manual scheduler demonstrates a one-second idle timeout immediately; omit scheduler in an application to use the system clock. This scheduler controls only pool idle timers.',
+        '突发型服务需要在两次请求高峰之间释放闲置成员。不设 idleTimeoutMs 时，池不会回收空闲成员。手动调度器可以立即演示一秒空闲过期；应用中省略 scheduler 即使用系统时钟。这个调度器只控制池的空闲计时器。'
+      ),
+      example: examples.idle,
+      result: t(
+        'Prints true 1. Advancing idle time retires the first member; the next request runs in a new member while the target remains one.',
+        '输出 true 1。推进空闲时间后，第一个成员被退役；下一次请求使用新成员，目标容量仍为一。'
+      ),
+      covers: ['spawn', 'size', 'idleTimeoutMs', 'scheduler']
+    }
+  ]
+}
 
 /** A guarded single entry can serve both the parent pool and its spawned Thread children. */
 const threadExample = `import { createThreadPool } from '@migaia/rpc-pool'
@@ -520,6 +607,7 @@ console.log(RpcPoolErrorCode.callAborted)`
         '必填原线程启动来源与池调度限制，池不复制来源或改写子运行时、转移及监督策略。'
       ),
       example: threadExample,
+      optionCases: poolOptionCases('Thread'),
       members: {
         ...commonOptions,
         spawn: {
@@ -528,7 +616,7 @@ console.log(RpcPoolErrorCode.callAborted)`
             '必填原线程启动类型，支持通过守卫复用当前入口的真值、路径、网址对象或原线程启动配置，启动入口经线程连接工厂提供方法，每成员接收完全相同来源。'
           )
         },
-        probe: probeOption
+        probe: { ...probeOption, example: poolOptionExamples('Thread').capacity }
       }
     },
     IProcessPoolOptions: {
@@ -537,6 +625,7 @@ console.log(RpcPoolErrorCode.callAborted)`
         '必填原进程启动来源及通用池限制，原运行时、权限、线协议绑定及重启策略仍归进程包拥有。'
       ),
       example: processExample,
+      optionCases: poolOptionCases('Process'),
       members: {
         ...commonOptions,
         spawn: {
@@ -545,7 +634,7 @@ console.log(RpcPoolErrorCode.callAborted)`
             '必填原进程启动类型，支持通过守卫复用当前入口的真值、路径、网址对象或原进程来源配置，程序经进程连接工厂提供方法，池原样转发精确来源。'
           )
         },
-        probe: { ...probeOption, example: processExample }
+        probe: { ...probeOption, example: poolOptionExamples('Process').capacity }
       }
     },
     IRpcPoolErrorCode: {
