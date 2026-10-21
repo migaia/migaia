@@ -24,7 +24,7 @@ import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { dissolveRouteContent, emergeRouteContent, settleRouteContent } from './motion.js'
 import { OPEN_SEARCH_EVENT } from './search.js'
-import { rememberLocale } from './locale-preference.js'
+import { preferredLocale, rememberLocale } from './locale-preference.js'
 import { Button } from './components/ui/button.js'
 import type { IPageNavigationContext } from './components/page-navigation.js'
 
@@ -494,18 +494,34 @@ export default App
 
 /** Renders a stable fallback while preserving the global recovery actions. */
 export function ErrorBoundary() {
-  const locale = localeFromPath(useLocation().pathname)
+  const { pathname } = useLocation()
+  /** True when the URL itself names a locale, which then always wins. */
+  const pathHasLocale = LOCALES.includes(pathname.split('/')[1] as ILocale)
+  /**
+   * Starts from the URL so prerendered and hydrated markup match. A path without a locale, such as
+   * `/xxx`, switches after mount to the reader's remembered or browser language.
+   */
+  const [locale, setLocale] = useState<ILocale>(() => localeFromPath(pathname))
+  useEffect(() => {
+    setLocale(pathHasLocale ? localeFromPath(pathname) : preferredLocale())
+  }, [pathHasLocale, pathname])
+  const copy = copyFor(locale)
+  /**
+   * A not-found page often fails hydration, and React then rebuilds `<html>` without the boot
+   * script's theme attributes. The header that normally re-applies the theme is not mounted here.
+   */
+  useEffect(() => applyTheme(storedTheme()), [])
   return (
     <main className="page-shell">
-      <p className="eyebrow">Not found</p>
-      <h1>That page is not available.</h1>
-      <p className="lede">{ROOT_DESCRIPTION}</p>
+      <p className="eyebrow">{copy.notFound}</p>
+      <h1>{copy.pageUnavailable}</h1>
+      <p className="lede">{copy.pageUnavailableBody}</p>
       <div className="actions">
         <Link className="button button-primary" to={`/${locale}/docs`}>
-          Browse Docs
+          {copy.browseDocs}
         </Link>
         <Link className="button button-secondary" to={`/${locale}`}>
-          Language home
+          {copy.languageHome}
         </Link>
       </div>
     </main>
