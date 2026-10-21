@@ -5,12 +5,19 @@ import type { IKeyRange, IStorageKey } from './context.js'
 
 /** Hard limits protect flat-key decoding from pathological persisted input. */
 export const KEY_DOMAIN_LIMITS = Object.freeze({
+  /** Maximum recursive key depth, measured from zero for the root value. */
   maxDepth: 32,
+  /** Maximum visited nodes, counting each array and each key component. */
   maxNodes: 4096,
+  /** Maximum bytes of each ArrayBuffer key component: one mebibyte. */
   maxBinaryBytes: 1024 * 1024
 } as const)
 
-/** Validate keys for L0, bytes, and metadata channels whose contract is string-only. */
+/**
+ * Checks a string-only key before a value, byte, or metadata operation. Empty strings are valid. A
+ * non-string throws INVALID_ARGUMENT with backend and a TypeError cause; this is distinct from the
+ * structured-record INVALID_KEY domain. label defaults to key and affects diagnostic text only.
+ */
 export function assertStringStorageKey(
   value: unknown,
   backend: IBackendKind,
@@ -48,8 +55,13 @@ const bufferValue = (value: unknown): ArrayBuffer | undefined => {
 }
 
 /**
- * Validate the IndexedDB-compatible key domain. Date/ArrayBuffer use structuredClone when available
- * so cross-realm values are accepted while constructor-name forgeries are rejected.
+ * Checks the shared record-key domain before an implementation accesses storage. Accepts strings,
+ * finite numbers, valid Dates, available ArrayBuffers, and nonempty, dense, acyclic arrays of keys.
+ * KEY_DOMAIN_LIMITS bounds recursive depth, visited nodes, and each binary component's size.
+ *
+ * Date/ArrayBuffer inspection uses structuredClone when available for cross-realm support, rather
+ * than trusting constructor names. Invalid keys produce INVALID_KEY with backend/key details. label
+ * defaults to key and affects only the message. No key is copied or frozen by this assertion.
  */
 export function assertStorageKey(
   value: unknown,
@@ -95,7 +107,13 @@ export function assertStorageKey(
     })
 }
 
-/** Validate and detach one key so later asynchronous work cannot observe caller mutation. */
+/**
+ * Validates and copies a structured key before asynchronous work can observe later input changes.
+ * Strings/numbers retain their value; Dates, ArrayBuffers, and nested arrays are copied
+ * recursively, then the copy is validated again. The returned copy is independently owned but not
+ * frozen. Invalid keys or copy failures produce INVALID_KEY; existing contract failures pass
+ * through. backend identifies the provider for diagnostics, and label defaults to key.
+ */
 export const snapshotStorageKey = (
   value: unknown,
   backend: IBackendKind,
@@ -130,7 +148,12 @@ export const snapshotStorageKey = (
   }
 }
 
-/** Compare keys using the same cross-realm classification as validation and encoding. */
+/**
+ * Compares already-valid storage keys for sorting or range work without touching a provider.
+ * Returns a negative, zero, or positive number; it is not restricted to -1/0/1. Cross-type order is
+ * number, Date, string, ArrayBuffer, then array. Binary values compare bytewise and arrays compare
+ * componentwise, with a shorter equal prefix first. Use assertStorageKey before unknown inputs.
+ */
 export const compareStorageKeys = (a: IStorageKey, b: IStorageKey): number => {
   const rank = (value: IStorageKey): number => {
     if (typeof value === 'number') return 0

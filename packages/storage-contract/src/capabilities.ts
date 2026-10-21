@@ -1,18 +1,29 @@
+/**
+ * Known provider labels. A label identifies a backend family; inspect capabilities before using
+ * extensions.
+ */
 export type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'
 
+/** Provider capability facts, independent of any browser or database implementation. */
 export type IStorageCapabilities = {
+  /** Whether a synchronous key-value channel is available. */
   readonly syncRead: boolean
+  /** Whether the provider supports the byte channel. */
   readonly binary: boolean
+  /** Whether the provider supports structured records. */
   readonly records: boolean
+  /** Whether record operations can use a transaction scope. */
   readonly transactions: boolean
+  /** Whether record iteration is available. */
   readonly iteration: boolean
   /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */
   readonly secondaryIndexes: boolean
   /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */
   readonly changeFeed: boolean
   /**
-   * Approximate per-value limit in bytes: about 4096 for cookies and 5 MB for localStorage.
-   * IndexedDB uses `undefined` because quota limits total storage.
+   * Provider-declared approximate per-value byte limit, or undefined when no single-value limit is
+   * declared. Must be a non-negative safe integer when present; this package does not measure
+   * quota.
    */
   readonly maxValueBytes: number | undefined
   /** Whether the backend can contain keys hidden from JavaScript, such as `HttpOnly` cookies. */
@@ -82,11 +93,21 @@ const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspect
 /** Return capability facts and preserve the exact accessor failure for a composing guard. */
 export const snapshotStorageCapabilitiesDetailed = inspectStorageCapabilities
 
-/** Snapshot a capability descriptor once; invalid or throwing accessors return undefined. */
+/**
+ * Reads capability fields once into a new descriptor before a consumer chooses a storage route.
+ * Required flags must be booleans; maxValueBytes must be undefined or a non-negative safe integer.
+ * Legacy descriptors may omit secondaryIndexes/changeFeed; both become false in the result. Invalid
+ * objects, reflection failures, and throwing getters return undefined rather than throw. The
+ * returned record is independent of the input descriptor but is not frozen.
+ */
 export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilities | undefined => {
   return inspectStorageCapabilities(value).value
 }
 
-/** Validate the complete runtime capability descriptor shared by public boundaries. */
+/**
+ * Tests the same descriptor shape as snapshotStorageCapabilities without retaining its result.
+ * Returns false for malformed values or throwing accessors. This checks declared facts only; it
+ * does not invoke storage methods or prove a provider actually implements those capabilities.
+ */
 export const isStorageCapabilities = (value: unknown): value is IStorageCapabilities =>
   snapshotStorageCapabilities(value) !== undefined

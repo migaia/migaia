@@ -1,9 +1,9 @@
 /**
  * Defines the error codes owned by `@migaia/storage-contract` in one place.
  *
- * The `(source, code)` pair uniquely identifies an error under `docs/contracts/error-codes.md`.
- * `source` is always `@migaia/storage-contract`. Throw sites reference these constants rather than
- * inline literals.
+ * The source/code pair identifies the contract failure category. source is always
+ *
+ * @migaia/storage-contract. Throw sites reference these constants rather than inline literals.
  *
  * Code values are public API, so renaming one is a breaking change.
  */
@@ -61,5 +61,6 @@ export const StorageContractErrorCode = Object.freeze({
   aborted: 'ABORTED'
 } as const)
 
+/** Union of this package's five stable semantic error codes. */
 export type IStorageContractErrorCode =
   (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode]

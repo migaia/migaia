@@ -12,22 +12,34 @@ export const STORAGE_CONTRACT_SOURCE = '@migaia/storage-contract'
  * details belong to `storage-web`.
  */
 export type IStorageContractErrorDetails = {
+  /** Optional provider family for diagnostics. */
   readonly backend?: IBackendKind
+  /** Optional offending or affected key; retained by reference rather than copied. */
   readonly key?: string | IStorageKey
+  /** Original failure retained through the standard Error cause property. */
   readonly cause?: unknown
 }
 
 /**
  * Represents a contract error with `source` fixed to `@migaia/storage-contract`.
  * `StorageContractErrorCode` defines the codes. Freezes the instance after construction and
- * preserves `stack` and the reachable `cause` chain. See `docs/contracts/error-codes.md`.
+ * preserves stack and the reachable cause chain. Details are not deep-frozen or cloned.
  */
 export class StorageContractError extends Error {
+  /** Stable package identity, always STORAGE_CONTRACT_SOURCE. */
   readonly source: string
+  /** Semantic contract failure category from StorageContractErrorCode. */
   readonly code: IStorageContractErrorCode
+  /** Provider family supplied in details, or undefined. */
   readonly backend?: IBackendKind
+  /** Key supplied in details, or undefined. */
   readonly key?: string | IStorageKey
 
+  /**
+   * Creates and freezes a contract failure. code is required; details defaults to an empty object.
+   * message defaults to the storage-contract prefix followed by code. The original details.cause
+   * stays reachable without changing its stack or identity; freezing does not freeze that cause.
+   */
   constructor(
     code: IStorageContractErrorCode,
     details: IStorageContractErrorDetails = {},
@@ -43,5 +55,9 @@ export class StorageContractError extends Error {
   }
 }
 
+/**
+ * Checks local StorageContractError instance identity, rather than accepting a source/code
+ * lookalike.
+ */
 export const isStorageContractError = (value: unknown): value is StorageContractError =>
   value instanceof StorageContractError

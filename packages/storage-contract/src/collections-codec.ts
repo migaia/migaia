@@ -67,13 +67,22 @@ const collectionReviver = (_key: string, value: unknown): unknown => {
 }
 
 /**
- * The runtime-neutral collection codec used by persistence. It preserves ordinary JSON byte output
- * while making Map/Set identity explicit and versioned; malformed input remains tagged at the
- * storage-contract boundary with its original parser failure as cause.
+ * Encodes nested Map/Set values as reserved, versioned JSON tuples instead of empty JSON objects.
+ * Use for JSON-shaped persistence data that also contains collections. name is
+ * migaia-collections-json-v1 and output is text; the descriptor is frozen.
+ *
+ * Ordinary JSON restrictions still hold: cycles, BigInt, and an undefined root fail, while values
+ * omitted or transformed by JSON retain that behavior. Decode restores reserved Map/Set tuples;
+ * unrelated arrays remain arrays. Encoding failure, non-string input, invalid JSON, or collection
+ * reconstruction failure reject with INVALID_ARGUMENT and the original reason on cause. No timer,
+ * cancellation listener, or storage operation is created here.
  */
 export const collectionsJsonCodec: ICodec<unknown, string> = Object.freeze({
+  /** Stable versioned identity used by encoded collection tuples. */
   name: COLLECTIONS_JSON_CODEC_NAME,
+  /** Encoded collections are JSON text and can use a text-capable storage route. */
   output: 'text',
+  /** Returns JSON text with explicit Map/Set tuples, or rejects with a coded format error. */
   async encode(value: unknown): Promise<string> {
     try {
       const encoded = JSON.stringify(value, collectionReplacer)
@@ -83,6 +92,7 @@ export const collectionsJsonCodec: ICodec<unknown, string> = Object.freeze({
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
     }
   },
+  /** Parses text and restores recognized collection tuples; invalid data rejects with its cause. */
   async decode(raw: unknown): Promise<unknown> {
     if (typeof raw !== 'string')
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, {

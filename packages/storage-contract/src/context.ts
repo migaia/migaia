@@ -1,8 +1,8 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 
 /**
- * Supplies cooperative cancellation and timeouts as an optional final argument to storage
- * operations.
+ * Optional final argument for asynchronous storage operations. The contract validates its shape;
+ * the backend owns cancellation, timers, paging, and the actual operation outcome.
  */
 export type IOperationContext = {
   /**
@@ -12,27 +12,41 @@ export type IOperationContext = {
    */
   readonly signal?: IAbortSignal
   /**
-   * Creates an internal timeout signal. When an external `signal` also exists, the first signal to
-   * fire wins.
+   * Optional non-negative safe-integer timeout in milliseconds. The backend creates any timer or
+   * combined signal it needs; this contract package creates neither. Omission leaves timing to the
+   * implementation rather than supplying a default duration.
    */
   readonly timeoutMs?: number
-  /** IndexedDB iterator page size; bounded to protect cursor memory. */
+  /** Optional iterator page-size hint: an integer from 1 through 4096. No default is inserted here. */
   readonly pageSize?: number
 }
 
+/** Frozen write-conflict choices shared by asynchronous, synchronous, and transaction contracts. */
 export const ConflictPolicy = Object.freeze({
+  /** Default transaction policy: reject an existing key instead of replacing it. */
   conflict: 'conflict',
+  /** Explicitly permit replacing an existing value under the same key. */
   replace: 'replace'
 } as const)
 
+/** Supported conflict-policy values; omitted transaction policy is interpreted as conflict. */
 export type IConflictPolicy = (typeof ConflictPolicy)[keyof typeof ConflictPolicy]
 
+/** Asynchronous operation context plus an optional write-conflict choice. */
 export type IWriteOptions = IOperationContext & {
+  /**
+   * Optional conflict or replace policy. Context snapshots preserve omission; the provider applies
+   * defaults.
+   */
   readonly conflictPolicy?: IConflictPolicy
 }
 
 /** Synchronous writes cannot honor cancellation or timeout fields. */
 export type ISyncWriteOptions = {
+  /**
+   * Optional conflict or replace choice; this reduced shape accepts no cancellation or timeout
+   * control.
+   */
   readonly conflictPolicy?: IConflictPolicy
 }
 
@@ -47,8 +61,12 @@ export type IStorageKey = string | number | Date | ArrayBuffer | readonly IStora
  * structured backends can implement it.
  */
 export type IKeyRange<TKey extends IStorageKey = IStorageKey> = {
+  /** Optional lower key bound. Omit for no lower bound; validate keys before backend use. */
   readonly lower?: TKey
+  /** Whether the lower endpoint is excluded; omitted means a closed endpoint under range semantics. */
   readonly lowerOpen?: boolean
+  /** Optional upper key bound; omission leaves the range unbounded above. */
   readonly upper?: TKey
+  /** Whether the upper endpoint is excluded; omitted means a closed endpoint under range semantics. */
   readonly upperOpen?: boolean
 }

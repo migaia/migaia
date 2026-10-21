@@ -2,7 +2,13 @@ import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import type { ICodec } from './codec.js'
 import { StorageContractErrorText } from './error-text.js'
 
-/** Read and validate a codec descriptor once so routing cannot observe changed accessors. */
+/**
+ * Reads a codec's name, output, encode, and decode once before capability-based routing. Accepts
+ * non-array objects, including class instances, with a nonblank name, text/binary/structured
+ * output, and two callable methods. Returns a new shallow descriptor, without running the methods
+ * or capturing their original receiver; the result is not frozen. Malformed descriptors and
+ * getter/reflection failures throw INVALID_ARGUMENT with cause retained.
+ */
 export const snapshotCodec = (codec: unknown): ICodec => {
   const candidate = codec as Record<string, unknown>
   let name: unknown
@@ -32,7 +38,7 @@ export const snapshotCodec = (codec: unknown): ICodec => {
   return { name, output, encode, decode } as ICodec
 }
 
-/** Validate the common runtime codec descriptor before any capability routing. */
+/** Applies snapshotCodec's validation for type narrowing; returns void or throws INVALID_ARGUMENT. */
 export function assertCodec(codec: unknown): asserts codec is ICodec {
   snapshotCodec(codec)
 }

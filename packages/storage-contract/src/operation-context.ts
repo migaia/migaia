@@ -8,14 +8,28 @@ type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown
 }
 
+/** Frozen operation fields captured once. The signal remains the original live signal object. */
 export type IOperationContextSnapshot = IOperationContext & {
+  /**
+   * Optional validated write policy; omission remains undefined rather than inserting a provider
+   * default.
+   */
   readonly conflictPolicy?: IConflictPolicy
 }
 
 /** Tracks frozen snapshots created here so layered consumers never re-read host getters. */
 const operationContextSnapshots = new WeakSet<object>()
 
-/** Read operation options once, validate them, and return an immutable-by-ownership snapshot. */
+/**
+ * Captures operation fields before a backend starts I/O, timers, or cancellation handling.
+ * undefined stays undefined; a snapshot previously produced here is returned by identity. Otherwise
+ * reads signal, timeoutMs, pageSize, and conflictPolicy once into a frozen record.
+ *
+ * TimeoutMs must be a non-negative safe integer; pageSize an integer from 1 through 4096;
+ * conflictPolicy is conflict or replace. A signal must expose boolean aborted and callable
+ * add/remove methods. Invalid fields/getters throw INVALID_ARGUMENT with the original cause. No
+ * timer or listener is installed, and an already-aborted valid signal is not rejected here.
+ */
 export const snapshotOperationContext = (
   ctx: IOperationValidationContext | undefined
 ): IOperationContextSnapshot | undefined => {
@@ -89,12 +103,21 @@ export const snapshotOperationContext = (
   return snapshot
 }
 
-/** Validate operation timing options before creating timers or merged signals. */
+/**
+ * Validates the same operation shape as snapshotOperationContext and discards the snapshot. Valid
+ * input returns void; invalid fields throw INVALID_ARGUMENT. This performs no I/O and does not
+ * enforce a deadline, observe cancellation, or create a timer.
+ */
 export const assertOperationContext = (ctx: IOperationValidationContext | undefined): void => {
   snapshotOperationContext(ctx)
 }
 
-/** Validate the reduced write context supported by synchronous channels. */
+/**
+ * Captures a synchronous write's conflictPolicy without creating asynchronous control state.
+ * Omitted options produce a new record with an undefined policy. conflict and replace are valid;
+ * non-undefined signal/timeoutMs, malformed options, or invalid policy throw INVALID_ARGUMENT.
+ * Getter/reflection failures are retained as cause. The returned record is not frozen.
+ */
 export const snapshotSyncWriteOptions = (
   options: unknown
 ): { readonly conflictPolicy?: IConflictPolicy } => {
@@ -131,7 +154,7 @@ export const snapshotSyncWriteOptions = (
   return { conflictPolicy: conflictPolicy as IConflictPolicy | undefined }
 }
 
-/** Validate the reduced write context supported by synchronous channels. */
+/** Validates snapshotSyncWriteOptions' reduced shape, returning void or throwing INVALID_ARGUMENT. */
 export const assertSyncWriteOptions = (options: unknown): void => {
   snapshotSyncWriteOptions(options)
 }
