@@ -1,20 +1,97 @@
 # `@migaia/rpc-threads`
 
-**Worker 线程 RPC。** 用一套 `request` / `notify` / `stream` 调用 Worker 中的函数，Worker 也能反向调用主线程。支持 Node `worker_threads`、Bun、Deno、浏览器 Web Worker 和 Electron。本包负责创建 Worker、建立消息端口和监督重启；调用语义、超时、取消、错误还原等由 `@migaia/rpc-core` 统一提供，Peer 调用 API 与 [`@migaia/rpc-process`](../rpc-process/README.md)、[`@migaia/rpc-browser`](../rpc-browser/README.md) 一致。
+把函数调用交给真实 Worker 执行，通过一套双向请求与流接口管理结果、重启和关闭。
 
-## 适用与不适用场景
+## 你可能遇到过
 
-**适用：**
+- 计算移出主线程后仍只检查进程 id，无法确认任务是否进入了不同线程。
+- Worker 还要调用父端并逐项返回结果，多套消息路由让请求关联与释放重复出现。
+- 发送字节后不知道谁还能使用原 buffer，把复制和转移混在一起造成所有权误判。
+- 重启完成后仍靠固定等待再调用，因为原生启动与应用目录就绪没有对齐。
+- 清理一个组件就关闭共享端口，因为连接的生命周期被误当成原生资源的所有权。
 
-- 把 CPU 密集计算（解析、压缩、图像处理）移出主线程，避免阻塞事件循环或 UI。
-- 需要像调用本地函数一样调用 Worker，而不是手写 `postMessage` 和消息分发。
-- 由 PluginHost 统一管理多个 Worker：查询、重启、替换。
+## 为什么选它
 
-**不适用：**
+- **区分真实 Worker 与独立进程。** 常见做法只看返回值，本例同时比较原生 pid 和 threadId，证明计算来自同进程的另一线程，见[同名场景](./USEGUIDE.md#在真实-worker-上执行任务并区分线程与进程)。
+- **反向请求与结果流使用同一连接。** 不必另建父端路由和序列协议，例子分别返回父端处理结果与三个流值，见[同名场景](./USEGUIDE.md#通过同一连接反向调用父端并消费-worker-结果)。
+- **默认复制保留调用方字节，未授权转移明确拒绝。** 不依赖“原生端口就能转移”的假设，例子验证副本修改、原 buffer 和提供方调用次数，见[同名场景](./USEGUIDE.md#未签名的-rpc-转移被拒绝后仍可使用原字节)。
+- **Host 报告重启就绪后可立即调用。** 不靠固定延时猜目录是否切换，例子在 ready 后立即读到新 Worker 的初始计数，见[同名场景](./USEGUIDE.md#host-报告重启就绪后立即调用新-worker)。
+- **逻辑关闭保留借入端口。** 不把注销连接等同于销毁物理资源，例子在共享关闭 Promise 完成后仍通过原端口收发，见[同名场景](./USEGUIDE.md#关闭借用通道后继续使用原生端口)。
 
-- 需要进程级隔离（崩溃互不影响、独立权限）：用 [`@migaia/rpc-process`](../rpc-process/README.md)。
-- 浏览器内跨窗口、iframe、SharedWorker、可靠有序的 RTCDataChannel：用 [`@migaia/rpc-browser`](../rpc-browser/README.md) 的 `createBrowserPeer`；Service Worker 与 BroadcastChannel 使用该包的 Endpoint transport。
-- 需要 `SharedArrayBuffer` / `Atomics` 共享内存：不在支持范围内，传入会被拒绝。
+## 从这里开始
+
+先安装本包及 Core、Contract 两个 peer，保存为 ESM 项目的 overview.ts，用 Node 24 直接运行；整个入口会在 Worker 中再次执行。
+
+```bash
+pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
+```
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+if (await isThreadChild()) {
+  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
+} else {
+  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })
+  try {
+    console.log(await worker.request('double', 21))
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+输出：
+
+```text
+42
+```
+
+需要复制或转移字节时看[未签名的 RPC 转移被拒绝后仍可使用原字节](./USEGUIDE.md#未签名的-rpc-转移被拒绝后仍可使用原字节)，需要重启后立即调用时看[Host 报告重启就绪后立即调用新 Worker](./USEGUIDE.md#host-报告重启就绪后立即调用新-worker)。
+
+provide.double 接收数值参数；spawn: true 选择当前入口，父端 finally 关闭自己拥有的 Worker。短来源默认容量 1、systemScheduler、best-effort 隔离和 30000 ms 调用期限；未设置 self 使用自动身份，未设置 report 使用默认诊断输出。
+
+## 手写时的隐患
+
+仅展示同一“发数值、取计算结果”场景，不运行：
+
+```ts doc-test=check
+import { Worker } from 'node:worker_threads'
+
+const source = `
+  import { parentPort } from 'node:worker_threads'
+  parentPort.on('message', (value) => parentPort.postMessage(value * 2))
+`
+const worker = new Worker(new URL('data:text/javascript,' + encodeURIComponent(source)))
+worker.once('message', (value) => console.log(value)) // 没有请求标识，并发结果难以对应
+worker.postMessage(21) // 没有调用期限或取消路径
+void worker // 未安排最终释放，Worker 可能继续存活
+```
+
+上一节用 request 关联一次调用及其结果，并在 finally 中关闭拥有的 Worker；child guard 则避免当前入口在子线程中再次派生。原生片段只展示隐患，不运行。
+
+## 三分钟心智模型
+
+| 需要解决的问题      | 使用工具                         | 谁负责释放                           |
+| ------------------- | -------------------------------- | ------------------------------------ |
+| 一个独立 Worker     | createThreadPeer + spawn         | Peer 创建者 await close。            |
+| Worker 反向调用     | 父端 provide + 子端 request      | 同一个 Peer 连接。                   |
+| 多个结果逐项到达    | stream + iterable provider       | 消费方结束迭代，最后关闭 Peer。      |
+| Host 管理重启与替换 | createThreadPlugin + host.thread | Host。                               |
+| 已有 MessagePort    | connect + channel                | 连接只退订，原生端口仍由调用方关闭。 |
+
+**Peer** 是持有一条逻辑连接的调用对象；**代次** 是一次启动得到的 Worker 实例；**能力提案** 是本地愿意支持的协议标签，双方实际确认后才可用；**预算** 限制同时存活的 Worker，不是 CPU 计时。
+
+## 典型场景
+
+| 场景                                       | 怎么组合                                                    | 详细说明                                                             |
+| ------------------------------------------ | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| 在真实 Worker 上执行任务并区分线程与进程   | isThreadChild → createThreadPeer → request → close          | [完整代码](./USEGUIDE.md#在真实-worker-上执行任务并区分线程与进程)   |
+| 通过同一连接反向调用父端并消费 Worker 结果 | provide → request / stream → close                          | [完整代码](./USEGUIDE.md#通过同一连接反向调用父端并消费-worker-结果) |
+| 未签名的 RPC 转移被拒绝后仍可使用原字节    | request → transfer admission → request                      | [完整代码](./USEGUIDE.md#未签名的-rpc-转移被拒绝后仍可使用原字节)    |
+| Host 报告重启就绪后立即调用新 Worker       | createThreadPlugin → host.use → restart → request → dispose | [完整代码](./USEGUIDE.md#host-报告重启就绪后立即调用新-worker)       |
+| 关闭借用通道后继续使用原生端口             | channel → subscribe → close → native postMessage            | [完整代码](./USEGUIDE.md#关闭借用通道后继续使用原生端口)             |
+| 真实原生转移后保留捕获字节并替换观察回调   | observe → send(transfer) → replace / stop                   | [完整代码](./USEGUIDE.md#真实原生转移后保留捕获字节并替换观察回调)   |
 
 ## 安装
 
@@ -22,206 +99,172 @@
 pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
 ```
 
-`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.9`）。运行时依赖 `@migaia/supervision`、`@migaia/lifecycle`、`@migaia/utils`，随包安装。使用 `./adapters/electron-main` 时需安装可选 peer `electron` ^44。
+Node 24 可直接运行本页真实 .ts 文件；发布的 Node engine 下限为 >=18，不代表所有版本都有 Node 24 的类型剥离能力。浏览器入口需使用已构建的模块 URL。两个底层通道场景直接导入 utils，Host 场景直接导入 PluginHost，按需另装：
 
-## 入口一览
-
-| 入口                           | 内容                                                                                                                 |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `@migaia/rpc-threads`          | `createThreadPeer`、`createThreadPlugin`、`isThreadChild`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数 |
-| `./adapters/node`              | `createNodeThreadLauncher`、`createNodeThreadChannelFactory`（Node `worker_threads`）                                |
-| `./adapters/electron-main`     | `createElectronMainThreadLauncher`、`createElectronMainThreadChannelFactory`                                         |
-
-Web、Bun、Deno 与 Electron renderer 共用 root 的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 统一从 root 导入。
-
-## 快速开始
-
-保存下面两个文件，编译为同目录的 `worker.js` 和 `main.js`，再运行 `main.js`。Worker 入口只声明自己提供的方法；由库创建时，它会自动连回父线程。后台错误默认交给 `console.error`。
-
-```ts doc-test=run file=worker.ts
-// worker.ts
-import { createThreadPeer } from '@migaia/rpc-threads'
-
-await createThreadPeer({
-  provide: {
-    math: { double: (value: number) => value * 2 },
-    bytes: {
-      inspect: (buffer: ArrayBuffer) => ({
-        length: buffer.byteLength,
-        first: new Uint8Array(buffer)[0]
-      })
-    }
-  }
-})
+```bash
+pnpm add @migaia/plugin-host @migaia/utils
 ```
 
-主线程只需要 Worker 入口。Node / Bun / Deno 的 launcher、一个 Worker 的预算、调度器和通道由当前运行时的适配器延迟加载：
+## 常用 API
 
-```ts doc-test=run file=main.ts
-// main.ts
-import { createThreadPeer } from '@migaia/rpc-threads'
+| API                              | 什么时候用                            |
+| -------------------------------- | ------------------------------------- |
+| createThreadPeer                 | 独立持有一条 Worker 或已有端口连接。  |
+| isThreadChild                    | self spawn 前先区分父子分支。         |
+| peer.request / notify            | 单次结果或无需业务完成回执的调用。    |
+| peer.stream                      | 逐项消费远端序列。                    |
+| createThreadPlugin / host.thread | 把 Worker 安装、重启和替换交给 Host。 |
+| peer.close / host.dispose        | 释放自己拥有的连接和 Worker。         |
 
-type IWorkerApi = {
-  math: { double: (value: number) => number }
-  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }
-}
-/** 当前文件的相邻模块是 Worker 入口。 */
-const worker = await createThreadPeer<IWorkerApi>({
-  spawn: new URL('./worker.js', import.meta.url)
-})
-try {
-  console.log(await worker.request('math.double', 21)) // 42
-  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))
-  // { length: 3, first: 7 }
-} finally {
-  await worker.close() // 关闭连接并终止 Worker
-}
-```
+## 契约细节
 
-`spawn` 接受 `true`、`URL`、路径字符串，或以 `entry` 为必填字段的短对象；`base`、`name`、`data`、`limits` 与既有 source 的依赖和监督字段都可覆盖。相对字符串按**主入口文件所在目录**解析；显式 `base: import.meta.url` 可改为当前模块，`URL` 始终按原值使用。短形式只展开为既有 source，仍经过相同的监督、握手和关闭路径。缺少 enforced 退出观察且未提供 health 时，绑定使用实际 RPC ping 做健康检查；能力仍保持 unsupported，不把 ping 当作原生退出证据。字段详情见 [USEGUIDE 第 3 节](./USEGUIDE.md#3-spawn-短形式)，完整配置见[高阶用法](#高阶用法完整-source)。
+### 职责、安装与入口
 
-## 同一个文件作为 Worker
+本包创建 Worker、接入消息端口，并把 Worker 的预算、启动、重启和释放交给监督器。调用关联、目录、超时、取消、错误还原和重试归 Core；协议与便携值归 Contract。它适合把解析、压缩、图像处理等计算移出主线程，以及让 Host 统一管理多条 Worker 连接。
 
-`spawn: true` 会重新执行主入口的全部顶层代码。用 `await isThreadChild()` 分开两支，避免子线程再次创建 Worker：
+线程共享进程，不能代替独立进程的权限或故障隔离。需要独立进程时使用 [rpc-process](../rpc-process/README.md)；跨窗口、iframe、SharedWorker、可靠有序 RTCDataChannel 的 Peer 使用 [rpc-browser](../rpc-browser/README.md)，Service Worker 和 BroadcastChannel 使用该包的 Endpoint transport。SharedArrayBuffer / Atomics 共享内存不在本包支持范围内。
 
-```ts doc-test=run file=self.ts
-import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+| 入口                                         | 内容                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `@migaia/rpc-threads`                        | Peer、Plugin、child guard、错误码、高级通道与 Web launcher，以及公开配置和 handle 类型。 |
+| `@migaia/rpc-threads/adapters/node`          | `createNodeThreadLauncher`、`createNodeThreadChannelFactory`。                           |
+| `@migaia/rpc-threads/adapters/electron-main` | `createElectronMainThreadLauncher`、`createElectronMainThreadChannelFactory`。           |
 
-type IMathApi = { double(value: number): number }
+直接安装 Core 与 Contract 两个 peer 依赖；不以硬编码版本相等作为运行时规则。lifecycle、supervision、utils 是运行时依赖。Electron-main 入口另需可选 peer `electron: ^44.0.0`。示例直接导入 PluginHost 或 utils 时，也应直接安装相应包。
 
-if (await isThreadChild()) {
-  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
-} else {
-  /** 当前主入口的副本提供计算方法。 */
-  const worker = await createThreadPeer<IMathApi>({ spawn: true })
-  try {
-    console.log(await worker.request('double', 21)) // 42
-  } finally {
-    await worker.close()
-  }
-}
-```
+Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。
 
-`isThreadChild()` 读取既有 launcher bootstrap 标记；它不授权外部 Worker。REPL、`--eval`、打包成单个二进制、Electron、以测试运行器为主入口等没有可用入口的场景，self spawn 以 `INVALID_CONFIG` 拒绝，不猜入口。
+### Peer 来源、类型与调用
 
-`.ts` 入口可直接传入。Node 24 能剥离类型，但不会把 `./x.js` 改为 `./x.ts`；Bun 支持该映射，Node / Deno 应使用编译后的 `.js`，或能处理该映射的 loader。模块解析失败保留原始 `cause`。
+`createThreadPeer<TRemote>(options, runtime?)` 返回 typed Peer。`TRemote` 默认 `Record<never, never>`，只约束调用端类型，不注册 Worker 方法。`IRuntimeDynamicSurface` 可以放宽静态路径检查，运行时仍以对端真实目录为准。默认本地身份为 `{ name: 'thread', instanceId: 自动生成值 }`；需要稳定地址时显式传 `self.name`、`self.instanceId`。
 
-浏览器请传明确的 Worker URL；`true` 和裸字符串只用于 Node / Bun / Deno。`spawn: new URL('./worker.js', import.meta.url)` 使用已经构建的模块。Vite / webpack 的 Worker 源码发现依赖字面量 `new Worker(new URL('./worker.ts', import.meta.url))`；库内部的动态构造不能代替这一规则。源码打包需预构建 Worker URL，或使用[自定义 Worker 构造](./USEGUIDE.md#8-高阶用法完整-source-与自定义-worker-构造)。
+主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。
 
-## 两种所有权：Peer 与 Plugin
+`provide` 缺省不暴露应用方法；自身可枚举数据属性中的函数形成方法，嵌套对象形成点分路径，不接受 accessor 作为方法声明。返回 iterable / async iterable 的方法通过 `stream` 调用。Worker 端也是 Peer，可反向调用父线程的 `provide`。
 
-- **`createThreadPeer`**：独立连接，调用方负责 `close()`。
-- **`createThreadPlugin`**：安装进 `@migaia/plugin-host`，由 Host 持有和释放。经 `host.thread.request(target, method, …)` 调用；`list` / `get` / `stop` / `kill` / `restart` / `replace` 也在这个出口上。
+| 调用                                 | 用途与边界                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `request(method, ...args)`           | 等待一次结果，参数形式由真实目录与 typed surface 约束。                    |
+| `notify(method, ...args)`            | 单向调用，不提供业务执行完成回执。                                         |
+| `stream(method, ...args)`            | 逐项消费远端 iterable / async iterable；取消仍依赖远端配合。               |
+| `group`、`outcome`、`describe`、`on` | 复用 Core 的分组、结果对账、目录和事件规则。                               |
+| `close()`、异步释放协议              | 调用方释放独立 Peer；spawn 来源还释放它拥有的 Worker，借用来源只释放连接。 |
 
-```ts doc-test=run file=worker.ts
-import { createThreadPeer } from '@migaia/rpc-threads'
+`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。
 
-await createThreadPeer({
-  provide: { math: { double: (value: number) => value * 2 } }
-})
-```
+`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。
 
-```ts doc-test=run file=main.ts
-import { defineHost } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+### 短 spawn、入口解析与监督默认值
 
-type IWorkerApi = { math: { double(value: number): number } }
-/** Host 接管 Worker 的连接与释放。 */
-const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({
-  name: 'worker',
-  spawn: new URL('./worker.js', import.meta.url)
-})
-/** 安装线程插件后，thread 出口提供调用与监督操作。 */
-const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-try {
-  await host.use(worker)
-  console.log(await host.thread!.request('worker', 'math.double', 21)) // 42
-} finally {
-  await host.dispose()
-}
-```
+| `spawn`                 | 含义                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `true`                  | 重新执行当前主入口的全部顶层代码；先 await child guard，把主线程副作用放在父分支。 |
+| URL                     | 精确使用该 URL。                                                                   |
+| 路径字符串              | Node / Bun / Deno 下相对主入口目录解析；绝对文件路径按文件 URL 编码。              |
+| `{ entry, ...options }` | entry 接受 true、URL、字符串，可覆盖下表字段。                                     |
 
-## 高阶用法：完整 source
+| 短对象字段                   | 省略值与用途                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `base`                       | 未设置；相对 entry 默认以主入口为基准，显式模块 URL / URL 字符串可改基准，不通过堆栈猜调用模块。                              |
+| `name`、`data`、`limits`     | 未设置；传入 Worker spec。data 先经 normalizePortable 形成快照，失败在 Worker 构造前以 Core INVALID_CONFIG 拒绝并保留 cause。 |
+| `scheduler`                  | systemScheduler；同一预算和默认 channel factory 使用它。                                                                      |
+| `budget`                     | `createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler })`。                                                              |
+| `launcher`、`channelFactory` | 按真实运行时延迟加载；自定义 factory 必须使用同一个 scheduler。                                                               |
+| `report`                     | 先取 source.report，再取顶层 options.report，最后 Core 默认 reporter。                                                        |
+| `health`                     | 未设置；仅当 launcher 没有 enforced exit-observation 时，绑定补实际 Endpoint ping；显式 health 优先且保留引用。               |
+| `supervisor.isolation`       | 短形式默认 `'best-effort'`；取值 `'required'` / `'best-effort'`。                                                             |
+| `keyFactory`、`retryPort`    | 未设置；顶层同名配置优先于 source 字段。                                                                                      |
 
-原来的完整 source 对象继续有效。需要自定义预算、监督或 runtime 时，显式组合平台 launcher 与 channel factory；两者共用同一个 scheduler。下面导出的对象可直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`，入口使用快速开始的 `worker.js`：
+短形式只是展开已有完整 source，不允许自报“已经协商”或“已经信任”。监督字段继续由 supervision 校验和执行：
 
-```ts doc-test=check file=source.ts
-import { fileURLToPath } from 'node:url'
-import {
-  createNodeThreadLauncher,
-  createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
+| 字段                                                          | 默认与取值                                                                                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `supervisor.id`                                               | 自动生成。                                                                                                               |
+| `supervisor.ready`                                            | 未设置；可提供真实就绪检查。                                                                                             |
+| `supervisor.startupTimeoutMs`                                 | 10000 ms。                                                                                                               |
+| `supervisor.restart.mode`                                     | `'on-failure'`；另有 `'never'`、`'always'`。                                                                             |
+| `supervisor.restart.maxRestarts` / `windowMs`                 | 5 / 60000 ms。                                                                                                           |
+| `supervisor.restart.initialDelayMs` / `factor` / `maxDelayMs` | 250 ms / 2 / 30000 ms，有界指数退避。                                                                                    |
+| `supervisor.terminalPolicy`                                   | 省略相当于 mode 为 stay，保持 terminal；另可选 mode 为 cooldown 并提供 afterMs 后重新尝试，terminal 不是“永远无法恢复”。 |
+| `supervisor.stop.exitTimeoutMs` / `reapTimeoutMs`             | 各 5000 ms。                                                                                                             |
+| `supervisor.stop.beforeTerminate`                             | 未设置；绑定先在剩余预算内排空当前调用，再调用自定义钩子。                                                               |
 
-/** 后台错误由应用统一记录。 */
-const report = (error: unknown) => console.error(error)
-/** Node source 显式持有一个 Worker 的预算与监督依赖。 */
-export const spawn = {
-  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },
-  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
-  scheduler: systemScheduler,
-  launcher: createNodeThreadLauncher(),
-  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-  report
-}
-```
+默认 RPC health 使用 5000 ms 间隔、2000 ms 单次上限、连续 3 次失败策略。Endpoint 尚未绑定时由原准备期限管理，绑定后只探测该 handle 的真实 Endpoint。显式去掉 ping 却未提供自定义 health 会以 INVALID_CONFIG 拒绝；健康检查不会把 unsupported 原生退出能力变成 enforced。
 
-各平台组合与 Web Worker 终止能力边界见 [USEGUIDE 第 8 节](./USEGUIDE.md#8-高阶用法完整-source-与自定义-worker-构造)。
+Node / Bun self spawn 保留运行时 flags；显式不同入口会过滤父进程的 eval、print、测试控制参数，保留 loader 等运行时 flags。REPL、eval、单文件二进制、Electron 和测试运行器等没有可复用主入口时，self spawn 以 INVALID_CONFIG 拒绝，不猜入口；显式可用入口不受“不能 self spawn”的推断限制。
 
-## 二进制数据
+Node 24 可剥离 .ts 类型，但不把相对 `./x.js` 重定向为 `./x.ts`；Bun 支持此映射。含这种 specifier 的工程在 Node / Deno 下使用构建输出或合适 loader，解析错误保留原 cause。浏览器只接受明确 URL，不接受 true / 裸字符串；动态 Worker 构造也不能替代 bundler 的字面量源码发现。应提供预构建模块 URL，或在自定义构造器内保留字面量 Worker 构造。Deno Worker 仍需相应宿主权限。
 
-`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。双方在 `createThreadPeer` 上配置 `authentication: { sign, verify }` 后，普通 launcher 与 channel factory 就能使用现有的签名原生二进制与 `transfer`；无需自定义 Endpoint。签名函数必须保护完整输入，校验函数必须拒绝伪造签名。Core 在实际端口上确认能力，并由认证中间件建立信任事实。
+### PluginHost 与代次所有权
 
-先保存 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer) 的 `signing.ts` 和 `worker.ts`；双方从各自环境读取同一 `RPC_SIGNING_KEY`，然后运行下面的主线程配置：
+`createThreadPlugin(options, runtime?)` 复用 Peer 来源、provide 与认证配置，另需 `name`，`expose` 缺省为空数组：不向 Worker 暴露 Host 应用方法。只有明确选中的 Host 路径可见。安装后由 Host 持有连接和 Worker，经 `host.thread` 操作；直接 Peer 则由创建者关闭。
 
-```ts doc-test=run group=thread-signed-transfer file=readme-main.ts entry=readme-main.ts
-// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。
-import { createThreadPeer } from '@migaia/rpc-threads'
-import { randomBytes } from 'node:crypto'
+`host.thread.request` / notify / stream / group / outcome 的第一参数是连接名或 `{ name, instanceId }`。list / get 查询连接及当前代次，broadcast 返回每个目标的独立结果，on / watch 复用 Core 事件目录。stop / kill / restart / replace 仅用于 spawn 来源；连接来源不能据此终止外部 Worker。线程 stop 只接受 `{ graceMs }`，出现 signal 字段（即便 undefined）也拒绝。
 
-/** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */
-process.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')
-/** 设置环境后才加载签名模块，实际 Worker 继承同一环境。 */
-const { authentication } = await import('./signing.js')
+restart 返回 ready、replace 返回 replaced 时，新代次已经发布进调用目录，可以立即调用，不需额外等待事件或自行退避。替换不会把已发往旧代次的业务自动迁移到新代次。Host 的 execution.mutationTimeoutMs 和 pipelineDrainTimeoutMs 必须显式配置，false 表示不设该预算。
 
-type IBytesApi = {
-  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }
-}
-/** 短 source 保留同一签名与原生 transfer owner，无需重复 Worker wiring。 */
-const worker = await createThreadPeer<IBytesApi>({
-  spawn: new URL('./worker.js', import.meta.url),
-  authentication
-})
-try {
-  const buffer = new Uint8Array([7, 8, 9]).buffer
-  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))
-  // { length: 3, first: 7 }
-  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效
-} finally {
-  await worker.close()
-}
-```
+### 二进制复制、签名与转移
 
-未配置签名时，`transfer` 仍以 `CAPABILITY_UNSUPPORTED` 拒绝。完整的签名配置与 Worker 示例见 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer)。
+| 输入或选项                          | 行为                                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| ArrayBuffer / Uint8Array            | 默认按值复制，原 buffer 仍可用；Uint8Array 的 offset / length 得到保留。                  |
+| `{ transfer: [buffer] }`            | 必须实际协商原生二进制与 transfer 能力，并建立签名认证；不满足时 CAPABILITY_UNSUPPORTED。 |
+| SharedArrayBuffer / 其它 TypedArray | 不支持，调用准入时拒绝。                                                                  |
 
-## 载体观察
+要使用普通 factory 的签名原生二进制，在双方 `createThreadPeer` 配置 `authentication: { sign, verify }`；无需另建 Endpoint。`sign` 保护完整语义输入及 Core 为原生 backing 计算的摘要，`verify` 必须拒绝伪造签名。该 profile 签名但不加密，encodedType 使用默认 any。能力提案经实际端口双边确认，配置里的字符串不构成信任证据。
 
-Node、Bun、Deno、浏览器 Web Worker 与 Electron 通道共用 Core 的 MessagePort transport；通过最终通道的 `transport.observe(probe)` 安装物理观察，每次发送和接收各报告一次。`detail.transfers` 在发送时是原生 transfer 列表长度，接收时为 `-1`，因为 structured clone 无法区分原生 buffer 是复制还是转移。直接 `ArrayBuffer` 或其 view 的 `sizeBytes` 是字节长度；其他原生消息为 `-1`。内容只在 `probe.capturing` 开启时读取，未转移内容保留原引用；实际转移的 buffer 在发送前复制以保留观察字节。Core 对 own-data 原生容器的选择性捕获保留 Array、Record、Map、Set 中的循环、共享 backing 与未转移对象引用；只通过 accessor 返回转移 buffer 的捕获仍需契约裁定，因为额外调用 getter 会改变原有调用次数。Probe 异常沿既有 `onListenerError` 报告为 `@migaia/rpc/core` / `TRANSPORT`，原异常保留在 `cause`，消息继续发送和接收。重复安装替换上一代；旧 disposer 不会解除新一代。调用当前代 disposer 或逻辑 `channel.close()` 停止观察；既有原生终端处理也会退休观察。借用 Node 端口逻辑 close 只退休 observer，原有物理端口关闭状态、监听与错误 cause 顺序不变。
+使用 HMAC 时，双方从各自部署配置读取同一个密钥；密钥不经 RPC 发送，也不进入日志。可由应用用 createHmac 对完整输入生成签名，verify 先检查签名长度再用 timingSafeEqual 校验，失败抛出认证错误。旧示例中的 RPC_SIGNING_KEY 是应用环境变量名，不是库自动提供的凭据。Node Worker 继承环境，应用应在加载读取密钥的模块前设置部署配置。
 
-## 错误
+buffer 在消息真正提交到原生端口时失效，byteLength 变为 0，共享 backing 的所有 view 同时失效。之后即使对端拒绝签名或调用失败，也不能恢复原 buffer。带 transfer 的调用不自动重试，库不保留输入副本；确认业务结果后按需重新构造数据。这里描述原生转移机制，没有未经测量的速度保证。
 
-错误带 `(source, code)`。本包自己只有一个错误码：`@migaia/rpc/threads` / `THREAD_USAGE_SAMPLE_FAILED`（采样 Worker 资源用量失败）。调用层错误来自 `@migaia/rpc/core`，例如 `DEADLINE_EXCEEDED`、`CANCELLED`、`OVERLOADED`。Worker 中抛出的业务错误会还原原生类型、`message` 和 `stack`。超时或取消不代表 Worker 没有执行，重试前先对账，见 [USEGUIDE 第 7 节](./USEGUIDE.md#7-错误处理)。
+### 现有端口与高级 source
 
-## 相关包
+`createNodeThreadChannel(port, peerId, options)` 借用 EventEmitter 端口，`createWebThreadChannel` 借用 EventTarget 端口；options.scheduler 必填。未传 capabilities 时使用固定基础 profile，同步返回且不做运行时 hello。固定子集只含 stream / batch 时也走同步固定路径；扩展能力提案返回 Promise，Core 在实际端口等待双边 ACK，缺失或错误 ACK 会拒绝，不能把单方声明当作完成协商。
 
-| 包                                                  | 关系                               |
-| --------------------------------------------------- | ---------------------------------- |
-| [`@migaia/rpc-core`](../rpc-core/README.md)         | 调用语义与底层 Endpoint；peer 依赖 |
-| [`@migaia/rpc-contract`](../rpc-contract/README.md) | 协议常量与数据格式；peer 依赖      |
-| [`@migaia/rpc-process`](../rpc-process/README.md)   | 同一套 API 的跨进程版本            |
-| [`@migaia/supervision`](../supervision/README.md)   | launcher、预算、重启策略           |
+在 Peer 的 connect callback 中把 `context.capabilities` 交给 channel，并让两端同时开始。context.self 是 Core 为本地准备的真实地址；peerId 表示对端连接。显式 capabilities 可缩小提案，不可扩大实际 launch offer、伪造协商或信任。逻辑 channel.close / Peer.close 解除自己的监听和 observer，不物理关闭借入端口；调用方最后关闭原生端口。固定 raw channel 不等于完整 runtime Peer。
 
-完整用法、平台差异、错误码与高级用法见 [USEGUIDE](./USEGUIDE.md)。
+完整 `IRuntimeThreadSpawn` 必填 spec、launcher、budget、scheduler、channelFactory、report；health、supervisor、keyFactory、retryPort 可省略。完整 source 不继承短形式的 isolation 覆盖：省略 supervisor.isolation 时由 supervision 默认 required 处理。spec.entry 是 Node 绝对路径 / file URL，Web 是绝对模块 URL；spec.name / data / limits 可省略。heapBytes 和 callWallTimeMs 是正限制：前者映射为 Node Worker 的 maxOldGenerationSizeMb，后者限制调用期限；不是进程总内存 / 总 CPU 限额。
+
+| 平台                                 | launcher / channel factory     | 原生能力                                                                           |
+| ------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------- |
+| Node                                 | node 子入口的两个工厂          | termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。 |
+| Bun、Deno、浏览器、Electron renderer | 根入口的两个 Web 工厂          | 三项均 unsupported；terminate 请求不产生真实 exit 回执。                           |
+| Electron main                        | electron-main 子入口的两个工厂 | 复用 worker_threads，但明确三项 unsupported，不把 Node 验证外推到 Electron。       |
+
+Web launcher 必填 report，可选 Worker 构造器（默认全局 Worker）和 runtimeApi；构造器接收 entry 与 `{ type: 'module', name }`。Node launcher options 默认空对象，可显式 execArgv / runtimeApi；高级 createAdapterNodeThreadLauncher 另接真实 runtime resource。工厂只在实际启动时获取宿主能力。Node 的 sampleUsage 为冷查询：可用时报告该 isolate 的 heap、CPU 微秒和 ELU，sharedPid 只是共享进程身份；缺少原生方法时字段缺席，退出后返回空对象，不拿整个父进程用量冒充线程用量。
+
+handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 原生 exited 只由真实 exit 结算；Web 的 exited 保持 pending，因此超时后可能报告 REAP_TIMEOUT 并保留 abandoned budget lease，不能提前把槽位当空闲。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。
+
+构造或打开失败时，launcher / 监督 owner 释放已取得监听和候选 Worker；主错误保持原对象或在 cause 链中，清理错误保留在 errors。Node Endpoint 构造失败会回收真实 Worker 和预算；Web 请求 terminate 仍不能补出退出证明。高级调用方若直接 launch，须负责逻辑 channel 关闭、terminate 请求和等待真实 exited 的边界，不能在缺少原生回执的 Web 路径无限 await exited。
+
+AdapterNodeThreadParentChannel 在构造时只保留真实 parentPort，open 才建立固定 profile，不先添加 listener。createAdapterNodeThreadPeer 接收已持有 parentPort 和原始 workerData；runtime resource 的 load 获取真实 Worker 模块，pid 表示共享进程。receiveThreadData 只消费匹配的初始 bootstrap，移除自己的 listener，await prepare(data, peerId) 后发送 ready；返回便携业务 data。readThreadBootstrap 校验并拆出 peerId / data；这些工具不给任意外部 Worker 授权。
+
+新适配器复用 [Core adapter SDK](../rpc-core/USEGUIDE.md) 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。本轮场景只对真实 Node Worker / MessagePort 给出运行证据，浏览器、Bun、Deno、Electron 的权限与退出行为不据此冒称已实测。
+
+### 载体观察
+
+最终 channel 的 `transport.observe(probe)` 安装物理消息观察；发送、接收各报告一次。发送 detail.transfers 为原生 transfer 列表长度，接收为 -1，因为 structured clone 不能说明收到的 buffer 是复制还是转移。直接 ArrayBuffer / view 的 sizeBytes 是字节长度，其它原生消息为 -1，不通过额外序列化估算对象大小。
+
+仅 probe.capturing 开启时读取内容；未转移内容借用原引用，实际转移的 buffer 在发送前复制以保留观察字节。Core 对 own-data 原生容器的选择性捕获保留 Array、Record、Map、Set 中的环、共享 backing 和未转移对象引用；只经 accessor 返回转移 buffer 的情形不提供额外读取保证，不能为捕获再执行 getter。
+
+probe 失败经 onListenerError 报 Core TRANSPORT，原异常保留在 cause，消息仍继续发送和接收。重复 observe 替换旧代，旧 disposer 不会移除新代；当前 disposer、逻辑 close 和既有原生 terminal 路径退休观察。借用端口 close 不改变物理端口所有权，也不改变既有监听与错误 cause 次序。
+
+### 错误与重试
+
+| source / code                                    | 含义与处理                                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| @migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED | 线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。 |
+| @migaia/rpc/core / INVALID_CONFIG                | 入口、来源、bootstrap、能力 ACK、portable data 或配置不合法；检查字段与 cause。 |
+| @migaia/rpc/core / TRANSPORT                     | 原生消息 I/O / 启动资源边界失败，保留原生错误类型和原因。                       |
+| @migaia/rpc/core / DEADLINE_EXCEEDED             | TimeoutError；Worker 可能已执行，先对账。                                       |
+| @migaia/rpc/core / CANCELLED                     | AbortError；协作取消，不能证明业务未执行。                                      |
+| @migaia/rpc/core / OVERLOADED                    | 并发额度满，provider 未调用，降低并发后重试。                                   |
+| @migaia/rpc/core / CAPABILITY_UNSUPPORTED        | 需要未协商能力，例如未签名的 transfer。                                         |
+| @migaia/rpc/core / TARGET_UNKNOWN                | 当前目录没有该目标，检查名字和当前代次。                                        |
+| @migaia/rpc/remote / REMOTE_CLOSED               | 连接或代次已关闭，重新选择目标，并对已发调用对账。                              |
+
+Node launcher 的原生 Worker 构造参数被拒绝时，使用 Core INVALID_CONFIG 标识；若已有原生 code，则以包装错误保留原 Error、name、message、stack 和原生 code 于 cause，不覆盖它们。此分类只描述 Node 构造边界，不泛化为所有 Web 构造器异常。
+
+本包本地错误码对象 RpcThreadErrorCode 只有 usageSampleFailed，值为 THREAD_USAGE_SAMPLE_FAILED，RPC_THREAD_ERROR_SOURCE 为 @migaia/rpc/threads。调用、监督和 Host 边界各使用自己的 source，不把所有失败改成本包采样码。按 source / code 分支，不匹配 message 文本；业务异常跨 Worker 后保留原生类型、message、stack、source/code 与 cause / errors 链，不能承诺接收端对象与发送端同一 identity。
+
+Worker 单独运行配置失败通常是没有库 launcher bootstrap；默认 buffer 未失效是复制语义；Worker 是否重启取决于 restart 策略。需人工恢复时用 Host 的 restart / replace，并查看 list / get 的当前代次与退出信息。
