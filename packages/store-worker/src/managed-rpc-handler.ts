@@ -5,14 +5,17 @@ import type { IRpcEndpoint } from '@migaia/rpc-core'
  *
  * `dispose()` is the only asynchronous disposal entry point. It always returns `Promise<void>`;
  * there is no `disposeAsync()`. `close()` synchronously stops accepting work without running user
- * cleanup.
+ * cleanup. Calling the function admits a raw message, waits for endpoint readiness and dispatches
+ * it; the returned Promise and pendingCount do not wait for the provider's computation. A terminal
+ * handler silently ignores later messages, including a message waiting when close wins readiness.
  */
 export type IManagedRpcHandler = {
   (message: unknown): Promise<void>
   /**
    * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup
-   * failures reject the promise instead of being swallowed. Repeated calls return the same
-   * promise.
+   * failures reject the promise instead of being swallowed. Repeated calls return the same promise.
+   * This does not detach the caller's native message listener or dispose a supplied serialization
+   * parser; those resources remain with their owner.
    */
   dispose(): Promise<void>
   /**
@@ -20,7 +23,9 @@ export type IManagedRpcHandler = {
    * the endpoint. Repeated calls have no additional effect.
    */
   close(): void
+  /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */
   readonly pendingCount: number
+  /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */
   readonly disposed: boolean
 }
 

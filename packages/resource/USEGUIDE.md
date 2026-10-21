@@ -1,8 +1,431 @@
 # `@migaia/resource` 使用指南
 
-本指南逐项列出 `Resource<T>` 全部公开 API 的签名、边界行为与错误码。包的定位、适用场景与五分钟上手见 [README](./README.md)。包只公开根入口 `@migaia/resource`，没有稳定深层子路径。
+[English](./USEGUIDE.en.md)
 
-## 目录
+包的定位、亮点和心智模型见 [README](./README.md)。本指南先按场景给出可以直接运行的示例（Node 24），再逐项列出 `Resource<T>` 全部公开 API 的签名、边界行为与错误码。包只公开根入口 `@migaia/resource`，没有稳定的深层子路径。
+
+## 按场景查找
+
+| 你遇到的问题 | 看这一节 |
+| --- | --- |
+| 慢的旧请求后返回，把新结果覆盖掉 | [只显示最新输入的结果](#只显示最新输入的结果) |
+| 几个筛选条件一起变，发出多次请求 | [同时改几个条件只发一次请求](#同时改几个条件只发一次请求) |
+| 多个组件同时请求同一份数据 | [多处同时读取只请求一次](#多处同时读取只请求一次) |
+| 离开页面后请求还在跑 | [离开页面时停掉还在进行的请求](#离开页面时停掉还在进行的请求) |
+| 用户取消后界面显示“失败” | [取消后显示已取消而不是错误](#取消后显示已取消而不是错误) |
+| 刷新时内容先清空再出现 | [刷新时继续显示旧数据](#刷新时继续显示旧数据) |
+| 404 也在重试，重试后认不出原始错误 | [只重试临时故障](#只重试临时故障) |
+| 服务端取过的数据，浏览器又请求一遍 | [服务端已取到的数据浏览器不再请求](#服务端已取到的数据浏览器不再请求) |
+
+## 只显示最新输入的结果
+
+搜索框里先输入 `re`，接着补全成 `react`。`re` 的请求更慢，比 `react` 晚返回，页面最后显示的却是 `re` 的结果。
+
+常见写法是输入一变就发请求，在 `then` 里直接写入结果。每个请求都会写入，谁最后返回谁就赢；接口不支持取消时，`AbortController` 也拦不住这次写入。
+
+`Resource` 给每次请求一个世代编号，只有最新世代的结果会写入 `state`。fetcher 在第一个 `await` 之前读取了 `keyword.value`，所以关键词一变就会自动发起新请求，不需要另写监听。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource, ResourceStatus } from '@migaia/resource'
+
+const runtime = createRuntime()
+const keyword = runtime.signal('re')
+
+// 模拟搜索接口：关键词越短，返回越慢；它也不支持取消
+function search(text: string): Promise<string> {
+  const delay = text.length < 3 ? 50 : 10
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      console.log(`接口返回：“${text}”`)
+      resolve(`“${text}”的 3 条结果`)
+    }, delay)
+  )
+}
+
+const results = new Resource(() => search(keyword.value), runtime)
+
+const view = runtime.effect(() => {
+  const state = results.state
+  if (state.status === ResourceStatus.success) console.log(`页面显示：${state.data}`)
+})
+
+keyword.value = 'react' // 用户继续输入
+await new Promise((resolve) => setTimeout(resolve, 100)) // 等两次请求都返回
+view.dispose()
+results.dispose()
+```
+
+输出：
+
+```text
+接口返回：“react”
+页面显示：“react”的 3 条结果
+接口返回：“re”
+```
+
+`react` 先返回并显示出来；50ms 后 `re` 才返回，日志里能看到接口返回了，但页面没有再变。
+
+即使底层请求不能取消，被替换的旧请求也写不进 `state`。接口支持 `signal` 时把它传下去，还能顺带停掉网络请求。
+
+## 同时改几个条件只发一次请求
+
+列表页切换排序时，页码也跟着变。两个条件各触发一次请求，就会多发一个注定被丢弃的请求，接口压力翻倍，加载状态也闪两次。
+
+手写时通常在每个条件的变化回调里各发一次请求，要合并只能自己加防抖，而防抖时长很难定。
+
+fetcher 读取了 `page` 和 `sort`，`Resource` 就把它们都登记为依赖。同一轮里的多次写入只把它标记为过期，在下一个微任务里合并成一次请求。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource, ResourceStatus } from '@migaia/resource'
+
+const runtime = createRuntime()
+const page = runtime.signal(1)
+const sort = runtime.signal('最新')
+
+const orders = new Resource(() => {
+  const query = `第 ${page.value} 页，按${sort.value}排序` // 在第一个 await 之前读取
+  console.log(`请求：${query}`)
+  return Promise.resolve(`${query}的订单`)
+}, runtime)
+
+const view = runtime.effect(() => {
+  const state = orders.state
+  if (state.status === ResourceStatus.success) console.log(`显示：${state.data}`)
+})
+await orders.promise
+
+// 用户点“热门”，页码同时回到第 2 页
+sort.value = '热门'
+page.value = 2
+await new Promise((resolve) => setTimeout(resolve, 10))
+view.dispose()
+orders.dispose()
+```
+
+输出：
+
+```text
+请求：第 1 页，按最新排序
+显示：第 1 页，按最新排序的订单
+请求：第 2 页，按热门排序
+显示：第 2 页，按热门排序的订单
+```
+
+第一次请求之后，同时修改排序和页码只多出一行“请求：第 2 页，按热门排序”。
+
+两次写入合并成了一次请求，新请求读到的是两个条件的最终值，不会先按“第 1 页、热门”请求一次。
+
+## 多处同时读取只请求一次
+
+页头、侧栏和设置页同时需要当前用户的资料。各自请求的话，同一份数据会同时发出三次。
+
+常见的去重做法是把 Promise 存在模块变量里，可失败后由谁清除、过期后谁重新获取、页面离开时谁来取消，这些代码会散落在各个调用方。
+
+同一个 `Resource` 的 `promise` 在请求进行中和缓存有效时都返回同一个 Promise。读取方只管 `await`，什么时候需要真正发请求由 `Resource` 决定。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '@migaia/resource'
+
+const runtime = createRuntime()
+let requests = 0
+
+const profile = new Resource(async () => {
+  requests++
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  return { name: 'Ada' }
+}, runtime)
+
+// 页头、侧栏、设置页同时需要用户资料
+const [header, sidebar, settings] = await Promise.all([
+  profile.promise,
+  profile.promise,
+  profile.promise
+])
+console.log(`请求次数：${requests}`)
+console.log(`三处拿到同一个对象：${header === sidebar && sidebar === settings}`)
+
+await profile.promise // 之后再读，缓存仍然有效
+console.log(`再读一次后的请求次数：${requests}`)
+profile.dispose()
+```
+
+输出：
+
+```text
+请求次数：1
+三处拿到同一个对象：true
+再读一次后的请求次数：1
+```
+
+三处拿到的是同一个对象，请求只发了一次；之后再读 `promise`，缓存仍然有效，请求次数还是 1。
+
+`ttl` 默认是 `Infinity`：成功的数据会一直有效，直到依赖变化或调用 `refetch()`。共享只发生在同一个 `Resource` 实例内，参数不同的请求需要各自的实例。
+
+## 离开页面时停掉还在进行的请求
+
+报表要 1 秒才加载完，用户中途离开了页面。请求还在跑，结果写进已经不存在的界面，或者一直占着连接和内存。
+
+手写时要自己创建 `AbortController`，离开时调用 `abort()`，再在 `catch` 里区分“被取消”和“真失败”。每个页面都写一遍，漏掉一处就留下一个跑完才停的请求。
+
+`dispose()` 会中止当前请求的 `signal`、清除依赖，并让还在等待的 `promise` 以 `AbortError` 失败。fetcher 只需要把 `signal` 交给底层请求。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '@migaia/resource'
+
+const runtime = createRuntime()
+
+// 模拟一个 1 秒后才返回的接口；收到中止信号就停下
+function loadReport(signal: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve('报表数据'), 1000)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      console.log('底层请求已停止')
+      reject(signal.reason)
+    })
+  })
+}
+
+const report = new Resource(({ signal }) => loadReport(signal), runtime)
+const waiting = report.promise.catch((error: Error & { code?: string }) => {
+  console.log(`等待方收到：${error.name}（${error.code}）`)
+})
+
+report.dispose() // 用户离开页面
+await waiting
+console.log(`资源已释放：${report.disposed}`)
+```
+
+输出：
+
+```text
+底层请求已停止
+等待方收到：AbortError（REQUEST_ABORTED）
+资源已释放：true
+```
+
+调用 `dispose()` 后立即输出“底层请求已停止”，等待方收到 `AbortError`，错误码是 `REQUEST_ABORTED`。
+
+`AbortError` 是原生的 `DOMException`，用 `error.name === 'AbortError'` 判断就能把它当作正常离开而不是故障。只想停掉这一次请求、之后还要复用资源时，改用 `cancel()`。
+
+## 取消后显示已取消而不是错误
+
+用户点了“取消导出”，界面却弹出“导出失败”，因为取消和失败走进了同一个 `catch`。
+
+手写的状态通常只有“加载中、成功、失败”三种，取消只能塞进“失败”，再靠比较错误信息字符串来区分。
+
+`cancel()` 把还在等待的请求变成 `cancelled` 状态，`state.error` 是原生 `AbortError`。资源本身没有被释放，之后调用 `refetch()` 可以重新开始。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '@migaia/resource'
+
+const runtime = createRuntime()
+let attempt = 0
+
+const exportJob = new Resource(({ signal }) => {
+  attempt++
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => resolve(`第 ${attempt} 次导出完成`), 20)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      reject(signal.reason)
+    })
+  })
+}, runtime)
+
+exportJob.cancel() // 用户点“取消导出”
+const cancelled = exportJob.state
+console.log(`状态：${cancelled.status}`)
+if (cancelled.status === 'cancelled') console.log(`原因：${cancelled.error.name}`)
+
+console.log(await exportJob.refetch()) // 同一个资源还能重新开始
+exportJob.dispose()
+```
+
+输出：
+
+```text
+状态：cancelled
+原因：AbortError
+第 2 次导出完成
+```
+
+取消后状态是 `cancelled`，原因是 `AbortError`；随后 `refetch()` 正常完成，输出“第 2 次导出完成”。
+
+`cancelled` 是单独的状态，界面可以按 `ResourceStatus.cancelled` 显示“已取消”。取消后再读取 `state` 不会自动重启请求，只有显式调用 `refetch()` 才会。
+
+## 刷新时继续显示旧数据
+
+价格表每次刷新都先清空成“加载中”，内容消失再出现，用户正在看的位置也跳走了。
+
+手写时数据和加载状态通常放在同一个变量里，刷新就得先把数据清掉；要保留旧数据，就得再加一个“正在刷新”的标志，还要在每个出口记得复位。
+
+开启 `staleWhileRevalidate` 后，刷新期间 `state` 保持 `success`，`data` 还是旧值，只多了 `refreshing: true`。新数据到了才替换。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource, ResourceStatus } from '@migaia/resource'
+
+const runtime = createRuntime()
+let version = 0
+
+const prices = new Resource(
+  async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    version++
+    return `价格表 v${version}`
+  },
+  runtime,
+  { staleWhileRevalidate: true } // 刷新期间继续显示旧数据
+)
+
+const view = runtime.effect(() => {
+  const state = prices.state
+  if (state.status === ResourceStatus.pending) console.log('加载中…')
+  if (state.status === ResourceStatus.success) {
+    console.log(state.refreshing ? `${state.data}（后台刷新中）` : state.data)
+  }
+})
+
+await prices.promise
+runtime.flush()
+await prices.refetch() // 用户点“刷新”
+runtime.flush() // 让副作用立即看到新结果
+view.dispose()
+prices.dispose()
+```
+
+输出：
+
+```text
+加载中…
+价格表 v1
+价格表 v1（后台刷新中）
+价格表 v2
+```
+
+依次输出加载中、v1、v1（后台刷新中）、v2，刷新期间界面一直有内容。
+
+`state.status` 描述屏幕上的数据；是否有请求在跑另看 `fetchStatus`（`ResourceFetchStatus`）。刷新被取消时，`refreshing` 会被清除，旧数据保留。
+
+## 只重试临时故障
+
+网关偶尔返回 503，重试一次就好；但 404 再怎么重试也没用，只会拖慢报错。
+
+手写重试循环时，很容易对所有错误一律重试，或者在重试耗尽后抛出一个新的包装错误，调用方再也认不出原来的 `HttpError`。
+
+`retry` 可以是一个函数，按第几次失败和错误对象决定要不要再试；`retryDelay` 决定每次等多久。停止重试后，拒绝的仍是最后一次的原始错误，`Resource` 只在它上面附加 `code`。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '@migaia/resource'
+
+class HttpError extends Error {
+  readonly status: number
+  constructor(status: number) {
+    super(`HTTP ${status}`)
+    this.status = status
+  }
+}
+
+const runtime = createRuntime()
+const replies = [503, 404] // 先是网关临时故障，接着是资源不存在
+let attempt = 0
+
+const order = new Resource(
+  async () => {
+    const status = replies[attempt++]
+    console.log(`第 ${attempt} 次请求：${status}`)
+    throw new HttpError(status)
+  },
+  runtime,
+  {
+    // 只重试 503，最多 3 次；404 重试也没用
+    retry: (failureCount, error) =>
+      failureCount <= 3 && error instanceof HttpError && error.status === 503,
+    retryDelay: (failureCount) => failureCount * 20 // 20ms、40ms……逐次加长
+  }
+)
+
+try {
+  await order.promise
+} catch (error) {
+  const failure = error as HttpError & { code?: string }
+  console.log(`最终失败：${failure.message}，仍是 HttpError：${failure instanceof HttpError}`)
+  console.log(`错误码：${failure.code}`)
+}
+order.dispose()
+```
+
+输出：
+
+```text
+第 1 次请求：503
+第 2 次请求：404
+最终失败：HTTP 404，仍是 HttpError：true
+错误码：FETCH_FAILED
+```
+
+第 1 次 503 后等 20ms 重试，第 2 次 404 不再重试，直接失败。
+
+最终错误仍是那个 `HttpError`（`instanceof` 为真），只是多了错误码 `FETCH_FAILED`。已经带有自己 `source` 和 `code` 的错误保持原样。
+
+## 服务端已取到的数据浏览器不再请求
+
+服务端渲染时已经请求过一次用户资料，页面到了浏览器又请求一遍。首屏先闪一下加载状态，接口也多承受了一倍请求。
+
+手写时常把数据塞进页面，在客户端判断“有数据就不请求”，但数据还能有效多久通常没人记，结果要么永不刷新，要么马上重取。
+
+`dehydrate()` 导出数据和两个时长：已经存在了多久（`ageMs`）、还能有效多久（`remainingTtlMs`）。浏览器把它作为 `initialSnapshot` 传入，`Resource` 用本地时钟接着计时，快照仍有效时不发请求。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { Resource, ResourceStatus } from '@migaia/resource'
+
+// 服务端：请求一次，把结果和剩余有效期一起放进页面
+const onServer = new Resource(async () => ({ name: 'Ada' }), createRuntime(), { ttl: 60_000 })
+await onServer.promise
+const html = JSON.stringify(onServer.dehydrate())
+onServer.dispose()
+
+// 浏览器：用页面里的快照创建资源
+let browserRequests = 0
+const onClient = new Resource(
+  async () => {
+    browserRequests++
+    return { name: 'Ada' }
+  },
+  createRuntime(),
+  { ttl: 60_000, initialSnapshot: JSON.parse(html) }
+)
+
+const state = onClient.state
+if (state.status === ResourceStatus.success) console.log(`首屏直接显示：${state.data.name}`)
+console.log(`浏览器端请求次数：${browserRequests}`)
+onClient.dispose()
+```
+
+输出：
+
+```text
+首屏直接显示：Ada
+浏览器端请求次数：0
+```
+
+浏览器端第一次读取 `state` 就是 `success`，fetcher 一次也没有被调用。
+
+快照只记录时长，不记录服务端的绝对时间，所以两边时钟不一致也没关系。传输或存储花掉的时间由调用方自己从 `remainingTtlMs` 里扣除；`data` 必须能被 JSON 序列化。
+
+---
+
+## API 手册
+
+### 目录
 
 - [`Resource<T>`](#resource)：构造函数、状态读取、操作方法、快照方法
 - [配置项 `IResourceOptions`](#配置项)
@@ -20,7 +443,7 @@
 
 ## `Resource<T>`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 import { Resource, type IResourceOptions } from '@migaia/resource'
 import type { IRuntime } from '@migaia/reactive'
 
@@ -59,7 +482,7 @@ class Resource<T> implements IObserver, IDisposable {
 
 响应式的可取消异步资源：构造时给一个 `fetcher`，它跟踪 `fetcher` 在**首次 `await` 之前**同步读取的响应式值作为依赖；依赖变化时自动发起新请求，只有最新一代请求的结果才会生效。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { Resource, ResourceStatus } from '@migaia/resource'
 import { createRuntime } from '@migaia/reactive'
 import { fetchUser } from './user-api.js'
@@ -105,7 +528,7 @@ export function disposeUserPanel(): void {
 
 ### 状态读取（getter）
 
-- `state: IResourceState<T>` —— 响应式状态机快照（读取会建立依赖，并顺带触发 `#ensureFresh()`：过期的 `success` 值或 `idle` 状态会自动发起新请求）。已释放时抛 `RESOURCE_DISPOSED`。
+- `state: IResourceState<T>` —— 响应式状态机快照（读取会登记依赖，并顺带检查有效期：数据已过期的 `success` 或 `idle` 状态会自动发起新请求）。已释放时抛 `RESOURCE_DISPOSED`。
 - `promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise 时抛 `NO_ACTIVE_PROMISE`。
 - `disposed: boolean` —— 是否已 `dispose()`；释放后仍可安全读取；`refreshing`、`observed` 也可读。
 - `refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。
@@ -115,16 +538,16 @@ export function disposeUserPanel(): void {
 
 ### `read()` / `peek()`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 read(): T; // Suspense 兼容：success 返回值，pending 抛 Promise，error/cancelled 抛错误
-peek(): T; // 与 read() 形状相同，但不建立依赖边，也不触发 ensureFresh()
+peek(): T; // 与 read() 形状相同，但不建立依赖边，也不检查有效期、不发起请求
 ```
 
 `read()` 按 React Suspense 期望的形状工作：成功返回缓存数据；`pending`/`idle` 抛出当前 `promise`；`error`/`cancelled` 抛出对应的错误对象。`peek()` 是它的非追踪版本，用于 `getSnapshot` 一类"读当前快照但不想加入别人追踪窗口"的场景，且不会顺手启动请求。合法的 `autoStart: false` 初始 idle 状态尚无 Promise，直接 `peek()` 会抛 `NO_ACTIVE_PROMISE`；用 `peekState()` 检查状态或显式启动请求。
 
 ### `refetch()` / `invalidate()`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 refetch(): Promise<T>;    // 总是发起新请求，不复用新鲜缓存
 invalidate(): Promise<T>; // 立即使缓存过期（expiresAt = 0）并发起新请求
 ```
@@ -133,7 +556,7 @@ invalidate(): Promise<T>; // 立即使缓存过期（expiresAt = 0）并发起�
 
 ### `cancel()`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 cancel(): void;
 ```
 
@@ -141,7 +564,7 @@ cancel(): void;
 
 ### `dehydrate()` / `hydrate()`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 dehydrate(): IResourceCacheSnapshot<T> | undefined;
 hydrate(snapshot: IResourceCacheSnapshot<T>): void;
 ```
@@ -152,7 +575,7 @@ hydrate(snapshot: IResourceCacheSnapshot<T>): void;
 
 ### `dispose()`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 dispose(): void;
 ```
 
@@ -195,7 +618,7 @@ const config = createResource(() => ({ signal }) => ConfigOwner.fromAsync(fetch(
 
 ## 配置项 `IResourceOptions`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IResourceOptions<T = unknown> = {
   debugName?: string
   ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）
@@ -228,7 +651,7 @@ type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => 
 
 ## 状态类型
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IResourceState<T> =
   | { status: 'idle' }
   | { status: 'pending' }
@@ -255,7 +678,7 @@ type ResourceFetchStatus = 'idle' | 'fetching'
 
 ## `IResourceFetcher` 与依赖追踪
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 ```
 
@@ -271,7 +694,7 @@ type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 
 ## 快照类型 `IResourceCacheSnapshot`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IResourceCacheSnapshot<T> = {
   readonly version: 2
   readonly data: T
@@ -290,7 +713,7 @@ type IResourceCacheSnapshot<T> = {
 
 `Resource` 内部直接组合 `@migaia/lifecycle` 与 `@migaia/reactive` 的原语，理解这层有助于诊断边界行为：
 
-- **`createGenerationController()`**（来自 `@migaia/lifecycle`）——每次 `#startRequest()` 调用 `begin()` 开一代新请求；`refetch()`/`invalidate()`/依赖变化都会使旧一代失效（`supersede()`），只有 `isCurrent(token)` 为真的那一代结果才会写回 `#stateSignal`。`dispose()` 时调用其 `dispose()` 终结控制器。
+- **`createGenerationController()`**（来自 `@migaia/lifecycle`）——每次发起请求都调用 `begin()` 开一代新请求；`refetch()`/`invalidate()`/依赖变化都会使旧一代失效（`supersede()`），只有 `isCurrent(token)` 为真的那一代结果才会写入 `state`。`dispose()` 时调用其 `dispose()` 终结控制器。
 - **`createTerminalController()`**（来自 `@migaia/lifecycle`）——驱动 `Resource` 自身的容器存活轴（`open → closing → terminal`）；`disposed` getter 直接读它的 `lifecycle === 'terminal'`。
 - **`probeThenable()` / `assimilateCapturedThen()`**（来自 `@migaia/utils/function`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。
 - **`systemScheduler`（来自 `@migaia/utils/scheduler`）/ `snapshotScheduler()`（来自 `@migaia/lifecycle`）**——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。
@@ -315,7 +738,7 @@ import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@mi
 | `requestAborted` | `REQUEST_ABORTED` | 请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause |
 | `requestCancelled`          | `REQUEST_CANCELLED`           | 调用方显式 `cancel()` 导致当前 pending 请求被取消，`state` 落入 `cancelled` 所携带的 `DOMException`                                             |
 | `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | 请求取消已完成状态收敛，但取消期间的 timer/listener cleanup 失败                                                                                |
-| `noActivePromise`           | `NO_ACTIVE_PROMISE`           | 读取 `promise`，或 `pending`/`idle` 状态下内部 `#materialize()` 时，没有一个正在进行或已缓存的 Promise 可返回                                   |
+| `noActivePromise`           | `NO_ACTIVE_PROMISE`           | 读取 `promise`，或在 `pending`/`idle` 状态下调用 `read()`/`peek()` 时，没有正在进行或已缓存的 Promise 可返回                                   |
 | `invalidSnapshot` | `INVALID_SNAPSHOT` | 非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败 |
 | `invalidOption`             | `INVALID_OPTION`              | 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求                                                             |
 | `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | `fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable                                                  |
@@ -340,7 +763,7 @@ function UserProfile({ resource }: { resource: Resource<User> }) {
 
 ### 2. SSR 快照恢复，客户端不重新请求
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // 服务端：
 const snapshot = serverUserResource.dehydrate() // undefined 或 { version: 2, data, ageMs, remainingTtlMs }
 // 通过安全的 JSON 传输通道发送；若内嵌 HTML，必须采用适合 HTML 上下文的编码。
@@ -355,7 +778,7 @@ const userResource = new Resource(fetchUser, runtime, {
 
 ### 3. 后台刷新且展示旧数据
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const list = new Resource(fetchList, runtime, {
   ttl: 10_000,
   staleWhileRevalidate: true
@@ -367,7 +790,7 @@ const list = new Resource(fetchList, runtime, {
 
 ### 4. 自定义重试退避
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const resource = new Resource(fetchWithFlakyBackend, runtime, {
   retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),
   retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s
@@ -376,7 +799,7 @@ const resource = new Resource(fetchWithFlakyBackend, runtime, {
 
 ### 5. 手动失效 + 取消
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 await resource.invalidate() // 立即视为过期并重新请求
 resource.cancel() // 只中止当前请求，资源仍可复用；被动读取保持暂停，显式 refetch() 重启
 ```
@@ -404,21 +827,21 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。
 
-### Ownership adapters: canonical inspection and reset
+### 适配层：只读检查与重置
 
-`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than materializing/throwing the value. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation/token.
+`peekState()` 返回当前的 `IResourceState<T>`，不登记依赖、不发起加载，也不检查有效期。和 `peek()` 不同，它返回状态联合本身，而不是取出值或抛出。`reset()` 取消进行中的请求，清除依赖和缓存数据，让同一个实例回到可复用的 `idle`。之前那个 pending Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`；重置后的请求不会沿用旧的 generation 或 token。
 
-`IResourceFetchContext` is the readonly lifecycle request identity (`signal`, monotonic `generation`, opaque `token`). Retries retain that identity; replacement requests receive a new one. Keep request identity separate from observation/suspension generations. Loaded-value ownership and render/version leases belong to adapters, not Resource's dependency graph. StoreLight uses these capabilities with one Resource instance, preserving the original T and shared request Promise.
+`IResourceFetchContext` 是只读的请求身份（`signal`、单调递增的 `generation`、不透明的 `token`）。同一次请求的多次重试保留这组身份，替换后的请求拿到新的一组。请求身份要和观察、休眠用到的计数分开看待。加载值的所有权和渲染版本租约属于适配层，不属于 Resource 的依赖图。StoreLight 用一个 Resource 实例使用这些能力，保留原始的 `T` 和共享的请求 Promise。
 
-```ts
+```ts doc-test=run
 import { createRuntime } from '@migaia/reactive'
 import { Resource } from '@migaia/resource'
 
 const value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })
-console.log(value.peekState().status) // idle: no loader was invoked
+console.log(value.peekState().status) // idle：请求函数还没被调用
 console.log(await value.promise)
 value.reset()
-console.log(value.peekState().status) // idle: same owner, no cached data
-console.log(await value.promise) // a later generation
+console.log(value.peekState().status) // idle：同一个实例，没有缓存数据
+console.log(await value.promise) // 更新的 generation
 value.dispose()
 ```

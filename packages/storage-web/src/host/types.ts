@@ -17,6 +17,10 @@ export declare const storageBackendPluginExtensionsBrand: unique symbol
 
 /** Opaque backend identity whose store binding cannot be forged by object literals. */
 export type IStorageBackendKind<TName extends string, TStore extends IKeyValueStore> = {
+  /**
+   * Stable descriptive backend-kind name; only the original opaque token carries matching
+   * authority.
+   */
   readonly name: TName
   readonly [storageBackendKindBrand]: TStore
 }
@@ -26,10 +30,13 @@ export type IStorageReactiveSourceDisposer = () => void | Promise<void>
 
 /** Exact store/context passed to an advanced adapter source at synchronous admission. */
 export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = {
+  /** Exact Store registered by this backend plugin. */
   readonly store: TStore
   /** Host-snapshotted scheduler shared with source timing and installation deadlines. */
   readonly scheduler: IScheduler
+  /** Source lifetime cancellation; subscriptions must release their resources when retired. */
   readonly signal: INativeAbortSignal
+  /** Report source failures without changing an already committed storage write. */
   readonly report: (error: unknown) => void
   /** Undefined invalidates all queries on this adapter; a known change permits scope filtering. */
   readonly onChange: (change?: IStorageChange) => void
@@ -45,9 +52,22 @@ export type IStorageReactiveVisibility =
 
 /** Reactive consistency and optional source hook retained in private feature metadata. */
 export type IStorageReactiveFeatureMetadata<TStore extends IKeyValueStore = IKeyValueStore> = {
+  /**
+   * Push uses notifications only; hybrid adds periodic reconciliation; polling uses periodic
+   * reconciliation.
+   */
   readonly mode: 'push' | 'hybrid' | 'polling'
+  /** Declared observation scope, ranging from this instance to eventual same-origin visibility. */
   readonly visibility: IStorageReactiveVisibility
+  /**
+   * Required positive finite milliseconds for hybrid/polling, forbidden for push; no implicit
+   * custom-adapter interval.
+   */
   readonly pollIntervalMs?: number
+  /**
+   * Optional source hook; admission requires a synchronous disposer. Promise-like results are
+   * rejected and observed for late cleanup.
+   */
   readonly subscribe?: (
     context: IStorageReactiveSubscribeContext<TStore>
   ) => IStorageReactiveSourceDisposer | PromiseLike<unknown>
@@ -58,6 +78,7 @@ export type IStorageBackendPluginHandle<
   TExtensions extends object = Record<never, never>,
   TStore extends IKeyValueStore = IKeyValueStore
 > = {
+  /** Exact bounded, case-sensitive backend registration id. */
   readonly id: string
   readonly [storageBackendPluginBrand]: TStore
   readonly [storageBackendPluginKindBrand]: unknown
@@ -73,6 +94,7 @@ export type IStorageBackendPlugin<
   TReactive extends boolean = false,
   TExtensions extends object = Record<never, never>
 > = IStorageBackendPluginHandle<TExtensions, TStore> & {
+  /** Literal backend id used for Host lookup and duplicate admission. */
   readonly id: TId
   readonly [storageBackendPluginBrand]: TStore
   readonly [storageBackendPluginKindBrand]: TBackendKind
@@ -104,6 +126,10 @@ type IStoragePluginExtensionCarrier<TPlugin> = TPlugin extends {
     : IPlugin<object, Record<never, never>>
   : never
 
+/**
+ * Installed extension projection inferred from the original PluginHost definition without treating
+ * the Store as an extension.
+ */
 export type IStoragePluginExtensions<TPlugin> = IMergePluginExts<
   [IStoragePluginExtensionCarrier<TPlugin>]
 > &
@@ -167,11 +193,11 @@ type IHasDuplicatePluginIds<
 export type IStorageHostOptions = {
   /** Bounds one complete plugin installation batch; defaults to 30 seconds. */
   readonly installTimeoutMs?: number
-  /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */
+  /** Supplies lifecycle timing for installation, rollback and cleanup; defaults to systemScheduler. */
   readonly scheduler?: IScheduler
   /**
-   * Receives contained late rejection and cleanup diagnostics without replacing the primary
-   * failure.
+   * Optional late-rejection/cleanup diagnostic sink; omission installs no caller sink. Reporter
+   * failures are contained and cannot replace the primary failure.
    */
   readonly report?: (error: unknown) => void | PromiseLike<void>
 }
@@ -183,16 +209,23 @@ export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendP
     readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>
   }
 
-/** Stable handle shape reserved for the reactive vertical slice. */
+/** Backend-bound query handle sharing the exact committed Store and adapter. */
 export type IReactiveBackendHandle<TStore extends IKeyValueStore, TId extends string> = {
+  /** Exact installed backend id whose reactive adapter this handle addresses. */
   readonly id: TId
+  /** Same actual Store returned by Host.backend for this id. */
   readonly store: TStore
+  /** Create a query for this fixed backend using a caller-owned reactive Runtime. */
   liveQuery<T>(
     options: Omit<ILiveQueryOptions<{ readonly [TKey in TId]: TStore }, TId, T>, 'backendId'>
   ): ILiveQuery<T>
 }
 
-/** Public live-query state; Resource settlement remains the sole state authority. */
+/**
+ * Resource-backed state: loading has no accepted value, ready exposes settlement, refreshing keeps
+ * a prior value while work runs, error records failure, and disposed is terminal. Optional values
+ * retain their application identity rather than being deep-cloned.
+ */
 export type ILiveQueryState<T> =
   | { readonly status: 'loading'; readonly value?: T }
   | { readonly status: 'ready'; readonly value: T }
@@ -208,8 +241,14 @@ export type ILiveQueryStateView<T> = Pick<
 
 /** Frozen consistency admitted by the installed reactive adapter. */
 export type IReactiveConsistency = Readonly<{
+  /** Push, hybrid or polling policy from the installed adapter. */
   readonly mode: 'push' | 'hybrid' | 'polling'
+  /** Configured reconciliation interval; absent for push. */
   readonly pollIntervalMs?: number
+  /**
+   * Actual adapter observation scope; eventual scopes are not transactional cross-context
+   * consistency.
+   */
   readonly visibility: IStorageReactiveVisibility
 }>
 
@@ -219,7 +258,12 @@ export type IStorageHostBase<
   TReactiveIds extends keyof TStores & string = never,
   TExtensions extends object = Record<never, never>
 > = {
+  /** Committed immutable extension projection; does not expose or replace the Store registry. */
   readonly extensions: Readonly<TExtensions>
+  /**
+   * Install one atomic plugin batch and return this Host with narrowed types. Concurrent use throws
+   * STORAGE_HOST_BUSY; batch failures reject and roll back.
+   */
   use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(
     ...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>
   ): Promise<
@@ -229,48 +273,90 @@ export type IStorageHostBase<
       TExtensions & IStoragePluginExtensions<TPlugins[number]>
     >
   >
+  /** Read the exact committed Store for an installed id; an absent id throws BACKEND_NOT_INSTALLED. */
   backend<TId extends keyof TStores & string>(id: TId): TStores[TId]
+  /** Test current committed id membership while the Host is open. */
   hasBackend(id: string): id is keyof TStores & string
+  /** Return a detached Map copy typed readonly; mutating that copy cannot change Host membership. */
   backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>
+  /** Test whether this exact id has a committed reactive adapter. */
   hasReactiveBackend(id: string): id is TReactiveIds
+  /** Return the exact adapter-bound Store/query view, or undefined when no adapter is installed. */
   reactiveBackend<TId extends keyof TStores & string>(
     id: TId
   ): IReactiveBackendHandle<TStores[TId], TId> | undefined
+  /** Return the exact adapter-bound Store/query view, or undefined when no adapter is installed. */
   reactiveBackend(id: string): IReactiveBackendHandle<IKeyValueStore, string> | undefined
+  /**
+   * Seal new operations immediately and release owned registrations; repeated calls share the
+   * original cleanup Promise.
+   */
   dispose(): Promise<void>
 }
 
-/** Minimal live-query handle shell reserved for the reactive vertical slice. */
+/** Resource-backed query handle with explicit ready, refresh and terminal cleanup. */
 export type ILiveQuery<T> = {
+  /**
+   * Frozen non-disposable view of the same-runtime computed state; nested domain values remain
+   * application-owned.
+   */
   readonly state: ILiveQueryStateView<T>
+  /** Frozen admitted adapter policy; no stronger cross-context guarantee is implied. */
   readonly consistency: IReactiveConsistency
+  /** Initial Resource settlement projection; rejects on initial failure or terminal disposal. */
   readonly ready: Promise<void>
+  /**
+   * Start or join current Resource work and return its settlement projection; terminal queries
+   * reject LIVE_QUERY_DISPOSED.
+   */
   refresh(): Promise<void>
+  /**
+   * Retire this query and its owned Resource/computed/subscription; the borrowed Runtime remains
+   * alive.
+   */
   dispose(): Promise<void>
 }
 
-/** Query input shell retaining the exact backend ID and store type. */
+/**
+ * Query inputs captured once before allocation, retaining the exact backend id, Store and borrowed
+ * Runtime.
+ */
 export type ILiveQueryOptions<
   TStores extends Record<string, IKeyValueStore>,
   TBackendId extends keyof TStores & string,
   T
 > = {
+  /** Exact installed reactive backend id; there is no default backend fallback. */
   readonly backendId: TBackendId
+  /**
+   * Caller-owned reactive Runtime used for Resource/computed state; query/Host disposal does not
+   * dispose it.
+   */
   readonly runtime: IRuntime
+  /** Authoritative read callback receiving the exact Store and per-generation cancellation signal. */
   readonly query: (context: {
+    /** Exact backend Store captured at query admission. */
     readonly store: TStores[TBackendId]
+    /** Resource generation cancellation signal; query I/O must observe it to cooperate. */
     readonly signal: INativeAbortSignal
+    /** Optional entity invalidation scope, forwarded to the callback. */
     readonly scope?: string
   }) => T | PromiseLike<T>
   /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */
   readonly scope?: string
   /** Optional change predicate; failures are reported and conservatively refresh the query. */
   readonly matches?: (change: IStorageChange) => boolean
-  /** Preserve the last visible value while Resource refreshes in the background. */
+  /** Preserve the last visible value while Resource refreshes; defaults to true. */
   readonly keepPreviousData?: boolean
-  /** Compare settled values before replacing the visible value projection. */
+  /**
+   * Optional equality policy preserving the prior visible value when true; omission accepts the new
+   * value.
+   */
   readonly equals?: (previous: T, next: T) => boolean
-  /** Per-generation deadline, driven by the Host scheduler. */
+  /**
+   * Optional finite non-negative per-generation deadline, driven by the Host scheduler; omission is
+   * unbounded.
+   */
   readonly timeoutMs?: number
   /** External cancellation for the whole query instance. */
   readonly signal?: IAbortSignal
@@ -283,12 +369,19 @@ export type IStorageHostReactiveApi<
   TStores extends Record<string, IKeyValueStore>,
   TReactiveIds extends keyof TStores & string
 > = {
+  /**
+   * Create a Resource-backed query only for an admitted reactive id; missing service/adapter fails
+   * synchronously.
+   */
   liveQuery<TBackendId extends TReactiveIds, _T>(
     options: ILiveQueryOptions<TStores, TBackendId, _T>
   ): ILiveQuery<_T>
 }
 
-/** Conditional Host type shell preserving exact backend IDs and reactive capability honesty. */
+/**
+ * Host view preserving exact backend ids and exposing liveQuery only when a reactive backend is
+ * known.
+ */
 export type IStorageHost<
   TStores extends Record<string, IKeyValueStore>,
   TReactiveIds extends keyof TStores & string = never,

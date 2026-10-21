@@ -1,22 +1,33 @@
 import type { ILogFilter, IOff, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
 import { LoggerLevel, type ILoggerLevel } from '../plugin-constants.js'
 
+/** Level/filter policy captured for this installation; core tags remain general labels. */
 export type ILevelPluginConfig = {
+  /** Minimum standard level, default debug; unknown tags bypass this threshold only. */
   level?: ILoggerLevel
+  /** Initial predicates, copied into an installation-local list; defaults to empty. */
   filters?: ILogFilter[]
   /** Defers entries from this plugin until after the current synchronous stack. Defaults to `false`. */
   asyncOutput?: boolean
 }
 
+/** Methods added only when the level plugin is installed. */
 export type ILevelPluginExt = {
+  /** Dispatch a debug entry; string-first arguments preserve console placeholder semantics. */
   debug(...args: unknown[]): void
+  /** Dispatch an info entry; nonstring-first values remain native arguments. */
   info(...args: unknown[]): void
+  /** Dispatch a warn entry under the current threshold/filter policy. */
   warn(...args: unknown[]): void
+  /** Dispatch an error entry without throwing it as a business exception. */
   error(...args: unknown[]): void
+  /** Dispatch a fatal entry; this method does not itself exit the process. */
   fatal(...args: unknown[]): void
+  /** Change this installation's live threshold without changing the host config snapshot. */
   setLevel(level: ILoggerLevel): void
   /** Adds a filter and returns an idempotent removal handle. */
   addFilter(filter: ILogFilter): IOff
+  /** Remove all registrations of this exact predicate reference. */
   removeFilter(filter: ILogFilter): void
 }
 
@@ -102,6 +113,11 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
   }
 }
 
+/**
+ * Create standard level methods plus a filtering stage, defaulting to debug, no filters and
+ * synchronous output. Every active predicate must pass; unknown tags skip only the level threshold.
+ * PluginHost owns stage/extension removal, and output failures follow the Logger diagnostic path.
+ */
 export const level = (
   config: ILevelPluginConfig = {}
 ): ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> => new LevelPlugin(config)

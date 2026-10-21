@@ -94,6 +94,10 @@ function cloneInitial<T>(value: T): T {
   }
 }
 
+/**
+ * A scope that keeps one value per definition: read with `get`/`peek`/`preview`, write with `set`,
+ * subscribe with `sub`, replace definitions with `override`, and release with `release`/`dispose`.
+ */
 export type IAtomStore = {
   readonly runtime: IRuntime
   readonly disposed: boolean
@@ -105,6 +109,15 @@ export type IAtomStore = {
   peek<T>(definition: IAtomDefinition<T>): T
   /** React/concurrent speculative read; value may be discarded after the turn. */
   preview<T>(definition: IAtomDefinition<T>): T
+  /**
+   * Writes a source definition with a new value or an updater of the previous value. Listed before
+   * the general overload so the updater's `previous` parameter is typed from the definition.
+   */
+  set<T>(
+    definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
+    update: IAtomUpdate<T>
+  ): void
+  /** Writes any writable definition; a writable derived one returns its `write` result. */
   set<T, Args extends readonly unknown[], Result>(
     definition: IWritableAtomDefinition<T, Args, Result>,
     ...args: Args
@@ -145,6 +158,10 @@ export type IAtomStore = {
   dispose(): void
 }
 
+/**
+ * Creates a new, independent store on `runtime`. Each call gives separate values for the same
+ * definitions; dispose it to release every node it created.
+ */
 export function createAtomStore(runtime: IRuntime): IAtomStore {
   /**
    * 实例表用 Map 而不是 WeakMap，且这里必须说实话：
@@ -614,6 +631,10 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
  */
 const DEFAULT_STORES = new WeakMap<IRuntime, IAtomStore>()
 
+/**
+ * Returns the default store of `runtime`, creating it on first use and again after the previous one
+ * was disposed. Meant for instance-style APIs used without a Provider.
+ */
 export function defaultAtomStore(runtime: IRuntime): IAtomStore {
   const existing = DEFAULT_STORES.get(runtime)
   if (existing && !existing.disposed) return existing

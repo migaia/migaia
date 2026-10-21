@@ -77,10 +77,18 @@ function socketChannel(socket: Socket): IProcessByteChannel {
   return createAdapterSocketByteIO(socket)
 }
 
-/** Connect to an existing process without taking ownership of its process lifetime. */
+/**
+ * Dial one absolute Unix path, supported Windows pipe, or numeric loopback TCP URL. The returned
+ * channel owns only the local socket and has not yet authenticated a remote peer. Cancellation or
+ * native dial failure rejects PROCESS_CHANNEL_CONNECT_FAILED with the original reason as cause;
+ * invalid/nonlocal addresses reject INVALID_CONFIG before opening a socket. This operation does not
+ * add retries or a dial timeout.
+ */
 export async function dialProcessByteChannel(
   options: Readonly<{
+    /** Exact local address; TCP permits only 127.0.0.1 or [::1] with an explicit numeric port. */
     address: string
+    /** Optional dial cancellation, detached after connection; it does not become channel lifetime. */
     signal?: AbortSignal
   }>
 ): Promise<IProcessByteChannel> {
@@ -142,7 +150,14 @@ export async function dialProcessByteChannel(
   })
 }
 
-/** Bind a local authenticated rendezvous point without exposing unverified bytes. */
+/**
+ * Bind a local rendezvous point and deliver pending candidates for one authenticated acceptance.
+ * Returning from onConnection without accepting closes the candidate. close shares one Promise,
+ * stops accepts and pending handshakes, but leaves ready channels with their adopting owners. Bind
+ * failures reject PROCESS_CHANNEL_LISTEN_FAILED; later native/path cleanup errors are reported.
+ * serviceId enables matching stale Unix-owner recovery, not a guarantee against external path
+ * races.
+ */
 export const listenProcessByteChannel: IListenProcessByteChannel = async (
   options
 ): Promise<IProcessByteListener> => {

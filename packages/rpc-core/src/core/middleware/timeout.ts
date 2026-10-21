@@ -86,6 +86,10 @@ function createTimeoutPlugin(config: IRpcTimeoutConfig): IRpcPlugin {
   })
 }
 
-/** Creates the native timeout plugin and retains its legacy middleware call shape. */
+/**
+ * Create a request timeout policy. Finite non-negative budgets include zero; false disables the
+ * deadline. With empty config the installed policy is unbounded, whereas endpoints without this
+ * middleware use their 1000 ms fallback. Invalid options reject installation.
+ */
 export const timeout = (config: IRpcTimeoutConfig = {}): IRpcPlugin =>
   registerJsonObjectMiddleware(freezePlugin(createTimeoutPlugin(config)))

@@ -5,28 +5,63 @@ import type { RpcPoolState } from './text.js'
 
 /** This snapshot measures pool client slots and FIFO entries, never provider concurrency. */
 export type IRpcPoolStats = Readonly<{
+  /** Requested capacity, retained after idle retirement and changed only by resize. */
   targetSize: number
+  /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */
   memberCount: number
+  /**
+   * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider
+   * concurrency.
+   */
   inFlight: number
+  /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */
   queued: number
+  /** Pool admission/drain phase, independent of native generation or supervision state. */
   state: RpcPoolState
 }>
 
 /** Pool controls own only the Peers created by their corresponding public factory. */
 export type IRpcPoolControls = Readonly<{
+  /**
+   * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes
+   * capacity.
+   */
   stats(): IRpcPoolStats
+  /**
+   * Queues a positive-integer target change in call order. Shrink prefers idle members and waits
+   * for occupied retirees without interrupting their calls; expansion acquires only the missing
+   * members. Factory/cleanup failures reject, and failed expansion restores the old target while
+   * still open. Closing pools reject resize with POOL_CLOSED.
+   */
   resize(size: number): Promise<void>
+  /**
+   * Synchronously enters closing, rejects new admission and drains already accepted operations and
+   * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their
+   * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member
+   * closes are attempted; retained close failures reject as CLOSE_FAILED AggregateError with
+   * original errors and the first retained failure on cause, even though state has become closed.
+   */
   close(): Promise<void>
 }>
 
-/** Thread payload, method and transfer types remain exactly those of its public Peer. */
+/**
+ * Thread calls retain their public Peer method/payload/transfer types. request releases its slot
+ * after the original Promise settles, notify after its original send Promise, and a lazy stream
+ * from first next until done/return/throw or failure. Queued cancellation belongs to the pool;
+ * dispatched cancellation and relative request timeouts remain with the original Peer.
+ */
 export type IThreadPool<TRemote = Record<never, never>> = Pick<
   Awaited<ReturnType<typeof createThreadPeer<TRemote>>>,
   'request' | 'notify' | 'stream'
 > &
   IRpcPoolControls
 
-/** Process call options retain the public owner's prohibition on native transfer lists. */
+/**
+ * Process request/notify/stream calls retain public Process types, including the prohibition on
+ * native transfer lists. Each accepted client operation owns one slot until its original Peer
+ * completion point; stream creation alone acquires nothing. Errors after dispatch remain with their
+ * original owner rather than being relabeled or automatically retried by the pool.
+ */
 export type IProcessPool<TRemote = Record<never, never>> = Pick<
   Awaited<ReturnType<typeof createProcessPeer<TRemote>>>,
   'request' | 'notify' | 'stream'
@@ -35,25 +70,41 @@ export type IProcessPool<TRemote = Record<never, never>> = Pick<
 
 /** Common pool limits are validated before acquiring any public Peer. */
 export type IRpcPoolOptions = Readonly<{
+  /** Required positive integer target; initial creation waits for this many independent Peers. */
   size: number
+  /** Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue. */
   maxQueue?: number
+  /**
+   * Optional idle retirement delay; omitted disables it. Must be finite, positive and at most
+   * 2147483647 ms, including fractional values. Target size remains unchanged after retirement;
+   * later demand refills missing members through the original public factory.
+   */
   idleTimeoutMs?: number
-  /** Controls only pool idle retirement; native Peer lifetimes keep their own source policy. */
+  /**
+   * Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers
+   * cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain
+   * their source policy, and timer unref is a liveness hint rather than an earlier deadline.
+   */
   scheduler?: IScheduler
 }>
 
 /** Every Thread member receives this exact original source value. */
 export type IThreadPoolOptions = IRpcPoolOptions &
   Readonly<{
+    /** Required original Thread spawn source; URL/path/true/config meaning is owned by rpc-threads. */
     spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>
-    /** Every member receives the same source probe without cloning its handle. */
+    /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */
     probe?: IRuntimeThreadPeerOptions['probe']
   }>
 
 /** Every Process member receives this exact original source value. */
 export type IProcessPoolOptions = IRpcPoolOptions &
   Readonly<{
+    /**
+     * Required original Process spawn source; command/path/URL/true/config rules remain with
+     * rpc-process.
+     */
     spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>
-    /** Every member receives the same source probe without cloning its handle. */
+    /** Optional Probe or readonly Probe array, default undefined, forwarded unchanged to each Peer. */
     probe?: IRuntimeProcessPeerOptions['probe']
   }>

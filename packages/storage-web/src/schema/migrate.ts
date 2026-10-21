@@ -13,8 +13,11 @@ import {
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { assertOperationContext, throwIfAborted } from '../core/operation.js'
 
+/** One declared version step; the signal belongs to the caller's existing operation. */
 export type IMigrationContext = {
+  /** Version immediately before this step. */
   readonly fromVersion: number
+  /** Version produced by this step. */
   readonly toVersion: number
   /** Optional operation signal for cooperative migration cancellation. */
   readonly signal?: IAbortSignal
@@ -24,8 +27,11 @@ export type IMigrationContext = {
 export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>
 
 /**
- * Creates a new runtime at the public entry, with one reporter per operation. See The contract on
- * separating public APIs from their internal steps.
+ * Run own migration steps in ascending version order with one operation reporter. Version numbers
+ * must be non-negative safe integers; fromVersion >= toVersion returns the same value after input
+ * and cancellation admission. Missing steps are no-ops here, unlike a declared entity's complete
+ * migration graph. Cancellation keeps the storage-contract ABORTED identity; step failure rejects
+ * MIGRATION_FAILED without rolling back external effects performed by user callbacks.
  */
 export const runMigrations = async (
   value: unknown,

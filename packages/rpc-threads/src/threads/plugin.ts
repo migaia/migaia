@@ -25,7 +25,13 @@ export type IRuntimeThreadPluginOptions = Omit<
 > &
   Readonly<{ report?: (error: unknown) => void }>
 
-/** Install a symmetric connection into the original canonical thread slot. */
+/**
+ * Define a named thread connection for Host.use using the same sources as createThreadPeer. The
+ * definition stays cold until installation; Host owns the shared thread outlet and release. provide
+ * supplies local methods and expose defaults to no Host Feature methods. Core/PluginHost preserve
+ * their own admission, generation, and cleanup errors; this factory does not add retries or
+ * stronger native execution guarantees.
+ */
 export function createThreadPlugin<
   TRemote = Record<never, never>,
   const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<
@@ -38,8 +44,11 @@ export function createThreadPlugin<
 >(
   options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> &
     Readonly<{
+      /** Host-local connection name used by host.thread to select this installed plugin. */
       name: TName
+      /** Optional local method tree; omission publishes no application methods. */
       provide?: TProvide
+      /** Optional exact Host Feature paths; omission exposes none to the remote Worker. */
       expose?: TExpose &
         (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])
     }>,

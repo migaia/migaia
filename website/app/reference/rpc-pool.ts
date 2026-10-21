@@ -6,6 +6,7 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { runtimeSharedTypes } from './rpc-runtime-shared.js'
+import { rpcPoolCases } from './rpc-pool-cases.js'
 
 /** Creates bilingual prose without sharing fallback language. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -123,7 +124,7 @@ const commonOptions: Readonly<Record<string, IMemberDoc>> = {
     ),
     default: t(
       '256 waiting operations; overflow rejects QUEUE_FULL without calling a Peer.',
-      '默认二百五十六个等待操作，溢出以 `QUEUE_FULL` 拒绝且不调用底层连接。'
+      '默认 `256` 个等待操作，溢出以 `QUEUE_FULL` 拒绝且不调用底层连接。'
     )
   },
   idleTimeoutMs: {
@@ -132,8 +133,8 @@ const commonOptions: Readonly<Record<string, IMemberDoc>> = {
       '不超过 `2147483647` 毫秒的有限正空闲时长，经原有关闭接口退役真正空闲成员，后续需求重新创建缺失目标容量。'
     ),
     default: t(
-      'Omitted, disabling pool-owned idle retirement; native Peer supervision remains unchanged.',
-      '默认省略，不执行池级空闲退役，原生连接监督保持原策略。'
+      'undefined, disabling pool-owned idle retirement; native Peer supervision remains unchanged.',
+      '默认 `undefined`，不执行池级空闲退役，原生连接监督保持原策略。'
     )
   },
   scheduler: {
@@ -143,7 +144,7 @@ const commonOptions: Readonly<Record<string, IMemberDoc>> = {
     ),
     default: t(
       'systemScheduler from @migaia/utils/scheduler; Peer restart and deadline policy stays with each original spawn source.',
-      '默认工具包系统调度器，各原始启动来源仍拥有连接重启及截止时间策略。'
+      '默认 `systemScheduler`，各原始启动来源仍拥有连接重启及截止时间策略。'
     )
   }
 }
@@ -155,8 +156,8 @@ const probeOption: IMemberDoc = {
     '来自核心探针包、例如采集器工厂产生的单个探针或只读探针数组，相同句柄原样传给每个公开成员工厂，按事件端点标识区分成员。'
   ),
   default: t(
-    'Omitted; no pool-added source probe is passed to member factories.',
-    '默认省略，不向成员工厂传入池额外提供的来源探针。'
+    'undefined; no pool-added source probe is passed to member factories.',
+    '默认 `undefined`，不向成员工厂传入池额外提供的来源探针。'
   )
 }
 
@@ -186,9 +187,13 @@ const controlMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Promise<void> after acquisition or retirement. Invalid size uses INVALID_OPTIONS; closure uses POOL_CLOSED. Expansion failure restores the previous target and retains the original factory failure.',
-      '完成接纳或退役后兑现空承诺，非法大小使用 `INVALID_OPTIONS`，关闭使用 `POOL_CLOSED`，扩容失败恢复旧目标并保留原工厂失败。'
+      '成员创建或退役完成后兑现 `Promise<void>`；非法大小使用 `INVALID_OPTIONS`，关闭使用 `POOL_CLOSED`，扩容失败恢复旧目标并保留原工厂失败。'
     ),
-    example: threadExample
+    whenToUse: t(
+      'Change capacity on an existing pool. This complete Node 24 example uses a guarded Thread entry with spawn true and required size 1; maxQueue defaults to 256, idleTimeoutMs to undefined and scheduler to systemScheduler. Each resize argument is the new required positive integer target.',
+      '已有池需要调整容量时使用。完整 Node 24 示例以子线程判断保护入口，设置 `spawn: true` 和必填初始 `size: 1`；`maxQueue` 默认 `256`，`idleTimeoutMs` 默认 `undefined`，`scheduler` 默认 `systemScheduler`。每次 `resize(size)` 的必填参数都是新的正整数目标。'
+    ),
+    example: rpcPoolCases.resize![0]!.example
   },
   close: {
     summary: t(
@@ -197,7 +202,7 @@ const controlMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     returns: t(
       'The same Promise<void> on repeated calls. Resolves after all member closes, or rejects with CLOSE_FAILED AggregateError retaining every original close failure and the first cause.',
-      '重复调用返回同一空承诺，全部成员关闭后兑现，或以保留所有原始关闭失败及首个原因的 `CLOSE_FAILED` 聚合错误拒绝。'
+      '重复调用返回同一个 `Promise<void>`；全部成员关闭后兑现，或以保留所有原始关闭失败及首个原因的 `CLOSE_FAILED` 聚合错误拒绝。'
     ),
     example: threadExample
   }
@@ -209,7 +214,7 @@ const threadCallMembers: Readonly<Record<string, IMemberDoc>> = {
     ...runtimeSharedTypes.IRuntimeTypedPeer!.members.request!,
     summary: t(
       'Schedules one original Thread Peer request in a single member slot. If busy it waits in the bounded FIFO; the slot remains occupied until the original result promise settles. Peer failures pass through unchanged and are never replayed.',
-      '在单个成员槽调度原线程连接请求，忙时进入有界先进先出等待队列，原结果承诺落定才释放槽，底层失败原样通过且不重放。'
+      '在单个成员槽调度原线程连接请求，忙时进入有界先进先出等待队列，原结果 Promise 完成后才释放槽，底层失败原样通过且不重放。'
     ),
     params: {
       method: t(
@@ -223,7 +228,7 @@ const threadCallMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Promise of the original typed result after queued dispatch. Pool-owned admission may reject POOL_CLOSED, QUEUE_FULL or queued CALL_ABORTED; native and Peer errors keep original identity and source/code.',
-      '派发后返回原类型化结果承诺，池接纳可因关闭、队列满或排队取消拒绝，原生及底层连接错误保留原身份与来源错误码。'
+      '派发后返回原类型化结果 Promise，池接纳可因关闭、队列满或排队取消拒绝，原生及底层连接错误保留原身份与来源错误码。'
     ),
     example: threadExample
   },
@@ -231,7 +236,7 @@ const threadCallMembers: Readonly<Record<string, IMemberDoc>> = {
     ...runtimeSharedTypes.IRuntimeTypedPeer!.members.notify!,
     summary: t(
       'Schedules one original Thread Peer notification; a slot is released when its send promise settles, without waiting for a remote business result.',
-      '调度原线程连接单向通知，发送承诺落定即释放槽，不等待远端业务结果。'
+      '调度原线程连接单向通知，发送 Promise 完成后即释放槽，不等待远端业务结果。'
     ),
     params: {
       method: t(
@@ -245,7 +250,7 @@ const threadCallMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Promise<void> from the original send boundary after pool scheduling; pool queue failures use its own codes and original send failures pass through.',
-      '池调度后来自原发送边界的空承诺，排队失败使用池错误码，原发送失败原样通过。'
+      '池调度后返回原发送边界的 `Promise<void>`，排队失败使用池错误码，原发送失败原样通过。'
     ),
     example: threadExample
   },
@@ -279,7 +284,7 @@ const processCallMembers: Readonly<Record<string, IMemberDoc>> = {
     ...threadCallMembers.request!,
     summary: t(
       'Schedules one original Process Peer request. Queue waiting does not start the native deadline; the occupied slot is released only when the original result promise settles. Pool scheduling never retries a failed business call.',
-      '调度原进程连接请求，排队不启动原截止时间，原结果承诺落定才释放槽，池调度从不重试失败业务调用。'
+      '调度原进程连接请求，排队不启动原截止时间，原结果 Promise 完成后才释放槽，池调度从不重试失败业务调用。'
     ),
     params: {
       method: t(
@@ -297,7 +302,7 @@ const processCallMembers: Readonly<Record<string, IMemberDoc>> = {
     ...threadCallMembers.notify!,
     summary: t(
       'Schedules one original Process Peer notification and holds its client slot until the send promise settles; no business response is awaited.',
-      '调度原进程连接单向通知，发送承诺落定前占用客户端槽，不等待业务响应。'
+      '调度原进程连接单向通知，发送 Promise 完成前占用客户端槽，不等待业务响应。'
     ),
     params: {
       method: t(
@@ -352,9 +357,14 @@ export const rpcPoolReference: ILibraryReference = {
       options: 'IThreadPoolOptions',
       returns: t(
         'Promise<IThreadPool<TRemote>> after all initial members are ready. Invalid pool input uses INVALID_OPTIONS; original factory failures preserve their identity, and partial acquisition closes successful members before rejecting. Caller must close the pool.',
-        '全部初始成员就绪后返回池承诺，非法池输入使用 `INVALID_OPTIONS`，原工厂失败保留身份，部分接纳失败在拒绝前关闭成功成员，调用者必须关闭池。'
+        '全部初始成员就绪后兑现池 Promise，非法池输入使用 `INVALID_OPTIONS`，原工厂失败保留身份，部分接纳失败在拒绝前关闭成功成员，调用者必须关闭池。'
       ),
-      example: threadExample,
+      exampleIntro: {
+        en: "Run the complete .ts example with Node 24. spawn true reruns the current entry, so its child guard must surround the pool-creation branch. size is a required positive integer; maxQueue defaults to 256, idleTimeoutMs to undefined and scheduler to systemScheduler. The scheduler controls only pool idle retirement. Each accepted operation occupies one member client slot; these counts do not measure provider concurrency.\n\nInstall @migaia/rpc-core, @migaia/rpc-threads and @migaia/rpc-process directly alongside this package's required peers. await isThreadChild selects the real Worker branch, and createThreadPeer({ provide }) publishes the shown methods. The identity payload contains actual process.pid and native threadId; request method names come from provide. The queue example uses a native AbortController: the call options object is optional, signal defaults to undefined and its reason is retained if cancellation occurs while waiting. Unspecified call policies still belong to the original ThreadPeer. The resize task below uses that same public pool method.",
+        zh: '用 Node 24 运行完整 `.ts` 示例；`spawn: true` 会重跑当前入口，必须用子程序判断分开发布方法与创建池。`size` 必填正整数，`maxQueue` 默认 `256`，`idleTimeoutMs` 默认 `undefined`，`scheduler` 默认 `systemScheduler`，只控制池的空闲回收；每项已接纳操作占用一个成员客户端槽，统计值不是远端计算并发。\n\n同时直接安装必需的三个 Peer 依赖 `@migaia/rpc-core`、`@migaia/rpc-threads`、`@migaia/rpc-process`；`await isThreadChild()` 选择真实 Worker 分支，`createThreadPeer({ provide })` 发布代码中的方法。身份数据来自真实 `process.pid` 与原生 `threadId`，请求方法名来自 `provide`；排队示例使用原生 `AbortController`，调用选项可省略，`signal` 默认 `undefined`，排队取消时保留其原始原因。其余调用策略仍归原 ThreadPeer，下方扩缩容任务使用同一公开池方法。'
+      },
+      cases: [...rpcPoolCases.createThreadPool!, ...rpcPoolCases.resize!],
+      example: rpcPoolCases.createThreadPool![0]!.example,
       scenarios: [
         t(
           'Run independent CPU or worker calls across several Thread Peers without introducing another RPC protocol.',
@@ -371,9 +381,14 @@ export const rpcPoolReference: ILibraryReference = {
       options: 'IProcessPoolOptions',
       returns: t(
         'Promise<IProcessPool<TRemote>> preserving Process public call-option types, including no native transfer lists. Invalid pool input uses INVALID_OPTIONS and original acquisition errors pass through; caller owns explicit pool close.',
-        '返回保留进程公开调用选项类型的池承诺，包含禁止原生转移列表约束，非法池输入使用 `INVALID_OPTIONS`，原接纳错误原样通过，调用者拥有显式关闭义务。'
+        '返回池 Promise，保留进程公开调用选项类型及禁止原生转移列表的约束，非法池输入使用 `INVALID_OPTIONS`，原接纳错误原样通过，调用者负责显式关闭。'
       ),
-      example: processExample,
+      exampleIntro: {
+        en: 'Run the complete .ts example with Node 24. spawn true reruns the current entry, so its child guard must surround the pool-creation branch. size is a required positive integer; maxQueue defaults to 256, idleTimeoutMs to undefined and scheduler to systemScheduler. The scheduler controls only pool idle retirement. Each accepted operation occupies one member client slot; these counts do not measure provider concurrency.\n\nDirectly install all three required peers: @migaia/rpc-core, @migaia/rpc-process and @migaia/rpc-threads. isProcessChild is synchronous; createProcessPeer({ provide }) publishes the shown child methods. The identity method returns its real process.pid. The stream returns two numeric values; the client must consume or return it to release its slot. Process call options retain the original API and forbid Thread transfer lists. The failure task receives the native TypeError itself with a RangeError cause, not a Worker-style outer wrapper.\n\nThe original short Process source defaults to best-effort isolation and can report a supervision CAPABILITY_UNSUPPORTED notice for unsupported process termination. This expected degradation does not turn a successful business call into failure, and it does not establish guaranteed termination of an entire process tree. The pool forwards original Peer failures and does not replay failed work.',
+        zh: '用 Node 24 运行完整 `.ts` 示例；`spawn: true` 会重跑当前入口，必须用子程序判断分开发布方法与创建池。`size` 必填正整数，`maxQueue` 默认 `256`，`idleTimeoutMs` 默认 `undefined`，`scheduler` 默认 `systemScheduler`，只控制池的空闲回收；每项已接纳操作占用一个成员客户端槽，统计值不是远端计算并发。\n\n直接安装三个必需依赖 `@migaia/rpc-core`、`@migaia/rpc-process`、`@migaia/rpc-threads`；`isProcessChild()` 同步判断子进程，`createProcessPeer({ provide })` 发布代码中的方法。身份方法返回真实 `process.pid`，流依次返回两个数字；调用方需消费或归还流才能释放槽。进程调用选项保留原接口，禁止线程转移列表；失败任务直接收到原生 `TypeError`，其 `cause` 为 `RangeError`，不是 Worker 示例中的外层包装。\n\n原进程短来源默认采用 `best-effort` 隔离，可能因不支持进程终止能力报告监督层的 `CAPABILITY_UNSUPPORTED` 提示；这种预期能力降级不把已成功的业务调用变成失败，也不保证整棵进程树一定能被强制终止。池透传原 Peer 失败，不重放失败工作。'
+      },
+      cases: rpcPoolCases.createProcessPool,
+      example: rpcPoolCases.createProcessPool![0]!.example,
       scenarios: [
         t(
           'Distribute independent service calls across owned child processes while preserving each public Process Peer lifecycle.',

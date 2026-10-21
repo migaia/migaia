@@ -7,7 +7,9 @@
   "files": [
     "dist",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -20,7 +22,7 @@
     }
   },
   "scripts": {
-    "fmt": "oxfmt src test e2e",
+    "fmt": "oxfmt src test e2e README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",

@@ -1,4 +1,4 @@
-/** Stable diagnostic text for an IndexedDB sidecar row without an authoritative record. */
+/** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
   /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */
   entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit',
@@ -68,9 +68,13 @@ export const StorageErrorText = Object.freeze({
   liveQueryFailed: 'live query extension failed',
   /** Stable text for aggregate direct backend cleanup failure. */
   backendDisposeFailed: 'storage backend failed to dispose',
+  /** An index sidecar row has no authoritative record; repair or rebuild the index. */
   indexOrphan: 'indexed record index contains orphan sidecar row',
+  /** A paged native query crossed a mutation epoch and must restart. */
   indexQueryInvalidated: 'native record index query invalidated by a concurrent mutation',
+  /** A terminal query cannot refresh; create a new query handle. */
   liveQueryDisposed: 'live query is disposed; create a new live query',
+  /** A backfill handle lost its original owner/checkpoint; reacquire through a repository operation. */
   indexBackfillStale: 'indexed record backfill handle is stale; retry the query',
   /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */
   indexBackfillProjectionTooLarge: 'indexed record backfill projection exceeds its fixed limit',

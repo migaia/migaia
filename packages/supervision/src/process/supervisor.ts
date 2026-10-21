@@ -48,7 +48,16 @@ export function validateProcessOptions<THandle extends IProcessHandle>(
     invalidProcessOption('output.tailBytes', true)
 }
 
-/** Adapts process-specific output, registration, usage and prewarming to core hooks. */
+/**
+ * Supervises a child process created by an application-supplied launcher, such as a ready-made Node
+ * launcher from an adapter package.
+ *
+ * Adds process concerns to the shared policy: bounded stdout/stderr tails, optional resource-usage
+ * sampling against declared limits, durable records for recovery after parent loss, and handover of
+ * a prewarmed idle process. This package never spawns a process itself. Under the default required
+ * isolation, a launcher that cannot guarantee termination or fault isolation is rejected with
+ * `CAPABILITY_UNSUPPORTED`; pass `isolation: 'best-effort'` to accept and report the gap instead.
+ */
 export function createProcessSupervisor<THandle extends IProcessHandle>(
   options: IProcessSupervisorOptions<THandle>
 ): IProcessSupervisor<THandle> {

@@ -4,13 +4,20 @@ import type { IRpcFrameAcceptResult, IRpcFrameContext } from '../types.js'
  * Binds native framing ingress preparation to the exact `accept` callable. Structural copies retain
  * native behaviour without making descriptor objects identity tokens.
  */
-export type IRpcPreparedFrame<TFrame> = Readonly<{ frame: TFrame; messageId: string }>
+export type IRpcPreparedFrame<TFrame> = Readonly<{
+  /** Prepared native snapshot or the unchanged opaque custom frame. */
+  frame: TFrame
+  /** Native fragment identity or the stable whole-frame fallback for opaque input. */
+  messageId: string
+}>
 /**
  * Describes a package-native framer whose output can be either a legal carrier or a fragment
  * object. Component admission uses this owner-provided fact without invoking framing callables.
  */
 export type IRpcNativeFrameOutputDomain = Readonly<{
+  /** Native frame output admits a whole encoded carrier as well as a chunk record. */
   readonly kind: 'carrier-or-fragment'
+  /** Actual whole-carrier category emitted by the exact registered frame callable. */
   readonly carrierEncodedType: 'string' | 'uint8array'
 }>
 /**
@@ -21,10 +28,13 @@ export type IRpcBoundFrameIngress<TFrame> = ((
   frame: TFrame,
   context: IRpcFrameContext
 ) => IRpcPreparedFrame<TFrame>) & {
+  /** Present only when the supplied frame callable has its own native output-domain fact. */
   readonly nativeOutputDomain?: IRpcNativeFrameOutputDomain
   /** Construction limits belong to the exact native pair used by this ingress. */
   readonly singleFrameLimits?: Readonly<{
+    /** Original paired native constructor's candidate capacity. */
     maxConcurrentMessages: number
+    /** Original paired native constructor's complete-message ceiling. */
     maxMessageBytes: number
   }>
 }

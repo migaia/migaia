@@ -28,11 +28,11 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     '出站同步或异步加密在端点为编码值包装重放元数据后、签名前执行；抛错或拒绝通常成为保留原因的认证失败。',
     t(
       'Replay-bound authentication envelope produced by the endpoint, including its encoded payload; not the bare application payload.',
-      '端点生成、绑定重放信息的认证信封，包含编码载荷，不是裸应用负载。'
+      '端点生成、绑定重放信息的认证消息封装，包含编码载荷，不是裸应用负载。'
     ),
     t(
       'Encrypted value or its Promise, passed unchanged into sign.',
-      '返回加密值或其承诺，原样传入签名阶段。'
+      '返回加密值或其 Promise，原样传入签名阶段。'
     ),
     t(
       'Leave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.',
@@ -41,11 +41,11 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
   ),
   decrypt: transform(
     'Inbound sync/async decryption runs on the value recovered by verify. The endpoint then validates the recovered authentication envelope and replay binding.',
-    '入站同步或异步解密处理验证阶段恢复的值；随后端点校验恢复的认证信封与重放绑定。',
+    '入站同步或异步解密处理验证阶段恢复的值；随后端点校验恢复的认证消息封装与重放绑定。',
     t('Verified protected value returned by verify.', '验证阶段返回的已验证受保护值。'),
     t(
       'Recovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.',
-      '返回恢复的重放绑定认证信封或其承诺；抛错或拒绝通常成为保留原始原因的认证失败。'
+      '返回恢复的重放绑定认证消息封装或其 Promise；抛错或拒绝通常成为保留原始原因的认证失败。'
     ),
     t(
       'Omit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.',
@@ -57,11 +57,11 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     '出站同步或异步签名在可选加密后执行，返回完整受保护帧表示；即使不加密，也必须配置签名与验证。',
     t(
       'Encrypted value when encrypt exists, otherwise the replay-bound authentication envelope.',
-      '存在加密阶段时接收加密值，否则接收重放绑定认证信封。'
+      '存在加密阶段时接收加密值，否则接收重放绑定认证消息封装。'
     ),
     t(
       'Signed representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.',
-      '返回签名表示或其承诺；抛错或拒绝通常成为认证失败，输出须符合声明的编码值域。'
+      '返回签名表示或其 Promise；抛错或拒绝通常成为认证失败，输出须符合声明的编码值域。'
     ),
     t(
       'There is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.',
@@ -77,7 +77,7 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     ),
     t(
       'Authenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.',
-      '返回认证内部值或其承诺，配置了解密时传给解密；签名非法时应拒绝或抛错，本地报告保留可能敏感的原校验失败，对端只接收净化摘要，其它返回值仍需通过信封及重放校验。'
+      '返回认证内部值或其 Promise，配置了解密时传给解密；签名非法时应拒绝或抛错，本地报告保留可能敏感的原校验失败，对端只接收净化摘要，其它返回值仍需通过消息封装及重放校验。'
     ),
     t(
       'There is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.',

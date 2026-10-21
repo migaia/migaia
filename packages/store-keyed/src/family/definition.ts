@@ -26,6 +26,10 @@ import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 export type IFamilyKey = string | number | symbol
 
+/**
+ * Options of `familyDef`/`derivedFamilyDef`: `maxSize` bounds the strong cache (default 4096),
+ * `debugLabel` names the produced definitions.
+ */
 export type IFamilyDefOptions = {
   /**
    * Limits the strong definition cache. Entries least recently accessed become weak references when

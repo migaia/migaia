@@ -4,7 +4,13 @@ import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtim
 import { captureThreadTask, type IThreadAdapterTask } from './adapter.js'
 import { defaultRpcReporter } from '@migaia/rpc-core'
 
-/** Discover only the actual held native parent port and its original raw launch input. */
+/**
+ * Create an advanced child Peer from the actual parentPort and its original native workerData. Core
+ * validates bootstrap/provide and performs the original capability admission; a caller-made
+ * metadata shape is not proof of native provenance. A null parent port delegates the configured
+ * main-thread source path. The Peer borrows this port and retains Core's normal failure
+ * identities.
+ */
 export function createAdapterNodeThreadPeer(
   options: IRuntimeThreadPeerOptions,
   parentPort: IThreadParentPort | null,

@@ -18,7 +18,12 @@ type IRemoteRetryOwnerOptions = Readonly<{
   report(error: unknown): void
 }>
 
-/** One logical request retains its key and deadline across at most two physical sends. */
+/**
+ * Create an opt-in request retry policy with at most two physical sends. Only an idempotent request
+ * can replay after generation departure, retaining any supplied key; readiness waiting consumes the
+ * original deadline. Unreconcilable departure rejects REMOTE_RESULT_UNKNOWN rather than silently
+ * rerunning side effects.
+ */
 export function createRemoteRetryPort(options: IRemoteRetryOwnerOptions): IRemoteRetryPort {
   return Object.freeze({
     dispatch: (input: IRemoteRetryDispatch) => dispatchRemoteRetry(options, input)

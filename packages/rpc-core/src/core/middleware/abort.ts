@@ -21,5 +21,9 @@ const abortPlugin: IRpcPlugin = Object.freeze({
   })
 })
 
-/** Creates the native abort-enable plugin used directly by the factory composer. */
+/**
+ * Enable remote abort notifications when a local request cancels or expires. Local signal
+ * cancellation also works without this plugin; remote application work must observe its
+ * context.signal to cooperate.
+ */
 export const abort = (): IRpcPlugin => registerJsonObjectMiddleware(freezePlugin(abortPlugin))

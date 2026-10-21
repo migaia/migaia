@@ -34,44 +34,62 @@ import { captureThreadTask, type IThreadAdapterTask } from './adapter.js'
 
 /** Existing thread deployment owns its original supervisor, budget, launcher and channel factory. */
 export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{
+  /** Complete Worker specification; portable data is admitted before supervisor/native construction. */
   spec: IThreadSpec
+  /** Caller-selected execution owner and its actual capability guarantees. */
   launcher: IThreadSupervisorOptions<THandle>['launcher']
+  /** Borrowed simultaneous-Worker budget; actual exit, not merely terminate(), releases a lease. */
   budget: IThreadSupervisorOptions<THandle>['budget']
+  /** Required clock shared by supervision, drain, and the channel factory. */
   scheduler: IScheduler
+  /** Open the original handle's channel; do not install a competing native message reader. */
   channelFactory: IThreadChannelFactory<THandle>
+  /** Required diagnostic sink for this source; top-level Peer report may override call reporting. */
   report(error: unknown): void
+  /** Custom health policy; omission adds ping only when native exit observation is not enforced. */
   health?: IThreadSupervisorOptions<THandle>['health']
+  /** Optional supervisor policy; full sources retain supervision's required isolation default. */
   supervisor?: Partial<
     Pick<
       IThreadSupervisorOptions<THandle>,
       'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'
     >
   >
+  /** Optional remote idempotency-key factory; top-level Peer keyFactory takes precedence. */
   keyFactory?: () => string
+  /** Optional Core retry owner; top-level Peer retryPort takes precedence. */
   retryPort?: IRemoteRetryPort
 }>
 
 /** Entry-only deployment fills the existing source's launcher, budget and channel defaults. */
 export type IRuntimeThreadShortSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{
+  /** True reexecutes the real main entry; URLs are exact and relative paths use the main entry/base. */
   entry: true | IUrlLike
   /** Explicit module URL or URL string changes only relative entry resolution. */
   base?: IUrlLike
+  /** Optional Worker name; omission leaves the native name unset and uses a launch fingerprint. */
   name?: IThreadSpec['name']
+  /** Optional portable initialization data, normalized before native Worker construction. */
   data?: IThreadSpec['data']
+  /** Optional heap/call limits; enforcement remains subject to the selected launcher's capabilities. */
   limits?: IThreadSpec['limits']
 }> &
   Partial<Omit<IRuntimeThreadSpawn<THandle>, 'spec'>>
 
 /**
- * Source callbacks remain only for the serial migration; deployed sources use original platform
- * specs.
+ * Choose an owned spawn or an existing Core connect/listen callback; library-launched children may
+ * omit the source for automatic bootstrap discovery. Short spawn selects a one-Worker budget,
+ * systemScheduler and best-effort isolation. Full sources supply their own required dependencies.
+ * Core retains provide/authentication/deadline and source-exclusivity admission.
  */
 export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHandle> = Omit<
   IRuntimePeerOptions,
   'spawn' | 'report'
 > &
   Readonly<{
+    /** Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter. */
     report?: (error: unknown) => void
+    /** Owned Worker source: callback, full deployment, short object, true, or an entry URL/path. */
     spawn?:
       | IRuntimePeerSource
       | IRuntimeThreadSpawn<THandle>

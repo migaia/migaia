@@ -119,8 +119,10 @@ export type IErrorIdentityHooks<T extends object> = {
 }
 
 /**
- * Attaches stable identity without replacing the original object. Optional hooks let a package
- * preserve its own fallback semantics for conflicts and non-extensible targets.
+ * Adds stable `source` / `code` (and optional `phase` / `detail`) fields to an existing error
+ * without replacing it, so `instanceof` and the stack stay intact. A field that already holds a
+ * different value throws `TypeError` unless `onConflict` picks a target; optional hooks let a
+ * package keep its own fallback for conflicts and non-extensible targets.
  */
 export function attachErrorIdentity<T extends object>(
   error: T,
@@ -255,7 +257,12 @@ class UtilsErrorValue extends UtilsError {
   }
 }
 
-/** Walks cause and AggregateError chains with bounded identity deduplication. */
+/**
+ * Lists an error and everything reachable through `cause` and `AggregateError.errors`, starting
+ * with the error itself. Identical values appear once, so cycles end; `maxDepth` (default 32)
+ * bounds the walk. An explicit `cause: undefined` contributes an `undefined` entry, so read fields
+ * with `?.`.
+ */
 export function walkErrorCauses(
   error: unknown,
   options?: { readonly maxDepth?: number }
@@ -312,10 +319,18 @@ export function isUtilsError(value: unknown): value is UtilsError {
   }
 }
 
+/**
+ * True for a utils error shape with code `ABORTED` (cooperative cancellation); no `instanceof`
+ * needed.
+ */
 export function isUtilsAbortError(value: unknown): value is UtilsAbortError {
   return isUtilsError(value) && (value as { code?: unknown }).code === UtilsErrorCode.aborted
 }
 
+/**
+ * True for a utils error shape with code `DEADLINE_EXCEEDED`; read `scope` and `timeoutMs` to tell
+ * an operation, attempt or total deadline apart. No `instanceof` needed.
+ */
 export function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError {
   return (
     isUtilsError(value) && (value as { code?: unknown }).code === UtilsErrorCode.deadlineExceeded

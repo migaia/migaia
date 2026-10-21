@@ -3,6 +3,52 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { createBroadcastChannelTransport } from '../../../src/browser/adapters/broadcast-channel.js'
 import { createWebTransportDatagramTransport } from '../../../src/browser/adapters/web-transport.js'
 import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc-data-channel.js'
+import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
+import { createServiceWorkerTransport } from '../../../src/browser/adapters/service-worker.js'
+
+it.each(['shared-worker', 'service-worker'] as const)(
+  'classifies native %s clone failure and keeps the borrowed port usable',
+  async (carrier) => {
+    /** A real native port supplies structured-clone failure and remains owned by this test. */
+    const { port1, port2 } = new MessageChannel()
+    /** Both public structural adapters use the same complete native MessagePort surface. */
+    const transport =
+      carrier === 'shared-worker'
+        ? createSharedWorkerTransport(
+            port1 as unknown as Parameters<typeof createSharedWorkerTransport>[0]
+          )
+        : createServiceWorkerTransport({
+            target: port1,
+            receiver: port1
+          } as unknown as Parameters<typeof createServiceWorkerTransport>[0])
+    try {
+      /** Classification must retain the native failure class and its constructor-created stack. */
+      let failure: unknown
+      try {
+        transport.send(() => undefined)
+      } catch (error) {
+        failure = error
+      }
+      expect(failure).toBeInstanceOf(DOMException)
+      expect(failure).toMatchObject({
+        name: 'DataCloneError',
+        source: '@migaia/rpc/core',
+        code: 'TRANSPORT'
+      })
+      expect((failure as Error).stack).toBeTruthy()
+      /** A failed send must not retire the caller-owned port or prevent later valid delivery. */
+      const received = new Promise<unknown>((resolve) => {
+        port2.addEventListener('message', (event) => resolve(event.data), { once: true })
+        port2.start()
+      })
+      transport.send('after clone failure')
+      await expect(received).resolves.toBe('after clone failure')
+    } finally {
+      port1.close()
+      port2.close()
+    }
+  }
+)
 
 it('classifies the native BroadcastChannel clone failure without replacing it', () => {
   /** Native serialization supplies a genuine DOMException and its original stack. */

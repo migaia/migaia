@@ -5,6 +5,7 @@
  * 2026-10-18.
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import { storeLightCases } from './store-light-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -290,6 +291,7 @@ export const storeLightReference: ILibraryReference = {
       ),
       options: 'ICreateStoreOptions',
       example: storeExample,
+      cases: storeLightCases.createStore,
       scenarios: [
         t(
           'Form, settings or session state without writing signals by hand.',
@@ -360,7 +362,8 @@ export const storeLightReference: ILibraryReference = {
         '`createStore` 能识别的 `IRaw` 包装对象。'
       ),
       example: `const form = createStore({ onSubmit: raw((data: FormData) => console.log(data)) })
-form.onSubmit = (data) => save(data)`
+form.onSubmit = (data) => save(data)`,
+      cases: storeLightCases.raw
     },
     isRaw: {
       role: 'operation',
@@ -420,6 +423,7 @@ form.onSubmit = (data) => save(data)`
       ),
       options: 'IStoreResourceOptions',
       example: resourceExample,
+      cases: storeLightCases.createStoreResource,
       scenarios: [
         t(
           'Load data for React Suspense with a cache that survives short unmounts.',

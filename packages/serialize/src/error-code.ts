@@ -1,9 +1,8 @@
 /**
  * The single declaration site for `@migaia/serialize` error codes.
  *
- * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
- * `source` is always `'@migaia/serialize'`. Throw sites use these constants instead of inline
- * values.
+ * The pair (source, code) uniquely identifies a failure at the package boundary. `source` is always
+ * `'@migaia/serialize'`. Throw sites use these constants instead of inline values.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -75,9 +74,10 @@ export const SerializeErrorCode = {
    * for byte merges.
    *
    * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the
-   * original capability failure.
+   * original capability failure when one exists; absent capability needs no synthetic cause.
    */
   envUnsupported: 'ENV_UNSUPPORTED'
 } as const
 
+/** Stable serialization failure values; diagnostic kind and parser type are separate domains. */
 export type ISerializeErrorCode = (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]

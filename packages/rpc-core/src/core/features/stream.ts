@@ -13,7 +13,9 @@ import { RpcStreamOwner } from '../internal/stream/owner.js'
 import type { IRpcContext } from '../typing.js'
 
 /** Connection owner answers whether a particular peer negotiated stream@1. */
-export type IRpcStreamCapabilityPort = Readonly<{ supports: (peerId: string) => boolean }>
+export type IRpcStreamCapabilityPort = Readonly<{
+  /** Check this direct peer's actual stream agreement. */ supports: (peerId: string) => boolean
+}>
 
 /**
  * Producer callback may return either native generator form; no synchronous iterable surface is
@@ -26,18 +28,23 @@ export type IRpcStreamRun = (
 
 /** Optional stream runtime projected into a composed endpoint. */
 export type IRpcStreamRuntime = Readonly<{
+  /** Open one negotiated stream; the caller owns iteration and early return cleanup. */
   open: (
     targetId: string,
     method: string,
     params: unknown,
     options?: Readonly<{ signal?: IAbortSignal; timeoutMs?: number | false }>
   ) => AsyncIterableIterator<IRpcPortableValue>
+  /** Register a stream producer and return the remover for that method registration. */
   provide: (method: string, run: IRpcStreamRun) => () => void
+  /** Retire this stream owner and settle/cancel its retained producer and consumer work. */
   dispose: () => Promise<void>
 }>
 
 /** The public key avoids colliding with ordinary endpoint provide/dispose methods. */
-export type IRpcStreamSurface = Readonly<{ stream: IRpcStreamRuntime }>
+export type IRpcStreamSurface = Readonly<{
+  /** Original endpoint-owned producer/consumer runtime. */ stream: IRpcStreamRuntime
+}>
 
 /** Install the optional stream owner over the existing outbound and provider capabilities. */
 export const createStreamFeature = (

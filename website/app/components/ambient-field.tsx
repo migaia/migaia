@@ -10,12 +10,12 @@ import { domainPath, LOCALES } from '../route-contract.js'
  * offsets (`flow` for the aurora, `drift` for the particles) that the host advances faster while a
  * route transition runs, so speed changes never make the field jump. `level` (0..1) is the eased
  * transition strength: particles stretch along the travel direction and lose some contrast.
- * `release` (0..1) tells the route story: while the old page releases what it owned, particles shrink
- * and pull back to their cell centres; once the new route commits, `release` falls while `level` is
- * still held, and the difference blooms the particles back out, larger and brighter. `hero` is the
- * docs home glass search box, a standing window like the focused card. `corner`
- * (0..1) is set on the docs home: the aurora and contour waves gain strength as they flow through the
- * top-right of the viewport, so the light is carried by the moving waves, not painted on. Faint
+ * `release` (0..1) tells the route story: while the old page releases what it owned, particles
+ * shrink and pull back to their cell centres; once the new route commits, `release` falls while
+ * `level` is still held, and the difference blooms the particles back out, larger and brighter.
+ * `hero` is the docs home glass search box, a standing window like the focused card. `corner`
+ * (0..1) is set on the docs home: the aurora and contour waves gain strength as they flow through
+ * the top-right of the viewport, so the light is carried by the moving waves, not painted on. Faint
  * topographic contour lines cover the whole viewport as texture behind the text. Output is
  * premultiplied alpha so the page `--canvas` color shows through.
  */

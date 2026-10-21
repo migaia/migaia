@@ -78,7 +78,11 @@ export function prepareRpcBinaryLazy(
   }
 }
 
-/** Enter the original asynchronous decode stage after its caller has captured quota and receipt. */
+/**
+ * Restore through the canonical binary validator after loading it if necessary. Sidecars default to
+ * an empty list and the allocation budget to 16 MiB; native storage requires a whole-backing
+ * digest. Grammar, budget and integrity failures reject as in the ordinary strict restore entry.
+ */
 export function restoreRpcBinaryLazy(
   value: unknown,
   storage: RpcBinaryStorage,

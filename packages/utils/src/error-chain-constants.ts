@@ -59,6 +59,7 @@ export const ErrorChainViolation = {
   totalBytes: 'totalBytes'
 } as const
 
+/** Key union of `ErrorChainViolation`, naming why an error tree failed validation. */
 export type ErrorChainViolation = keyof typeof ErrorChainViolation
 
 /** Native constructor names interpreted by default restoration without evaluating received text. */

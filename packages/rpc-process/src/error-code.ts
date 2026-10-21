@@ -47,6 +47,7 @@ export const RpcProcessErrorCode = {
   liquidated: 'PROCESS_LIQUIDATED'
 } as const
 
+/** Semantic Process error values; Core and supervision failures keep their own package identities. */
 export type IRpcProcessErrorCode = (typeof RpcProcessErrorCode)[keyof typeof RpcProcessErrorCode]
 
 /** The public Process source alias retains the same historical semantic identity. */

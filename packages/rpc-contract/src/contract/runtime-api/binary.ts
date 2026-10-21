@@ -143,8 +143,11 @@ export async function finishRpcBinaryCapture(
 
 /**
  * Restore one completely validated manifest. Native digests finish before this result can be
- * committed by the original authentication owner; no replay or provider state exists in this
- * codec.
+ * committed by the original authentication owner; no replay or provider state exists in this codec.
+ * Sidecars default to an empty list and the allocation budget defaults to 16 MiB. Native storage
+ * requires a whole-backing digest. Invalid grammar, budget or integrity rejects with an
+ * INVALID_ENVELOPE error; native length/hash mismatch remains identifiable through its cause
+ * chain.
  */
 export function restoreRpcBinary(
   value: unknown,

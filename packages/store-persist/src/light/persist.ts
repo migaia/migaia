@@ -16,9 +16,16 @@ import { snapshotPersistOptions } from '../core/options.js'
  * `IReactiveStore`. Stores from `@migaia/store-light` satisfy it structurally without adaptation.
  */
 export type IPersistableStore = {
+  /** Borrowed graph owner for persistence status values and the Store's own notifications. */
   readonly $runtime: IRuntime
+  /** Reads persistable signal-backed fields; the Store determines which fields are included. */
   $plain(): Record<string, unknown>
+  /** Returns a disposer; the adapter passes fireImmediately false to avoid an attachment write. */
   $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer
+  /**
+   * Restores known fields synchronously. Persistence supplies no options; the Store owns unknown
+   * key handling, validation and errors rather than providing a transaction rollback here.
+   */
   $hydrate(
     partial: Record<string, unknown>,
     options?: {
@@ -28,15 +35,25 @@ export type IPersistableStore = {
   ): void
 }
 
+/** Store attachment options; Runtime and restoration merge come from the Store adapter. */
 export type IPersistOptions = Pick<
   IPersistUnitOptions<Record<string, unknown>>,
   'debounceMs' | 'maxWaitMs' | 'scheduler'
 > & {
+  /** Required storage key, passed unchanged; empty strings are not rejected by this adapter. */
   key: string
+  /** Borrowed storage adapter satisfying the core text/optional-byte projection. */
   storage: IPersistStorage
+  /** Complete envelope codec, default defaultJsonCodec with Map/Set support. */
   codec?: ICodec
+  /** Nonnegative safe archive version, default 0. */
   version?: number
+  /** Synchronous version conversion; omitted means different archived versions fail hydration. */
   migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>
+  /**
+   * Synchronous write projection, default identity; omitted fields remain governed by Store
+   * hydration.
+   */
   partialize?: (state: Record<string, unknown>) => Record<string, unknown>
 }
 
@@ -48,6 +65,13 @@ function toPersistUnit(store: IPersistableStore): IPersistUnit<Record<string, un
   }
 }
 
+/**
+ * Attaches automatic envelope hydration and writes to one existing Store. Copies supplied options
+ * once, reuses the Store Runtime, reads through $plain and restores through $hydrate. Returns the
+ * core handle before asynchronous hydration completes; await ready, then flush when persistence
+ * must finish. Admission failures throw synchronously; hydration/write failures appear on the
+ * handle. Disposing the attachment leaves the Store and storage caller-owned.
+ */
 export function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle {
   const snapshot = snapshotPersistOptions(options)
   return persistUnit(toPersistUnit(store), {

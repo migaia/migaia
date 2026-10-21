@@ -25,18 +25,23 @@ export const TopologyInvalidReason = {
   transactionClosed: 'transaction-closed'
 } as const
 
+/** Structural admission and transaction-state failures interpreted by the caller's error adapter. */
 export type ITopologyInvalidReason =
   (typeof TopologyInvalidReason)[keyof typeof TopologyInvalidReason]
 
 /** One provider edge consumed by the pure topology admission primitive. */
 export type ITopologyDependency = {
+  /** Nonempty provider ID; a missing optional provider is permitted. */
   readonly provider: string
+  /** Required edges reject absent providers in the static builder and drive dependent closure. */
   readonly required: boolean
 }
 
 /** Minimal admitted node shape consumed by the static and incremental topology owners. */
 export type ITopologyNode = {
+  /** Unique nonempty identity captured before topology traversal. */
   readonly id: string
+  /** Ordered edge snapshot; duplicate providers are rejected even if requiredness differs. */
   readonly dependencies: readonly ITopologyDependency[]
   /** Public registration ordinal; admitted nodes must cover each integer in [0, nodeCount). */
   readonly ordinal: number
@@ -44,15 +49,17 @@ export type ITopologyNode = {
 
 /** Frozen topology snapshot shared by static Graph and incremental topology projections. */
 export type ICapabilityTopology = {
+  /** Frozen node snapshots in ascending dependency level, then registration ordinal. */
   readonly ordered: readonly ITopologyNode[]
   /** Provider-to-consumer facts retained for dynamic graph reuse. */
   readonly providers: ReadonlyMap<string, readonly ITopologyNode[]>
   /** Consumer-to-provider facts retained as the canonical edge snapshot. */
   readonly consumers: ReadonlyMap<string, readonly ITopologyDependency[]>
-  /** Remaining dependency count at topology admission. */
+  /** Count of edges to present providers at admission, before traversal; includes optional edges. */
   readonly indegree: ReadonlyMap<string, number>
+  /** Longest present-provider path depth, with independent nodes at zero. */
   readonly level: ReadonlyMap<string, number>
-  /** Registration ordinal for stable same-level scheduling. */
+  /** Dense registration ordinal for stable same-level scheduling in this snapshot. */
   readonly ordinal: ReadonlyMap<string, number>
 }
 
@@ -122,7 +129,14 @@ function snapshotTopologyNodes(
   return Object.freeze(snapshots)
 }
 
-/** Builds provider adjacency, levels, and a deterministic schedule from one pure snapshot. */
+/**
+ * Copies node and edge facts into a frozen dependency schedule without starting or releasing any
+ * resource. Nodes need unique IDs and ordinals covering zero through nodeCount minus one. Present
+ * edges, including optional edges, affect levels and cycle checks; only required missing providers
+ * invoke onUnknownProvider. onCycle receives a frozen closed path, and onInvalid handles malformed
+ * facts with captured getter causes retained. All four arguments are required; adapters own
+ * errors.
+ */
 export function buildCapabilityTopology(
   nodes: readonly ITopologyNode[],
   onUnknownProvider: (nodeId: string, provider: string) => never,

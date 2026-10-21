@@ -13,10 +13,15 @@ import { defaultRpcId } from './internal/id.js'
 export type IRpcIdempotencyOutcome = Readonly<
   | { ok: true; data?: IRpcPortableValue }
   | {
+      /** False selects a failed application outcome retained for replay. */
       ok: false
+      /** Stable application failure code retained with this original outcome. */
       code: string
+      /** Application failure message retained for replay. */
       message: string
+      /** Optional portable application result or failure detail. */
       data?: IRpcPortableValue
+      /** Optional serialized failure chain retained for the original result. */
       error?: IRpcSerializedError
     }
 >
@@ -24,12 +29,26 @@ export type IRpcIdempotencyOutcome = Readonly<
 /** A claim either owns execution, waits, replays, or rejects capacity admission. */
 export type IRpcIdempotencyClaim =
   | Readonly<{
+      /**
+       * Claimed owns execution; pending waits for the original owner; done replays retention; full
+       * refuses admission.
+       */
       status: 'claimed'
+      /** Settle this exact claim once with its outcome and settlement-relative monotonic time. */
       settle: (outcome: IRpcIdempotencyOutcome, now: number) => void
+      /** Release an unsettled claim and resolve its waiting observers with undefined. */
       release: () => void
     }>
   | Readonly<{
+      /**
+       * Claimed owns execution; pending waits for the original owner; done replays retention; full
+       * refuses admission.
+       */
       status: 'pending'
+      /**
+       * Original completed outcome or pending observation; unavailable means the body was not
+       * retained.
+       */
       outcome: Promise<IRpcIdempotencyOutcome | 'unavailable' | undefined>
     }>
   | Readonly<{ status: 'done'; outcome: IRpcIdempotencyOutcome | 'unavailable' }>
@@ -37,6 +56,10 @@ export type IRpcIdempotencyClaim =
 
 /** Injectable store boundary; the session owner chooses scopes only after identity admission. */
 export type IRpcIdempotencyStore = Readonly<{
+  /**
+   * Atomically claim a scoped logical key, observe its existing owner/result, or refuse capacity.
+   * Fingerprint mismatch rejects the contract.
+   */
   claim: (scope: string, key: string, now: number, fingerprint?: string) => IRpcIdempotencyClaim
   /**
    * Optional outcome-lookup extension; a legacy store without lookup cannot advertise outcome
@@ -137,13 +160,26 @@ function capacity(value: number | undefined, fallback: number): number {
   return value
 }
 
-/** Provide bounded, settlement-relative deduplication without owning endpoint timers. */
+/**
+ * Provide bounded, settlement-relative deduplication without owning endpoint timers. All capacities
+ * must be positive safe integers. Completed bodies may become unavailable under byte pressure while
+ * their tombstones still prevent re-execution. Pending claims expire only by settlement or
+ * release.
+ */
 export function createRpcIdempotencyStore(
   options: {
+    /**
+     * Completed-entry retention, defaulting to 300000 ms; pending executions are not expired by
+     * this budget.
+     */
     readonly retentionMs?: number
+    /** Global claim/tombstone capacity; defaults to 1024. */
     readonly maxEntries?: number
+    /** Per-authenticated-scope claim/tombstone capacity; defaults to 256. */
     readonly maxEntriesPerScope?: number
+    /** Total retained outcome-body budget; defaults to 8 MiB. */
     readonly maxBytes?: number
+    /** Per-outcome body budget; defaults to 1 MiB. */
     readonly maxOutcomeBytes?: number
   } = {}
 ): IRpcIdempotencyStore {

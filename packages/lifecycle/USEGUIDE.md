@@ -1,6 +1,268 @@
 # `@migaia/lifecycle` 使用指南
 
-本指南逐个模块列出全部导出 API 的签名、边界行为与错误码。包的定位、适用/不适用场景与安装方式见 [README](./README.md)。
+[English](./USEGUIDE.en.md)
+
+包的定位、亮点和心智模型见 [README](./README.md)。本指南先按场景给出可以直接运行的示例，再逐个模块列出全部导出 API 的签名、边界行为与错误码。
+
+## 按场景查找
+
+| 你遇到的问题 | 看这一节 |
+| --- | --- |
+| 发布时进行中的请求被砍断 | [服务优雅停机](#服务优雅停机) |
+| 搜索框、详情页显示的是旧结果 | [只采用最新一次请求的结果](#只采用最新一次请求的结果) |
+| 离开页面后订阅、计时器还在运行 | [离开页面时一起清理](#离开页面时一起清理) |
+| 初始化到一半失败，留下没人关的资源 | [初始化失败时回收已经创建的资源](#初始化失败时回收已经创建的资源) |
+| 两次保存乱序，旧内容覆盖了新内容 | [按提交顺序保存](#按提交顺序保存) |
+| 一个清理失败，后面的都没执行 | [一项清理失败，其余照常释放](#一项清理失败其余照常释放) |
+
+## 服务优雅停机
+
+[README](./README.md#从这里开始) 演示了请求按时完成的情况。这里演示另一种情况：有一个请求要 10 秒才能完成，超过了 300 毫秒的停机期限。`boundedWait` 到期后返回 `false`，停机流程继续往下走，不会被这个请求挂住；它也不会取消那个请求。
+
+```ts doc-test=run
+import { boundedWait } from '@migaia/lifecycle'
+import { createPendingTracker } from '@migaia/lifecycle/quiescence'
+import { createLifecycleScope } from '@migaia/lifecycle/scope'
+
+const app = createLifecycleScope()
+const inFlight = createPendingTracker()
+app.own('db-pool', { force: () => console.log('关闭数据库连接池') })
+app.own('http', {
+  force: async () => {
+    const finished = await boundedWait(inFlight.drain(), performance.now() + 300)
+    console.log(finished ? '进行中的请求都已完成' : `还有 ${inFlight.size} 个请求没完成，继续关闭`)
+  }
+})
+
+// 一个需要 10 秒的导出请求。unref() 让它不阻止示例进程退出。
+void inFlight.track(new Promise((resolve) => setTimeout(resolve, 10_000).unref()))
+await app.dispose()
+```
+
+输出：
+
+```text
+还有 1 个请求没完成，继续关闭
+关闭数据库连接池
+```
+
+在真实服务里，把 `app.dispose()` 接到 `process.once('SIGTERM', …)` 上，并把截止时间设得比平台的强制结束时间短一些。例如 Kubernetes 默认在 SIGTERM 之后 30 秒强制结束容器，截止时间可以设成 25 秒。
+
+## 只采用最新一次请求的结果
+
+每次请求前调用 `begin()`，拿到这次请求的 `token` 和 `signal`。新的 `begin()` 会让上一次请求“过期”，并取消它的 `signal`。拿到结果后，先用 `isCurrent(token)` 确认它仍是最新的那次，再更新页面。
+
+```ts doc-test=run
+import { createGenerationController } from '@migaia/lifecycle/generation'
+
+// 模拟搜索接口：越短的关键词结果越多，返回得越慢。
+const search = (keyword: string, signal: AbortSignal) =>
+  new Promise<string[]>((resolve, reject) => {
+    const timer = setTimeout(() => resolve([`${keyword} 的结果`]), keyword.length === 1 ? 300 : 100)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      reject(signal.reason)
+    })
+  })
+
+const requests = createGenerationController()
+let shown: string[] = []
+
+async function onInput(keyword: string) {
+  const request = requests.begin() // 新的输入会让上一次请求过期，并取消它
+  try {
+    const results = await search(keyword, request.signal)
+    if (requests.isCurrent(request.token)) shown = results
+  } catch (error) {
+    if (!requests.isCurrent(request.token)) return // 被新输入取代，忽略
+    throw error
+  }
+}
+
+// 用户快速输入 “a”，紧接着输入 “ab”。
+await Promise.all([onInput('a'), onInput('ab')])
+console.log('页面显示:', shown)
+```
+
+输出：
+
+```text
+页面显示: [ 'ab 的结果' ]
+```
+
+`begin({ timeoutMs })` 可以给一次请求设置超时，到期时取消它的 `signal`。如果旧请求已经拿到了需要释放的资源（例如一个连接），用 `adopt(token, value, release)`：结果仍是最新的就返回 `true` 交给你，否则调用 `release(value)` 回收它并返回 `false`。
+
+## 离开页面时一起清理
+
+页面打开时创建一个作用域，把每个订阅、计时器、连接都登记进去；离开页面时只调用一次 `dispose()`。释放顺序与登记顺序相反，所以先登记连接、后登记依赖连接的订阅，离开时就会先退订、再断开连接。
+
+```ts doc-test=run
+import { createLifecycleScope } from '@migaia/lifecycle/scope'
+
+function openChatPage(messages: EventTarget) {
+  const page = createLifecycleScope()
+
+  page.own('connection', { force: () => console.log('断开连接') })
+
+  const onMessage = () => console.log('收到消息')
+  messages.addEventListener('message', onMessage)
+  page.own(onMessage, {
+    force: () => {
+      messages.removeEventListener('message', onMessage)
+      console.log('取消订阅消息')
+    }
+  })
+
+  const timer = setInterval(() => console.log('心跳'), 60_000)
+  page.own(timer, {
+    force: () => {
+      clearInterval(timer)
+      console.log('清除心跳计时器')
+    }
+  })
+  return page
+}
+
+const messages = new EventTarget()
+const page = openChatPage(messages)
+messages.dispatchEvent(new Event('message'))
+await page.dispose() // 离开页面
+messages.dispatchEvent(new Event('message')) // 不会再打印
+```
+
+输出：
+
+```text
+收到消息
+清除心跳计时器
+取消订阅消息
+断开连接
+```
+
+`dispose()` 之后再调用 `own()` 会抛出 `SCOPE_TERMINAL`，避免在已经离开的页面上再挂资源。全部清理都是同步的（例如 DOM 监听器）时，可以用 `createSyncLifecycleScope()`，它的 `dispose()` 立即完成，还支持 `using` 语法。
+
+## 初始化失败时回收已经创建的资源
+
+初始化分好几步时，把每一步创建的资源先登记到临时作用域里。全部成功后调用 `commitTo(app)`，把它们整体交给长期作用域；中途失败就调用 `rollback()`，按相反顺序回收已经创建的资源。
+
+```ts doc-test=run
+import { createProvisionalScope } from '@migaia/lifecycle'
+import { createLifecycleScope } from '@migaia/lifecycle/scope'
+
+const app = createLifecycleScope()
+
+// 安装插件分三步：连数据库、开缓存、注册路由。
+async function installPlugin(failAtStep3: boolean) {
+  const setup = createProvisionalScope()
+  try {
+    setup.own('db', { force: () => console.log('  回收：断开数据库') })
+    setup.own('cache', { force: () => console.log('  回收：关闭缓存') })
+    if (failAtStep3) throw new Error('路由冲突')
+    await setup.commitTo(app) // 全部成功：整体交给应用作用域
+    console.log('插件已安装')
+  } catch (error) {
+    await setup.rollback() // 失败：已经创建的资源按相反顺序回收
+    console.log('安装失败:', (error as Error).message)
+  }
+}
+
+await installPlugin(true)
+await installPlugin(false)
+console.log('应用关闭：')
+await app.dispose()
+```
+
+输出：
+
+```text
+  回收：关闭缓存
+  回收：断开数据库
+安装失败: 路由冲突
+插件已安装
+应用关闭：
+  回收：关闭缓存
+  回收：断开数据库
+```
+
+`commitTo()` 和 `rollback()` 只能二选一、只能选一次。如果目标作用域在移交途中已经开始关闭，已经移交的部分留在目标里，没移交的部分由临时作用域回收，然后抛出 `PROVISIONAL_PARENT_CLOSED`，原始错误在 `cause` 上。
+
+## 按提交顺序保存
+
+两次保存几乎同时发出时，慢的旧请求可能最后到达服务器，把新内容覆盖掉。`createMutationQueue()` 让修改一个接一个执行：后一次保存要等前一次完成才开始。
+
+```ts doc-test=run
+import { createMutationQueue } from '@migaia/lifecycle'
+
+// 模拟服务器：第一次保存的请求比第二次慢。
+let stored = ''
+const save = (text: string, delayMs: number) =>
+  new Promise<void>((resolve) =>
+    setTimeout(() => {
+      stored = text
+      resolve()
+    }, delayMs)
+  )
+
+// 直接并发发送：慢的旧版本最后到达，覆盖了新版本。
+await Promise.all([save('草稿 v1', 100), save('草稿 v2', 10)])
+console.log('不排队时服务器保存的是:', stored)
+
+// 交给变更队列：后一次保存等前一次完成后才开始。
+const queue = createMutationQueue()
+await Promise.all([
+  queue.enqueue(() => save('草稿 v1', 100)),
+  queue.enqueue(() => save('草稿 v2', 10))
+])
+console.log('排队后服务器保存的是:', stored)
+```
+
+输出：
+
+```text
+不排队时服务器保存的是: 草稿 v1
+排队后服务器保存的是: 草稿 v2
+```
+
+队列不会并发执行任务。如果一个任务在执行时又往同一个队列提交任务并等待它，就会永远等不到；给任务传 `{ owner }` 后，这种情况会立即以 `QUEUE_SELF_DEPENDENCY` 失败，而不是卡住。
+
+## 一项清理失败，其余照常释放
+
+默认错误策略是 `throw`：所有资源都会尝试释放，结束后再把失败抛出。只有一个失败时，抛出的就是原始错误本身，只是多了 `source` 和 `code` 属性；多个失败时抛出 `AggregateError`，每个原始错误都在 `errors` 里。
+
+```ts doc-test=run
+import { createLifecycleScope } from '@migaia/lifecycle/scope'
+
+const page = createLifecycleScope()
+page.own('socket', { force: () => console.log('关闭 socket') })
+page.own('cache', {
+  force: () => {
+    throw new Error('缓存文件被占用')
+  }
+})
+page.own('timer', { force: () => console.log('清除计时器') })
+
+try {
+  await page.dispose()
+} catch (error) {
+  const failure = error as Error & { code?: string }
+  console.log('dispose() 失败:', failure.message, `(${failure.code})`)
+}
+console.log('作用域状态:', page.lifecycle)
+```
+
+输出：
+
+```text
+清除计时器
+关闭 socket
+dispose() 失败: 缓存文件被占用 (SCOPE_DISPOSAL_FAILED)
+作用域状态: terminal
+```
+
+不想让关闭流程抛错时，用 `createLifecycleScope({ errorPolicy: 'collect' })`，`dispose()` 会把失败作为数组返回；或者用 `{ errorPolicy: 'report', report }`，把每个失败交给日志函数。
+
+---
+
 
 ## 目录
 
@@ -28,7 +290,7 @@
 
 这些类型从根入口导出，不创建runtime state：
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IDisposer = () => void
 type ILifecycleState = 'open' | 'closing' | 'terminal'
 
@@ -85,7 +347,7 @@ import {
 
 ### `IReleaseDescriptor` —— 领域表达释放意图的唯一词汇
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IReleaseDescriptor = {
   readonly syncSafe?: boolean
   readonly order?: number
@@ -111,7 +373,7 @@ type IReleaseDescriptor = {
 
 ### `createLifecycleScope`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope
 
 type ILifecycleScopeOptions = {
@@ -133,7 +395,7 @@ type ILifecycleScope = ILifecycleOwner & {
 
 通用异步所有权容器：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const scope = createLifecycleScope()
 const connection = scope.own(
   { close: () => undefined },
@@ -155,7 +417,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 
 ### `createSyncLifecycleScope`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope
 
 type ISyncLifecycleScopeOptions = {
@@ -177,7 +439,7 @@ type ISyncLifecycleScope = {
 
 纯同步容器：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const scope = createSyncLifecycleScope()
 scope.own(node, { syncSafe: true, force: () => node.detach() })
 scope.close()
@@ -196,7 +458,7 @@ const failures = scope.dispose() // 同步返回
 
 ### `executeReleaseDescriptor`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function executeReleaseDescriptor(
   descriptor: IReleaseDescriptor,
   context: IReleaseContext
@@ -205,7 +467,7 @@ function executeReleaseDescriptor(
 
 独立运行单个 descriptor 的完整降级链（`custom` → 否则 `graceful`（带超时竞速）→ `force`），不经过完整事务，常用于测试或自定义编排：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const errors = await executeReleaseDescriptor(descriptor, {
   signal: controller.signal,
   deadlineAt: undefined,
@@ -217,7 +479,7 @@ const errors = await executeReleaseDescriptor(descriptor, {
 
 ### `createDisposeTransaction`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createDisposeTransaction(
   mode: { readonly kind: 'order' } | { readonly kind: 'plan' },
   options?: IDisposeTransactionOptions
@@ -243,7 +505,7 @@ type IDisposeTransaction = {
 
 编排多个资源的释放，`order` 弱排序或 `plan` 强序列二选一，同一实例不能混用：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const transaction = createDisposeTransaction(
   { kind: 'plan' },
   { errorPolicy: 'collect', signal: controller.signal }
@@ -286,7 +548,7 @@ const result = await mergeCleanupResults([{
 
 ### `createSyncStartedDisposalLedger`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger
 
 type ISyncStartedDisposalLedger = {
@@ -309,7 +571,7 @@ type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{
 
 用于“同步启动全部 disposer，但异步统一等待”的领域容器。Ledger 是 pending、raw error 与 terminal 的唯一事实源；调用方仍负责生成顺序计划、清空领域 registry，以及把 raw errors 投影成自己的 throw/report/aggregate 契约。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
 const ledger = createSyncStartedDisposalLedger()
@@ -367,7 +629,7 @@ import {
 
 ### `createGenerationController`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createGenerationController(options?: IGenerationControllerOptions): IGenerationController
 
 type IGenerationControllerOptions = {
@@ -404,7 +666,7 @@ type IGenerationController = {
 
 代数 + 每代一个 `AbortSignal`，新一代自动使旧一代失效：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const shutdown = new AbortController()
 const generations = createGenerationController({ parentSignal: shutdown.signal })
 const request = generations.begin({ timeoutMs: 5000 }) // 超过 5s 自动 abort 当前代
@@ -444,7 +706,7 @@ import {
 
 ### `createQuiescenceTracker` / `createStringLeaseRegistry`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>
 function createStringLeaseRegistry(): IQuiescenceTracker<string>
 
@@ -461,7 +723,7 @@ type IQuiescenceTracker<TKey> = {
 
 按 key 计数的租约追踪：对象键用 `WeakMap`（自动 GC），字符串键用 `Map`（归零后自动清理未 seal 的条目）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()
 const release = tracker.retain(key)
 tracker.count(key) // 1
@@ -481,7 +743,7 @@ await tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEA
 
 ### `createObjectLeaseRegistry` / `createStringLeaseRegistry`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>
 function createStringLeaseRegistry(): ILeaseRegistry<string>
 // type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>
@@ -491,7 +753,7 @@ function createStringLeaseRegistry(): ILeaseRegistry<string>
 
 ### `createPendingTracker`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createPendingTracker(): IPendingTracker
 
 type IPendingTracker = {
@@ -503,7 +765,7 @@ type IPendingTracker = {
 
 只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise（内部基于一个字符串键 `createStringLeaseRegistry()`）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const pending = createPendingTracker()
 pending.track(doWork()) // 原样返回传入的 promise
 await pending.drain() // 等到 size 归零；排空期间新增的 track() 不会被漏计（内部循环 whenZeroOnce）
@@ -529,7 +791,7 @@ import {
 
 ### `createProvisionalScope`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope
 
 type IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }
@@ -546,7 +808,7 @@ type ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T 
 
 构造期两阶段所有权：资源先暂存这里，最终要么 `commitTo(parent)` 转移给真正的 owner，要么 `rollback()` 释放，二选一、只能选一次：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const shutdown = new AbortController()
 const provisional = createProvisionalScope({ parentSignal: shutdown.signal })
 const db = provisional.own(await connect(), { force: (ctx) => db.close() })
@@ -582,7 +844,7 @@ import {
 
 ### `createMutationQueue`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue
 
 type IMutationQueueOptions = {
@@ -605,7 +867,7 @@ type IMutationQueue = {
 
 严格 FIFO 串行队列，无并发池，带可选的入队 SLA 看门狗：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5000 })
 const result = await queue.enqueue(() => applyMutation(), { owner: 'sync-loop' })
 queue.size // 排队中 + 正在执行的任务数（0 或 1）
@@ -652,13 +914,13 @@ import { createManualScheduler, type IManualScheduler } from '@migaia/utils/test
 
 ### `snapshotScheduler`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function snapshotScheduler(value: unknown): IScheduler | undefined
 ```
 
 把任意 duck-typed 值快照成标准 `IScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错
 ```
 
@@ -666,7 +928,7 @@ const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 un
 
 ### `resolveScheduler` / `resolveSchedulerOption`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function resolveScheduler(value: unknown): IScheduler
 function resolveSchedulerOption(
   options: { readonly scheduler?: unknown } | null | undefined,
@@ -681,7 +943,7 @@ function resolveSchedulerOption(
 
 ### `createAbortController`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createAbortController(): IAbortController
 // type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };
 // type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };
@@ -689,7 +951,7 @@ function createAbortController(): IAbortController
 
 本包委托当前宿主的原生 `AbortController`，返回真实 host instance（结构上与 DOM/Node 的 `AbortSignal` 兼容，可互相传递）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const controller = createAbortController()
 controller.signal.addEventListener('abort', () => console.log('aborted'))
 controller.abort('reason')
@@ -697,9 +959,9 @@ controller.abort('reason')
 
 无构造参数，也不接受 custom factory。实际对象由当前 realm 的 host-owned `globalThis.AbortController` 构造；lifecycle 不返回 facade、Proxy 或自建 EventTarget。宿主 constructor 缺失、getter throw、不可构造、构造失败或结果不满足最小 controller/signal shape时，抛保留原始 cause 的 `ENV_UNSUPPORTED`。
 
-V2 intentional breaking behavior：
+需要注意的行为：
 
-- `abort()` 与 `abort(undefined)` 使用宿主默认 reason，通常是原生 `DOMException`（name 为 `AbortError`），不再保留 V1 的 `undefined`。
+- `abort()` 与 `abort(undefined)` 使用宿主默认 reason，通常是原生 `DOMException`（name 为 `AbortError`），而不是 `undefined`。
 - non-`undefined` explicit reason保持 `===` identity；把 structural parent signal 的 `undefined` reason转发给native child时，同样规范化为宿主 `AbortError`。
 - 重复 `abort()` 幂等，不覆盖第一次固化的 reason。
 - 外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle也不再提供 `ABORT_LISTENER_FAILED`。
@@ -709,7 +971,7 @@ V2 intentional breaking behavior：
 
 ### `boundedWait`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function boundedWait(
   task: PromiseLike<unknown>,
   deadlineAt: number,
@@ -722,7 +984,7 @@ function boundedWait(
 
 等到绝对截止时间为止，**从不取消**被等待的任务：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）
 ```
 
@@ -730,7 +992,7 @@ const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=�
 
 ### `createTerminalController`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createTerminalController(): ITerminalController
 
 type ITerminalController = {
@@ -743,7 +1005,7 @@ type ITerminalController = {
 
 独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope` 内部都基于它：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const terminal = createTerminalController()
 terminal.close() // open → closing，幂等
 terminal.forceTerminal() // 直接进 terminal，resolve whenTerminal()
@@ -763,7 +1025,7 @@ await terminal.whenTerminal()
 | Subpath                        | 主要导出                                                    |
 | ------------------------------ | ----------------------------------------------------------- |
 | `@migaia/lifecycle/abort`      | `createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供） |
-| `@migaia/lifecycle/scheduler`  | snapshot、resolve 与安全时间相加                               |
+| `@migaia/lifecycle/scheduler`  | `snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption` |
 | `@migaia/lifecycle/quiescence` | quiescence/lease/pending trackers                           |
 | `@migaia/lifecycle/scope`      | `createLifecycleScope`                                      |
 | `@migaia/lifecycle/generation` | `createGenerationController`                                |
@@ -801,7 +1063,7 @@ import { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@mig
 
 ### `LIFECYCLE_SOURCE`
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const LIFECYCLE_SOURCE: '@migaia/lifecycle'
 ```
 
@@ -811,13 +1073,13 @@ const LIFECYCLE_SOURCE: '@migaia/lifecycle'
 
 ### `containAsyncRejection`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void
 ```
 
 保护性地探测某个返回值是否是 thenable，是则观察其 rejection 而不让其变成未处理拒绝：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))
 ```
 
@@ -827,7 +1089,7 @@ containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))
 
 从 `@migaia/utils/function` 导入；下述工具属于 utils，不是 lifecycle 的公开导出。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function probeThenable(value: unknown): IThenableProbe
 
 type IThenableProbe =
@@ -838,7 +1100,7 @@ type IThenableProbe =
 
 只读一次 `value.then`，返回判别结果（不是布尔值，是否 thenable/是否 getter 抛错都会区分）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const probe = probeThenable(result)
 if (probe.kind === 'thenable') {
   /* probe.thenFn 已捕获，可安全 apply 一次 */
@@ -849,7 +1111,7 @@ if (probe.kind === 'thenable') {
 
 ### `assimilateCapturedThen`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function assimilateCapturedThen<T>(
   thenFn: (resolve: unknown, reject: unknown) => void,
   thenable: unknown
@@ -858,7 +1120,7 @@ function assimilateCapturedThen<T>(
 
 把 `probeThenable` 捕获到的 `thenFn` 安全地 apply 成一个真正的 `Promise`，且只调用一次（内部用 `Reflect.apply` 保持 `this === thenable`）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue)
 ```
 
@@ -866,7 +1128,7 @@ const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue)
 
 ### `createErrorCollector`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createErrorCollector(
   policy: 'throw' | 'collect' | 'report' | 'firstError',
   report: ((error: unknown) => void) | undefined
@@ -881,7 +1143,7 @@ type IErrorCollector = {
 
 按四种错误策略收集/上报错误，`createDisposeTransaction`/`createSyncLifecycleScope` 内部都用它：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const collector = createErrorCollector('collect', undefined)
 collector.add('item-1', error)
 const collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]
@@ -909,7 +1171,7 @@ import { ThenableProbeKind } from '@migaia/utils/function'
 | 常量                     | 取值                                                                                          | 语义                                                                                            |
 | ------------------------ | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `LifecycleState`         | `{ open: 'open', closing: 'closing', terminal: 'terminal' }`                                  | 容器存活轴                                                                                      |
-| `LifecycleErrorPolicy`   | `{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`          | 释放错误策略；`firstError` 只为兼容 `web-rpc` discovery-registry 的迁移语义存在，不是通用默认值 |
+| `LifecycleErrorPolicy`   | `{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`          | 释放错误策略；`firstError` 只服务需要“第一个错误为准”的调用方，不是通用默认值 |
 | `DisposeTransactionKind` | `{ order: 'order', plan: 'plan' }`                                                            | `createDisposeTransaction` 的模式                                                               |
 
 ---
@@ -924,7 +1186,7 @@ import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'
 
 稳定错误码表，**22 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 if (error.code === LifecycleErrorCode.scopeClosed) {
   /* ... */
 }
@@ -938,8 +1200,8 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 | `scopeReentrantDispose`        | `SCOPE_REENTRANT_DISPOSE`        | disposer 内部重入本 scope 的 `dispose()`                                                                              |
 | `scopeReentrantOwn`            | `SCOPE_REENTRANT_OWN`            | disposer 内部调用本 scope 的 `own()`                                                                                  |
 | `scopeSyncViolation`           | `SCOPE_SYNC_VIOLATION`           | `SyncLifecycleScope` 收到 `syncSafe !== true` 的 descriptor、收到一个异步 scope 实例作为资源、或某回调返回了 thenable |
-| `scopeDisposalFailed`          | `SCOPE_DISPOSAL_FAILED`          | `throw` 错误策略在多个资源释放失败时的 `AggregateError` 聚合出口                                                      |
-| `unitStartFailed`              | `UNIT_START_FAILED`              | `LifecycleUnit.start()` 返回的 thenable 被 reject（单元进入 `failed`）                                                |
+| `scopeDisposalFailed`          | `SCOPE_DISPOSAL_FAILED`          | `throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码                                                    |
+| `unitStartFailed`              | `UNIT_START_FAILED`              | 由已不再导出的内部单元加载器使用                                                |
 | `generationSuperseded`         | `GENERATION_SUPERSEDED`          | 一次异步操作的结果在 `adopt()` 提交点已被更晚的 generation 取代（非失败信号，仅诊断）                                 |
 | `generationCancellationFailed` | `GENERATION_CANCELLATION_FAILED` | generation 取消期间的 timer、parent listener 或 signal cleanup 失败                                                   |
 | `generationDisposed`           | `GENERATION_DISPOSED`            | 在已 `dispose()` 的 `GenerationController` 上调用 `begin()`                                                           |
@@ -969,7 +1231,7 @@ import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle'
 
 稳定诊断消息表（本包内部错误信息的唯一声明处，公开是为了让调用方按文本断言/比对）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 error.message === LifecycleErrorText.disposeTransactionFailed
 ```
 
@@ -983,7 +1245,7 @@ error.message === LifecycleErrorText.disposeTransactionFailed
 
 ### 1. 作用域 + 代数：请求场景下取代过期结果
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createLifecycleScope, createGenerationController } from '@migaia/lifecycle'
 
 const scope = createLifecycleScope({ errorPolicy: 'collect' })
@@ -999,7 +1261,7 @@ async function loadUser(id: string) {
 
 ### 2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 
@@ -1040,7 +1302,7 @@ async function applyBatch(mutations: Array<() => Promise<void>>) {
 
 ### 4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
 import { createManualScheduler } from '@migaia/utils/testing';
 
@@ -1083,7 +1345,7 @@ function withListeners() {
 
 `dispose()` 必须同步返回、但内部 disposer 可能返回 Promise 时，用 ledger 启动并统一观测；不要让每个 Registry 自造 pending/error 状态机：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'
 
 const ledger = createSyncStartedDisposalLedger()
@@ -1103,7 +1365,7 @@ const { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])
 
 ### 7. 服务退出：停止接单，等待在途任务，再释放资源
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createLifecycleScope, createPendingTracker } from '@migaia/lifecycle'
 
 const scope = createLifecycleScope({ errorPolicy: 'collect' })

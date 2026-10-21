@@ -12,6 +12,7 @@
  */
 import type { ICode, IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { runtimePeerOptionMembers } from './rpc-runtime-shared.js'
+import { rpcBrowserCases } from './rpc-browser-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -654,6 +655,119 @@ const rtcChannelMembers: Readonly<Record<string, IMemberDoc>> = {
   )
 }
 
+/** Browser source fields are shown beside the common Peer options without adding source openers. */
+const browserPeerOptions: Readonly<Record<string, IMemberDoc>> = {
+  ...runtimePeerOptionMembers,
+  self: {
+    ...runtimePeerOptionMembers.self!,
+    default: t(
+      '`{ name: "browser", instanceId: generated }` when omitted.',
+      '省略时使用 `{ name: "browser", instanceId: 自动生成的标识 }`。'
+    )
+  },
+  provide: {
+    ...runtimePeerOptionMembers.provide!,
+    summary: t(
+      'Local method record. The request example provides double(value: number), returning its doubled number; the stream example provides async *values(start: number), yielding start and start + 1. Remote typing selects request for scalar methods and stream for generators; no context.success wrapper is needed.',
+      '本端方法对象：请求示例的 `double(value: number)` 返回两倍数值，流示例的 `async *values(start: number)` 依次产生 `start` 与 `start + 1`。远端类型决定普通结果使用 `request`、生成器使用 `stream`，不需要 `context.success` 包装。'
+    )
+  },
+  defaultTimeoutMs: {
+    ...runtimePeerOptionMembers.defaultTimeoutMs!,
+    default: t('`30000` ms for request and stream.', '默认 `30000` 毫秒，用于请求与流调用。')
+  },
+  connect: {
+    summary: t(
+      'Supply exactly one source: { window, origin, receiver?, allowUnsafeTargetOrigin? }, { sharedWorker }, or { rtcDataChannel }. Select connect or listen, never both.',
+      '只选择一种来源：`{ window, origin, receiver?, allowUnsafeTargetOrigin? }`、`{ sharedWorker }` 或 `{ rtcDataChannel }`；`connect` 与 `listen` 必须二选一。'
+    ),
+    default: t(
+      '`undefined`; listen must then be supplied.',
+      '默认 `undefined`，此时必须提供 `listen`。'
+    )
+  },
+  'connect.window': {
+    summary: t(
+      'The actual destination Window with postMessage.',
+      '实际目标 Window，须提供原生 `postMessage`。'
+    )
+  },
+  'connect.origin': {
+    summary: t(
+      'Required nonempty destination origin for a Window source; no same-origin default.',
+      'Window 来源必填的非空目标源，没有同源默认值。'
+    )
+  },
+  'connect.receiver': {
+    summary: t(
+      'The actual owner of inbound message events for the Window source.',
+      'Window 来源中实际接收 `message` 事件的对象。'
+    ),
+    default: t('The global event receiver when available.', '默认使用可接收事件的全局对象。')
+  },
+  'connect.allowUnsafeTargetOrigin': {
+    summary: t(
+      'Explicit wildcard escape; source Window identity is still checked.',
+      '显式允许通配目标源，接收时仍核对来源窗口身份。'
+    ),
+    default: t(
+      '`undefined`; omission rejects a wildcard origin.',
+      '默认 `undefined`，省略时拒绝通配目标源。'
+    ),
+    values: {
+      true: t(
+        'Allow origin "*" while retaining the source identity check.',
+        '允许 `origin: "*"`，仍检查来源身份。'
+      ),
+      false: t('Require a concrete destination origin.', '要求具体的目标源。')
+    }
+  },
+  'connect.sharedWorker': {
+    summary: t(
+      'A caller-owned SharedWorker or the public { port } configuration.',
+      '调用方拥有的 SharedWorker，或公开的 `{ port }` 配置对象。'
+    )
+  },
+  'connect.sharedWorker.port': {
+    summary: t(
+      'The actual ISharedWorkerPort: postMessage, addEventListener and removeEventListener are required; start is optional. Native Node MessagePort supplies these operations in the runnable examples.',
+      '真实的 `ISharedWorkerPort`：必须有 `postMessage`、`addEventListener`、`removeEventListener`，`start` 可选；运行示例直接使用提供这些完整操作的 Node 原生 MessagePort。'
+    )
+  },
+  'connect.rtcDataChannel': {
+    summary: t(
+      'An application-established native RTC channel with ordered: true, maxRetransmits: null and maxPacketLifeTime: null; finish signaling and wait for open before connecting.',
+      '应用完成信令并等到打开的原生 RTC 频道，须为 `ordered: true`、`maxRetransmits: null`、`maxPacketLifeTime: null`。'
+    )
+  },
+  listen: {
+    summary: t(
+      'A real SharedWorker connect-event scope, accepting every actual event port independently; it is not exercised by the Node port examples.',
+      '真实 SharedWorker 的 `connect` 事件作用域，分别接纳每个事件中的实际端口；Node 端口示例不验证此宿主。'
+    ),
+    default: t(
+      '`undefined`; connect must then be supplied.',
+      '默认 `undefined`，此时必须提供 `connect`。'
+    )
+  },
+  signal: {
+    summary: t(
+      'Caller AbortSignal for unfinished connection setup; in listen mode cancellation also closes accepted logical peers without closing borrowed carriers.',
+      '调用方用于取消未完成连接的 AbortSignal；监听模式下还会关闭已接纳逻辑连接，借用载体不关闭。'
+    ),
+    default: t(
+      '`undefined`; no caller cancellation signal.',
+      '默认 `undefined`，没有调用方取消信号。'
+    )
+  }
+}
+
+/** Native Node ports exercise the structural carrier boundary without claiming browser realms. */
+const nativePortIntro = t(
+  'Install @migaia/rpc-browser and its @migaia/rpc-core peer directly. Node 24 supplies the real MessageChannel; its constructor takes no arguments and returns paired port1/port2. These complete native ports satisfy the public port contract. The examples prove port delivery only, not SharedWorker lifecycle, Window origins, RTC signaling, or browser authentication.',
+  '直接安装 `@migaia/rpc-browser` 及其 peer 依赖 `@migaia/rpc-core`。Node 24 提供真实 MessageChannel，无参数构造后取得配对的 `port1`、`port2`，它们完整实现公开端口契约。示例只证明端口交付，不证明 SharedWorker 生命周期、窗口来源、RTC 信令或浏览器认证。'
+)
+
 /** Reference of `@migaia/rpc-browser`. */
 export const rpcBrowserReference: ILibraryReference = {
   modules: {
@@ -725,7 +839,15 @@ export const rpcBrowserReference: ILibraryReference = {
         '来自 `@migaia/rpc-core` 的 `IRuntimePeer`：`request` / `notify` / `stream` / `group` / `outcome` 调用对端，`on("ready")` 观察重新就绪，`describe()` 读取方法目录，`close()`（或 `await using`）结束逻辑连接但不关闭载体。提供 `TRemote` 时带有类型。'
       ),
       options: 'IRuntimeBrowserPeerOptions',
-      example: peerExample,
+      optionDocs: browserPeerOptions,
+      exampleIntro: t(
+        nativePortIntro.en +
+          ' Both connect factories start concurrently. request(method, payload, options?) and stream(method, payload, options?) use the accepted method name and its declared input; omitted call options inherit the 30000 ms request/stream deadline. close() takes no arguments and repeated calls share its Promise. After logical cleanup, Node port.once("message", listener) receives the data once to prove the borrowed port remains open.',
+        nativePortIntro.zh +
+          '两端连接工厂并发启动。`request(method, payload, options?)` 与 `stream(method, payload, options?)` 使用已接纳的方法名及声明输入；省略调用选项时，请求与流继承 `30000` 毫秒默认期限。`close()` 无参数，重复调用复用其 Promise；逻辑清理后才用 Node 的 `port.once("message", listener)` 接收一次数据，证明借用端口仍打开。'
+      ),
+      example: rpcBrowserCases.createBrowserPeer![0]!.example,
+      cases: rpcBrowserCases.createBrowserPeer,
       scenarios: [
         t(
           'A shop page calls functions inside a payment iframe from another origin.',
@@ -796,7 +918,14 @@ export const rpcBrowserReference: ILibraryReference = {
         'An `IRpcTransport`; the port is borrowed and must be closed by its owner.',
         '一个 `IRpcTransport`；端口是借用的，需由其持有者关闭。'
       ),
-      example: sharedEndpointExample
+      exampleIntro: t(
+        nativePortIntro.en +
+          ' createSharedWorkerTransport(port) has no options argument. subscribe(listener) supplies {data, origin?, source?} and returns an idempotent disposer; it uses no business result but observes synchronous and thenable failures. send(message, {transfer}) defaults transfer to undefined; an explicit array transfers those native objects. onListenerError(error => void) reports listener failures, distinct from physical onTransportError. Promise.withResolvers creates a local delivery Promise and does not implement RPC.',
+        nativePortIntro.zh +
+          '`createSharedWorkerTransport(port)` 没有选项参数。`subscribe(listener)` 提供 `{ data, origin?, source? }` 并返回幂等退订函数；不使用业务返回值，但会观察同步抛错及类 Promise 对象的拒绝。`send(message, { transfer })` 的 `transfer` 默认 `undefined`，显式数组会转移其中原生对象。`onListenerError(error => void)` 接收监听器失败，与物理故障的 `onTransportError` 不同；`Promise.withResolvers` 只创建本地交付 Promise，不实现 RPC。'
+      ),
+      example: rpcBrowserCases.createSharedWorkerTransport![0]!.example,
+      cases: rpcBrowserCases.createSharedWorkerTransport
     },
     createServiceWorkerTransport: {
       role: 'enhancer',
@@ -827,7 +956,12 @@ export const rpcBrowserReference: ILibraryReference = {
         'An `IRpcTransport`; the caller still closes the channel.',
         '一个 `IRpcTransport`；频道仍需调用方自行关闭。'
       ),
-      example: broadcastExample
+      exampleIntro: t(
+        'Install @migaia/rpc-browser and @migaia/rpc-core directly. Node 24 supplies native BroadcastChannel(name); name is required, and the examples reuse one randomUUID string across distinct channels to isolate the run. createBroadcastChannelTransport(channel) has no options argument. subscribe receives {data, origin?, source?} and returns a disposer. send(message) uses native structured cloning with no transfer-list support. Channel close() is a separate no-argument operation owned by the caller; once:true removes the final raw native listener after one delivery.',
+        '直接安装 `@migaia/rpc-browser` 与 `@migaia/rpc-core`。Node 24 的原生 `BroadcastChannel(name)` 名称必填，示例让不同频道实例复用同一个随机 UUID，隔离本次运行。`createBroadcastChannelTransport(channel)` 没有选项参数；`subscribe` 接收 `{ data, origin?, source? }` 并返回退订函数，`send(message)` 使用原生结构化克隆，不支持转移列表。频道的无参数 `close()` 由调用方负责；`once: true` 让最后的原生监听在收到一条消息后自动移除。'
+      ),
+      example: rpcBrowserCases.createBroadcastChannelTransport![0]!.example,
+      cases: rpcBrowserCases.createBroadcastChannelTransport
     },
     createRtcDataChannelTransport: {
       role: 'enhancer',
@@ -875,6 +1009,9 @@ export const rpcBrowserReference: ILibraryReference = {
       ),
       members: {
         ...runtimePeerOptionMembers,
+        self: browserPeerOptions.self!,
+        provide: browserPeerOptions.provide!,
+        defaultTimeoutMs: browserPeerOptions.defaultTimeoutMs!,
         connect: {
           summary: t(
             'Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.',
@@ -940,7 +1077,7 @@ export const rpcBrowserReference: ILibraryReference = {
             'Allows `origin: "*"`; the source window is still checked on receive.',
             '允许 `origin: "*"`；接收时仍会校验来源窗口。'
           ),
-          default: t('`false`: `*` is rejected.', '`false`：拒绝使用 `*`。')
+          default: t('`undefined`: omitted disables `*`.', '默认 `undefined`，省略时拒绝使用 `*`。')
         }
       }
     },
@@ -1068,7 +1205,7 @@ export const rpcBrowserReference: ILibraryReference = {
             'Allows `targetOrigin: "*"`; the source window is still checked.',
             '允许 `targetOrigin: "*"`；仍会校验来源窗口。'
           ),
-          default: t('`false`.', '`false`：拒绝使用 `*`。')
+          default: t('`undefined`: omitted disables `*`.', '默认 `undefined`，省略时拒绝使用 `*`。')
         }
       }
     },

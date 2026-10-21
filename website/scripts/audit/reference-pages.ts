@@ -160,7 +160,9 @@ function codeTokens(code: string): string {
 /** Extracts only example code, excluding signatures that could mask absent member descriptions. */
 function exampleBlocks(article: string): string[] {
   return [
-    ...article.matchAll(/<figure class="code-frame" data-code-kind="example"[\s\S]*?<\/figure>/g)
+    ...article.matchAll(
+      /data-code-kind="example"[^>]*>\s*<figure class="code-frame"[\s\S]*?<\/figure>/g
+    )
   ].map((match) => readerText(match[0].match(/<pre[\s\S]*?<\/pre>/)?.[0] ?? ''))
 }
 
@@ -177,7 +179,7 @@ function isCodeField(group: keyof ILibraryReference, path: readonly string[]): b
     )
   if (path.length !== 3 || path[2] !== 'example') return false
   return (
-    (group === 'symbols' && path[0] === 'optionDocs') ||
+    (group === 'symbols' && (path[0] === 'optionDocs' || path[0] === 'cases')) ||
     (group === 'types' && path[0] === 'members') ||
     (group === 'enhancers' && path[0] === 'grants')
   )

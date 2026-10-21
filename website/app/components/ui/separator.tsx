@@ -5,11 +5,7 @@ type ISeparatorProps = ComponentProps<'div'> & {
 }
 
 /** Separates neighboring content groups without adding another visual heading. */
-export function Separator({
-  className = '',
-  decorative = true,
-  ...props
-}: ISeparatorProps) {
+export function Separator({ className = '', decorative = true, ...props }: ISeparatorProps) {
   return (
     <div
       aria-hidden={decorative || undefined}

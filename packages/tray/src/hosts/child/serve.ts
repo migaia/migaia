@@ -52,7 +52,13 @@ export async function serveChild(
     throw primary
   }
 }
-/** Node Worker/process entry; automatic source selection connects once and ends only after exit. */
+/**
+ * Runs a trusted thread/process definition in its Node child entry using automatic RPC connection.
+ * Coroutine definitions reject with TRAY_HOST_INVALID. options defaults to no probe and
+ * console.error reporting. Waits for the first child exit request, disposes its Host, then exits
+ * the Node realm with 0 for clean exit or 1 for a reported crash. Parent spawn/initialization
+ * remains a separate owner.
+ */
 export async function serveTrayHost(
   definition: IAnyTrayHost,
   options?: Partial<ITrayRuntimeOptions>

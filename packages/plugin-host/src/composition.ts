@@ -301,16 +301,21 @@ export const registerManagedHost = (
 /**
  * Whether a value is a host this package constructed.
  *
- * The predicate a composing package should branch on instead of `instanceof`: a nominal check fails
- * across two copies of the package and cannot see a host produced by a factory rather than a
- * constructor, and both of those are shapes this package now ships.
+ * Recognizes class instances and defineHost() handles issued by this package instance, without
+ * inspecting user properties. It checks provenance rather than current lifecycle state; structural
+ * lookalikes and Hosts from another copy of the package return false.
  */
 export const isManagedHost = (target: unknown): boolean =>
   (typeof target === 'object' || typeof target === 'function') &&
   target !== null &&
   managedHosts.has(target as object)
 
-/** The managed-protocol port of a registered host, or `COMPOSITION_TARGET_UNMANAGED`. */
+/**
+ * Returns the stable frozen composition port for a Host issued by this package instance. Use it
+ * only when owning prepare/commit/discard and cleanup-fence protocols; ordinary consumers use
+ * plugin handles. Unknown targets throw COMPOSITION_TARGET_UNMANAGED. Opening the port does not
+ * reactivate a closing or disposed Host; individual operations keep their lifecycle checks.
+ */
 export const openComposition = (target: object): IPluginHostCompositionIntegration<object> => {
   const port = managedHosts.get(target)
   if (!port)

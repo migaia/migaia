@@ -2,7 +2,12 @@ import { RpcCapability } from '../wire-constants.js'
 import { RpcRuntimeCancel, RpcRuntimeMode } from './constants.js'
 import type { IRpcRuntimeOptions } from './types.js'
 
-/** Return the exact AND dependencies for an opted-in operation, never an inferred offer closure. */
+/**
+ * Return a frozen AND-requirement list for one opted-in runtime operation. Empty options and
+ * hasSignal=false add only that mode's baseline; optional ordering, cancellation and outcome
+ * semantics add their own dependencies. This computes requirements without validating an offer,
+ * negotiating capabilities or enabling a feature on either peer.
+ */
 export function runtimeOperationCapabilities(
   mode: RpcRuntimeMode,
   options: IRpcRuntimeOptions = {},

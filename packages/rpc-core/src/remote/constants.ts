@@ -8,9 +8,11 @@ export const RemoteMethodName = {
   runtimeStreamPrefix: RpcRuntimeStreamPrefix,
   /** Automatic application methods cannot impersonate the reserved library control namespace. */
   runtimeNamespace: 'migaia.remote.',
-  hostUse: 'migaia.remote.host.use',
-  hostUnUse: 'migaia.remote.host.unUse',
-  hostInspect: 'migaia.remote.host.inspect'
+  /** Reserved request to install a declared remote Host plugin. */ hostUse:
+    'migaia.remote.host.use',
+  /** Reserved request to plan/remove an adopted remote Host registration. */ hostUnUse:
+    'migaia.remote.host.unUse',
+  /** Reserved query for safe remote catalog state. */ hostInspect: 'migaia.remote.host.inspect'
 } as const
 
 /** Names for service plugins are private to remote; user plugins must avoid this prefix. */

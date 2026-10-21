@@ -11,9 +11,18 @@ const maxBytes = 64 * 1024
 
 /** Actual launch data contains a private token that consumers must keep out of diagnostics. */
 export type IRpcByteRuntimeBootstrap = Readonly<{
-  self: Readonly<{ name: string; instanceId: string }>
+  /** Bounded display/address identity; excludes process IDs and environment data. */
+  self: Readonly<{
+    /** Nonempty bounded execution name. */
+    name: string
+    /** Nonempty bounded execution-instance address. */
+    instanceId: string
+  }>
+  /** Nonempty bounded launching-parent address. */
   parentInstanceId: string
+  /** Required private bootstrap token; never include it in public diagnostics. */
   token: string
+  /** Optional original generation fact, still requiring runtime-owner provenance. */
   generation?: IRpcRuntimeGeneration
 }>
 
@@ -73,4 +82,16 @@ function read(
 }
 
 /** Pure protocol data/parser; Core derives provenance only from its own actual held-I/O receive. */
-export const rpcByteRuntimeBootstrap = Object.freeze({ kind, version, maxBytes, read })
+export const rpcByteRuntimeBootstrap = Object.freeze({
+  /** Closed initial byte-launch metadata discriminator. */
+  kind,
+  /** Required launch metadata version. */
+  version,
+  /** Complete encoded bootstrap ceiling of 64 KiB. */
+  maxBytes,
+  /**
+   * Validate a closed record or strict UTF-8 JSON bytes; failures return valid:false without
+   * secrets.
+   */
+  read
+})

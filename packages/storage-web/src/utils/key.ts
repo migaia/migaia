@@ -6,11 +6,20 @@ import { utf8ByteLength } from '@migaia/utils/bytes'
 
 /** Namespace/key codec boundary. Custom codecs own migration and collision safety. */
 export type INamespaceCodec = {
+  /**
+   * Map a logical namespace/key pair to a physical string; a custom codec owns collision safety and
+   * migration.
+   */
   encode(namespace: string, key: string): string
+  /** Return this namespace's logical key, or undefined for a foreign/malformed physical name. */
   decode(namespace: string, physicalKey: string): string | undefined
 }
 
-/** Default collision-free namespace codec. */
+/**
+ * Default frozen namespace codec using a versioned UTF-8-length-prefixed namespace and the original
+ * logical key. Decode returns undefined for foreign or malformed physical names. Persisted data
+ * needs explicit migration if the namespace codec changes.
+ */
 export const lengthPrefixedNamespaceCodec: INamespaceCodec = Object.freeze({
   encode: (namespace, key) => {
     const encodedNamespace = encodeURIComponent(namespace)

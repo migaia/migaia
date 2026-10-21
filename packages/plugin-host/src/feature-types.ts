@@ -7,9 +7,13 @@ export type IFeatureReference<
   TOptional extends boolean = false,
   TProvider extends string = string
 > = Readonly<{
+  /** Provider plugin name captured by the trusted definition's getFeature() method. */
   readonly plugin: TProvider
+  /** Declared Feature name, validated when the reference is created. */
   readonly feature: string
+  /** False requires the provider; true allows an absent provider to resolve as undefined. */
   readonly optional: TOptional
+  /** Declaration-only output axis; this is not an instantiated Feature value. */
   readonly __output?: TOutput
 }>
 
@@ -21,6 +25,7 @@ export type IFeatureDependencyRecord = Readonly<Record<string, IFeatureDependenc
 
 /** Read-only capability surface available to one synchronous Feature factory. */
 export type IFeatureCore<TExpose extends object> = Readonly<{
+  /** Explicit guarded expose methods; no Host mutation, setup or pipeline API is granted here. */
   readonly featureExpose: TExpose
 }>
 
@@ -44,8 +49,11 @@ export type IFeature<
 > = Readonly<{
   /** Type-only metadata; runtime identity is authorized exclusively by defineFeature's WeakMap. */
   readonly __feature: {
+    /** Required expose contract, carried only in declarations. */
     readonly expose: TExpose
+    /** Exact synchronous factory output type, without an eagerly created runtime value. */
     readonly output: TOutput
+    /** Direct dependency aliases used for compile-time output injection. */
     readonly dependencies: TDependencies
   }
 }>
@@ -95,6 +103,8 @@ export type IFeatureFactory<
 
 /** Read-only trusted topology projection; factories and dependency metadata remain private. */
 export type IFeatureInspection<TFeatures extends IFeatureRecord> = Readonly<{
+  /** Frozen copy of selected root names, retaining the original opaque Feature identities. */
   readonly roots: TFeatures
+  /** Frozen dependency-first local Feature closure; cross-plugin references are not local factories. */
   readonly ordered: readonly IFeature<any, any, any>[]
 }>

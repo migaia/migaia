@@ -7,7 +7,7 @@ export const RpcDevtoolsErrorCode = {
   serviceResultInvalid: 'SERVICE_RESULT_INVALID',
   /** Collector/hub options violate their supported domain; fix the option before construction. */
   invalidOption: 'INVALID_OPTION',
-  /** Runtime is absent or the instance is closed; install the runtime or create a live instance . */
+  /** Collector or hub is closed; create a new instance rather than reviving retained resources. */
   closed: 'CLOSED',
   /** A recording already owns the collector; stop it before starting another. */
   recordActive: 'RECORD_ACTIVE',

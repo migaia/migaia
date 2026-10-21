@@ -97,17 +97,29 @@ export function runtimeSupervisorEvent(
 
 /** Lifecycle facts contain only the original identity, time and explicitly safe native fields. */
 export type IRuntimeEvent = Readonly<{
+  /** Original ready/exit/degraded/restart/terminal/liquidated lifecycle fact. */
   type: RuntimeEventName
+  /** Safe registered connection name. */
   name: string
+  /** Accepted remote instance identity, or explicit unavailable state. */
   instanceId: string | IRuntimeUnavailable
+  /** Original unit generation if observable; it is distinct from accepted provider generation. */
   generation: number | IRuntimeUnavailable
+  /** Original monotonic observation time, or explicit unavailable state. */
   timestamp: number | IRuntimeUnavailable
+  /** Clock label describing the timestamp domain. */
   clock: string
+  /** Safe lifecycle reason when the original event supplies one. */
   reason?: string
+  /** Native exit code when observed; absence remains explicit. */
   code?: number | IRuntimeUnavailable
+  /** Native exit signal when observed; absence remains explicit. */
   signal?: string | IRuntimeUnavailable
+  /** Safe source/code diagnostic projection; no raw native handle or credentials. */
   error?: Readonly<{ source?: string; code?: string }>
+  /** Observed restart count for a restart event. */
   count?: number
+  /** Original unit degradation reasons when supplied. */
   degraded?: readonly string[]
 }>
 /** Subscriptions and watch share one publisher; none is a terminal handler or control owner. */

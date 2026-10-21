@@ -4,23 +4,38 @@ import { RpcHandshakeStep, RpcReservedKind } from '../wire-constants.js'
 import { RPC_FRAME_TEXT_ENCODING } from './text-encoding.js'
 
 /** A carrier's existing handshake role selects only its own receive grammar. */
-export const RpcHandshakeRole = { initiator: 'initiator', responder: 'responder' } as const
+export const RpcHandshakeRole = {
+  /** Receives the responder selection and permits the original post-accept business branch. */
+  initiator: 'initiator',
+  /** Receives the initial offer and records its own accept transition before activation. */
+  responder: 'responder'
+} as const
 export type RpcHandshakeRole = keyof typeof RpcHandshakeRole
 
 /** Retain the actual configuration reference so role getters run at the original frame points. */
-export type IRpcHandshakeFrameReceiverOptions = Readonly<{ role?: RpcHandshakeRole }>
+export type IRpcHandshakeFrameReceiverOptions = Readonly<{
+  /** Optional actual exchange role; omission enables no initiator-specific early-business branch. */
+  role?: RpcHandshakeRole
+}>
 
 /**
  * A custom framed carrier owns this protocol receiver; no native resource or execution is owned
  * here.
  */
 export type IRpcHandshakeFrameReceiver = Readonly<{
+  /** Decode one complete UTF-8 payload; return business text, an admission error, or no delivery. */
   accept(frame: Uint8Array): string | Error | undefined
+  /** Consume the sole handshake frame; repeated reads reject, and close preserves its reason. */
   readHandshakeFrame(): Promise<string>
+  /** Allow the existing post-accept branch while the carrier defers its own consumer activation. */
   deferActivation(): void
+  /** Record responder acceptance before its physical write; throws the retained reason after close. */
   beginAccept(): void
+  /** Enter business-frame decoding after a received control frame; invalid sequencing throws. */
   activate(): void
+  /** Idempotently retain the first reason, reject the reader and drop cached data; owns no I/O. */
   close(reason: unknown): void
+  /** Whether this receiver activated; close does not reset this historical phase flag. */
   readonly ready: boolean
 }>
 

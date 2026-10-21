@@ -19,9 +19,16 @@ function borrowNodeThreadParent(port: IThreadParentPort): AdapterNodeThreadParen
   return new AdapterNodeThreadParentChannel(port)
 }
 
-/** Launch this runtime's actual Worker through the complete Core-owned execution operation. */
+/**
+ * Create a Node worker_threads launcher without starting a Worker. launch requires an absolute
+ * entry, validates portable initialization data, and retains native error/exit events. Node
+ * advertises enforced termination, exit observation and heap limits; this does not isolate OS
+ * permissions or provide a separate process. Options default to {}, retaining native execArgv
+ * inheritance.
+ */
 export function createNodeThreadLauncher(
   options: Readonly<{
+    /** Optional explicit runtime context; the actual held launch proposal takes precedence. */
     runtimeApi?: IRuntimePeerSourceContext
     /** Explicit runtime flags apply to short entries without replaying their parent's controller. */
     execArgv?: readonly string[]
@@ -30,7 +37,12 @@ export function createNodeThreadLauncher(
   return createAdapterNodeThreadLauncher(threadRuntimeResource, options)
 }
 
-/** Construct the factory over Core-owned handles or the existing strict custom raw-port shape. */
+/**
+ * Build the Node channel factory with a required borrowed scheduler. Exact launcher handles retain
+ * their preparation and actual capability ACK, while custom raw ports keep the fixed profile.
+ * Channel closure and supervisor termination have separate ownership; opening failure of a genuine
+ * launched handle requests termination and retains the primary failure.
+ */
 export function createNodeThreadChannelFactory(options: IThreadChannelOptions) {
   return createAdapterNodeThreadChannelFactory(options)
 }

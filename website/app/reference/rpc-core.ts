@@ -21,6 +21,7 @@ import { transportReference, transportMembers } from './rpc-core-transports.js'
 import { remoteReference } from './rpc-core-remote.js'
 import { authenticationOptionMembers as authenticationOptions } from './rpc-core-auth.js'
 import { kitReference } from './rpc-core-transport-kit.js'
+import { rpcCoreCases } from './rpc-core-cases.js'
 
 /** Produces explicit bilingual prose at every node. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -85,11 +86,11 @@ const signal = p(
 /** Relative timeout semantics preserve explicit false and middleware defaults. */
 const timeoutMs = {
   ...p(
-    'Optional finite nonnegative local deadline in milliseconds; false explicitly disables it and omission uses timeout middleware configuration.',
-    '可选有限非负本地毫秒截止；假值显式关闭，省略使用超时中间件配置。',
+    'Optional finite nonnegative local deadline in milliseconds; false disables it. For scalar send, omission uses the installed timeout configuration: no plugin falls back to 1000 ms, while timeout({}) configures undefined and no local deadline. Ping and discovery queries have their own waiting defaults.',
+    '可选有限非负毫秒期限，`false` 明确取消期限。标量 `send` 省略时使用已安装的超时配置：未安装插件则回退到 `1000` 毫秒，`timeout({})` 的配置为 `undefined`，不设本地期限；心跳和发现查询另有自己的等待默认值。',
     t(
-      'Absent: inherit timeout middleware, otherwise no deadline.',
-      '默认继承超时中间件，否则不设截止。'
+      'Scalar send inherits the installed timeout value; no plugin means 1000 ms, and timeout({}) means no deadline. Other operations use their documented waiting defaults.',
+      '标量 `send` 继承已安装超时值，未安装插件时为 `1000` 毫秒，`timeout({})` 则不设期限；其他操作采用各自说明的等待默认值。'
     )
   ),
   values: {
@@ -102,7 +103,7 @@ const timeoutMs = {
 /** Explicit physical ownership transfer never infers native backing ownership. */
 const transfer = p(
   'Optional caller-supplied original transferable objects in the intended order; the real carrier validates support and ownership.',
-  '调用方按预期顺序提供的可选原始可转移对象；实际载体验证支持及所有权。',
+  '调用方按预期顺序提供的可选原始可转移对象；实际传输对象验证支持及所有权。',
   t('Absent: no ownership transfer is requested.', '默认不设置，不请求所有权转移。')
 )
 /** Native clock injection remains external to this package. */
@@ -124,12 +125,12 @@ const sendOptions: Record<string, IMemberDoc> = {
   transfer,
   idempotencyKey: p(
     'Application-issued stable key reused only for the same intended operation; requires actual idempotency capability.',
-    '应用签发的稳定键，只为相同预期操作复用，要求实际幂等能力。',
+    '应用提供的稳定键，只为相同预期操作复用，要求实际幂等能力。',
     t('Absent: no keyed replay reservation.', '默认不设置，不进行带键重放预留。')
   ),
   trace: p(
     'Optional caller-issued opaque diagnostic trace; downstream calls must pass it explicitly.',
-    '调用方签发的可选不透明诊断追踪，下游调用须显式传入。',
+    '调用方提供的可选不透明诊断追踪，下游调用须显式传入。',
     t('Absent: no trace is attached.', '默认不设置，不附加追踪值。')
   )
 }
@@ -142,7 +143,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
       method,
       provider: t(
         'Application callback receives IRpcContext and returns context.success or context.failed synchronously or asynchronously. Legacy ordinary throws usually become INTERNAL; trusted wire summaries and SCHEMA_INVALID retain public classification. Runtime operations serialize the original failure.',
-        '应用回调接收运行上下文，同步或异步返回成功或失败结果；传统普通抛错通常成为内部失败，可信线上摘要及结构非法保留公开分类，运行接口序列化原失败。'
+        '应用回调接收运行上下文，同步或异步返回成功或失败结果；传统普通抛错通常成为内部失败，可信线上摘要及结构非法保留公开分类，运行接口序列化原始失败。'
       )
     },
     t(
@@ -161,7 +162,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
       ),
       listener: t(
         'Application callback receives IRpcContext, returns void or Promise<void>, and should not retain expired response operations.',
-        '应用回调接收运行上下文，返回空值或空值承诺，不应保留过期响应操作。'
+        '应用回调接收运行上下文，返回空值或 Promise<void>，不应保留过期响应操作。'
       )
     },
     t('Idempotent unsubscriber removes only this registration.', '幂等移除函数只移除本次登记。'),
@@ -184,7 +185,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
     },
     t(
       'Promise of provider data; remote business failure, cancellation, deadline, transport or lifecycle failure rejects with its native coded error. A synchronous UUID admission failure releases operation signal listeners; ordinary send cancellation keeps RpcAbortError.',
-      '返回提供方数据承诺；远端业务、取消、截止、载体或生命周期失败以原生编码错误拒绝；同步标识生成失败会释放操作信号监听，普通发送取消仍使用 `RpcAbortError`。'
+      '返回提供方数据 Promise；远端业务、取消、截止、传输对象或生命周期失败以原生编码错误拒绝；同步标识生成失败会释放操作信号监听，普通发送取消仍使用 `RpcAbortError`。'
     ),
     endpointExample
   ),
@@ -257,7 +258,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
     },
     t(
       'Promise of actual step outcomes; unsupported native group capability rejects before dispatch.',
-      '返回实际步骤结果承诺，不支持原生分组能力时在派发前拒绝。'
+      '返回实际步骤结果 Promise，不支持原生分组能力时在派发前拒绝。'
     ),
     'const outcomes = await client.group("server", [{ method: "echo", payload: "a" }, { method: "echo", payload: "b" }])'
   ),
@@ -268,7 +269,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
       targetId,
       idempotencyKey: t(
         'Original application-issued key used for the same earlier logical operation.',
-        '同一较早逻辑操作使用的原应用签发键。'
+        '来自调用方先前同一逻辑操作的幂等键，查询时复用原键。'
       )
     },
     t(
@@ -306,7 +307,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
     },
     t(
       'Promise<boolean> for the observed reply; disposal settles an active ping as false. Calling after disposal or without ping capability throws its coded error. Ping cancellation does not require abort middleware.',
-      '返回所观察响应的布尔承诺；进行中的心跳在释放时结算为假，释放后调用或缺心跳能力时抛编码错误；心跳取消不要求安装中止中间件。'
+      '返回所观察响应的布尔 Promise；进行中的心跳在释放时结算为假，释放后调用或缺心跳能力时抛编码错误；心跳取消不要求安装中止中间件。'
     ),
     'const alive = await client.ping("server")'
   ),
@@ -330,7 +331,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
   ),
   hooks: p(
     'Local diagnostic subscription facade; hooks.on receives IRpcHookEvent and returns an unsubscriber.',
-    '本地诊断订阅表面，钩子登记接收事件并返回移除函数。'
+    '本地诊断订阅接口，钩子登记接收事件并返回移除函数。'
   ),
   dispose: m(
     'Idempotently stops admission, drains owned work and releases middleware/adapter resources in the canonical lifecycle order.',
@@ -338,7 +339,7 @@ const endpointMembers: Record<string, IMemberDoc> = {
     {},
     t(
       'Promise resolves after disposal; cleanup failures remain reachable through standard cause/errors traversal, including all failures in the same batch; future operations fail ENDPOINT_DISPOSED.',
-      '释放后承诺兑现；同批全部清理失败均可经标准原因及错误列表遍历，后续操作以端点已释放错误失败。'
+      '释放后 Promise 兑现；同批全部清理失败均可经标准原因及错误列表遍历，后续操作以端点已释放错误失败。'
     ),
     'await client.dispose()'
   )
@@ -388,7 +389,7 @@ const fields: Record<string, IMemberDoc> = {
   transfer,
   source: p(
     'Stable semantic error package source retained from the actual original failure.',
-    '从实际原失败保留的稳定语义错误包来源。'
+    '从实际原始失败保留的稳定语义错误包来源。'
   ),
   code: p(
     'Stable semantic error code; classify it together with source, not diagnostic message text.',
@@ -412,15 +413,15 @@ const fields: Record<string, IMemberDoc> = {
   ),
   platform: p(
     'Actual transport platform label supplied by the selected adapter.',
-    '所选适配器提供的实际载体平台标签。'
+    '所选适配器提供的实际传输对象平台标签。'
   ),
   origin: p(
     'Optional actual inbound origin supplied by a carrier that can establish it.',
-    '能够确认来源的载体提供的可选实际入站来源域。'
+    '能够确认来源的传输对象提供的可选实际入站来源域。'
   ),
   peerId: p(
     'Optional direct peer identifier issued by the actual transport adapter.',
-    '实际载体适配器签发的可选直接对端标识。'
+    '实际传输对象适配器签发的可选直接对端标识。'
   ),
   uniqueTargetId: p(
     'Explicit application identity or identity factory result, not a guessed discovery address.',
@@ -448,7 +449,7 @@ const fields: Record<string, IMemberDoc> = {
   ),
   rejected: p(
     'Original failed fan-out errors keyed by selected receiver or target identity.',
-    '按选中接收端或目标身份记录的原失败扇出错误。'
+    '按选中接收端或目标身份记录的原始失败扇出错误。'
   ),
   resource: p(
     'Lifecycle owner label identifying the cleanup resource that produced this original failure.',
@@ -530,7 +531,7 @@ const fields: Record<string, IMemberDoc> = {
     '顶层配置或原生连接中间件选择的实际应用适配器，原生来源证据仍归适配器。',
     t(
       'Absent: use the selected connect middleware transport; otherwise construction fails.',
-      '默认使用所选连接中间件载体，否则构造失败。'
+      '默认使用所选连接中间件传输对象，否则构造失败。'
     )
   ),
   protocol: p(
@@ -543,12 +544,12 @@ const fields: Record<string, IMemberDoc> = {
     '来自序列化包的编解码器，其编码输出精确匹配所选分片器输入。',
     t(
       'identityCodecV1 preserves the canonical semantic envelope.',
-      '默认恒等编解码保持规范语义信封。'
+      '默认恒等编解码保持规范语义消息封装。'
     )
   ),
   framer: p(
     'IRpcFramer from rpc-contract/framing whose actual output is accepted by the selected transport.',
-    '来自契约分帧入口的分片器，其实际输出须由所选载体接受。',
+    '来自契约分帧入口的分片器，其实际输出须由所选传输对象接受。',
     t('messageFramerV1 uses complete unfragmented messages.', '默认消息分片器使用完整未分片消息。')
   )
 }
@@ -572,7 +573,7 @@ const typeDoc = (
   scenarios: [
     t(
       'Compose actual endpoint or runtime peers while keeping transport and lifecycle ownership with their canonical owners.',
-      '组合实际端点或运行对端，并由规范所有者保持载体与生命周期所有权。'
+      '组合实际端点或运行对端，并由规范所有者保持传输对象与生命周期所有权。'
     )
   ],
   example
@@ -591,12 +592,12 @@ const providerLimits: Record<string, IMemberDoc> = {
   ),
   maxReplayEntriesPerPeer: p(
     'Maximum completed inbound replay tombstones retained for each actual verified peer.',
-    '每个实际已验证对端保留的已完成入站重放墓碑上限。',
+    '每个已验证对端最多保留多少条已完成入站请求标识，用于识别重复请求。',
     t('`1024` completed entries per peer.', '默认每个对端 `1024` 个完成条目。')
   ),
   onRejected: p(
     'Application callback receives actual IRpcProviderRejection before any provider runs; may return void or Promise<void>. Throw/rejection is reported through hooks without replacing OVERLOADED.',
-    '应用回调在提供方执行前接收实际准入拒绝，可返回空值或空值承诺；抛错或拒绝经钩子上报，不替换过载结果。',
+    '应用回调在提供方执行前接收实际准入拒绝，可返回空值或 Promise<void>；抛错或拒绝经钩子上报，不替换过载结果。',
     t('Absent: no additional local refusal observer.', '默认不设置，不添加本地拒绝观察者。')
   )
 }
@@ -604,8 +605,8 @@ const providerLimits: Record<string, IMemberDoc> = {
 const factoryOptions: Record<string, IMemberDoc> = {
   ...pick(['id', 'scheduler', 'wallClock', 'transport', 'protocol', 'codec', 'framer']),
   targetIds: p(
-    'Optional known-peer base identifiers issued by application deployment configuration; automatic discovery can resolve more later.',
-    '应用部署配置签发的可选已知对端基础标识，自动发现之后可以解析更多标识。',
+    'Optional known-peer base identifiers from application deployment configuration; automatic discovery can resolve more later.',
+    '来自应用部署配置的可选已知对端基础标识，自动发现之后可以取得更多标识。',
     t('Empty seed list; discovery remains available.', '默认空种子列表，仍可使用发现。')
   ),
   provider: p(
@@ -641,17 +642,17 @@ const factoryOptions: Record<string, IMemberDoc> = {
   ),
   replay: p(
     'Outbound active identifiers plus settled tombstone retention, separate from business result storage.',
-    '出站活动标识及已结算墓碑保留配置，与业务结果存储分开。',
+    '配置活动请求标识及已结束请求的标识记录，后者用于识别迟到答复；它们与业务结果分开存储。',
     t('Use maxEntries 4096 and ttlMs 310000.', '默认条目 `4096`，保留 `310000` 毫秒。')
   ),
   'replay.maxEntries': p(
     'Maximum retained outbound request identities including active operations and settled tombstones.',
-    '保留的出站请求身份总上限，含活动操作及已结算墓碑。',
+    '保留的出站请求标识总上限，包括活动请求和已结束请求的标识记录。',
     t('`4096` retained outbound identities.', '默认保留 `4096` 个出站身份。')
   ),
   'replay.ttlMs': p(
     'Scheduler milliseconds to retain settled outbound request identity tombstones.',
-    '已结算出站请求身份墓碑保留的调度器毫秒数。',
+    '请求结束后继续保留其出站标识的毫秒数，按调度器时钟计算。',
     t('`310000` milliseconds after settlement.', '默认结算后保留 `310000` 毫秒。')
   ),
   middlewares: p(
@@ -660,7 +661,7 @@ const factoryOptions: Record<string, IMemberDoc> = {
   ),
   features: p(
     'Optional finite immutable tuple of actual native IRpcFeature roots; dependencies remain private and only selected public surfaces are projected.',
-    '可选有限不可变原生功能根元组，依赖保持私有，只投影已选公开表面。',
+    '可选有限不可变原生功能入口元组，依赖保持私有，只投影已选公开接口。',
     t('Empty tuple adds no user-defined features.', '默认空元组，不增加自定义功能。')
   ),
   construction: p(
@@ -676,7 +677,7 @@ const factoryOptions: Record<string, IMemberDoc> = {
   'construction.timeoutMs': {
     ...p(
       'Finite nonnegative construction deadline or false to disable; rollback retains the primary failure and cleanup failures.',
-      '有限非负构造截止，或假值关闭；回滚保留主失败及清理失败。',
+      '有限非负构造截止，或`false`关闭；回滚保留主失败及清理失败。',
       t('Absent or false: no construction deadline.', '默认省略或假值，不设构造截止。')
     ),
     values: { false: t('Disable only the construction deadline.', '只关闭构造阶段的截止限制。') }
@@ -743,7 +744,7 @@ const manualMembers: Record<string, IMemberDoc> = {
     {
       listener: t(
         'Application callback receives IRpcInboundDiscoveryQuery, returns void or Promise<void>; async rejection is observed through hooks.',
-        '应用回调接收入站发现查询，返回空值或空值承诺，异步拒绝经钩子观察。'
+        '应用回调接收入站发现查询，返回空值或 Promise<void>，异步拒绝经钩子观察。'
       )
     },
     t('Idempotent unsubscriber for this query listener.', '返回只移除本次查询监听的幂等函数。'),
@@ -770,7 +771,7 @@ const manualMembers: Record<string, IMemberDoc> = {
     { targetId, receiverId },
     t(
       'Resolves after unregister processing; it does not close the external physical carrier.',
-      '取消登记处理后兑现，不关闭外部物理载体。'
+      '取消登记处理后兑现，不关闭外部底层传输通道。'
     ),
     'await client.connect.unregister("server", candidate.receiverId)'
   ),
@@ -798,7 +799,7 @@ const manualMembers: Record<string, IMemberDoc> = {
 Object.assign(types, {
   IRpcEndpoint: typeDoc(
     'Application-owned complete endpoint surface; middleware selection narrows discovery and ping capabilities.',
-    '应用拥有的完整端点表面，中间件选择会收窄发现和心跳能力。',
+    '应用拥有的完整端点接口，中间件选择会收窄发现和心跳能力。',
     endpointMembers
   ),
   IRpcEndpointFactory: typeDoc(
@@ -808,7 +809,7 @@ Object.assign(types, {
   ),
   IRpcFactoryConfig: typeDoc(
     'Application construction configuration with one canonical protocol/codec/framer/transport direction and atomic middleware installation.',
-    '应用构造配置，具有规范协议、编解码、分帧、载体方向和原子中间件安装。',
+    '应用构造配置，具有规范协议、编解码、分帧、传输对象方向和原子中间件安装。',
     factoryOptions
   ),
   IRpcCoreConfig: typeDoc(
@@ -829,7 +830,7 @@ Object.assign(types, {
   ),
   IRpcFanoutResult: typeDoc(
     'Per-receiver successful data and original failures from one actual endpoint fan-out.',
-    '一次实际端点扇出中每接收端的成功数据和原失败。',
+    '一次实际端点扇出中每接收端的成功数据和原始失败。',
     pick(['fulfilled', 'rejected'])
   ),
   ISendOptions: typeDoc(
@@ -846,7 +847,17 @@ Object.assign(types, {
         '可选调用方中止信号直接取消本次心跳，不要求安装中止中间件。',
         signal.default
       ),
-      timeoutMs
+      timeoutMs: {
+        ...timeoutMs,
+        summary: t(
+          'Optional finite nonnegative ping waiting budget in milliseconds, or false to disable the timer. It inherits an explicit installed timeout value; when resolution returns undefined, ping uses 1000 ms even with timeout({}).',
+          '可选有限非负心跳等待毫秒数，`false` 取消计时器；可继承已安装的显式超时值，解析结果为 `undefined` 时仍采用 `1000` 毫秒，包括安装 `timeout({})` 的情况。'
+        ),
+        default: t(
+          'Inherit an explicit configured number or false; otherwise 1000 ms.',
+          '继承已配置的显式数值或 `false`，否则使用 `1000` 毫秒。'
+        )
+      }
     }
   ),
   IRpcRuntimeGroupOptions: typeDoc(
@@ -862,12 +873,12 @@ Object.assign(types, {
   IRpcRuntimeOutcomeResult: contractReference.types.IRpcRuntimeOutcomeResult,
   IRpcProvider: typeDoc(
     'Application callback receives IRpcContext and returns explicit success/failure directly or through a Promise. Legacy ordinary throws usually become INTERNAL, while trusted wire summaries and SCHEMA_INVALID retain public classification; runtime operations serialize original failures.',
-    '应用回调接收运行上下文，直接或经承诺返回显式成功失败；传统普通抛错通常成为内部失败，可信线上摘要及结构非法保留公开分类，运行接口序列化原失败。',
+    '应用回调接收运行上下文，直接或经 Promise 返回显式成功失败；传统普通抛错通常成为内部失败，可信线上摘要及结构非法保留公开分类，运行接口序列化原始失败。',
     {}
   ),
   IRpcEventListener: typeDoc(
     'Application one-way event callback receives IRpcContext and returns void or Promise<void>; rejection is observed through hooks.',
-    '应用单向事件回调接收运行上下文，返回空值或空值承诺，拒绝经钩子观察。',
+    '应用单向事件回调接收运行上下文，返回空值或 Promise<void>，拒绝经钩子观察。',
     {}
   ),
   IRpcProviderLimits: typeDoc(
@@ -988,13 +999,13 @@ Object.assign(types, {
   ),
   IRpcConnectControl: typeDoc(
     'Canonical discovery control surface; manual methods exist only when actual manual mode is selected.',
-    '规范发现控制表面，手动方法只在实际选择手动模式时存在。',
+    '规范发现控制接口，手动方法只在实际选择手动模式时存在。',
     manualMembers,
     manualExample
   ),
   IRpcConnectControlForMode: typeDoc(
     'Conditional control type selects the actual automatic or manual surface from middleware mode.',
-    '条件控制类型根据中间件模式选择实际自动或手动表面。',
+    '条件控制类型根据中间件模式选择实际自动或手动接口。',
     {}
   ),
   IRpcDiscoveryControl: typeDoc(
@@ -1049,7 +1060,7 @@ Object.assign(types, {
         },
         t(
           'Promise<boolean> indicates whether this original query response was accepted for sending.',
-          '布尔承诺表示原查询响应是否被接受发送。'
+          '布尔 Promise 表示原查询响应是否被接受发送。'
         ),
         manualExample
       ),
@@ -1064,7 +1075,7 @@ Object.assign(types, {
         },
         t(
           'Promise<boolean> reports whether the original rejection response was accepted for sending.',
-          '布尔承诺表示原拒绝响应是否被接受发送。'
+          '布尔 Promise 表示原拒绝响应是否被接受发送。'
         ),
         'const stop = server.connect.onQuery((query) => query.reject("unavailable")); const candidates = await client.connect.query("server"); stop()'
       )
@@ -1159,7 +1170,7 @@ const coreErrors: Record<string, IText> = {
   ),
   providerGenerationRetired: t(
     'PROVIDER_GENERATION_RETIRED: an admitted forwarded execution retired with its exact generation; never replay it.',
-    '提供方世代已退役：已准入转发执行随精确世代退役，不能重放。'
+    '对应的提供方代次已经结束；先前接受的转发执行随该代次失效，不能重放。'
   ),
   forwardLoop: t(
     'FORWARD_LOOP: signed route revisits this or the selected next Host; choose another route.',
@@ -1183,7 +1194,7 @@ const coreErrors: Record<string, IText> = {
   ),
   invalidConfig: t(
     'INVALID_CONFIG: factory, component, transport or transform configuration is invalid; inspect detail and correct local inputs.',
-    '配置非法错误：工厂、组件、载体或转换配置无效，应检查细节并修正本地输入。'
+    '配置非法错误：工厂、组件、传输对象或转换配置无效，应检查细节并修正本地输入。'
   ),
   probeFailed: t(
     'PROBE_FAILED: a diagnostic emit/describe/redact callback failed; business execution remains isolated.',
@@ -1195,7 +1206,7 @@ const coreErrors: Record<string, IText> = {
   ),
   protocolInvalid: t(
     'PROTOCOL_INVALID: codec/protocol/envelope behavior or correlated control is invalid; inspect original cause.',
-    '协议非法错误：编解码、信封行为或关联控制非法，应检查原始原因。'
+    '协议非法错误：编解码、消息封装行为或关联控制非法，应检查原始原因。'
   ),
   contractInvalid: t(
     'CONTRACT_INVALID: method correlation, direction or contract identity fields violate the actual request contract.',
@@ -1247,7 +1258,7 @@ const coreErrors: Record<string, IText> = {
   ),
   transport: t(
     'TRANSPORT: actual physical send or terminal channel failed; preserve original transport evidence before choosing recovery. The code alone never proves nonexecution; retry requires independent evidence or idempotency/outcome reconciliation.',
-    '载体错误：实际物理发送或通道终止失败，恢复前保留原载体证据；单凭此码不能证明未执行，重试须有独立证据或幂等结果核对。'
+    '传输错误：实际物理发送或通道终止失败，恢复前保留原传输对象证据；单凭此码不能证明未执行，重试须有独立证据或幂等结果核对。'
   ),
   authenticationFailed: t(
     'AUTHENTICATION_FAILED: signing, verification, encryption, decryption or original replay binding failed; details stay local.',
@@ -1255,7 +1266,7 @@ const coreErrors: Record<string, IText> = {
   ),
   schemaInvalid: t(
     'SCHEMA_INVALID: params/result parse rejected the method data; inspect normalized issues and original cause.',
-    '结构非法错误：入参或结果解析拒绝方法数据，应检查规范问题及原原因。'
+    '结构非法错误：入参或结果解析拒绝方法数据，应检查规范问题及原始原因。'
   ),
   capabilityConflict: t(
     'CAPABILITY_CONFLICT: selected middleware/features publish conflicting keys or an ambiguous runtime instance.',
@@ -1267,7 +1278,7 @@ const coreErrors: Record<string, IText> = {
   ),
   streamResultUnknown: t(
     'STREAM_RESULT_UNKNOWN: transport may have sent a stream frame before rejecting; open a new stream without replaying items.',
-    '流结果未知错误：载体可能已发送帧后拒绝，应新建流，不重放条目。'
+    '流结果未知错误：传输对象可能已发送帧后拒绝，应新建流，不重放条目。'
   ),
   chunkInvalid: t(
     'CHUNK_INVALID: physical fragment grammar is invalid; hooks observe it and the frame is not replayed.',
@@ -1323,11 +1334,11 @@ domain(
     ),
     replayLedgerFull: t(
       'Inbound request tombstones cannot retain another original identity.',
-      '入站请求墓碑无法保留另一个原始身份。'
+      '入站请求标识记录已满，无法再保留新的请求身份。'
     ),
     outboundReplayFull: t(
       'Active outbound identities and tombstones exhausted their ceiling.',
-      '活动出站身份及墓碑耗尽其保留上限。'
+      '活动请求和已结束请求的出站标识记录已达到保留上限。'
     ),
     bindingExpired: t(
       'The actual verified binding expired before provider execution started.',
@@ -1363,7 +1374,7 @@ domain(
 domain(
   'RpcTransportOwnership',
   'Determines which actual transport resources endpoint disposal may close.',
-  '决定端点释放可以关闭哪些实际载体资源。',
+  '决定端点释放可以关闭哪些实际传输对象资源。',
   {
     owned: t(
       'Endpoint disposal closes actual resources owned by this adapter.',
@@ -1378,13 +1389,13 @@ domain(
 domain(
   'RpcTransportEncoding',
   'Actual transport carrier domain matched to the selected codec and framer.',
-  '与所选编解码及分帧匹配的实际载体值域。',
+  '与所选编解码及分帧匹配的实际传输值类型。',
   {
     any: t('Transport accepts arbitrary complete message values.', '载体接受任意完整消息值。'),
     string: t('Transport accepts only complete string carriers.', '载体只接受完整字符串载体。'),
     uint8Array: t(
       'Transport accepts genuine Uint8Array byte carriers.',
-      '载体接受真实字节数组载体。'
+      '传输对象接受真实字节数组传输对象。'
     )
   }
 )
@@ -1399,7 +1410,7 @@ domain(
     ),
     multiplexed: t(
       'One transport carries several peer sources with actual source proof.',
-      '一个载体携带多个对端来源并提供实际来源证明。'
+      '一个传输对象携带多个对端来源并提供实际来源证明。'
     ),
     broadcast: t(
       'One send reaches a group; per-instance selection requires actual distinct identities.',
@@ -1410,7 +1421,7 @@ domain(
 domain(
   'RpcEndpointStatus',
   'Endpoint admission status carried by actual transport diagnostics.',
-  '实际载体诊断携带的端点准入状态。',
+  '实际传输对象诊断携带的端点准入状态。',
   {
     active: t(
       'The original endpoint remains active for admitted work.',
@@ -1459,27 +1470,27 @@ for (const [name, en, zh] of [
   [
     'createEndpoint',
     'Creates the full canonical endpoint with provider, outbound, discovery and control roots; actual middleware tuple narrows optional ping/manual controls.',
-    '创建完整规范端点，包含提供、出站、发现及控制功能根；实际中间件元组收窄可选心跳和手动控制。'
+    '创建标准双向端点，支持发送请求、登记处理函数、发现对端及处理控制消息；心跳和手动发现接口取决于所安装的中间件。'
   ],
   [
     'createFullEndpoint',
     'Creates the full canonical endpoint preset through the same kernel and lifecycle as createEndpoint; feature dependencies remain privately installed.',
-    '通过与完整端点相同核心及生命周期创建完整预设，功能依赖保持私有安装。'
+    '显式创建标准双向端点预设，与根入口的 `createEndpoint` 共用核心实现和生命周期，功能依赖仅在内部安装。'
   ],
   [
     'createFullOneWayEndpoint',
     'Creates the full preset with explicit sendOneWay physical-admission support; business results are not awaited by one-way sends.',
-    '创建额外具有显式单向物理准入支持的完整预设，单向发送不等待业务返回结果。'
+    '在标准双向预设上增加 `sendOneWay()`，可等待本地发送完成，但不等待远端业务结果。'
   ],
   [
     'createClientEndpoint',
     'Creates only outbound and its private canonical dependencies plus explicitly selected user features, preserving the original endpoint lifecycle.',
-    '只创建出站及其私有规范依赖，加显式用户功能，保留原端点生命周期。'
+    '创建用于发起调用的客户端端点，并加入显式选择的用户功能；相关依赖只在内部安装，生命周期沿用同一端点实现。'
   ],
   [
     'createProviderEndpoint',
     'Creates provider registration with its inseparable original outbound closure; callbacks use actual inbound execution contexts.',
-    '创建提供方登记及不可分割的原出站闭包，回调使用实际入站执行上下文。'
+    '创建可登记处理函数的服务端点，内部复用发送能力返回答复；处理函数接收真实请求上下文。'
   ]
 ] as const) {
   symbols[name] = {
@@ -1488,13 +1499,13 @@ for (const [name, en, zh] of [
     params: {
       config: t(
         'Application IRpcFactoryConfig whose actual protocol/codec/framer/transport types satisfy both directed pipeline edges; middlewares is the actual finite installation tuple.',
-        '应用工厂配置，实际协议、编解码、分帧及载体类型满足双向管线边界；中间件为实际有限安装元组。'
+        '由应用提供的 `IRpcFactoryConfig`：协议、编解码、分帧和传输对象的输入输出类型须能衔接；`middlewares` 是本次实际安装的有限中间件元组。'
       )
     },
     options: 'IRpcFactoryConfig',
     returns: t(
       'Promise of the selected endpoint surface; invalid inputs fail before publication, failed construction rolls back and preserves original/cleanup causes. An unclassified middleware install failure gains CALLBACK_FAILED without replacing mutable native type/stack; foreign semantic identities stay intact and immutable values remain on cause.',
-      '返回所选端点表面承诺，非法输入在发布前失败，构造失败会回滚并保留原始及清理原因；未分类中间件安装失败附加回调失败码，可修改原生类型及堆栈保持，外部语义身份不变，不可修改值保留在原因链。'
+      '返回 Promise，兑现为所选端点接口；非法输入在返回可用端点前失败，构造失败会回滚，并保留原始错误与清理错误。未分类且可扩展的原生安装错误会原位附加 `CALLBACK_FAILED`，保留类型和堆栈；已有外包错误身份不变，不可修改的失败值保留在原因链。'
     ),
     example: endpointExample.replaceAll('createEndpoint', name)
   }
@@ -1504,7 +1515,7 @@ symbols.createComposedEndpoint = {
   role: 'factory',
   purpose: t(
     'Constructs one canonical lifecycle kernel and projects only explicitly selected native feature roots; dependencies install privately and duplicate public keys fail before activation.',
-    '构造一个规范生命周期核心，只投影显式选中原生功能根；依赖私有安装，重复公开键在激活前失败。'
+    '构造一个规范生命周期核心，只投影显式选中原生功能入口；依赖私有安装，重复公开键在激活前失败。'
   ),
   params: {
     config: t(
@@ -1513,7 +1524,7 @@ symbols.createComposedEndpoint = {
     ),
     modulesOrRoots: t(
       'Caller finite record of actual native IRpcFeature roots created by the first-party factories; keys define explicit public projections.',
-      '调用方提供的实际原生功能根有限记录，由内置工厂创建，记录键定义显式公开投影。'
+      '调用方提供的实际原生功能入口有限记录，由内置工厂创建，记录键定义显式公开投影。'
     ),
     roots: t(
       'Actual finite native root record; overload name for modulesOrRoots.',
@@ -1523,7 +1534,7 @@ symbols.createComposedEndpoint = {
   options: 'IRpcFactoryConfig',
   returns: t(
     'Promise of the inferred lifecycle kernel plus exact selected root/user feature surfaces; no unselected dependency method is exposed.',
-    '返回核心及精确已选根和用户功能表面承诺，不公开未选依赖方法。'
+    '返回核心及精确已选根和用户功能接口 Promise，不公开未选依赖方法。'
   ),
   example:
     'const canonicalChunk = createCanonicalChunkFeature(); const outbound = createOutboundFeature(canonicalChunk); const endpoint = await createComposedEndpoint(config, { outbound }); await endpoint.dispose()'
@@ -1584,12 +1595,12 @@ const connectOptions: Record<string, IMemberDoc> = {
   discoveryMode: fields.discoveryMode,
   useBaseIdVerifyOnly: p(
     'True/omitted uses base-id verification; false requires an actual identifier callback before unique per-instance identity is honored.',
-    '真值或省略使用基础标识验证，假值要求实际身份回调后才采用唯一实例身份。',
+    '真值或省略使用基础标识验证，`false`要求实际身份回调后才采用唯一实例身份。',
     t('Omitted: base-id verification only.', '默认只验证基础标识。')
   ),
   uniqueTargetId: p(
     'Optional application-issued string or async factory receiving endpointId/platform and returning the actual unique suffix; effective only with useBaseIdVerifyOnly false and identifier.',
-    '应用签发的可选字符串或异步工厂，接收端点标识及平台并返回实际唯一后缀；只在关闭基础验证且提供身份回调时采用。',
+    '应用提供的可选字符串或异步工厂，接收端点标识及平台并返回实际唯一后缀；只在关闭基础验证且提供身份回调时采用。',
     t('Absent: no explicit unique instance suffix.', '默认不设置显式唯一实例后缀。')
   ),
   identifier: p(
@@ -1620,7 +1631,7 @@ for (const [name, en, zh, options, typeName] of [
   [
     'connect',
     'Installs actual transport identity verification and discovery mode before endpoint activation; construction requires this capability.',
-    '端点激活前安装实际载体身份验证及发现模式，构造要求此能力。',
+    '端点激活前安装实际传输对象身份验证及发现模式，构造要求此能力。',
     connectOptions,
     'IRpcConnectConfig'
   ],
@@ -1648,7 +1659,7 @@ for (const [name, en, zh, options, typeName] of [
   [
     'timeout',
     'Installs a local deadline default resolved per operation, retaining explicit false to disable a particular wait.',
-    '安装逐操作解析的本地截止默认值，保留显式假值以关闭特定等待。',
+    '安装逐操作解析的本地截止默认值，保留显式`false`以关闭特定等待。',
     { timeoutMs },
     'IRpcTimeoutConfig'
   ],
@@ -1697,7 +1708,7 @@ for (const name of ['abort', 'ping'])
         ? 'Installs original local and correlated cancellation support; it does not create a signal or invent remote cancellation success.'
         : 'Installs canonical liveness control; the selected actual endpoint tuple gains ping and pingAll only when this capability exists.',
       name === 'abort'
-        ? '安装原本地及关联取消支持，不创建信号，也不虚构远端取消成功。'
+        ? '安装本地及关联取消支持，不创建信号，也不虚构远端取消成功。'
         : '安装规范存活控制，只有实际端点元组存在该能力时才获得心跳及全体心跳。'
     ),
     returns: t(
@@ -1727,7 +1738,7 @@ for (const [name, kind, param] of [
             ? 'Actual @migaia/serialize/codec ICodec descriptor with matching encode/decode types and immutable identity.'
             : 'Actual rpc-contract IRpcFramer descriptor with original frame/accept callables and compatible encoded domains.',
         name === 'protocol'
-          ? '实际契约协议描述对象，省略使用规范传统协议，不接受只有编码解码方法的旧对象。'
+          ? '实际契约协议描述对象，省略使用`rpcProtocolV1` 协议，不接受只有编码解码方法的旧对象。'
           : name === 'codec'
             ? '实际序列化包编解码描述对象，具有匹配编码解码类型及不可变身份。'
             : '实际契约分片描述对象，含原发送接收函数及兼容编码域。'
@@ -1768,7 +1779,7 @@ for (const name of [
     scenarios: [
       t(
         'Select only the actual capabilities required by the endpoint application and carrier.',
-        '只选择端点应用及载体实际需要的能力。'
+        '只选择端点应用及传输对象实际需要的能力。'
       )
     ],
     example: endpointExample
@@ -1817,7 +1828,7 @@ symbols.defineFeature = {
   params: {
     install: t(
       'Application synchronous @migaia/plugin-host IFeatureFactory receives its native feature context and returns the capability surface; throws fail construction.',
-      '应用同步原生功能工厂接收功能上下文并返回能力表面，抛错使构造失败。'
+      '应用同步原生功能工厂接收功能上下文并返回能力接口，抛错使构造失败。'
     ),
     dependencies: t(
       'Optional application record of genuine feature tokens returned by defineFeature; omitted means no direct private dependency.',
@@ -1848,7 +1859,7 @@ symbols.defineMiddleware = {
     ),
     name: t(
       'Stable unique middleware name issued by the application; duplicate public keys or incompatible claims reject construction.',
-      '应用签发的稳定唯一中间件名称，重复公开键或不兼容声明使构造拒绝。'
+      '应用提供的稳定唯一中间件名称，重复公开键或不兼容声明使构造拒绝。'
     ),
     descriptorFactory: t(
       'Application synchronous callback receives IRpcMiddlewareCore and returns an IRpcMiddlewareDescriptor; async work belongs in install. Throws fail construction.',
@@ -1878,7 +1889,7 @@ for (const [name, example] of [
     behaviors: [
       t(
         'The application defines the output surface; no fixed endpoint method is implied by defining a token.',
-        '应用定义输出表面，创建令牌不隐含固定端点方法。'
+        '应用定义输出接口，创建令牌不隐含固定端点方法。'
       )
     ],
     scenarios: [
@@ -1924,7 +1935,7 @@ for (const [name, en, zh] of [
   [
     'IRpcFeatureSurface',
     'Compile-time intersection of selected native root output surfaces, without a runtime feature registry.',
-    '所选原生根输出表面的编译期交集，不建立运行功能注册表。'
+    '所选原生根输出接口的编译期交集，不建立运行功能注册表。'
   ],
   [
     'IRpcMiddleware',
@@ -1949,7 +1960,7 @@ const own = m(
     ),
     release: t(
       'Application zero-argument callback returning void or Promise<void>; releases that resource once when its owner cleans up.',
-      '应用无参回调返回空值或承诺，在所有者清理时释放该资源一次。'
+      '应用无参回调返回空值或 Promise，在所有者清理时释放该资源一次。'
     )
   },
   t(
@@ -2011,12 +2022,12 @@ types.IRpcMiddlewareDescriptor = typeDoc(
   {
     install: p(
       'Application zero-argument callback returns extension or PromiseLike<extension>; throws/rejections fail construction and trigger owned cleanup.',
-      '应用无参回调返回扩展或类承诺，抛错及拒绝使构造失败并触发已有清理。',
+      '应用无参回调返回扩展或类 Promise 对象，抛错及拒绝使构造失败并触发已有清理。',
       t('Absent: no installation extension.', '默认没有安装扩展。')
     ),
     expose: p(
       'Application synchronous zero-argument callback returns its public endpoint projection; PromiseLike outputs are unsupported.',
-      '应用同步无参回调返回公开端点投影，不支持类承诺输出。',
+      '应用同步无参回调返回公开端点投影，不支持类 Promise 对象输出。',
       t('Absent: no public projection.', '默认没有公开投影。')
     ),
     featureExpose: p(
@@ -2049,7 +2060,7 @@ types.IRpcPluginClaims = typeDoc(
       [
         'publicKeys',
         'Keys published on the endpoint public surface.',
-        '发布到端点公开表面的属性键。'
+        '发布到端点公开接口的属性键。'
       ],
       [
         'exposedKeys',
@@ -2114,7 +2125,7 @@ types.IRpcPluginInstallResult = typeDoc(
 )
 types.IRpcPlugin = typeDoc(
   'Original component/plugin definition captured before installation; only its genuine composer can publish accepted execution surfaces.',
-  '安装前捕获的原组件插件定义，只有真实组合器可以发布受认可执行表面。',
+  '安装前捕获的原组件插件定义，只有真实组合器可以发布受认可执行接口。',
   {
     name: p('Stable unique plugin name issued by its author.', '作者签发的稳定唯一插件名称。'),
     metadata: p(
@@ -2203,7 +2214,7 @@ types.IRpcUniqueTargetIdContext = typeDoc(
 )
 types.IRpcConnectContext = typeDoc(
   'Original inbound verification context attributed by the held transport; labels alone do not prove peer identity.',
-  '持有载体归属的原入站验证上下文，仅有标签不能证明对端身份。',
+  '持有传输对象归属的原入站验证上下文，仅有标签不能证明对端身份。',
   {
     senderId: fields.senderId,
     targetId: fields.targetId,
@@ -2211,7 +2222,7 @@ types.IRpcConnectContext = typeDoc(
     origin: fields.origin,
     source: p(
       'Actual native inbound source retained by the transport, such as a Window or MessagePort; it is not an error package source.',
-      '载体保留的实际原生入站来源，例如窗口或消息端口，不是错误包来源。'
+      '传输对象保留的实际原生入站来源，例如窗口或消息端口，不是错误包来源。'
     ),
     data: fields.data,
     platform: p('Actual inbound transport platform when available.', '可用时的实际入站载体平台。'),
@@ -2223,7 +2234,7 @@ types.IRpcConnectContext = typeDoc(
 )
 types.IRpcConnectCapability = typeDoc(
   'Captured installed connection policy retains original transport and actual verification operations.',
-  '捕获的已安装连接策略保留原载体及实际验证操作。',
+  '捕获的已安装连接策略保留原传输对象及实际验证操作。',
   {
     ...connectOptions,
     uniqueTargetId: p(
@@ -2232,7 +2243,7 @@ types.IRpcConnectCapability = typeDoc(
     ),
     uniqueTargetIdFactory: p(
       'Optional original application factory receives IRpcUniqueTargetIdContext and returns a string or Promise<string>; failures reject installation.',
-      '可选原应用工厂接收唯一目标上下文，返回字符串或承诺，失败拒绝安装。'
+      '可选原应用工厂接收唯一目标上下文，返回字符串或 Promise，失败拒绝安装。'
     ),
     verify: m(
       'Runs actual configured inbound identification, preserving asynchronous verification and original read-failure reporting.',
@@ -2240,7 +2251,7 @@ types.IRpcConnectCapability = typeDoc(
       {
         context: t(
           'Actual IRpcConnectContext attributed by the held transport.',
-          '持有载体归属的实际连接上下文。'
+          '持有传输对象归属的实际连接上下文。'
         ),
         reportRead: t(
           'Optional synchronous callback receives property key and original getter error, must return undefined; a throw preserves both failures.',
@@ -2249,7 +2260,7 @@ types.IRpcConnectCapability = typeDoc(
       },
       t(
         'Boolean or Promise<boolean> indicating this original message passes identification.',
-        '布尔值或承诺表示此原消息是否通过识别。'
+        '布尔值或 Promise 表示此原消息是否通过识别。'
       ),
       endpointExample
     )
@@ -2277,7 +2288,7 @@ types.IRpcAuthenticationTransform = typeDoc(
 )
 types.IRpcAuthenticationCapability = typeDoc(
   'Original installed frame-protection operations own actual authentication mode and encoded carrier requirements.',
-  '原已安装帧保护操作拥有实际认证模式及编码载体要求。',
+  '原已安装帧保护操作拥有实际认证模式及编码传输对象要求。',
   {
     mode: {
       ...p(
@@ -2290,11 +2301,11 @@ types.IRpcAuthenticationCapability = typeDoc(
     encodedType: authenticationOptions.encodedType,
     protect: p(
       'Original transform receives value and authentication context, returns protected value or Promise; failures retain AUTHENTICATION_FAILED semantics.',
-      '原转换接收值及认证上下文，返回保护值或承诺，失败保留认证失败语义。'
+      '原转换接收值及认证上下文，返回保护值或 Promise，失败保留认证失败语义。'
     ),
     unprotect: p(
       'Original transform receives physical protected value and context, returns verified unprotected value or Promise.',
-      '原转换接收物理保护值及上下文，返回已验证解除保护值或承诺。'
+      '原转换接收物理保护值及上下文，返回已验证解除保护值或 Promise。'
     )
   }
 )
@@ -2318,7 +2329,7 @@ types.IRpcSchema = typeDoc(
   {
     parse: m(
       'Validates the supplied original value synchronously; a throw becomes SCHEMA_INVALID with original cause.',
-      '同步验证给定原值，抛错成为结构非法并保留原原因。',
+      '同步验证给定原值，抛错成为结构非法并保留原始原因。',
       {
         value: t(
           'Original request or result value supplied by the contract owner.',
@@ -2382,16 +2393,16 @@ types.IRpcTimeoutCapability = typeDoc(
     timeoutMs,
     resolveTimeout: m(
       'Selects a valid explicit override or the installed default, preserving false as disabled.',
-      '选择有效显式覆盖或已安装默认值，假值保持关闭含义。',
+      '选择有效显式覆盖或已安装默认值，`false`保持关闭含义。',
       {
         override: t(
           'Optional finite nonnegative milliseconds or false from the actual operation options.',
-          '实际操作选项提供的可选有限非负毫秒或假值。'
+          '实际操作选项提供的可选有限非负毫秒或`false`。'
         )
       },
       t(
         'Effective milliseconds, false, or undefined when unconfigured.',
-        '返回生效毫秒、假值或未配置时的未定义值。'
+        '返回生效毫秒、`false`或未配置时的未定义值。'
       ),
       endpointExample
     )
@@ -2430,7 +2441,7 @@ for (const name of ['IRpcProtocolConfig', 'IRpcProtocolCapability'])
     {
       encode: p(
         'Synchronous value-to-carrier callback; original thrown failures propagate to the owning encoding boundary.',
-        '同步值到载体回调，原抛错传播到所属编码边界。',
+        '同步值到传输对象回调，原抛错传播到所属编码边界。',
         t(
           'Optional only on configuration shapes; no callback is invented.',
           '仅在配置形态中可选，不虚构回调。'
@@ -2438,7 +2449,7 @@ for (const name of ['IRpcProtocolConfig', 'IRpcProtocolCapability'])
       ),
       decode: p(
         'Synchronous carrier-to-value callback; original thrown failures propagate to the owning decoding boundary.',
-        '同步载体到值回调，原抛错传播到所属解码边界。',
+        '同步传输对象到值回调，原抛错传播到所属解码边界。',
         t(
           'Optional only on configuration shapes; no callback is invented.',
           '仅在配置形态中可选，不虚构回调。'
@@ -2457,7 +2468,7 @@ for (const name of ['IRpcProtocolConfig', 'IRpcProtocolCapability'])
   )
 types.IRpcHook = typeDoc(
   'Application observer receives IRpcHookEvent and returns void or Promise<void>; failures are observed by onHookError rather than replacing operation results.',
-  '应用观察者接收钩子事件并返回空值或承诺，失败由钩子错误回调观察，不替换操作结果。',
+  '应用观察者接收钩子事件并返回空值或 Promise，失败由钩子错误回调观察，不替换操作结果。',
   {}
 )
 /** Hook fields describe local evidence without pretending they are wire control authority. */
@@ -2536,7 +2547,7 @@ types.IRpcReplayCapacityDetail = typeDoc(
         inbound: t('Inbound verified-peer original replay ledger.', '入站已验证对端原始重放账本。'),
         outbound: t(
           'Outbound active identities and retained tombstones.',
-          '出站活动身份及已保留墓碑。'
+          '当前活动出站请求标识，以及为已结束请求保留的标识记录。'
         )
       }
     },
@@ -2573,7 +2584,7 @@ types.IRpcIdempotencyOutcome = typeDoc(
     ok: {
       ...p(
         'True retains successful data; false retains public failure presentation.',
-        '真值保留成功数据，假值保留公开失败展示。'
+        '真值保留成功数据，`false`保留公开失败展示。'
       ),
       values: {
         true: t(
@@ -2597,14 +2608,14 @@ types.IRpcIdempotencyOutcome = typeDoc(
     ),
     error: p(
       'Optional rpc-contract IRpcSerializedError preserving the original failure chain.',
-      '保留原失败链的可选契约序列化错误。'
+      '保留原始失败链的可选契约序列化错误。'
     )
   },
   idempotencyExample
 )
 types.IRpcIdempotencyClaim = typeDoc(
   'One store claim owns execution, waits on original work, replays retained outcome, or refuses capacity; each status has a distinct available surface.',
-  '一次存储认领可以拥有执行、等待原工作、重放保留结果或拒绝容量，每个状态有不同可用表面。',
+  '一次存储认领可以拥有执行、等待原工作、重放保留结果或拒绝容量，每个状态有不同可用接口。',
   {
     status: {
       ...p(
@@ -2661,7 +2672,7 @@ types.IRpcIdempotencyClaim = typeDoc(
     ),
     outcome: p(
       'Pending returns the original completion Promise; done contains retained outcome or unavailable when its body was evicted.',
-      '等待分支返回原完成承诺，完成分支包含保留结果或结果体被淘汰时的不可用标记。'
+      '等待分支返回原完成 Promise，完成分支包含保留结果或结果体被淘汰时的不可用标记。'
     )
   },
   idempotencyExample
@@ -2676,11 +2687,11 @@ types.IRpcIdempotencyStore = typeDoc(
       {
         scope: t(
           'Actual verified session scope issued by the admission owner, or an explicit application-issued isolated scope for direct use.',
-          '实际已验证会话准入所有者签发的作用域，直接使用时由应用签发隔离作用域。'
+          '实际已验证会话准入所有者签发的作用域，直接使用时由应用提供隔离作用域。'
         ),
         key: t(
           'Stable application-issued operation key reused only for the same intended execution.',
-          '应用签发的稳定操作键，只为相同预期执行复用。'
+          '应用提供的稳定操作键，只为相同预期执行复用。'
         ),
         now: t(
           'Finite monotonic milliseconds supplied by the original caller clock.',
@@ -2743,7 +2754,7 @@ symbols.createRpcIdempotencyStore = {
   role: 'factory',
   purpose: t(
     'Creates a bounded in-memory execution/outcome store with post-settlement retention. Byte pressure evicts completed bodies while retaining execution tombstones, so missing bodies do not authorize re-execution.',
-    '创建有界内存执行及结果存储，保留期从结算开始；字节压力淘汰完成结果体而保留执行墓碑，因此缺少结果体不授权再次执行。'
+    '创建容量受限的内存执行与结果存储，保留期从操作结束时计算；字节压力可以淘汰已完成结果，但仍保留执行记录，因此缺少结果内容不表示可以再次执行。'
   ),
   optionDocs: Object.fromEntries(
     [
@@ -2775,7 +2786,7 @@ symbols.createRpcIdempotencyStore = {
         'maxOutcomeBytes',
         1048576,
         'Positive safe-integer per-outcome retention budget; larger results leave an unavailable tombstone.',
-        '逐结果正安全整数保留预算，超过预算时保留不可用墓碑。'
+        '每项结果的保留预算，须为正安全整数；超过预算时仍保留结果已不可用的执行记录。'
       ]
     ].map(([key, value, en, zh]) => [
       key,
@@ -2810,7 +2821,7 @@ const errorMembers: Record<string, IMemberDoc> = {
   },
   cause: p(
     'Exact original failure preserved on the cause chain when supplied.',
-    '提供时在原因链保留的精确原失败。'
+    '提供时在原因链保留的精确原始失败。'
   ),
   cleanupErrors: p(
     'Original cleanup resource labels and exact failures without replacing the primary error.',
@@ -2861,9 +2872,14 @@ for (const name of [
     'Public diagnostic ' +
       name +
       ' type preserves native Error name/message/stack and original cause; only RpcLifecycleError is a runtime class exported from this entry.',
-    '公开诊断错误类型保留原生错误名称、消息、堆栈及原原因，本入口只有生命周期错误类作为运行时类导出。',
+    '公开诊断错误类型保留原生错误名称、消息、堆栈及原始原因，本入口只有生命周期错误类作为运行时类导出。',
     {
-      ...errorMembers,
+      // A remote failure carries the peer's detail, not local construction cleanup evidence.
+      ...Object.fromEntries(
+        Object.entries(errorMembers).filter(
+          ([member]) => name !== 'RpcRemoteError' || member !== 'cleanupErrors'
+        )
+      ),
       ...(name === 'RpcLifecycleError'
         ? {
             errors: p(
@@ -2921,7 +2937,7 @@ symbols.RpcLifecycleError = {
   },
   returns: t(
     'Native RpcLifecycleError carrying original cause and cleanup references.',
-    '返回携带原原因及清理引用的原生生命周期错误。'
+    '返回携带原始原因及清理引用的原生生命周期错误。'
   ),
   example:
     'const error = new RpcLifecycleError("Application endpoint closed"); console.log(error.code)'
@@ -2967,7 +2983,7 @@ for (const [name, en, zh] of [
 operation(
   'defaultRpcReporter',
   'Default background-failure sink writes the original failure to console.error. Explicit report callbacks receive the same original diagnostic events.',
-  '默认后台失败接收器把原失败写入控制台错误输出，显式上报回调收到相同原诊断事件。',
+  '默认后台失败接收器把原始失败写入控制台错误输出，显式上报回调收到相同原诊断事件。',
   {
     error: t(
       'Original observed background failure retaining identity and cause.',
@@ -3028,17 +3044,17 @@ for (const [name, en, zh] of [
   [
     'IRpcTransportTopologyValue',
     'One physical topology from RpcTransportTopology, without implied provenance.',
-    '规范载体拓扑中的一个物理拓扑，不隐含来源身份。'
+    '规范传输对象拓扑中的一个物理拓扑，不隐含来源身份。'
   ],
   [
     'IRpcTransportEncodingValue',
     'One actual accepted carrier encoding domain from RpcTransportEncoding.',
-    '规范载体编码中的一个实际接受值域。'
+    '规范传输对象编码中的一个实际接受值域。'
   ],
   [
     'IRpcTransportOwnershipValue',
     'One physical cleanup responsibility from RpcTransportOwnership.',
-    '规范载体所有权中的一个物理清理责任值。'
+    '规范传输对象所有权中的一个物理清理责任值。'
   ],
   [
     'IRpcOperation',
@@ -3054,7 +3070,7 @@ for (const [name, en, zh] of [
   types[name] = typeDoc(en, zh, {})
 types.IIpcGatedTransport = typeDoc(
   'Original physical transport with a readonly exact whole-envelope gate; the same native gate feature must be installed on its endpoint.',
-  '带只读精确完整信封门控的原物理载体，同一端点须安装相同原生门控功能。',
+  '带只读精确完整消息封装门控的原底层传输通道，同一端点须安装相同原生门控功能。',
   {
     ...transportMembers,
     ipcSendGate: p(
@@ -3114,7 +3130,7 @@ types.IOutboundSurface = typeDoc(
 )
 types.IProviderRegistrationSurface = typeDoc(
   'Selected provider registration projection returns its own surface for chaining and owns one-way listener registration.',
-  '所选提供方登记投影返回自身表面用于链式调用，并拥有单向监听登记。',
+  '所选提供方登记投影返回自身接口用于链式调用，并拥有单向监听登记。',
   selectEndpoint(['provide', 'on'])
 )
 types.IProviderSurface = typeDoc(
@@ -3124,7 +3140,7 @@ types.IProviderSurface = typeDoc(
 )
 types.IDiscoverySurface = typeDoc(
   'Selected discovery projection adds original connect/discovery controls without publishing private outbound dependency methods.',
-  '所选发现投影添加原连接发现控制，不公开私有出站依赖方法。',
+  '选择此发现功能后会增加连接与发现控制接口，但不公开内部发送依赖的方法。',
   selectEndpoint(['connect', 'discovery'])
 )
 types.IControlSurface = typeDoc(
@@ -3142,7 +3158,7 @@ types.IRpcOneWayOptions = typeDoc(
       ...timeoutMs,
       summary: t(
         'Optional finite nonnegative explicit physical-send deadline; false disables it, and omission does not inherit middleware policy.',
-        '可选有限非负显式物理发送截止，假值关闭，省略不继承中间件策略。'
+        '可选有限非负显式物理发送截止，`false`关闭，省略不继承中间件策略。'
       ),
       default: t('Absent: physical send has no local deadline.', '默认物理发送没有本地截止。')
     }
@@ -3170,7 +3186,7 @@ types.IOneWaySurface = typeDoc(
       },
       t(
         'Promise<void> settles on physical send; it never confirms listener execution or a provider business result.',
-        '承诺随物理发送结算，从不确认监听执行或提供方业务结果。'
+        'Promise 随物理发送结算，从不确认监听执行或提供方业务结果。'
       ),
       oneWayExample
     )
@@ -3179,7 +3195,7 @@ types.IOneWaySurface = typeDoc(
 )
 types.IRpcStreamCapabilityPort = typeDoc(
   'Original connection owner answers whether the actual peer negotiated stream@1; method names cannot grant support.',
-  '原连接所有者回答实际对端是否协商流第一版，方法名称不能赋予支持。',
+  '由现有连接判断对端是否已协商流协议第一版；仅使用某个方法名不会获得该能力。',
   {
     supports: m(
       'Synchronously checks actual negotiated stream support for a real connected peer.',
@@ -3221,7 +3237,7 @@ types.IRpcStreamRuntime = typeDoc(
         ),
         options: t(
           'Optional explicit local signal and finite nonnegative timeoutMs/false; producer lifetime remains owned by this stream.',
-          '可选显式本地信号及有限非负超时或假值，生产者生命周期仍由此流拥有。'
+          '可选显式本地信号及有限非负超时或`false`，生产者生命周期仍由此流拥有。'
         )
       },
       t(
@@ -3252,7 +3268,7 @@ types.IRpcStreamRuntime = typeDoc(
       {},
       t(
         'Promise joins original stream cleanup; endpoint disposal also owns this same release.',
-        '承诺加入原流清理，端点释放也拥有同一释放。'
+        'Promise 加入原流清理，端点释放也拥有同一释放。'
       ),
       composedExample
     )
@@ -3398,7 +3414,7 @@ for (const [name, en, zh, params, surface] of [
     behaviors: [
       t(
         'Only explicitly selected public roots are projected; private dependency ownership is reused.',
-        '只投影显式所选公开根，并复用私有依赖所有权。'
+        '只投影显式所选公开功能入口，并复用私有依赖所有权。'
       )
     ],
     scenarios: [
@@ -3467,7 +3483,7 @@ types.createFullOneWayEndpoint = {
 }
 types.IPeerPairOptions = typeDoc(
   'Two real same-process runtime peer sides use the original memory carrier and canonical method/deadline/admission policy; no fake endpoint or scheduler is introduced.',
-  '两个真实同进程运行对端使用原内存载体及规范方法、截止和准入策略，不引入伪端点或调度器。',
+  '两个真实同进程运行对端使用原内存传输对象及规范方法、截止和准入策略，不引入伪端点或调度器。',
   {
     a: p(
       'Application first-side provide map plus optional defaultTimeoutMs, providerLimits and contract; provide must be an actual method map.',
@@ -3493,7 +3509,7 @@ symbols.createPeerPair = {
   role: 'factory',
   purpose: t(
     'Constructs two genuine typed runtime peers over the reference memory carrier. Portable binary is restored inline; explicit transfer is unsupported and fails before detach. Failed pair construction closes successful peers and preserves the original failure.',
-    '在参考内存载体上构造两个真实类型运行对端，可移植二进制以内联恢复，显式转移在分离前拒绝，构造失败关闭已成功对端并保留原失败。'
+    '在参考内存传输对象上构造两个真实类型运行对端，可移植二进制以内联恢复，显式转移在分离前拒绝，构造失败关闭已成功对端并保留原始失败。'
   ),
   options: 'IPeerPairOptions',
   returns: t(
@@ -3528,14 +3544,14 @@ const modules: Record<string, ILibraryReference['modules'][string]> = {
   index: {
     summary: t(
       'Runtime-neutral native RPC endpoint construction starts with createEndpoint and connect; choose actual protocol, codec, framer and transport components or narrower presets. The curated user manifest selects common entry points; the full export reference also includes published advanced adapter and transport subpaths.',
-      '运行时中立原生调用端点构造从端点工厂及连接中间件开始，选择实际协议、编解码、分帧及载体，或使用较小预设；用户索引选择常用入口，完整导出参考另含已发布的高级适配器及载体子入口。'
+      '运行时中立原生调用端点构造从端点工厂及连接中间件开始，选择实际协议、编解码、分帧及传输对象，或使用较小预设；用户索引选择常用入口，完整导出参考另含已发布的高级适配器及传输对象子入口。'
     ),
     example: endpointExample
   },
   client: {
     summary: t(
       'Choose this subpath when an endpoint only needs to call methods on another endpoint. `createClientEndpoint()` gives it sending methods and `dispose()` without adding provider registration or peer-discovery controls. The root `createEndpoint()` selects a fuller preset for two-way use. You still supply the transport and the middleware that connects it.',
-      '端点只需要调用另一端的方法时，选择这个子路径。`createClientEndpoint()` 提供发送方法和 `dispose()`，不附带服务方法登记或对端发现控制。根入口的 `createEndpoint()` 则选择适合双向通信的完整预设。使用客户端预设时，仍需提供载体和负责连接的中间件。'
+      '端点只需要调用另一端的方法时，选择这个子路径。`createClientEndpoint()` 提供发送方法和 `dispose()`，不附带服务方法登记或对端发现控制。根入口的 `createEndpoint()` 则选择适合双向通信的完整预设。使用客户端预设时，仍需提供传输对象和负责连接的中间件。'
     ),
     example: symbols.createClientEndpoint.example
   },
@@ -3549,7 +3565,7 @@ const modules: Record<string, ILibraryReference['modules'][string]> = {
   full: {
     summary: t(
       'Use this entry to explicitly choose the standard two-way endpoint preset. `createFullEndpoint()` combines sending, handler registration, discovery and control; the root also exports it as `createEndpoint()`. `createFullOneWayEndpoint()` adds `sendOneWay()` when you need a promise for local sending without waiting for a reply. Transport and middleware are still supplied by the caller, and ping support depends on the middleware.',
-      '需要明确选择标准双向端点预设时，使用这个入口。`createFullEndpoint()` 组合发送、处理函数登记、发现和控制能力，根入口也以 `createEndpoint()` 导出它。若需要等待本地发送完成而不等待远端答复，可用 `createFullOneWayEndpoint()` 增加 `sendOneWay()`。载体和中间件仍由调用方提供，心跳支持取决于所选中间件。'
+      '需要明确选择标准双向端点预设时，使用这个入口。`createFullEndpoint()` 组合发送、处理函数登记、发现和控制能力，根入口也以 `createEndpoint()` 导出它。若需要等待本地发送完成而不等待远端答复，可用 `createFullOneWayEndpoint()` 增加 `sendOneWay()`。传输对象和中间件仍由调用方提供，心跳支持取决于所选中间件。'
     ),
     example: oneWayExample
   },
@@ -3570,14 +3586,14 @@ const modules: Record<string, ILibraryReference['modules'][string]> = {
   testing: {
     summary: t(
       "Use this entry to exercise peer-to-peer calls inside one process without setting up a native communication channel. `createPeerPair()` builds two real peers over the memory transport and infers each side's remote methods from the other side's `provide` value. Close both peers when finished. Unlike the root endpoint factory, it creates both sides together; it does not prove behavior that depends on native ownership transfer.",
-      '需要在一个进程内验证双端调用，又不想准备原生通信通道时，使用这个入口。`createPeerPair()` 在内存载体上创建两个真实对端，并根据各端的 `provide` 推导另一端可调用的方法。使用完后关闭两个对端。与根入口一次创建一个端点不同，它同时创建双端；不能用它证明依赖原生所有权转移的行为。'
+      '需要在一个进程内验证双端调用，又不想准备原生通信通道时，使用这个入口。`createPeerPair()` 在内存传输对象上创建两个真实对端，并根据各端的 `provide` 推导另一端可调用的方法。使用完后关闭两个对端。与根入口一次创建一个端点不同，它同时创建双端；不能用它证明依赖原生所有权转移的行为。'
     ),
     example: symbols.createPeerPair.example
   },
   'transport-constants': {
     summary: t(
       'Use this entry when an adapter or diagnostic tool needs the shared vocabulary for transport metadata. `RpcPlatform` identifies the communication mechanism, while `RpcTransportOwnership` states whether cleanup closes the resource or only releases borrowed access. The root re-exports these constants too; this subpath makes a metadata-only dependency explicit. Selecting a label does not create a transport or establish its capabilities.',
-      '适配器或诊断工具需要使用一致的载体信息取值时，选择这个入口。`RpcPlatform` 标识通信方式，`RpcTransportOwnership` 则说明清理时应关闭资源，还是只释放对借用资源的使用。根入口也导出这些常量，子路径适合明确只依赖载体信息的代码。填写标签不会创建载体，也不能证明载体支持某种能力。'
+      '适配器或诊断工具需要使用一致的传输对象信息取值时，选择这个入口。`RpcPlatform` 标识通信方式，`RpcTransportOwnership` 则说明清理时应关闭资源，还是只释放对借用资源的使用。根入口也导出这些常量，子路径适合明确只依赖传输对象信息的代码。填写标签不会创建传输对象，也不能证明传输对象支持某种能力。'
     ),
     example: 'console.log(RpcPlatform.memory, RpcTransportOwnership.borrowed)'
   }
@@ -3594,7 +3610,7 @@ for (const [path, summary] of [
     'discovery',
     t(
       'Use this entry when a composed endpoint needs to find peers and select where calls go. `createDiscoveryFeature()` reuses the existing sending feature and adds the `connect` and `discovery` controls. These controls manage peer candidates; they are different from the root `connect()` middleware that wires a transport into an endpoint. The full preset already selects the discovery feature.',
-      '自行组合的端点需要发现对端并选择调用去向时，使用这个入口。`createDiscoveryFeature()` 复用现有发送功能，增加 `connect` 和 `discovery` 控制接口。这些接口管理候选对端，与根入口中负责接入载体的 `connect()` 中间件不同。完整端点预设已经选中发现功能。'
+      '自行组合的端点需要发现对端并选择调用去向时，使用这个入口。`createDiscoveryFeature()` 复用现有发送功能，增加 `connect` 和 `discovery` 控制接口。这些接口管理候选对端，与根入口中负责接入传输对象的 `connect()` 中间件不同。完整端点预设已经选中发现功能。'
     )
   ],
   [
@@ -3691,9 +3707,12 @@ types.IRpcTimeoutConfig = {
       ...timeoutMs,
       summary: t(
         'Optional finite nonnegative default deadline in milliseconds; false disables local default deadlines.',
-        '可选有限非负默认毫秒截止，假值关闭本地默认截止。'
+        '可选有限非负默认毫秒截止，`false`关闭本地默认截止。'
       ),
-      default: t('Absent: no default local deadline is installed.', '默认不安装本地默认截止。')
+      default: t(
+        'Omitted timeoutMs in timeout({}) stays undefined and sets no local deadline; omitting the plugin entirely uses Core fallback 1000 ms.',
+        '`timeout({})` 省略 `timeoutMs` 时保持 `undefined`，不设本地期限；完全省略插件时 Core 回退到 `1000` 毫秒。'
+      )
     }
   }
 }
@@ -3726,6 +3745,43 @@ const restored = deserializeRpcError(wire)
 console.log(restored.message)`
 symbols.serializeRpcError = { ...symbols.serializeRpcError, example: errorRoundtrip }
 symbols.deserializeRpcError = { ...symbols.deserializeRpcError, example: errorRoundtrip }
+/** Shared setup explains every endpoint parameter used by the runnable case pages. */
+const caseEndpointSetup = t(
+  'The examples use application-chosen id values and a caller-created memory transport pair. Both transport and connect({ transport }) refer to the same side; memory options default to {}, with asynchronous delivery and no value cloning. middlewares is the required installation tuple; targetIds is an optional application seed list, default []. provide registers an application method whose context.data is the request and context.success(value) forms its reply. send(targetId, method, data, options?) takes the target and method named by that application; options defaults to {}. Dispose each endpoint, then close the borrowed pair as its creator.',
+  '示例的 `id` 由应用命名，内存通道对由调用者创建；`transport` 与 `connect({ transport })` 指向同一侧。内存选项默认 `{}`，消息异步交付且不拷贝值；`middlewares` 是必填安装元组，`targetIds` 是应用提供的已知目标列表，默认 `[]`。`provide` 登记应用方法，`context.data` 是请求数据，`context.success(value)` 构造答复；`send(targetId, method, data, options?)` 使用应用约定的目标、方法与数据，`options` 默认 `{}`。最后释放各端点，再由创建者关闭借入的通道对。'
+)
+/** Cases retain the frozen complete examples instead of the older illustrative snippets. */
+for (const name of ['createEndpoint', 'timeout', 'abort'] as const) {
+  const cases = rpcCoreCases[name]!
+  symbols[name] = {
+    ...symbols[name],
+    purpose: t(
+      symbols[name].purpose.en + '\n\n' + caseEndpointSetup.en,
+      symbols[name].purpose.zh + '\n\n' + caseEndpointSetup.zh
+    ),
+    exampleIntro: cases[0]!.problem,
+    example: cases[0]!.example,
+    exampleResult: cases[0]!.result,
+    cases
+  }
+}
+symbols.abort = {
+  ...symbols.abort,
+  purpose: t(
+    'Returns an option-free plugin enabling correlated remote cancellation. Install it in both endpoint middleware tuples and pass a caller-owned signal in send options. Running providers must observe context.signal and stop cooperatively; local rejection alone does not prove that remote work stopped.\n\n' +
+      caseEndpointSetup.en,
+    '返回不接收选项的远端协作取消插件；在两端的中间件元组中安装，并把调用者拥有的 `signal` 传给 `send` 选项。正在运行的处理函数须观察 `context.signal` 并自行停止，本地拒绝不能单独证明远端工作已停止。\n\n' +
+      caseEndpointSetup.zh
+  )
+}
+/** The no-argument plugin and configured deadline use the same canonical case installation. */
+for (const name of ['timeout', 'abort'] as const)
+  enhancers[name] = {
+    ...enhancers[name],
+    install: rpcCoreCases[name]![0]!.example,
+    example: rpcCoreCases[name]![0]!.example,
+    behaviors: [symbols[name].purpose]
+  }
 /** Documentation object remains unregistered until every node passes its audit. */
 export const reference: ILibraryReference = {
   modules: {

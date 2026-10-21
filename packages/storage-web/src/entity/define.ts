@@ -138,11 +138,15 @@ const defaultDiagnostic = (message: string): void => {
 /**
  * Defines a record entity declaratively. `connect()` binds the definition to a backend and returns
  * a repository for repeated `get`, `put`, `remove`, `list`, `stream`, and `batch` calls. The same
- * definition can connect to multiple backends with consistent behavior.
+ * definition can connect to multiple backends with capability-selected codec/query routes.
+ * Definition errors throw INVALID_CONFIG before backend use; version defaults to 1 and
+ * validateOnRead to true. The curried form is required when declaring indexes; each connected Store
+ * retains its disposal ownership.
  */
 export function defineEntity<TDomain, TStored = TDomain>(
   options: IEntityOptions<TDomain, TStored, never> & { readonly indexes?: undefined }
 ): IEntityDefinition<TDomain>
+/** Choose the domain type first, then infer literal index names from the supplied entity options. */
 export function defineEntity<TDomain, TStored = TDomain>(): IDefineEntityBuilder<TDomain, TStored>
 export function defineEntity<TDomain, TStored = TDomain>(
   options?: IEntityOptions<

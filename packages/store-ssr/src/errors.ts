@@ -10,11 +10,17 @@ export const STORE_SSR_SOURCE = '@migaia/store-ssr'
 const tagStoreSsrError = <E extends Error>(error: E, code: IStoreSsrErrorCode): E =>
   attachErrorIdentity(error, { source: STORE_SSR_SOURCE, code })
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Create an SSR-owned Error for the supplied stable code and display text. An optional nonundefined
+ * cause remains reachable by identity; the native stack is generated normally and never rewritten.
+ */
 export function createStoreSsrError(
   code: IStoreSsrErrorCode,
   message: string,
-  options?: { readonly cause?: unknown }
+  options?: {
+    /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */
+    readonly cause?: unknown
+  }
 ): Error {
   const error = new Error(
     message,

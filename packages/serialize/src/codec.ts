@@ -9,14 +9,29 @@ export type ICodec<
   TId extends string = string,
   TVersion extends number = number
 > = Readonly<{
+  /** Stable format identity, separate from parser registry plugin routing. */
   id: TId
+  /** Explicit format revision; built-in factories require a positive safe integer. */
   version: TVersion
+  /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */
   encodedType: 'unknown' | 'string' | 'uint8array'
+  /**
+   * Synchronously converts a domain value to the declared representation; format failures are
+   * thrown.
+   */
   encode: (value: TValue) => TEncoded
+  /**
+   * Synchronously restores the codec's domain value; decoding does not imply original object
+   * identity.
+   */
   decode: (value: TEncoded) => TValue
 }>
 
-/** Runtime-neutral portable input accepted by the built-in format codecs. */
+/**
+ * Recursive portable value shape used by format codecs. Runtime validation additionally requires
+ * finite numbers, supported record prototypes, dense arrays, no cycles, and valid reserved bytes
+ * tags. The type alone does not prove these constraints or restore encoded bytes to Uint8Array.
+ */
 export type ICodecValue =
   | null
   | boolean
@@ -47,7 +62,11 @@ export {
 } from './portable.js'
 export type { IPortableWalkerStrategy, IPortableBinaryResult } from './portable.js'
 
-/** Wraps a format callback while retaining the package error code and original cause. */
+/**
+ * Returns an already serialize-owned Error unchanged, preserving its existing semantic code.
+ * Otherwise builds a coded Error with the supplied message and exact original failure on cause;
+ * format factories use it to avoid repeatedly wrapping a classified portable-value rejection.
+ */
 export function normalizeCodecFailure(
   error: unknown,
   code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode],

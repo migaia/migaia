@@ -119,7 +119,12 @@ function rpcErrorStrategy(
   }
 }
 
-/** Project any thrown value with the unchanged RPC wire, privacy and reporting policy. */
+/**
+ * Project a thrown value into a bounded frozen wire-error tree while retaining native text, stack,
+ * semantic identity and reachable cause/aggregate structure where admitted. Unclassified values use
+ * UNKNOWN; cycles and over-budget branches are truncated. The required report hook observes failed
+ * inspection, while exact-reference metadata can supply safe local presentation only.
+ */
 export function serializeRpcError(
   value: unknown,
   options: IRpcSerializeErrorOptions,
@@ -128,7 +133,11 @@ export function serializeRpcError(
   return serializeErrorChain(value, rpcErrorStrategy(metadata), options) as IRpcSerializedError
 }
 
-/** Walk original causes, aggregate entries and cleanup failures with the RPC identity bound. */
+/**
+ * Yield original values reachable through causes, aggregate entries and cleanup failures, with a
+ * bounded identity-aware graph walk. The required report hook observes read failures; no error is
+ * deserialized, replaced or given remote execution authority by this diagnostic traversal.
+ */
 export function* reachRpcError(
   value: unknown,
   options: IRpcSerializeErrorOptions
@@ -140,11 +149,22 @@ export function* reachRpcError(
 export function sanitizeText(
   value: string,
   truncate = true
-): { value: string; bytes: number; changed: boolean } {
+): {
+  /** Sanitized text, optionally shortened to the wire UTF-8 limit. */
+  value: string
+  /** Actual UTF-8 size of the returned text. */
+  bytes: number
+  /** Whether surrogate replacement or optional truncation changed the input. */
+  changed: boolean
+} {
   return sanitizeErrorText(value, RpcWireErrorLimit.maxStringBytes, truncate)
 }
 
-/** Validate a fresh frozen wire tree with Contract's exact first-violation policy. */
+/**
+ * Validate untrusted serialized-error data and return a fresh frozen tree under stable depth, node,
+ * string and total-byte budgets. Unknown fields reject by default; ignore mode omits them and
+ * optionally reports them. Invalid input throws INVALID_WIRE_ERROR with pointer/violation.
+ */
 export function normalizeRpcSerializedError(
   value: unknown,
   options: IRpcWireErrorOptions = {}
@@ -152,7 +172,12 @@ export function normalizeRpcSerializedError(
   return normalizeSerializedErrorChain(value, rpcErrorStrategy(), options) as IRpcSerializedError
 }
 
-/** Restore native classes and remote stacks after validating the whole untrusted RPC tree. */
+/**
+ * Validate the complete wire tree before restoring native error classes and remote stacks, keeping
+ * cause/aggregate structure and semantic source/code. Unknown fields reject unless configured
+ * otherwise; invalid input throws INVALID_WIRE_ERROR. Optional route storage records diagnostics
+ * only, and restored wire properties do not mint local Contract-error authority.
+ */
 export function deserializeRpcError(
   value: unknown,
   options?: IRpcWireErrorOptions,

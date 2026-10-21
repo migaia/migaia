@@ -16,11 +16,20 @@ import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.j
 import { StoreFieldMode } from '@migaia/store-light'
 import { StoreWasmErrorText } from './error-text.js'
 
+/** Owned f64 field created by the Store field protocol; disposal makes value access terminal. */
 export type IWasmNumberField = IDisposable & {
+  /** Tracked number, initially 0; accepts every JavaScript number, including NaN and infinities. */
   value: number
+  /** Whether the field's reactive Source currently has observers; does not itself track a value. */
   readonly observed: boolean
 }
 
+/**
+ * Describe a synchronous zero-initialized f64 Store field; this factory takes no arguments and
+ * allocates nothing until the Store creates it. Await ensureWasm before Store construction. Number
+ * writes use Object.is equality and Source commits; nonnumber writes are INVALID_OPTION. The field
+ * owns its Source/block, not the Runtime; disposed value access throws FIELD_DISPOSED.
+ */
 export function number(): IFieldBuilder<IWasmNumberField> {
   return {
     [FIELD_BUILDER]: true,

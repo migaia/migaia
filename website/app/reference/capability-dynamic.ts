@@ -290,8 +290,8 @@ const types: Record<string, ITypeDoc> = {
         '来自应用登记定义的提供方标识，缺失标识可以保留为待满足的依赖边。'
       ),
       required: p(
-        'True requires provider readiness and participates in cascades; false is an optional observation edge.',
-        '为真时要求提供方就绪并参与级联，为假时仅表示可选观察依赖。'
+        '`true` requires provider readiness and participates in cascades. `false` permits absence and does not cascade through this edge; when the provider exists, the edge still participates in topology ordering and cycle checks.',
+        '`true` 要求提供方就绪并参与级联；`false` 允许缺失且不沿该边级联，但提供方存在时仍参与拓扑排序与依赖环检查。'
       )
     }
   },

@@ -16,7 +16,17 @@ import {
 import { RpcCoreErrorCode } from '@migaia/rpc-core'
 import { BrowserRpcErrorText } from '../error-text.js'
 
-/** Adapts BroadcastChannel for tab-to-tab and storage-backed coordination. */
+/**
+ * Adapt an existing same-origin BroadcastChannel as a borrowed broadcast Endpoint transport. Native
+ * delivery is one-to-many rather than a fixed Runtime Peer connection. send performs structured
+ * cloning without a transfer list; native clone/send failures receive Core TRANSPORT identity while
+ * preserving the original exception or cause.
+ *
+ * Message subscribers share one native callback. Each onTransportError registration owns its
+ * messageerror wrapper; its disposer and message disposers are idempotent and can surface cleanup
+ * or retained reporter failures. onListenerError handles dispatch/probe failures. No close method
+ * takes ownership of the channel: dispose the Endpoint/subscriptions, then close the channel.
+ */
 export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport {
   const listeners = createMessageListenerHub<{
     data: unknown

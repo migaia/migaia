@@ -1,14 +1,15 @@
 /** Stable stage ordinals keep Core dispatch numeric; name tables serve exported diagnostics. */
 export const RpcProbeStage = Object.freeze({
-  peer: 0,
-  message: 1,
-  envelope: 2,
-  encoded: 3,
-  frame: 4,
-  protected: 5,
-  carrier: 6
+  /** Endpoint lifecycle and admission observations. */ peer: 0,
+  /** Logical application interactions. */ message: 1,
+  /** Admitted semantic protocol envelopes. */ envelope: 2,
+  /** Values after the selected codec. */ encoded: 3,
+  /** Framer output and acceptance observations. */ frame: 4,
+  /** Authentication-protected physical values. */ protected: 5,
+  /** Actual native I/O observations when the adapter exposes them. */ carrier: 6
 } as const)
 
+/** Numeric stage ordinal corresponding to RpcProbeStageName. */
 export type RpcProbeStage = (typeof RpcProbeStage)[keyof typeof RpcProbeStage]
 
 /** Stage names also define the configuration vocabulary accepted by defineProbe and setStages. */
@@ -22,11 +23,17 @@ export const RpcProbeStageName = Object.freeze([
   'carrier'
 ] as const)
 
+/** Accepted configuration stage name from the stable stage-name table. */
 export type IRpcProbeStageName = (typeof RpcProbeStageName)[number]
 
 /** Direction ordinals distinguish physical traffic from endpoint-local lifecycle events. */
-export const RpcProbeDirection = Object.freeze({ outbound: 0, inbound: 1, local: 2 } as const)
+export const RpcProbeDirection = Object.freeze({
+  /** Traffic leaving the endpoint. */ outbound: 0,
+  /** Traffic entering the endpoint. */ inbound: 1,
+  /** Owner-local lifecycle or admission observation. */ local: 2
+} as const)
 
+/** Numeric outbound, inbound or local observation direction. */
 export type RpcProbeDirection = (typeof RpcProbeDirection)[keyof typeof RpcProbeDirection]
 
 /** Export-time direction names correspond exactly to RpcProbeDirection ordinals. */
@@ -34,17 +41,18 @@ export const RpcProbeDirectionName = Object.freeze(['outbound', 'inbound', 'loca
 
 /** Interaction-kind ordinals cover logical calls, streams, control and lifecycle observations. */
 export const RpcProbeKind = Object.freeze({
-  request: 0,
-  response: 1,
-  notify: 2,
-  streamOpen: 3,
-  streamChunk: 4,
-  streamClose: 5,
-  cancel: 6,
-  control: 7,
-  lifecycle: 8
+  /** Result-bearing scalar call. */ request: 0,
+  /** Scalar reply. */ response: 1,
+  /** Notification without a remote result. */ notify: 2,
+  /** Stream creation. */ streamOpen: 3,
+  /** Stream value delivery. */ streamChunk: 4,
+  /** Stream terminal observation. */ streamClose: 5,
+  /** Cancellation control. */ cancel: 6,
+  /** Other protocol control traffic. */ control: 7,
+  /** Endpoint or connection lifetime event. */ lifecycle: 8
 } as const)
 
+/** Numeric interaction-kind ordinal used in live probe views. */
 export type RpcProbeKind = (typeof RpcProbeKind)[keyof typeof RpcProbeKind]
 
 /** Export-time kind names correspond exactly to RpcProbeKind ordinals. */
@@ -62,16 +70,17 @@ export const RpcProbeKindName = Object.freeze([
 
 /** Outcome ordinals distinguish progress, admission and settlement without string hot paths. */
 export const RpcProbeOutcome = Object.freeze({
-  none: 0,
-  created: 1,
-  sent: 2,
-  received: 3,
-  admitted: 4,
-  rejected: 5,
-  settled: 6,
-  failed: 7
+  /** No progress outcome applies. */ none: 0,
+  /** Local work was created. */ created: 1,
+  /** Local sending completed. */ sent: 2,
+  /** An inbound value was observed. */ received: 3,
+  /** The owner accepted the operation. */ admitted: 4,
+  /** Admission refused the operation. */ rejected: 5,
+  /** The operation completed normally. */ settled: 6,
+  /** The observed operation failed. */ failed: 7
 } as const)
 
+/** Numeric progress or settlement outcome used in probe views. */
 export type RpcProbeOutcome = (typeof RpcProbeOutcome)[keyof typeof RpcProbeOutcome]
 
 /** Export-time outcome names correspond exactly to RpcProbeOutcome ordinals. */

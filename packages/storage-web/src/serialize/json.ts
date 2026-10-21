@@ -2,7 +2,12 @@ import { StorageError, StorageErrorCode } from '../types/errors.js'
 import type { ICodec } from './types.js'
 import { StorageCodecOutput } from '../constants.js'
 
-/** Provides the default codec without external dependencies. Works on every backend. */
+/**
+ * Frozen JSON text codec delegating to JSON.stringify/JSON.parse. Undefined top-level encoding
+ * becomes the text null; ordinary JSON loss/conversion rules still apply. Encode/decode failures
+ * reject SERIALIZE_FAILED/DESERIALIZE_FAILED with the native cause. Entity repositories choose this
+ * by default only for text backends.
+ */
 export const jsonCodec: ICodec<unknown, string> = Object.freeze({
   name: 'json',
   output: StorageCodecOutput.text,

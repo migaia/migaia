@@ -24,7 +24,7 @@ function markdownExamples(): ICodeExample[] {
   const examples: ICodeExample[] = []
   for (const entry of readdirSync(join(workspaceRoot, 'packages'), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    for (const name of ['README.md', 'USEGUIDE.md']) {
+    for (const name of ['README.md', 'README.en.md', 'USEGUIDE.md', 'USEGUIDE.en.md']) {
       const path = join(workspaceRoot, 'packages', entry.name, name)
       if (!existsSync(path)) continue
       const source = readFileSync(path, 'utf8')

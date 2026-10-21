@@ -2971,7 +2971,6 @@ a.library-item:is(:hover, :focus-visible) strong {
     font-size: 2.5rem;
   }
 
-
   .lede {
     font-size: 1.0625rem;
   }
@@ -3089,4 +3088,15 @@ a.library-item:is(:hover, :focus-visible) strong {
 .left-rail-inventory > summary:hover {
   background: var(--surface-subtle);
   color: var(--text-strong);
+}
+
+/* Fields of a documented object-typed parameter, listed under that parameter. */
+.member-parameter-fields {
+  margin: 0.4rem 0 0.2rem;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.member-parameter-fields li {
+  margin: 0.2rem 0;
 }

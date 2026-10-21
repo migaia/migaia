@@ -50,38 +50,91 @@ import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Caller-owned command data excludes the channel, bootstrap and supervision authority. */
 export type IProcessLaunchCommand = Readonly<{
+  /** Executable passed directly to the native launcher, without a shell. */
   command: string
+  /** Exact argument array for this launch, including any retained runtime flags. */
   args: readonly string[]
+  /** Optional native working directory; undefined preserves the launcher's normal default. */
   cwd?: string
+  /** Explicit inherited names and literal additions; ambient environment is not copied wholesale. */
   env: Readonly<IProcessEnv>
 }>
 
 /** Ordinary launch configuration overrides defaults without granting launch or handshake authority. */
 export type IProcessShortSpawn = Readonly<{
+  /** Module URL or path; omission selects the real main entry, if the runtime has one. */
   entry?: IUrlLike
+  /** Explicit base for resolving relative entry paths; omission uses the main entry. */
   base?: IUrlLike
+  /** Optional executable override; supplying it bypasses module-entry resolution. */
   command?: string
+  /**
+   * Defaults to [] for an explicit entry/command; spawn:true forwards the parent's script
+   * arguments.
+   */
   args?: readonly string[]
+  /** Optional working directory forwarded unchanged to the native process specification. */
   cwd?: string
+  /** Defaults to inherit:['PATH'] and set:{}; selected additions override inherited names. */
   env?: Partial<IProcessEnv>
-  /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */
+  /**
+   * Rewrite the command once per launch; throws/invalid returned data reject with
+   * PROCESS_PLUGIN_INVALID_OPTION.
+   */
   wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand
+  /**
+   * Defaults to stdin:'channel', stdout:'channel', stderr:'drain'; channel/bootstrap ownership
+   * stays local.
+   */
   stdio?: IProcessSpec['stdio']
+  /**
+   * Optional supervision limits; unsupported native enforcement follows the selected isolation
+   * policy.
+   */
   limits?: IProcessSpec['limits']
+  /**
+   * Optional permissions forwarded to supervision; they do not grant an adapter unsupported
+   * capabilities.
+   */
   permissions?: IProcessSpec['permissions']
+  /**
+   * 'native' by default; 'jsonrpc' selects the Content-Length profile and requires a contract or
+   * establish.
+   */
   wire?: ProcessPluginWire
+  /** Optional local remote contract; the default JSON-RPC establish path requires it. */
   contract?: IRemoteContract
+  /**
+   * Optional credential; omission generates 32 random bytes encoded as base64url for stdin
+   * bootstrap.
+   */
   token?: string
+  /** Optional explicit native proposal; otherwise Core's actual local capabilities supply the offer. */
   offer?: IRpcHandshakeOffer
+  /** Optional channel negotiator; omission selects the native or JSON-RPC implementation from wire. */
   establish?: IProcessPluginEstablish
+  /** Overrides the default one-unit, best-effort process supervisor and its generated specification. */
   supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>
+  /**
+   * Receive expected unsupported-termination notices; omission uses the configured/default
+   * reporter.
+   */
   onNotice?(notice: unknown): void
 }>
 
 /** Plugin closures forward only source configuration after Core captures the original Host identity. */
 export type IProcessShortSourceOptions = Readonly<{
+  /** Credential for explicit addresses; same-user Unix named endpoints have an OS-isolated default. */
   token?: string
+  /**
+   * Optional listener verifier; omission compares the configured token and returns the local
+   * principal.
+   */
   verify?: IProcessServeListenerIngress['verify']
+  /**
+   * Finite nonnegative named-local rendezvous wait, default 5000ms; explicit addresses do not
+   * retry.
+   */
   connectTimeoutMs?: number
 }>
 

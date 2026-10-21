@@ -19,13 +19,21 @@ type IRuntimeHostConstructor = new <
 /** The value is the same runtime constructor; this type adds no wrapper or phantom instance state. */
 const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost
 
-/** Root functional Host configures the canonical runtime with trusted definition admission. */
+/**
+ * Class entry for the canonical plugin runtime, with trusted definePlugin admission enabled.
+ * Subclass it for domain capabilities or use defineHost() for a frozen owner handle. Mutations
+ * retain the inherited FIFO, rollback, handle and bounded-cleanup contracts.
+ */
 export class PluginHost<
   TDomainCore extends object,
   TValue = never,
   TInstalled extends readonly import('./typing.js').IPluginConstraint<any>[] = readonly []
 > extends RuntimeHost<TDomainCore, TValue, TInstalled> {
-  /** Installs the trusted reader while preserving the canonical Host runtime implementation. */
+  /**
+   * Creates an empty Host with explicit mutation and pipeline-drain budgets in options.execution.
+   * Invalid budgets/options fail before plugin hooks run; no plugin is installed by construction.
+   * Own the resulting Host until its shared dispose() completion has been observed.
+   */
   constructor(options: import('./typing.js').IPluginHostOptions) {
     super(options, readDefinedPluginDefinition)
   }

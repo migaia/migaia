@@ -86,7 +86,11 @@ export function constructWebThreadChannel(
   })
 }
 
-/** Borrow the supplied EventEmitter port synchronously when its policy uses only the fixed profile. */
+/**
+ * Borrow a Node/EventEmitter port with a synchronous identity channel and no hello for the fixed
+ * profile. peerId is the caller's routing label and scheduler is required. close shares one Promise
+ * and removes this channel's listeners/observer without physically closing the borrowed port.
+ */
 export function createNodeThreadChannel(
   port: INodeMessagePortLike,
   peerId: string,
@@ -95,7 +99,11 @@ export function createNodeThreadChannel(
       capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]
     }>
 ): IRuntimePeerSourceResult
-/** Runtime capability proposals use Core's bounded bilateral ACK over the held native port. */
+/**
+ * Expanded capabilities return a Promise and require Core's actual bilateral ACK on this port.
+ * Unsupported/missing/malformed acknowledgement rejects; local labels alone grant no Peer RPC
+ * runtime, binary, authentication or transfer authority. The caller still owns the physical port.
+ */
 export function createNodeThreadChannel(
   port: INodeMessagePortLike,
   peerId: string,
@@ -112,7 +120,11 @@ export function createNodeThreadChannel(
     : constructNodeThreadChannel(port, peerId, options)
 }
 
-/** Borrow the supplied EventTarget port synchronously when its policy uses only the fixed profile. */
+/**
+ * Borrow an EventTarget port synchronously with the fixed identity profile and no bootstrap hello.
+ * peerId is a routing label, scheduler is required, and logical close only detaches this channel's
+ * observers/listeners. The caller retains Worker/physical-port shutdown responsibility.
+ */
 export function createWebThreadChannel(
   port: IThreadWebPort,
   peerId: string,
@@ -121,7 +133,11 @@ export function createWebThreadChannel(
       capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]
     }>
 ): IRuntimePeerSourceResult
-/** Runtime capability proposals use Core's same bilateral ACK over the held EventTarget resource. */
+/**
+ * Expanded proposals await the same bounded raw ACK on the actual EventTarget port. The Promise
+ * rejects failed admission rather than treating a matching local declaration as trusted agreement.
+ * Peer RPC binary/transfer use also requires Core's separate authentication and profile checks.
+ */
 export function createWebThreadChannel(
   port: IThreadWebPort,
   peerId: string,

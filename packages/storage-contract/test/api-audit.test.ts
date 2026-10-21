@@ -131,6 +131,20 @@ describe('storage-contract audit boundary regressions', () => {
     )
   })
 
+  it('readTransactionConflictPolicy codes revoked option reflection before backend work', () => {
+    /** Revoked unknown input fails during the initial array-shape check. */
+    const revoked = Proxy.revocable({}, {})
+    revoked.revoke()
+    expect(() => contract.readTransactionConflictPolicy(revoked.proxy, 'memory')).toThrowError(
+      expect.objectContaining({
+        source: contract.STORAGE_CONTRACT_SOURCE,
+        code: contract.StorageContractErrorCode.invalidArgument,
+        backend: 'memory',
+        cause: expect.any(TypeError)
+      })
+    )
+  })
+
   it.each(['asRecordStore', 'asSecondaryIndexRecordStore', 'asChangeFeedStore'] as const)(
     '%s preserves a failing capability accessor as the exact cause',
     (name) => {

@@ -6,6 +6,7 @@
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityGraphReference } from './capability-graph.js'
 import { capabilityTopologyReference } from './capability-topology.js'
+import { capabilityCases } from './capability-cases.ts'
 
 /** Builds bilingual text without fallback. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -60,8 +61,8 @@ const members: Record<string, IMemberDoc> = {
     ),
     params: {
       definition: t(
-        'Application-created name and activate(context) callback; return a disposable handle or its Promise, and throws become failed activation results.',
-        '应用创建的名称与 `activate(context)` 回调；返回可释放句柄或其承诺，抛错转换为激活失败结果。'
+        'Required application-authored object, with no field defaults: `name` is a string containing a non-whitespace character and must be unique in this host; `activate(context)` is a function receiving the original factory context. Return a handle, or its Promise, with a required zero-argument `dispose()` returning void or a completion thenable. Activation throws or rejections become failed results. Registration captures the name and callback without starting them.',
+        '应用必填对象，各字段无默认值：`name` 是含非空白字符的字符串，且在当前宿主中唯一；`activate(context)` 为接收工厂原上下文的函数。返回句柄或其 Promise，句柄必须提供无参数 `dispose()`，返回空值或清理完成的类 Promise。激活抛错或拒绝会成为失败结果。登记只捕获名称与回调，不会启动它。'
       )
     },
     returns: done,
@@ -78,8 +79,8 @@ const members: Record<string, IMemberDoc> = {
     ),
     params: { name },
     returns: t(
-      'CapabilityState value: off permits activation, gated denies activation.',
-      '返回 `CapabilityState` 取值；`off` 允许激活，`gated` 禁止激活。'
+      '`CapabilityState`: `off` allows activation without an adopted handle, `gated` denies it, `activating` means activation is pending, `on` means a handle is adopted, and `failed` retains an activation failure.',
+      '返回 `CapabilityState`：`off` 为获准但未启用，`gated` 为禁止激活，`activating` 为正在激活，`on` 为已接纳句柄，`failed` 为保留激活失败。'
     ),
     example: `${setup}\nconsole.log(host.state('search'))`
   },
@@ -155,8 +156,8 @@ const members: Record<string, IMemberDoc> = {
     ),
     params: { name },
     returns: t(
-      'Promise of whether an enabled capability was disabled; cleanup failures are retained and reported to onError.',
-      '返回是否关闭了已启用能力的承诺；清理失败会保留诊断并交给 `onError`。'
+      'Promise of whether an enabled capability was disabled; waits for this entry’s pending activation and cleanup, including late handles. Cleanup failures are retained and reported to `onError` rather than rejecting this completion.',
+      'Promise 表示是否关闭了已启用能力，并等待本项在途激活及清理，包括晚到句柄。清理失败会保留诊断并交给 `onError`，不会使此完成结果拒绝。'
     ),
     example: `${setup}\nawait host.enable('search')\nconsole.log(await host.disable('search'))\nawait host.dispose()`
   },
@@ -369,12 +370,12 @@ const types: Record<string, ITypeDoc> = {
     members: {
       flags: {
         ...p(
-          'Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.',
-          '复制的完整名称到布尔值映射，仅值严格为真的自有数据属性授予许可。'
+          'Copied complete name-to-boolean mapping; only own enumerable data properties exactly `true` grant permission. Getters and inherited properties do not grant permission; later input mutation has no effect.',
+          '复制的完整名称到布尔值映射，仅值严格为 `true` 的自有可枚举数据属性授予许可；访问器和继承属性不会授权，之后修改输入也不生效。'
         ),
         default: t(
-          'Omitted: every capability is denied until explicitly enabled by a flag.',
-          '省略时禁止全部能力，直到显式打开对应开关。'
+          '`undefined`: every capability is denied until explicitly permitted by a flag; granting permission does not activate it.',
+          '`undefined`：禁止全部能力，直到显式打开对应开关；授予许可不会自动激活。'
         )
       },
       onError: {
@@ -503,13 +504,13 @@ export const capabilityReference: ILibraryReference = {
     createCapabilityHost: {
       role: 'factory',
       purpose: t(
-        'Creates an isolated capability gate around an application context. Register lazy activation factories, grant flags explicitly and let the host own activated handles and cleanup.',
-        '围绕应用上下文创建隔离的能力闸门；登记按需激活工厂，显式授予开关许可，由宿主拥有已激活句柄并负责关闭后的资源清理。'
+        'Creates an isolated host owning feature permission, activation state and disposable handles. Register activation callbacks, grant permission explicitly and call enable to start. `options` defaults to `{}`; omitted flags deny every capability. Resource dependencies belong to the graph entry rather than this independent-feature gate.',
+        '创建隔离的能力宿主，持有功能许可、激活状态和可释放句柄。登记激活回调，显式授予许可，再调用启用方法启动。`options` 默认 `{}`，省略开关会禁止全部能力；需要管理资源依赖时使用图入口。'
       ),
       params: {
         context: t(
-          'Application tenant or service context passed unchanged to activation callbacks.',
-          '应用提供的租户或服务上下文，将原样传给每个激活回调。'
+          'Required application context, which may explicitly be `undefined`; there is no default, cloning or prescribed field shape. Activation callbacks receive the original value. In the first case, the caller owns the `tenant` string field.',
+          '必填的应用上下文，可以显式传 `undefined`；没有默认值，不复制，也不规定字段结构。激活回调收到原值。首个场景中的 `tenant` 字符串由调用方定义。'
         )
       },
       options: 'ICapabilityHostOptions',
@@ -517,15 +518,10 @@ export const capabilityReference: ILibraryReference = {
         'Caller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.',
         '返回调用方拥有的 `ICapabilityHost`，结束后须释放；非法选项在构造完成前抛出附码原生错误。'
       ),
-      exampleIntro: t(
-        'Suppose each tenant can enable its own persistence service. The host keeps tenantId as the context passed to the service factory. Register that factory, call enable(), and check whether activation succeeded before using the service methods.',
-        '假设每个租户可以分别启用自己的持久化服务。宿主保存 tenantId，创建服务时把它传给工厂函数。下面先登记工厂，再调用 enable()，确认启用成功后，才使用服务提供的方法。'
-      ),
-      example: capabilityHostExample,
-      exampleResult: t(
-        'The output is sync: tenant-42 followed by disposed: tenant-42. flags.persistence permits activation but does not start the service on its own; enable() invokes the factory. The finally block disposes the host and releases the active service even if its sync() method fails.',
-        '运行后先输出 sync: tenant-42，再输出 disposed: tenant-42。flags.persistence 只允许启用，不会自行启动服务；enable() 才调用工厂创建它。finally 中会释放宿主与已启用的服务，即使 sync() 失败也会执行清理。'
-      )
+      exampleIntro: capabilityCases.createCapabilityHost![0]!.problem,
+      example: capabilityCases.createCapabilityHost![0]!.example,
+      exampleResult: capabilityCases.createCapabilityHost![0]!.result,
+      cases: capabilityCases.createCapabilityHost
     },
     snapshotGraphReadiness: {
       role: 'operation',

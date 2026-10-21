@@ -1,413 +1,295 @@
 # `@migaia/store-react`
 
-把 `@migaia/store-light`（甜 API Store）、`@migaia/store-keyed`（Atom 定义系统）、`@migaia/resource`（可取消异步值）接到 React 组件树上的驱动程序：一组基于 `useSyncExternalStore` 的 hook，外加一个负责作用域/生命周期/就绪时机的 `StoreProvider`。这几个底层包本身完全不认识 React；本包只做"接线"，不重新定义状态模型。
+把已有响应式状态接到 React 读取钩子，并为独立组件树或服务端请求分别登记状态。
 
-## 适用与不适用场景
+## 你可能遇到过
 
-**适用**：已经在用 `@migaia/store-light` 的 Store、`@migaia/store-keyed` 的 Atom，或 `@migaia/resource` 的 `Resource`，要在 React 里渲染它们；需要按 Provider/请求作用域隔离状态（SSR 每请求一份、多棵独立子树互不干扰）；需要在渲染子树前挡住一个异步初始化（比如等 wasm 模块 ready）。
+- 两个请求渲染同一组件，却读到对方的数据：状态仍来自模块级单例。
+- 组件找不到状态时偷偷用了全局默认值：缺少 Provider 和忘记登记没有被分开处理。
+- 两个面板共享运行时后连计数也合并了：把依赖图的归属当成状态实例的归属。
+- 初始化输入已完成，首次服务端 HTML 却直接渲染子树：忽略了就绪状态仍需被观察。
+- 同一资料被渲染两次就请求两次：每次渲染都创建新的异步资源。
 
-**不适用**：不要把它当 Redux/Zustand 那种"全局单一 store + reducer"框架——这里的 Store 是可任意拆分的对象字面量甜 API；也不要指望它能让"读到共享变量但从不检查 signal/依赖"的代码自动响应式化，本包只负责把 `@migaia/reactive` 的依赖图接到 React 的订阅模型上。
+## 为什么选它
+
+- **让同一登记键在不同请求读到各自的 Store。** 每个 Provider 使用自己的登记表 Registry，读取按当前组件树解析，见[从独立请求注册表读取同一个 token](./USEGUIDE.md#从独立请求注册表读取同一个-token)。
+- **直接区分缺少 Provider 与缺少登记。** useProvidedStore 分别给出 PROVIDER_REQUIRED 和 STORE_MISSING，见[区分缺少 Provider 与 token 未登记](./USEGUIDE.md#区分缺少-provider-与-token-未登记)。
+- **共享 Atom 定义，不合并面板的当前值。** 每个 Registry 拥有自己的 AtomStore，即使它们借用同一 Runtime，见[让同一个 atom 定义的状态归各注册表所有](./USEGUIDE.md#让同一个-atom-定义的状态归各注册表所有)。
+- **首次服务端渲染也遵守就绪占位。** 已完成的输入 Promise 仍须经过归一化屏障观察，本例子树没有提前读取，见[在首次服务端渲染中显示就绪占位](./USEGUIDE.md#在首次服务端渲染中显示就绪占位)。
+- **把已加载资料交给多个服务端视图复用。** 同一个预加载 Resource 被两次读取，示例加载函数只运行一次，见[读取已加载 Resource 而不另发请求](./USEGUIDE.md#读取已加载-resource-而不另发请求)。
+
+## 从这里开始
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { createStore } from '@migaia/store-light'
+import { useStore } from '@migaia/store-react'
+
+const store = createStore({ price: 3, quantity: 2 })
+function Total() {
+  const total = useStore(store, (state) => state.price * state.quantity)
+  return createElement('output', null, String(total))
+}
+console.log(renderToString(createElement(Total)))
+store.price = 4
+console.log(renderToString(createElement(Total)))
+await store.$dispose()
+```
+
+输出：
+
+```text
+<output>6</output>
+<output>8</output>
+```
+
+下一步：每个请求需要自己的状态看[请求登记表](./USEGUIDE.md#从独立请求注册表读取同一个-token)，已有异步资料看[预加载读取](./USEGUIDE.md#读取已加载-resource-而不另发请求)。
+
+## 手写时的隐患
+
+下面用原生对象与手工快照表示同一总价读取，只展示、不执行；两个写入路径都需要维护额外的视图副本。
+
+```ts doc-test=check
+const state = { price: 3, quantity: 2 }
+let displayedTotal = state.price * state.quantity // 隐患：派生值复制成第二份状态，需要手工同步。
+function setPrice(price: number) {
+  state.price = price // 隐患：这条路径忘记更新视图副本，后续读取仍是旧总价。
+}
+function setQuantity(quantity: number) {
+  state.quantity = quantity
+  displayedTotal = state.price * state.quantity
+}
+setPrice(4)
+setQuantity(3)
+console.log(displayedTotal)
+```
+
+上例 selector 直接读取 Store 源字段，无需同步 displayedTotal 副本；SSR 更新后仍须显式再次渲染。
+
+## 三分钟心智模型
+
+直接读取已有 Store/Signal 时使用对应 hook；需要组件树选择不同实例时，用 token 登记到 Registry，再交给 Provider。异步资源由应用加载和拥有，React 钩子负责读取状态与订阅。
+
+| 问题 / 术语                     | 对应工具                                             | 白话含义                                |
+| ------------------------------- | ---------------------------------------------------- | --------------------------------------- |
+| 读取一个投影 / selector         | useStore                                             | 从已有 Store 计算组件需要的结果         |
+| 单值接入 / Signal               | useSignal                                            | 一个响应式值及其设置函数                |
+| 为子树选实例 / token、Registry  | createStoreToken、createStoreRegistry、StoreProvider | 类型化登记键、实例表与组件树边界        |
+| 描述与值分开 / Atom definition  | useAtomDefinition                                    | 描述可以共享，值属于各自 AtomStore      |
+| 等待异步值 / Resource、Suspense | useResource / useResourceValue                       | 读完整状态，或让 Promise/错误交给 React |
+| 结束拥有关系 / owned            | registry.disposeAsync                                | 等待由登记表负责的实例清理              |
+
+## 典型场景
+
+| 场景                                       | 怎么组合                                                     | 详细说明                                                             |
+| ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 无需 Provider 生成 Store 投影的服务端 HTML | `createStore → useStore → renderToString`                    | [完整示例](./USEGUIDE.md#无需-provider-生成-store-投影的服务端-html) |
+| 在首次服务端渲染中显示就绪占位             | `ready + fallback → StoreProvider → renderToString`          | [完整示例](./USEGUIDE.md#在首次服务端渲染中显示就绪占位)             |
+| 从独立请求注册表读取同一个 token           | `Registry × 2 → register(token) → useProvidedStore`          | [完整示例](./USEGUIDE.md#从独立请求注册表读取同一个-token)           |
+| 区分缺少 Provider 与 token 未登记          | `Provider boundary → Registry.require(token)`                | [完整示例](./USEGUIDE.md#区分缺少-provider-与-token-未登记)          |
+| 让同一个 atom 定义的状态归各注册表所有     | `Runtime → Registry × 2 → atomStore.set → useAtomDefinition` | [完整示例](./USEGUIDE.md#让同一个-atom-定义的状态归各注册表所有)     |
+| 读取已加载 Resource 而不另发请求           | `Resource → await promise → useResourceValue → dispose`      | [完整示例](./USEGUIDE.md#读取已加载-resource-而不另发请求)           |
 
 ## 安装
 
 ```bash
-pnpm add @migaia/store-react react react-dom
+pnpm add @migaia/store-react @migaia/store-light react react-dom
 ```
 
-`react`/`react-dom` 是 peer dependency（`>=19`，异步 Store 使用 React 19 的 `use`）。本包依赖 `@migaia/store-light`（`createStore` 产出的 Store 靠 `$runtime`/`$async`/`$snapshot()`/`$batch()` 这几个元字段与 `storeReady()` 对接，见源码 `reactive-store.ts`）、`@migaia/store-keyed`（Atom 定义/AtomStore 协议）、`@migaia/resource`（`Resource`）、`@migaia/reactive`（响应式图）、`@migaia/lifecycle`、`@migaia/utils`；这些包按需装即可，不是全部都要在业务代码里直接 import。产物是纯 ESM，`package.json` 当前只公开根入口，所有 API 都从 `@migaia/store-react` 导入（没有子路径）。
-
-## 目录
-
-- [StoreProvider](#storeprovider)
-- [核心订阅 hook](#核心订阅-hook)：`useStore` / `useSignal` / `useTracked` / `useNodeValue`
-- [异步值 hook](#异步值-hook)：`useResource` / `useResourceValue` / `useStoreResource` / `useAsyncAtomValue`
-- [Atom hook](#atom-hook)：`useAtomValue` / `useSetAtom` / `useAtom` / `useAtomDefinition` / `useSetAtomDefinition`
-- [依赖注入：IStoreToken / StoreRegistry](#依赖注入istoretoken--storeregistry)
-- [Config / Feature flag](#config--feature-flag)
-- [高阶组合示例](#高阶组合示例)
-- [构建门禁](#构建门禁)
-
-完整签名、边界行为、错误码与生命周期细节，见 [USEGUIDE.md](./USEGUIDE.md)。
-
----
-
-<a id="storeprovider"></a>
-
-## StoreProvider
-
-```tsx
-import { StoreProvider, useStore } from '@migaia/store-react';
-import { createStore } from '@migaia/store-light';
-```
-
-**`StoreProvider`｜5 秒上手** —— 给子树建立 Registry/Runtime 作用域；只用 `useStore`/`useSignal` 读取模块级单例时理论上可以不套它，但项目里建议根部始终套一层：
-
-```tsx
-const counterStore = createStore({
-  count: 0,
-  increment() {
-    this.count += 1;
-  }
-});
-
-function Counter() {
-  const count = useStore(counterStore, (state) => state.count);
-  return <button onClick={() => counterStore.increment()}>count: {count}</button>;
-}
-
-function App() {
-  return (
-    <StoreProvider>
-      <Counter />
-    </StoreProvider>
-  );
-}
-```
-
-全部 props（`IStoreProviderProps`）：
-
-- `children: ReactNode`（必填）
-- `registry?: StoreRegistry` —— 不传则内部自建；传了默认不由 Provider 释放（见下）
-- `runtime?: IRuntime` —— 不传则内部 `createRuntime()`；无论谁创建 Registry，`runtime` 本身的生命周期永远由调用方负责，Provider 从不释放它
-- `disposeOnUnmount?: boolean` —— 都不传 `registry`/`runtime` 时默认 `true`（自建自释放）；只传 `registry` 时默认 `false`（外部对象默认外部拥有）
-- `config?: IStoreProviderConfig` —— `{ features？, ready？, fallback？, defaults？ }`，见下方 [Config / Feature flag](#config--feature-flag)
-
-同时传 `registry` 与 `runtime` 且 `registry.runtime !== runtime` 会立刻抛错；完整所有权规则、`config.ready` 的数组身份换代语义、StrictMode 下的候选 Registry 回收机制，见 USEGUIDE §2、§6。
-
----
-
-<a id="核心订阅-hook"></a>
-
-## 核心订阅 hook
-
-```tsx
-import { useStore, useSignal, useTracked, useNodeValue } from '@migaia/store-react';
-```
-
-**`useStore(store, selector, isEqual?)`｜5 秒上手** —— 订阅 `@migaia/store-light` Store 的一个 selector，只在读到的字段变化时重渲染：
-
-```tsx
-const count = useStore(counterStore, (state) => state.count);
-```
-
-全部参数：`store: IReactiveStore<S>`（必填）、`selector: (state: IStoreShape<S>) => R`（必填，引用应稳定）、`isEqual?: (a: R, b: R) => boolean`（默认 `Object.is`）。不需要 `StoreProvider`；`store.$async === true` 时会先 `use(storeReady(store))`，组件在 Store 就绪前 Suspend。
-
-**`useSignal(signal)`｜3 秒上手** —— 订阅单个 `IReactiveSignal`，返回 `[值, 设置函数]`：
-
-```tsx
-const [name, setName] = useSignal(nameSignal);
-```
-
-单参数 `signal: IReactiveSignal<T>`（必填），无其他选项；依赖集合恒为该 Signal 自己，走比 `useTracked` 更轻的直连路径。
-
-**`useTracked(read, isEqual?, runtime?)`｜10 秒上手** —— 最底层的通用订阅 hook，`read()` 内访问到的任意响应式节点都会被自动追踪为依赖；`useStore`/`useResource` 都是它的薄封装：
-
-```tsx
-const total = useTracked(() => priceSignal.value + taxSignal.value);
-```
-
-全部参数：`read: () => T`（必填，引用应稳定）、`isEqual?: (a: T, b: T) => boolean`（默认 `Object.is`）、`runtime?: IRuntime`（默认 `defaultRuntime`）。
-
-**`useNodeValue(node, runtime, enabled?)`｜5 秒上手** —— 最底层的稳定节点订阅，适用于依赖集合恒为"这一个节点自己"的场景：
-
-```tsx
-const value = useNodeValue(mySignal, runtime);
-```
-
-全部参数：`node: IStableNode<T>`（必填，形状 `{ value: T; peek(): T }`）、`runtime: IRuntime`（必填）、`enabled?: boolean`（默认 `true`，`false` 时订阅是空操作）；`node` 不属于传入的 `runtime` 会在 render 阶段同步抛错（可被 Error Boundary 捕获）。
-
----
-
-<a id="异步值-hook"></a>
-
-## 异步值 hook
-
-```tsx
-import {
-  useResource,
-  useResourceValue,
-  useStoreResource,
-  useAsyncAtomValue
-} from '@migaia/store-react';
-```
-
-**`useResource(resource)` / `useResourceValue(resource)`｜10 秒上手** —— 订阅 `@migaia/resource` 的 `Resource<T>`；前者拿完整状态机，后者是 Suspense-safe 的取值版本：
-
-```tsx
-const state = useResource(profileResource); // { status: 'idle'|'pending'|'success'|'error'|'cancelled', ... }
-const profile = useResourceValue(profileResource); // 成功返回 data；pending/idle 时 throw promise；error/cancelled 时 throw error
-```
-
-均为单参数 `resource: Resource<T>`（必填），无可选项；`resource.runtime` 决定追踪用的 Runtime。
-
-**`useStoreResource(resource)`｜5 秒上手** —— 订阅 `@migaia/store-light` Store 内部声明的异步字段（`IStoreResource<T>`），带渲染期版本租约，StrictMode 下不会提前释放正在用的资源：
-
-```tsx
-const value = useStoreResource(store.someAsyncField);
-```
-
-单参数 `resource: IStoreResource<T>`（必填），无可选项。与 `Resource<T>` 是两套不同协议，不能互换，见 USEGUIDE §1.4。
-
-**`useAsyncAtomValue(atom)`｜3 秒上手** —— 给形如 `{ resource: Resource<T> }` 的异步 atom 提供 Suspense-safe 取值：
-
-```tsx
-const value = useAsyncAtomValue(asyncAtom); // 内部即 useResourceValue(atom.resource)
-```
-
-单参数 `atom: { readonly resource: Resource<T> }`（必填），无可选项。
-
----
-
-<a id="atom-hook"></a>
-
-## Atom hook
-
-```tsx
-import {
-  useAtomValue,
-  useSetAtom,
-  useAtom,
-  useAtomDefinition,
-  useSetAtomDefinition
-} from '@migaia/store-react';
-```
-
-**`useAtomValue(atom)` / `useSetAtom(atom)` / `useAtom(atom)`｜10 秒上手** —— 协议 hook：只要求对象实现 `IReadableAtom`/`IWritableAtom`（`@migaia/store-keyed/reactive/atom`），Provider 可选：
-
-```tsx
-const value = useAtomValue(myAtom);
-const write = useSetAtom(myWritableAtom);
-const [value2, write2] = useAtom(myWritableAtom);
-```
-
-全部参数：`atom: IReadableAtom<T>` 或 `IWritableAtom<T, Args, Result>`（必填），无其他选项。有 `StoreProvider` 且 `atom.atomDefinition` 存在时读写路由到 `registry.atomStore`；否则直接订阅/写入 atom 节点本身。`useAtom` 就是 `[useAtomValue(atom), useSetAtom(atom)]`。
-
-**`useAtomDefinition(definition)` / `useSetAtomDefinition(definition)`｜10 秒上手** —— **必须有 `StoreProvider`**，固定读写 `registry.atomStore`，配合 `atomDef`/`derivedDef`/`writableDef`/`familyDef`（`@migaia/store-keyed`）产出的定义使用：
-
-```tsx
-const value = useAtomDefinition(countDef);
-const increment = useSetAtomDefinition(incrementDef);
-```
-
-全部参数：`definition: IAtomDefinition<T>` 或 `IWritableAtomDefinition<T, Args, Result>`（必填），无其他选项。无 Provider 时抛 `[store] hook requires a StoreProvider`。
-
----
-
-<a id="依赖注入storetoken--storeregistry"></a>
-
-## 依赖注入：IStoreToken / StoreRegistry
-
-```tsx
-import {
-  createStoreToken,
-  StoreRegistry,
-  createStoreRegistry,
-  useStoreRegistry,
-  useStoreRuntime,
-  useStoreFromProvider,
-  useProvidedStore
-} from '@migaia/store-react';
-```
-
-**`createStoreToken(debugName)`｜3 秒上手** —— 定义一把带类型参数的 key（内部是 `Symbol`）：
-
-```tsx
-const sessionToken = createStoreToken<IReactiveStore<ISession>>('session');
-```
-
-单参数 `debugName: string`（必填，非空——空字符串抛 `[store] IStoreToken requires a debug name`），同时作为报错信息里的可读定位名。
-
-**`useStoreFromProvider(token)` / `useProvidedStore(token, selector, isEqual?)`｜10 秒上手** —— 按 token 从当前 Provider 的 Registry 取回注册实例；后者额外做一次 `useStore` 订阅：
-
-```tsx
-const sessionStore = useStoreFromProvider(sessionToken);
-const userId = useProvidedStore(sessionToken, (s) => s.userId);
-```
-
-`useStoreFromProvider` 单参数 `token: IStoreToken<T>`（必填），未注册抛 `[store] missing provider store: X`。`useProvidedStore` 额外参数 `selector: (state: IStoreShape<S>) => Result`（必填）、`isEqual?`（默认 `Object.is`）。均**必须有 Provider**。
-
-**`useStoreRegistry()` / `useStoreRuntime()`｜3 秒上手** —— 取当前 Provider 的 Registry / 其所属 Runtime，均**必须有 Provider**（否则抛 `[store] hook requires a StoreProvider`），无参数：
-
-```tsx
-const registry = useStoreRegistry();
-const runtime = useStoreRuntime(); // = useStoreRegistry().runtime
-```
-
-**`StoreRegistry` / `createStoreRegistry(runtime?)`｜10 秒上手** —— 手动构造作用域化容器，常见于 SSR 每请求一份、或测试：
-
-```tsx
-const registry = createStoreRegistry(); // runtime 不传则内部 createRuntime()
-const unregister = registry.register(sessionToken, sessionStore, { owned: true });
-registry.dispose(); // 同步、幂等；owned 实体按注册顺序的逆序释放
-```
-
-`createStoreRegistry` 单参数 `runtime?: IRuntime`（默认新建）。`StoreRegistry` 实例方法：`register(token, value, { owned? })`（同 token 重复注册抛错，`owned: true` 时 Registry 释放会调用其 `$dispose()`/`dispose()`）、`replace(token, value, options?)`（无重复检查，直接覆盖）、`get`/`require`/`has`（查询）、`remove(token, disposeOwned = true)`、`dispose()`（同步）、`disposeAsync()`（异步、单飞）、`retain(disposeOnRelease)`（返回幂等 release；最后一次释放延至 setTimeout(0)）、只读 `runtime`/`atomStore`/`lifecycle`/`disposed`、`whenTerminal()`。跨 Runtime 注册会抛 `[store] provider store "X" belongs to a different Runtime`。完整生命周期语义见 USEGUIDE §4、§6。
-
----
-
-<a id="config--feature-flag"></a>
-
-## Config / Feature flag
-
-```tsx
-import {
-  useStoreConfig,
-  useStoreFeature,
-  useAssertStoreFeature,
-  StoreProviderState
-} from '@migaia/store-react';
-```
-
-**`useStoreConfig()`｜3 秒上手** —— 取归一化后的完整配置快照：
-
-```tsx
-const config = useStoreConfig(); // 无 Provider 时返回 null
-```
-
-无参数。
-
-**`useStoreFeature(path)` / `useAssertStoreFeature(path, apiName?)`｜5 秒上手** —— 查询/断言某个 feature 是否开启，用于给实验性 API 设置入口守卫：
-
-```tsx
-if (useStoreFeature('experimental.charts')) {
-  /* 渲染实验特性 */
-}
-useAssertStoreFeature('wasm', 'myWasmApi'); // 未开启（含无 Provider）直接抛错
-```
-
-`path: 'wasm' | \`experimental.${string}\`` 是两者共同的必填参数；`useAssertStoreFeature`额外的`apiName?: string`（默认 `'this API'`）出现在错误信息里。`useStoreFeature`无 Provider 时返回`false`，不抛；`useAssertStoreFeature`未开启（含无 Provider）一律抛`Error`。这两个都要通过 `StoreProvider`的`config.features.wasm`/`config.features.experimental`显式开启才算生效（只认字面`true`）。
-
-**`StoreProviderState`｜3 秒上手** —— 就绪屏障三态的稳定取值集合，常量对象，无调用参数：
-
-```tsx
-StoreProviderState.pending; // 'pending' | 'ready' | 'error' 之一
-```
-
-业务代码一般不需要直接用它，除非要复刻类似的三态就绪追踪逻辑。
-
----
-
-<a id="高阶组合示例"></a>
-
-## 高阶组合示例
-
-### 1. StoreProvider + 就绪屏障 + IStoreToken 注入 + Suspense 异步读取
-
-```tsx
-import { Suspense } from 'react';
-import {
-  StoreProvider, createStoreRegistry, createStoreToken,
-  useProvidedStore, useStoreFromProvider, useResourceValue, useStoreFeature
-} from '@migaia/store-react';
-import { createStore, type IReactiveStore } from '@migaia/store-light';
-import { Resource } from '@migaia/resource';
-
-type ISession = { userId: string; setUserId(id: string): void };
-const sessionToken = createStoreToken<IReactiveStore<ISession>>('session');
-const profileToken = createStoreToken<Resource<{ name: string }>>('profile');
-
-// 在 React 首次渲染前组装；每个应用或 SSR 请求各调用一次。
-function createApplication() {
-  const registry = createStoreRegistry();
-  const sessionStore = createStore<ISession>({
-    userId: '',
-    setUserId(id) { this.userId = id; }
-  }, { runtime: registry.runtime });
-  registry.register(sessionToken, sessionStore, { owned: true });
-  // Resource 来自可观察的应用 owner，身份不随组件 render 改变。
-  const profile = new Resource(async () => ({ name: sessionStore.userId || '访客' }), registry.runtime);
-  registry.register(profileToken, profile, { owned: true });
-  const ready = [() => Promise.resolve()];
-
-  function App() {
-    return (
-      <StoreProvider registry={registry} config={{ ready, fallback: <div>加载中…</div> }}>
-        <Suspense fallback={<div>加载中…</div>}><Dashboard /></Suspense>
-      </StoreProvider>
-    );
-  }
-  return { App, dispose: () => registry.disposeAsync() };
-}
-
-function Dashboard() {
-  const userId = useProvidedStore(sessionToken, (state) => state.userId);
-  const profile = useResourceValue(useStoreFromProvider(profileToken));
-  const showCharts = useStoreFeature('experimental.charts');
-  return <p>{userId}: {profile.name}{showCharts ? ' · 图表已开启' : ''}</p>;
-}
-```
-
-### 2. useTracked 手写跨节点组合读取（不经过 Store）
-
-```tsx
-import { useTracked } from '@migaia/store-react';
-import { defaultRuntime } from '@migaia/reactive';
-
-const priceSignal = defaultRuntime.signal(10);
-const qtySignal = defaultRuntime.signal(2);
-
-function Total() {
-  const total = useTracked(() => priceSignal.value * qtySignal.value);
-  return <span>合计：{total}</span>;
-}
-```
-
-### 3. AtomStore + useAtomDefinition 精细订阅
-
-```tsx
-import { StoreProvider, useAtomDefinition, useSetAtomDefinition } from '@migaia/store-react';
-import { atomDef, writableDef } from '@migaia/store-keyed/atom/definition';
-
-const countDef = atomDef(0);
-const incrementDef = writableDef(
-  (get) => get(countDef),
-  (get, set) => set(countDef, get(countDef) + 1)
-);
-
-function Counter() {
-  const count = useAtomDefinition(countDef);
-  const increment = useSetAtomDefinition(incrementDef);
-  return <button onClick={() => increment()}>count: {count}</button>;
-}
-
-function App() {
-  return (
-    <StoreProvider>
-      <Counter />
-    </StoreProvider>
-  );
-}
-```
-
-### 4. SSR 请求作用域：手动 Registry + StoreProvider 接管
-
-```tsx
-import { StoreProvider, createStoreRegistry } from '@migaia/store-react';
-import { createRuntime } from '@migaia/reactive';
-
-async function renderForRequest(children: React.ReactNode) {
-  const registry = createStoreRegistry(createRuntime()); // 每个请求独立一份
-  const html = renderToString(<StoreProvider registry={registry}>{children}</StoreProvider>); // disposeOnUnmount 默认 false：手动负责释放
-  await registry.disposeAsync();
-  return html;
-}
-```
-
----
-
-<a id="构建门禁"></a>
-
-## 构建门禁
+react/react-dom 的 peer 范围为 `>=19`。指南的 Atom/Resource 场景还直接导入：
 
 ```bash
-pnpm --filter @migaia/store-react fmt
-pnpm --filter @migaia/store-react lint
-pnpm --filter @migaia/store-react typecheck
-pnpm --filter @migaia/store-react typecheck:test
-pnpm --filter @migaia/store-react test
-pnpm --filter @migaia/store-react typecheck:e2e
-pnpm --filter @migaia/store-react test:e2e
-pnpm --filter @migaia/store-react build
+pnpm add @migaia/reactive @migaia/store-keyed @migaia/resource
 ```
 
-迁移说明：React/react-dom 最低版本改为 19。Registry 首次 dispose 在 owned 回调前关闭接纳；reentrant disposeAsync 复用既有完成 Promise。移除无操作 prepareForRender 和 retain 的无效第二参数；保留 retain/release、原清理顺序与 lifecycle 账本。
+## 常用 API
+
+| API                                        | 用途                              |
+| ------------------------------------------ | --------------------------------- |
+| `StoreProvider`                            | 为一棵组件树提供 Registry 与配置  |
+| `useStore / useSignal`                     | 读取已有 Store 投影或单个 Signal  |
+| `useProvidedStore / useStoreFromProvider`  | 按 token 取得当前子树的实例       |
+| `useAtomDefinition / useSetAtomDefinition` | 读写当前 Registry 的 Atom 值      |
+| `useResource / useResourceValue`           | 读取异步状态或 Suspense 值        |
+| `useStoreResource`                         | 读取 Store 异步字段并管理版本租约 |
+
+## 契约细节
+
+### 归属、安装与运行环境
+
+本包只把既有状态模型接入 React，不实现 Store、Atom、Resource 或全局状态框架。store-light 提供 Store 和异步字段，store-keyed 提供 Atom 定义与 AtomStore，resource 提供独立 Resource，reactive 提供依赖图；lifecycle 和 utils 承担清理与公共工具。它不会让未读取响应式节点的普通共享变量自动响应。
+
+产物为 ESM，只有 `@migaia/store-react` 根入口，没有子路径。peer react/react-dom 均为 `>=19`，异步 Store 使用 React 19 的 use。直接导入 store-light、store-keyed、reactive、resource 的示例应显式安装对应包，不能依赖顶层可访问传递依赖。SSR 示例使用真实 ReactDOM server，只证明服务器读取/渲染，不证明客户端订阅或 effect 清理。
+
+### Runtime、状态与作用域
+
+Runtime 是一张响应式依赖图的容器。节点、Store、Atom 所属 Runtime 通过统一所有权协议确定，不能跨图建立订阅。Provider 的 Registry/AtomStore 属于一个 Runtime，但 Registry 不拥有 Runtime 本身。
+
+Store 的普通字段、get 访问器和方法分别由 store-light 转为 Signal、Computed 与 Action。本包读取 $runtime，异步 Store 的 $async/storeReady，并使用资源协议；普通字段导出/hydration 仍由 $plain/$hydrate 等 Store API 负责；$snapshot() 提供 Store 快照，$batch(recipe) 把多次同步写入合并通知，recipe 的参数是 `IStoreShape<S>`。只用模块单例的 useStore/useSignal 不必有 Provider，但 Provider 不会把已共享的单例自动变成每请求独立实例。
+
+Atom 定义是冻结描述对象，不含运行时状态；同一 atomDef/derivedDef/writableDef/familyDef 等定义在不同 AtomStore 中各自实例化。Registry 自己拥有一个 atomStore，同一 Runtime 也可容纳多个独立 Registry 的 Atom 状态。准备请求或应用时先创建 Registry，再用其 runtime 创建要注入的 Store/Resource，注册后才渲染，结束时由明确 owner 释放。
+
+### StoreProvider 参数与所有权
+
+`IStoreProviderProps` 的 children:ReactNode 必填；registry、runtime、disposeOnUnmount、config 均可省略。
+
+| registry/runtime 输入 | 默认行为                                                                       |
+| --------------------- | ------------------------------------------------------------------------------ |
+| 都省略                | Provider 新建 Runtime 与 Registry，disposeOnUnmount 默认 true                  |
+| 只传 runtime          | 新建 Registry 并借用 runtime，disposeOnUnmount 默认 true                       |
+| 只传 registry         | 使用外部 Registry，disposeOnUnmount 默认 false                                 |
+| 两者都传              | 必须 registry.runtime===runtime，否则 INVALID_CONFIG；外部 Registry 默认不释放 |
+
+Provider 从不销毁 Runtime，disposeOnUnmount 控制的是 Registry 及其 atomStore/owned 登记。外部 Registry 可显式 disposeOnUnmount:true 接管卸载释放。内部 runtime prop 改变时选择新候选 Registry，commit 后切换；旧已提交实例由其 effect cleanup 释放，不把新图的读取混进旧图。
+
+客户端 RegistryBoundary 在 effect 中 retain，cleanup 调用 release；最后一个释放后 setTimeout(0) 再复查引用数与 generation，保护 StrictMode 的紧接重挂。外部接管的 Registry 也用这条路径。SSR 不运行这些 effect，因此不会靠 unmount 自动清理，必须在请求 owner 的 finally 中 disposeAsync。未提交的候选也没有可靠的“永久 abandoned render”回调，不用定时器猜测；需要确定性释放时由外部可观察 owner 接管。useMemo 只稳定身份，不负责资源释放。
+
+### 配置、特性与就绪屏障
+
+| config 字段                                             | 默认值与行为                                                     |
+| ------------------------------------------------------- | ---------------------------------------------------------------- |
+| features.wasm?:boolean                                  | false；只有字面 true 开启，开启却没有 ready 时生成拒绝的配置屏障 |
+| features.experimental?:Readonly<Record<string,boolean>> | 空白名单；只有自有可枚举数据属性的值严格 true 才开启             |
+| ready?:readonly IStoreReadyBarrier[]                    | 无屏障，归一化 ready 为 null；每项为 Promise 或零参工厂          |
+| fallback?:ReactNode                                     | null；屏障 pending 时渲染占位，不保留旧 children                 |
+| defaults.warnAsyncActions?:boolean                      | false；仅配置快照，不自动传给 createStore                        |
+
+IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。
+
+同一 Provider/barrierScope、同一 ready 数组身份复用列表 Promise；新数组产生新就绪代，即使元素相同也重建 ReadyBoundary，旧代完成不能放行新代。工厂结果另按 scope+factory 身份缓存，在途/成功结果可跨列表复用，失败后删除工厂缓存，但同一旧数组仍复用已缓存的失败列表 Promise；单换数组不保证重新运行已成功的工厂。不同 Provider/请求 scope 隔离。abandoned render 之间不保证工厂恰好运行一次；非幂等初始化应由应用 owner 提供稳定 Promise。
+
+已完成 Promise 的状态仍在 then 微任务更新，因此首次同步渲染可能 pending；客户端 effect 会重查，SSR renderToString 不运行 effect。保持 ready 数组、Store/Signal/Resource、selector/equality 身份稳定；配置是 readonly 输入，改变配置时提供新对象，不在 render 中写状态或创建持有资源的业务实例。
+
+归一化配置的 features.wasm 为 boolean，features.experimental 为空原型浅冻结白名单，defaults 含 warnAsyncActions，ready 为 null 或带 promise/status()/error() 的跟踪对象；状态为 pending/ready/error；只有实验白名单被冻结，外层 features/defaults/ready 容器不保证冻结。StoreProviderState/IStoreProviderState 公开这三个值，状态不是错误码。实验键排序编码使输入键次序不影响配置；访问器不作为开启数据且不执行 getter，`__proto__` 是普通键。
+
+| API                                         | 参数、默认与结果                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| useStoreConfig()                            | 返回当前 IStoreConfigValue，无 Provider 返回 null                                      |
+| useStoreFeature(path)                       | path 为 `'wasm' 或 experimental.${string}`，无 Provider/未开启返回 false               |
+| useAssertStoreFeature(path,apiName?)        | apiName 默认 `'this API'`；无 Provider 为 PROVIDER_REQUIRED，未开启为 FEATURE_DISABLED |
+| readStoreFeature(config,path)               | 非 hook 查询，config 必填；未知路径或空实验键返回 false                                |
+| assertStoreFeature(config,path,apiName?)    | 非 hook 断言，可传 null，默认名同上                                                    |
+| normalizeStoreConfig(config?,barrierScope?) | config 默认 undefined，scope 默认每次新 `{}`；显式稳定 scope 决定 ready 缓存隔离       |
+
+配置字段读取失败、非法 ready 项或无法安全读取实验特性为 INVALID_CONFIG，并按可用 cause 保留原错。defaults.warnAsyncActions 只是供应用读取，应在 createStore 的相应选项显式传入才改变 Store 行为。
+
+### Store、Signal 与通用读取钩子
+
+| API                                                | 参数、默认与行为                                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `useStore<S,R>(store,selector,isEqual?):R`         | Store 与 selector 必填，isEqual 默认 Object.is，用 store.$runtime；不要求 Provider |
+| `useSignal<T>(signal):readonly [T,(next:T)=>void]` | signal 必填，使用其 runtime；Signal 身份不变时 setter 稳定                         |
+| `useTracked<T>(read,isEqual?,runtime?):T`          | read 必填，默认 Object.is/defaultRuntime，追踪实际读取节点                         |
+| `useNodeValue<T>(node,runtime,enabled?):T`         | node/runtime 必填，enabled 默认 true；固定单节点的订阅                             |
+
+useStore 在 store.$async 为 true 时先 use(storeReady(store))，就绪前进入外层 Suspense。selector 的参数为 `IStoreShape<S>`。useTracked 在 render 捕获读取，在 commit 发布 selector/snapshot 与依赖；被丢弃的 render 不改已提交订阅语义，Runtime 变化重建绑定，不让新图执行旧 reader。selector/equality 引用变化会重新捕获，但不需要靠每次退订重订实现。相等结果复用快照，避免重复 getSnapshot 得到新包装引用。
+
+`IStableNode<T>` 的公开形状为 readonly value:T 与 peek():T，但节点还须满足 reactive 的实际所有权协议。useNodeValue 在 render 校验 node/runtime；enabled=false 仅关闭订阅，不跳过所有权校验和取值。订阅首轮只登记依赖不通知，快照直接 node.peek，不另缓存旧节点值。useSignal 走这条固定节点路径，不走动态依赖捕获；这只是机制差异，不作速度比较。
+
+客户端通知通过 runtime.untracked 调用 React listener，listener 失败向 Runtime 以 subscription-listener 报告，不污染当前响应式依赖。useSyncExternalStore 负责与 React 的订阅模型接合；服务端 getServerSnapshot 读取不代表客户端订阅已经建立。
+
+### 两种异步值
+
+| 来源                                  | 钩子                           | 协议                                  |
+| ------------------------------------- | ------------------------------ | ------------------------------------- |
+| resource 的 `Resource<T>`             | useResource / useResourceValue | 独立异步状态机，使用 resource.runtime |
+| 含 resource:`Resource<T>` 的异步 atom | useAsyncAtomValue              | 委托 useResourceValue(atom.resource)  |
+| store-light 的 `IStoreResource<T>`    | useStoreResource               | Store 异步字段，带版本捕获与提交租约  |
+
+这些钩子都是单个必填参数，无额外选项；Resource 与 IStoreResource 不能互换。useResource 返回 `IResourceState<T>`：idle、pending、success（data、可选 refreshing）、error（error）、cancelled（DOMException error）。useResourceValue 成功返回 data，error/cancelled 在 render 抛 error，idle/pending 在 render 抛 resource.promise 交 Suspense；不会从调度器 Effect 中抛出这些业务 Promise/错误。hook 不替应用 owner 销毁 Resource。
+
+useStoreResource 订阅 resource.subscribe/getSnapshot，render 用 captureSnapshot(existingLease) 获取当前版本，layout commitCapture 后释放上一租约；unmount cleanup 的微任务+epoch 复查保护 StrictMode 重挂。这里只管理已捕获版本租约，不把完整资源生命周期移交给 React。底层 read/preload/retry/captureSnapshot/commitCapture 等协议须来自真实 IStoreResource。
+
+### Atom 钩子
+
+| API                                                                       | 行为                                                                             |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| useAtomValue(atom:`IReadableAtom<T>`)                                     | 有 Provider 且 atom.atomDefinition 存在时读 registry.atomStore，否则直接节点读取 |
+| useSetAtom(atom:`IWritableAtom<T,Args,Result>`)                           | 稳定 writer，按相同条件选择 atomStore.set 或 atom.write(...args)                 |
+| useAtom(atom)                                                             | 返回 readonly [useAtomValue(atom),useSetAtom(atom)]                              |
+| useAtomDefinition(definition:`IAtomDefinition<T>`)                        | 必须有 Provider；sub 订阅、preview 取快照                                        |
+| useSetAtomDefinition(definition:`IWritableAtomDefinition<T,Args,Result>`) | 必须有 Provider；稳定包装 atomStore.set(definition,...args)                      |
+
+Args 是 readonly unknown[]、Result 是写入结果；这几种钩子均只有一个必填参数，没有选项。通用协议来自 store-keyed/reactive/atom，不强制某个工厂；定义来自 atom/definition。Provider 路径和直连路径按 enabled 互斥订阅而保持 hook 调用顺序；即使直连 disabled，useNodeValue 仍先检查其实际所有权。定义读取用 preview，派生预览不发布正式依赖边，在同一 Runtime version 保持引用稳定；正式订阅由 sub 负责。定义是描述，AtomStore 才拥有每个作用域的值。
+
+### Provider 查询钩子
+
+下列钩子都要求上层 StoreProvider，无 Provider 时为 PROVIDER_REQUIRED。
+
+| API                                               | 参数、返回与错误                                                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| useStoreRegistry()                                | 无参，返回当前 StoreRegistry                                                                                                                           |
+| useStoreRuntime()                                 | 无参，返回当前 Registry.runtime                                                                                                                        |
+| `useStoreFromProvider<T>(token:IStoreToken<T>):T` | token 必填，调用 registry.require(token)；缺失为 STORE_MISSING，只查找实例、不订阅其字段变化                                                           |
+| useProvidedStore(token,selector,isEqual?)         | token 为 `IStoreToken<IReactiveStore<S>>`，selector 为 (state:`IStoreShape<S>`)=>R，二者必填；isEqual 默认 Object.is；查找后调用 useStore 建立投影订阅 |
+
+### Token 与 StoreRegistry
+
+`createStoreToken<T>(debugName:string):IStoreToken<T>` 返回冻结的 {key:symbol,debugName}，名称必须是非空字符串；同名 token 仍是不同 Symbol。new StoreRegistry(runtime?) 与 createStoreRegistry(runtime?) 都默认新建 Runtime，借用该 Runtime 并拥有自己的 atomStore。
+
+| 成员                                       | 参数、默认与行为                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| register(token,value,options?)             | options 默认 {}，owned 默认 false；重复 token 为 STORE_DUPLICATE；返回仅作用于本代 entry 的幂等注销函数 |
+| replace(token,value,options?)              | owned 默认 false，提交新 entry；旧值 owned 且引用不同时释放旧值，同引用不释放                           |
+| get / require / has(token)                 | 缺失分别为 undefined / STORE_MISSING / false；关闭后均拒绝                                              |
+| remove(token,disposeOwned?)                | disposeOwned 默认 true；返回是否移除，false 只摘除不释放                                                |
+| retain(disposeOnRelease:boolean)           | 必填；返回幂等 release，最后释放且为 true 时任务延后复查再关闭                                          |
+| dispose()                                  | 同步、幂等启动全部整体清理，可能抛同步清理错误                                                          |
+| disposeAsync()                             | 稳定单 Promise，等待整体清理账本完成，失败拒绝且重播原链                                                |
+| whenTerminal()                             | 仅等待到 terminal，不替代 disposeAsync 的错误结果                                                       |
+| runtime / atomStore / lifecycle / disposed | 只读；lifecycle 为 open→closing→terminal，disposed 从非 open 起为 true                                  |
+
+IStoreRegistrationOptions 只有 owned?:boolean；非对象、读取失败或非布尔值为 INVALID_CONFIG，owned 捕获一次。register/replace 通过统一 ownerOf 校验已声明所有权：跨 Runtime 为 CROSS_RUNTIME，未声明 owner 的普通值允许注册。get/require/has 是查询而非写入，但仍有 active 守卫。整体 dispose 一开始先关闭接纳、清登记，再调用 owned 回调，防止重入登记。
+
+owned 释放优先 $dispose()，否则 dispose()，无对应函数则无操作；不拥有的值只摘除引用。整体清理按当前登记逆序启动 owned 释放，再释放 atomStore，不串行等待每项完成；thenable 由 lifecycle 读取一次 then 并用原 receiver 调用。同步 dispose 不等待 Promise，迟到失败由 Runtime lifecycle-hook 报告并被观察。disposeAsync 可在同步 dispose 之后等待同一批仍在途工作；提前发布的稳定完成 Promise 也支持清理回调重入共享。
+
+单个同步失败可直接附 REGISTRY_DISPOSAL_FAILED 保留原 Error，多个失败用 AggregateError；冻结或非 Error 原因经 cause/errors，外包已有身份不改。整体完成 Promise 重播同步与异步错误，whenTerminal 只反映清理已落定，不表示没有错误。
+
+remove、replace 和 register 返回的注销函数触发的是单项清理：异步失败会报告，但不纳入之后整体 disposeAsync 的等待账本。应用若要等待某个已移除对象的真实异步释放，应由该对象 owner 保留自己的完成协议，不能把 Registry 完成当成所有历史清理的屏障。
+
+### 错误与迁移
+
+| StoreReactErrorCode 属性 | code                     | 场景                                         |
+| ------------------------ | ------------------------ | -------------------------------------------- |
+| registryDisposed         | REGISTRY_DISPOSED        | Registry closing/terminal 后继续接纳或查询   |
+| registryDisposalFailed   | REGISTRY_DISPOSAL_FAILED | owned 清理失败                               |
+| providerRequired         | PROVIDER_REQUIRED        | Provider-only hook/feature 断言没有 Provider |
+| featureDisabled          | FEATURE_DISABLED         | 特性未显式开启                               |
+| storeMissing             | STORE_MISSING            | require token 尚未注册                       |
+| storeDuplicate           | STORE_DUPLICATE          | 同 token 重复 register                       |
+| crossRuntime             | CROSS_RUNTIME            | Registry 注入跨图值                          |
+| invalidConfig            | INVALID_CONFIG           | token/Provider/owned/ready/feature 配置无效  |
+| readyRejected            | READY_REJECTED           | 非 Error ready 拒绝原因的包装                |
+
+STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。
+
+| 稳定诊断                                                                          | 对应处理                               |
+| --------------------------------------------------------------------------------- | -------------------------------------- |
+| `[store] StoreProvider registry/runtime ownership mismatch`                       | 只传 registry 或让 runtime 同引用      |
+| `[store] hook requires a StoreProvider`                                           | 给 Provider-only hook 提供上层作用域   |
+| `[store] provider registry is disposed`                                           | 新建 Registry，不复用已关闭实例        |
+| `[store] duplicate provider store token: X` / `[store] missing provider store: X` | 修正注册顺序、token 身份或显式 replace |
+| `[store] provider store "X" belongs to a different Runtime`                       | 对齐实际 owner                         |
+| `[store] IStoreToken requires a debug name`                                       | 提供非空字符串                         |
+| `[store] ready barrier rejected`                                                  | 检查 cause，用外层 Error Boundary      |
+| `[store] provider registry disposal failed`                                       | 展开 AggregateError.errors 或单个原错  |
+
+feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。
+
+### 排查与开发命令
+
+缺 Provider 时检查组件真正的 React 父树，Context 不是按 DOM 位置传播；portal 保留其 React 父树上下文。未重渲染时确认 selector 实际读取目标节点、equality 未把变化判相等、读取没有提前在追踪外缓存。ready 卡住时检查 Promise 结算、稳定数组与 Error Boundary；SSR 应使用外部请求 Registry 并在 finally 等待 disposeAsync。
+
+```bash
+pnpm run fmt
+pnpm run lint
+pnpm run typecheck
+pnpm run typecheck:test
+pnpm run test
+pnpm run typecheck:e2e
+pnpm run test:e2e
+pnpm run build
+```
+
+浏览器集成需 Playwright 浏览器。列出命令不表示本次文档任务运行了它们。

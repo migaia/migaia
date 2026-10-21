@@ -69,7 +69,12 @@ function liquidationReason(primary: unknown, cleanupErrors: readonly unknown[]):
   )
 }
 
-/** Own bounded sessions and one terminal diagnostic clock per registered supervisor. */
+/**
+ * Own bounded session admission and terminal diagnostics while borrowing registered supervisors.
+ * Invalid capacities/policies reject synchronously before I/O. Closing releases listeners and
+ * diagnostic registrations through one shared Promise, retaining cleanup failures in an aggregate;
+ * it does not dispose the borrowed supervisors or forcibly close previously adopted leases.
+ */
 export function createProcessResilience(options: IProcessResilienceOptions): IProcessResilience {
   const manager = createProcessSessionManager(options)
   /** Normal registrations are removed at their own release, not kept as tombstones. */

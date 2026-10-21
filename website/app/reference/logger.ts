@@ -13,6 +13,7 @@ import type {
   IText,
   ITypeDoc
 } from './contract.js'
+import { loggerCases } from './logger-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -49,8 +50,8 @@ const logEntryMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   context: {
     summary: t(
-      'Context path such as `["api", "users"]`.',
-      '条目所属的上下文路径，例如 `["api", "users"]`。'
+      'Context path such as ["api", "users"]; when dispatchRaw omits it, the entry copies ctx.path, whose constructor default is [].',
+      '条目所属路径，例如 `["api", "users"]`；`dispatchRaw` 省略时复制 `ctx.path`，构造路径默认 `[]`。'
     )
   },
   error: {
@@ -183,8 +184,8 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: {
       tag: t(
-        'Entry tag such as `info` or `audit`; `level()` filters standard level tags.',
-        '日志条目的标签，例如 `info` 或 `audit`；`level()` 只过滤标准级别标签。'
+        'Entry tag such as `info` or `audit`; the level() threshold applies only to the five standard levels, while its filters apply to every tag.',
+        '日志条目的标签，例如 `info` 或 `audit`；`level()` 的级别门槛仅约束五个标准级别，过滤函数仍约束所有标签。'
       ),
       message: t(
         'Message text; `%s`, `%d`, `%o` placeholders are left for the console sink.',
@@ -208,8 +209,8 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: {
       input: t(
-        '`{ tag, message, args?, meta?, data?, context?, error?, time? }`; `context` defaults to the `context` option.',
-        '`{ tag, message, args?, meta?, data?, context?, error?, time? }`；`context` 默认取构造选项中的 `context`。'
+        'Required tag and message, plus optional args (default []), meta (undefined), data ({}), context (constructor context), error (first Error argument projected to name/message/stack/raw, otherwise undefined) and time (current Date). The core assigns id; callers cannot supply it. Metadata/data keys such as orderId and route are application-defined. Containers are copied, nested application values stay shared.',
+        '`tag` 与 `message` 必填；可选 `args` 默认 `[]`，`meta` 默认 `undefined`，`data` 默认 `{}`，`context` 默认构造路径，`error` 默认取首个 Error 参数的名称、消息、堆栈及原对象投影，未找到时为 `undefined`，`time` 默认当前日期。`id` 由核心分配，调用者不能提供；`orderId`、`route` 等键由应用定义，容器会复制，嵌套业务值仍共享。'
       ),
       options: dispatchOptionsParam
     },
@@ -390,8 +391,8 @@ log.useAsyncGeneratorPipeline(async function* (entry, context) {
   },
   flush: {
     summary: t(
-      'Waits for deferred tasks, async sink results, `onFlush` callbacks, batches and forwarded loggers. Concurrent calls share one Promise; a stuck Promise is abandoned after about 3 seconds and reported with `LIFECYCLE_DEADLINE`.',
-      '等待延后任务、异步 sink 结果、`onFlush` 回调、批处理以及转发目标全部完成。并发调用共享同一个 Promise；卡住的 Promise 约 3 秒后放弃等待，并以 `LIFECYCLE_DEADLINE` 上报。'
+      'Public flush() takes no argument. It waits for tracked deferred tasks, async sink results, onFlush callbacks, batches and forwarded loggers within a 3000 ms scheduler budget. Concurrent pending calls share one Promise; hitting the deadline reports LIFECYCLE_DEADLINE without aborting underlying work or proving delivery.',
+      '公开 `flush()` 不接收参数，在日志调度器的 `3000` 毫秒预算内等待已追踪的延后任务、异步输出、刷新回调、批处理及转发目标；尚未完成的并发调用共享同一 Promise，截止时报告 `LIFECYCLE_DEADLINE`，不会中止底层工作，也不证明日志已送达。'
     ),
     returns: t(
       'Resolves when the known work finished or the budget ran out.',
@@ -415,8 +416,8 @@ log.useAsyncGeneratorPipeline(async function* (entry, context) {
   },
   shutdown: {
     summary: t(
-      'Closes the logger: runs shutdown handlers, flushes, then uninstalls all plugins. Reentrant and concurrent calls share the same Promise. Afterwards logs are silently ignored and the logger cannot be reopened.',
-      '关闭 logger：执行收尾函数、刷新输出，再卸载全部插件。重入和并发调用共享同一个 Promise。之后的日志会被静默忽略，logger 不能重新启用。'
+      'Closes the logger: shutdown handlers and flush share a 3000 ms waiting budget, then Host disposal uses execution budgets separately. Handlers can enqueue final structured logs while raw output is closed. Reentrant and later calls share one terminal Promise; completed shutdown ignores new logs and cannot reopen.',
+      '关闭日志器：收尾回调与排空共享 `3000` 毫秒等待预算，之后 Host 释放另用 `execution` 预算；回调仍可写最终结构化日志，此时原始文本输出已关闭。重入及后续调用共享同一终结 Promise，关闭完成后忽略新日志，不能重新启用。'
     ),
     params: {
       reason: t(
@@ -524,6 +525,16 @@ await target.shutdown('manual')`
   }
 }
 
+/** Member docs of `ILoggerCore`: it installs plugins (`use` / `unUse`) but has no `onDispose`. */
+const loggerCoreMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEntries(
+  Object.entries(coreMembers).filter(([name]) => name !== 'onDispose')
+)
+
+/** Member docs of the plugin `core` (`ILoggerPluginCore`): `onDispose` instead of `use` / `unUse`. */
+const pluginCoreMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEntries(
+  Object.entries(coreMembers).filter(([name]) => name !== 'use' && name !== 'unUse')
+)
+
 /** Output rules and argument interpretation explained once per owning level-method surface. */
 const levelMessageArguments = t(
   'Entries from debug(), info(), warn(), error() and fatal() reach output only when their level meets the configured minimum and every installed filter accepts them. Entries below the minimum or rejected by any filter are discarded. For all five methods, a string first argument becomes the message, while remaining arguments are kept for output. For example, info("Order %s", orderId) keeps the placeholder and orderId for the output handler. If the first argument is not a string, the message is empty and every argument is retained in the args array.',
@@ -592,16 +603,16 @@ const levelMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
     ),
     params: { filter: t('`(entry) => boolean`.', '过滤函数 `(entry) => boolean`。') },
     returns: t(
-      'A function that removes this filter; calling it again does nothing.',
-      '移除该过滤器的函数；重复调用没有效果。'
+      'Idempotent removal function; removes every occurrence of this filter function identity, including duplicates.',
+      '幂等移除函数，按同一过滤函数身份删除所有匹配项，包括重复登记。'
     ),
     example: `const removeHealth = log.addFilter((entry) => !entry.message.includes('/health'))`
   },
   removeFilter: {
     call: '(filter)',
     summary: t(
-      'Removes a filter previously added (by `addFilter()` or the `filters` option).',
-      '移除之前添加的过滤器（来自 `addFilter()` 或 `filters` 选项）。'
+      'Removes every matching function identity, whether added by addFilter or the filters option.',
+      '按函数身份移除所有匹配项，包括 `addFilter` 或构造 `filters` 添加的项。'
     ),
     params: { filter: t('The same function object that was added.', '之前添加的同一个函数对象。') },
     returns: t('Nothing; unknown filters are ignored.', '无返回值；未添加过的过滤器会被忽略。'),
@@ -786,8 +797,8 @@ ${create}
     Logger: {
       role: 'factory',
       purpose: t(
-        'Creates a logger. Plugins in `plugins` are installed synchronously in array order; a plugin whose install returns a Promise makes the constructor throw (install those later with `use()`). The methods of installed plugins appear on the instance with full types.',
-        '创建一个 logger。`plugins` 中的插件按数组顺序同步安装；安装过程返回 Promise 的插件会让构造函数抛错（这类插件请在构造后用 `use()` 安装）。已安装插件的方法会出现在实例上，并带有完整类型。'
+        'Creates a logger with no built-in sink or level methods. Constructor plugins install synchronously in Feature dependency order; a Promise-returning install rejects construction, so install asynchronous plugins later with use(). Static plugin extensions appear on the returned instance with their types.',
+        '创建日志器，核心不自带输出端或级别方法；构造插件按功能依赖顺序同步安装，返回 Promise 的安装会使构造失败，异步插件应在构造后用 `use()` 安装。静态插件扩展会带着类型出现在返回实例上。'
       ),
       params: {
         options: t(
@@ -800,7 +811,10 @@ ${create}
         '一个 logger 实例；选项不合法时抛 `INVALID_OPTION`，某个插件安装失败时会回滚它之前已安装的插件并重新抛出。'
       ),
       options: 'ILoggerOptions',
-      example: loggerExample,
+      exampleIntro: loggerCases.Logger![0]!.problem,
+      example: loggerCases.Logger![0]!.example,
+      exampleResult: loggerCases.Logger![0]!.result,
+      cases: loggerCases.Logger,
       scenarios: loggerScenarios,
       avoid: [
         t(
@@ -909,39 +923,40 @@ console.log(getLoggerRuntimeManager() === previous, lines)`
     level: {
       role: 'enhancer',
       purpose: t(
-        'Plugin that adds `debug()` / `info()` / `warn()` / `error()` / `fatal()`, a minimum level and filters. Without it a logger only has `log(tag, message)`.',
-        '增加 `debug()` / `info()` / `warn()` / `error()` / `fatal()`、最低级别与过滤器的插件。没有它时 logger 只有通用的 `log(tag, message)` 方法。'
+        'Adds debug/info/warn/error/fatal methods, a standard-level threshold and filters for every tag. setLevel changes the live threshold; built-in level captures configuration during installation, so config.update alone does not reconfigure that threshold or its filters. The example supplies both required Logger execution budgets as false (no Host deadline), installs this plugin, and registers a memory sink.',
+        '增加五种级别方法、标准级别门槛与面向所有标签的过滤器；`setLevel` 修改活动门槛。内置插件在安装时捕获配置，单独 `config.update` 不会重配门槛或过滤列表；本例为 Logger 两项必填 `execution` 预算设 `false`（无 Host 时限），安装插件并登记内存输出端。'
       ),
       params: {
-        config: t('Optional; see `ILevelPluginConfig`.', '可选配置，见 `ILevelPluginConfig`。')
+        config: t(
+          'Optional ILevelPluginConfig, defaults to {}.',
+          '可选 `ILevelPluginConfig`，默认 `{}`。'
+        )
       },
       returns: t('A plugin object for one logger.', '只能安装到一个 logger 上的插件对象。'),
       options: 'ILevelPluginConfig',
-      example: `import { Logger } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
-
-${create}
-  plugins: [level({ level: 'info' })]
-})
-log.warn('cache miss for %s', key)`
+      exampleIntro: loggerCases.level![0]!.problem,
+      example: loggerCases.level![0]!.example,
+      exampleResult: loggerCases.level![0]!.result,
+      cases: loggerCases.level
     },
     color: {
       role: 'enhancer',
       purpose: t(
-        'Prints readable lines or JSON with optional ANSI colors, using captured runtimeManager.console in preference to write. To capture output replace that console or supply a pure write manager without console. It offers paint/dim to reasoning().',
-        '把日志输出为可读文本或结构化格式，可选终端颜色；优先使用捕获的管理器控制台，捕获输出应替换控制台或提供不含控制台的纯写入管理器；另向流式插件提供着色能力。'
+        'Prints pretty lines or JSON using the captured runtimeManager.console before falling back to write. JSON rendering projects bounded source/code/name/message/stack/cause/errors and excludes the local raw Error reference. It adds no logger methods and provides paint/dim to reasoning().\n\nThe example supplies required Logger execution.mutationTimeoutMs and execution.pipelineDrainTimeoutMs as false (no Host deadline), context as the entry path (default []), and plugins (default []). runtimeManager defaults to the current manager; this example borrows its randomUUID, defer and write capabilities, replacing only console.log/warn/error with variadic void callbacks that capture the rendered string.',
+        '将日志渲染为可读文本或 JSON，优先使用已捕获的 `runtimeManager.console`，缺失时才使用 `write`。JSON 采用有界错误链投影，保留来源、错误码、名称、消息、堆栈、原因与聚合分支，不含本地 `raw` 错误引用；插件不添加日志方法，并向 `reasoning()` 提供着色能力。\n\n本例为 Logger 必填的 `execution.mutationTimeoutMs` 与 `execution.pipelineDrainTimeoutMs` 设 `false`（无 Host 时限），`context` 提供条目路径（默认 `[]`），`plugins` 默认 `[]`。`runtimeManager` 默认捕获当前管理器，本例沿用其 `randomUUID`、`defer`、`write`，仅替换 `console.log`、`warn`、`error` 为接收任意参数、返回空值的函数，将渲染文本收进内存。'
       ),
       params: {
-        config: t('Optional; see `IColorPluginConfig`.', '可选配置，见 `IColorPluginConfig`。')
+        config: t(
+          'Optional IColorPluginConfig, defaults to {}.',
+          '可选 `IColorPluginConfig`，默认 `{}`。'
+        )
       },
       returns: t('A plugin object for one logger.', '只能安装到一个 logger 上的插件对象。'),
       options: 'IColorPluginConfig',
-      example: `import { Logger } from '@migaia/logger'
-import { level, color } from '@migaia/logger/plugins'
-
-${create}
-  plugins: [level(), color({ format: 'pretty', colorMessage: 'head' })]
-})`
+      exampleIntro: loggerCases.color![0]!.problem,
+      example: loggerCases.color![0]!.example,
+      exampleResult: loggerCases.color![0]!.result,
+      cases: loggerCases.color
     },
     batch: {
       role: 'enhancer',
@@ -1155,14 +1170,14 @@ ${create}
       ),
       scenarios: loggerScenarios,
       example: loggerExample,
-      members: coreMembers
+      members: loggerCoreMembers
     },
     ILoggerPluginCore: {
       summary: t(
         'The `core` a plugin receives in `install(core)`: the logger core without `use` / `unUse`, plus `onDispose()` for cleanup.',
         '插件在 `install(core)` 中收到的 `core`：去掉 `use` / `unUse` 的 logger 核心，外加用于清理的 `onDispose()`。'
       ),
-      members: coreMembers
+      members: pluginCoreMembers
     },
     ILoggerConfig: {
       summary: t(
@@ -1172,13 +1187,13 @@ ${create}
       members: {
         get: {
           summary: t(
-            'Reads a nested value of one plugin configuration; reading a whole plugin root is invalid. The result is a shallow copy; nested objects are shared.',
-            '读取某个插件配置中的嵌套值；不能直接读取插件的根配置。返回浅拷贝，嵌套对象仍是共享引用。'
+            'Reads one committed plugin configuration or a nested value through the Host config facade. Object and array snapshots are recursively frozen; Logger adds no copy or root-name restriction.',
+            '通过 Host 配置接口读取某个插件的完整已提交配置或嵌套值；对象与数组快照递归冻结，Logger 不额外拷贝，也不禁止读取插件根配置。'
           ),
           params: {
             path: t(
-              '`<pluginName>.<key>` or `<pluginName>.[index].<key>`, e.g. `level.level`.',
-              '`<插件名>.<键>` 或 `<插件名>.[下标].<键>`，例如 `level.level`。'
+              'A plugin name for its whole configuration, or a nested path such as level.level or plugin.[index].key.',
+              '用插件名读取完整配置，或使用 `level.level`、`plugin.[index].key` 等嵌套路径。'
             )
           },
           returns: t(
@@ -1190,8 +1205,8 @@ console.log(storedRetries ?? 2)`
         },
         update: {
           summary: t(
-            'Shallow-merges a patch into one plugin configuration and commits it.',
-            '把补丁浅合并到某个插件的配置中并提交。'
+            'Shallow-merges a patch, runs an optional plugin update hook, then commits the Host-owned snapshot. A plugin that captures config at install time needs its explicit runtime methods for behavior changes; use setLevel for the built-in level threshold.',
+            '浅合并补丁，运行可选插件更新钩子，再提交 Host 拥有的快照；安装时捕获配置的插件，须使用明确的运行时方法改变行为，内置级别门槛使用 `setLevel`。'
           ),
           params: {
             name: t(
@@ -1296,8 +1311,20 @@ console.log(storedRetries ?? 2)`
       members: {
         execution: {
           summary: t(
-            'Required deadlines: `mutationTimeoutMs` for plugin install/uninstall and `pipelineDrainTimeoutMs` for pipeline drain; `false` means no deadline.',
-            '必填的截止设置：`mutationTimeoutMs` 用于插件安装与卸载，`pipelineDrainTimeoutMs` 用于管线排空；`false` 表示不设截止时间。'
+            'Required object containing mutationTimeoutMs and pipelineDrainTimeoutMs. Each field is a finite nonnegative millisecond number or false; neither has a default. These Host budgets are distinct from the logger 3000 ms flush/shutdown-handler waiting budget.',
+            '必填对象，含 `mutationTimeoutMs` 与 `pipelineDrainTimeoutMs`，两字段都没有默认值，须为有限非负毫秒数或 `false`；这些 Host 预算不同于日志排空与关闭回调的 `3000` 毫秒等待预算。'
+          )
+        },
+        'execution.mutationTimeoutMs': {
+          summary: t(
+            'Required plugin install/uninstall mutation budget in finite nonnegative milliseconds; false explicitly disables its deadline.',
+            '必填插件安装与卸载变更预算，使用有限非负毫秒数；`false` 显式取消该截止时间。'
+          )
+        },
+        'execution.pipelineDrainTimeoutMs': {
+          summary: t(
+            'Required Host pipeline drain budget in finite nonnegative milliseconds; false explicitly disables its deadline.',
+            '必填 Host 管线排空预算，使用有限非负毫秒数；`false` 显式取消该截止时间。'
           )
         },
         runtimeManager: {
@@ -1333,8 +1360,8 @@ console.log(storedRetries ?? 2)`
         },
         plugins: {
           summary: t(
-            'Plugins installed synchronously in array order; their methods appear on the instance.',
-            '按数组顺序同步安装的插件；它们的方法会出现在实例上。'
+            'Plugins installed synchronously in Feature dependency order within this batch; their static extensions appear on the instance.',
+            '本批插件按功能依赖顺序同步安装，静态扩展会出现在返回实例上。'
           ),
           default: t('`[]`: a bare core with `log()` only.', '`[]`：只有 `log()` 的空核心。')
         },
@@ -1404,11 +1431,7 @@ console.log(storedRetries ?? 2)`
           '通过注入 `fs`，在浏览器或小程序中使用 `file()` 插件。'
         )
       ],
-      example: `const lines: string[] = []
-${create}
-  runtimeManager: { ...getLoggerRuntimeManager(), write: (text) => lines.push(text) },
-  plugins: [color({ format: 'json' })]
-})`,
+      example: loggerCases.color![0]!.example,
       members: {
         process: {
           summary: t(
@@ -1456,8 +1479,8 @@ ${create}
         },
         console: {
           summary: t(
-            'Console used by `color()` for pretty output and by failure reporting.',
-            '`color()` 可读输出与失败上报使用的控制台对象。'
+            'Optional console.log/warn/error callbacks used by color for both pretty and JSON output and by failure reporting. Each accepts variadic unknown values and returns void. Without console, the renderer falls back to write.',
+            '可选的 `console.log`、`warn`、`error` 回调，供颜色插件的可读与 JSON 输出及失败报告使用；各接收任意多个未知值，返回空值，未提供控制台时渲染器改用 `write`。'
           )
         },
         fetch: {
@@ -1552,7 +1575,8 @@ ${create}
         '`dispatchRaw()` 的输入：`tag` 与 `message` 必填，其它条目字段可选。'
       ),
       members: {
-        ...logEntryMembers,
+        // `dispatchRaw()` assigns the entry id itself, so the input type omits `id`.
+        ...Object.fromEntries(Object.entries(logEntryMembers).filter(([name]) => name !== 'id')),
         tag: {
           summary: t(
             'Tag of the entry, such as `audit`.',
@@ -1707,10 +1731,13 @@ ${create}
       members: {
         level: {
           summary: t(
-            'Minimum level written; lower levels are dropped. Tags that are not level names always pass.',
-            '会被输出的最低级别，更低的级别被丢弃；不是级别名称的标签总是放行。'
+            'Minimum standard level; lower standard levels are dropped. Other tags bypass only the threshold and still pass through every filter. Captured at installation; change behavior with setLevel, not config.update alone.',
+            '最低标准级别，更低标准级别会被丢弃；其他标签仅跳过门槛，仍经过所有过滤函数。安装时捕获此值，改变行为使用 `setLevel`，不能只提交 `config.update`。'
           ),
-          default: t('`debug`: everything passes.', '`debug`：全部放行。'),
+          default: t(
+            '`debug`: all five standard levels meet the threshold.',
+            '`debug`：五个标准级别均达到门槛。'
+          ),
           values: { enum: 'LoggerLevel' }
         },
         filters: {
@@ -1775,8 +1802,8 @@ remove()`,
           default: t('`auto`.', '`auto`：根据环境自动选择。'),
           values: {
             auto: t(
-              '`LOG_FORMAT` if set; otherwise `pretty` in CI or a terminal, `json` when stdout is redirected.',
-              '设置了 `LOG_FORMAT` 时按它；否则在 CI 或终端中为 `pretty`，stdout 被重定向时为 `json`。'
+              'Uses LOG_FORMAT only when it is pretty or json; otherwise pretty in CI or a terminal, and json for other output.',
+              '`LOG_FORMAT` 仅取 `pretty` 或 `json` 时生效；否则 CI 或终端使用 `pretty`，其余输出使用 `json`。'
             ),
             pretty: t(
               'One readable line: time, `[LEVEL]`, context, message and arguments.',
@@ -1959,8 +1986,8 @@ await batcher.flush()`,
         },
         requestTimeoutMs: {
           summary: t(
-            'Maximum time of one request; on timeout it is aborted and handled like a network error.',
-            '单次请求的最长时间；超时会中止请求并按网络错误处理。'
+            'Abort timer for one request when an AbortController is available. This is not an independent Promise race: fetch that ignores its signal may remain pending, and no controller means no request timer. An abort rejection is handled like a network error.',
+            '有可用 AbortController 时为单次请求安排中止计时器；这不是独立的 Promise 竞速，`fetch` 忽略信号时仍可能不结算，没有控制器就不建立请求计时器；中止导致的拒绝按网络错误处理。'
           ),
           default: t('`10000`.', '默认值为 `10000` 毫秒。')
         },

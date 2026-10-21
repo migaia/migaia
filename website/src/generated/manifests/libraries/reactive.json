@@ -5,6 +5,7 @@
     "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
     "version": "0.0.8",
     "exports": [".", "./extension"],
+    "readmeLocales": ["zh", "en"],
     "documentation": {
       "readme": {
         "sections": [
@@ -14,76 +15,158 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "与 UI 框架、宿主环境无关的响应式内核：`Signal`（可写值）、`Computed`（惰性派生值）、`Effect`（副作用）三个基础节点，加一个提供隔离依赖图与调度器的 `Runtime`。"
-              }
-            ]
-          },
-          {
-            "id": "1-这是什么",
-            "heading": "1. 这是什么",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "如果把响应式状态管理拆成两层——\"图怎么建、什么时候该重算、副作用什么时候该跑\"是引擎层，\"用 Map/Set 建模集合、给异步请求做状态机、跟某个 UI 框架的渲染时机对齐\"是应用层——`@migaia/reactive` 只做引擎层。它不认识 React、不认识 DOM、不内置集合类型或异步资源状态机，只提供三个最小节点原语和一个把它们粘在一起的 `Runtime`：写一个 `Signal`，读它的 `Computed` 会被标记为\"可能过期\"，订阅了这个 `Computed` 的 `Effect` 会在下一次调度里重新跑一遍。"
+                "text": "English"
               },
               {
                 "type": "paragraph",
-                "text": "可以把 `Runtime` 类比成一个独立的电子表格计算引擎实例：`Signal` 是输入单元格，`Computed` 是带公式的单元格（只有被别的单元格引用时才会重算），`Effect` 是\"某个单元格变了就打印/发请求\"这类订阅动作。这个 monorepo 里的 `store-*` 系列包（集合、持久化、React 绑定等）都是在这个引擎之上搭建的上层能力。"
+                "text": "界面上的合计、筛选结果、徽标数字都是由其他数据推导出来的。手动在每个修改点同步它们，迟早会漏掉一处；每次写入都立刻通知，又会让页面闪过一半新一半旧的值。`@migaia/reactive` 用 Signal（可写的值）、Computed（自动推导的值）和 Effect（值变化后要做的事）记录谁依赖谁，值变了只更新真正受影响的部分。它与 UI 框架和宿主环境无关，浏览器、Node、Worker 里都能用；store 系列包（集合、持久化、React 绑定等）都建立在它之上。"
               }
             ]
           },
           {
-            "id": "2-适合什么场景",
-            "heading": "2. 适合什么场景",
-            "blocks": [
-              {
-                "type": "table",
-                "headers": ["场景", "说明"],
-                "rows": [
-                  [
-                    "自己搭建状态管理/Store 库",
-                    "需要精确控制批处理、调度时机、依赖追踪细节，而不是套用某个框架自带的响应式实现"
-                  ],
-                  [
-                    "同一进程需要多个互不干扰的响应式图",
-                    "每个 `Runtime` 完全隔离：SSR 每请求一个、单测每个用例一个、多个 Worker 各一个，互不污染"
-                  ],
-                  [
-                    "需要给响应式变化接可观测性",
-                    "`subscribeTrace` 提供只读事件流（值变化、依赖连接、副作用执行），可以做 devtools 而不侵入核心逻辑"
-                  ],
-                  [
-                    "需要把响应式图接到某个 UI 框架",
-                    "三段式 `capture`/`commit` 绑定原语（见 USEGUIDE）支持并发渲染安全的适配层实现"
-                  ]
-                ]
-              },
-              {
-                "type": "paragraph",
-                "text": "不适合的场景：只是想要组件内部的局部状态（等价于 `useState`），不需要跨组件共享的响应式图；需要开箱即用的可观察集合、异步资源状态机——这些是 monorepo 里其它包（如集合、resource 包）在本包之上构建的上层能力，`@migaia/reactive` 本身不提供。"
-              }
-            ]
-          },
-          {
-            "id": "3-用了之后能得到什么",
-            "heading": "3. 用了之后能得到什么",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
             "blocks": [
               {
                 "type": "list",
                 "items": [
-                  "完全隔离的 Runtime：不同 `Runtime` 的节点分属不同依赖图和版本时钟，混用会立即抛错，不会有全局单例串状态的问题。",
-                  "惰性 + 缓存的 Computed：不被读取时不计算；没有订阅者时的手动读取仍会计算；多个下游共享同一个上游变化（diamond 依赖）只重算一次；普通无人观察读取的 `Computed` 在 idle 挂起，最后观察者离开时同步挂起（断开依赖、保留重验证快照），无需手动管理。",
-                  "显式生命周期：`Signal`/`Computed`/`Effect` 都要 `dispose()`；`@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()` 提供集中持有与一次性释放。读取已释放节点会立刻抛出明确错误，不会静默返回陈旧值。",
-                  "可控的调度：默认微任务合并触发；创建 Runtime 时可用 `schedulerStrategy` 选项设为 `requestAnimationFrame`/`idle`/自定义策略；`batch()` 显式合并多次写入为一次副作用刷新；`flush()` 手动同步冲刷。",
-                  "失控保护：自触发无限循环会在超过 `maxFlushPasses`（默认 100 轮）后抛错并如实报告被丢弃了哪些待办，而不是让标签页卡死。",
-                  "诊断即观测，不侵入业务：trace 事件、错误上报都走独立通道，不会成为业务状态的一部分。"
+                  "派生值漏更新：合计、筛选结果单独存在变量里，每个修改点都要记得重算，漏掉一处页面就显示旧值。根因是依赖关系靠人记，没有被程序记录下来。",
+                  "页面闪过一半新一半旧的值：同时改名和姓，页头先显示 “Grace Lovelace”，再显示正确的名字。根因是每次写入都立刻通知监听者，监听者读到的是只改了一半的数据。",
+                  "旧订阅没有取消：切换聊天房间后还在接收旧房间的消息，内存慢慢上涨。根因是订阅的清理散落在各处，靠人记得调用。",
+                  "标签页卡死：两个副作用互相写对方读取的值，值始终对不上，就一直互相触发。根因是没有任何东西限制一次更新能连锁多少轮。",
+                  "服务端渲染串数据：状态放在模块级的全局变量里，一个请求写入的值被另一个请求读到。根因是所有请求共用了同一份状态图。"
                 ]
               }
             ]
           },
           {
-            "id": "4-安装与公开入口",
-            "heading": "4. 安装与公开入口",
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "派生值只声明一次，依赖自动登记。 手写时每个修改点都要记得重算；`computed` 在读取 `price.value` 时就记下了依赖，任何一个输入变化都会让它重算。示例",
+                  "多次写入只更新一次，看不到一半新一半旧的值。 每次写入都立刻通知会渲染出混合值；Runtime 写入时只标记过期，副作用在下一次冲刷时按最终输入运行，从多条路径读取同一组值的派生值也一致。示例",
+                  "没人读取的派生值不计算。 关着的面板也在重算是常见的浪费；`computed` 没人读取就不运行，最后一个读者离开后自动和输入断开，下次读取时才按需重算。示例",
+                  "副作用死循环会被截断，而不是卡死页面。 互相触发的副作用可能无限运行；每次冲刷最多 `maxFlushPasses` 轮（默认 100），超过后停止并报告 `FLUSH_LOOP` 和相关的 `debugName`。示例",
+                  "每个 Runtime 完全隔离，混用会立刻报错。 全局状态在服务端请求之间串用很难发现；不同 Runtime 的节点不能互相依赖，跨 Runtime 读取立刻抛 `CROSS_RUNTIME`。示例"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面用购物车演示：合计由商品和折扣推导出来，两者都变了也只更新一次。用 Node 24 直接运行。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst items = runtime.signal([{ name: '键盘', price: 300 }])\nconst discount = runtime.signal(0)\n// 合计从商品和折扣推导出来，任何一个变了都会自动重算\nconst total = runtime.computed(\n  () => items.value.reduce((sum, item) => sum + item.price, 0) * (1 - discount.value)\n)\n\nconst badge = runtime.effect(() => console.log(`合计 ${total.value} 元`))\n\nitems.value = [...items.peek(), { name: '鼠标', price: 100 }]\ndiscount.value = 0.1\nawait Promise.resolve() // 两次修改在下一个微任务里合并成一次更新\nbadge.dispose()"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "合计 300 元\n合计 360 元"
+              },
+              {
+                "type": "paragraph",
+                "text": "`effect` 创建时立即运行一次，输出 300。之后的两次修改不会各自触发一次输出，而是在下一个微任务里合并成一次，直接得到 360（(300 + 100) × 0.9）。`total` 读了 `items.value` 和 `discount.value`，依赖就自动登记了，不需要另写订阅代码。"
+              },
+              {
+                "type": "paragraph",
+                "text": "下一步：派生值和副作用的更多用法看 USEGUIDE 的“按场景查找”；服务端渲染、测试要隔离状态时看 服务端每个请求一个 Runtime。"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面是常见的手写“值变了就通知”。它能跑，但有三个隐患（只用于说明，不必运行）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "let price = 30\nlet quantity = 2\nlet total = price * quantity\nconst listeners = new Set<() => void>()\n\nfunction setQuantity(next: number) {\n  quantity = next\n  // 隐患 1：每个修改点都要记得重算派生值；setPrice 里漏写这一行，页面就显示旧合计\n  total = price * quantity\n  // 隐患 2：每次写入都立刻通知，连续改两个值会渲染两次，第一次是一半新一半旧的结果\n  listeners.forEach((listener) => listener())\n}\n\n// 隐患 3：订阅要手动取消；组件卸载时忘了 delete，监听器和它引用的对象一直留在内存里\nlisteners.add(() => console.log(total))"
+              },
+              {
+                "type": "paragraph",
+                "text": "用 Runtime 时，`computed` 只声明一次推导规则，依赖在读取时自动登记；写入只把下游标记为过期，副作用在下一次冲刷时统一运行；副作用返回的清理函数会在重跑前和 `dispose()` 时自动执行。"
+              }
+            ]
+          },
+          {
+            "id": "三分钟心智模型",
+            "heading": "三分钟心智模型",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "可以把一个 `Runtime` 想成一个独立的电子表格：`Signal` 是输入单元格，`Computed` 是带公式的单元格，`Effect` 是“某个单元格变了就打印或发请求”这类动作。"
+              },
+              {
+                "type": "table",
+                "headers": ["概念", "一句话"],
+                "rows": [
+                  [
+                    "`Runtime`",
+                    "一套独立的依赖图、版本时钟和调度器；节点必须属于同一个 `Runtime` 才能互相依赖"
+                  ],
+                  ["`Signal`", "可写的值，读 `.value` 会登记依赖，写 `.value` 会通知下游"],
+                  ["`Computed`", "惰性计算、带缓存的派生值，只在被读取时按需重算"],
+                  ["`Effect`", "读取依赖并执行副作用；创建时立即运行一次，依赖变化后被安排重跑"],
+                  [
+                    "`batch()` / `flush()`",
+                    "把多次写入合并成一次副作用刷新 / 立即同步冲刷待运行的副作用"
+                  ],
+                  ["trace", "只读诊断事件：值变化、依赖连接和断开、副作用执行，不影响业务状态"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "几个说法："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "依赖追踪：`Computed` 或 `Effect` 运行时读了哪些 `Signal` / `Computed`，就自动依赖哪些。",
+                  "冲刷（flush）：真正运行排队中的副作用。默认在写入后的下一个微任务自动进行。",
+                  "挂起：没有读者的 `Computed` 断开和输入的连接，不再随写入重算；下次读取时先检查输入，变了才重算。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "典型场景",
+            "heading": "典型场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["场景", "怎么组合", "详细说明"],
+                "rows": [
+                  ["派生值随输入自动更新", "`runtime.computed` + `runtime.effect`", "USEGUIDE"],
+                  ["切换房间、页面时清理旧订阅", "`effect` 返回清理函数", "USEGUIDE"],
+                  ["同时修改多个值", "默认微任务合并，或 `runtime.batch`", "USEGUIDE"],
+                  ["关闭的面板不再重算", "`computed` 自动挂起，`keepAlive` 可关闭", "USEGUIDE"],
+                  ["防止副作用死循环", "`maxFlushPasses` + `onError`", "USEGUIDE"],
+                  ["服务端渲染、测试隔离", "每个请求或用例一个 `createRuntime()`", "USEGUIDE"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
             "blocks": [
               {
                 "type": "code",
@@ -92,23 +175,63 @@
               },
               {
                 "type": "table",
-                "headers": ["入口", "内容与边界"],
+                "headers": ["入口", "内容"],
                 "rows": [
                   [
                     "`@migaia/reactive`",
-                    "Runtime 工厂、`IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect`、诊断常量与错误码。"
+                    "`createRuntime`、`defaultRuntime`、节点类型 `IReactiveSignal` / `IReactiveComputed` / `IReactiveEffect`、诊断常量与错误码"
                   ],
                   [
                     "`@migaia/reactive/extension`",
-                    "所有权、受控 source、observer binding、图协议类型与只读版本查询。"
+                    "给 store、集合、资源和 UI 框架适配层用的扩展能力：所有权登记、自定义数据源、observer binding、只读的版本查询"
                   ]
                 ]
               }
             ]
           },
           {
-            "id": "5-五分钟上手",
-            "heading": "5. 五分钟上手",
+            "id": "常用-api",
+            "heading": "常用 API",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "做什么"],
+                "rows": [
+                  [
+                    "`createRuntime(options?)`",
+                    "创建一个隔离的 Runtime；选项可设置调度方式、`maxFlushPasses`、`onError`、`onTrace`"
+                  ],
+                  [
+                    "`runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)`",
+                    "创建可写值、派生值和副作用；都有 `dispose()`"
+                  ],
+                  [
+                    "`runtime.batch(fn)` / `runtime.flush()`",
+                    "把多次写入合并成一次刷新 / 立即同步冲刷"
+                  ],
+                  ["`runtime.untracked(fn)`", "在不登记依赖的情况下读取"],
+                  ["`runtime.subscribeTrace(listener)`", "订阅只读诊断事件"],
+                  [
+                    "`createObserverBinding`（`/extension`）",
+                    "写 UI 框架适配层：渲染期间采集依赖，提交后再订阅"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "契约细节",
+            "heading": "契约细节",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "全部签名、边界行为与错误码见 USEGUIDE.md。下面是使用时最需要记住的约束。"
+              }
+            ]
+          },
+          {
+            "id": "一张依赖图的完整生命周期",
+            "heading": "一张依赖图的完整生命周期",
             "blocks": [
               {
                 "type": "code",
@@ -117,86 +240,51 @@
               },
               {
                 "type": "paragraph",
-                "text": "这段代码建立的是一张由当前 `runtime` 独占的依赖图。`runtime.effect()` 创建时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。"
+                "text": "这段代码建立的是一张由当前 `runtime` 独占的依赖图。`runtime.effect()` 创建时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。"
               },
               {
                 "type": "paragraph",
-                "text": "`count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动 flush；测试、SSR 或需要确定提交边界的代码才显式调用 `flush()`。"
+                "text": "`count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动冲刷；测试、服务端渲染或需要确定提交边界的代码才显式调用 `flush()`。"
               },
               {
                 "type": "paragraph",
-                "text": "释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。这里没有持久化数据、连接或计时器，`dispose()` 的实际作用是断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给从 `@migaia/lifecycle` 导入的 `createLifecycleScope()`/`createSyncLifecycleScope()` 持有并统一释放。"
-              },
-              {
-                "type": "paragraph",
-                "text": "不想自己管理 `Runtime` 生命周期时，可以用内置的全局单例 `defaultRuntime`（进程级共享，测试/SSR/Worker 场景不建议用它，见下方注意事项）。"
+                "text": "释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。`dispose()` 断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给 `@migaia/lifecycle` 的 `createLifecycleScope()` / `createSyncLifecycleScope()` 持有并统一释放。"
               }
             ]
           },
           {
-            "id": "6-核心概念速览",
-            "heading": "6. 核心概念速览",
+            "id": "生命周期-错误与边界",
+            "heading": "生命周期、错误与边界",
             "blocks": [
               {
-                "type": "table",
-                "headers": ["概念", "一句话"],
-                "rows": [
-                  [
-                    "`Runtime`",
-                    "一套独立的依赖图 + 版本时钟 + 调度器；节点必须属于同一个 `Runtime` 才能互相依赖"
-                  ],
-                  ["`Signal`", "可写的响应式原子值"],
-                  ["`Computed`", "惰性求值、带缓存的派生值"],
-                  ["`Effect`", "读取依赖并执行副作用；依赖变化后被调度重跑；构造时立即跑一次"],
-                  [
-                    "`batch()` / `flush()`",
-                    "把多次写入合并成一次副作用刷新 / 手动立即触发一次冲刷"
-                  ],
-                  [
-                    "trace",
-                    "只读诊断事件流：值变化、依赖连接/断开、副作用执行、显式 action，不影响业务状态"
-                  ]
-                ]
+                "type": "paragraph",
+                "text": "1. 不要跨 `Runtime` 混用节点：一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed` / `Effect` 读取会抛 `CROSS_RUNTIME`。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，都有 `dispose()` / `disposed`。三个节点类是内部实现，不作为值导出。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. 给 `Signal` 写入相同的值（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有读者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本和拓扑，未变则复用缓存）。需要“暂时没人读也保持计算”时传 `{ keepAlive: true }`。 6. `dispose()` 之后的读取会立刻抛 `NODE_DISPOSED`，不会静默返回旧值，避免出现“看起来能用但永远不更新”的状态。 7. `defaultRuntime` 是进程级单例。服务端渲染的请求隔离、单测互不影响、Worker 独立运行，都应该显式调用 `createRuntime()`。 8. 调度可控：默认在微任务里合并冲刷；创建 Runtime 时可用 `schedulerStrategy` 改为 `requestAnimationFrame`、空闲回调或自定义策略。 9. 诊断不进入业务状态：trace 事件和错误上报走独立通道。"
+              },
+              {
+                "type": "paragraph",
+                "text": "不适合的场景：只想要组件内部的局部状态（相当于 `useState`），不需要跨组件共享的依赖图；或者需要开箱即用的可观察集合、异步请求状态机。后两者由本仓的集合、resource 等包在本包之上提供，本包自身不包含。"
+              },
+              {
+                "type": "paragraph",
+                "text": "通用的“一组资源集中释放”容器（原 `Scope` / `createScope()`）已移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()` / `createSyncLifecycleScope()`。"
               }
             ]
           },
           {
-            "id": "7-包内入口一览",
-            "heading": "7. 包内入口一览",
+            "id": "多份副本与扩展入口",
+            "heading": "多份副本与扩展入口",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；自定义source/observer也只取得绑定到自身节点的能力，不取得内部服务或可变图边。三个节点类保持内部实现，不作为值导出。"
+                "text": "扩展入口的 `claimOwnership`、`ownerOf`、`assertOwnedBy` 对普通对象和函数对象使用同一归属契约：已登记的函数可以查到原 Runtime，跨 Runtime 校验抛 `CROSS_RUNTIME`，另一模块副本的品牌抛 `COPY_CONFLICT`。"
               },
               {
                 "type": "paragraph",
-                "text": "扩展入口的 `claimOwnership`、`ownerOf`、`assertOwnedBy` 对普通对象和函数对象使用同一归属契约：已登记函数可查询原 Runtime，跨 Runtime 校验抛 `CROSS_RUNTIME`，另一模块副本的品牌抛 `COPY_CONFLICT`。"
+                "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。升级时请让同一进程中的 reactive 副本保持同一版本：旧的 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数，也不会识别对方的归属标记。"
               },
               {
                 "type": "paragraph",
-                "text": "通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。"
-              }
-            ]
-          },
-          {
-            "id": "8-生命周期-错误与边界",
-            "heading": "8. 生命周期、错误与边界",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有订阅者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
-              },
-              {
-                "type": "paragraph",
-                "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+                "text": "`@migaia/reactive/extension` 提供 `getDefaultRuntime()`，给需要在导入时保持不创建任何东西的适配层使用。它在第一次调用时创建共享的默认 Runtime，返回的对象与根入口的 `defaultRuntime` 完全相同；导入根入口的 `defaultRuntime` 仍在导入时创建。`ReactiveErrorPhase` 也可以从扩展入口导入，与根入口导出的是同一个对象。"
               },
               {
                 "type": "code",
@@ -205,7 +293,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
+                "text": "`@migaia/reactive/extension` 的 `deferRuntimeCleanup(runtime, task)` 通过该 Runtime 的 `scheduleIdle` 通道安排一次同步的适配层清理（默认使用微任务）。清理抛出的错误交给 Runtime 的 `reportError`。它不返回可修改的调度器或依赖图能力，也不负责异步资源。"
               },
               {
                 "type": "code",
@@ -224,7 +312,269 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本指南列出两个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 README。"
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "包的定位、亮点和心智模型见 README。本指南先按场景给出可以直接运行的示例（Node 24），再列出两个公开入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类是内部实现。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["你遇到的问题", "看这一节"],
+                "rows": [
+                  ["派生值要在每个修改点手动更新", "派生值自动更新"],
+                  ["切换房间、页面后旧订阅还在", "切换订阅时先清理旧的"],
+                  ["同时改两个值，页面闪过一半新一半旧的结果", "多次写入只更新一次"],
+                  ["关着的面板也在重算", "没人读取的派生值不计算"],
+                  ["两个副作用互相触发，标签页卡死", "副作用互相触发时不会卡死"],
+                  ["服务端渲染时请求之间串数据", "服务端每个请求一个 Runtime"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "派生值自动更新",
+            "heading": "派生值自动更新",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "把购物车合计单独存在一个变量里，单价或数量一变，页面就该显示新的合计。"
+              },
+              {
+                "type": "paragraph",
+                "text": "手写时每个修改单价或数量的地方都得记得重新计算合计，漏掉一处页面就显示旧值；依赖关系只存在于开发者的记忆里。"
+              },
+              {
+                "type": "paragraph",
+                "text": "用 Runtime 时，`computed` 只需根据它读到的值把合计声明一次；读取它的 `effect` 会在任一依赖变化后重跑。不需要列出依赖：在函数里读了 `price.value`，就自动依赖它。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(30)\nconst quantity = runtime.signal(2)\n// 合计由单价和数量推导出来，不需要在每个修改的地方手动更新\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst render = runtime.effect(() => {\n  console.log(`购物车合计：${total.value} 元`)\n})\n\nquantity.value = 3 // 改数量\nruntime.flush() // 示例里手动冲刷；平时由微任务自动完成\nprice.value = 25 // 改单价\nruntime.flush()\n\nrender.dispose()\ntotal.dispose()"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "购物车合计：60 元\n购物车合计：90 元\n购物车合计：75 元"
+              },
+              {
+                "type": "paragraph",
+                "text": "先输出 `购物车合计：60 元`，改数量后输出 `90 元`，改单价后输出 `75 元`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "副作用在创建时运行一次，之后每次变化运行一次；`runtime.flush()` 只是让时机更明确，不写它时默认的微任务冲刷也得到同样的输出。"
+              }
+            ]
+          },
+          {
+            "id": "切换订阅时先清理旧的",
+            "heading": "切换订阅时先清理旧的",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "聊天窗口每次切换房间都加入新房间，却从不离开旧房间，最后会收到所有去过的房间的消息。"
+              },
+              {
+                "type": "paragraph",
+                "text": "手写订阅时，“离开”要写在切换房间的每个分支里，还要记得在关闭窗口时再写一次；漏掉任何一处，旧订阅就一直留着。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`effect` 可以返回一个清理函数，Runtime 会在副作用重跑之前、以及 `dispose()` 时调用它，所以“离开”总是先于下一次“进入”。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = runtime.signal('大厅')\n\nconst chat = runtime.effect(() => {\n  const name = room.value\n  console.log(`进入 ${name}`)\n  // 返回的函数会在下次重跑之前、以及 dispose() 时执行\n  return () => console.log(`离开 ${name}`)\n})\n\nroom.value = '技术交流'\nruntime.flush()\nchat.dispose() // 用户关闭聊天窗口"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "进入 大厅\n离开 大厅\n进入 技术交流\n离开 技术交流"
+              },
+              {
+                "type": "paragraph",
+                "text": "依次输出 `进入 大厅`、`离开 大厅`、`进入 技术交流`，`dispose()` 后输出 `离开 技术交流`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "每次清理拿到的都是它那一次运行的房间，因为闭包捕获的是那一次的 `name`。"
+              }
+            ]
+          },
+          {
+            "id": "多次写入只更新一次",
+            "heading": "多次写入只更新一次",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "同时改名和姓，页头先显示 “Grace Lovelace” 这种混合值，再显示正确的名字。"
+              },
+              {
+                "type": "paragraph",
+                "text": "如果每次写入都立刻通知监听者，监听者会在两次写入之间运行，读到只改了一半的数据，页面也因此多渲染一次。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Runtime 写入时只把下游标记为过期，副作用在下一次冲刷（默认是微任务）时才运行，所以同一段同步代码里的写入会被一起看到。从多条路径读取同一组值的派生值（`initials` 和 `label` 都读了名字）也按最终输入重新计算。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst initials = runtime.computed(() => `${first.value[0]}.${last.value[0]}.`)\nconst label = runtime.computed(() => `${first.value} ${last.value}（${initials.value}）`)\n\nlet effectRuns = 0\nconst header = runtime.effect(() => {\n  effectRuns += 1\n  console.log('页头显示:', label.value)\n})\n\n// 同一段同步代码里改了两个值\nfirst.value = 'Grace'\nlast.value = 'Hopper'\nawait Promise.resolve() // 等默认的微任务冲刷\nconsole.log('副作用一共执行了', effectRuns, '次')\nheader.dispose()"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "页头显示: Ada Lovelace（A.L.）\n页头显示: Grace Hopper（G.H.）\n副作用一共执行了 2 次"
+              },
+              {
+                "type": "paragraph",
+                "text": "创建时输出 `页头显示: Ada Lovelace（A.L.）`，两次写入后只输出一次 `Grace Hopper（G.H.）`；`副作用一共执行了 2 次`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "没有任何一行出现名和姓混搭的值：同一轮里的写入合并成一次副作用运行。"
+              }
+            ]
+          },
+          {
+            "id": "没人读取的派生值不计算",
+            "heading": "没人读取的派生值不计算",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "一个昂贵的统计放在可以收起的面板里，面板关着时，数据每变一次它仍然重算一次。"
+              },
+              {
+                "type": "paragraph",
+                "text": "手写的派生值通常在写入时立刻重算，不管有没有人在看，关着的面板也在消耗时间。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`computed` 是惰性的：没人读取就不运行。最后一个读取者（这里是副作用）被释放后，它会和输入断开，之后的写入不再引发重算；下次读取时先检查输入是否变化，变了才重算一次。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst orders = runtime.signal([120, 80, 45])\nlet computations = 0\nconst report = runtime.computed(() => {\n  computations += 1 // 假设这是一段昂贵的统计\n  return orders.value.reduce((sum, amount) => sum + amount, 0)\n})\n\norders.value = [...orders.peek(), 60] // 还没人读取 report\nconsole.log('没人读取时计算次数:', computations)\n\nconst panel = runtime.effect(() => console.log('报表面板:', report.value))\norders.value = [...orders.peek(), 10]\nruntime.flush()\nconsole.log('面板打开期间计算次数:', computations)\n\npanel.dispose() // 面板关闭，最后一个读者离开\norders.value = [...orders.peek(), 99]\norders.value = [...orders.peek(), 1]\nconsole.log('面板关闭后计算次数:', computations)\nconsole.log('再次读取:', report.value, '计算次数:', computations)"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "没人读取时计算次数: 0\n报表面板: 305\n报表面板: 315\n面板打开期间计算次数: 2\n面板关闭后计算次数: 2\n再次读取: 415 计算次数: 3"
+              },
+              {
+                "type": "paragraph",
+                "text": "`没人读取时计算次数: 0`；面板打开期间每次变化计算一次（共 2 次）；面板关闭后又写入两次，计数仍是 2；再次读取得到 415，计数变为 3。"
+              },
+              {
+                "type": "paragraph",
+                "text": "计算只发生在有人读取的时候，关闭面板后的写入不会触发任何计算。"
+              }
+            ]
+          },
+          {
+            "id": "副作用互相触发时不会卡死",
+            "heading": "副作用互相触发时不会卡死",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "用两个副作用实现摄氏度和华氏度的双向同步，每个都写对方读取的值；两个值始终对不上时，标签页卡死。"
+              },
+              {
+                "type": "paragraph",
+                "text": "手写的双向同步没有轮数限制，两个监听者会无限互相触发，卡在循环里的页面失去响应，也看不到是哪两段代码在打架。"
+              },
+              {
+                "type": "paragraph",
+                "text": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // 默认 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发\nruntime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })\nruntime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('页面仍可响应，celsius =', Math.round(celsius.peek()))"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "async-flush FLUSH_LOOP\n页面仍可响应，celsius = 12"
+              },
+              {
+                "type": "paragraph",
+                "text": "先由 `onError` 输出 `async-flush FLUSH_LOOP`，再输出 `页面仍可响应，celsius = 12`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "循环在 20 轮（示例里设的 `maxFlushPasses`）后被截断，而不是一直运行下去；报告里带的 `debugName` 指出了互相触发的副作用。"
+              }
+            ]
+          },
+          {
+            "id": "服务端每个请求一个-runtime",
+            "heading": "服务端每个请求一个 Runtime",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "服务端给很多用户渲染页面，一个用户的数据出现在另一个用户的页面上。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`defaultRuntime` 是整个进程共用的一个 Runtime；把请求状态放在这张共享的依赖图里，一个请求写入的值会被另一个请求读到，而且很难发现。"
+              },
+              {
+                "type": "paragraph",
+                "text": "为每个请求用 `createRuntime()` 创建自己的 Runtime。不同 Runtime 的节点不能互相依赖：跨 Runtime 读取会立刻抛出 `CROSS_RUNTIME`，而不是悄悄把数据混在一起。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive'\n\n// 服务端渲染：每个请求一个 Runtime，用户之间的状态互不可见\nfunction renderPage(user: string) {\n  const runtime = createRuntime()\n  const name = runtime.signal(user)\n  const greeting = runtime.computed(() => `你好，${name.value}`)\n  return { runtime, greeting }\n}\n\nconst pageA = renderPage('Ada')\nconst pageB = renderPage('Grace')\nconsole.log(pageA.greeting.value, '|', pageB.greeting.value)\n\n// 把 A 的节点拿到 B 的 Runtime 里使用，会立刻报错，而不是悄悄串数据\nconst leaked = pageB.runtime.computed(() => pageA.greeting.value)\ntry {\n  leaked.value\n} catch (error) {\n  console.log('跨 Runtime 读取:', (error as { code?: string }).code)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "你好，Ada | 你好，Grace\n跨 Runtime 读取: CROSS_RUNTIME"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `你好，Ada | 你好，Grace`：每个请求有自己的状态。"
+              },
+              {
+                "type": "paragraph",
+                "text": "把节点带到别的 Runtime 里读取时输出 `跨 Runtime 读取: CROSS_RUNTIME`：串用会在出错的那一行暴露出来。"
               }
             ]
           },
@@ -799,7 +1149,7 @@
                   "读取节点抛 `NODE_DISPOSED`：节点已 `dispose()`，绝不会静默返回旧值；停止持有该引用，改用重新创建的实例。",
                   "抛 `CROSS_RUNTIME`/`NOT_RUNTIME_OWNED`：跨 `Runtime` 混用了节点，或传入的对象不是由 `createRuntime()` 创建；确认节点与消费它的 `Runtime` 是同一个。",
                   "`Computed` 抛 `CIRCULAR_DEPENDENCY`：依赖图里存在自读环（`a` 直接或间接又读了 `a` 自己）；检查依赖图，拆掉循环引用。",
-                  "`flush()` 抛 `FLUSH_LOOP`：依赖图里存在自触发环（典型是某个 `Effect` 的写操作又落回了它自己的依赖）；错误信息列出了被丢弃的待办 `debugName`，据此定位并拆环。",
+                  "`flush()` 抛 `FLUSH_LOOP`（自动冲刷时交给 `onError`，phase 为 `async-flush`）：副作用之间互相触发停不下来，典型是两个 `Effect` 各自写对方读取的值，而两个值始终对不上；错误信息列出了被丢弃的待办 `debugName`，据此定位并拆环。单个 `Effect` 在运行中写自己读取的值不会让自己重跑。",
                   "`createObserverBinding().observe()` 抛 `BINDING_DUPLICATE`：同一个 binding 在已处于 observed 状态时又被 `observe()` 了一次；再次调用前先确认当前是否已在观察中，或为新一轮渲染创建新的 binding。",
                   "`commit()` 返回 `'stale'`：这不是错误，是正常的竞态处理信号；作废当前快照，重新 `capture()`/`commit()`，不要在 commit 阶段直接 pull 脏节点。",
                   "`COPY_CONFLICT`/`BRAND_CORRUPTED`：进程内存在本库的多份模块副本；去重依赖（多数打包器问题），或在应用启动时调用 `assertSingleRuntimeCopy()` 主动 fail-fast。",
@@ -818,7 +1168,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+                "text": "`@migaia/reactive/extension` 提供 `getDefaultRuntime()`，给需要在导入时保持不创建任何东西的适配层使用。它在第一次调用时创建共享的默认 Runtime，返回的对象与根入口的 `defaultRuntime` 完全相同；导入根入口的 `defaultRuntime` 仍在导入时创建。`ReactiveErrorPhase` 也可以从扩展入口导入，与根入口导出的是同一个对象。"
               },
               {
                 "type": "code",
@@ -827,7 +1177,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
+                "text": "`@migaia/reactive/extension` 的 `deferRuntimeCleanup(runtime, task)` 通过该 Runtime 的 `scheduleIdle` 通道安排一次同步的适配层清理（默认使用微任务）。清理抛出的错误交给 Runtime 的 `reportError`。它不返回可修改的调度器或依赖图能力，也不负责异步资源。"
               },
               {
                 "type": "code",
@@ -837,6 +1187,1232 @@
             ]
           }
         ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-reactive",
+              "heading": "@migaia/reactive",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Totals, filtered lists and badge counts on a page are all derived from other data. Syncing them by hand at every place that changes the data eventually misses one; notifying on every single write makes the page flash half-updated values. `@migaia/reactive` uses Signals (writable values), Computeds (derived values) and Effects (work to do when values change) to record who depends on whom, and updates only what a change really affects. It does not depend on any UI framework or host, so it runs in browsers, Node and Workers; the store module (collections, persistence, React bindings and so on) are built on it."
+                }
+              ]
+            },
+            {
+              "id": "you-may-have-run-into",
+              "heading": "You may have run into",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Stale derived values: totals or filtered lists kept in their own variables must be recalculated at every place that changes the data, and one missed place shows an old value. The cause: people, not the program, keep track of the dependencies.",
+                    "Half-updated values flashing on the page: changing first and last name shows \"Grace Lovelace\" in the header before the right name appears. The cause: every write notifies listeners immediately, so they read data that is only half updated.",
+                    "Old subscriptions that never end: after switching chat rooms the window still receives the old room's messages, and memory slowly grows. The cause: subscription cleanup is scattered and depends on someone remembering to call it.",
+                    "A frozen tab: two effects write the value the other reads, the values never agree, and they keep triggering each other. The cause: nothing limits how many rounds one update may chain.",
+                    "Server rendering mixes data: state lives in module-level variables, and a value written by one request is read by another. The cause: every request shares one state graph."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "why-choose-it",
+              "heading": "Why choose it",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "A derived value is declared once, and its dependencies register themselves. Hand-written code must remember to recalculate at every change; a `computed` records a dependency the moment it reads `price.value`, and any input change makes it recompute. Example",
+                    "Several writes produce one update, with no half-updated values. Notifying on every write renders mixed values; the Runtime only marks dependents as stale on write and runs effects in the next flush with the final inputs, so derived values read through several paths agree too. Example",
+                    "A derived value nobody reads is not computed. Recomputing for a closed panel is a common waste; a `computed` does not run until something reads it, disconnects from its inputs when its last reader leaves, and recomputes on demand at the next read. Example",
+                    "An endless effect loop is cut off instead of freezing the page. Effects that trigger each other may run forever; each flush is capped at `maxFlushPasses` passes (default 100), after which it stops and reports `FLUSH_LOOP` with the `debugName`s involved. Example",
+                    "Every Runtime is isolated, and mixing them fails at once. Global state leaking between server requests is hard to notice; nodes of different Runtimes cannot depend on each other, and a cross-Runtime read throws `CROSS_RUNTIME` immediately. Example"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The shopping cart below derives its total from the items and the discount, and updates once even when both change. Run it with Node 24."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst items = runtime.signal([{ name: 'keyboard', price: 300 }])\nconst discount = runtime.signal(0)\n// The total is derived from items and discount and recomputes when either changes\nconst total = runtime.computed(\n  () => items.value.reduce((sum, item) => sum + item.price, 0) * (1 - discount.value)\n)\n\nconst badge = runtime.effect(() => console.log(`total ${total.value}`))\n\nitems.value = [...items.peek(), { name: 'mouse', price: 100 }]\ndiscount.value = 0.1\nawait Promise.resolve() // both changes merge into one update in the next microtask\nbadge.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "total 300\ntotal 360"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The `effect` runs once on creation and prints 300. The two changes that follow do not print once each; they merge into one update in the next microtask, which prints 360 directly ((300 + 100) × 0.9). `total` read `items.value` and `discount.value`, so those dependencies were registered with no extra subscription code."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Next: for more uses of derived values and effects, see Find by scenario in the usage guide; when server rendering or tests need isolated state, see One Runtime per server request."
+                }
+              ]
+            },
+            {
+              "id": "the-traps-of-hand-written-code",
+              "heading": "The traps of hand-written code",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Here is a common hand-written \"notify when a value changes\". It runs, but it has three traps (for illustration only; no need to run it):"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "let price = 30\nlet quantity = 2\nlet total = price * quantity\nconst listeners = new Set<() => void>()\n\nfunction setQuantity(next: number) {\n  quantity = next\n  // Trap 1: every place that changes data must remember to recalculate; forget this line in setPrice and the page shows an old total\n  total = price * quantity\n  // Trap 2: every write notifies at once, so changing two values renders twice, and the first render is half updated\n  listeners.forEach((listener) => listener())\n}\n\n// Trap 3: subscriptions must be removed by hand; forget the delete when a component unmounts and the listener and everything it references stay in memory\nlisteners.add(() => console.log(total))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With a Runtime, a `computed` declares its rule once and registers dependencies as it reads them; a write only marks dependents as stale and effects run together in the next flush; and the cleanup function an effect returns runs automatically before each rerun and on `dispose()`."
+                }
+              ]
+            },
+            {
+              "id": "a-three-minute-mental-model",
+              "heading": "A three-minute mental model",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Think of a `Runtime` as an independent spreadsheet: a `Signal` is an input cell, a `Computed` is a cell with a formula, and an `Effect` is an action such as \"print or send a request when a cell changes\"."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Concept", "In one sentence"],
+                  "rows": [
+                    [
+                      "`Runtime`",
+                      "An independent dependency graph, version clock and scheduler; nodes can depend on each other only within one `Runtime`"
+                    ],
+                    [
+                      "`Signal`",
+                      "A writable value; reading `.value` registers a dependency and writing `.value` notifies dependents"
+                    ],
+                    ["`Computed`", "A lazy, cached derived value that recomputes only when read"],
+                    [
+                      "`Effect`",
+                      "Reads its dependencies and performs a side effect; runs once on creation and is scheduled to rerun when a dependency changes"
+                    ],
+                    [
+                      "`batch()` / `flush()`",
+                      "Merge several writes into one effect flush / run pending effects synchronously right now"
+                    ],
+                    [
+                      "trace",
+                      "Read-only diagnostic events: value changes, dependency connections and disconnections, effect runs; it never affects application state"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A few terms:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Dependency tracking: whatever `Signal` / `Computed` a `Computed` or `Effect` reads while running becomes its dependency automatically.",
+                    "Flush: actually running the queued effects. By default it happens in the microtask after a write.",
+                    "Suspension: a `Computed` with no readers disconnects from its inputs and stops recomputing on writes; the next read checks the inputs and recomputes only if they changed."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "typical-scenarios",
+              "heading": "Typical scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Scenario", "How to combine", "Details"],
+                  "rows": [
+                    [
+                      "Derived values follow their inputs",
+                      "`runtime.computed` + `runtime.effect`",
+                      "Usage guide"
+                    ],
+                    [
+                      "Clean up old subscriptions when switching rooms or pages",
+                      "an `effect` that returns a cleanup function",
+                      "Usage guide"
+                    ],
+                    [
+                      "Change several values at once",
+                      "default microtask merging, or `runtime.batch`",
+                      "Usage guide"
+                    ],
+                    [
+                      "Stop recomputing for a closed panel",
+                      "automatic `computed` suspension, which `keepAlive` turns off",
+                      "Usage guide"
+                    ],
+                    ["Guard against effect loops", "`maxFlushPasses` + `onError`", "Usage guide"],
+                    [
+                      "Isolate server rendering and tests",
+                      "one `createRuntime()` per request or test",
+                      "Usage guide"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "installation",
+              "heading": "Installation",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add @migaia/reactive"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Entry", "Contents"],
+                  "rows": [
+                    [
+                      "`@migaia/reactive`",
+                      "`createRuntime`, `defaultRuntime`, the node types `IReactiveSignal` / `IReactiveComputed` / `IReactiveEffect`, diagnostic constants and error codes"
+                    ],
+                    [
+                      "`@migaia/reactive/extension`",
+                      "Extension capabilities for store, collection, resource and UI framework adapter authors: ownership registration, custom data sources, observer binding and read-only version queries"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "common-apis",
+              "heading": "Common APIs",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "What it does"],
+                  "rows": [
+                    [
+                      "`createRuntime(options?)`",
+                      "Creates an isolated Runtime; options set the scheduling, `maxFlushPasses`, `onError` and `onTrace`"
+                    ],
+                    [
+                      "`runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)`",
+                      "Create writable values, derived values and effects; each has `dispose()`"
+                    ],
+                    [
+                      "`runtime.batch(fn)` / `runtime.flush()`",
+                      "Merge several writes into one flush / flush synchronously right now"
+                    ],
+                    ["`runtime.untracked(fn)`", "Read without registering dependencies"],
+                    [
+                      "`runtime.subscribeTrace(listener)`",
+                      "Subscribe to read-only diagnostic events"
+                    ],
+                    [
+                      "`createObserverBinding` (`/extension`)",
+                      "Write a UI framework adapter: capture dependencies during render, subscribe after commit"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "contract-details",
+              "heading": "Contract details",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "See the usage guide for every signature, edge behavior and error code. Below are the constraints that matter most in daily use."
+                }
+              ]
+            },
+            {
+              "id": "the-full-lifecycle-of-one-dependency-graph",
+              "heading": "The full lifecycle of one dependency graph",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\n\nconst seen: number[] = []\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value)\n}) // runs once synchronously on creation: seen = [2]\n\ncount.value = 3\nruntime.flush() // flush pending effects by hand: seen = [2, 6]\n\neffect.dispose()\ndoubled.dispose()\ncount.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "This code builds a dependency graph owned by the current `runtime` alone. `runtime.effect()` runs once immediately on creation; while it runs it reads `doubled.value`, which registers the three-level dependency `Effect → Computed → Signal` automatically, so `seen` first receives `2`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`count.value = 3` only invalidates `doubled` and queues `effect`; it does not rerun the effect inside the setter. `runtime.flush()` drains that runtime's queue synchronously: `doubled` recomputes to `6` when read, and then `effect` writes it into `seen`. Production code usually lets the default microtask flush automatically; tests, server rendering or code that needs a definite commit point call `flush()` explicitly."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Release from consumers to sources: stop `effect` first so cleanup does not observe data again, then the derived node `doubled`, and finally the source node `count`. `dispose()` disconnects dependency edges and forbids further reads of the released node. A `Runtime` itself has no `dispose()`; to manage nodes in bulk, hand them to `createLifecycleScope()` / `createSyncLifecycleScope()` from `@migaia/lifecycle` and release them together."
+                }
+              ]
+            },
+            {
+              "id": "lifecycle-errors-and-limits",
+              "heading": "Lifecycle, errors and limits",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "1. Do not mix nodes across `Runtime`s: a `Signal` created by one `Runtime` and read by a `Computed` / `Effect` of another throws `CROSS_RUNTIME`. 2. Always create nodes through the Runtime factories: `runtime.signal(value, options?)`, `runtime.computed(fn, config?)` and `runtime.effect(fn, options?)`, each with `dispose()` / `disposed`. The three node classes are internal and not exported as values. 3. `runtime.effect(...)` runs once synchronously on creation; it does not wait for a dependency change before its first run. 4. Writing the same value to a `Signal` (by `Object.is`) triggers no notification and does not advance its version. 5. A `Computed` with no readers is suspended automatically (its dependencies are disconnected; the next read first checks versions and topology and reuses the cache when nothing changed). Pass `{ keepAlive: true }` when it must keep computing while nobody reads it. 6. Reading after `dispose()` throws `NODE_DISPOSED` immediately instead of silently returning an old value, so nothing can \"look alive but never update\". 7. `defaultRuntime` is a process-wide singleton. Request isolation in server rendering, independent unit tests and Workers should all call `createRuntime()` explicitly. 8. Scheduling is configurable: by default flushes merge in a microtask; when creating a Runtime, `schedulerStrategy` can switch to `requestAnimationFrame`, idle callbacks or a custom strategy. 9. Diagnostics never enter application state: trace events and error reports use separate channels."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Where it does not fit: you only need local component state (the equivalent of `useState`) and no dependency graph shared across components; or you need ready-made observable collections or a state machine for async requests. The collection and resource module in this repository build those on top of this module; it does not include them itself."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The general \"release a group of resources together\" container (formerly `Scope` / `createScope()`) has moved out of this module; use `createLifecycleScope()` / `createSyncLifecycleScope()` from `@migaia/lifecycle`."
+                }
+              ]
+            },
+            {
+              "id": "multiple-copies-and-the-extension-entry",
+              "heading": "Multiple copies and the extension entry",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The extension entry's `claimOwnership`, `ownerOf` and `assertOwnedBy` apply one ownership contract to plain objects and function objects: a registered function reports its original Runtime, a cross-Runtime check throws `CROSS_RUNTIME`, and a brand from another module copy throws `COPY_CONFLICT`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When upgrading, keep every reactive copy in one process on the same version: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must create nothing at import time. It creates the shared default Runtime on its first call and returns exactly the same object as the root entry's `defaultRuntime`; importing the root `defaultRuntime` still creates it at import time. `ReactiveErrorPhase` can also be imported from the extension entry and is the same object as the root export."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules one synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (microtasks by default). Errors thrown by the cleanup go to the Runtime's `reportError`. It returns no modifiable scheduler or graph capability and does not own asynchronous resources."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "migaia-reactive-usage-guide",
+              "heading": "@migaia/reactive usage guide",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "For what the module is for, its highlights and its mental model, see the README. This guide starts with runnable examples organized by scenario (Node 24), then lists the APIs, edge behavior and error codes of both public entries. Nodes are always created through the Runtime factory; the `Signal`, `Computed` and `Effect` classes are internal."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Your problem", "Read this section"],
+                  "rows": [
+                    [
+                      "Derived values must be updated by hand at every change",
+                      "Keep derived values in sync automatically"
+                    ],
+                    [
+                      "Old subscriptions are still active after switching rooms or pages",
+                      "Clean up the old subscription before switching"
+                    ],
+                    [
+                      "Changing two values flashes a half-updated result",
+                      "Several writes, one update"
+                    ],
+                    ["A closed panel keeps recomputing", "Skip work nobody reads"],
+                    [
+                      "Two effects trigger each other and the tab freezes",
+                      "Effects feeding each other do not freeze the page"
+                    ],
+                    ["Requests share data in server rendering", "One Runtime per server request"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "keep-derived-values-in-sync-automatically",
+              "heading": "Keep derived values in sync automatically",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A cart total is kept in its own variable, and whenever the price or quantity changes the page should show the new total."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hand-written code has to recalculate the total in every place that changes price or quantity; miss one and the page shows a stale total, because the dependency exists only in the developer's head."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With a Runtime, `computed` declares the total once from the values it reads, and an `effect` that reads it reruns when any of them changes. Nobody has to list the dependencies: reading `price.value` inside the function is enough."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(30)\nconst quantity = runtime.signal(2)\n// The total is derived from price and quantity; no code that changes them has to update it\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst render = runtime.effect(() => {\n  console.log(`cart total: ${total.value}`)\n})\n\nquantity.value = 3 // change the quantity\nruntime.flush() // flushed by hand here; normally a microtask does it\nprice.value = 25 // change the price\nruntime.flush()\n\nrender.dispose()\ntotal.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "cart total: 60\ncart total: 90\ncart total: 75"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `cart total: 60`, then `90` after the quantity changes and `75` after the price changes."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The effect ran on creation and once per change; `runtime.flush()` only makes the timing explicit, and without it the default microtask flush gives the same output."
+                }
+              ]
+            },
+            {
+              "id": "clean-up-the-old-subscription-before-switching",
+              "heading": "Clean up the old subscription before switching",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A chat window joins a new room whenever the room changes but never leaves the old one, and ends up receiving messages from every room it ever visited."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With hand-written subscriptions, \"leave\" has to be written in every branch that switches rooms and again when the window closes; missing any one of them keeps an old subscription alive."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An `effect` may return a cleanup function. The Runtime calls it before the effect runs again and when the effect is disposed, so \"leave\" always runs before the next \"join\"."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = runtime.signal('lobby')\n\nconst chat = runtime.effect(() => {\n  const name = room.value\n  console.log(`join ${name}`)\n  // The returned function runs before the next rerun and on dispose()\n  return () => console.log(`leave ${name}`)\n})\n\nroom.value = 'engineering'\nruntime.flush()\nchat.dispose() // the user closes the chat window"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "join lobby\nleave lobby\njoin engineering\nleave engineering"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `join lobby`, `leave lobby`, `join engineering`, and `leave engineering` after `dispose()`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Each cleanup sees the room of its own run, because the closure captured that run's `name`."
+                }
+              ]
+            },
+            {
+              "id": "several-writes-one-update",
+              "heading": "Several writes, one update",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Changing first and last name together makes the header show a mixed value such as \"Grace Lovelace\" before the correct name."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "When every write notifies listeners at once, a listener runs between the two writes, reads half-updated data, and the page renders one extra time."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A Runtime write only marks downstream nodes stale, and effects run at the next flush (a microtask by default), so writes in the same synchronous code are seen together. Derived values that read the same inputs through several paths (`initials` and `label` both read the name) are recomputed from the final inputs too."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst initials = runtime.computed(() => `${first.value[0]}.${last.value[0]}.`)\nconst label = runtime.computed(() => `${first.value} ${last.value} (${initials.value})`)\n\nlet effectRuns = 0\nconst header = runtime.effect(() => {\n  effectRuns += 1\n  console.log('header shows:', label.value)\n})\n\n// Two values change in the same synchronous code\nfirst.value = 'Grace'\nlast.value = 'Hopper'\nawait Promise.resolve() // wait for the default microtask flush\nconsole.log('the effect ran', effectRuns, 'times')\nheader.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "header shows: Ada Lovelace (A.L.)\nheader shows: Grace Hopper (G.H.)\nthe effect ran 2 times"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `header shows: Ada Lovelace (A.L.)` on creation and, after the two writes, a single `Grace Hopper (G.H.)`; `effect ran 2 times`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "No line ever shows a mixed first and last name: writes in the same turn merged into one effect run."
+                }
+              ]
+            },
+            {
+              "id": "skip-work-nobody-reads",
+              "heading": "Skip work nobody reads",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "An expensive aggregation sits in a panel that can be collapsed, and it recalculates on every change even while the panel is closed."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hand-written derived values usually recompute right when data is written, whether or not anyone is looking, so a closed panel still costs time."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A `computed` is lazy: it does not run until something reads it. When its last reader (here the effect) is disposed, it disconnects from its inputs, so later writes trigger no recomputation; the next read checks whether its inputs changed and recomputes once if they did."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst orders = runtime.signal([120, 80, 45])\nlet computations = 0\nconst report = runtime.computed(() => {\n  computations += 1 // pretend this is an expensive aggregation\n  return orders.value.reduce((sum, amount) => sum + amount, 0)\n})\n\norders.value = [...orders.peek(), 60] // nobody reads report yet\nconsole.log('computations while unread:', computations)\n\nconst panel = runtime.effect(() => console.log('report panel:', report.value))\norders.value = [...orders.peek(), 10]\nruntime.flush()\nconsole.log('computations while the panel is open:', computations)\n\npanel.dispose() // the panel closes; its last reader leaves\norders.value = [...orders.peek(), 99]\norders.value = [...orders.peek(), 1]\nconsole.log('computations after closing:', computations)\nconsole.log('read again:', report.value, 'computations:', computations)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "computations while unread: 0\nreport panel: 305\nreport panel: 315\ncomputations while the panel is open: 2\ncomputations after closing: 2\nread again: 415 computations: 3"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`computations while unread: 0`; while the panel is open each change computes once (2 in total); after closing, two more writes leave the count at 2; reading again returns 415 and the count becomes 3."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Computation happens only when something reads the value; writes after the panel closed trigger none."
+                }
+              ]
+            },
+            {
+              "id": "effects-feeding-each-other-do-not-freeze-the-page",
+              "heading": "Effects feeding each other do not freeze the page",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Two-way Celsius/Fahrenheit syncing is written with two effects that each write what the other reads; when the values never settle, the tab freezes."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hand-written two-way syncing has no limit on rounds, so the two listeners trigger each other forever, the page stops responding, and nothing tells you which two pieces of code are fighting."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Each flush is capped at `maxFlushPasses` passes (default 100). Past the cap the Runtime stops, drops the remaining queued effects and reports `FLUSH_LOOP` with their `debugName`s: to `onError` for automatic flushes, or as a thrown error from a manual `flush()`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // default 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// Two effects write the value the other reads, and the conversion is off by 1, so they never agree and keep triggering each other\nruntime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })\nruntime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('the page stays responsive, celsius =', Math.round(celsius.peek()))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "async-flush FLUSH_LOOP\nthe page stays responsive, celsius = 12"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `async-flush FLUSH_LOOP` from `onError`, then `the page stays responsive, celsius = 12`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The loop was cut after 20 passes (the `maxFlushPasses` set in the example) instead of running forever, and the reported `debugName`s point at the effects feeding each other."
+                }
+              ]
+            },
+            {
+              "id": "one-runtime-per-server-request",
+              "heading": "One Runtime per server request",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A server renders pages for many users, and one user's data appears on another user's page."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defaultRuntime` is one shared Runtime for the whole process; request state kept in that shared graph can be written by one request and read by another, and the leak is hard to notice."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Create a Runtime per request with `createRuntime()`. Nodes of different Runtimes cannot depend on each other: a cross read throws `CROSS_RUNTIME` at once instead of quietly mixing data."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\n// Server rendering: one Runtime per request, so users never see each other's state\nfunction renderPage(user: string) {\n  const runtime = createRuntime()\n  const name = runtime.signal(user)\n  const greeting = runtime.computed(() => `Hello, ${name.value}`)\n  return { runtime, greeting }\n}\n\nconst pageA = renderPage('Ada')\nconst pageB = renderPage('Grace')\nconsole.log(pageA.greeting.value, '|', pageB.greeting.value)\n\n// Using a node of A inside the Runtime of B fails at once instead of silently mixing data\nconst leaked = pageB.runtime.computed(() => pageA.greeting.value)\ntry {\n  leaked.value\n} catch (error) {\n  console.log('cross-Runtime read:', (error as { code?: string }).code)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "Hello, Ada | Hello, Grace\ncross-Runtime read: CROSS_RUNTIME"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `Hello, Ada | Hello, Grace`: each request has its own state."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The leaked read prints `cross-Runtime read: CROSS_RUNTIME`: mixing Runtimes shows up at the exact line that does it."
+                }
+              ]
+            },
+            {
+              "id": "contents",
+              "heading": "Contents",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Main entry `@migaia/reactive`: Runtime factory, node types, diagnostic constants and error codes",
+                    "`/extension` entry: ownership, controlled sources, observer binding, graph types and read-only version queries",
+                    "Error codes",
+                    "Trace events and constants",
+                    "Combined examples",
+                    "Troubleshooting and build gates"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "main-entry-migaia-reactive",
+              "heading": "Main entry @migaia/reactive",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  createRuntime,\n  defaultRuntime,\n  assertSingleRuntimeCopy,\n  ReactiveErrorCode,\n  REACTIVE_SOURCE,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  ReactiveTraceReason,\n  type IReactiveSignal,\n  type IReactiveComputed,\n  type IReactiveEffect,\n  type IComputedConfig,\n  type IReactiveNodeOptions,\n  type IDisposable,\n  type IDisposer,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult,\n  type IRuntimeTraceEvent,\n  type IRuntimeErrorContext,\n  type IReactiveErrorCode,\n  type IReactiveError\n} from '@migaia/reactive'"
+                }
+              ]
+            },
+            {
+              "id": "ireactivesignal-t",
+              "heading": "IReactiveSignal<T>",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IReactiveSignal<T> = IDisposable & {\n  readonly runtime: IRuntime\n  readonly debugName?: string\n  readonly version: number\n  readonly disposed: boolean\n  readonly observed: boolean // !disposed && has downstream subscribers\n  value: T // reading registers a dependency; writing notifies dependents\n  peek(): T // reads without registering a dependency\n  dispose(): void\n  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A writable atom, the only \"source of truth\" in the reactive graph:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const runtime = createRuntime()\nconst count = runtime.signal(1)\ncount.value // 1; reading inside a Computed / Effect registers a dependency\ncount.value = 2 // compared with Object.is; writing the same value notifies nothing and keeps the version\ncount.peek() // 2, without registering a dependency\ncount.dispose()\ncount.value // throws NODE_DISPOSED"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Edge behavior:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Created with `runtime.signal(value, options?)`; it returns a narrow node view that exposes no graph edges or internal methods.",
+                    "`value = next`: when `Object.is(next, previous)` is true the write short-circuits, with no version bump and no notification. Otherwise it first takes a new version number from the `VersionClock` and then stores the value. If taking a version fails (the clock is exhausted), the write fails atomically, so \"value changed but version did not\" can never happen.",
+                    "`dispose()` is idempotent. Releasing first marks the node `disposed` and then removes every downstream edge, in that order, so an Effect forced to rerun reads a clear `NODE_DISPOSED` instead of subscribing to a released node again.",
+                    "`addObservedHooks({ onObserved?, onUnobserved? })` registers node-level lifecycle hooks (several callers can register without overwriting each other) and returns a removal function. When hooks fail, a single failure keeps its original instance and several failures are aggregated as an `OBSERVER_FAILED` `AggregateError`; the public observation path catches them and reports them to `onError` with phase `lifecycle-hook`, so creating an Effect never surfaces hook failures as a synchronous throw.",
+                    "Reading or subscribing to a `Signal` from another `Runtime` throws `CROSS_RUNTIME`."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ireactivecomputed-t",
+              "heading": "IReactiveComputed<T>",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean\n  keepAlive?: boolean\n  debugName?: string\n}\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean)\n\ntype IReactiveComputed<T> = IDisposable & {\n  readonly runtime: IRuntime\n  readonly debugName?: string\n  readonly version: number\n  readonly disposed: boolean\n  readonly observed: boolean\n  readonly value: T // reading registers a dependency and recomputes lazily\n  peek(): T // reads and recomputes without registering a dependency\n  dispose(): void\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A lazy, cached derived value: writes only mark it dirty (push), and the value is recomputed only when read (pull):"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const doubled = runtime.computed(() => count.value * 2)\ndoubled.value // the first read actually computes\ndoubled.value // returns the cache while dependencies are unchanged\n\nconst clamped = runtime.computed(() => Math.max(0, count.value), { keepAlive: true }) // stays warm without subscribers\nconst custom = runtime.computed(\n  () => ({ n: count.value }),\n  (a, b) => a.n === b.n\n) // the config may be a comparison function directly"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Edge behavior:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Created with `runtime.computed(fn, config?)`; the config can be an object or an `equals` comparison function.",
+                    "`equals`: `Object.is` by default. If the comparison function itself throws, the dirty state is not settled, so the next read recomputes instead of being stuck \"stale but marked clean\".",
+                    "`keepAlive`: `false` by default. An ordinary read with nobody observing suspends the node at idle time; when the last observer leaves it suspends synchronously (disconnecting dependencies but keeping its version and topology snapshot). The next read revalidates first, reusing the cache when nothing changed and recomputing otherwise. `true` disables automatic suspension.",
+                    "A circular self-dependency (the evaluation reads itself directly or indirectly) throws `CIRCULAR_DEPENDENCY` instead of overflowing the stack.",
+                    "`value` / `peek` on a released node always throw `NODE_DISPOSED`."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ireactiveeffect",
+              "heading": "IReactiveEffect",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IReactiveEffect = IDisposable & {\n  readonly runtime: IRuntime\n  readonly debugName?: string\n  readonly disposed: boolean\n  dispose(): void\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A side effect, the only observer that is really \"executed\" (a `Computed` only marks itself dirty and does not rerun; only an `Effect` is actually `tick`ed by the scheduler):"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const seen: number[] = []\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value)\n  return () => console.log('cleanup') // optional: the return value is the cleanup before the next rerun / dispose\n}) // runs once synchronously on creation\neffect.dispose() // release: remove dependency edges and run the last cleanup (untracked, so it registers no dependencies)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Edge behavior:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Runs once synchronously on creation; it does not wait for a dependency change before its first run.",
+                    "`fn()` may return a cleanup function (`IDisposer`), called before the next rerun and on `dispose()`, wrapped in `runtime.untracked()` so it registers no new dependencies. The old cleanup is detached (set to empty) before it runs, so if the new `fn()` throws, the next rerun or dispose does not run the old cleanup twice.",
+                    "With the default microtask strategy, a dependency change does not rerun the effect immediately; `Scheduler.enqueue()` marks it dirty and queues it, and `flush()` (automatic or manual) drives `tick()`. Inside `tick()` it first confirms that a dependency really changed (`hasStaleDependencies`) before calling `run()`. With a synchronous strategy such as `flush => flush()`, the setter can rerun the Effect right after the full fan-out.",
+                    "When a dependency node is disconnected through `dispose()` / `disconnectObservable`, the next `tick()` reruns unconditionally, without checking whether it is really dirty."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "createruntime-defaultruntime",
+              "heading": "createRuntime / defaultRuntime",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createRuntime(options?: IRuntimeOptions): IRuntime\nconst defaultRuntime: IRuntime"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter> // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void\n  onTrace?: (event: IRuntimeTraceEvent) => void\n  maxFlushPasses?: number // default 100, must be a positive integer\n  scheduleIdle?: (task: () => void) => void // defaults to adapter.scheduleMicrotask\n  schedulerStrategy?: ISchedulerStrategy // chosen at creation, merges in microtasks by default\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Creates a new isolated runtime:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const runtime = createRuntime({\n  maxFlushPasses: 50,\n  onError: (e, ctx) => console.error(ctx.phase, e)\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Edge behavior:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "A `maxFlushPasses` that is not a positive integer (not a safe integer, or `< 1`) throws a `RangeError` with code `INVALID_OPTION`.",
+                    "Each `adapter` method (`scheduleMicrotask` / `now` / `timestamp` / `reportError`) is resolved on its own: missing or explicitly `undefined` falls back to the default (`queueMicrotask` / `performance.now()` / `Date.now()` / no-op); provided but not a function throws a `TypeError` with code `INVALID_OPTION`.",
+                    "`onError` / `onTrace` / `scheduleIdle` / `schedulerStrategy`, when provided but not functions, throw a native `TypeError` carrying the top-level `INVALID_OPTION` at construction. The strategy is validated before the Scheduler is created.",
+                    "`defaultRuntime` is a process-wide singleton (`createRuntime()` runs when the module loads). Per-request isolation in server rendering, independent unit tests and Workers should call `createRuntime()` explicitly instead of relying on it.",
+                    "When several runtime copies of this library are detected (duplicate installs, CDN copies side by side, micro-frontends bundling their own), construction reports a `COPY_CONFLICT` diagnostic through `reportError` without blocking construction."
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The public methods of `IRuntime` (brand fields omitted):"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IRuntime = {\n  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>\n  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect // returns the lifecycle handle of the node\n  batch<T>(fn: () => T): T\n  untracked<T>(fn: () => T): T\n  flush(): 'completed' | 'deferred'\n  runTracedAction<T>(name: string, fn: () => T): T\n  reportError(\n    error: unknown,\n    context: { phase: IRuntimeErrorContext['phase']; observer?: object; observable?: object }\n  ): void\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Method by method:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`batch(fn)`: merges several writes into one effect flush; it counts nesting depth on entry and only the outermost exit actually calls `flush()`. If `fn` throws and the closing `flush()` also throws, a writable plain `Error` stays the same object and gets the flush error attached on `cause`; a non-`Error` or a non-writable `Error` is preserved through an `AggregateError` with code `ACTION_FLUSH_FAILED`. If the `cause` getter of the application error throws, the aggregate's `errors` keep, in order, the application error, the flush error and the value the getter threw; `onError` also receives the getter's thrown value with phase `cause-read`.",
+                    "`untracked(fn)`: turns dependency tracking off while `fn` runs, so reading any `Signal` / `Computed` registers no edge.",
+                    "`flush()`: flushes the current queue synchronously. Reentrancy: calling `flush()` again inside an observer's `tick()` returns `'deferred'` (the outer flush is still running and this call does not flush); the outermost call returns `'completed'` once it has drained the queue. When one flush exceeds `maxFlushPasses` recomputation passes it throws `FLUSH_LOOP` (see the error codes), clears the rest of the queue, and the error message lists at most 8 dropped `debugName`s.",
+                    "The creation option `schedulerStrategy` only changes when `flush` happens and does not hand out the Scheduler queue. A strategy must return synchronously; returning a thenable triggers an `INVALID_OPTION` diagnostic and falls back to the validated safe strategy. There is no public way to replace it while the Runtime lives.",
+                    "`runTracedAction(name, fn)`: runs and traces one real action; `name` must be a non-empty string, otherwise it throws `INVALID_OPTION`. Without trace listeners it only runs `fn` inside the same callback error boundary and creates no trace event.",
+                    "`reportError(error, context)`: the diagnostic channel. `context.observer` / `context.observable` are raw node objects that are first reduced to an `IRuntimeNodeDescriptor` before reaching `onError`. A throw or rejection from the reporter itself goes to the shared host exception queue of utils and never breaks graph operations in return.",
+                    "`subscribeTrace(listener)`: a read-only diagnostic event stream (value changes, dependency connections and disconnections, effect runs, explicit actions); it returns an unsubscribe function."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assertsingleruntimecopy",
+              "heading": "assertSingleRuntimeCopy()",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Requires that only one module copy entered the correctness boundary in the current process, otherwise it throws `COPY_CONFLICT`. Applications call it explicitly from the root entry; the library never calls it by itself. With duplicate installs, CDN copies side by side or independently bundled micro-frontends, deduplicate the dependency."
+                }
+              ]
+            },
+            {
+              "id": "extension-entry",
+              "heading": "/extension entry",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Implementation layers get their extension capabilities from this entry. It allows taking part in the graph protocol and registering ownership, which is more than the public `IRuntime` offers; it never hands out tracker / scheduler / clock objects or modifiable edge sets."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  type ICapture\n} from '@migaia/reactive/extension'"
+                }
+              ]
+            },
+            {
+              "id": "createobserverbinding",
+              "heading": "createObserverBinding",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createObserverBinding(runtime: IRuntime): IObserverBinding\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer\n  commit(capture: ICapture<unknown>): IObserverCommitResult\n  retrack(): IObserverRetrackResult\n}\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer'\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Sets up a three-phase binding for one subscriber: during render it only captures dependencies, read-only, and only at commit does it install them on the subscriber. A render in between may be discarded by concurrent rendering, so the capture phase never creates edges. The binding owns an internal `Effect`: an adapter can capture / observe / commit / retrack, but cannot reach `deps`, versions or a forced scheduling entry:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const binding = createObserverBinding(runtime)\nconst dispose = binding.observe(() => {\n  // the real subscriber body; it is scheduled to rerun normally when dependencies change\n})\n\n// render phase (may be discarded):\nconst capture = binding.capture(() => doubled.value) // records only what was read and its version; no edges\n\n// commit phase:\nconst result = binding.commit(capture) // 'committed' | 'stale' | 'no-observer'\nif (result === 'stale') {\n  // dependencies changed after the capture: re-evaluate instead of reusing the same capture token\n}\n\nbinding.retrack() // forces the current subscriber to rerun once and reports whether its dependencies or recorded versions changed\ndispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The four members:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`capture<R>(read: () => R): ICapture<R>`: a render-phase capture. It only records which dependency nodes this read touched and their versions at that moment; it creates no dependency edges, bumps no versions and schedules no idle work. Reading a dirty Computed reuses its speculative preview, and the evaluated graph it needs stays inside the same token; commit first validates the complete dependency tree and then adopts the graph and caches without rerunning derivations or comparers, so a discarded render leaves no subscription behind. `ICapture<R>` is a branded, opaque token whose `result: R` is the return value of `read()`; the dependency set lives in a private `WeakMap` of the tracker, so holding a token neither reveals the dependencies nor allows changing versions.",
+                    "`observe(fn, options?): IDisposer`: installs the internal `Effect` the binding owns (the concrete class stays private, so the adapter cannot change `deps` / versions or call `run` / `markDirty`). Calling it again on the same binding while the current subscriber is still observed throws `BINDING_DUPLICATE`. The returned disposer is idempotent.",
+                    "`commit(capture): IObserverCommitResult`: installs the dependencies at commit time, putting `capture` on the observer the binding was created for. `'committed'`: the dependency edges are installed. `'stale'`: dependencies changed after the capture; the token is consumed and you must capture again. Only then should the caller discard its snapshot and read again; it should not pull dirty nodes during commit, which would throw the user's evaluation errors inside commit and bypass the Error Boundary. `'no-observer'`: the commit target does not exist yet (not `observe()`d yet, or already disposed); the token is not consumed and can be retried once the observer is ready.",
+                    "`retrack(): IObserverRetrackResult`: forces the currently committed observer to rerun once and reports whether its dependency set or recorded versions changed (`'changed'` / `'unchanged'`); without an observer it returns `'no-observer'`."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ownership-registration-and-assertions",
+              "heading": "Ownership registration and assertions",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  claimOwnership,\n  ownerOf,\n  assertOwnedBy,\n  assertReactiveOwnedBy\n} from '@migaia/reactive/extension'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Registration and assertions of \"which `Runtime` a node belongs to\", for authors building store, collection or resource libraries on top of this module."
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`claimOwnership(value: object, runtime: IRuntime): void`: registers ownership. The first registration installs the existing non-enumerable, non-writable cross-copy brand, while the WeakMap stays the local authority. Registering the same object to a different `Runtime` throws `OWNERSHIP_CONFLICT`.",
+                    "`ownerOf(value: unknown): IRuntime | undefined`: looks up ownership; an ordinary unregistered value returns `undefined`. A foreign copy's brand triggers `COPY_CONFLICT` instead of passing as an ordinary unregistered value.",
+                    "`assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void`: a lenient assertion. Ordinary unregistered values pass, while a foreign copy's brand is rejected first (third parties may register ordinary values in a Registry without touching the graph); it throws `CROSS_RUNTIME` only when the value is registered and belongs elsewhere.",
+                    "`assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void`: the strict assertion used at core graph boundaries. An unregistered value throws `NOT_RUNTIME_OWNED` at once; a value registered to another `runtime` throws `CROSS_RUNTIME`."
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const runtime = createRuntime()\nconst node = {}\nclaimOwnership(node, runtime)\nassertOwnedBy(node, runtime, 'my-node') // passes\nassertOwnedBy(node, otherRuntime, 'my-node') // throws CROSS_RUNTIME"
+                }
+              ]
+            },
+            {
+              "id": "createfieldsource",
+              "heading": "createFieldSource",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createFieldSource, type IRuntimeFieldSource } from '@migaia/reactive/extension'"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createFieldSource(\n  runtime: IRuntime,\n  debugName?: string\n): {\n  track(): void\n  notify(): void\n  commit<T>(write: () => T): T\n  readonly observed: boolean\n  readonly disposed: boolean\n  dispose(): void\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Creates a controlled Source for the extension layer (for example a Wasm field or a value backed by SharedArrayBuffer). The caller gets only the four capabilities `track` / `notify` / `commit` / `dispose`, and never the underlying node, `subs`, versions or `Tracker`, so it cannot create one-sided dependencies, forge versions or notify the graph of another `Runtime`:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const field = createFieldSource(runtime, 'wasm-counter')\nfunction read(): number {\n  field.track() // registers a dependency and returns nothing; the real value lives in outside storage\n  return wasmMemory.getValue()\n}\nfunction write(v: number): void {\n  field.commit(() => wasmMemory.setValue(v)) // take a version, run the write, then publish, as one atomic step\n}\nfield.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Edge behavior: `track()` / `notify()` / `commit()` throw `NODE_DISPOSED` after `dispose()`; `commit(write)` takes a version number first, runs `write()` and then publishes the notification (the same three steps as `Signal.value = `)."
+                }
+              ]
+            },
+            {
+              "id": "graph-views-and-read-only-queries",
+              "heading": "Graph views and read-only queries",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  internalRuntimeOf,\n  isRuntimeTracking,\n  isAnyRuntimeTracking,\n  currentRuntimeVersion,\n  type IObservable,\n  type IObserver,\n  type IInternalRuntime\n} from '@migaia/reactive/extension'"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`internalRuntimeOf(runtime: IRuntime): IInternalRuntime`: validates that the Runtime is registered by this library and throws `NOT_RUNTIME_OWNED` otherwise. Its `signal()` returns `IReactiveSignal<T> & IObservable` and its `computed()` returns `IReactiveComputed<T> & IObservable & IObserver`. These relationships are read-only; observer operations and ownership registration are extension capabilities, and internal service objects and modifiable edge sets are no longer public. Public nodes already have `dispose()` themselves.",
+                    "`isRuntimeTracking(runtime: IRuntime): boolean`: read-only query of whether that `Runtime` is collecting a dependency frame right now.",
+                    "`isAnyRuntimeTracking(): boolean`: read-only query of whether any `Runtime` in the process has an active dependency frame.",
+                    "`currentRuntimeVersion(runtime: IRuntime): number`: reads the existing version clock without exposing the clock object; an unregistered object throws the top-level `NOT_RUNTIME_OWNED`."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "custom-sources-and-observers",
+              "heading": "Custom sources and observers",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createSourceBinding(node)` registers the canonical version and subscriber set for a new node that implements `IObservable`, and returns read-only `version` / `subs` plus `source` operations bound to the original node. Construct the node with this read-only metadata attached before publishing the instance; the original identity of SAB-backed nodes is preserved. Ordinary outside fields should still use `createFieldSource(runtime)`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createTrackedObserver(observer)` creates read-only `deps` / `depVersions` for a new node that implements `IObserver` and provides self-bound `runTracked` / `clear` / `suspend` / `isSuspended` / `revalidate` / `hasStaleDependencies` / `deferIdle`. `clear` only disconnects graph dependencies; resource requests and cancellation stay with the caller, and it creates no extra Effect or tracker. Framework render / commit adapters keep using `createObserverBinding(runtime)`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Neither factory can rebind a graph node that is already registered (built-in nodes included): it throws `GRAPH_NODE_REGISTERED` and never replaces a set that still has live edges. `invalidateObservable(runtime, node)` removes only the node's downstream edges while keeping upstream edges and caches, for switching Atom routing; to really release a node, still call its `dispose`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Migration: `@migaia/reactive/internals` has been removed. The old `internalsOf` / `registerSubs` / `registerVersion` / `registerDeps` and similar functions cannot import the whole tracker under a new name; move each use to the matching binding capability of `/extension` described above. `tracker` / `scheduler` / `clock` and writable sets always stay inside the kernel."
+                }
+              ]
+            },
+            {
+              "id": "error-codes",
+              "heading": "Error codes",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The stable error code table has 18 codes, declared only in `src/error-code.ts`, and `source` is always `'@migaia/reactive'`. (Background: the five codes `SCOPE_CLOSED` / `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` / `SCOPE_DISPOSAL_FAILED` that used to belong here moved out with the lifecycle primitives and now belong to `@migaia/lifecycle`.)"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`ReactiveErrorCode` key", "Code", "When it happens"],
+                  "rows": [
+                    [
+                      "`callbackFailed`",
+                      "`CALLBACK_FAILED`",
+                      "An unclassified action / batch / untracked / tracked derivation callback failed. Native errors get the code in place where possible; primitives (including undefined) and immutable native errors are kept on `cause`; existing semantic identity is unchanged; a thrown non-Error object keeps its control identity so a Resource / Suspense owner can admit it once"
+                    ],
+                    [
+                      "`nodeDisposed`",
+                      "`NODE_DISPOSED`",
+                      "A read or write method was called on a disposed `Signal` / `Computed` / custom Source"
+                    ],
+                    [
+                      "`circularDependency`",
+                      "`CIRCULAR_DEPENDENCY`",
+                      "Evaluating a `Computed` read (directly or indirectly) the result it is currently evaluating"
+                    ],
+                    [
+                      "`crossRuntime`",
+                      "`CROSS_RUNTIME`",
+                      "A node of one `Runtime` was read, subscribed or checked at the tracking / ownership boundary of another `Runtime`"
+                    ],
+                    [
+                      "`notRuntimeOwned`",
+                      "`NOT_RUNTIME_OWNED`",
+                      "The object was not created by `createRuntime()` or carries no internal ownership registration"
+                    ],
+                    [
+                      "`ownershipConflict`",
+                      "`OWNERSHIP_CONFLICT`",
+                      "The same node object was registered to different `Runtime`s"
+                    ],
+                    [
+                      "`copyConflict`",
+                      "`COPY_CONFLICT`",
+                      "Several runtime copies of this library were detected, or `assertSingleRuntimeCopy()` found more than one copy"
+                    ],
+                    [
+                      "`brandCorrupted`",
+                      "`BRAND_CORRUPTED`",
+                      "A cross-copy diagnostic brand was found in an unexpected shape"
+                    ],
+                    [
+                      "`versionExhausted`",
+                      "`VERSION_EXHAUSTED`",
+                      "A new version was requested after the monotonic version clock reached its limit (default `Number.MAX_SAFE_INTEGER`)"
+                    ],
+                    [
+                      "`flushLoop`",
+                      "`FLUSH_LOOP`",
+                      "One flush exceeded `maxFlushPasses` recomputation passes (default 100)"
+                    ],
+                    [
+                      "`observerFailed`",
+                      "`OBSERVER_FAILED`",
+                      "Several observers' `tick()` failed in one flush, or several observable lifecycle hooks failed; used as the `AggregateError` wrapper"
+                    ],
+                    [
+                      "`actionFlushFailed`",
+                      "`ACTION_FLUSH_FAILED`",
+                      "An action inside `runBatched()` and its closing flush both failed; a plain writable error gets the aggregate on `cause`, and when `cause` cannot be read the three original values go straight into `AggregateError.errors`"
+                    ],
+                    [
+                      "`schedulerFailed`",
+                      "`SCHEDULER_FAILED`",
+                      "Reserved: diagnostic channel code for unhandled errors caught from an async scheduling strategy callback or `reportError()` (no built-in throw or report point by default)"
+                    ],
+                    [
+                      "`captureInvalid`",
+                      "`CAPTURE_INVALID`",
+                      "At `commitCapture()` the token from `capture()` was already invalid or consumed, belonged to another tracker, or its observer was disposed"
+                    ],
+                    [
+                      "`bindingDuplicate`",
+                      "`BINDING_DUPLICATE`",
+                      "`observe()` was called again on the same `IObserverBinding` while it was already observed"
+                    ],
+                    [
+                      "`graphNodeRegistered`",
+                      "`GRAPH_NODE_REGISTERED`",
+                      "A source / observer binding tried to replace the sets of an existing graph node; create a new node instead"
+                    ],
+                    [
+                      "`internalsRegistered`",
+                      "`INTERNALS_REGISTERED`",
+                      "The internal surface of the same `Runtime` object was registered twice (`registerInternals()`)"
+                    ],
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "An option passed while constructing a `Runtime` / `Scheduler` / `VersionClock` did not meet its requirements"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callers should always check `error.code === ReactiveErrorCode.xxx` instead of hard-coding the code strings. The JSDoc in `src/error-code.ts` explains the reason for each code."
+                }
+              ]
+            },
+            {
+              "id": "trace-events-and-constants",
+              "heading": "Trace events and constants",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Events received by `subscribeTrace(listener)` are one of these discriminated variants:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IRuntimeTraceEvent =\n  | {\n      type: 'observable-change'\n      timestamp: number\n      observable: IRuntimeNodeDescriptor\n      reason: 'set' | 'notify'\n    }\n  | {\n      type: 'dependency'\n      timestamp: number\n      phase: 'connect' | 'disconnect'\n      observable: IRuntimeNodeDescriptor\n      observer: IRuntimeNodeDescriptor\n      reason?: 'retrack' | 'invalidate' | 'dispose'\n    }\n  | {\n      type: 'observer-run'\n      timestamp: number\n      phase: 'start' | 'end' | 'error'\n      observer: IRuntimeNodeDescriptor\n      durationMs?: number\n      error?: unknown\n    }\n  | {\n      type: 'action'\n      timestamp: number\n      phase: 'start' | 'end' | 'error'\n      name: string\n      durationMs?: number\n      error?: unknown\n    }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Nodes appear as reduced `IRuntimeNodeDescriptor`s (`{ id, kind, debugName? }`), not as raw node objects."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Constant", "Values", "Purpose"],
+                  "rows": [
+                    [
+                      "`ReactiveTraceType`",
+                      "`{ observableChange, dependency, observerRun, action }`",
+                      "Top-level discriminant of trace events"
+                    ],
+                    [
+                      "`ReactiveTracePhase`",
+                      "`{ start, end, error, connect, disconnect }`",
+                      "Phase of dependency / observerRun / action events"
+                    ],
+                    [
+                      "`ReactiveErrorPhase`",
+                      "`{ asyncFlush, causeRead, dependencyDisconnect, lifecycleHook, ssrResource, subscriptionListener, traceListener }`",
+                      "Values of `context.phase` received by `reportError` / `onError`; `causeRead` means reading the `cause` of an application error failed while closing a batch"
+                    ],
+                    [
+                      "`ReactiveTraceReason`",
+                      "`{ set, notify, retrack, invalidate, dispose }`",
+                      "Reason of observableChange / dependency events"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "1-isolated-runtime-manual-flush-server-rendering-unit-tests",
+              "heading": "1. Isolated Runtime + manual flush (server rendering / unit tests)",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nfunction renderOnce() {\n  const runtime = createRuntime() // one per request / test, so nothing leaks between them\n  const count = runtime.signal(1)\n  const doubled = runtime.computed(() => count.value * 2)\n  const seen: number[] = []\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value)\n  })\n  count.value = 5\n  runtime.flush() // flush synchronously by hand; server rendering does not depend on microtask timing\n  dispose.dispose()\n  return seen // [2, 10]\n}"
+                }
+              ]
+            },
+            {
+              "id": "2-three-phase-binding-a-minimal-concurrency-safe-subscription-adapter",
+              "heading": "2. Three-phase binding: a minimal concurrency-safe subscription adapter",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createObserverBinding } from '@migaia/reactive/extension'\nimport { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(0)\nconst doubled = runtime.computed(() => count.value * 2)\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime)\n  const capture = binding.capture(read) // render phase: read-only capture that may be discarded\n  // ...when the render really commits:\n  binding.observe(() => {\n    // re-render after a change; a real host calls the returned disposer on unmount\n  })\n  const result = binding.commit(capture) // install the observer first, then commit the token\n  if (result === 'stale') {\n    // dependencies changed: evaluate again (a real framework adapter triggers a re-render here)\n  }\n  return capture.result\n}"
+                }
+              ]
+            },
+            {
+              "id": "3-batch-error-priority-the-order-of-an-action-failure-and-a-closing-flush-failure",
+              "heading": "3. Batch + error priority: the order of an action failure and a closing flush failure",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const runtime = createRuntime()\ntry {\n  runtime.batch(() => {\n    signalA.value = 1\n    signalB.value = 2\n    throw new Error('business failure')\n  })\n} catch (error) {\n  // error is the 'business failure' itself; if the closing flush also fails, the flush error hangs on error.cause\n}"
+                }
+              ]
+            },
+            {
+              "id": "4-custom-scheduling-strategy-switch-to-requestanimationframe",
+              "heading": "4. Custom scheduling strategy: switch to requestAnimationFrame",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const runtime = createRuntime({\n  schedulerStrategy: (flush) => {\n    requestAnimationFrame(() => flush())\n  }\n})"
+                }
+              ]
+            },
+            {
+              "id": "troubleshooting-and-build-gates",
+              "heading": "Troubleshooting and build gates",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Reading a node throws `NODE_DISPOSED`: the node was `dispose()`d and never silently returns an old value; stop holding that reference and use a newly created instance.",
+                    "`CROSS_RUNTIME` / `NOT_RUNTIME_OWNED`: nodes were mixed across `Runtime`s, or the object was not created by `createRuntime()`; make sure a node and the `Runtime` consuming it are the same one.",
+                    "A `Computed` throws `CIRCULAR_DEPENDENCY`: the graph has a self-reading cycle (`a` reads `a` directly or indirectly); check the graph and break the cycle.",
+                    "`flush()` throws `FLUSH_LOOP` (automatic flushes report it to `onError` with phase `async-flush`): effects keep triggering each other and never stop, typically two `Effect`s that each write the value the other reads while the two values never agree. The error message lists the dropped pending `debugName`s; use them to find and break the cycle. A single `Effect` that writes a value it reads during its own run does not make itself rerun.",
+                    "`createObserverBinding().observe()` throws `BINDING_DUPLICATE`: the same binding was `observe()`d again while already observed; check whether it is still observing before calling again, or create a new binding for a new render round.",
+                    "`commit()` returns `'stale'`: not an error but the normal race signal; discard the current snapshot and `capture()` / `commit()` again, without pulling dirty nodes during commit.",
+                    "`COPY_CONFLICT` / `BRAND_CORRUPTED`: several module copies of this library exist in the process; deduplicate the dependency (usually a bundler issue), or call `assertSingleRuntimeCopy()` at application start to fail fast.",
+                    "`VERSION_EXHAUSTED`: the monotonic version clock ran out (with production defaults this takes about 285 years); release every node the current `Runtime` holds and create a new `Runtime` instead of reusing the same graph.",
+                    "You need collection types, an async resource state machine or UI framework bindings: `@migaia/reactive` only provides the engine layer, the three node primitives and the `Runtime`; those higher-level capabilities are built on it by the `store-*` module, `@migaia/resource` and the framework adapters in this monorepo."
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When migrating, upgrade every reactive copy in one process together: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must create nothing at import time. It creates the shared default Runtime on its first call and returns exactly the same object as the root entry's `defaultRuntime`; importing the root `defaultRuntime` still creates it at import time. `ReactiveErrorPhase` can also be imported from the extension entry and is the same object as the root export."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules one synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (microtasks by default). Errors thrown by the cleanup go to the Runtime's `reportError`. It returns no modifiable scheduler or graph capability and does not own asynchronous resources."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
+                }
+              ]
+            }
+          ]
+        }
       }
     }
   },
@@ -1036,7 +2612,7 @@
           "name": "createRuntime",
           "kind": "function",
           "signature": "export declare function createRuntime(options?: IRuntimeOptions): IRuntime;",
-          "declarationLine": 21,
+          "declarationLine": 27,
           "source": "packages/reactive/dist/runtime/runtime.class.d.ts",
           "purpose": "Creates an isolated reactive runtime: its own dependency graph, version clock and scheduler. Nodes created by one runtime cannot be read by computed values or effects of another (`CROSS_RUNTIME`). Create one per SSR request, per test, or per worker instead of sharing `defaultRuntime`.",
           "core": "options: Runtime options; all optional, see the options table.\nAn `IRuntime`. Invalid options throw a `TypeError` or `RangeError` with code `INVALID_OPTION`.\nadapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
@@ -1053,6 +2629,12 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(30)\nconst quantity = runtime.signal(2)\n// 合计由单价和数量推导出来，不需要在每个修改的地方手动更新\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst render = runtime.effect(() => {\n  console.log(`购物车合计：${total.value} 元`)\n})\n\nquantity.value = 3 // 改数量\nruntime.flush() // 示例里手动冲刷；平时由微任务自动完成\nprice.value = 25 // 改单价\nruntime.flush()\n\nrender.dispose()\ntotal.dispose()",
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = runtime.signal('大厅')\n\nconst chat = runtime.effect(() => {\n  const name = room.value\n  console.log(`进入 ${name}`)\n  // 返回的函数会在下次重跑之前、以及 dispose() 时执行\n  return () => console.log(`离开 ${name}`)\n})\n\nroom.value = '技术交流'\nruntime.flush()\nchat.dispose() // 用户关闭聊天窗口",
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst initials = runtime.computed(() => `${first.value[0]}.${last.value[0]}.`)\nconst label = runtime.computed(() => `${first.value} ${last.value}（${initials.value}）`)\n\nlet effectRuns = 0\nconst header = runtime.effect(() => {\n  effectRuns += 1\n  console.log('页头显示:', label.value)\n})\n\n// 同一段同步代码里改了两个值\nfirst.value = 'Grace'\nlast.value = 'Hopper'\nawait Promise.resolve() // 等默认的微任务冲刷\nconsole.log('副作用一共执行了', effectRuns, '次')\nheader.dispose()",
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst orders = runtime.signal([120, 80, 45])\nlet computations = 0\nconst report = runtime.computed(() => {\n  computations += 1 // 假设这是一段昂贵的统计\n  return orders.value.reduce((sum, amount) => sum + amount, 0)\n})\n\norders.value = [...orders.peek(), 60] // 还没人读取 report\nconsole.log('没人读取时计算次数:', computations)\n\nconst panel = runtime.effect(() => console.log('报表面板:', report.value))\norders.value = [...orders.peek(), 10]\nruntime.flush()\nconsole.log('面板打开期间计算次数:', computations)\n\npanel.dispose() // 面板关闭，最后一个读者离开\norders.value = [...orders.peek(), 99]\norders.value = [...orders.peek(), 1]\nconsole.log('面板关闭后计算次数:', computations)\nconsole.log('再次读取:', report.value, '计算次数:', computations)",
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // 默认 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发\nruntime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })\nruntime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('页面仍可响应，celsius =', Math.round(celsius.peek()))",
+            "import { createRuntime } from '@migaia/reactive'\n\n// 服务端渲染：每个请求一个 Runtime，用户之间的状态互不可见\nfunction renderPage(user: string) {\n  const runtime = createRuntime()\n  const name = runtime.signal(user)\n  const greeting = runtime.computed(() => `你好，${name.value}`)\n  return { runtime, greeting }\n}\n\nconst pageA = renderPage('Ada')\nconst pageB = renderPage('Grace')\nconsole.log(pageA.greeting.value, '|', pageB.greeting.value)\n\n// 把 A 的节点拿到 B 的 Runtime 里使用，会立刻报错，而不是悄悄串数据\nconst leaked = pageB.runtime.computed(() => pageA.greeting.value)\ntry {\n  leaked.value\n} catch (error) {\n  console.log('跨 Runtime 读取:', (error as { code?: string }).code)\n}",
             "const runtime = createRuntime()\nconst count = runtime.signal(1)\ncount.value // 1，在 Computed/Effect 内读取会建立依赖\ncount.value = 2 // Object.is 判定；写入相同值不触发任何通知，也不推进版本\ncount.peek() // 2，不建立依赖\ncount.dispose()\ncount.value // 抛 NODE_DISPOSED",
             "const runtime = createRuntime({\n  maxFlushPasses: 50,\n  onError: (e, ctx) => console.error(ctx.phase, e)\n})",
             "const runtime = createRuntime()\nconst node = {}\nclaimOwnership(node, runtime)\nassertOwnedBy(node, runtime, 'my-node') // 通过\nassertOwnedBy(node, otherRuntime, 'my-node') // 抛 CROSS_RUNTIME",
@@ -1061,6 +2643,7 @@
             "const runtime = createRuntime()\ntry {\n  runtime.batch(() => {\n    signalA.value = 1\n    signalB.value = 2\n    throw new Error('business failure')\n  })\n} catch (error) {\n  // error 就是 'business failure' 本身；若收尾 flush 也失败，flush 错误挂在 error.cause 上\n}",
             "const runtime = createRuntime({\n  schedulerStrategy: (flush) => {\n    requestAnimationFrame(() => flush())\n  }\n})",
             "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true",
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst items = runtime.signal([{ name: '键盘', price: 300 }])\nconst discount = runtime.signal(0)\n// 合计从商品和折扣推导出来，任何一个变了都会自动重算\nconst total = runtime.computed(\n  () => items.value.reduce((sum, item) => sum + item.price, 0) * (1 - discount.value)\n)\n\nconst badge = runtime.effect(() => console.log(`合计 ${total.value} 元`))\n\nitems.value = [...items.peek(), { name: '鼠标', price: 100 }]\ndiscount.value = 0.1\nawait Promise.resolve() // 两次修改在下一个微任务里合并成一次更新\nbadge.dispose()",
             "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\n\nconst seen: number[] = []\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value)\n}) // 创建时立即同步跑一次：seen = [2]\n\ncount.value = 3\nruntime.flush() // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose()\ndoubled.dispose()\ncount.dispose()"
           ],
           "members": [],
@@ -1277,43 +2860,48 @@
               ]
             },
             {
-              "id": "8-生命周期-错误与边界",
-              "heading": "8. 生命周期、错误与边界",
+              "id": "一张依赖图的完整生命周期",
+              "heading": "一张依赖图的完整生命周期",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\n\nconst seen: number[] = []\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value)\n}) // 创建时立即同步跑一次：seen = [2]\n\ncount.value = 3\nruntime.flush() // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose()\ndoubled.dispose()\ncount.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这段代码建立的是一张由当前 `runtime` 独占的依赖图。`runtime.effect()` 创建时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动冲刷；测试、服务端渲染或需要确定提交边界的代码才显式调用 `flush()`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。`dispose()` 断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给 `@migaia/lifecycle` 的 `createLifecycleScope()` / `createSyncLifecycleScope()` 持有并统一释放。"
+                }
+              ]
+            },
+            {
+              "id": "生命周期-错误与边界",
+              "heading": "生命周期、错误与边界",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有订阅者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
+                  "text": "1. 不要跨 `Runtime` 混用节点：一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed` / `Effect` 读取会抛 `CROSS_RUNTIME`。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，都有 `dispose()` / `disposed`。三个节点类是内部实现，不作为值导出。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. 给 `Signal` 写入相同的值（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有读者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本和拓扑，未变则复用缓存）。需要“暂时没人读也保持计算”时传 `{ keepAlive: true }`。 6. `dispose()` 之后的读取会立刻抛 `NODE_DISPOSED`，不会静默返回旧值，避免出现“看起来能用但永远不更新”的状态。 7. `defaultRuntime` 是进程级单例。服务端渲染的请求隔离、单测互不影响、Worker 独立运行，都应该显式调用 `createRuntime()`。 8. 调度可控：默认在微任务里合并冲刷；创建 Runtime 时可用 `schedulerStrategy` 改为 `requestAnimationFrame`、空闲回调或自定义策略。 9. 诊断不进入业务状态：trace 事件和错误上报走独立通道。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
+                  "text": "不适合的场景：只想要组件内部的局部状态（相当于 `useState`），不需要跨组件共享的依赖图；或者需要开箱即用的可观察集合、异步请求状态机。后两者由本仓的集合、resource 等包在本包之上提供，本包自身不包含。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
+                  "text": "通用的“一组资源集中释放”容器（原 `Scope` / `createScope()`）已移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()` / `createSyncLifecycleScope()`。"
                 }
               ]
             }
           ],
-          "usageScore": 156,
+          "usageScore": 260,
           "configuration": [
             {
               "name": "adapter",
@@ -1327,9 +2915,9 @@
               "name": "onError",
               "type": "(error: unknown, context: IRuntimeErrorContext) => void",
               "optional": true,
-              "description": "`addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，内部单个失败保留原实例，多个失败聚合为 `OBSERVER_FAILED` AggregateError；公开观察路径捕获并通过 `onError` 的 `lifecycle-hook` phase 报告，创建 Effect 不靠同步 throw 暴露 hook 失败。",
+              "description": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。",
               "descriptionEn": "",
-              "descriptionZh": "`addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，内部单个失败保留原实例，多个失败聚合为 `OBSERVER_FAILED` AggregateError；公开观察路径捕获并通过 `onError` 的 `lifecycle-hook` phase 报告，创建 Effect 不靠同步 throw 暴露 hook 失败。"
+              "descriptionZh": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
             },
             {
               "name": "onTrace",
@@ -1343,9 +2931,9 @@
               "name": "maxFlushPasses",
               "type": "number",
               "optional": true,
-              "description": "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。",
+              "description": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。",
               "descriptionEn": "Maximum executions for one observer within one flush. The default is 100. Exceeding the limit is treated as a self-triggering cycle and throws after clearing the queue. The limit is configurable scheduling policy, not a physical constant.",
-              "descriptionZh": "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。"
+              "descriptionZh": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
             },
             {
               "name": "scheduleIdle",
@@ -1429,43 +3017,25 @@
           "identity": "packages/reactive/dist/runtime/default-runtime.d.ts:defaultRuntime:export declare const defaultRuntime: IRuntime;",
           "guidance": [
             {
-              "id": "8-生命周期-错误与边界",
-              "heading": "8. 生命周期、错误与边界",
+              "id": "生命周期-错误与边界",
+              "heading": "生命周期、错误与边界",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有订阅者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
+                  "text": "1. 不要跨 `Runtime` 混用节点：一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed` / `Effect` 读取会抛 `CROSS_RUNTIME`。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，都有 `dispose()` / `disposed`。三个节点类是内部实现，不作为值导出。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. 给 `Signal` 写入相同的值（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有读者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本和拓扑，未变则复用缓存）。需要“暂时没人读也保持计算”时传 `{ keepAlive: true }`。 6. `dispose()` 之后的读取会立刻抛 `NODE_DISPOSED`，不会静默返回旧值，避免出现“看起来能用但永远不更新”的状态。 7. `defaultRuntime` 是进程级单例。服务端渲染的请求隔离、单测互不影响、Worker 独立运行，都应该显式调用 `createRuntime()`。 8. 调度可控：默认在微任务里合并冲刷；创建 Runtime 时可用 `schedulerStrategy` 改为 `requestAnimationFrame`、空闲回调或自定义策略。 9. 诊断不进入业务状态：trace 事件和错误上报走独立通道。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
+                  "text": "不适合的场景：只想要组件内部的局部状态（相当于 `useState`），不需要跨组件共享的依赖图；或者需要开箱即用的可观察集合、异步请求状态机。后两者由本仓的集合、resource 等包在本包之上提供，本包自身不包含。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
+                  "text": "通用的“一组资源集中释放”容器（原 `Scope` / `createScope()`）已移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()` / `createSyncLifecycleScope()`。"
                 }
               ]
             }
           ],
-          "usageScore": 46,
+          "usageScore": 56,
           "configuration": [],
           "fragment": "reactive-index--defaultRuntime"
         },
@@ -1473,7 +3043,7 @@
           "name": "IComputedConfig",
           "kind": "type",
           "signature": "export type IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);",
-          "declarationLine": 7,
+          "declarationLine": 12,
           "source": "packages/reactive/dist/reactive/computed.class.d.ts",
           "purpose": "Second argument of `runtime.computed()`: an `equals` function, or `{ equals, keepAlive, debugName }`.",
           "core": "Second argument of `runtime.computed()`: an `equals` function, or `{ equals, keepAlive, debugName }`.",
@@ -1542,7 +3112,7 @@
           "name": "IDisposable",
           "kind": "type",
           "signature": "export type IDisposable = { dispose(): void; readonly disposed: boolean; };",
-          "declarationLine": 217,
+          "declarationLine": 233,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Ownership contract shared by nodes and sources: `dispose()` is idempotent and `disposed` reports the state.",
           "core": "dispose: Releases the node: removes its dependency edges and stops notifications. Calling it again does nothing.\nNothing; afterwards `disposed` is `true` and reading the node throws `NODE_DISPOSED`.\ndisposed: `true` after `dispose()`; a disposed node can no longer be read or written.",
@@ -1631,7 +3201,7 @@
           "name": "IDisposer",
           "kind": "type",
           "signature": "export type IDisposer = () => void;",
-          "declarationLine": 211,
+          "declarationLine": 227,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "A cleanup function returned by effects and subscriptions.",
           "core": "A cleanup function returned by effects and subscriptions.",
@@ -1698,7 +3268,7 @@
           "name": "IFlushResult",
           "kind": "type",
           "signature": "export type IFlushResult = 'completed' | 'deferred';",
-          "declarationLine": 230,
+          "declarationLine": 246,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Result of `runtime.flush()`: `completed` (queue drained) or `deferred` (re-entrant call, outer flush continues).",
           "core": "Result of `runtime.flush()`: `completed` (queue drained) or `deferred` (re-entrant call, outer flush continues).",
@@ -1763,7 +3333,7 @@
           "name": "IReactiveComputed",
           "kind": "type",
           "signature": "export type IReactiveComputed<T> = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; readonly observed: boolean; readonly version: number; readonly value: T; peek(): T; };",
-          "declarationLine": 32,
+          "declarationLine": 36,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "A lazy cached derived node created by `runtime.computed()`. Writes upstream only mark it dirty; it recomputes when read. Diamond dependencies recompute once per change.",
           "core": "runtime: The runtime that created the node; only nodes of the same runtime can depend on each other.\ndebugName: Label given at creation, shown in trace events and error messages; `undefined` when not set.\ndispose: Releases the node: removes its dependency edges and stops notifications. Calling it again does nothing.\nNothing; afterwards `disposed` is `true` and reading the node throws `NODE_DISPOSED`.\ndisposed: `true` after `dispose()`; a disposed node can no longer be read or written.\nvalue: Current derived value; reading subscribes and recomputes when stale. A cycle throws `CIRCULAR_DEPENDENCY`.\npeek: Reads (and recomputes if needed) without subscribing.\nThe derived value; throws `NODE_DISPOSED` after dispose.\nobserved: `true` while at least one observer depends on it; an unobserved computed suspends at idle time.\nversion: Advances when the derived value changes according to `equals`.",
@@ -1887,7 +3457,7 @@
           "name": "IReactiveEffect",
           "kind": "type",
           "signature": "export type IReactiveEffect = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; };",
-          "declarationLine": 41,
+          "declarationLine": 45,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Handle of a running side effect created by `runtime.effect()`. The effect already ran once at creation; the handle only controls its lifetime.",
           "core": "runtime: The runtime that created the node; only nodes of the same runtime can depend on each other.\ndebugName: Label given at creation, shown in trace events and error messages; `undefined` when not set.\ndispose: Releases the node: removes its dependency edges and stops notifications. Calling it again does nothing.\nNothing; afterwards `disposed` is `true` and reading the node throws `NODE_DISPOSED`.\ndisposed: `true` after `dispose()`; a disposed node can no longer be read or written.",
@@ -2207,7 +3777,7 @@
           "name": "IReactiveErrorCode",
           "kind": "type",
           "signature": "export type IReactiveErrorCode = (typeof ReactiveErrorCode)[keyof typeof ReactiveErrorCode];",
-          "declarationLine": 162,
+          "declarationLine": 163,
           "source": "packages/reactive/dist/error-code.d.ts",
           "purpose": "Union of every `ReactiveErrorCode` value.",
           "core": "Union of every `ReactiveErrorCode` value.",
@@ -2387,7 +3957,7 @@
           "name": "IReactiveNodeOptions",
           "kind": "type",
           "signature": "export type IReactiveNodeOptions = { debugName?: string; };",
-          "declarationLine": 11,
+          "declarationLine": 15,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Options of `signal()` and `effect()`.",
           "core": "debugName: Label used in trace events and error messages.\nNot set: the node shows only its numeric id.",
@@ -2464,7 +4034,7 @@
           "name": "IReactiveSignal",
           "kind": "type",
           "signature": "export type IReactiveSignal<T> = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; readonly observed: boolean; readonly version: number; value: T; peek(): T; /** Registers observation callbacks and returns a token that removes only those callbacks. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): IDisposer; };",
-          "declarationLine": 18,
+          "declarationLine": 22,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "A writable reactive node created by `runtime.signal()`: the only source of truth in the graph.",
           "core": "runtime: The runtime that created the node; only nodes of the same runtime can depend on each other.\ndebugName: Label given at creation, shown in trace events and error messages; `undefined` when not set.\ndispose: Releases the node: removes its dependency edges and stops notifications. Calling it again does nothing.\nNothing; afterwards `disposed` is `true` and reading the node throws `NODE_DISPOSED`.\ndisposed: `true` after `dispose()`; a disposed node can no longer be read or written.\nvalue: Current value. Reading it inside a computed or effect subscribes; assigning a value that is not `Object.is`-equal notifies dependents. Same-value writes do nothing.\npeek: Reads the value without subscribing.\nThe current value; throws `NODE_DISPOSED` after dispose.\nobserved: `true` while the node is alive and at least one computed or effect depends on it.\nversion: Version number advanced by each effective write; useful for cheap change detection.\naddObservedHooks: Registers callbacks for the first observer arriving (`onObserved`) and the last one leaving (`onUnobserved`). Several callers can register independently.\naddObservedHooks.hooks: `onObserved` and/or `onUnobserved`.\nA function that removes only this registration group, even when another owner supplied the same callbacks. Several failing hooks are combined into `OBSERVER_FAILED`.\nStart and stop expensive sources (sockets, polling) with demand.",
@@ -2603,7 +4173,7 @@
           "name": "IRuntime",
           "kind": "type",
           "signature": "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** * Creates a writable node owned by this runtime and sharing its dependency graph and version * clock. */ signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>; /** Creates an immediately executed effect whose handle owns idempotent disposal. */ effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns * `completed` after draining the queue. */ flush(): IFlushResult; /** * Runs and traces an action. Callers provide only its name and function, never fabricated phases * or trace events. */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency * records. */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
-          "declarationLine": 91,
+          "declarationLine": 100,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "One isolated reactive graph returned by `createRuntime()`. All nodes are created through it, and it owns batching, flushing and diagnostics.",
           "core": "signal: Creates a writable node. Reading `.value` inside a computed or an effect records a dependency; assigning a value that is not `Object.is`-equal advances its version and marks dependents dirty.\nsignal.value: Initial value.\nsignal.options: `debugName`: label used in trace events and errors.\nAn `IReactiveSignal`; its owner should `dispose()` it when done.\ncomputed: Creates a lazy, cached derived value. It computes on first read, recomputes only after a dependency changed, and when nobody observes it any more it suspends itself at idle time (unless `keepAlive`).\ncomputed.fn: Pure derivation; every node read inside becomes a dependency. It must not write signals.\ncomputed.config: Either an `equals(a, b)` function, or `{ equals, keepAlive, debugName }`. `equals` decides whether dependents see a change (default `Object.is`); `keepAlive: true` keeps the value warm without observers.\nAn `IReactiveComputed` whose `.value` is read-only.\nAny value that can be derived from other nodes. Use an effect only for side effects.\neffect: Creates a side effect that runs once immediately, records the nodes it reads, and runs again at the next flush after any of them changed. A function returned by `fn` is called before each rerun and on dispose.\neffect.fn: Effect body; may return a cleanup function.\neffect.options: `debugName`: label for traces.\nAn `IReactiveEffect` handle; `dispose()` removes dependencies and runs the last cleanup.\nbatch: Runs `fn` and merges every write inside it into one flush when the outermost `batch` returns, so effects never see a half-applied update. Nested calls only increase the depth.\nbatch.fn: Code that writes several nodes.\nWhat `fn` returns. If `fn` throws and the final flush also throws, both errors are kept (see `ACTION_FLUSH_FAILED`).\nuntracked: Runs `fn` with dependency tracking turned off: nodes read inside are not recorded as dependencies of the current computed or effect.\nuntracked.fn: Code whose reads must not subscribe.\nWhat `fn` returns.\nRead configuration or context inside an effect without rerunning when it changes. For one node, `node.peek()` is shorter.\nflush: Runs the pending effects now, synchronously. Production code normally relies on the scheduler strategy (merged microtasks by default); tests, SSR and explicit commit points call it directly.\n`completed` from the outermost call after the queue is empty; `deferred` when called from inside an effect (the outer flush continues). More than `maxFlushPasses` reruns of one effect throw `FLUSH_LOOP` and drop the rest of the queue.\nrunTracedAction: Runs `fn` as one named action in the trace stream (start, end or error records). Without trace listeners it is the same as calling `fn()`.\nrunTracedAction.name: Non-empty action name shown in devtools; otherwise `INVALID_OPTION`.\nrunTracedAction.fn: The action body.\nWhat `fn` returns; an error of `fn` is rethrown after the error record.\nPair it with `subscribeTrace` (or the `onTrace` option): mark a user-level operation so devtools can group the node changes and effect runs it caused between its start and end records. Without a listener it adds no cost and records nothing.\nreportError: Sends an error to the runtime diagnostic channel (`onError`, or the adapter `reportError`). Node references in `context` are replaced by descriptors before they reach callbacks.\nreportError.error: The failure to report.\nreportError.context: `phase` (a `ReactiveErrorPhase` value) plus optional `observer` / `observable` node involved.\nNothing; reporting never throws into the caller.\nAdapters and extensions that must swallow an error but keep it observable.\nsubscribeTrace: Subscribes to read-only diagnostic events: node changes, dependency connect/disconnect, effect runs and traced actions. Nodes appear as `{ id, kind, debugName }` descriptors, not as objects.\nsubscribeTrace.listener: Receives each trace event.\nA function that stops the subscription.\nDevtools, loggers and tests that need to see why the graph changed. Pair it with `runTracedAction` to group the events of one user operation under a name; subscribe after the runtime exists, or use the `onTrace` option to receive events from creation on.",
@@ -2832,7 +4402,7 @@
           "name": "IRuntimeErrorContext",
           "kind": "type",
           "signature": "export type IRuntimeErrorContext = { phase: IRuntimeErrorPhase; observer?: IRuntimeNodeDescriptor; observable?: IRuntimeNodeDescriptor; };",
-          "declarationLine": 121,
+          "declarationLine": 132,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Context passed with an error to `onError`.",
           "core": "phase: Where the error happened; a `ReactiveErrorPhase` value.\nobserver: Descriptor `{ id, kind, debugName }` of the observer involved, if any.\nobservable: Descriptor of the node involved, if any.",
@@ -2929,7 +4499,7 @@
           "name": "IRuntimeOptions",
           "kind": "type",
           "signature": "export type IRuntimeOptions = { /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant. */ maxFlushPasses?: number; /** * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask. */ scheduleIdle?: (task: () => void) => void; /** Selects flush timing at creation; the runtime does not expose strategy replacement. */ schedulerStrategy?: ISchedulerStrategy; };",
-          "declarationLine": 152,
+          "declarationLine": 168,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Options of `createRuntime()`; all fields are optional and fixed at creation.",
           "core": "adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nonError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nonTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nmaxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nscheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nschedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
@@ -3053,7 +4623,7 @@
           "name": "IRuntimeTraceEvent",
           "kind": "type",
           "signature": "export type IRuntimeTraceEvent = { readonly type: typeof ReactiveTraceType.observableChange; readonly timestamp: number; readonly observable: IRuntimeNodeDescriptor; readonly reason: typeof ReactiveTraceReason.set | typeof ReactiveTraceReason.notify; } | { readonly type: typeof ReactiveTraceType.dependency; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.connect | typeof ReactiveTracePhase.disconnect; readonly observable: IRuntimeNodeDescriptor; readonly observer: IRuntimeNodeDescriptor; readonly reason?: typeof ReactiveTraceReason.retrack | typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose; } | { readonly type: typeof ReactiveTraceType.observerRun; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.start | typeof ReactiveTracePhase.end | typeof ReactiveTracePhase.error; readonly observer: IRuntimeNodeDescriptor; readonly durationMs?: number; readonly error?: unknown; } | { readonly type: typeof ReactiveTraceType.action; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.start | typeof ReactiveTracePhase.end | typeof ReactiveTracePhase.error; readonly name: string; readonly durationMs?: number; readonly error?: unknown; };",
-          "declarationLine": 57,
+          "declarationLine": 66,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "One trace event: node change, dependency connect/disconnect, effect run, or traced action. Nodes appear as descriptors.",
           "core": "type: Event discriminant from `ReactiveTraceType`, selecting observable changes, dependency edges, observer execution or actions.\ntimestamp: Runtime-supplied event timestamp from the tracing clock; consumers do not construct this value.\nobservable: Runtime-issued node descriptor for the changed value or the dependency edge’s observable source.\nreason: Runtime-supplied cause of a value change or dependency transition; absent when that event carries no reason.\nphase: Dependency connect/disconnect or execution start/end/error phase, interpreted together with the event type.\nobserver: Runtime-issued descriptor identifying the observer at the dependency edge or execution event.\ndurationMs: Optional measured execution duration in milliseconds, supplied by observer or action completion tracing.\nerror: Original execution failure on an error-phase observer or action event; successful phases omit it.\nname: Action name supplied by the caller to the runtime action API and retained on its trace events.",
@@ -3323,7 +4893,7 @@
           "name": "ISchedulerStrategy",
           "kind": "type",
           "signature": "export type ISchedulerStrategy = (flush: () => void) => void;",
-          "declarationLine": 225,
+          "declarationLine": 241,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Function that decides when to flush: it receives `flush` and calls it (now or later).",
           "core": "Function that decides when to flush: it receives `flush` and calls it (now or later).",
@@ -4571,7 +6141,7 @@
           "name": "createObserverBinding",
           "kind": "function",
           "signature": "export declare function createObserverBinding(runtime: IRuntime): IObserverBinding;",
-          "declarationLine": 88,
+          "declarationLine": 92,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
           "purpose": "Creates a binding for framework adapters that render concurrently: dependencies are captured during render without creating edges, and installed only at commit. A discarded render therefore leaves no subscription behind.",
           "core": "runtime: A runtime created by `createRuntime()` (or `defaultRuntime`). Other objects throw `NOT_RUNTIME_OWNED`.\nAn `IObserverBinding`.",
@@ -4679,7 +6249,7 @@
               ]
             }
           ],
-          "usageScore": 58,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "reactive-extension--createObserverBinding"
         },
@@ -5006,44 +6576,7 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/deferred-cleanup.d.ts:deferRuntimeCleanup:export declare function deferRuntimeCleanup(runtime: IRuntime, task: () => void): void;",
-          "guidance": [
-            {
-              "id": "8-生命周期-错误与边界",
-              "heading": "8. 生命周期、错误与边界",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有订阅者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
-                }
-              ]
-            }
-          ],
+          "guidance": [],
           "usageScore": 30,
           "configuration": [],
           "fragment": "reactive-extension--deferRuntimeCleanup"
@@ -5108,44 +6641,7 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/default-runtime-provider.d.ts:getDefaultRuntime:export declare function getDefaultRuntime(): IRuntime;",
-          "guidance": [
-            {
-              "id": "8-生命周期-错误与边界",
-              "heading": "8. 生命周期、错误与边界",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有订阅者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
-                }
-              ]
-            }
-          ],
+          "guidance": [],
           "usageScore": 30,
           "configuration": [],
           "fragment": "reactive-extension--getDefaultRuntime"
@@ -5154,7 +6650,7 @@
           "name": "ICapture",
           "kind": "type",
           "signature": "export type ICapture<R> = { readonly result: R; readonly [CAPTURE_TOKEN]: true; };",
-          "declarationLine": 6,
+          "declarationLine": 10,
           "source": "packages/reactive/dist/runtime/dependency-tracker.class.d.ts",
           "purpose": "Opaque token returned by `binding.capture()`: holds the read result and, privately, the dependencies read at render time.",
           "core": "result: The value returned by the read function.",
@@ -5622,7 +7118,7 @@
           "name": "IObservable",
           "kind": "type",
           "signature": "export type IObservable = { readonly runtime: IRuntime; debugName?: string; /** Reverse edges are maintained by the Runtime tracker, not extension code. */ readonly subs: ReadonlySet<IObserver>; readonly version: number; pull?(): void; isStale?(): boolean; onObserved?(): void; onUnobserved?(): void; };",
-          "declarationLine": 183,
+          "declarationLine": 199,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Node protocol for values in the graph. Custom nodes implement it and are registered with `createSourceBinding()`; `subs` and `version` are maintained by the runtime.",
           "core": "runtime: The runtime that created the node; only nodes of the same runtime can depend on each other.\ndebugName: Label given at creation, shown in trace events and error messages; `undefined` when not set.\nsubs: Observers depending on the node (maintained by the runtime).\nversion: Version advanced by each published change.\npull: Optional: brings a lazy node up to date before it is read.\nNothing; afterwards `version` is current.\nisStale: Optional: tells, without computing, whether the node needs recomputation.\n`true` when stale; must not throw or change the graph.\nonObserved: Optional hook called when the first observer subscribes.\nNothing.\nonUnobserved: Optional hook called when the last observer leaves.",
@@ -5762,7 +7258,7 @@
           "name": "IObserver",
           "kind": "type",
           "signature": "export type IObserver = { readonly runtime: IRuntime; readonly disposed: boolean; debugName?: string; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; markDirty(): void; onDependencyDisconnected(observable: IObservable): void; };",
-          "declarationLine": 198,
+          "declarationLine": 214,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Node protocol for consumers in the graph (computed values and effects implement it). Custom observers are registered with `createTrackedObserver()`.",
           "core": "runtime: The runtime that created the node; only nodes of the same runtime can depend on each other.\ndisposed: `true` after `dispose()`; a disposed node can no longer be read or written.\ndebugName: Label given at creation, shown in trace events and error messages; `undefined` when not set.\ndeps: Nodes this observer depends on.\ndepVersions: Versions of the dependencies at the last run.\nmarkDirty: Called by the runtime when a dependency changed.\nNothing; the observer should schedule its rerun.\nonDependencyDisconnected: Called by the runtime when a dependency is disconnected by disposal or invalidation; an invalidated node can still be usable.\nonDependencyDisconnected.observable: The disconnected dependency, which may still be usable after invalidation.\nNothing; rerun to reconnect or expose a disposal failure as appropriate.",
@@ -6011,7 +7507,7 @@
           "name": "IObserverBinding",
           "kind": "type",
           "signature": "export type IObserverBinding = { /** * Captures dependencies during render. * * Records the nodes read and their versions without creating dependency edges. Discarded renders * therefore leave no subscriptions. */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * Installs captured dependencies during commit. * * Three outcomes distinguish a required fresh capture from a missing observer. Invalidate the * snapshot and reread only for `stale`. Do not pull dirty nodes during commit, because evaluation * errors would bypass the Error Boundary. */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };",
-          "declarationLine": 57,
+          "declarationLine": 61,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
           "purpose": "Render/commit binding returned by `createObserverBinding()`. It owns one internal effect; the adapter can capture, observe, commit and retrack but cannot reach its dependencies.",
           "core": "capture: Runs `read` with opaque capture and computed previews, without adding edges, advancing versions or scheduling work, including nested computed reads.\ncapture.read: Render-time read function.\nAn `ICapture` token with `result`.\nobserve: Installs the internal effect that reruns when committed dependencies change. Calling it again while observed throws `BINDING_DUPLICATE`.\nobserve.fn: The subscriber body (usually a rerender request).\nobserve.options: `debugName` for traces.\nAn idempotent disposer.\ncommit: Recursively validates the evaluated capture tree, then lets the canonical tracker adopt its dependencies and preview cache. It does not rerun derivations or comparers.\ncommit.capture: Token from `capture()`; consumed when committed.\n`committed` (edges installed), `stale` (a dependency changed since capture; read again) or `no-observer` (call `observe()` first; the token is kept).\nretrack: Forces the committed observer to rerun once.\n`changed` or `unchanged` (whether its dependency set or recorded versions changed), or `no-observer`.",
@@ -6319,7 +7815,7 @@
           "name": "IObserverRetrackResult",
           "kind": "type",
           "signature": "export type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';",
-          "declarationLine": 40,
+          "declarationLine": 44,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
           "purpose": "Result of `binding.retrack()`: `changed`, `unchanged` or `no-observer`.",
           "core": "Result of `binding.retrack()`: `changed`, `unchanged` or `no-observer`.",
@@ -7111,44 +8607,7 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: 'async-flush'; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: 'cause-read'; readonly dependencyDisconnect: 'dependency-disconnect'; readonly lifecycleHook: 'lifecycle-hook'; readonly ssrResource: 'ssr-resource'; readonly subscriptionListener: 'subscription-listener'; readonly traceListener: 'trace-listener'; };",
-          "guidance": [
-            {
-              "id": "8-生命周期-错误与边界",
-              "heading": "8. 生命周期、错误与边界",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(...)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5. 没有订阅者的 `Computed` 会被自动挂起（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
-                }
-              ]
-            }
-          ],
+          "guidance": [],
           "usageScore": 30,
           "configuration": [],
           "fragment": "reactive-extension--ReactiveErrorPhase"

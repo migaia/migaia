@@ -4,7 +4,8 @@
  * for reentrancy. Cleanup failures retain native identity or original cause with their owning code.
  * Defaults remain readable application data; Provider/Registry never dispose the Runtime itself.
  */
-import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import type { ICaseDoc, ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import { storeReactCases } from './store-react-cases.js'
 
 /** Constructs one bilingual explanation. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -29,7 +30,7 @@ const path = t(
 /** Equality callback is a pure synchronous selector boundary. */
 const equality = t(
   'Optional synchronous comparator receiving previous and next selector results; return true to reuse the prior snapshot. Defaults to Object.is; throws propagate.',
-  '可选同步比较器接收先前与新的选择结果，相等时返回真以复用快照；默认使用同值比较，抛错传播。'
+  '可选同步比较器接收先前与新的选择结果，返回 `true` 时复用快照；默认 `Object.is`，抛错传播。'
 )
 /** Source Runtime owns graph operations and stays caller-owned. */
 const runtime = t(
@@ -94,7 +95,7 @@ const features: Readonly<Record<string, IMemberDoc>> = {
       'Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.',
       '声明使用网页汇编字段；启用时必须提供至少一个就绪屏障，否则归一化创建拒绝的配置屏障。'
     ),
-    default: t('False: no WASM readiness requirement.', '默认假值，不要求网页汇编就绪。'),
+    default: t('`false`: no WASM readiness requirement.', '默认 `false`，不要求 WASM 就绪。'),
     values: {
       true: t(
         'Require caller-supplied initialization readiness before rendering the subtree.',
@@ -121,7 +122,7 @@ const defaults: Readonly<Record<string, IMemberDoc>> = {
       'Application-readable default in useStoreConfig; the Provider does not pass it into createStore, so each Store must explicitly apply its own option.',
       '通过配置钩子读取的应用默认值；提供者不把它传给轻量存储工厂，各存储必须显式应用自身选项。'
     ),
-    default: t('False in the normalized configuration.', '归一化配置默认使用假值。'),
+    default: t('`false` in the normalized configuration.', '归一化配置默认 `false`。'),
     values: {
       true: t(
         'Expose an enabled application preference without changing any Store automatically.',
@@ -143,7 +144,7 @@ const configOptions: Readonly<Record<string, IMemberDoc>> = {
   ready: {
     summary: t(
       'Promises or zero-argument synchronous/async factories. Normalization eagerly invokes uncached factories before returning, caches factory results by scope plus factory identity, and separately caches each list Promise by scope plus array identity. Rejected factory results leave the factory cache; scopes are isolated. A changed array identity selects a new Provider generation and ReadyBoundary, so an old generation cannot release the new one; changing only the array does not rerun a successful cached factory.',
-      '承诺或无参数同步、异步工厂。归一化返回前即调用未缓存工厂，按作用域加工厂身份缓存结果，列表承诺另按作用域加数组身份缓存。拒绝的工厂结果从工厂缓存删除，不同作用域隔离。数组身份变化会选择新的提供者代次及就绪边界，旧代不能放行新代；仅换数组不会重跑成功缓存的工厂。'
+      'Promise 或无参数同步、异步工厂。归一化返回前即调用未缓存工厂，按作用域与工厂身份缓存结果，列表 Promise 另按作用域与数组身份缓存。失败的工厂结果会移出缓存，不同作用域相互隔离。数组身份变化会创建新的 Provider 就绪代次，旧代次无法放行新子树；仅换数组不会重跑成功缓存的工厂。'
     ),
     returns: t(
       'Factory result is awaited and discarded; rejection blocks the subtree and reaches its outer Error Boundary.',
@@ -159,14 +160,14 @@ const configOptions: Readonly<Record<string, IMemberDoc>> = {
       'ReactNode rendered while readiness remains pending; rejected barriers throw instead of rendering this fallback.',
       '就绪仍待完成时渲染的界面节点；屏障拒绝会抛错，不渲染此等待内容。'
     ),
-    default: t('Null: render no subtree while pending.', '默认空值，等待期间不渲染子树。')
+    default: t('`null`: render no subtree while pending.', '默认 `null`，等待期间不渲染子树。')
   },
   defaults: {
     summary: t(
       'Application-readable defaults snapshot; it does not change existing or future Store construction options.',
       '应用可读取的默认值快照，不改变已有或未来存储的构造选项。'
     ),
-    default: t('warnAsyncActions is false.', '默认异步操作警告偏好为假值。')
+    default: t('`warnAsyncActions` is `false`.', '`warnAsyncActions` 默认设为 `false`。')
   }
 }
 /** Real nested configuration fields retain their owning path. */
@@ -233,8 +234,8 @@ const providerProps: Readonly<Record<string, IMemberDoc>> = {
       '最终提供者释放是否在任务延后后释放登记表、原子存储与自持有登记；运行时不属于此释放责任。'
     ),
     default: t(
-      'True for internal registries, false for injected external registries.',
-      '内部登记表默认为真，注入的外部登记表默认为假。'
+      '`true` for internal registries, `false` for injected external registries; SSR runs no unmount effects.',
+      '内部登记表默认 `true`，注入的外部登记表默认 `false`；SSR 不执行卸载副作用。'
     ),
     values: {
       true: t(
@@ -272,7 +273,10 @@ const registrationOptions: Readonly<Record<string, IMemberDoc>> = {
       'Transfer value cleanup responsibility to this registration. Prefer $dispose when present, otherwise dispose; values with neither method need no cleanup.',
       '将值清理责任交给本登记；存在专用存储释放方法时优先调用，否则调用普通释放方法，两者都没有时无需清理。'
     ),
-    default: t('False: the caller retains value ownership.', '默认假值，调用方保留值所有权。'),
+    default: t(
+      '`false`: the caller retains value ownership.',
+      '默认 `false`，调用方保留值所有权。'
+    ),
     values: {
       true: t(
         'Unregister, replacement, removal or registry disposal can release this value.',
@@ -291,8 +295,18 @@ const hook = (
   zh: string,
   params: Readonly<Record<string, IText>>,
   returns: IText,
-  example: string
-): ISymbolDoc => ({ role: 'operation', purpose: t(en, zh), params, returns, example })
+  example: string,
+  cases?: readonly ICaseDoc[],
+  exampleIntro?: IText
+): ISymbolDoc => ({
+  role: 'operation',
+  purpose: t(en, zh),
+  params,
+  returns,
+  example: cases?.[0]?.example ?? example,
+  cases,
+  exampleIntro
+})
 /** Atom protocol examples receive stable application-owned source objects. */
 const atomExample = `function Counter({ atom }: { atom: IWritableAtom<number, readonly [number], void> }) {
   const [count, write] = useAtom(atom)
@@ -482,7 +496,12 @@ export const storeReactReference: ILibraryReference = {
         'React element tree; internal registries default to disposal on final unmount and external registries remain borrowed by default.',
         '返回组件元素树；内部登记表默认在最终卸载后释放，外部登记表默认借用。'
       ),
-      example: definitionExample
+      example: storeReactCases.StoreProvider![0]!.example,
+      cases: storeReactCases.StoreProvider,
+      exampleIntro: t(
+        'Install React 19 and react-dom 19 or later with this package. createStoreRegistry() creates a fresh Runtime when omitted. children is required; this example supplies ready and fallback explicitly. SSR does not run unmount effects, so the request owner awaits registry.disposeAsync().',
+        '同时安装 React 19、react-dom 19 或更高版本。`createStoreRegistry()` 省略运行时时会新建一份；`children` 必填，本例显式传入 `ready` 与 `fallback`。SSR 不执行卸载副作用，请求拥有者须等待 `registry.disposeAsync()`。'
+      )
     },
     createStoreRegistry: {
       role: 'factory',
@@ -551,7 +570,12 @@ export const storeReactReference: ILibraryReference = {
         'Current selected value; equality preserves the prior snapshot reference.',
         '返回当前选择值，相等比较保留先前快照引用。'
       ),
-      storeExample
+      storeExample,
+      storeReactCases.useStore,
+      t(
+        'Also install @migaia/store-light and the React 19 peers. createStore(initialState) requires the initial record; omitted options use the Store default Runtime. The selector receives state synchronously. isEqual defaults to Object.is. Each renderToString call below is a separate server render, not a mounted subscription.',
+        '还需直接安装 `@migaia/store-light` 及 React 19 的两个 peer 包。`createStore(initialState)` 的初始对象必填，省略选项时使用 Store 的默认运行时。选择器同步接收状态，`isEqual` 默认 `Object.is`。下面两次 `renderToString` 是独立服务端渲染，不是挂载后的订阅更新。'
+      )
     ),
     useTracked: hook(
       'Tracks arbitrary synchronous reactive reads with render capture and commit validation; changing selectors retracks dependencies without exposing abandoned render closures.',
@@ -625,7 +649,7 @@ export const storeReactReference: ILibraryReference = {
     ),
     useResourceValue: hook(
       'Unwraps a subscribed Resource during render: returns success data, throws its Promise for idle/pending, and throws the original error for error/cancelled.',
-      '渲染期间解包已订阅资源：成功时返回数据，空闲或等待时抛出承诺，错误或取消时抛出原始错误。',
+      '渲染期间读取资源：成功时返回数据，空闲或等待时抛出 Promise，错误或取消时抛出原始错误。',
       {
         resource: t(
           'Stable caller-owned Resource<T> from @migaia/resource, rendered under appropriate Suspense and Error Boundary owners.',
@@ -636,7 +660,12 @@ export const storeReactReference: ILibraryReference = {
         'Successful T value; pending suspends and failure propagates through React rendering.',
         '返回成功值；等待时挂起，失败通过组件渲染传播。'
       ),
-      'function Profile({ resource }: { resource: Resource<string> }) { return <span>{useResourceValue(resource)}</span> }'
+      'function Profile({ resource }: { resource: Resource<string> }) { return <span>{useResourceValue(resource)}</span> }',
+      storeReactCases.useResourceValue,
+      t(
+        'Also install @migaia/resource and @migaia/reactive. Resource(fetcher, runtime, options) requires the fetcher and Runtime; options defaults to {}, autoStart to true and ttl to Infinity. The fetcher returns the loaded value. This example awaits resource.promise before SSR and explicitly disposes the caller-owned Resource.',
+        '还需直接安装 `@migaia/resource` 与 `@migaia/reactive`。`Resource(fetcher, runtime, options)` 的加载函数与运行时必填；选项默认 `{}`，`autoStart` 默认 `true`，`ttl` 默认 `Infinity`。加载函数返回业务值，本例先等待 `resource.promise`，再生成 HTML，最后显式释放 Resource。'
+      )
     ),
     useStoreResource: hook(
       'Subscribes to the store-light resource protocol, captures a render snapshot and commits its lease in layout; previous committed leases release after replacement.',
@@ -726,7 +755,12 @@ export const storeReactReference: ILibraryReference = {
         'Current definition value; missing Provider throws PROVIDER_REQUIRED.',
         '返回当前定义值；缺少提供者抛提供者必需错误。'
       ),
-      definitionExample
+      definitionExample,
+      storeReactCases.useAtomDefinition,
+      t(
+        'Also install @migaia/store-keyed and @migaia/reactive. atomDef(initialValue, debugLabel?) requires an initial value; debugLabel defaults to undefined. createStoreRegistry(runtime?) creates a Runtime only when omitted and never disposes it. The example shares one Runtime while each registry owns its own AtomStore.',
+        '还需直接安装 `@migaia/store-keyed` 与 `@migaia/reactive`。`atomDef(initialValue, debugLabel?)` 的初始值必填，调试标签默认 `undefined`。`createStoreRegistry(runtime?)` 仅在省略时新建运行时，释放注册表不会释放运行时；本例共享运行时，每个注册表仍拥有独立的 AtomStore。'
+      )
     ),
     useSetAtomDefinition: hook(
       'Returns a stable writer for one writable definition in the current Provider AtomStore without subscribing to its value.',
@@ -793,7 +827,12 @@ export const storeReactReference: ILibraryReference = {
         'Current selected Store value; missing Provider/registration throws before selection.',
         '返回当前存储选择值，提供者或登记缺失时先于选择器抛错。'
       ),
-      injectionExample
+      injectionExample,
+      storeReactCases.useProvidedStore,
+      t(
+        'Also install @migaia/store-light. createStoreToken(debugName) requires a nonempty diagnostic name; token identity comes from its fresh Symbol. register(token, value, options = {}) defaults owned to false; these request examples transfer cleanup with owned: true and construct Stores using registry.runtime. isEqual defaults to Object.is.',
+        '还需直接安装 `@migaia/store-light`。`createStoreToken(debugName)` 需要非空诊断名，身份由全新 Symbol 决定。`register(token, value, options = {})` 的 `owned` 默认 `false`；请求示例以 `owned: true` 移交清理责任，并用 `registry.runtime` 创建 Store。`isEqual` 默认 `Object.is`。'
+      )
     ),
     normalizeStoreConfig: {
       role: 'factory',

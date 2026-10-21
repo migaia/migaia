@@ -24,12 +24,11 @@ export const essentialApis: Readonly<Record<string, readonly string[]>> = {
   ],
   lifecycle: [
     'scope:createLifecycleScope',
-    'createSyncLifecycleScope',
-    'abort:createAbortController',
-    'disposal:createDisposeTransaction',
     'generation:createGenerationController',
     'quiescence:createPendingTracker',
-    'errors:createErrorCollector'
+    'boundedWait',
+    'createProvisionalScope',
+    'disposal:createDisposeTransaction'
   ],
   logger: ['Logger', 'plugins:level', 'plugins:batch', 'plugins:http', 'plugins/file:file'],
   'plugin-host': ['PluginHost', 'definePlugin', 'defineFeature', 'defineHost'],
@@ -132,11 +131,11 @@ export const essentialApis: Readonly<Record<string, readonly string[]>> = {
     'serialize:createSerializeWorkerHandler'
   ],
   supervision: [
-    'createSupervisor',
     'createUnitBudget',
-    'threads:createThreadSupervisor',
+    'coroutine:createCoroutineSupervisor',
     'process:createProcessSupervisor',
-    'coroutine:createCoroutineSupervisor'
+    'threads:createThreadSupervisor',
+    'createSupervisor'
   ],
   tray: ['createTray', 'defineTrayHost', 'createTrayGraph', 'defineRoutingPolicy', 'serveTrayHost'],
   utils: [

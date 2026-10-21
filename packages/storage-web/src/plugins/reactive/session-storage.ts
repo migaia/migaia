@@ -17,7 +17,11 @@ const sessionStorageReactiveFeature = defineNativeReactiveFeature(
   sessionStorageBackendKind
 )
 
-/** Creates the canonical sessionStorageHost reactive fast-path plugin. */
+/**
+ * Define a sessionStorage backend plus its exact reactive adapter; default id session. Consistency
+ * is hybrid/top-level-context-eventual, polling every 1000 ms. Host installation owns Store/source
+ * rollback and disposal; eventual observation does not make cross-context writes transactional.
+ */
 export const sessionStorageReactive = {
   sessionStorageReactive: <const TId extends string = 'session'>(
     options: ISessionStorageOptions & IBuiltInPluginId<TId> = {}

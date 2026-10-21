@@ -12,6 +12,13 @@ import { attachSecondaryErrors } from '@migaia/utils/error'
 // 不会重复 fetch/instantiate，也不会导致 use() 每次渲染都重新挂起
 let wasmReady: Promise<WebAssembly.Memory> | undefined
 let wasmMemory: WebAssembly.Memory | undefined
+/**
+ * Initialize the shared WASM module and return its Memory, sharing the exact pending/successful
+ * Promise across calls. Await before creating a Store containing these synchronous fields, or pass
+ * this factory to a Provider readiness barrier. A failed attempt clears the initialization cache
+ * for retry; native loading/trap errors retain their identity rather than receiving a Store code.
+ * This does not allocate a field or provide an instance-reset/disposal API.
+ */
 export function ensureWasm(): Promise<WebAssembly.Memory> {
   // Keep the settled promise identity as well as the memory value. A ready
   // barrier is a generation token for React/SSR callers; wrapping the value

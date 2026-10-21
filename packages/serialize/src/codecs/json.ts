@@ -10,9 +10,18 @@ import {
 import { assertCodecVersion, createCodecError } from '../internal/codec.js'
 
 /** Options for the native JSON codec factory. */
-export type IJsonCodecOptions<TVersion extends number> = Readonly<{ version: TVersion }>
+export type IJsonCodecOptions<TVersion extends number> = Readonly<{
+  /** Required positive safe integer revision; no default version is inserted. */
+  version: TVersion
+}>
 
-/** Create a deterministic JSON codec for the portable profile. */
+/**
+ * Creates a frozen synchronous json codec with the required positive safe-integer revision.
+ * Encoding projects sorted record keys and inline bytes tags, then rejects values outside the
+ * portable profile rather than silently dropping them. Decoding validates parsed values without
+ * reviving bytes tags. Portable failures retain INVALID_OPTION; other format failures carry
+ * ENCODE_FAILED or DECODE_FAILED with their original cause. No optional format peer is imported.
+ */
 export function defineJsonCodec<const TVersion extends number>(
   options: IJsonCodecOptions<TVersion>
 ): ICodec<ICodecValue, string, 'json', TVersion> {

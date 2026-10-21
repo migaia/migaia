@@ -19,30 +19,43 @@ import {
 import { LoggerErrorText } from '../error-text.js'
 import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
 
+/** HTTP delivery policy; network operations use the Logger's captured runtime manager. */
 export type IHttpPluginConfig = {
+  /** Required destination passed to the captured fetch capability. */
   url: string
+  /** Optional bearer token; when truthy, replaces the Authorization header. */
   authToken?: string
+  /** Optional headers merged over Content-Type: application/json; defaults to an empty record. */
   headers?: Record<string, string>
+  /** Retry attempts after the initial POST, defaulting to 2; finite nonnegative integers only. */
   retries?: number
-  /** Maximum wait for one HTTP request. Defaults to 10,000 ms. */
+  /**
+   * Attempt to abort one request after 10000 ms by default, when a controller is available. This
+   * does not independently race the fetch Promise; settlement depends on fetch honoring its
+   * signal.
+   */
   requestTimeoutMs?: number
-  /** Uses the batch plugin when installed. Without it, each log entry is sent separately. */
+  /**
+   * Optional shared-provider overrides. Without that provider, supplying this object creates a
+   * private maxSize=1/asyncOutput=false queue; omission keeps direct per-entry delivery.
+   */
   batch?: {
-    /** Flushes a batch when it reaches this many entries. */
+    /** Size threshold, default 20 with a shared provider; private fallback forces one entry. */
     maxSize?: number
-    /** Flushes a non-empty batch after this many milliseconds. */
+    /** Nonempty-buffer delay, default 2000 ms unless the provider config overrides it. */
     maxWaitMs?: number
-    /** Bounds the number of batch callbacks executing concurrently. */
+    /** Concurrent delivery ceiling, default one unless the provider config overrides it. */
     maxConcurrentBatches?: number
-    /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */
+    /** Queued plus executing batch ceiling, default 1024 unless the provider config overrides it. */
     maxPendingBatches?: number
-    /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */
+    /** Defaults to true with shared batching; private fallback forces false. */
     asyncOutput?: boolean
   }
   /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */
   maxRetryAfterMs?: number
 }
 
+/** Stable registration/config key for the HTTP sink and its optional batch dependency. */
 export const HTTP_PLUGIN_NAME = 'http' as const
 
 /** Optional batch output resolved once for one HTTP registration. */
@@ -568,6 +581,13 @@ class HttpPlugin implements ILoggerPlugin<
   }
 }
 
+/**
+ * Create a POST sink with required url and optional batch/retry policy. Transport failures, 429 and
+ * 5xx responses can retry; other unsuccessful statuses stop. Invalid retry/timeout options fail
+ * during construction. Missing fetch or delivery/serialization failures are reported when sending.
+ * Logger shutdown drains before plugin disposal. A private queue is drained on removal; shared
+ * queues remain provider-owned, while HTTP disposal aborts its own request/backoff work.
+ */
 export const http = (
   config: IHttpPluginConfig
 ): ILoggerPlugin<

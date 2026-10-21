@@ -18,7 +18,12 @@ export type IFeatureDescriptor<
   TDependencies extends IFeatureDependencyRecord,
   TOutput extends object
 > = Readonly<{
+  /** Synchronous Feature factory; returned methods may be async, the factory result may not be. */
   readonly install: IFeatureFactory<TExpose, TDependencies, TOutput>
+  /**
+   * Direct aliases to trusted local Features or cross-plugin references; defaults to no
+   * dependencies.
+   */
   readonly dependencies?: TDependencies
 }>
 
@@ -67,7 +72,12 @@ export const snapshotFeatureRecord = (value: unknown): Readonly<Record<string, o
   return Object.freeze(snapshot)
 }
 
-/** Defines a synchronous, opaque Feature without evaluating user factory code. */
+/**
+ * Captures a synchronous factory and its direct dependency aliases as one frozen opaque Feature.
+ * Omitted dependencies mean none. Defining runs no factory; each registration later constructs its
+ * dependency-first closure once. Invalid definitions throw INVALID_OPTION. Async factory results
+ * are rejected during installation, while methods on a valid object output may return Promises.
+ */
 export function defineFeature<
   TExpose extends object = Record<never, never>,
   const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
@@ -76,6 +86,7 @@ export function defineFeature<
   factory: IFeatureFactory<TExpose, TDependencies, TOutput>,
   dependencies?: TDependencies
 ): IFeature<TExpose, TOutput, TDependencies>
+/** Object form of the same captured factory/dependency contract; install must be an own data method. */
 export function defineFeature<
   TExpose extends object = Record<never, never>,
   const TDependencies extends IFeatureDependencyRecord = Record<never, never>,

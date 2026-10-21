@@ -4,12 +4,21 @@ import { RpcCapability, RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
 /** Omitted extensions allow runtime defaults while retaining an explicitly disabled stream policy. */
 const defaultNativeOffers = new WeakMap<IRpcHandshakeOffer, boolean>()
 
-/** Native byte connections advertise only capabilities installed by their endpoint owner. */
+/**
+ * Build a frozen JSON native-handshake proposal with ping, close and batch, deduplicating
+ * extensions. stream:true adds stream immediately; omission allows a runtime owner to fill
+ * installed defaults, while stream:false excludes that default and an explicit capabilities array
+ * stays narrow. This proposal does not authenticate a peer or prove a capability was negotiated.
+ */
 export function createNativeProcessOffer(
   options: Readonly<{
+    /** Local handshake identity; the factory freezes a shallow copy of these peer fields. */
     peer: IRpcPeerInfo
+    /** Optional credential forwarded unchanged; it is not diagnostic metadata. */
     auth?: IRpcHandshakeOffer['auth']
+    /** Optional stream policy: true advertises it now, false disables the omitted-extension default. */
     stream?: boolean
+    /** Optional extension list; [] explicitly suppresses automatic runtime extension completion. */
     capabilities?: readonly string[]
   }>
 ): IRpcHandshakeOffer {

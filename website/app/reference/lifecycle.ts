@@ -5,6 +5,7 @@
  * registration. Late graceful failures and accidental asynchronous hook failures remain observed
  * through the existing report boundary.
  */
+import { lifecycleCases } from './lifecycle-cases.js'
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 
 /** Builds the two localized versions of one reference sentence. */
@@ -868,6 +869,7 @@ console.log(await wait)`
     },
     boundedWait: {
       role: 'operation',
+      cases: lifecycleCases.boundedWait,
       purpose: t(
         'Observes one task until an existing absolute deadline without cancelling that task. A task rejection before timeout stays primary even if timer cancellation fails: secondary cleanup is attached through cause/errors. Synchronous timer completion waits for its handle before settling, cancels once, and applies the same cleanup policy. Late rejection remains observed.',
         '观察一个任务直到既有绝对截止时刻，不取消任务本身。超时前任务拒绝保持主因，计时器取消失败通过原因或错误列表附加。同步计时器回调等待句柄返回后才结算，取消一次并遵守相同清理策略；迟到拒绝仍被观察。'
@@ -910,6 +912,7 @@ console.log(await boundedWait(Promise.resolve(), systemScheduler.now() + 100))`
     },
     createLifecycleScope: {
       role: 'factory',
+      cases: lifecycleCases.createLifecycleScope,
       purpose: t(
         'Creates an asynchronous resource owner with explicit release descriptors, descending release priority and reverse-registration tie order. Closing stops admission; disposal releases resources and always converges to terminal state.',
         '创建使用显式释放描述器的异步资源所有者，按优先级降序释放，同优先级按登记逆序释放。关闭停止登记，释放执行清理并最终进入终止状态。'
@@ -936,6 +939,7 @@ console.log(await boundedWait(Promise.resolve(), systemScheduler.now() + 100))`
     },
     createProvisionalScope: {
       role: 'factory',
+      cases: lifecycleCases.createProvisionalScope,
       purpose: t(
         'Accumulates setup resources until the caller chooses commit or rollback. Listener-detach failures enter settlement without skipping remaining cleanup. Pair with `createLifecycleScope()` for a permanent parent: transfer preserves the committed prefix and awaits compensation of every untransferred resource on failure.',
         '在调用方选择提交或回滚前累积初始化资源；移除监听失败进入结算，不跳过剩余清理。搭配 `createLifecycleScope()` 建立永久父级：转交失败时保留已提交前缀，并等待全部未转交资源完成补偿释放。'
@@ -965,6 +969,7 @@ await done`
     },
     createGenerationController: {
       role: 'factory',
+      cases: lifecycleCases.createGenerationController,
       purpose: t(
         'Keeps one active result generation with identity tokens, optional timeout and parent cancellation. Pair `begin()` with `adopt()` or `isCurrent()` before accepting asynchronous results, then complete or dispose the active generation.',
         '通过身份令牌、可选超时和父级取消维护单个有效结果世代。搭配 `begin()` 与 `adopt()` 或 `isCurrent()` 判断异步结果是否可接纳，再完成或释放当前世代。'
@@ -1024,6 +1029,7 @@ registry.forget('connection')`
     },
     createPendingTracker: {
       role: 'factory',
+      cases: lifecycleCases.createPendingTracker,
       purpose: t(
         'Tracks in-flight promises without exposing lease keys or sealing to domain callers. Settlement automatically decrements the count, and draining rechecks work that arrived while an earlier wait was pending.',
         '跟踪未完成异步工作，不向领域调用方暴露租约键或封闭操作。异步结果结算后自动减少数量，排空会再次检查等待期间新增的工作。'
@@ -1039,6 +1045,7 @@ await tracker.drain()`
     },
     createMutationQueue: {
       role: 'factory',
+      cases: lifecycleCases.createMutationQueue,
       purpose: t(
         'Serializes caller-authored mutations in submission order. Only waiting tasks receive an admission timer; the current task is never interrupted, and a labeled same-owner submission is rejected to avoid a self-dependent successor.',
         '按提交顺序串行执行调用方变更。只有排队任务接收接纳定时器，当前任务不会被中断；与运行任务相同所有者标签的提交会被拒绝，以避免自依赖后继。'

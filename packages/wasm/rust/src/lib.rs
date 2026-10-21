@@ -102,12 +102,17 @@ fn insert_zeroed_block(arena: &mut Arena, words: usize) -> Option<u32> {
     Some(id)
 }
 
-/// Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes.
+/// Allocates zeroed WASM memory for bytes or aligned numeric typed-array views.
 ///
-/// Returns a stable allocation id, or `0` (`NULL_ID`) if the id space or
-/// linear memory is exhausted. The buffer never moves for the lifetime of the
-/// id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] —
-/// suitable for exposing as a contiguous numeric typed array on the JS side.
+/// Call after module initialization. `byte_len` is the requested byte count;
+/// capacity rounds up to a multiple of eight. A zero-byte request still returns
+/// a live id with zero capacity. The returned nonzero id belongs to the caller
+/// and must be released with `dealloc_bytes(id)`.
+///
+/// Returns `0` if the allocation size, available linear memory, or id space
+/// prevents allocation. The pointer returned by `ptr_of(id)` stays fixed until
+/// release, but memory growth can detach an existing JavaScript view. Create
+/// views from the current `memory.buffer` after any allocation or conversion.
 #[wasm_bindgen]
 pub fn alloc_bytes(byte_len: u32) -> u32 {
     // round up to whole u64 words so the whole requested range is backed
@@ -116,10 +121,14 @@ pub fn alloc_bytes(byte_len: u32) -> u32 {
     ARENA.with(|arena| insert_zeroed_block(&mut arena.borrow_mut(), words).unwrap_or(NULL_ID))
 }
 
-/// Byte pointer into wasm linear memory for `id`. Guaranteed 8-byte aligned.
+/// Returns the eight-byte-aligned byte offset of a live allocation.
 ///
-/// Returns `0` for an unknown/dead id instead of trapping, so a stale handle is
-/// recoverable on the JS side rather than aborting the module.
+/// Use with the initialized module's current `memory.buffer` to create a byte
+/// or numeric typed-array view. The offset stays fixed until `dealloc_bytes(id)`;
+/// the view must be recreated if WASM memory grows. Reading the pointer does not
+/// transfer ownership or keep the allocation alive.
+///
+/// Unknown ids, released ids, and the reserved id `0` return `0` without a trap.
 #[wasm_bindgen]
 pub fn ptr_of(id: u32) -> u32 {
     ARENA.with(|arena| {
@@ -131,8 +140,14 @@ pub fn ptr_of(id: u32) -> u32 {
     })
 }
 
-/// Capacity in bytes actually backing `id` (rounded up to 8), or 0 if unknown.
-/// Lets JS size a `Float64Array`/`BigInt64Array` view without guessing.
+/// Returns an allocation's byte capacity, rounded up to a multiple of eight.
+///
+/// Use to size a numeric view or check available storage. Capacity includes
+/// alignment padding; it is not the document length passed to a converter.
+/// Read `ConversionResult.len` for the exact length of converted output.
+///
+/// Unknown ids, released ids, and the reserved id `0` return `0`. A live
+/// zero-byte allocation also has zero capacity, so this is not an existence test.
 #[wasm_bindgen]
 pub fn byte_len_of(id: u32) -> u32 {
     ARENA.with(|arena| {
@@ -144,7 +159,12 @@ pub fn byte_len_of(id: u32) -> u32 {
     })
 }
 
-/// Free the allocation. Returns `true` if it existed.
+/// Releases one caller-owned arena allocation and reports whether it existed.
+///
+/// Call when the input or converted output is no longer needed. Returns `true`
+/// only for a live id; unknown ids, repeated release, and id `0` return `false`.
+/// Any pointer or view into the released allocation must no longer be used.
+/// This does not release a `ConversionResult` wrapper; call its `free()` separately.
 #[wasm_bindgen]
 pub fn dealloc_bytes(id: u32) -> bool {
     ARENA.with(|arena| arena.borrow_mut().map.remove(&id).is_some())
@@ -167,11 +187,16 @@ pub fn dealloc_bytes(id: u32) -> bool {
 // JSON. It is here for what V8 has no native parser for, and for producing a
 // more compact archive than JSON without touching the main thread's object graph.
 
-/// Metadata returned by one conversion operation.
+/// Owns the metadata returned by one JSON or MessagePack conversion.
 ///
-/// Keeping the output id, exact byte length, and error on the same value makes
-/// each conversion self-contained. Re-entrant callers cannot observe a later
-/// operation's result through global side channels.
+/// Read `id`, `len`, and `error` together: success has a nonzero output id, exact
+/// output length, and an empty error; failure has id `0`, length `0`, and a reason.
+/// Each result is independent, so later conversions do not overwrite its fields.
+///
+/// JavaScript callers release every result, including failed results, once with
+/// `free()` or `Symbol.dispose`. Do not read its properties after release. Result
+/// disposal does not release the input or output arena allocation; their owner
+/// must call `dealloc_bytes(id)` separately.
 #[wasm_bindgen]
 pub struct ConversionResult {
     id: u32,
@@ -181,13 +206,20 @@ pub struct ConversionResult {
 
 #[wasm_bindgen]
 impl ConversionResult {
-    /// Allocation id containing the conversion output, or zero on failure.
+    /// Returns the new output allocation id, or `0` when conversion failed.
+    ///
+    /// A nonzero id belongs to the caller and remains live after this result's
+    /// `free()`. Read the exact output range with `len` and release the allocation
+    /// with `dealloc_bytes(id)` when finished. The input id is never consumed.
     #[wasm_bindgen(getter)]
     pub fn id(&self) -> u32 {
         self.id
     }
 
-    /// Exact output byte length; zero on failure.
+    /// Returns the exact number of output bytes, or `0` on failure.
+    ///
+    /// Use this length when reading output or passing it to another converter.
+    /// `byte_len_of(id)` includes arena padding and can exceed this value.
     #[wasm_bindgen(getter)]
     #[allow(
         clippy::len_without_is_empty,
@@ -197,7 +229,13 @@ impl ConversionResult {
         self.len
     }
 
-    /// Empty on success, otherwise the operation-specific failure reason.
+    /// Returns an empty string on success or the current operation's failure reason.
+    ///
+    /// Invalid handles and lengths report `unknown allocation id or length past
+    /// capacity`. Initial output allocation failure reports `arena exhausted`.
+    /// Parse and write failures start with `json to msgpack failed:` or
+    /// `msgpack to json failed:`.
+    /// Read before freeing this metadata wrapper; no global error lookup is needed.
     #[wasm_bindgen(getter)]
     pub fn error(&self) -> String {
         self.error.clone()
@@ -379,24 +417,43 @@ fn convert_msgpack_to_json(arena: &mut Arena, input: &[u8]) -> ConversionResult 
     }
 }
 
-/// JSON bytes in, MessagePack bytes out. Returns operation-bound output metadata.
+/// Converts one UTF-8 JSON document into a new MessagePack arena allocation.
 ///
-/// Transcodes straight from the JSON reader into the MessagePack writer. Going
-/// through `serde_json::Value` first was measurably worse: a million four-field
-/// records meant roughly four million String allocations for a tree that gets
-/// thrown away one statement later.
+/// Call after initialization when JSON bytes are already stored under live `id`.
+/// `len` is the exact input byte count, excluding unused arena capacity. The
+/// reader writes directly to the MessagePack writer without building a JSON
+/// value tree. Object keys remain strings without a schema.
 ///
-/// JSON objects use string map keys without a schema. Roundtrip preservation is
-/// limited to the JSON data model and representable numbers; arbitrary MessagePack
-/// bin/ext values, non-JSON map keys, and integers outside JSON's supported numeric
-/// range are not promised a reversible JSON representation. This path serializes
-/// maps directly, so struct-map configuration would not affect object encoding.
+/// Success returns an independent `ConversionResult` with the output id, exact
+/// byte length, and empty error. Invalid ids, lengths beyond capacity, empty or
+/// malformed JSON, and a trailing second document return id `0`, length `0`, and
+/// an error reason. Whitespace after the JSON document is accepted.
+///
+/// Input bytes and ownership are preserved on success and ordinary failure.
+/// Release input and successful output ids with `dealloc_bytes`; release the
+/// result metadata with `free()` even on failure. A native WASM trap still throws.
+/// Roundtrip preservation covers the JSON data model and representable numbers,
+/// not arbitrary MessagePack bin/ext values, map keys, or integer ranges.
 #[wasm_bindgen]
 pub fn json_to_msgpack(id: u32, len: u32) -> ConversionResult {
     ARENA.with(|arena| with_input(&mut arena.borrow_mut(), id, len, convert_json_to_msgpack))
 }
 
-/// MessagePack bytes in, JSON bytes out. Returns operation-bound output metadata.
+/// Converts one complete MessagePack document into a new UTF-8 JSON allocation.
+///
+/// Call after initialization with live input `id` and its exact byte count `len`.
+/// Use a previous conversion's `len`, not `byte_len_of(id)`, because arena padding
+/// counts as trailing input. The converter must consume every input byte.
+///
+/// Success returns an independent `ConversionResult` with a nonzero output id,
+/// exact output length, and empty error. Unknown ids, excessive lengths, empty
+/// or malformed MessagePack, values JSON cannot represent, and trailing bytes return
+/// id `0`, length `0`, and an error reason. A native WASM trap still throws.
+///
+/// Input bytes and ownership survive success and ordinary failure. Release input
+/// and successful output ids with `dealloc_bytes`, and release every result with
+/// `free()`. Arbitrary bin/ext values, non-JSON map keys, and out-of-range integers
+/// are not guaranteed a reversible JSON representation.
 #[wasm_bindgen]
 pub fn msgpack_to_json(id: u32, len: u32) -> ConversionResult {
     ARENA.with(|arena| with_input(&mut arena.borrow_mut(), id, len, convert_msgpack_to_json))

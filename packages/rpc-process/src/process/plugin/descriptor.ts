@@ -32,39 +32,56 @@ import {
 
 /** Persisted environment entries inherit by name or declare a literal non-secret value. */
 export type IProcessDescriptorEnv = Readonly<{
+  /** Required allowlist of inherited environment names; no ambient environment snapshot is stored. */
   inherit: readonly string[]
+  /** Optional literals explicitly marked nonSecret:true; credentials must be injected at runtime. */
   set?: Readonly<Record<string, Readonly<{ value: string; nonSecret: true }>>>
 }>
 
 /** Bootstrap payload is injected at runtime and environment values are explicit data. */
 export type IProcessSpecDescriptor = Readonly<
   Omit<IProcessSpec, 'bootstrap' | 'env'> & {
+    /** Persist only environment names and explicit nonsecret literals. */
     env: IProcessDescriptorEnv
+    /** Persist stdin/fd selection without the runtime secret payload; fd requires an integer >=3. */
     bootstrap?: Readonly<Omit<IProcessBootstrap, 'payload'>>
   }
 >
 
 /** Persisted budget data has no scheduler, parent, or live lease. */
 export type IProcessBudgetDescriptor = Readonly<{
+  /** Required nonnegative safe-integer capacity; parsing creates no live budget or leases. */
   maxUnits: number
+  /** Optional 'reject' or 'queue' policy preserved as data for the eventual budget owner. */
   overflow?: BudgetOverflow
+  /** Optional positive finite queue wait in milliseconds; omission stays absent in the descriptor. */
   queueTimeoutMs?: number
+  /** Optional positive max/windowMs limit, or false to disable; parsing does not start a rate clock. */
   launchRate?: Readonly<{ max: number; windowMs: number }> | false
 }>
 
 /** A physical deployment carries pure data rather than adapter functions. */
 export type IProcessPluginDeploymentDescriptor =
   | Readonly<{
+      /** Supervised byte child deployment, with a bootstrap channel but no stored secret bytes. */
       kind: 'spawn'
+      /** Byte deployments require an explicit wire profile and bootstrap selection. */
       channelKind: 'byte'
+      /** 'native' selects the native handshake; 'jsonrpc' selects Content-Length framing. */
       wire: ProcessPluginWire
+      /** Pure process specification validated without invoking a launcher. */
       spec: IProcessSpecDescriptor
+      /** Pure capacity policy validated without reserving a unit. */
       budget: IProcessBudgetDescriptor
     }>
   | Readonly<{
+      /** Supervised whole-message child deployment; wire and bootstrap fields are forbidden. */
       kind: 'spawn'
+      /** Preserve native message boundaries instead of adding a byte protocol. */
       channelKind: 'message'
+      /** Pure process specification with no secret bootstrap. */
       spec: IProcessSpecDescriptor
+      /** Pure capacity policy to be instantiated by its eventual owner. */
       budget: IProcessBudgetDescriptor
     }>
   | Readonly<{ kind: 'connect'; address: string }>
@@ -72,22 +89,37 @@ export type IProcessPluginDeploymentDescriptor =
 /** Plugin and Host descriptions share deployment data but have disjoint catalogs. */
 export type IProcessPluginDescriptor =
   | Readonly<{
+      /** Persisted format version; the parser currently accepts only 1. */
       descriptorVersion: 1
+      /** Plugin target; omitted input target is normalized to this value. */
       target: 'plugin'
+      /** Valid remote name matching contract.plugin. */
       name: string
+      /** Nonempty descriptive runtime label; it does not select or authorize a launcher. */
       runtime: string
+      /** Data-only owned spawn or borrowed connection deployment. */
       deployment: IProcessPluginDeploymentDescriptor
+      /** Optional 'shared' or 'per-connection' policy; omission remains absent after parsing. */
       instanceMode?: ProcessPluginInstanceMode
+      /** Optional 'stop-then-start' or 'start-then-switch'; forbidden for connect deployments. */
       replaceStrategy?: ReplaceStrategy
+      /** Normalized remote API contract for the named plugin. */
       contract: IRemoteContract
     }>
   | Readonly<{
+      /** Persisted format version; the parser currently accepts only 1. */
       descriptorVersion: 1
+      /** Explicit Host target; a Host uses catalog rather than a plugin contract. */
       target: 'host'
+      /** Valid local name, independent of any remote authentication principal. */
       name: string
+      /** Nonempty descriptive runtime label, with no platform acquisition effect. */
       runtime: string
+      /** Data-only deployment; parsing does not launch or dial. */
       deployment: IProcessPluginDeploymentDescriptor
+      /** Optional whole-process replacement policy, available only with spawn. */
       replaceStrategy?: ReplaceStrategy
+      /** Normalized remote Host catalog; executable adapters are supplied separately at runtime. */
       catalog: IRemoteHostCatalog
     }>
 
@@ -268,7 +300,12 @@ function deploymentShape(value: unknown, path: string): IProcessPluginDeployment
   return deployment as IProcessPluginDeploymentDescriptor
 }
 
-/** Normalize one portable description without retaining launch ports or secrets. */
+/**
+ * Normalize and validate a data-only plugin/Host descriptor without launching or dialing. Closed
+ * records, secret-bearing deployment fields, invalid names and malformed budgets reject with
+ * PROCESS_PLUGIN_INVALID_OPTION and a field path; rejected secret values are not retained as cause.
+ * The returned root is frozen, but its deployment is not a deep-frozen runtime configuration.
+ */
 export function parseProcessPluginDescriptor(input: unknown): IProcessPluginDescriptor {
   /** Portable normalization rejects getters, cycles, platform objects, and non-finite values. */
   let portable: IRpcPortableValue

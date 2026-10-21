@@ -21,16 +21,34 @@ import { StoreWasmErrorText } from './error-text.js'
 const DEFAULT_GRANULARITY = 64
 const MAX_FLOAT64_LENGTH = Math.floor(0xffff_ffff / Float64Array.BYTES_PER_ELEMENT)
 
+/** Fixed-size owned f64 field with bucket-level dependencies and explicit write methods. */
 export type IWasmArrayField = IDisposable & {
+  /** Fixed element count; reading length does not subscribe to array values. */
   readonly length: number
+  /** Read an in-range safe-integer index and track its bucket; negative indices are not supported. */
   at(index: number): number
+  /**
+   * Commit a number to one bucket, skipping Object.is-equal writes; invalid index/type is
+   * INVALID_OPTION.
+   */
   setAt(index: number, value: number): void
+  /**
+   * Replace [lo,hi) from an exactly matching ArrayLike. Snapshot all input values before native
+   * writes, then batch changed buckets. Input failure leaves values unchanged; commit failure
+   * attempts byte rollback but cannot undo observer or callback side effects.
+   */
   setRange(lo: number, hi: number, values: ArrayLike<number>): void
-  // Returns a copy for an independent snapshot. Writing to that copy does not emit reactive notifications.
+  /** Return a fresh, writable Float64Array copy without tracking or exposing WASM linear memory. */
   view(): Float64Array
 }
 
-/** Builds a fixed f64 array; granularity shares one graph Source per bucket, defaulting to 64. */
+/**
+ * Describe a zero-initialized fixed f64 array; allocate only when a Store creates the field after
+ * ensureWasm. length is required, nonnegative and at most floor(0xffffffff / 8); granularity
+ * defaults to 64 and must be a positive safe integer. Invalid arguments throw INVALID_OPTION.
+ * Reads/writes lazily create a Source per bucket: different indices in one bucket can notify the
+ * same observer. view is an untracked copy; data operations reject FIELD_DISPOSED after disposal.
+ */
 export function array(
   length: number,
   granularity: number = DEFAULT_GRANULARITY

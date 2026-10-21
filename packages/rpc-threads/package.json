@@ -13,7 +13,9 @@
     "dist",
     "schema",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -41,7 +43,7 @@
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
-    "fmt": "oxfmt src test vitest.config.ts",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage"
   },
@@ -49,16 +51,6 @@
     "@migaia/lifecycle": "workspace:^",
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
-  },
-  "peerDependencies": {
-    "@migaia/rpc-contract": "workspace:*",
-    "@migaia/rpc-core": "workspace:*",
-    "electron": "^44.0.0"
-  },
-  "peerDependenciesMeta": {
-    "electron": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@migaia/plugin-host": "workspace:^",
@@ -72,6 +64,16 @@
     "protobufjs": "8.8.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
+    "electron": "^44.0.0"
+  },
+  "peerDependenciesMeta": {
+    "electron": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18"

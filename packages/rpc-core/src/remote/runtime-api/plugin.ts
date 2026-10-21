@@ -80,14 +80,24 @@ export type IRuntimePluginOptions<
   Readonly<{
     /** Missing reporters use console.error for every lifecycle and cleanup diagnostic. */
     report?: IRuntimePeerOptions['report']
+    /**
+     * Physical spawn source for an owned managed connection; mutually exclusive with
+     * connect/listen.
+     */
     spawn?: TSpawn
+    /** Physical connect source, mutually exclusive with spawn/listen. */
     connect?: TConnect
+    /** Physical listener source, mutually exclusive with spawn/connect. */
     listen?: TListen
+    /** Unique Host connection registration name. */
     name: string
+    /** Explicit local/forward method whitelist; defaults to no exposed Host methods. */
     expose?: readonly string[]
     /** Existing Host-control configuration is used only when host is explicitly exposed. */
     host?: IRemoteHostControlOptions['host']
+    /** Optional Host-control catalog used only when host is explicitly exposed. */
     catalog?: IRemoteHostControlOptions['catalog']
+    /** Local synchronous resolver for explicitly exposed Host installation controls. */
     resolvePlugin?: IRemoteHostControlOptions['resolvePlugin']
   }>
 

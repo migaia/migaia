@@ -27,7 +27,12 @@ import { sampleNativeProcess } from './native-usage.js'
 
 /** A Node handle exposes stdout/stdin only when the specification chose byte channels. */
 export type INodeProcessHandle = IProcessHandle &
-  Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity }>
+  Readonly<{
+    /** Present only when stdin and stdout were both configured as channels. */
+    channel?: IProcessByteChannel
+    /** Safe launch identity emitted only for the opted-in runtime bootstrap. */
+    runtimeApiIdentity?: IRuntimePeerIdentity
+  }>
 
 /** Node does not claim tree termination until the POSIX grandchild fixture proves it. */
 const NODE_CAPABILITIES = Object.freeze({
@@ -72,7 +77,12 @@ function terminateChild(child: ChildProcess, mode: TerminationMode): void {
   }
 }
 
-/** Spawn without a shell and drain diagnostics before writing a secret bootstrap frame. */
+/**
+ * Create a reusable shell-free Node launcher; construction itself does not spawn. Each launch uses
+ * the specification's environment allowlist and drains selected output before writing bootstrap.
+ * The supervisor owns termination after adoption; advertised tree termination remains unsupported.
+ * Native spawn/bootstrap failures reject with PROCESS_CHANNEL_CONNECT_FAILED and reachable cause.
+ */
 export function createNodeProcessLauncher(
   options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions }> = {}
 ): IProcessLauncher<INodeProcessHandle> {
@@ -209,11 +219,19 @@ export function createNodeProcessLauncher(
   })
 }
 
-/** A child opens one stdio byte port and receives its bootstrap before handshake. */
+/**
+ * Open the current child's stdio once and optionally consume its first stdin bootstrap frame before
+ * handshake. 'none' returns without reading bootstrap; 'fd' is unsupported and rejects
+ * INVALID_CONFIG. Closing this channel pauses stdin and ends stdout, rather than terminating the
+ * process.
+ */
 export async function openProcessStdioChannel(
   options: Readonly<{
+    /** Required selection: consume 'stdin', consume nothing with 'none', or reject unsupported 'fd'. */
     bootstrap: 'stdin' | 'fd' | 'none'
+    /** Reserved for fd bootstrap; selecting fd is currently rejected regardless of this value. */
     fd?: number
+    /** Optional finite nonnegative first-frame wait; omission installs no bootstrap timer. */
     bootstrapTimeoutMs?: number
   }>
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {

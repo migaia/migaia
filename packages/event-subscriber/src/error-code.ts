@@ -1,13 +1,17 @@
 /** Stable source attached to every event-subscriber package-boundary error. */
 export const EVENT_SUBSCRIBER_SOURCE = '@migaia/event-subscriber'
 
-/** The package-local error code declaration site. */
+/**
+ * Stable semantic error codes attached together with EVENT_SUBSCRIBER_SOURCE. Compare these values
+ * when handling input, dispatch, or ownership failures; native error types and original failures
+ * remain available through the error itself, cause, or AggregateError.errors.
+ */
 export const EventSubscriberErrorCode = {
   /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */
   invalidListener: 'INVALID_LISTENER',
   /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */
   invalidReporter: 'INVALID_REPORTER',
-  /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */
+  /** Use a valid structural source for subscriber helpers, or a factory channel for invoke helpers. */
   invalidChannel: 'INVALID_CHANNEL',
   /**
    * A signal-like value failed structural validation or abort rollback; caller must provide a valid
@@ -52,10 +56,6 @@ export const EventSubscriberErrorCode = {
    * Handle descriptor projection failed after registration; the package rolls back the first
    * registration and preserves the projection failure as the primary cause.
    */
-  /**
-   * Handle descriptor projection failed after registration; the package rolls back the first
-   * registration and preserves the projection failure as the primary cause.
-   */
   subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED',
   /** A captured invocation was called after completion or more than once. */
   invocationClosed: 'INVOCATION_CLOSED',
@@ -66,5 +66,6 @@ export const EventSubscriberErrorCode = {
   subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED'
 } as const
 
+/** Union of the package-owned error code values used for source/code-based failure handling. */
 export type IEventSubscriberErrorCode =
   (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode]

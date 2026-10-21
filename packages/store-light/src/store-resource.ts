@@ -34,6 +34,7 @@ import { createEventChannel } from '@migaia/event-subscriber'
 export type { IStoreResourceLoadContext } from './store-resource-request.js'
 export type { IResourceCapture } from './store-resource-captures.js'
 
+/** A readable value with the version number and token that identify it for leases. */
 export type IStoreResourceSnapshot<T> = {
   readonly value: T
   readonly version: number
@@ -42,28 +43,41 @@ export type IStoreResourceSnapshot<T> = {
 
 /** Readable async value with separate resource and rendered-version leases. */
 export type IStoreResource<T> = {
+  /** Returns the value; throws the pending Promise while loading and the error after a failure. */
   read(): T
+  /** Starts loading if it has not started; takes no lease. */
   preload(): void
+  /** Loads again, keeping the current value readable until the new one is published. */
   retry(): void
+  /** Holds the resource until the returned function is called; returns the release function. */
   retainResource(): () => void
+  /** Keeps one version from being released until the returned function is called. */
   retainVersion(version: number | IVersionToken): () => void
   /** Internal React bridge: protect version during render, then commit in layout. */
   captureVersion(version: number): IResourceCapture
   commitCapture(capture: IResourceCapture): () => void
+  /** Releases the resource once no holder remains; with holders left it waits in `closing`. */
   dispose(): void
+  /** Releases the resource now, ignoring holders. */
   forceDispose(): void
   /** Resolves once this resource reaches its terminal state. Never depends on GC. */
   whenTerminal(): Promise<void>
+  /** Calls `listener` after every state change; returns the unsubscribe function. */
   subscribe(listener: () => void): () => void
+  /** Revision number that increases on every state change, for `useSyncExternalStore`. */
   getSnapshot(): number
+  /** Like `read()`, but also returns the version and its token. */
   readSnapshot(): IStoreResourceSnapshot<T>
+  /** Reads a snapshot and captures its version for render; reuses `existingLease` when given. */
   captureSnapshot(existingLease?: object): {
     snapshot: IStoreResourceSnapshot<T>
     capture?: IResourceCapture
   }
 }
 
+/** Phase reported to `onError`: `load`, `dispose` or `listener`. */
 export type IStoreResourceErrorPhase = StoreResourceErrorPhase
+/** Options of `createStoreResource()`, read once at creation. */
 export type IStoreResourceOptions<T> = {
   /** Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime. */
   runtime?: IRuntime
@@ -71,15 +85,23 @@ export type IStoreResourceOptions<T> = {
   scheduler?: IScheduler
   /** Cache TTL only; React render safety comes from capture/commit leases. */
   keepAliveMs?: number
+  /**
+   * Releases one loaded value, called exactly once per value. When omitted, a value's own
+   * `$dispose` method is used; when given, values must be objects or functions.
+   */
   dispose?: (value: T) => void | PromiseLike<void>
+  /** Observes load, dispose and listener failures; without it they go to the Runtime. */
   onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void
+  /** Called once when the resource reaches its end state. */
   onTerminal?: () => void
 }
+/** Loads one value; `context.signal` aborts when the load is superseded or the resource closes. */
 export type IStoreResourceFactory<T> = (context: IStoreResourceLoadContext) => Promise<T> | T
 /** Object-form Resource factory with the same options accepted by the function overload. */
 export type IStoreResourceConfig<T> = IStoreResourceOptions<T> & {
   load: IStoreResourceFactory<T>
 }
+/** A group of resources released together by `dispose()`. */
 export type IStoreResourceScope = {
   resource<T>(
     factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>,
@@ -108,6 +130,10 @@ function snapshotResourceOptions<T>(source: object): IStoreResourceOptions<T> {
   return snapshot as IStoreResourceOptions<T>
 }
 
+/**
+ * Creates a scope whose `resource()` delegates to `createStoreResource()` and whose `dispose()`
+ * force-releases every resource still in the group, without waiting for holders.
+ */
 export function createStoreResourceScope(): IStoreResourceScope {
   const resources = new Set<IStoreResource<unknown>>()
   return {
@@ -127,8 +153,10 @@ export function createStoreResourceScope(): IStoreResourceScope {
 }
 
 /**
- * Suspense-safe owned async value. Factories transfer ownership to this resource; values with
- * explicit disposers must have reference identity.
+ * Suspense-safe owned async value. Factories transfer ownership of each loaded value to this
+ * resource, which releases it exactly once after the last holder leaves and `keepAliveMs` passes,
+ * or when a reload publishes its replacement. Values with explicit disposers must have reference
+ * identity. Invalid options throw `INVALID_OPTION`.
  */
 export function createStoreResource<T>(
   factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>,

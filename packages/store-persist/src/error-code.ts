@@ -1,9 +1,9 @@
 /**
  * Declares the public error codes for `@migaia/store-persist` in one place.
  *
- * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/store-persist'`. Throw sites use these constants instead of inline
- * literals.
+ * Locally constructed errors use source `'@migaia/store-persist'`. Codec, unit and adapter failures
+ * may instead retain their owning boundary's identity. Throw sites use these constants instead of
+ * inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -49,8 +49,9 @@ export const StorePersistErrorCode = {
   encodeFailed: 'ENCODE_FAILED',
 
   /**
-   * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its
-   * error chain.
+   * The handle retains both a hydration error and a write error. Its combined error projection
+   * returns an AggregateError containing them in hydration-then-write order; it does not reopen a
+   * failed hydration's write gate.
    *
    * Inspect `error.errors` and handle each failure. This is a double failure, not one transient
    * error.
@@ -73,5 +74,6 @@ export const StorePersistErrorCode = {
   invalidOption: 'INVALID_OPTION'
 } as const
 
+/** Stable values declared by StorePersistErrorCode for locally identified failures. */
 export type IStorePersistErrorCode =
   (typeof StorePersistErrorCode)[keyof typeof StorePersistErrorCode]

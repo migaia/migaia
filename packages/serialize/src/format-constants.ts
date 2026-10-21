@@ -1,38 +1,74 @@
 /** Canonical serialized chunk kinds. */
 export const SerializeChunkKind = {
+  /** Complete in-memory payload; registry encoding permits it only as the sole chunk. */
   value: 'value',
+  /** Wire text joined directly when all encoded chunks are text. */
   text: 'text',
+  /** Wire bytes; multi-chunk assembly promotes accompanying text into the binary result. */
   bytes: 'bytes'
 } as const
 
 /** Codec output representations used by serializers and persistence adapters. */
 export const SerializeOutput = {
+  /** Text representation chosen by a serializer or persistence adapter. */
   text: 'text',
+  /** Structured representation supported by the receiving carrier. */
   structured: 'structured',
+  /** Binary representation requiring a compatible carrier or explicit conversion. */
   binary: 'binary'
 } as const
 
 /** Portable management projections choose an output-only text format, never a parser plugin. */
-export const SerializeTextFormat = { json: 'json', yaml: 'yaml', toml: 'toml' } as const
+export const SerializeTextFormat = {
+  /** Default emitter format using native JSON after own-data admission. */
+  json: 'json',
+  /** YAML flow-style output for the admitted subset; not a registered decoding plugin. */
+  yaml: 'yaml',
+  /** TOML output requiring a record root, Unicode scalar strings, and no null values. */
+  toml: 'toml'
+} as const
+/** Supported output-only text format labels. */
 export type ISerializeTextFormat = (typeof SerializeTextFormat)[keyof typeof SerializeTextFormat]
 
 /** Error-location labels for encoding and decoding; these constants emit no instrumentation events. */
-export const SerializePhase = { encode: 'encode', decode: 'decode' } as const
+export const SerializePhase = {
+  /** Failure while producing encoded chunks or frames. */
+  encode: 'encode',
+  /** Failure while parsing an encoded chunk or frame. */
+  decode: 'decode'
+} as const
 
 /** Cleanup policies and diagnostic kinds used by the serializer registry. */
-export const SerializeCleanupPolicy = { throw: 'throw', report: 'report' } as const
+export const SerializeCleanupPolicy = {
+  /** Default: reject disposal with cleanup failures, retaining any earlier primary. */
+  throw: 'throw',
+  /** Send cleanup failures to the required cleanup reporter without replacing the primary. */
+  report: 'report'
+} as const
+/** Cleanup and drain observations; these kinds are not thrown semantic error codes. */
 export const SerializeCleanupKind = {
+  /** Parser release failed and report policy emits its original failure. */
   cleanupError: 'cleanup-error',
+  /** Disposal stopped waiting for pending work at its admitted deadline. */
   drainTimeout: 'drain-timeout'
 } as const
 
 /** Built-in serializer plugin identifiers used in registry metadata. */
-export const SerializePluginType = { json: 'json' } as const
+export const SerializePluginType = {
+  /** Routing token used by the built-in native JSON plugin. */
+  json: 'json'
+} as const
 
+/** Chunk discriminants, independent of parser type routing. */
 export type ISerializeChunkKind = (typeof SerializeChunkKind)[keyof typeof SerializeChunkKind]
+/** Representation labels consumed by serializers and receiving adapters. */
 export type ISerializeOutputFormat = (typeof SerializeOutput)[keyof typeof SerializeOutput]
+/** Encode/decode failure-location domain. */
 export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase]
+/** Registry parser-cleanup policy labels. */
 export type ISerializeCleanupPolicy =
   (typeof SerializeCleanupPolicy)[keyof typeof SerializeCleanupPolicy]
+/** Diagnostic discriminants for cleanup failure or bounded draining. */
 export type ISerializeCleanupKind = (typeof SerializeCleanupKind)[keyof typeof SerializeCleanupKind]
+/** Built-in routing tokens; custom plugins may use other valid tokens. */
 export type ISerializePluginType = (typeof SerializePluginType)[keyof typeof SerializePluginType]

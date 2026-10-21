@@ -13,11 +13,15 @@ describe('abort reason uses the guarded property read export', () => {
     expect(readFileSync(new URL('../dist/error.d.ts', import.meta.url), 'utf8')).not.toContain(
       'IAbortReasonRead'
     )
-    for (const name of ['README.md', 'USEGUIDE.md']) {
+    // The README is the reader-first introduction; the usage guides own this contract detail.
+    for (const [name, policy] of [
+      ['USEGUIDE.md', /失败.*调用方|调用方.*失败/],
+      ['USEGUIDE.en.md', /failure.*caller|caller.*failure/]
+    ] as const) {
       const guide = readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')
       const example = guide.indexOf("tryReadProperty(signal, 'reason')")
       expect(example, name).toBeGreaterThanOrEqual(0)
-      expect(guide.slice(example, example + 500), name).toMatch(/失败.*调用方|调用方.*失败/)
+      expect(guide.slice(example, example + 500), name).toMatch(policy)
     }
   })
 })

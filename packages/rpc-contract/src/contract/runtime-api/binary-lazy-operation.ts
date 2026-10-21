@@ -21,7 +21,12 @@ export type {
 } from './binary-capture.js'
 export { RpcBinaryProfile, RpcBinaryStorage, RpcNativeBinaryKind } from './binary-constants.js'
 
-/** Preserve canonical synchronous capture and first native digest before cold codec loading. */
+/**
+ * Prepare through the same 16 MiB default budget, held codec and whole-backing digest contract as
+ * the ordinary binary entry. Capture and the first native digest begin before cold codec loading;
+ * the Promise resolves to the same frozen manifest/list shape or rejects with the original cause
+ * reachable. Module loading adds no authentication, replay or physical-transfer authority.
+ */
 export function prepareRpcBinaryLazy(
   message: IRpcRuntimeEnvelope,
   storage: RpcBinaryStorage,

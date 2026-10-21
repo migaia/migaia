@@ -22,19 +22,36 @@ import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */
 export type IRTCDataChannel = {
+  /** Native string send; the adapter stringifies non-string outgoing messages before delegation. */
   send(data: string): void
+  /** Construct with open, or closed for an already-terminal adapter; connecting/closing rejects. */
   readonly readyState: string
+  /** Register message delivery and closing/close/error terminal notification. */
   addEventListener(
     type: 'message' | 'closing' | 'close' | 'error',
     listener: (event: unknown) => void
   ): void
+  /** Remove the same native callback; adapter cleanup never calls the channel's close method. */
   removeEventListener(
     type: 'message' | 'closing' | 'close' | 'error',
     listener: (event: unknown) => void
   ): void
 }
 
-/** Uses the reliable ordered data channel as a string-message transport. */
+/**
+ * Adapt an existing RTCDataChannel as a borrowed exclusive string Endpoint transport. Strings are
+ * sent unchanged and other values use JSON.stringify; received data remains undecoded. The Peer
+ * bridge adds JSON decoding and reliability checks, while this lower-level adapter does not check
+ * ordered/maxRetransmits/maxPacketLifeTime. Complete signaling and wait for open before normal
+ * use.
+ *
+ * Missing lifecycle operations or connecting/closing states throw TypeError/INVALID_CONFIG. An
+ * already-closed channel yields a terminal adapter. Closing/close/error events mark it closed,
+ * retire listeners and report TRANSPORT, retaining the event's original error by identity or cause.
+ * Late onTransportError subscribers see the stored primary; later send/subscribe throw. Listener
+ * and probe failures use onListenerError. Subscription cleanup releases native hooks, not the
+ * channel or its RTCPeerConnection; the caller owns both physical lifetimes.
+ */
 export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport {
   if (
     !channel ||

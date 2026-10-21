@@ -26,19 +26,24 @@ export type IReadableAtom<T> = IDisposable & {
   peek(): T
 }
 
+/** A readable instance-style atom that can also be written through `write(...args)`. */
 export type IWritableAtom<T, Args extends readonly unknown[], Result> = IReadableAtom<T> & {
   write(...args: Args): Result
 }
 
+/** Reads an instance-style atom inside read callbacks. */
 export type IAtomGetter = <T>(atom: IReadableAtom<T>) => T
 
+/** Writes an instance-style atom inside write callbacks. */
 export type IAtomSetter = <T, Args extends readonly unknown[], Result>(
   atom: IWritableAtom<T, Args, Result>,
   ...args: Args
 ) => Result
 
+/** Read callback of an instance-style atom. */
 export type IAtomRead<T> = (get: IAtomGetter) => T
 
+/** Write callback of an instance-style atom. */
 export type IAtomWrite<Args extends readonly unknown[], Result> = (
   get: IAtomGetter,
   set: IAtomSetter,
@@ -66,6 +71,7 @@ export function atomGetter(runtime: IRuntime): IAtomGetter {
   }
 }
 
+/** Returns a setter bound to `runtime`; writing an atom from another Runtime throws `CROSS_RUNTIME`. */
 export function atomSetter(runtime: IRuntime): IAtomSetter {
   return <T, Args extends readonly unknown[], Result>(
     atom: IWritableAtom<T, Args, Result>,

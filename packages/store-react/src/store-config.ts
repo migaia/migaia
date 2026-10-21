@@ -6,18 +6,13 @@ import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-stat
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**
- * Configures application features and readiness on `StoreProvider`.
- *
- * Provider registries and runtimes own the graph independently of this configuration. The
- * configuration selects enhancements and whether readiness blocks the subtree.
- *
- * When `features.wasm === true`, supply `ready`, usually with `ensureWasm` from
- * `@migaia/store-wasm`. Without a barrier, normalization creates a rejected readiness promise, and
- * the provider reports the configuration error before rendering its subtree.
+ * Application-named experimental flag map. Normalization includes own enumerable data properties
+ * and enables only values exactly equal to true; accessors and non-enumerable entries are ignored.
  */
 
 export type IStoreFeatureExperimental = Readonly<Record<string, boolean>>
 
+/** Optional feature declarations; only literal true enables a feature in the normalized snapshot. */
 export type IStoreFeatures = {
   /**
    * Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness
@@ -35,22 +30,33 @@ export type IStoreFeatures = {
 /** Provides a readiness promise or a zero-argument factory, such as `ensureWasm`. */
 export type IStoreReadyBarrier = Promise<unknown> | (() => Promise<unknown> | unknown)
 
+/** Application-visible defaults, exposed by configuration hooks rather than forwarded to Stores. */
 export type IStoreProviderDefaults = {
   /**
    * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It
-   * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly.
+   * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. Defaults to
+   * false when omitted or not exactly true.
    */
   readonly warnAsyncActions?: boolean
 }
 
+/**
+ * Feature flags, optional readiness barriers and pending UI for one Provider configuration. This
+ * selects enhancements/readiness without owning the registry graph or applying Store options.
+ * wasm=true requires ready, commonly ensureWasm from store-wasm; omission becomes rejected
+ * readiness.
+ */
 export type IStoreProviderConfig = {
+  /** Omission disables wasm and every experimental feature. */
   readonly features?: IStoreFeatures
   /**
    * Requires all barriers to fulfill before the subtree renders. For example, use `ready:
-   * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.
+   * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. Omitted/empty means no barrier
+   * unless wasm is enabled; factory execution may start during normalization, so use idempotent
+   * work or a caller-owned Promise when render retries must not repeat application work.
    */
   readonly ready?: readonly IStoreReadyBarrier[]
-  /** Displays this fallback while readiness barriers are pending. */
+  /** Displays this fallback while readiness barriers are pending; defaults to null. */
   readonly fallback?: ReactNode
   /**
    * Exposes a read-only snapshot of application defaults. The provider does not apply them to
@@ -59,23 +65,32 @@ export type IStoreProviderConfig = {
   readonly defaults?: IStoreProviderDefaults
 }
 
+/** Readiness status vocabulary used inside the exported normalized configuration shape. */
 export type IReadyStatus = (typeof StoreProviderState)[keyof typeof StoreProviderState]
 
+/** Shared normalized readiness Promise and synchronous status projection for one barrier generation. */
 export type ITrackedReady = {
+  /** Fulfills once every barrier fulfills, or rejects with the original barrier failure. */
   readonly promise: Promise<void>
   /**
    * Reads status synchronously. Tracking an already settled promise updates status in a microtask,
    * so the first frame may still be pending.
    */
   status(): IReadyStatus
+  /** Raw rejection reason, or undefined before rejection; Provider normalizes it for rendering. */
   error(): unknown
 }
 
+/** Normalized flags/defaults and optional readiness tracker; only the experimental map is frozen. */
 export type IStoreConfigValue = {
+  /** Boolean feature projection, not a mutation-control interface. */
   readonly features: {
+    /** False by default; true requires a readiness barrier before the Provider renders children. */
     readonly wasm: boolean
+    /** Frozen null-prototype map of own enumerable data flags, enabled only when exactly true. */
     readonly experimental: Readonly<Record<string, boolean>>
   }
+  /** Snapshot of application defaults, including normalized warnAsyncActions=false by default. */
   readonly defaults: IStoreProviderDefaults
   /** Provides normalized readiness tracking, or `null` when no barrier exists. */
   readonly ready: ITrackedReady | null
@@ -88,6 +103,13 @@ const EMPTY_EXPERIMENTAL: Readonly<Record<string, boolean>> = Object.freeze(
 )
 const EXPERIMENTAL_ENCODING_CACHE = new WeakMap<object, string>()
 
+/**
+ * Read feature/default inputs once and create an optional readiness tracker. No config yields false
+ * flags, an empty experimental map, warnAsyncActions=false and ready=null. Invalid reads/barriers
+ * throw INVALID_CONFIG. wasm without a barrier instead produces a rejecting readiness Promise.
+ * barrierScope defaults to a fresh object; reuse it explicitly to share cached barrier-list/factory
+ * work within one Provider or request scope. Different scopes never share that factory cache.
+ */
 export function normalizeStoreConfig(
   config?: IStoreProviderConfig,
   barrierScope: object = {}
@@ -207,9 +229,9 @@ function freezeExperimental(
 }
 
 /**
- * Canonical, getter-free feature snapshot used by StoreProvider memoization. Accessors are rejected
- * closed and a sorted tuple encoding makes key order irrelevant. `__proto__` remains an inert
- * string key on the decoded null- prototype object.
+ * Canonical, getter-free feature snapshot used by StoreProvider memoization. Accessors and
+ * non-enumerable entries are ignored; sorted tuples make key order irrelevant. `__proto__` stays an
+ * inert string key on the decoded null- prototype object.
  */
 export function encodeStoreExperimental(input: IStoreFeatureExperimental | undefined): string {
   if (!input) return '[]'
@@ -274,8 +296,13 @@ function runBarrier(barrier: IStoreReadyBarrier, scope: object): Promise<unknown
   return cached
 }
 
+/** Supported flag paths: wasm, or experimental followed by a nonempty flag name after the dot. */
 export type IStoreFeaturePath = 'wasm' | `experimental.${string}`
 
+/**
+ * Read a normalized flag; missing experimental entries, an empty suffix and unknown paths are
+ * false.
+ */
 export function readStoreFeature(config: IStoreConfigValue, path: IStoreFeaturePath): boolean {
   if (path === 'wasm') return config.features.wasm
   if (path.startsWith('experimental.')) {
@@ -286,6 +313,11 @@ export function readStoreFeature(config: IStoreConfigValue, path: IStoreFeatureP
   return false
 }
 
+/**
+ * Require a Provider configuration and enabled flag, throwing PROVIDER_REQUIRED or
+ * FEATURE_DISABLED. apiName defaults to this API and supplies only the diagnostic label; no feature
+ * is enabled here.
+ */
 export function assertStoreFeature(
   config: IStoreConfigValue | null,
   path: IStoreFeaturePath,

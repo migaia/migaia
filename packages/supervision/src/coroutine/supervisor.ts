@@ -16,7 +16,16 @@ import type {
   ICoroutineSupervisorOptions
 } from './types.js'
 
-/** Adapts a cooperative task and optional heartbeat policy to the core supervisor. */
+/**
+ * Supervises a task that runs on the current event loop and stops when its `signal` aborts.
+ *
+ * Use it for background work inside one process: a formatter, a queue consumer, a periodic scanner.
+ * The task may publish one port with `expose()` and report progress with `heartbeat()`; with the
+ * `heartbeat` option, a task that stops reporting is treated as unhealthy and restarted. A
+ * coroutine cannot be preempted or isolated: a task that ignores cancellation is reported with
+ * `REAP_TIMEOUT` and keeps its budget slot until it actually ends. Choose a process when a forced
+ * stop is required.
+ */
 export function createCoroutineSupervisor<TPort = undefined>(
   options: ICoroutineSupervisorOptions<TPort>
 ): ICoroutineSupervisor<TPort> {

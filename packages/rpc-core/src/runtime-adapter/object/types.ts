@@ -33,8 +33,12 @@ export type IRuntimeObjectChannel = IRuntimePeerSourceResult &
  * constructs the final transport from the internally retained agreement exactly once.
  */
 export type IRuntimeObjectConnection = Readonly<{
+  /** Capture the local proposal before negotiation performs physical I/O. */
   prepare(offer: IRpcHandshakeOffer): void
+  /** Exchange the actual handshake reply and retain the accepted agreement. */
   negotiate(): Promise<void>
+  /** Construct the final channel from the retained agreement and supplied connection controls. */
   open(options: IRuntimeConnectionOptions): IRuntimeObjectChannel
+  /** Retire this original physical connection and share its terminal cleanup. */
   close(reason?: unknown): Promise<void>
 }>

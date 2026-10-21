@@ -1,8 +1,6 @@
 /**
- * Owns the error-code declarations for `@migaia/store-wasm`. Under `docs/contracts/error-codes.md`,
- * `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-wasm'`.
- * Throw sites reference these constants instead of inline literals. Code values are public API.
- * Renaming a code is a breaking change.
+ * Package-owned failures paired with source `@migaia/store-wasm`. Native WASM loading/trap errors
+ * and complete foreign identities retain their original behavior. Code values are public API.
  */
 export const StoreWasmErrorCode = {
   /**
@@ -13,8 +11,9 @@ export const StoreWasmErrorCode = {
   notInitialized: 'NOT_INITIALIZED',
 
   /**
-   * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of
-   * reusing it. `detail` identifies the operation.
+   * Rejects scalar/record value access and array data operations after field disposal. Create a new
+   * field instead of reusing it; metadata such as disposed and fixed array length remains
+   * readable.
    */
   fieldDisposed: 'FIELD_DISPOSED',
 
@@ -29,10 +28,9 @@ export const StoreWasmErrorCode = {
   reservedFieldName: 'RESERVED_FIELD_NAME',
 
   /**
-   * Reports WASM allocation failure or invalid alignment or memory length. Examples include
-   * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check
-   * allocation parameters and memory integrity. This is an allocation or memory failure rather than
-   * a logic error.
+   * Reports no usable allocation id/pointer, failed array alignment, or corrupt stored string
+   * length. Check allocation availability and memory integrity. Invalid requested sizes are
+   * INVALID_OPTION rather than this allocation/memory failure.
    */
   allocationFailed: 'ALLOCATION_FAILED',
 
@@ -52,7 +50,7 @@ export const StoreWasmErrorCode = {
   cleanupFailed: 'CLEANUP_FAILED',
 
   /**
-   * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised
+   * Rejects allocation after an arena export used by this package on the shared instance raised
    * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every
    * later export would trap again; the instance is unusable for the rest of the page or process.
    * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed.
@@ -60,4 +58,5 @@ export const StoreWasmErrorCode = {
   instancePoisoned: 'INSTANCE_POISONED'
 } as const
 
+/** Public union of Store-owned failure values, distinct from unmodified native WASM errors. */
 export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]

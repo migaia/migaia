@@ -44,6 +44,7 @@ export type IRuntimePluginTyping<
   TExpose,
   TKind
 > = Readonly<{
+  /** Registered connection name used by typed outlet target selection. */
   readonly name: TName
   readonly [runtimePluginSurface]: Readonly<{
     remote: TRemote
@@ -196,18 +197,25 @@ export type IRuntimeTypedPeer<
   'self' | 'describe' | 'close' | 'outcome' | 'on' | typeof Symbol.asyncDispose
 > &
   Readonly<{
+    /** Group scalar methods from this exact declared remote surface. */
     group<Steps extends readonly IRuntimeGroupStep<S>[]>(
       steps: Steps,
       options?: IRuntimeFamilyGroupOptions<K>
     ): Promise<readonly IRpcRuntimeStepOutcome[]>
+    /** Request one declared scalar method with its inferred payload/result types. */
     request<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
       ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]
     ): Promise<IRuntimeResult<S[M]>>
+    /**
+     * Notify a declared scalar method; successful sending is not a remote completion
+     * acknowledgement.
+     */
     notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
       ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]
     ): Promise<void>
+    /** Iterate one declared generator method; yielded values keep the original inferred type. */
     stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(
       method: M,
       ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]

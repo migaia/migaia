@@ -246,7 +246,17 @@ export const invokeDispatchSnapshot = <T, R, V = undefined>(
   projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
 ): R | PromiseLike<R> => snapshot.listener(createEventContext(value, snapshot, projection) as never)
 
-/** Runs a callback over one immutable target snapshot and always closes its invocations. */
+/**
+ * Gives a visitor a frozen, registration-ordered list of single-use listener invocations. Use when
+ * custom invocation order is needed without exposing listeners or registration ownership. Only a
+ * channel created by this package instance, or its task-filter view, is accepted.
+ *
+ * The visitor decides which entries to invoke and whether to await their results. Entries close
+ * when the visitor returns synchronously or its returned promise settles. Calling an entry twice or
+ * after closure throws INVOCATION_CLOSED. Visitor failure crosses the boundary as VISITOR_FAILED
+ * while retaining the original failure; malformed channels throw INVALID_CHANNEL before
+ * visitation.
+ */
 export const withSnapshotEntries = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,
   value: T,
@@ -305,7 +315,17 @@ export const withSnapshotEntries = <T, R, V = undefined>(
   }
 }
 
-/** Visits registrations with append-live visibility while always releasing dispatch bookkeeping. */
+/**
+ * Visits listener invocations synchronously, including registrations appended during this pass.
+ * Unlike a fixed snapshot, a later scan can admit new registrations until a removal or clear ends
+ * admission. Entries already admitted stay scheduled, even when their registrations are removed.
+ * Only this package instance's canonical channel or task-filter view is accepted.
+ *
+ * The visitor chooses whether to invoke each entry and owns any returned listener promise. Each
+ * entry is single-use; all entries close when this synchronous visitor pass finishes.
+ * INVALID_CHANNEL rejects other sources; visitor throws become VISITOR_FAILED with the original
+ * failure retained. This helper does not await visitor or listener results.
+ */
 export const invokeEachLive = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,
   value: T,
@@ -402,7 +422,21 @@ const reportTerminal = <T, S extends IEventApiStyle | undefined = undefined, V =
   )
 }
 
-/** Creates a canonical transient channel backed by an O(1) linked registration list. */
+/**
+ * Creates a transient event channel for synchronous notifications or awaited invoke helpers. Each
+ * publish takes a registration-ordered snapshot; adding, removing, or clearing registrations during
+ * delivery changes future snapshots. Events are not stored or replayed.
+ *
+ * Defaults are recursive nested delivery, multiple independent registrations, handle-only removal,
+ * a 100_000 listener-call budget per top-level publish, and throwOnAborted false. style defaults to
+ * subscribe-publish; reporters and value projection are absent unless configured. Style aliases
+ * share the canonical methods and do not create another dispatcher.
+ *
+ * Invalid construction options throw INVALID_OPTIONS or INVALID_REPORTER before admission.
+ * Synchronous publish failures aggregate as PUBLISH_FAILED after other selected listeners run; late
+ * listener rejections go to report and then terminal diagnostics rather than changing the
+ * synchronous return. The publish budget can stop delivery with a partial-delivery PUBLISH_FAILED.
+ */
 export function createCanonicalChannel<
   T,
   R,
@@ -414,23 +448,32 @@ export function createCanonicalChannel<
     : IEventChannelOptions<T, undefined, V>
 ): ICanonicalEventChannel<T, R, S, V> &
   (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>)
+/** Creates a channel with canonical method names and optional reporting, policies, and value alias. */
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options: IEventChannelOptions<T, undefined, V>
 ): ICanonicalEventChannel<T, R, undefined, V>
+/** Selects the canonical subscribe/publish/unsubscribe names without adding alias properties. */
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {
     readonly style: 'subscribe-publish'
   }
 ): ICanonicalEventChannel<T, R>
+/** Adds on/emit/off aliases while retaining canonical method identity and dispatch semantics. */
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-emit' }
 ): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>
+/** Adds on/trigger/off aliases while retaining canonical method identity and dispatch semantics. */
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-trigger' }
 ): ICanonicalEventChannel<T, R, 'on-trigger', V> & IStyledEventChannel<T, R, 'on-trigger', V>
+/**
+ * Adds listen/fire/unlisten aliases while retaining canonical method identity and dispatch
+ * semantics.
+ */
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'listen-fire' }
 ): ICanonicalEventChannel<T, R, 'listen-fire', V> & IStyledEventChannel<T, R, 'listen-fire', V>
+/** Creates a default channel when options are omitted; invalid supplied options throw before use. */
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options?: IEventChannelOptions<T, undefined, V>
 ): ICanonicalEventChannel<T, R, undefined, V>
@@ -917,7 +960,17 @@ export const createChannelWithProjection = createCanonicalChannel as <T, R = voi
   projectionPlan: IEventProjectionPlan
 ) => ICanonicalEventChannel<T, R, undefined, V>
 
-/** Registers a subscriber object without introducing a class hierarchy. */
+/**
+ * Subscribes an object whose handle method receives events with the object as its receiver. Use for
+ * subscribers that keep instance or private-field state. The current handle method is read on each
+ * delivery, so no bind or cached receiver-changing wrapper is required.
+ *
+ * Accepts canonical, styled, or compatible structural channels and returns an idempotent canonical
+ * unsubscribe function without style aliases. The source must return a callable release function
+ * and must not deliver during subscribe. Invalid objects/methods throw INVALID_SUBSCRIBER;
+ * malformed sources or installation-time delivery throw INVALID_CHANNEL, with owned release run
+ * before a rejected installation exits. Listener failures follow the source dispatch policy.
+ */
 export const subscribeSubscriber = <T, R>(
   channel: IEventChannelLike<T, R>,
   subscriber: { readonly handle?: unknown }
@@ -963,7 +1016,16 @@ export const subscribeSubscriber = <T, R>(
   }
 }
 
-/** Installs once semantics on any event-subscriber-compatible structural channel. */
+/**
+ * Delivers at most one event and unsubscribes before calling the listener. Use when the listener
+ * can publish synchronously again: reentry, a throw, or a rejected result cannot make this
+ * registration fire twice. Optional taskId is forwarded without a default label.
+ *
+ * Accepts canonical/styled channels and structural sources that return a callable release handle
+ * without delivering during installation. Returns an idempotent canonical unsubscribe function,
+ * without style aliases. Invalid channel, listener, options, or taskId inputs throw their matching
+ * INVALID_* errors before delivery. Listener returns and failures follow the source dispatcher.
+ */
 export const subscribeOnce = <T, R, V = undefined>(
   channel: IEventChannelLike<T, R, V>,
   listener: IEventListener<T, R, V>,
@@ -991,7 +1053,18 @@ export const subscribeOnce = <T, R, V = undefined>(
   return release
 }
 
-/** Installs abort-linked subscription with a helper-owned overlay and closed race protocol. */
+/**
+ * Keeps a subscription until manual release or signal abort, then removes both owned listeners.
+ * Accepts a standard AbortSignal or compatible object with boolean aborted and callable abort-event
+ * add/remove methods. Optional taskId is forwarded without a default label. Aborting updates the
+ * running context's aborted/abortReason values but does not interrupt code already executing.
+ *
+ * An already-aborted signal creates no registration and normally returns a no-op unsubscribe; a
+ * canonical channel with throwOnAborted true throws ABORTED instead. Aborts during installation
+ * also release any acquired registration before returning or throwing. Invalid inputs and cleanup
+ * failures leave as coded errors, with INVALID_SIGNAL preserving signal/cleanup failures. The
+ * returned idempotent function has canonical naming, without the channel's style aliases.
+ */
 export const subscribeUntil = <T, R, V = undefined>(
   channel: IEventChannelLike<T, R, V>,
   signal: IAbortSignal,

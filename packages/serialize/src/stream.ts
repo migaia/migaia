@@ -53,7 +53,7 @@ type IDecodeStreamSnapshot = {
 type ISerializeInvokable<TResult> = (...args: never[]) => TResult
 
 /**
- * MRC-C-R02-only receiver boundary: invokes the once-captured encoder method with its original
+ * Captured encoder receiver boundary: invokes the once-captured encoder method with its original
  * receiver.
  */
 const invokeCollectEncoderWithReceiver = <TResult>(
@@ -451,15 +451,10 @@ const snapshotSerializeScheduler = (value: unknown): IScheduler | undefined => {
 /**
  * Adaptive slicing to fit a frame budget.
  *
- * A recorded one-million-item worker measurement shows 237 ms of continuous main-thread blocking
- * for one-shot encoding, roughly 14 frames. Slices of 50,000 items with yields reduce the longest
- * block to 14.2 ms. That measurement stays within the 16.7 ms budget at 60 fps, reports no dropped
- * frames, and reduces wall time by 37%. Slices of 10,000 items reduce the longest block to 3.1 ms,
- * but 100 yields return wall time to the one-shot level.
- *
  * Slice size follows measured processing time rather than a fixed byte count. The generator
  * suspends after yielding and resumes when the consumer requests the next slice. The elapsed
- * interval measures consumer processing time and controls the next slice size.
+ * interval measures consumer processing time and controls the next slice size. The target is
+ * adaptive guidance, not a guarantee that an individual slice or consumer operation fits a frame.
  */
 export type IFrameBudgetOptions = {
   /**
@@ -467,17 +462,19 @@ export type IFrameBudgetOptions = {
    * rendering and other work.
    */
   readonly targetMs?: number
-  /** Minimum slice size to keep per-message overhead from dominating processing. */
+  /** Minimum slice size, default 64; must be a positive safe integer. */
   readonly minItems?: number
-  /** Maximum slice size to limit how long one slice can occupy the main thread. */
+  /** Maximum slice size, default 250000; must be a positive safe integer at least minItems. */
   readonly maxItems?: number
-  /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */
+  /** Initial size, default 2048; a positive safe integer clamped to the configured min/max bounds. */
   readonly initialItems?: number
   /**
    * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for
-   * finer scheduling or `requestIdleCallback` for a more conservative yield.
+   * finer scheduling or requestIdleCallback for a more conservative yield. A custom callback owns
+   * its own cancellation and settlement; it cannot forcibly interrupt consumer work.
    */
   readonly yieldTo?: () => Promise<void>
+  /** Optional cooperative cancellation signal, default undefined; checked between slice admissions. */
   readonly signal?: IAbortSignal
   /**
    * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host
@@ -620,7 +617,11 @@ const snapshotDecodeStreamOptions = (options: unknown): IDecodeStreamSnapshot =>
  * Slices a large array to fit a frame budget and yields the main thread between slices.
  *
  * Use `for await (const slice of sliceByFrameBudget(rows, { scheduler }))` and process each slice
- * in the loop. The generator measures that processing time to choose the next slice size.
+ * in the loop. The generator measures the interval until the next pull to choose the next slice
+ * size; it yields fresh shallow slices in input order. Options are captured on first iteration,
+ * before slicing. Empty input yields nothing; invalid options reject with INVALID_OPTION, and
+ * cooperative cancellation preserves its reason. The source array stays unchanged; element payloads
+ * are not cloned.
  */
 export async function* sliceByFrameBudget<T>(
   items: readonly T[],
@@ -655,8 +656,11 @@ export async function* sliceByFrameBudget<T>(
   }
 }
 
+/** Frame slicing plus registry routing and ordered concurrency policy; scheduler remains required. */
 export type IEncodeStreamOptions = IFrameBudgetOptions & {
+  /** Optional plugin route, defaulting through each registry call to primaryType. */
   readonly type?: string
+  /** Diagnostic label, default stream. */
   readonly context?: string
   /**
    * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice
@@ -668,9 +672,14 @@ export type IEncodeStreamOptions = IFrameBudgetOptions & {
 
 /** Captured policy for one collector operation; getters are read before iterator acquisition. */
 export type ICollectStreamOptions = {
+  /**
+   * Optional cancellation signal, default undefined; an outstanding iterator next is not forcibly
+   * interrupted.
+   */
   readonly signal?: IAbortSignal
   /** Chooses whether an empty stream returns empty text or rejects; defaults to `text`. */
   readonly empty?: 'text' | 'reject'
+  /** Diagnostic label, default stream. */
   readonly context?: string
 }
 
@@ -680,6 +689,10 @@ export type ICollectStreamOptions = {
  * `registry.encode` merges each operation's chunks into one complete result for consumers that need
  * a whole blob. Stream consumers such as IndexedDB, files, or fetch bodies can accept slices
  * individually. Avoiding full-stream assembly avoids retaining another object containing all data.
+ * Each slice is encoded independently, so concatenating JSON array slices is not one JSON array.
+ * Results stay in input order with at most maxInFlight operations outstanding. Early consumer
+ * return cancels operation-owned work and observes late failures without waiting indefinitely for a
+ * non-cooperative parser; registry disposal remains responsible for draining its parser tasks.
  */
 export async function* encodeStream<T>(
   registry: ISerializeRegistry,
@@ -771,13 +784,21 @@ export async function* encodeStream<T>(
   }
 }
 
-/** Decodes a chunk stream one piece at a time without assembling the full result. */
+/**
+ * Decodes each source chunk sequentially and yields one decoded value without joining frames.
+ * Options default to an empty record: route uses registry.primaryType, context is stream, and no
+ * caller signal is supplied. Cancellation is checked before source pulls and after consumer
+ * resumption. Iterator or parser failures retain the stream position and original cause.
+ */
 export async function* decodeStream(
   registry: ISerializeRegistry,
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
   options: {
+    /** Registry route, default primaryType. */
     readonly type?: string
+    /** Diagnostic label, default stream. */
     readonly context?: string
+    /** Optional cooperative cancellation signal, default undefined. */
     readonly signal?: IAbortSignal
   } = {}
 ): AsyncGenerator<unknown, void, undefined> {
@@ -829,7 +850,12 @@ export async function* decodeStream(
 
 /**
  * Assembles a chunk stream into one result. Use only when the consumer needs a complete blob
- * because all data stays in memory.
+ * because all data stays in memory. Text chunks join as text; multiple chunks containing bytes
+ * produce one byte chunk and require an explicit encoder, even when every chunk is already bytes. A
+ * single wire chunk needs no conversion. Value chunks always reject INVALID_CHUNK. Empty input
+ * defaults to empty text, or rejects ENCODE_FAILED with empty: reject. Failure closes the acquired
+ * iterator and retains cleanup errors without replacing the primary failure; payload references are
+ * not deep-cloned.
  */
 export async function collectStream(
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,

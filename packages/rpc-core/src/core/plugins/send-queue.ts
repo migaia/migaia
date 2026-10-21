@@ -86,7 +86,11 @@ function classify(envelope: IRpcEnvelope | IRpcRuntimeEnvelope): IIpcSendClass {
   return IpcSendClass.data
 }
 
-/** Creates one connection's bounded admission token and native installation marker. */
+/**
+ * Create one bounded physical send gate and its native installation Feature. Defaults to 256 data
+ * and 8 control envelopes including active sends; invalid capacities throw INVALID_CONFIG. Install
+ * the exact Feature with its wrapped transport and close the gate with the connection.
+ */
 export function createIpcSendQueueFeature(
   options: IIpcSendQueueOptions
 ): IIpcSendQueueInstallation {

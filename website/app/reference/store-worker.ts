@@ -8,68 +8,14 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { resourceReference } from './resource.js'
+import { storeWorkerCases } from './store-worker-cases.js'
 
 /** Localized source-backed behavior. */
 const t = (en: string, zh: string): IText => ({ en, zh })
-/** One browser module can act as the worker entry and its main-thread caller. */
-const computeExample = `import { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'
-import { createRuntime } from '@migaia/reactive'
-
-if (typeof document === 'undefined') {
-  const host = globalThis as unknown as {
-    postMessage(message: unknown): void
-    onmessage: ((event: { data: unknown }) => void) | null
-  }
-  const handler = createWorkerHandler<number[], number>(
-    (values, { signal }) => {
-      if (signal.aborted) throw signal.reason
-      return values.reduce((sum, value) => sum + value, 0)
-    },
-    (message) => host.postMessage(message)
-  )
-  host.onmessage = (event) => { void handler(event.data).catch(console.error) }
-} else {
-  const worker = new Worker(new URL(import.meta.url), { type: 'module' })
-  const adapter = new WorkerAdapter(worker, { timeoutMs: 3000 })
-  const runtime = createRuntime()
-  const values = runtime.signal([1, 2, 3])
-  const sum = workerComputed<number[], number>(adapter, () => values.value, {
-    runtime, autoStart: false
-  })
-  try {
-    console.log(await adapter.request<number[], number>([4, 5]))
-    console.log(await sum.refetch(), sum.state)
-  } finally {
-    sum.dispose()
-    await adapter.dispose()
-    worker.terminate()
-  }
-}`
-/** Real parser/handler/plugin installation with deterministic registry ownership. */
-const codecExample = `import { createSerializeWorkerHandler, workerPlugin } from '@migaia/store-worker/serialize/worker'
-import { createSerializeRegistry } from '@migaia/serialize'
-import { jsonParser } from '@migaia/serialize/plugins'
-
-if (typeof document === 'undefined') {
-  const host = globalThis as unknown as {
-    postMessage(message: unknown, transfer?: readonly unknown[]): void
-    onmessage: ((event: { data: unknown }) => void) | null
-  }
-  const handler = createSerializeWorkerHandler(jsonParser(),
-    (message, transfer) => host.postMessage(message, transfer))
-  host.onmessage = (event) => { void handler(event.data).catch(console.error) }
-} else {
-  const worker = new Worker(new URL(import.meta.url), { type: 'module' })
-  const registry = createSerializeRegistry([
-    workerPlugin({ worker, type: 'json', terminateOnDispose: true })
-  ])
-  try {
-    const encoded = await registry.encode({ count: 2 })
-    console.log(await registry.decode(encoded))
-  } finally {
-    await registry.dispose()
-  }
-}`
+/** Complete native Worker computation used by root and port reference pages. */
+const computeExample = storeWorkerCases.WorkerAdapter![0]!.example
+/** Actual Worker-side JSON parser paired with a main-side registry plugin. */
+const codecExample = storeWorkerCases.workerPlugin![0]!.example
 /** Public byte policies select input ownership without exposing private chunk helpers. */
 const ownershipExample = `import { WorkerByteOwnership, type IByteOwnership } from '@migaia/store-worker'
 const policy: IByteOwnership = WorkerByteOwnership.copy
@@ -93,8 +39,8 @@ const clientOptions: Readonly<Record<string, IMemberDoc>> = {
       '可选的每请求毫秒超时，由适配器透传至标准请求发送操作，校验、取消与超时错误由请求包负责。'
     ),
     default: t(
-      'Omitted: no default request deadline is supplied.',
-      '默认省略，不提供请求默认截止期限。'
+      'undefined: no default request deadline is supplied.',
+      '`undefined`：不提供请求默认截止期限。'
     )
   }
 }
@@ -109,7 +55,7 @@ const portMembers: Readonly<Record<string, IMemberDoc>> = {
       message: t('Raw envelope received from the transport.', '来自传输层的原始请求外层。'),
       transfer: t(
         'Optional native transfer list received from send options; omit for ordinary cloning.',
-        '来自发送选项的可选原生转移列表，省略时走普通复制。'
+        '来自发送选项的可选原生转移列表，默认 `undefined`，不提供转移列表时走普通复制。'
       )
     },
     returns: t(
@@ -129,7 +75,7 @@ port.terminate()`
     params: {
       type: t(
         'Event name supplied by the RPC adapter: message, error or messageerror.',
-        '请求适配器提供的消息、脚本错误或反序列化错误事件名。'
+        '请求适配器提供的事件名：`message` 为消息，`error` 为脚本错误，`messageerror` 为反序列化错误。'
       ),
       listener: t(
         'Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.',
@@ -167,14 +113,14 @@ const computedOptions: Readonly<Record<string, IMemberDoc>> = {
   retry: {
     summary: t(
       'Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.',
-      '资源重试策略，可为非负整数额外尝试次数，或同步接收从一开始的失败次数及原始取值失败并返回布尔值的回调；真表示重试，抛错或非布尔及类承诺结果成为资源失败，不等待承诺。'
+      '非负整数表示额外重试次数，也可提供同步回调 `retry(failureCount, error)`；失败次数从 `1` 开始，错误为原始取值失败。返回 `true` 才重试，抛错、非布尔值或类 Promise 对象会使资源失败，不等待异步结果。'
     ),
     default: t('Zero extra attempts; no automatic retry.', '默认零次额外尝试，不自动重试。')
   },
   retryDelay: {
     summary: t(
       'Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.',
-      '每次获准重试前等待的有限非负毫秒数，或同步接收从一开始失败次数及原始失败并返回毫秒数的回调；抛错、无效数、非数字或类承诺结果成为资源失败，延迟期间仍可通过资源取消。'
+      '每次获准重试前等待的有限非负毫秒数，也可用同步回调 `retryDelay(failureCount, error)` 返回毫秒数；次数从 `1` 开始，错误为原始失败。抛错、无效数字或类 Promise 对象会使资源失败，延迟期间仍可取消。'
     ),
     default: t(
       'Zero milliseconds; retries without a configured delay.',
@@ -194,9 +140,9 @@ const computedOptions: Readonly<Record<string, IMemberDoc>> = {
   transfer: {
     summary: t(
       'Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.',
-      '在资源取值器中输入选择之后同步接收所选输入，返回本次请求的只读原生转移列表，抛错成为资源取值失败，不支持承诺结果，转移可能分离调用者数据且不保证全程零拷贝。'
+      '资源取值器同步选出输入后，将其交给此回调并取得本次原生转移列表；抛错会使资源取值失败，不支持 Promise 结果。转移可能分离调用方数据，不保证全程零拷贝。'
     ),
-    default: t('Omitted: no native transfer entries.', '默认省略，不提供原生转移条目。')
+    default: t('undefined: no native transfer entries.', '`undefined`：不提供原生转移条目。')
   },
   scheduler: {
     summary: t(
@@ -277,11 +223,11 @@ await handler.dispose()`
   dispose: {
     summary: t(
       'Closes, awaits readiness, then unsubscribes provider routes and disposes the endpoint. Repeated/concurrent calls share one Promise. It does not terminate the Worker or dispose the supplied parser.',
-      '先关闭并等待就绪，再注销提供路由并销毁端点，重复或并发调用共享同一承诺，不终止工作线程也不销毁外部解析器。'
+      '先关闭并等待就绪，再注销服务路由并销毁端点；重复或并发调用复用同一 Promise，不终止工作线程，也不销毁外部解析器。'
     ),
     returns: t(
       'Stable Promise<void>; endpoint initialization and cleanup failures reject.',
-      '返回稳定无值承诺，端点初始化及清理失败拒绝。'
+      '返回同一个 `Promise<void>`，端点初始化或清理失败会拒绝。'
     ),
     example: `const done = handler.dispose()
 console.log(done === handler.dispose())
@@ -394,8 +340,13 @@ export const storeWorkerReference: ILibraryReference = {
       optionDocs: clientOptions,
       returns: t(
         'New WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.',
-        '返回已启动异步端点初始化的新适配器，请求等待初始化且销毁共享清理承诺，无效选项对象读取同步抛无效选项错误，端点初始化失败经请求或销毁观察。'
+        '返回已启动异步端点初始化的适配器，请求自动等待初始化，重复销毁复用清理 Promise；无效选项或读取失败同步抛 `INVALID_OPTION`，端点初始化失败经请求或销毁观察。'
       ),
+      exampleIntro: {
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nThe Node Worker itself has on/off rather than Web addEventListener; its transferred MessagePort implements IWorkerPort directly. Constructor options default to {}, clientId to 'main' and timeoutMs to undefined, so this installed timeout middleware supplies no deadline. request options default to {}, with signal and transfer undefined. Generics provide typing only. Use finite primitives, arrays and plain records; undefined, ArrayBuffer and Uint8Array have bridge representations, $worker is reserved, and byte transfer does not prove zero-copy.",
+        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\nNode Worker 自身使用 `on/off`，转交的 `MessagePort` 直接满足 `IWorkerPort`。构造选项默认 `{}`，`clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，已安装的超时中间件不设置默认期限；请求选项也默认 `{}`，`signal`、`transfer` 默认 `undefined`。泛型只提供类型标注；载荷使用有限原始值、数组和普通记录，`undefined`、`ArrayBuffer`、`Uint8Array` 有桥接表示，`$worker` 为保留键，字节转移不证明零拷贝。"
+      },
+      cases: storeWorkerCases.WorkerAdapter,
       example: computeExample
     },
     createWorkerHandler: {
@@ -407,7 +358,7 @@ export const storeWorkerReference: ILibraryReference = {
       params: {
         compute: t(
           'Synchronous or async callback (payload: Input, {signal: INativeAbortSignal}) returning Output or Promise<Output>. Reads/throws/rejections follow RPC provider handling; check signal cooperatively for long work.',
-          '同步或异步接收输入及原生中止信号，返回结果或结果承诺，抛错与拒绝经请求提供者处理，长工作须合作检查信号。'
+          '接收输入与含原生中止信号的上下文，可同步返回结果或异步返回 Promise；抛错与拒绝由 RPC 服务端处理，长时间计算需主动检查信号。'
         ),
         postMessage: t(
           'Synchronous callback receiving raw reply/control envelopes, normally message => workerGlobal.postMessage(message); return void, host send errors follow transport failure handling.',
@@ -420,14 +371,22 @@ export const storeWorkerReference: ILibraryReference = {
             'Forwarded endpoint option; this provider helper does not apply it as a compute execution deadline. Set request deadline on the main-side adapter.',
             '透传端点选项，此提供者辅助不把它应用为计算执行截止期限，请在主端适配器设置请求期限。'
           ),
-          default: t('Omitted: no endpoint request default.', '默认省略，无端点请求默认期限。')
+          default: t(
+            'undefined: no endpoint request deadline is supplied.',
+            '`undefined`：不设置端点向外请求的默认期限。'
+          )
         }
       },
       returns: t(
         'Callable IManagedRpcHandler: await handler(rawMessage) for delivery, then close/dispose for endpoint cleanup. Compute failures are replies, while initialization/delivery failures can reject the callback.',
         '返回可调用受管句柄，传入原始消息并等待投递，以关闭及异步销毁完成端点清理，计算失败转回复，初始化或投递失败可使回调拒绝。'
       ),
-      example: computeExample
+      exampleIntro: {
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\ncompute receives the decoded payload and a native AbortSignal, and may return a result or Promise; cancellation is cooperative. The required postMessage callback forwards raw replies to the real port. The options object defaults to {}; timeoutMs defaults to undefined and only concerns outgoing endpoint requests, not a compute deadline. clientId is not part of this handler's public options. Computation errors return through RPC; attach and observe the managed message callback separately.",
+        zh: '把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n`compute` 接收解码后的载荷与原生 `AbortSignal`，可返回结果或 Promise，取消需要计算主动配合；必填的发送回调把原始回复转给真实端口。选项对象默认 `{}`，`timeoutMs` 默认 `undefined`，只涉及端点向外发出的请求，不是计算截止期限；此处理器的公开选项不含 `clientId`。计算失败经 RPC 返回，受管消息回调仍需单独接线并观察其失败。'
+      },
+      cases: storeWorkerCases.createWorkerHandler,
+      example: storeWorkerCases.createWorkerHandler![0]!.example
     },
     workerComputed: {
       role: 'factory',
@@ -442,16 +401,21 @@ export const storeWorkerReference: ILibraryReference = {
         ),
         selectInput: t(
           'Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.',
-          '每次资源取值尝试同步无参数返回输入的回调，依赖变化、刷新或重试可再次执行，抛错成为资源失败，不应返回承诺。'
+          '每次资源取值时无参数同步返回输入；依赖变化、刷新或重试都可再次执行，抛错会使资源失败，不应返回 Promise。'
         )
       },
       options: 'IWorkerComputedOptions',
       optionDocs: computedOptions,
       returns: t(
         'Resource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.',
-        '返回资源包标准实例，提供状态、刷新、承诺、取消、缓存脱水复水及销毁，代次取消和重试由资源包标准文档定义，须分别销毁资源、等待适配器销毁并终止调用者线程。'
+        '返回标准 `Resource`，提供状态、刷新、Promise、取消、缓存导出恢复及销毁；请求代次与重试遵循资源包契约。先释放资源，再等待适配器清理，最后终止调用方创建的线程。'
       ),
-      example: computeExample
+      exampleIntro: {
+        en: 'Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/reactive for createRuntime(); omitted Runtime options use the host adapter and microtask scheduler. runtime.signal uses the shown initial array and default Object.is equality. Pass that same Runtime to workerComputed; otherwise it defaults to defaultRuntime. This example changes autoStart from true to false, but the first state read still starts lazy work. ttl defaults to Infinity; explicit refetch forces a request and fresh passive promise reads reuse cache. Full Resource options below retain their own defaults. transfer defaults to undefined; Resource disposal does not dispose the adapter.',
+        zh: '把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n直接安装 `@migaia/reactive` 来调用 `createRuntime()`，省略选项时使用宿主适配器及微任务调度；`runtime.signal` 接收本例初始数组，默认按 `Object.is` 判断相等。把同一运行时传给 `workerComputed`，否则使用 `defaultRuntime`；本例将 `autoStart` 从默认 `true` 改为 `false`，首次读取 `state` 仍会按需启动。`ttl` 默认 `Infinity`，显式 `refetch` 强制请求，新鲜缓存的被动 `promise` 读取则复用结果；下表完整列出资源选项。`transfer` 默认 `undefined`，释放资源不释放适配器。'
+      },
+      cases: storeWorkerCases.workerComputed,
+      example: storeWorkerCases.workerComputed![0]!.example
     },
     createSerializeWorkerHandler: {
       role: 'factory',
@@ -462,7 +426,7 @@ export const storeWorkerReference: ILibraryReference = {
       params: {
         parser: t(
           'ISerializeParser from @migaia/serialize/plugins or a compatible implementation. encode(value,{signal,context}) may return chunk, iterable or async iterable; decode(chunk,context) returns a value or Promise. Worker sets context to serialize-worker; parser failures use only canonical RPC rejection, retaining name, message, stack, source, code, cause and aggregate errors. Already-delivered chunks remain available before the stream reports failure.',
-          '序列化插件包或兼容实现的解析器，编码接值及信号上下文并可返回块、可迭代或异步可迭代，解码接块及上下文并返回值或承诺，工作端固定上下文标签，解析失败仅经标准请求拒绝传递，保留名称、消息、堆栈、来源、错误码、原因及聚合子项，流失败前已投递的数据块仍可读取。'
+          '真实序列化插件或兼容解析器：`encode(value, context)` 可返回单块或同步、异步块流，`decode(chunk, context)` 返回值或 Promise；工作端诊断标签固定为 `serialize-worker`。解析失败经 RPC 拒绝传递，保留原错误链；流失败前已投递的块仍可读取。'
         ),
         post: t(
           'Synchronous host callback receiving raw message and optional readonly transfer list; return void, normally forward to worker-global postMessage. Native send failures follow RPC transport policy.',
@@ -473,10 +437,7 @@ export const storeWorkerReference: ILibraryReference = {
         'IManagedRpcHandler callable with raw host event.data, plus close/dispose/pendingCount/disposed. Invalid or inaccessible factory parser members are INVALID_OPTION: native failures retain identity/class/stack, complete foreign identities remain unchanged, and untaggable failures remain on cause. Encode uses two initial credits and acknowledgements. Stream failure is a canonical RPC rejection; an iterator.return failure is attached with the primary first in the reachable error chain. Handler disposal does not call parser.dispose.',
         '返回接收宿主原始消息的可调用句柄及关闭、销毁、待投递数量和状态；工厂解析成员无效或不可访问时使用 `INVALID_OPTION`，原生失败保留身份类型堆栈，完整外包身份不变，无法附码的失败保留在原因链。编码初始两份额度并等待确认；流失败经标准请求拒绝，迭代器归还失败附入可达错误链且主失败在首位，处理器销毁不调用解析器销毁。'
       ),
-      example: codecExample.replace(
-        'createSerializeWorkerHandler, workerPlugin',
-        'createSerializeWorkerHandler, workerPlugin, workerParser'
-      )
+      example: codecExample
     },
     workerParser: {
       role: 'factory',
@@ -489,15 +450,12 @@ export const storeWorkerReference: ILibraryReference = {
         'ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. No parser timeoutMs option exists; use context.signal for cancellation. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.',
         '返回序列化包解析协议，含名称、接值及上下文返回异步块流的编码、接块及上下文异步返回载荷的解码，以及稳定异步销毁；解析器没有超时选项，取消使用上下文信号；信号透传请求，解码及预先取消编码包装取消诊断并保留原始原因，流错误可能保留原生请求或中止形状。销毁失败活动队列、关闭端点，再按需终止线程，端点失败仍尝试终止，二者失败聚合。'
       ),
-      example: codecExample
-        .replace(
-          'createSerializeWorkerHandler, workerPlugin',
-          'createSerializeWorkerHandler, workerParser'
-        )
-        .replace(
-          "workerPlugin({ worker, type: 'json', terminateOnDispose: true })",
-          "{ type: 'json', parser: workerParser({ worker, type: 'json', terminateOnDispose: true }) }"
-        )
+      exampleIntro: {
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/serialize for these examples. jsonParser(options = {}) is the real native JSON parser: replacer, reviver, space and decoder default to undefined; byte decoding then uses host TextDecoder. Text chunks are ['text', string], byte chunks ['bytes', Uint8Array], and value chunks ['value', unknown]. Main-side context requires a cancellation signal and a diagnostic context string; no parser timeoutMs option exists.\n\nThe worker option is required. Here type defaults to 'worker', ownership to 'copy', terminateOnDispose to false, and clientId to 'main'. TextEncoder creates the eleven JSON bytes; TextDecoder verifies they remain readable. The pre-aborted decode uses a real AbortController and keeps its original reason on cause; it demonstrates cancellation before sending, not preemption. The borrowed MessagePort has no terminate method, so the caller explicitly closes it and terminates the separately owned Worker.",
+        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n示例需直接安装 `@migaia/serialize`；`jsonParser(options = {})` 使用真实原生 JSON 编解码，`replacer`、`reviver`、`space`、`decoder` 均默认 `undefined`，字节解码未指定解码器时使用宿主 `TextDecoder`。文本块为 `['text', string]`，字节块为 `['bytes', Uint8Array]`，值块为 `['value', unknown]`；主端上下文必填取消信号与诊断标签，不提供解析器 `timeoutMs` 选项。\n\n`worker` 必填；本例 `type` 默认 `'worker'`，`ownership` 默认 `'copy'`，`terminateOnDispose` 默认 `false`，`clientId` 默认 `'main'`。`TextEncoder` 生成十一字节 JSON，`TextDecoder` 核对原输入仍可读取；真实 `AbortController` 在发送前取消解码，`cause` 保留其原始原因，不表示抢占计算。借用的消息端口没有终止方法，调用方显式关闭端口并终止单独持有的 Worker。"
+      },
+      cases: storeWorkerCases.workerParser,
+      example: storeWorkerCases.workerParser![0]!.example
     },
     workerPlugin: {
       role: 'factory',
@@ -510,7 +468,12 @@ export const storeWorkerReference: ILibraryReference = {
         'ISerializePlugin from serialize with local format label and parser; no extra format detection, negotiation or Worker ownership is added.',
         '返回序列化包插件协议，包含本地格式标签及解析器，不额外检测格式、协商或取得线程所有权。'
       ),
-      example: codecExample
+      exampleIntro: {
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/serialize for these examples. jsonParser(options = {}) is the real native JSON parser: replacer, reviver, space and decoder default to undefined; byte decoding then uses host TextDecoder. Text chunks are ['text', string], byte chunks ['bytes', Uint8Array], and value chunks ['value', unknown]. Main-side context requires a cancellation signal and a diagnostic context string; no parser timeoutMs option exists.\n\ncreateSerializeRegistry requires a non-empty plugin list; the first plugin type is the default for encoding and decoding, and options default to systemScheduler with host TextEncoder/TextDecoder. Per-call context defaults to 'anonymous' and signal to undefined. This example chooses type 'json', overriding workerPlugin's default 'worker'; ownership remains 'copy', terminateOnDispose false, and clientId 'main'. The encoded chunk does not embed the plugin type, so retain a type separately when storing multiple formats. Registry disposal awaits parser disposal, not native Worker termination.",
+        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n示例需直接安装 `@migaia/serialize`；`jsonParser(options = {})` 使用真实原生 JSON 编解码，`replacer`、`reviver`、`space`、`decoder` 均默认 `undefined`，字节解码未指定解码器时使用宿主 `TextDecoder`。文本块为 `['text', string]`，字节块为 `['bytes', Uint8Array]`，值块为 `['value', unknown]`；主端上下文必填取消信号与诊断标签，不提供解析器 `timeoutMs` 选项。\n\n`createSerializeRegistry` 必填非空插件列表，首个格式作为编码与解码的默认格式；选项默认使用 `systemScheduler` 和宿主 `TextEncoder`、`TextDecoder`，每次调用的诊断标签默认 `'anonymous'`，信号默认 `undefined`。本例用 `'json'` 覆盖插件默认格式 `'worker'`，其余默认值为 `ownership: 'copy'`、`terminateOnDispose: false`、`clientId: 'main'`；输出块本身不包含格式标签，保存多种格式时需另外保留标签。注册表等待解析器释放，不终止原生 Worker。"
+      },
+      cases: storeWorkerCases.workerPlugin,
+      example: storeWorkerCases.workerPlugin![0]!.example
     },
     createStoreWorkerError: errorDoc(),
     createStoreWorkerAggregateError: errorDoc(true),
@@ -582,12 +545,12 @@ console.log(WorkerDiagnosticType.worker)`
             ),
             options: t(
               'Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.',
-              '可选含中止信号及转移列表对象，默认空，信号透传以合作取消，原生转移可能分离别名，无效选项或读取器返回拒绝承诺。'
+              '选项对象默认 `{}`，其中 `signal`、`transfer` 均默认 `undefined`；信号用于协作取消，转移可能分离其他别名视图。非法选项或 getter 失败使返回的 Promise 拒绝。'
             )
           },
           returns: t(
             'Promise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.',
-            '承诺返回结果，已关闭适配器以 `ADAPTER_DISPOSED` 拒绝，端点、请求及计算失败保持标准身份；通用请求取消检查 `RPC_CORE_ERROR_SOURCE` 与 `RpcCoreErrorCode.cancelled`，不使用序列化取消码，仅关闭不会取消已接纳请求。'
+            '返回结果 Promise，已关闭适配器以 `ADAPTER_DISPOSED` 拒绝；端点、请求与计算失败保留所属错误身份。通用请求取消检查 `RPC_CORE_ERROR_SOURCE` 与 `RpcCoreErrorCode.cancelled`，不是序列化取消码；仅调用 `close` 不会取消已接纳请求。'
           ),
           example: computeExample
         },
@@ -606,7 +569,7 @@ await adapter.dispose()`
         dispose: {
           summary: t(
             'Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.',
-            '关闭适配器、等待就绪并关闭端点，从不终止借用线程，重复调用返回相同承诺。'
+            '关闭适配器、等待就绪并关闭端点，不终止借用线程；重复调用返回同一 Promise。'
           ),
           returns: t(
             'Stable Promise<void>; initialization/cleanup failures reject.',
@@ -622,7 +585,7 @@ worker.terminate()`
     IManagedRpcHandler: {
       summary: t(
         'Callable (message: unknown) => Promise<void> from either handler factory. Message is raw event.data; it awaits readiness and delivery, not compute completion. Terminal calls resolve without delivery; init/delivery failures reject. Attach host listener yourself and remove it yourself at teardown.',
-        '两种处理器工厂返回的可调用函数，接未知原始消息并返回无值承诺，参数取自事件数据，等待就绪及投递而非计算完成，终态调用直接兑现，初始化或投递失败拒绝，宿主监听须自行接入和移除。'
+        '两种处理器工厂返回的可调用函数，接收事件中的原始消息并返回 `Promise<void>`；它等待就绪与投递，不等待计算完成。关闭后调用直接完成，初始化或投递失败会拒绝，宿主监听需自行接入与移除。'
       ),
       scenarios: [
         t(

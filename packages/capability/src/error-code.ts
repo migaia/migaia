@@ -1,9 +1,8 @@
 /**
  * The single declaration site for `@migaia/capability` error codes.
  *
- * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
- * `source` is always `'@migaia/capability'`. Throw sites use these constants instead of inline
- * values.
+ * The pair (source, code) uniquely identifies an error at the public boundary. `source` is always
+ * `'@migaia/capability'`. Throw sites use these constants instead of inline values.
  *
  * The migration assigns codes to previously untagged errors. `INVALID_NAME`, `INVALID_ACTIVATE`,
  * and `INVALID_HANDLE` retain their native `TypeError` identity. Codes are attached as properties
@@ -86,10 +85,10 @@ export const CapabilityErrorCode = {
    * proxy. Annotatable readiness getter Errors retain their native identity and receive this code.
    *
    * The gate fails closed before throwing. `cause` retains the original proxy exception by
-   * identity. See `docs/contracts/error-codes.md`. Correct the `flags` or `definition` object
-   * before retrying.
+   * identity. Correct the flags or definition object before retrying.
    */
   invalidOption: 'INVALID_OPTION'
 } as const
 
+/** Stable host error values; activation outcomes use CapabilityEnableStatus instead. */
 export type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]

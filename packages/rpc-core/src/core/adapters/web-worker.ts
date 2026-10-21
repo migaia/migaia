@@ -31,11 +31,14 @@ import { RpcCoreErrorCode } from '../index.js'
  * Node types; a real `Worker`/`MessagePort` is assignable.
  */
 export type IWebWorkerLikePort = {
+  /** Send via the original Worker/port with the selected physical transfer list. */
   postMessage(message: unknown, transfer?: readonly unknown[]): void
+  /** Register one native message or failure observer without replacing other listeners. */
   addEventListener(
     type: 'message' | 'error' | 'messageerror',
     listener: (event: IWebWorkerPortEvent) => void
   ): void
+  /** Remove the adapter's exact native listener. */
   removeEventListener(
     type: 'message' | 'error' | 'messageerror',
     listener: (event: IWebWorkerPortEvent) => void
@@ -46,9 +49,13 @@ export type IWebWorkerLikePort = {
 export type IWebWorkerPortEvent = {
   /** Native ErrorEvent retains the actual failure independently from its presentation message. */
   readonly error?: unknown
+  /** Native message payload, absent on ordinary failure events. */
   readonly data?: unknown
+  /** Native delivery origin, if available. */
   readonly origin?: unknown
+  /** Native delivery source object, if available. */
   readonly source?: unknown
+  /** Native event kind used for diagnostics. */
   readonly type?: string
 }
 
@@ -56,7 +63,9 @@ export type IWebWorkerPortEvent = {
 export type IWebWorkerTransportOptions = {
   /** Explicit static agreement; both deployment endpoints must use the same capabilities. */
   readonly capabilities?: readonly string[]
+  /** Optional static direct-peer address known by deployment. */
   readonly peerId?: string
+  /** Optional expected native origin used in connection verification. */
   readonly origin?: string
 }
 

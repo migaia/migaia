@@ -47,6 +47,7 @@ function keysEqual<Key>(left: Key, right: Key): boolean {
   return left === right || Object.is(left, right)
 }
 
+/** Reads `path` from `value`; throws `TypeError` naming `label` when a segment is missing. */
 export function readOpticPath(
   value: unknown,
   path: readonly PropertyKey[],
@@ -69,6 +70,10 @@ export function readOpticPath(
   }
 }
 
+/**
+ * Returns a copy of `value` with `path` set to `next`, copying each level and never mutating the
+ * original; throws `TypeError` naming `label` when a segment cannot be written.
+ */
 export function writeOpticPath(
   value: unknown,
   path: readonly PropertyKey[],
@@ -122,6 +127,7 @@ export function findKeyIndex<T, Key>(
   return -1
 }
 
+/** True when both arrays have the same length and `Object.is`-equal items. */
 export function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean {
   return (
     left.length === right.length && left.every((value, index) => Object.is(value, right[index]))
@@ -165,6 +171,7 @@ export function requireKeyIndex<T, Key>(
   return index
 }
 
+/** Returns a new frozen array with `item` inserted at `index`, clamped to the array bounds. */
 export function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[] {
   const next = [...list]
   const target = Math.max(0, Math.min(next.length, index))
@@ -172,6 +179,10 @@ export function spliceInsert<T>(list: readonly T[], item: T, index: number): rea
   return Object.freeze(next)
 }
 
+/**
+ * Removes every item whose key matches by SameValueZero; returns the original array when nothing
+ * was removed.
+ */
 export function filterOutKey<T, Key>(
   list: readonly T[],
   keyOf: (item: T, index: number) => Key,
@@ -186,6 +197,7 @@ export function filterOutKey<T, Key>(
   return removed ? { removed, next: Object.freeze(next) } : { removed, next: list }
 }
 
+/** Returns a new frozen array with the item at `index` replaced; the index is not bounds-checked. */
 export function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[] {
   const next = [...list]
   next[index] = value

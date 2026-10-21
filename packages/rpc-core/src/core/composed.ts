@@ -63,9 +63,12 @@ import type { IPluginConstraint } from '@migaia/plugin-host'
 import type { IRpcFeature, IRpcFeatureSurface } from './feature.js'
 import { readWebRpcPortFeature } from './internal/port-feature.js'
 
-/** Runtime-neutral configuration accepted by the composition kernel. */
+/**
+ * Runtime-neutral configuration accepted by the composition kernel; user Feature tuples belong to
+ * IRpcFactoryConfig instead.
+ */
 export type IRpcCoreConfig = Omit<IRpcFactoryConfig, 'features'> & {
-  /** Internal normalized view omits optional custom features from legacy fixtures. */
+  /** This normalized core view omits user Feature selection. */
   readonly features?: undefined
 }
 
@@ -506,7 +509,12 @@ type IPublicCallable = {
   >
 }
 
-/** Checked public boundary reuses the original composition runtime and prepare path. */
+/**
+ * Construct an endpoint from an explicit record of native Feature roots plus the configured
+ * middleware tuple. Resolution publishes only admitted public keys after atomic installation and
+ * ingress activation. Invalid claims or setup failures reject with rollback; dispose releases the
+ * same canonical kernel resources.
+ */
 export const createComposedEndpoint = createComposedEndpointRuntime as unknown as IPublicCallable
 
 /** Resolves every declared middleware port from the matching PluginHost handle Feature. */

@@ -13,6 +13,7 @@ import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
 import { getLoggerSchedulerDomain } from '../scheduler-domain.js'
 import { observeLoggerReporterResult } from '../thenable.js'
 
+/** Opt-in process integration sharing one compatible listener set across installed Loggers. */
 export type IProcessPluginConfig = {
   /**
    * Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled.
@@ -29,6 +30,7 @@ export type IProcessPluginConfig = {
   interceptProcessExit?: boolean
 }
 
+/** Stable registration/config key for shared process listeners and optional exit interception. */
 export const PROCESS_PLUGIN_NAME = 'process' as const
 
 /**
@@ -442,6 +444,12 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   }
 }
 
+/**
+ * Create process integration, defaulting to crash capture, a 3000 ms shutdown wait and no exit
+ * interception. Hosts without process are inert. Compatible installations share listeners and a
+ * scheduler domain; conflicts or shutdown admission fail. Final uninstall removes owned listeners
+ * and restores any intercepted exit function without disposing the borrowed host process.
+ */
 export const process = (
   config: IProcessPluginConfig = {}
 ): ILoggerPlugin<IEmptyPluginExt, IProcessPluginConfig> => new ProcessPlugin(config)

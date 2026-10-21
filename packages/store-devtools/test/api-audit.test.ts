@@ -1,8 +1,45 @@
 import { describe, expect, it } from 'vitest'
+import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
 import { createStoreDevTools, type IStoreDevTools } from '../src/index.js'
 
 describe('store-devtools audit regressions', () => {
+  it('classifies a replay clone failure and restores history capture afterwards', async () => {
+    /** The real Store remains borrowed by the diagnostic session throughout replay. */
+    const store = createStore(
+      { count: 0 },
+      { runtime: createRuntime({ schedulerStrategy: (run) => run() }) }
+    )
+    /** Initial recording succeeds before the application callback starts failing. */
+    let fail = false
+    /** Native identity and stack must survive the same clone boundary used for recording. */
+    const original = new TypeError('replay clone failed')
+    /** Disable unrelated trace capture so only history publication is observed. */
+    const session = createStoreDevTools(store, {
+      captureRuntimeTrace: false,
+      clone(state) {
+        if (fail) throw original
+        return { ...state }
+      }
+    })
+    try {
+      fail = true
+      expect(() => session.jumpTo(session.history[0]!.id)).toThrow(original)
+      expect(original).toMatchObject({ source: '@migaia/store-devtools', code: 'CALLBACK_FAILED' })
+      expect(original.stack).toBeTruthy()
+      expect(store.count).toBe(0)
+      expect(session.history).toHaveLength(1)
+      fail = false
+      store.count++
+      expect(session.history).toHaveLength(2)
+      expect(session.history[1]!.id).toBe(2)
+      expect(session.history[1]!.state.count).toBe(1)
+    } finally {
+      session.dispose()
+      await store.$dispose()
+    }
+  })
+
   it('rejects publication when cloning disposes the actual session', async () => {
     /** Business Store ownership is independent of the diagnostic session. */
     const store = createStore({ count: 0 })

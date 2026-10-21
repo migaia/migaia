@@ -194,6 +194,13 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
   /** Header shows its hairline only after the page scrolls under it. */
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
+  /**
+   * The server never sees the URL fragment, so the language link adds `location.hash` only after
+   * hydration; otherwise a direct load of an anchored page renders a different `href` on each
+   * side.
+   */
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
   const locale = localeFromPath(location.pathname)
   /** Opposite locale exposed as the header's single language-switch destination. */
   const alternateLocale: ILocale = locale === 'zh' ? 'en' : 'zh'
@@ -204,7 +211,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
     /^\/(?:en|zh)(?=\/|$)/.test(canonicalPathname)
       ? canonicalPathname.replace(/^\/(?:en|zh)(?=\/|$)/, `/${alternateLocale}`)
       : `/${alternateLocale}${canonicalPathname}`
-  }${location.search}${location.hash}`
+  }${location.search}${hydrated ? location.hash : ''}`
   /** Library slug of the current docs page, shown as the header context crumb. */
   const currentLibrary = canonicalPathname.match(/^\/(?:en|zh)\/docs\/([^/]+)/)?.[1]
   const copy = copyFor(locale)

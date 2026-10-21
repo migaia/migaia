@@ -60,7 +60,13 @@ function copyNumbers(source: object, fields: readonly string[]): Record<string, 
   return snapshot
 }
 
-/** Validates the host DSL, snapshots options and arrays, and never invokes plugins or config. */
+/**
+ * Validates and freezes a trusted host definition without launching work or invoking
+ * plugins/config. Captures own data fields and arrays, defaults runtime to coroutine, and rejects
+ * accessors or incompatible launch fields with TRAY_HOST_INVALID. Only this exact returned identity
+ * may be registered; per-generation config validation and plugin installation happen later during
+ * spawn.
+ */
 export function defineTrayHost<
   const TName extends string,
   const TPlugins extends ITrayPlugins,

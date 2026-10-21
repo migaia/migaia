@@ -16,10 +16,16 @@ function rejectUnsupportedPipe(address: string): void {
     })
 }
 
-/** Deno's Node-compatible TCP/Unix streams reuse the one authenticated state machine. */
+/**
+ * Dial through Deno's Node-compatible TCP/Unix implementation, borrowing the remote process and
+ * owning only this socket. Named pipes reject INVALID_CONFIG synchronously; other address, abort
+ * and dial outcomes retain the shared Node adapter's contract.
+ */
 export function dialProcessByteChannel(
   options: Readonly<{
+    /** Absolute Unix path or numeric loopback TCP URL; Windows named pipes are unsupported. */
     address: string
+    /** Optional dial-only cancellation, detached after successful connection. */
     signal?: AbortSignal
   }>
 ): Promise<IProcessByteChannel> {
@@ -27,7 +33,10 @@ export function dialProcessByteChannel(
   return dialNodeCompatibleChannel(options)
 }
 
-/** Listener policy remains shared with Node, while named pipes stay unsupported. */
+/**
+ * Bind the same authenticated pending-candidate listener as Node, including ready-channel ownership
+ * transfer and idempotent close. Deno named pipes reject INVALID_CONFIG before native acquisition.
+ */
 export const listenProcessByteChannel: IListenProcessByteChannel = (options) => {
   rejectUnsupportedPipe(options.address)
   return listenNodeCompatibleChannel(options)

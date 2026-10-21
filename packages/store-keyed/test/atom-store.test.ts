@@ -45,6 +45,23 @@ describe('AtomStore: reads', () => {
     store.dispose()
   })
 
+  it('set() and write-callback set() infer the updater parameter from a source definition', () => {
+    const store = createAtomStore(createRuntime())
+    const cart = atomDef({ items: [] as string[] })
+    const count = atomDefFactory(() => 1)
+    // No annotations: the previous value must be typed by the definition, not inferred as any.
+    store.set(cart, (previous) => ({ items: [...previous.items, 'keyboard'] }))
+    store.set(count, (previous) => previous + 1)
+    const addItem = writableDef(
+      (get) => get(cart).items.length,
+      (_get, set, item: string) => set(cart, (previous) => ({ items: [...previous.items, item] }))
+    )
+    store.set(addItem, 'mouse')
+    expect(store.get(cart).items).toEqual(['keyboard', 'mouse'])
+    expect(store.get(count)).toBe(2)
+    store.dispose()
+  })
+
   it('primitive-factory create() runs once per store, lazily on first access', () => {
     const store = createAtomStore(createRuntime())
     const create = vi.fn(() => ({ value: 1 }))

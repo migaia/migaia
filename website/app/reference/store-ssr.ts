@@ -6,6 +6,7 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { reactiveReference } from './reactive.js'
+import { storeSsrCases } from './store-ssr-cases.ts'
 
 /** Localized contract prose. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -85,7 +86,7 @@ const key = t(
 const timeout: IMemberDoc = {
   summary: t(
     'Total milliseconds, finite from 0 through 2147483647. Zero waits only for already-settled Promise reactions, never for in-flight work. Invalid input returns a rejected Promise with RangeError INVALID_OPTION. At the deadline only unsettled resources receive RESOURCE_TIMEOUT; fulfilled work is omitted and rejected work keeps its original reason. Resources are not cancelled.',
-    '所有轮次的总毫秒预算，须为零至 `2147483647` 的有限数；零只排空已结算承诺的反应，不等待在途工作。无效值返回以范围错误及 `INVALID_OPTION` 拒绝的承诺；截止时仅未结算资源记录 `RESOURCE_TIMEOUT`，已兑现项跳过，已拒绝项保留原始原因，不取消资源。'
+    '所有轮次的总毫秒预算，须为零至 `2147483647` 的有限数；零只处理已结算 Promise 的反应，不等待在途工作。无效值使 Promise 以 `RangeError` 及 `INVALID_OPTION` 拒绝；截止时仅未结算资源记录 `RESOURCE_TIMEOUT`，已兑现项跳过，已拒绝项保留原始原因，不取消资源。'
   ),
   default: t(
     'Omitted: no deadline; waits until convergence or scope disposal.',
@@ -160,8 +161,8 @@ const scopeMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   register: {
     summary: t(
-      'Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw keeps the key free and pending data available; reentrant scope disposal rejects SCOPE_DISPOSED. Neither failure transfers ownership of the candidate, so the caller cleans it up. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.',
-      '注册同运行时状态容器，待复水回调后重检活动状态再提交；回调抛错保留空闲键及待复水数据，重入销毁作用域则以 `SCOPE_DISPOSED` 拒绝；两种失败均不转移候选对象所有权，须由调用者清理。重复键抛 `INVALID_OPTION`，其他运行时抛 `CROSS_RUNTIME`。'
+      'Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw leaves the key free and retains pending data while the scope remains active; disposal clears pending data and rejects SCOPE_DISPOSED. Neither failure transfers candidate ownership. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.',
+      '注册同运行时状态容器，待复水回调后重检活动状态再提交；回调抛错时键仍空闲，仅作用域仍活动时保留待复水数据，作用域销毁会清空该数据并以 `SCOPE_DISPOSED` 拒绝。两种失败均不转移候选对象所有权；重复键抛 `INVALID_OPTION`，其他运行时抛 `CROSS_RUNTIME`。'
     ),
     params: {
       key,
@@ -208,8 +209,8 @@ await detached?.$dispose()`
   },
   registerResource: {
     summary: t(
-      'Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and pending data available; reentrant scope disposal rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.',
-      '注册同运行时资源，待复水回调后重检活动状态再提交；回调抛错保留待复水数据且不拥有候选对象，重入销毁作用域以 `SCOPE_DISPOSED` 拒绝且不接纳候选对象，清理仍归调用者；重复键抛 `INVALID_OPTION`，归属不同抛 `CROSS_RUNTIME`。'
+      'Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and retains pending data only while the scope stays active. Disposal clears pending data and rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.',
+      '注册同运行时资源，待复水回调后重检活动状态再提交；回调抛错不拥有候选对象，仅作用域仍活动时保留待复水数据。作用域销毁会清空该数据，以 `SCOPE_DISPOSED` 拒绝且不接纳候选对象，清理仍归调用者；重复键抛 `INVALID_OPTION`，归属不同抛 `CROSS_RUNTIME`。'
     ),
     params: {
       key,
@@ -292,7 +293,7 @@ profile.dispose()`
   awaitResources: {
     summary: t(
       'Waits in waterfall rounds, deduplicating last Promise identity per key. New retries/refetches participate. Getter failures and rejections become diagnostics. Continued new work after 64 rounds rejects RESOURCE_ROUND_LIMIT. Disposal returns already collected failures.',
-      '按瀑布轮次等待，每键按上次承诺身份去重，新重试或刷新参与等待，读取器失败及拒绝收为诊断，六十四轮后继续新增工作以 `RESOURCE_ROUND_LIMIT` 拒绝，销毁返回已收集失败。'
+      '按瀑布轮次等待，每键按上次 Promise 身份去重，新重试或刷新参与等待，读取器失败及拒绝收为诊断，六十四轮后继续新增工作以 `RESOURCE_ROUND_LIMIT` 拒绝，销毁返回已收集失败。'
     ),
     params: {
       options: t(
@@ -302,7 +303,7 @@ profile.dispose()`
     },
     returns: t(
       'Promise of readonly ISSRResourceFailure entries. At timeout only still-pending Promises receive RESOURCE_TIMEOUT; fulfilled entries are omitted and rejected entries retain their original reason. A zero budget recognizes already-settled work without awaiting in-flight resources. Invalid options reject the Promise rather than throwing synchronously.',
-      '承诺返回只读失败条目；超时仅标记仍在途承诺，已兑现项跳过，已拒绝项保留原始原因；零预算仅识别已结算工作，不等待在途资源；无效选项使承诺拒绝而非同步抛错。'
+      'Promise 兑现为只读失败条目；超时仅标记仍在途 Promise，已兑现项跳过，已拒绝项保留原始原因；零预算仅识别已结算工作，不等待在途资源；无效选项使 Promise 拒绝而非同步抛错。'
     ),
     example: resourceExample
   },
@@ -319,7 +320,7 @@ profile.dispose()`
     },
     returns: t(
       'Promise<ISSRState>; diagnostic throws/rejections are reported best-effort and do not stop other reports. Returned reporter thenables are observed without awaiting.',
-      '承诺返回状态，诊断抛错或拒绝尽力报告且不停止其他报告，观察回调返回的类承诺但不等待。'
+      'Promise 兑现为状态，诊断抛错或拒绝尽力报告且不停止其他报告，观察回调返回的类 Promise 对象但不等待。'
     ),
     example: resourceExample
   },
@@ -338,11 +339,11 @@ await scope.disposeAsync()`
   disposeAsync: {
     summary: t(
       'Starts disposal if needed and awaits every tracked owned cleanup. Completion is published before synchronous cleanup callbacks, so reentrant calls from dispose or disposeAsync share the same Promise. It waits for the full cleanup set admitted by the synchronous start pass and replays failures; the Runtime itself is retained.',
-      '需要时启动销毁并等待全部已追踪清理；同步清理回调前发布完成承诺，因此从同步或异步销毁入口重入均共享同一承诺；等待本次同步启动阶段接纳的完整清理集合并重放失败，保留运行时本体。'
+      '需要时启动销毁并等待全部已追踪清理；同步清理回调前发布完成 Promise，因此从同步或异步销毁入口重入均共享同一 Promise；等待本次同步启动阶段接纳的完整清理集合并重放失败，保留运行时本体。'
     ),
     returns: t(
       'Stable Promise<void>; exact single retained failure or SCOPE_DISPOSAL_FAILED AggregateError for multiple failures.',
-      '返回稳定无值承诺，单项保留失败原样拒绝，多项聚合拒绝。'
+      '返回稳定的 Promise<void>，单项保留失败原样拒绝，多项聚合拒绝。'
     ),
     example: `const first = scope.disposeAsync()
 console.log(first === scope.disposeAsync())
@@ -363,7 +364,7 @@ const scriptMembers: Readonly<Record<string, IMemberDoc>> = {
       '来自调用者的脚本标识符，写端要求首字符字母或下划线，后续为字母数字下划线冒号点连字符，否则抛 `INVALID_STATE_SCRIPT`。'
     ),
     default: t(
-      'Uses the stable __STORE_STATE__ element identifier.',
+      'Uses the stable `__STORE_STATE__` element identifier.',
       '默认使用 `__STORE_STATE__` 元素标识符。'
     )
   },
@@ -430,12 +431,12 @@ const errors = {
     '多项复水失败，成功条目仍保留变化。'
   ),
   invalidSnapshot: t(
-    'Malformed stores/resources or resource metadata, property-access failures and invalid JSON syntax. Unclassified extensible native errors receive INVALID_SNAPSHOT in place with identity/class/stack preserved; frozen/non-Error failures remain on cause and complete foreign identities keep their owner.',
-    '状态或资源外层、资源元数据无效、属性访问失败或语法无效；未编码且可扩展的原生错误原位附 `INVALID_SNAPSHOT`，保留身份、类型及堆栈；冻结或非错误值保留在原因链，完整外包身份保持原归属。'
+    'Malformed stores/resources or resource metadata, or property-access failures. Unclassified extensible native errors receive INVALID_SNAPSHOT in place with identity/class/stack preserved; frozen/non-Error failures remain on cause and complete foreign identities keep their owner.',
+    '状态或资源外层、资源元数据无效，或属性访问失败；未编码且可扩展的原生错误原位附 `INVALID_SNAPSHOT`，保留身份、类型及堆栈；冻结或非错误值保留在原因链，完整外包身份保持原归属。'
   ),
   invalidStateScript: t(
-    'Unsupported envelope version or invalid script ID.',
-    '不支持的外层版本或无效脚本标识符。'
+    'Unsupported envelope version, invalid script ID, or invalid JSON syntax in deserializeSSRState.',
+    '不支持的外层版本、无效脚本标识符，或 `deserializeSSRState` 收到非法 JSON 语法。'
   ),
   invalidStoreKey: t(
     'Empty, non-string or `__proto__` registration/snapshot key.',
@@ -460,7 +461,7 @@ const errors = {
   ),
   resourceTimeout: t(
     'One resource Promise is still unsettled at the total deadline; completed siblings do not receive this code. Choose fallback or client refetch.',
-    '单个资源承诺在总截止期限时仍未结算，已完成的同轮资源不附此码，应选择降级或客户端重新获取。'
+    '单个资源 Promise 在总截止期限时仍未结算，已完成的同轮资源不附此码，应选择降级或客户端重新获取。'
   )
 }
 
@@ -494,16 +495,25 @@ export const storeSsrReference: ILibraryReference = {
     createSSRRequestScope: {
       role: 'factory',
       purpose: t(
-        'Constructs a fresh request scope; objects from a different Runtime cannot be registered.',
-        '构造新请求作用域，不能注册其他运行时的对象。'
+        'Constructs a request scope with a new Runtime by default. Retain it through rendering, register objects created with scope.runtime, and await disposeAsync afterward. Install @migaia/store-light and @migaia/resource directly for the examples that import them.',
+        '构造请求作用域，默认新建运行时；渲染期间保留它，登记使用 `scope.runtime` 创建的对象，结束后等待 `disposeAsync`。运行直接导入轻量状态包或资源包的示例时，须直接安装 `@migaia/store-light` 与 `@migaia/resource`。'
       ),
+      params: {
+        options: t(
+          'Optional ISSRRequestScopeOptions, defaults to {}. runtime reuses an existing Runtime; runtimeOptions constructs a new one, and the two fields cannot be combined. Supplying a shared Runtime does not isolate requests.',
+          '可选 `ISSRRequestScopeOptions`，默认 `{}`；`runtime` 复用已有运行时，`runtimeOptions` 构造新运行时，两字段互斥；显式共享运行时不会隔离请求。'
+        )
+      },
       options: 'ISSRRequestScopeOptions',
       optionDocs: runtimeMembers,
       returns: t(
-        'SSRRequestScope to retain through rendering and await disposeAsync afterward.',
-        '返回供渲染期间保留、结束后等待异步销毁的作用域。'
+        'SSRRequestScope with separate store/resource key spaces. register/registerResource default to owned: true and require the exact scope Runtime; detach transfers cleanup to the caller. Dehydrate copies/freezes supported JSON data. The Resource example overrides its default ttl of Infinity with 60000 ms to keep its completed cache eligible; ttl is a Resource option, not a scope option.',
+        '返回状态与资源键空间独立的 `SSRRequestScope`；`register` 与 `registerResource` 默认 `owned: true`，要求对象属于精确的作用域运行时，`detach` 将清理交回调用者。脱水拷贝并冻结支持的 JSON 数据；资源例子将 `ttl` 的默认 `Infinity` 改为 `60000` 毫秒，用于保留已完成缓存；这是资源构造选项，不是作用域选项。'
       ),
-      example: scopeExample
+      exampleIntro: storeSsrCases.createSSRRequestScope![0]!.problem,
+      example: storeSsrCases.createSSRRequestScope![0]!.example,
+      exampleResult: storeSsrCases.createSSRRequestScope![0]!.result,
+      cases: storeSsrCases.createSSRRequestScope
     },
     assertSSRState: {
       role: 'operation',
@@ -531,15 +541,18 @@ export const storeSsrReference: ILibraryReference = {
       ),
       params: {
         state: t(
-          'ISSRState from scope.dehydrate or valid application data.',
-          '来自作用域脱水或有效应用数据的状态。'
+          'Required ISSRState: version must be 1; stores is a plain record of store keys to plain JSON field records. resources is optional and contains version-2 Resource snapshots. JSON values support null, booleans, strings, finite numbers, arrays and plain objects; no cycles, unsupported objects, depth above 256, or traversal above one million nodes.',
+          '必填 `ISSRState`：`version` 必须为 `1`，`stores` 是按容器键索引普通 JSON 字段表的普通对象；可选 `resources` 保存版本 `2` 的资源快照。JSON 值支持 `null`、布尔、字符串、有限数字、数组及普通对象，不支持环、其他对象、超过 `256` 层深度或一百万遍历节点。'
         )
       },
       returns: t(
         'HTML-escaped JSON string; validation/native JSON failures propagate.',
         '返回页面安全转义文本，校验及原生序列化失败传播。'
       ),
-      example: scopeExample
+      exampleIntro: storeSsrCases.serializeSSRState![0]!.problem,
+      example: storeSsrCases.serializeSSRState![0]!.example,
+      exampleResult: storeSsrCases.serializeSSRState![0]!.result,
+      cases: storeSsrCases.serializeSSRState
     },
     serializeTrustedSSRState: {
       role: 'operation',
@@ -572,29 +585,35 @@ export const storeSsrReference: ILibraryReference = {
         )
       },
       returns: t(
-        'ISSRState; invalid JSON keeps its native SyntaxError class, stack and identity with INVALID_SNAPSHOT attached in place. Invalid payloads retain their validation identity; complete foreign identities remain unchanged.',
-        '返回状态，无效语法保留原生语法错误类别、堆栈及身份，并原位附 `INVALID_SNAPSHOT`；无效载荷保留校验身份，完整外包错误身份不变。'
+        'ISSRState; invalid JSON keeps its native SyntaxError class, stack and identity with INVALID_STATE_SCRIPT attached in place. Invalid payloads retain their validation identity; complete foreign identities remain unchanged.',
+        '返回状态，无效语法保留原生 SyntaxError 类型、堆栈及身份，并原位附 `INVALID_STATE_SCRIPT`；无效载荷保留校验身份，完整外包错误身份不变。'
       ),
       example: scopeExample
     },
     createSSRStateScript: {
       role: 'operation',
       purpose: t(
-        'Builds an application/json script with validated ID and safe JSON. Pair with readSSRStateFromDocument using the same ID.',
-        '校验标识符并安全序列化后构造不可执行脚本，使用相同标识符搭配 `readSSRStateFromDocument`。'
+        'Builds a complete application/json script element with a validated ID and escaped JSON. It returns HTML text; it neither inserts nodes nor hydrates stores. To read the element later, supply the same ID and an explicit document to readSSRStateFromDocument.',
+        '校验标识符并转义 JSON 后构造完整的 `application/json` 脚本元素；返回 HTML 文本，不插入节点也不复水容器。后续读取时，可向 `readSSRStateFromDocument` 提供同一标识及显式文档。'
       ),
       params: {
-        state: t('Valid version-1 SSR state.', '有效第一版状态。'),
+        state: t(
+          'Required version-1 ISSRState with a plain stores record and optional version-2 resource snapshots; it uses serializeSSRState validation and HTML escaping.',
+          '必填版本 `1` 的 `ISSRState`，含普通 `stores` 表及可选版本 `2` 资源快照，采用 `serializeSSRState` 的校验与 HTML 转义。'
+        ),
         elementId: t(
-          'Optional ID from caller configuration, default __STORE_STATE__; must match the safe identifier pattern.',
-          '来自调用者的可选标识符，默认 `__STORE_STATE__`，须符合安全标识符规则。'
+          'Optional ID from caller configuration, defaults to `__STORE_STATE__`; must match /^[A-Za-z_][A-Za-z0-9_:.-]*$/. Empty IDs, whitespace, quotes and a leading digit reject with INVALID_STATE_SCRIPT.',
+          '来自调用者配置的可选标识符，默认 `__STORE_STATE__`，须匹配 `/^[A-Za-z_][A-Za-z0-9_:.-]*$/`；空值、空白、引号或数字开头均以 `INVALID_STATE_SCRIPT` 拒绝。'
         )
       },
       returns: t(
         'Complete script HTML; invalid ID throws INVALID_STATE_SCRIPT.',
         '返回完整脚本标签文本，无效标识符抛 `INVALID_STATE_SCRIPT`。'
       ),
-      example: jsonExample
+      exampleIntro: storeSsrCases.createSSRStateScript![0]!.problem,
+      example: storeSsrCases.createSSRStateScript![0]!.example,
+      exampleResult: storeSsrCases.createSSRStateScript![0]!.result,
+      cases: storeSsrCases.createSSRStateScript
     },
     readSSRStateFromDocument: {
       role: 'operation',
@@ -604,7 +623,7 @@ export const storeSsrReference: ILibraryReference = {
       ),
       params: {
         elementId: t(
-          'Optional matching ID from caller configuration, default __STORE_STATE__.',
+          'Optional matching ID from caller configuration, default `__STORE_STATE__`.',
           '来自调用者的可选匹配标识符，默认 `__STORE_STATE__`。'
         ),
         documentValue: t(
@@ -628,7 +647,7 @@ export const storeSsrReference: ILibraryReference = {
       options: 'ISSRScriptOptions',
       returns: t(
         'Promise of complete script with codec/wire metadata; codec/abort failures follow serialize.',
-        '承诺返回含格式与传输元数据的完整脚本，格式及取消失败遵循序列化包。'
+        'Promise 兑现为含格式与传输元数据的完整脚本，格式及取消失败遵循序列化包。'
       ),
       example: codecExample
     },
@@ -641,7 +660,7 @@ export const storeSsrReference: ILibraryReference = {
       options: 'ISSRReadOptions',
       returns: t(
         'Promise<ISSRState | undefined>; missing/empty text yields undefined, unregistered codec rejects CODEC_CONTRACT, host/codec failures propagate.',
-        '承诺返回状态或 `undefined`，正文缺失或空则无结果，未注册格式以 `CODEC_CONTRACT` 拒绝，宿主及格式失败传播。'
+        'Promise 兑现为状态或 `undefined`，正文缺失或空则无结果，未注册格式以 `CODEC_CONTRACT` 拒绝，宿主及格式失败传播。'
       ),
       example: codecExample
     },
@@ -724,7 +743,7 @@ await app.$dispose()`
         onResourceError: {
           summary: t(
             'Synchronous callback for each {key,error} failure in collected order; return void. Throws and rejected returned thenables are reported best-effort to Runtime phase ssr-resource; returned thenables are not awaited.',
-            '按收集顺序为各项含键及原始错误的失败同步调用，返回空值，抛错及返回类承诺的拒绝尽力交运行时资源阶段报告，不等待返回类承诺。'
+            '按收集顺序为各项含键及原始错误的失败同步调用，返回空值，抛错及返回类 Promise 对象的拒绝尽力交运行时资源阶段报告，不等待返回的类 Promise 对象。'
           ),
           default: t(
             'Runtime.reportError(failure.error, {phase: ssr-resource}).',
@@ -802,7 +821,7 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
         $plain: {
           summary: t(
             'Synchronous plain data callback, never a Promise.',
-            '同步普通数据回调，不能返回承诺。'
+            '同步普通数据回调，不能返回 Promise。'
           ),
           returns: t(
             'Record<string, unknown>; validated/copied by dehydrate or retained live by trusted path. Throws propagate.',
@@ -831,7 +850,7 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
           ),
           returns: t(
             'Void or PromiseLike<void>; scope observes rejection and disposeAsync awaits completion.',
-            '返回空值或无值类承诺，作用域观察拒绝并通过异步销毁等待完成。'
+            '返回空值或 PromiseLike<void>，作用域观察拒绝并通过异步销毁等待完成。'
           ),
           example: `await app.$dispose()`
         }
@@ -865,7 +884,7 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
         promise: {
           summary: t(
             'Current prefetch Promise, reread each round and deduplicated by identity per key; continuous getter failure is captured once.',
-            '当前预取承诺，每轮重读且逐键按身份去重，持续读取器失败只记录一次。'
+            '当前预取 Promise，每轮重读且逐键按身份去重，持续读取器失败只记录一次。'
           )
         },
         dehydrate: {

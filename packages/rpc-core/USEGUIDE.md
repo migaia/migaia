@@ -1,326 +1,35 @@
-# `@migaia/rpc-core` 使用手册
+# `@migaia/rpc-core` 使用指南
 
-本手册覆盖 Core 的全部公开能力。安装、入口一览与最短示例见 [README](./README.md)。用进程、线程、浏览器或其它语言的具体场景，请先看对应包的文档，它们都建立在本手册描述的语义之上。
+按问题选择完整场景；这里直接运行真实 Endpoint 和内存 transport，Remote Peer、Host、适配器与 Probe 的契约放在后面的详细参考中。
 
-## 目录
+| 要解决的问题                     | 公开入口       | 完整场景                                  |
+| -------------------------------- | -------------- | ----------------------------------------- |
+| 通过一对内存端点调用实际处理函数 | createEndpoint | [开始](#通过一对内存端点调用实际处理函数) |
+| 让并发答复回到各自的请求         | createEndpoint | [开始](#让并发答复回到各自的请求)         |
+| 拒绝重复登记，并保留原处理函数   | createEndpoint | [开始](#拒绝重复登记并保留原处理函数)     |
+| 释放端点，同时保留借入的传输通道 | createEndpoint | [开始](#释放端点同时保留借入的传输通道)   |
+| 只覆盖某次请求的继承期限         | timeout        | [开始](#只覆盖某次请求的继承期限)         |
+| 让已经运行的处理函数协作停止     | abort          | [开始](#让已经运行的处理函数协作停止)     |
 
-1. [两层 API：Runtime Peer 与 Endpoint](#1-两层-apiruntime-peer-与-endpoint)
-2. [Runtime Peer](#2-runtime-peer)
-3. [Plugin 与 Host 出口](#3-plugin-与-host-出口)
-4. [Endpoint](#4-endpoint)
-5. [中间件](#5-中间件)
-6. [载体：内置 transport 与自定义 transport](#6-载体内置-transport-与自定义-transport)
-7. [按需组装：减小打包体积](#7-按需组装减小打包体积)
-8. [容量、并发与重放窗口](#8-容量并发与重放窗口)
-9. [高阶用法：编写一个适配器](#9-高阶用法编写一个适配器)
-10. [错误码与处理](#10-错误码与处理)
-11. [二进制、转发与重试](#11-二进制转发与重试)
-12. [常见问题](#12-常见问题)
-13. [Probe](#13-probe)
+## 运行前准备
 
----
+先安装本包及显式 peer 依赖；全部场景只导入本包公开入口，使用同进程内存载体，不启动进程、Worker 或外部网络。请在支持顶层 await 的 ESM TypeScript 环境执行。
 
-## 1. 两层 API：Runtime Peer 与 Endpoint
-
-| 层           | 入口                      | 调用方式                                                                     | 适合                                                     |
-| ------------ | ------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Runtime Peer | `@migaia/rpc-core/remote` | `peer.request('math.double', 21)`，方法目录由 `provide` 自动生成，带类型推导 | 进程、线程、桥接；Host 管理的连接                        |
-| Endpoint     | `@migaia/rpc-core`        | `endpoint.provide(name, handler)`、`endpoint.send(target, name, data)`       | iframe、标签页、MessagePort 等浏览器载体；自定义协议组装 |
-
-两层共享同一套调用语义（超时、取消、错误还原、并发准入）。Runtime Peer 在 Endpoint 之上增加了：握手时交换方法目录、`stream` / `group` / `outcome`、代次与重启、Host 出口。
-
-## 2. Runtime Peer
-
-### 2.1 创建
-
-大多数情况下，Runtime Peer 由平台包的工厂创建：`createProcessPeer`、`createThreadPeer`。Core 提供的 `createRuntimePeer(options)` 用于自定义来源：
-
-```ts doc-test=check
-import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'
-
-/** 调用方交入实际协议通道的来源；握手和资源仍由该来源的 owner 完成。 */
-export function createClientPeer(connect: IRuntimePeerSource) {
-  return createRuntimePeer({
-    provide: { ping: () => 'pong' },
-    connect
-  })
-}
+```bash
+pnpm add @migaia/rpc-core @migaia/rpc-contract
 ```
 
-| 选项                           | 说明                                                                                                        |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `self`                         | 可省略；Core 生成显示名 `peer` 与唯一 `instanceId`。显式 `{ name, instanceId }` 保持原值，`name` 不用于认证 |
-| `provide`                      | 本端提供的方法树（见 2.2）                                                                                  |
-| `spawn` / `connect` / `listen` | 来源，必须且只能有一个。Core 层是回调形式 `(context) => Promise<channel>`；平台包另有对象形式               |
-| `defaultTimeoutMs`             | request / stream 的默认超时，必须是有限正数；不设时为 30000                                                 |
-| `providerLimits`               | 入站并发上限：`maxPerPeer`（默认 64）、`maxGlobal`（默认 256）、`onRejected` 观察被拒绝的调用               |
-| `contract`                     | 显式的方法契约（模式、幂等声明、schema），一般不需要                                                        |
-| `keyFactory`、`retryPort`      | 幂等键生成与重试端口，用于自定义重试策略                                                                    |
-| `endpointFactory`              | 自定义 Endpoint 组装（例如加入 `authentication` 中间件）                                                    |
-| `report`                       | 接收后台错误；省略时使用 `console.error`                                                                    |
+## 通过一对内存端点调用实际处理函数
 
-来源回调收到的 `context` 包含本端 `self` 与本端实际编译出的能力 `capabilities`。回调必须返回已经完成握手的协议通道，不能伪造能力或身份。
+两个模块需要请求与对应答复，又不想打开线程或网络连接；调用者应直接等待处理结果，而非自行维护消息监听。
 
-`createManagedRuntimePeer` 在此基础上加入监督（启动、重启、停止）；平台包的 spawn 来源就是用它实现的。
+手写发送与订阅代码，需要自行关联答复、区分方法名并在关闭时移除监听，物理通道本身不提供这些请求语义。
 
-### 2.2 provide：声明可被调用的方法
+为每个 `createEndpoint` 提供内存通道的一侧和配套 `connect` 插件，用 `provide` 登记 `double` 并返回 `context.success`，再等待 `client.send`，最后释放两端。
 
-```ts doc-test=check
-/** 方法树是完整数据；调用方把它交给所选平台 factory 的 provide。 */
-export const provide = {
-  math: {
-    double: (value: number) => value * 2,
-    slow: async (ms: number) => {
-      await new Promise<void>((resolve) => setTimeout(resolve, ms))
-      return ms
-    }
-  },
-  feed: {
-    count: async function* (limit: number) {
-      for (let index = 1; index <= limit; index++) yield index
-    }
-  }
-}
-```
+### 本例参数
 
-- 只读取对象自身的可枚举数据属性；嵌套对象生成点分路径（`math.double`）。
-- getter、循环引用、非法名字或重复路径在打开来源之前就会被拒绝。
-- 参数与返回值必须可移植：JSON 能表示的数据，以及协商后的 `ArrayBuffer` / `Uint8Array`。`Date`、`Map`、类实例等会被拒绝。
-- 方法目录在握手时由库生成并交换。对端只能调用目录里的方法。
-
-### 2.3 调用
-
-| 方法                                  | 返回                    | 说明                                                                               |
-| ------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------- |
-| `request(method, payload?, options?)` | `Promise<结果>`         | 等待结果                                                                           |
-| `notify(method, payload?, options?)`  | `Promise<void>`         | 只保证已发出，不代表对端执行成功                                                   |
-| `stream(method, payload?, options?)`  | `AsyncIterableIterator` | 惰性，第一次 `next()` 前不发送；提前 `return()` 会通知对端停止                     |
-| `group(steps, options?)`              | `Promise<步骤结果[]>`   | `[{ method, payload? }]` 按顺序执行；第一个失败后其余为 `not-executed`；**不回滚** |
-| `outcome(idempotencyKey)`             | `Promise<…>`            | 查询幂等调用的状态：`pending`、`done`（含结果）、`unknown`（不代表未执行）         |
-| `describe(options?)`                  | `Promise<对象>`         | 本地查询：身份、连接、方法目录                                                     |
-| `close()`                             | `Promise<void>`         | 立即拒绝新调用；已接受的调用执行完毕后关闭。重复调用返回同一个 Promise             |
-| `on(event, listener)`                 | `取消函数`              | 订阅真实 owner 的后续生命周期事实；取消可重复调用，不重放首次 ready                |
-| `[Symbol.asyncDispose]()`             | `Promise<void>`         | 原 `close` 函数本身，供 `await using` 释放作用域资源                               |
-
-调用选项：
-
-| 选项             | 说明                                                                       |
-| ---------------- | -------------------------------------------------------------------------- |
-| `timeoutMs`      | 截止时间；`false` 关闭默认超时，`0` 立即到期。受来源设置的单次调用上限约束 |
-| `signal`         | 取消，协作式                                                               |
-| `idempotencyKey` | 幂等键；同键重复调用复用保留的结果                                         |
-| `orderKey`       | 同一 `orderKey` 的调用在对端串行执行                                       |
-| `cancel`         | `'before-start'`：取消时若对端尚未开始执行则撤销，已开始则仍返回真实结果   |
-| `transfer`       | 仅线程：零拷贝转移的 `ArrayBuffer` 列表，需要协商相应能力                  |
-
-**同步抛错**：方法名、参数或选项不合法时，调用可能在返回 Promise 之前同步抛出。需要统一处理时，把整个调用表达式放进 `try` 块，而不只是在返回的 Promise 上 `.catch`。
-
-### 2.4 类型
-
-下面的独立 Node 示例使用真实 MessageChannel 载体，并在结束时释放两个端口。平台 Peer 的类型来自 Core，方法树与参数仍严格关联。
-
-```ts doc-test=run
-import { MessageChannel } from 'node:worker_threads'
-import { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'
-import { systemScheduler } from '@migaia/utils/scheduler'
-
-type IRemoteApi = {
-  math: { double: (value: number) => number }
-  feed: { count: (limit: number) => AsyncIterableIterator<number> }
-}
-/** 真实 MessagePort 是业务载体；创建方在最外层释放它们。 */
-const { port1, port2 } = new MessageChannel()
-try {
-  /** 双方在实际端口上确认能力，Peer 仍使用 Core 的同一套调用与类型规则。 */
-  const [peer, server] = await Promise.all([
-    createThreadPeer<IRemoteApi>({
-      self: { name: 'client', instanceId: 'client-1' },
-      connect: async (context) =>
-        createNodeThreadChannel(port1, 'server-1', {
-          scheduler: systemScheduler,
-          capabilities: context.capabilities
-        })
-    }),
-    createThreadPeer({
-      self: { name: 'server', instanceId: 'server-1' },
-      provide: {
-        math: { double: (value: number) => value * 2 },
-        feed: {
-          count: async function* (limit: number) {
-            for (let index = 1; index <= limit; index++) yield index
-          }
-        }
-      },
-      connect: async (context) =>
-        createNodeThreadChannel(port2, 'client-1', {
-          scheduler: systemScheduler,
-          capabilities: context.capabilities
-        })
-    })
-  ])
-  try {
-    console.log(await peer.request('math.double', 21)) // number：42
-    await peer.notify('math.double', 21) // 只确认发出，不确认业务完成
-    for await (const value of peer.stream('feed.count', 3)) console.log(value) // number：1、2、3
-    console.log(
-      await peer.group([
-        { method: 'math.double', payload: 2 },
-        { method: 'math.double', payload: 3 }
-      ])
-    ) // 顺序执行，得到两个步骤结果
-    console.log(await peer.outcome('not-issued')) // unknown 不能证明某个业务操作没有执行
-  } finally {
-    await Promise.all([peer.close(), server.close()])
-  }
-} finally {
-  port1.close()
-  port2.close()
-}
-```
-
-- 流式方法的返回类型要写成 `AsyncIterableIterator<T>`（或 `IterableIterator<T>`），这样 `stream` 才能识别它。
-- 不提供泛型时没有可调用的方法类型。需要按字符串动态调用时用 `IRuntimeDynamicSurface`：只放宽编译期检查，运行时仍按对端目录拒绝未知方法。
-- `IRuntimeSurface<THost, TPlugin>` 从 Host 与插件定义中提取纯类型，不产生运行时代码。
-
-### 2.5 作用域释放与真实生命周期事件
-
-首次 ready 已经包含在 `await createThreadPeer(...)` / `await createRuntimePeer(...)` 的完成里。`on('ready')` 从订阅时开始，只观察原 registration 后来真正接受的新代次。受监督的 Peer 从原 supervisor 获取 exit/restart/degraded；listener 的 ready 来自实际接受的 session。raw Peer 没有原生执行生命周期，不伪造 exit 或后续 ready。事件不是资源 disposer；释放仍用 `close` 或 `await using`。
-
-下面的 Node Worker 自然退出，由真实 supervisor 发布 exit；父线程等待该事实，然后由 `await using` 释放 Peer：
-
-```ts doc-test=run file=worker.ts
-import { createThreadPeer } from '@migaia/rpc-threads'
-
-await createThreadPeer({
-  provide: {
-    exit: () => {
-      // 先回复调用，再自然退出这个实际 Worker。
-      setTimeout(() => process.exit(0), 0)
-      return true
-    }
-  }
-})
-```
-
-```ts doc-test=run file=main.ts
-import { createThreadPeer } from '@migaia/rpc-threads'
-import type { IRuntimeEvent } from '@migaia/rpc-core/remote'
-
-type IWorkerApi = { exit(): boolean }
-/** 作用域结束时直接调用 Peer 原来的 close。 */
-await using worker = await createThreadPeer<IWorkerApi>({
-  spawn: new URL('./worker.js', import.meta.url)
-})
-/** 只等待原 supervisor 对实际 Worker 的退出观察，没有自造 ready 或 exit。 */
-const exited = new Promise<IRuntimeEvent>((resolve) => worker.on('exit', resolve))
-console.log(await worker.request('exit')) // true
-console.log((await exited).type) // exit
-```
-
-`Symbol.asyncDispose` 与 `close` 是同一函数引用，重复或并发调用保留同一个原 Promise。取消订阅不会停止 Worker；Peer 开始关闭时注销其事件订阅。listener 没有原生执行控制，raw Peer 也不会把逻辑关闭包装成原生 exit。
-
-## 3. Plugin 与 Host 出口
-
-`createRuntimePlugin`、本包的 `createCoroutinePlugin`，以及平台包的 `createProcessPlugin`、`createThreadPlugin` 返回可以用 `@migaia/plugin-host` 安装的插件。同一运行时家族的连接共享一个出口：`host.process`、`host.thread` 或 `host.coroutine`（名称见 `RuntimePluginKey`）。
-
-| 出口方法                                              | 说明                                                                                                                  |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `request` / `notify` / `stream` / `group` / `outcome` | 第一个参数是目标：连接名，或 `{ name, instanceId }` 精确指定实例；同名多实例无法唯一确定时拒绝                        |
-| `list(options?)`、`get(target, options?)`             | 本地查询连接、身份、代次、健康、退出信息；拿不到的事实返回 `unavailable`，不伪造为 0                                  |
-| `on(event, listener)`                                 | 订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`terminal`、`liquidated` |
-| `watch(options?)`                                     | 有界的事件异步迭代器；积压超过 100 条时报告 `RUNTIME_EVENT_OVERFLOW` 并结束                                           |
-| `broadcast(method, payload?, options?)`               | 对所有目标调用并汇总各自结果；不保证全部成功                                                                          |
-| `stop` / `kill` / `restart` / `replace`               | 只对由 spawn 或 coroutine task 创建的执行单元有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝              |
-
-- **`expose`**：插件默认不向对端公开本端 Host 的任何方法。用 `expose: ['feature.method', …]` 显式列出；只有列出的方法可见。
-- **目录就绪 ≠ 远端安装完成**：连接 ready 只说明方法目录已交换，不说明对端 Host 的某个插件安装事务已提交。需要等待远端安装完成时，用应用自己的确认信号。
-- **查询格式**：`list` / `get` / `describe` 默认返回对象；可选参数指定为文本格式输出。
-
-### Calls during install
-
-A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not.
-This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered.
-
-### 3.1 Coroutine task
-
-`createCoroutinePlugin({ name, task, supervisor? })` 是父模式：创建受监督的 task，每个代次拥有自己的 `MessageChannel`。Task 收到 `signal`、`heartbeat()` 与 opaque `connect`；子模式 `createCoroutinePlugin({ name, connect })` 只接入该连接，不创建执行单元。两模式都支持 `provide` 与 `expose`；使用 `expose` 时先安装本端 provider 插件，再安装 runtime 插件。
-
-```ts doc-test=run group=useguide-coroutine file=main.ts
-import { defineHost } from '@migaia/plugin-host'
-import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
-
-/** 父模式拥有 task 与每个代次的消息端口。 */
-const service = createCoroutinePlugin<{ math: { double(value: number): number } }>({
-  name: 'math',
-  task: async ({ connect, signal }) => {
-    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */
-    const parent = createCoroutinePlugin({
-      name: 'parent',
-      connect,
-      provide: { math: { double: (value: number) => value * 2 } }
-    })
-    /** Task 负责释放自己创建的子 Host。 */
-    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({
-      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-    })
-    try {
-      await childHost.use(parent)
-      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */
-      await new Promise<void>((resolve) => {
-        if (signal.aborted) resolve()
-        else signal.addEventListener('abort', () => resolve(), { once: true })
-      })
-    } finally {
-      await childHost.dispose()
-    }
-  }
-})
-/** 父 Host 释放时停止它拥有的 coroutine task。 */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-try {
-  await host.use(service)
-  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42
-} finally {
-  await host.dispose()
-}
-```
-
-`task` 与 `connect` 必须二选一；`connect` 只能使用当前 task 收到的值，不能传 `MessagePort`。父模式可通过 `supervisor` 配置现有监督策略，默认预算为每个插件一个 coroutine 单元。`host.coroutine.replace('math', { task: nextTask })` 更换任务；非函数 task 在替换前以 `INVALID_CONFIG` 拒绝，旧单元继续提供服务。
-
-Task resolve 产生正常退出，reason 为 `exited`；reject 产生崩溃，reason 为 `crashed`，后续处理遵循监督策略。终止重启链的错误通过 `terminal` 事件提供 `{ source, code }`，`name` 是插件连接名。Stop 的 signal 取消是协作式的，端口在 task 结束后关闭；忽略取消的 task 可延迟结束，预算租约保留到实际 settlement。Coroutine 共享父事件循环，无法强制停止阻塞事件循环的 task。
-
-## 4. Endpoint
-
-Endpoint 是更底层的 API：没有握手时的方法目录交换，调用按"目标 id + 方法名"路由。
-
-### 4.1 创建
-
-```ts doc-test=check
-import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'
-
-/** transport 由实际载体提供；返回的 Endpoint 由调用方 dispose。 */
-export function createClientEndpoint(transport: IRpcTransport) {
-  return createEndpoint({
-    id: 'client',
-    targetIds: ['server'],
-    transport,
-    middlewares: [connect({ transport })]
-  })
-}
-```
-
-| 配置          | 说明                                      |
-| ------------- | ----------------------------------------- |
-| `id`          | 本端稳定标识                              |
-| `targetIds`   | 已知的对端 id                             |
-| `transport`   | 载体                                      |
-| `middlewares` | 中间件列表（第 5 节）。两端的组合必须一致 |
-| `scheduler`   | 单调时钟与定时器；测试中可注入假时钟      |
-| `wallClock`   | 墙钟，只用于消息时间戳等诊断字段          |
-
-### 4.2 提供与调用
+id 是本端标识，客户端 targetIds 列出 server；transport 是各自的内存侧，middlewares 使用同侧 connect({ transport })，discoveryMode 默认 automatic；provide 的方法名为 double，context.data 是发送的 21，context.success 返回成功结果；send 的 target/method/data 都必填。
 
 ```ts doc-test=run
 import { connect, createEndpoint } from '@migaia/rpc-core'
@@ -332,9 +41,65 @@ const server = await createEndpoint({
   transport: right,
   middlewares: [connect({ transport: right })]
 })
-server.provide('add', (context) => {
-  const [a, b] = context.data as [number, number]
-  return context.success(a + b) // 或 context.failed('Invalid input', 'INVALID_INPUT')
+server.provide('double', (context) => context.success((context.data as number) * 2))
+const client = await createEndpoint({
+  id: 'client',
+  targetIds: ['server'],
+  transport: left,
+  middlewares: [connect({ transport: left })]
+})
+console.log(await client.send<number>('server', 'double', 21))
+await client.dispose()
+await server.dispose()
+left.close()
+```
+
+### 输出与边界
+
+```text
+42
+```
+
+输出 `42`；处理函数从 `context.data` 取得 `21`，成功结果经过真实端点与内存传输，兑现调用方的发送 Promise。
+
+该预设包含发送、处理函数登记、发现与控制；`connect` 绑定传输对象，内存消息异步交付且值仍共享引用。端点释放后借入的通道对仍打开，调用者须显式关闭。
+
+## 让并发答复回到各自的请求
+
+较慢请求先启动，后来的请求却先完成；若只维护一个“当前请求”槽，后一个结果可能交给错误的等待者。
+
+只按方法名匹配，无法区分同时调用的两个 `double`；假定答复顺序等于发送顺序，也会在处理任务乱序完成时失效。
+
+每次调用分别保留 `send` 的 Promise；处理函数用明确的完成门控制首个调用，客户端先取得第二个结果，再放行并等待第一个。
+
+### 本例参数
+
+构造与上例相同；两个 send 分别传入 2 和 5，每个 Promise 独立；started/release 只控制示例完成顺序，不增加计时器；本例未安装 timeout，中间件缺省时 Endpoint 使用 1000 毫秒 fallback。
+
+```ts doc-test=run
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({
+  id: 'server',
+  transport: right,
+  middlewares: [connect({ transport: right })]
+})
+let started!: () => void
+let release!: () => void
+const firstStarted = new Promise<void>((resolve) => {
+  started = resolve
+})
+server.provide('double', async (context) => {
+  const value = context.data as number
+  if (value === 2) {
+    started()
+    await new Promise<void>((resolve) => {
+      release = resolve
+    })
+  }
+  return context.success(value * 2)
 })
 const client = await createEndpoint({
   id: 'client',
@@ -342,674 +107,481 @@ const client = await createEndpoint({
   transport: left,
   middlewares: [connect({ transport: left })]
 })
-try {
-  const sum = await client.send<number>('server', 'add', [20, 22])
-  console.log(sum) // 42；data 必填，没有参数时传 null
-} finally {
-  await client.dispose()
-  await server.dispose()
-}
+const first = client.send<number>('server', 'double', 2)
+await firstStarted
+console.log(await client.send<number>('server', 'double', 5))
+release()
+console.log(await first)
+await client.dispose()
+await server.dispose()
+left.close()
 ```
 
-| 方法                                      | 说明                                                           |
-| ----------------------------------------- | -------------------------------------------------------------- |
-| `provide(method, handler)`                | 注册方法；返回 Endpoint，可链式调用                            |
-| `send<T>(target, method, data, options?)` | 调用并等待结果                                                 |
-| `sendAll<T>(method, data, options?)`      | 对所有已知对端调用，返回 `{ fulfilled, rejected }`，按对端分组 |
-| `dispatch(target, method, data)`          | 只发送，不等结果                                               |
-| `dispatchAll(method, data)`               | 对所有已知对端只发送                                           |
-| `group`、`outcome`                        | 与 Runtime Peer 相同（需要相应中间件与能力）                   |
-| `ping(target)`、`pingAll()`               | 安装 `ping()` 中间件后可用                                     |
-| `on(event, listener)`、`hooks.on(...)`    | 订阅事件与钩子                                                 |
-| `dispose()`                               | 释放：注销监听器，拒绝在途调用                                 |
+### 输出与边界
 
-`send` 的选项：`signal`、`timeoutMs`、`idempotencyKey`、`trace`、`transfer`。
-
-### 4.3 createRuntimeApiEndpoint：自定义 runtime Endpoint
-
-`createRuntimeApiEndpoint(config, channel)` 使用真实 channel 构造支持 runtime 调用（`group`、`outcome` 等）的 Endpoint，平台包内部以及 `endpointFactory` 自定义组装时使用。它同步返回 Endpoint，使用前先 `await endpoint.ready`。单参数形式只适用于 `createRuntimeApiEndpoint({ binding })`，由调用方提供完整的 owned binding operations。 该 facade 的重复与同步重入 `dispose()` 共享 facade 自己的首次结算 Promise，底层 `dispose` 只调用一次。
-
-| 配置                     | 说明                                                   |
-| ------------------------ | ------------------------------------------------------ |
-| `id`                     | 本端稳定标识，写入每条消息                             |
-| `targetIds`              | 已知对端 id                                            |
-| `transport`              | 载体；收到的正是所选 `framer` 的输出                   |
-| `scheduler`              | 单调时钟与定时器；同一实例也驱动插件宿主的期限         |
-| `wallClock`              | 墙钟，只用于消息时间戳等诊断字段                       |
-| `protocol`               | 协议描述，决定信封格式                                 |
-| `codec`                  | 编码器；输出必须正好是 `framer` 的输入                 |
-| `framer`                 | 分帧器；输出交给 `transport`                           |
-| `provider`               | 构造完成前就注册好的方法表                             |
-| `providerLimits`         | 入站并发上限，默认全局 256、每个对端 64                |
-| `idempotency`            | 幂等存储与会话作用域，只用于带 `idempotencyKey` 的调用 |
-| `replay`                 | 出站重放账本的上限                                     |
-| `replay.maxEntries`      | 保留的出站请求 id 数量，默认 4096                      |
-| `replay.ttlMs`           | 出站请求 id 的保留时间，默认 310 秒                    |
-| `middlewares`            | 中间件元组，构造时原子安装                             |
-| `features`               | 自定义功能模块元组                                     |
-| `construction`           | 构造过程的取消与期限                                   |
-| `construction.signal`    | 取消构造；已安装的中间件会被全部回滚                   |
-| `construction.timeoutMs` | 构造期限；`false` 表示不设期限                         |
-
-## 5. 中间件
-
-| 中间件                                               | 作用                                                                    |
-| ---------------------------------------------------- | ----------------------------------------------------------------------- |
-| `connect({ transport })`                             | 连接与对端发现；按载体的来源证明（`sourceProof`）过滤消息。几乎总是需要 |
-| `contract({ version, … })`                           | 业务契约：版本、可接受的版本、方法 schema 校验                          |
-| `protocol()`                                         | 启用标准协议帧                                                          |
-| `codec(descriptor)`                                  | 指定编码格式（例如二进制载体需要把消息编码为字节）                      |
-| `framer(descriptor)`                                 | 指定分帧方式                                                            |
-| `abort()`                                            | 允许取消在途调用                                                        |
-| `timeout({ timeoutMs })`                             | 默认超时                                                                |
-| `ping()`                                             | 启用心跳，提供 `ping` / `pingAll`                                       |
-| `authentication({ sign, verify, encrypt, decrypt })` | 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要                 |
-| `hooks({ listeners })`                               | 观察调用生命周期事件                                                    |
-| `uuid({ … })`                                        | 自定义消息 id 生成                                                      |
-
-中间件的配置项：
-
-| 中间件与配置                        | 说明                                                |
-| ----------------------------------- | --------------------------------------------------- |
-| `contract` 的 `version`             | 本端业务契约版本                                    |
-| `contract` 的 `acceptVersions`      | 额外接受的对端契约版本列表                          |
-| `contract` 的 `maxIdentifierLength` | discovery 的 targetId、receiverId、uniqueTargetId 与 variation id 长度上限；不限制方法名 |
-| `contract` 的 `schemas`             | 按方法名声明参数与结果的 schema，调用时校验         |
-| `authentication` 的 `encodedType`   | 受保护帧的编码类型：`any`、`string` 或 `uint8array` |
-| `hooks` 的 `onHookError`            | 钩子监听器抛错时的回调，不影响调用本身              |
-| `uuid` 的 `generate`                | 自定义消息 id 生成函数                              |
-
-`defineMiddleware` / `defineFeature` 用于编写自定义中间件与功能。自定义中间件适合日志、诊断、策略；新增协议级根能力不属于公开扩展面。
-
-## 6. 载体：内置 transport 与自定义 transport
-
-内置载体：
-
-| 入口                      | 函数                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `./adapters/memory`       | `createMemoryTransportPair()`：同一进程内的一对载体，用于测试与演示                              |
-| `./adapters/message-port` | `createNodeMessagePortTransport(port)`、`createBrowserMessagePortTransport(port, { ownership })` |
-| `./adapters/web-worker`   | `createWebWorkerTransport(port, options?)`：Dedicated Worker 或其 `self`                         |
-| `@migaia/rpc-browser`     | window、BroadcastChannel、SharedWorker、Service Worker、WebRTC、WebTransport                     |
-
-内置载体的选项：
-
-| 选项                                               | 说明                                                                                  |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `createBrowserMessagePortTransport` 的 `ownership` | `owned`（默认）：释放 Endpoint 时一并关闭端口；`borrowed`：只注销监听器，端口由你关闭 |
-| `createWebWorkerTransport` 的 `capabilities`       | 静态约定的能力列表；两端必须一致（该载体不做握手）                                    |
-| `createWebWorkerTransport` 的 `peerId`             | 对端标识                                                                              |
-
-自定义载体实现 `IRpcTransport`：
-
-| 成员                                    | 说明                                                           |
-| --------------------------------------- | -------------------------------------------------------------- |
-| `send(message, options?)`               | 发送一条消息                                                   |
-| `subscribe(listener)`                   | 订阅收到的消息，返回取消订阅函数                               |
-| `close?()`                              | 关闭                                                           |
-| `platform`                              | 平台标签（`RpcPlatform`）                                      |
-| `ownership?`                            | `owned`（释放时一并关闭底层资源）或 `borrowed`（只注销监听器） |
-| `topology?`                             | 单对端、多对端还是广播组                                       |
-| `sourceProof?(source, origin)`          | 多路复用载体用来证明消息确实来自预期对端                       |
-| `encodedType?`                          | 载体只接受字符串或字节时声明，以便配置相应 codec               |
-| `onTransportError?`、`onListenerError?` | 上报载体与监听器错误                                           |
-
-`./transport-kit` 提供编写载体常用的工具：监听器集合（`createMessageListenerHub`）、监听器失败的收集与上报、安全读取属性（`safeRead`）等。
-
-## 7. 按需组装：减小打包体积
-
-`createEndpoint` 包含全部能力。只需要部分能力时：
-
-| 入口         | 函数                     | 能力                                 |
-| ------------ | ------------------------ | ------------------------------------ |
-| `./client`   | `createClientEndpoint`   | 只发起调用                           |
-| `./provider` | `createProviderEndpoint` | 提供方法并保留出站调用                           |
-| `./full`     | `createFullEndpoint`     | 双向                                 |
-| `./composed` | `createComposedEndpoint` | 从 `./features/*` 中显式挑选功能模块 |
-
-`./features/*` 提供 `createOutboundFeature`、`createProviderFeature`、`createOneWayFeature`、`createDiscoveryFeature`、`createControlFeature`，`./stream` 提供流式与分片重组功能。`createProviderAdmissionScope` 用于让多个 Endpoint 共享同一组并发额度。
-
-## 8. 容量、并发与重放窗口
-
-**入站并发**：每个对端最多 64 个、全局最多 256 个同时执行的调用（request / notify / stream 都计入）。超出时调用方收到 `OVERLOADED`，对端函数不会被调用。可通过 `providerLimits` 调整，并用 `onRejected` 观察拒绝原因。调用方的 `OVERLOADED` 错误不包含具体原因；要区分是并发满还是其它准入原因，看对端的 `onRejected`。
-
-**重放窗口**：为了识别重复投递的消息，Core 会在一段时间内记住已完成的调用。
-
-- **进程与线程的原生独占通道**（由平台包的 launcher 建立）只记录在途调用，不受下面的速率限制。
-- **其它载体**（浏览器载体、BroadcastChannel、自定义载体）使用有界账本：出站每个 Endpoint 4096 条，入站每个对端 1024 条、全局 4096 条，每条保留 310000 ms。由此得到的**持续**速率上限约为：出站每个 Endpoint 13.2 次/秒，入站每个对端 3.3 次/秒、全局 13.2 次/秒。这是持续速率的上限，不是吞吐量：短时突发可以超过它，但总量受账本容量约束。高频场景请合并调用（批量参数或 `group`）。
-
-**幂等存储**：`createRpcIdempotencyStore({ retentionMs, maxEntries, maxEntriesPerScope, maxBytes, maxOutcomeBytes })` 创建有界的幂等结果存储，用于 `idempotencyKey` 去重与 `outcome` 查询。默认的内存存储在进程重启后会丢失，`outcome` 此时会报告连续性已中断。
-
-## 9. 高阶用法：编写一个适配器
-
-`@migaia/rpc-core/adapter` 提供 `defineMessageAdapter({ open, launch? })` 和 `defineByteAdapter({ open, listen?, dial? })`。定义完成后，用 `adapter.peer(options)` 创建独立 Peer，用 `adapter.plugin(options)` 安装到 Host。`open` 返回真实消息端口或有序字节 I/O；Core 继续完成原来的握手、能力协商、方法目录与收发。
-
-| 定义                   | 物理操作                                                             | 创建结果                      |
-| ---------------------- | -------------------------------------------------------------------- | ----------------------------- |
-| `defineMessageAdapter` | `open` 打开端口；可选 `launch` 调用运行时原有启动操作                | Peer 与 `host.thread` Plugin  |
-| `defineByteAdapter`    | `open` 打开字节流；可选 `dial` 拨号、`listen` 取得一条已接受的字节流 | Peer 与 `host.process` Plugin |
-
-下面是完整的第三方 MessagePort 适配器。它只用公开 SDK；两个原生端口由示例创建和关闭。
-
-```ts doc-test=run group=custom-message-adapter file=peer-main.ts entry=peer-main.ts
-import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { defineMessageAdapter } from '@migaia/rpc-core/adapter'
-
-/** 把调用方实际持有的端口交给 Core 的现有消息 owner。 */
-const adapter = defineMessageAdapter({ open: (port: MessagePort) => port })
-/** 原生端口由创建方持有，Peer.close() 释放借用的监听器。 */
-const { port1, port2 } = new MessageChannel()
-/** 显式地址用于这两个独立端口的对称路由。 */
-const [left, right] = await Promise.all([
-  adapter.peer<{ echo(value: number): number }>({
-    self: { name: 'left', instanceId: 'left' },
-    connect: port1,
-    peerId: 'right'
-  }),
-  adapter.peer({
-    self: { name: 'right', instanceId: 'right' },
-    connect: port2,
-    peerId: 'left',
-    provide: { echo: (value: number) => value }
-  })
-])
-try {
-  console.log(await left.request('echo', 42)) // 42
-} finally {
-  await Promise.all([left.close(), right.close()])
-  port1.close()
-  port2.close()
-}
+```text
+10
+4
 ```
 
-同一个定义也能构造真正的 Host Plugin。Host 的原安装批次管理连接与资源，插件只公开 `expose` 中的 Host 方法。
+逐行输出 `10`、`4`；参数为 `5` 的调用先于被暂挂的 `2` 完成，每个 Promise 仍取得各自输入的二倍值。
 
-```ts doc-test=run group=custom-message-adapter-host file=main.ts
-import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { defineHost } from '@migaia/plugin-host'
-import { defineMessageAdapter } from '@migaia/rpc-core/adapter'
+答复按操作身份关联，而非按完成先后分配；完成门只让顺序可观察，不添加计时器或自制传输实现。处理任务可能并发执行，业务状态仍需自行确定并发策略。
 
-/** 这个第三方定义只负责取得真实端口。 */
-const adapter = defineMessageAdapter({ open: (port: MessagePort) => port })
-/** 两个端口的物理生命周期仍由创建方持有。 */
-const { port1, port2 } = new MessageChannel()
-/** 服务端与 Host 安装并发开始，让原消息 owner 完成双向 ACK。 */
-const serving = adapter.peer({
-  self: { name: 'service', instanceId: 'service' },
-  connect: port2,
-  peerId: 'host',
-  provide: { echo: (value: number) => value }
-})
-/** 这个定义产生的真实 Plugin 交给原 Host 安装批次。 */
-const plugin = adapter.plugin<{ echo(value: number): number }>({
-  name: 'custom',
-  self: { name: 'host', instanceId: 'host' },
-  connect: port1,
-  peerId: 'service'
-})
-/** Plugin 元组把实际 thread 出口保留在 Host 类型上。 */
-const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-/** 与已经开始的服务端 Peer 并发安装，完成原双向握手。 */
-const installed = host.use(plugin)
-/** 服务端 Peer 与实际安装都完成后才发业务调用。 */
-const right = await serving
-try {
-  await installed
-  console.log(await host.thread!.request('custom', 'echo', 42)) // 42
-} finally {
-  await host.dispose()
-  await right.close()
-  port1.close()
-  port2.close()
-}
-```
+## 拒绝重复登记，并保留原处理函数
 
-`defineByteAdapter` 同样只接物理 I/O。下面用 Node 标准库的两条 PassThrough 演示有序双向字节流；握手、分帧和目录交换仍由 Core 完成。
+两条初始化路径登记了同一方法名；直接覆盖映射表，会悄悄替换第一个处理函数，改变后续调用执行的业务操作。
 
-```ts doc-test=run group=custom-byte-adapter file=main.ts
-import { PassThrough } from 'node:stream'
-import { defineByteAdapter } from '@migaia/rpc-core/adapter'
+没有登记准入检查时，第二个所有者无法得知自己接管了别人的方法，另建一份名称列表又可能与实际分派表脱节。
 
-/** 一端持有实际读流和写流，关闭时释放自己持有的两条流。 */
-type IStreams = Readonly<{ input: PassThrough; output: PassThrough }>
-/** 标准库流只提供字节读写；Core 负责协议和能力判断。 */
-const adapter = defineByteAdapter({
-  open: (streams: IStreams) => ({
-    kind: 'byte' as const,
-    write: (chunk: Uint8Array) =>
-      new Promise<void>((resolve, reject) => {
-        streams.output.write(chunk, (error) => (error ? reject(error) : resolve()))
-      }),
-    onData: (listener: (chunk: Uint8Array) => void) => {
-      streams.input.on('data', listener)
-      return () => {
-        streams.input.off('data', listener)
-      }
-    },
-    onClose: (listener: (reason?: unknown) => void) => {
-      streams.input.on('end', listener)
-      return () => {
-        streams.input.off('end', listener)
-      }
-    },
-    close: () => {
-      streams.input.destroy()
-      streams.output.destroy()
-    }
-  }),
-  listen: (streams: IStreams) => ({
-    kind: 'byte' as const,
-    write: (chunk: Uint8Array) =>
-      new Promise<void>((resolve, reject) => {
-        streams.output.write(chunk, (error) => (error ? reject(error) : resolve()))
-      }),
-    onData: (listener: (chunk: Uint8Array) => void) => {
-      streams.input.on('data', listener)
-      return () => {
-        streams.input.off('data', listener)
-      }
-    },
-    onClose: (listener: (reason?: unknown) => void) => {
-      streams.input.on('end', listener)
-      return () => {
-        streams.input.off('end', listener)
-      }
-    },
-    close: () => {
-      streams.input.destroy()
-      streams.output.destroy()
-    }
-  })
-})
-/** 两条真实流分别承载两个方向，顺序由标准库保持。 */
-const toLeft = new PassThrough()
-const toRight = new PassThrough()
-/** 一端发 hello，另一端在自己实际接收的流上 accept。 */
-const [left, right] = await Promise.all([
-  adapter.peer<{ double(value: number): number }>({
-    self: { name: 'left', instanceId: 'left' },
-    peerId: 'right',
-    connect: { input: toLeft, output: toRight }
-  }),
-  adapter.peer({
-    self: { name: 'right', instanceId: 'right' },
-    peerId: 'left',
-    listen: { input: toRight, output: toLeft },
-    provide: { double: (value: number) => value * 2 }
-  })
-])
-try {
-  console.log(await left.request('double', 21)) // 42
-} finally {
-  await Promise.all([left.close(), right.close()])
-}
-```
+直接在端点登记处理函数；同名的第二次 `provide` 抛出 `PROVIDER_DUPLICATED`，捕获这一配置失败后，再通过真实客户端调用原方法。
 
-`launch` 真的调用定义中提供的物理启动操作，并返回端口、`exited` 与 `terminate`。现有运行时可以把自己的 supervisor 的原启动结果交给它；重启、预算与原生退出观察继续属于那个 supervisor。Core 的消息 resource 在握手失败、冷启动取消及 Peer 关闭时，通过同一个 termination-once owner 释放这个实际句柄。rpc-process 与 rpc-threads 的完整 managed 来源仍交给原 supervision 与 generation owner。
+### 本例参数
 
-治理配置保留为 `peer` / `plugin` 的 `governor` 和 `scope` 选项。`governor` 使用原 rate、payload、连续超时与 idle 策略；其 disposer 挂在实际连接的 close owner 上。`adapter.scope(store?)` 创建原 provider scope，调用方共享它时，在所有 Peer 关闭后执行 `scope.close()`。作用域使用 Core 从实际连接捕获的认证 principal；普通借用端口的地址字符串不提供 principal。需要会话幂等作用域时，字节 responder 必须使用实际 `auth.verify`。
-
-`./adapter/internal-advanced` 保留原生 Process、Threads 与 JSON-RPC Bridge 仍需要的低级操作。第三方的起点是上面的两个定义函数；它们不接受成品 Peer、channel、已协商能力、可信身份或 ownership 声明。
-
-字节握手的 `auth.verify` 原始失败通过本地 `cause` 和可信 `report` 保留；发给对端的拒绝只含净化摘要，不序列化 verifier 的原始错误链。
-
-适配器自己的错误继续用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加自己的 source/code，并保留原错误在 `cause` 上；协议错误继续由原 Core/Contract owner 产生。
-
-## 10. 错误码与处理
-
-### 10.1 判断错误
-
-所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。
+provide 的方法名在同一端点必须唯一；第二次同步拒绝；send 无业务输入仍传必填 data: null；重复登记不覆盖原处理函数。
 
 ```ts doc-test=run
-import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'
-import { createPeerPair } from '@migaia/rpc-core/testing'
-
-/** 可执行的对端让超时例子不依赖未定义 peer。 */
-const pair = await createPeerPair({
-  a: { provide: {} },
-  b: {
-    provide: {
-      math: {
-        slow: async (ms: number) => {
-          await new Promise<void>((resolve) => setTimeout(resolve, ms))
-          return ms
-        }
-      }
-    }
-  }
-})
-try {
-  await pair.a.request('math.slow', 300, { timeoutMs: 50 })
-} catch (error) {
-  const { source, code } = error as { source?: string; code?: string }
-  if (isRpcTimeoutError(error)) {
-    console.error(code) // DEADLINE_EXCEEDED：对端可能仍在执行
-  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {
-    console.error(code) // 对端额度已满，函数未执行，可以退避重试
-  } else throw error
-} finally {
-  await Promise.all([pair.a.close(), pair.b.close()])
-}
-```
-
-- `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。
-- `isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。
-- 错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。
-
-公开错误形状使用 `IRpcError`；平台与拓扑值域使用 `IRpcPlatformValue`、`IRpcTransportTopologyValue`。工厂组合类型从实际调用结果推导，认证 nonce 由认证 owner 内部生成。
-
-### 10.2 Core 错误码
-
-source 均为 `@migaia/rpc/core`。
-
-| code                                               | 何时发生                                            | 建议处理                                                         |
-| -------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| `DEADLINE_EXCEEDED`                                | 超时（`TimeoutError`）                              | 对端可能已执行；有 `idempotencyKey` 时查 `outcome`，否则业务对账 |
-| `CANCELLED`                                        | 被取消（`AbortError`）                              | 同上；`before-start` 撤销成功时可确定未执行                      |
-| `OVERLOADED`                                       | 并发额度已满，函数未执行                            | 降低并发，带抖动退避后重试                                       |
-| `TRANSPORT`                                        | 载体失败或连接中断                                  | 调用可能已送达；恢复连接后先对账                                 |
-| `PROVIDER_NOT_FOUND`                               | 对端没有这个方法                                    | 检查方法路径与对端版本，不要盲目重试                             |
-| `PAYLOAD_INVALID`                                  | 参数不可移植、超限或二进制形状不支持                | 修正数据                                                         |
-| `SCHEMA_INVALID`                                   | 参数或结果不符合 schema                             | 修正数据                                                         |
-| `CONTRACT_INVALID`                                 | 方法、模式或幂等键使用不合法                        | 修正调用；不要换一个幂等键重发可能已执行的调用                   |
-| `PROTOCOL_INVALID`                                 | 收到不合法的协议消息                                | 修正协议实现或版本                                               |
-| `CAPABILITY_UNSUPPORTED`                           | 使用了对端未协商的能力                              | 改用受支持的方式；库不会静默降级                                 |
-| `CAPABILITY_CONFLICT`                              | 能力或实例归属有歧义，或对借用连接执行 stop/restart | 修正装配或指定实例                                               |
-| `INVALID_CONFIG`                                   | 配置或选项不合法（包括进程调用传 `transfer`）       | 修正配置                                                         |
-| `TARGET_UNKNOWN`                                   | 出口中找不到目标                                    | 重新读取可用目标                                                 |
-| `TARGET_NOT_IDENTIFIABLE`                          | 同名多实例无法唯一确定                              | 用 `{ name, instanceId }` 精确指定                               |
-| `ENDPOINT_DISPOSED`                                | Endpoint 已释放                                     | 新建；已发出的调用仍按原结果对账                                 |
-| `AUTHENTICATION_FAILED`                            | 认证失败                                            | 修正凭据或重建会话；不会自动重放旧消息                           |
-| `STREAM_RESULT_UNKNOWN`                            | 流中断，已交付的项之外结果未知                      | 业务对账后再开新流，不重放已交付的项                             |
-| `IDEMPOTENCY_RESULT_UNAVAILABLE`                   | 业务已执行，但结果未被保留                          | 对账；不要换键重执行                                             |
-| `PROVIDER_GENERATION_MISMATCH`                     | 目标代次不匹配                                      | 重新选择目标                                                     |
-| `PROVIDER_GENERATION_RETIRED`                      | 目标代次已退役；转发中的调用可能已执行              | 用 `outcome` 或业务对账，不要仅凭此码重执行                      |
-| `FORWARD_LOOP`、`FORWARD_HOP_LIMIT`                | 转发成环 / 超过三跳                                 | 修正转发路径，或改为直接连接                                     |
-| `PROVIDER_DUPLICATED`                              | 重复注册同名方法                                    | 修正注册                                                         |
-| `PROVIDER_NOT_SETTLED`                             | 提供方函数没有完成（未调用 success / failed）       | 修正提供方实现                                                   |
-| `PROVIDER_CONTEXT_EXPIRED` | 过期 context 的 `success` / `failed` 返回 `ok:false` 与此码 | 检查返回值；修正提供方生命周期 |
-| `MIDDLEWARE_DUPLICATED`、`MIDDLEWARE_MISSING`      | 中间件重复或缺失                                    | 修正 Endpoint 组装                                               |
-| `CHUNK_INVALID`                                    | 分片重组失败                                        | 修正分帧或载体                                                   |
-| `PROPERTY_READ_FAILED`、`STRING_CONVERSION_FAILED` | 读取属性的 getter 抛错 / 无法转为字符串             | 修正输入对象                                                     |
-| `CALLBACK_FAILED` | 冷 Probe stage listener、中间件安装或诊断 reporter 失败 | 检查原错或 cause；reporter 失败进入既有宿主异常队列 |
-| `INTERNAL`                                         | 内部错误                                            | 按 `cause` 处理，默认不自动重试                                  |
-
-认证拒绝使用 `code: AUTHENTICATION_FAILED`；`error.reason` 为 `RpcAuthenticationRejectionReason.sessionUnknown`（丢弃会话缓存后重新发现）或 `challengeInvalid`（修正帧格式）。
-
-手动 `connect.query` 的取消拒绝是带 `CANCELLED` 的原生 `DOMException` / `AbortError`，`cause` 指向调用方的 `signal.reason`。
-
-### 10.3 Remote 错误码
-
-source 均为 `@migaia/rpc/remote`。
-
-| code                      | 何时发生                           | 建议处理                                               |
-| ------------------------- | ---------------------------------- | ------------------------------------------------------ |
-| `REMOTE_START_FAILED`     | 来源未能建立连接（包括握手被拒绝） | 查看 `cause`；确认没有发出业务调用后可重新建立         |
-| `REMOTE_CLOSED`           | 连接或代次已关闭                   | 重新选择目标；已发出的调用先对账，不要自动转投同名后继 |
-| `REMOTE_RESULT_UNKNOWN`   | 调用结果未知                       | 业务可能已执行；查 `outcome` 或对账                    |
-| `REMOTE_CONTRACT_INVALID` | 目录或契约不合法                   | 修正契约                                               |
-| `REMOTE_HOST_NOT_ADOPTED` | 远端 Host 控制未被该连接采纳       | 先完成对应的 `hostUse`                                 |
-| `RUNTIME_EVENT_OVERFLOW`  | `watch` 积压超过 100 条            | 先用 `list` / `get` 查询当前状态，再重新订阅           |
-
-### 10.4 跨进程传递错误
-
-`serializeRpcError` / `deserializeRpcError`（包根）在 Core 层传递错误时使用：它们保留 Core 的脱敏与转发路由信息。错误树的结构、校验与 JSON-RPC 映射见 [rpc-contract USEGUIDE 第 9 节](../rpc-contract/USEGUIDE.md#9-高阶用法跨进程与跨语言传递错误)。
-
-对端抛出的业务错误会还原为原生类型并保留 `message`、`stack` 与 `cause` 链。来自对端的 source / code 只用于诊断，不会被当作本地库的错误身份，也不授予任何控制权限。
-
-## 11. 二进制、转发与重试
-
-**二进制**
-
-- `ArrayBuffer` / `Uint8Array` 需要双方协商二进制能力；平台包的默认配置已启用。`Uint8Array` 的 offset 与 length 保持不变。
-- 内联传输时只携带视图可见的字节；原生清单（线程）保留完整的底层 buffer 并以摘要校验。
-- `SharedArrayBuffer`、`Atomics` 与其它 TypedArray 不支持。
-- **transfer**（仅线程）：消息真正提交时 buffer 才失效，之后即使失败也不能恢复；带 transfer 的调用不会自动重试，库不保留输入副本。需要签名认证配置，未满足时以 `CAPABILITY_UNSUPPORTED` 拒绝，不会降级为复制。
-
-**转发**
-
-插件可以用 `expose` 公开它已接受连接的方法前缀，让第三方经它转发调用。每一跳固定当时的目标代次，最多三跳，成环或超过时拒绝。最终提供方认证的是直接上一跳，而不是最初的调用者。中继不缓存业务结果。
-
-**重试原则**
-
-先看 `(source, code)` 与调用进行到了哪一步。只有能独立确认对端没有执行时（例如 `OVERLOADED`、`before-start` 撤销成功），才可以直接重试。超时、断线、`unknown`、连接恢复都不能证明未执行：给调用加 `idempotencyKey`，失败后用 `outcome(key)` 查询，或按业务规则对账。退避与总时间预算由调用方控制。
-
-## 12. 常见问题
-
-**`notify` 成功了，对端却没执行？**
-`notify` 只保证已发出。需要确认时用 `request`。
-
-**为什么我的调用同步抛错了？**
-参数、方法名或选项在发出前就不合法。把调用放进 `try` 块。
-
-**浏览器载体上高频调用被拒绝？**
-非独占载体的重放账本有持续速率上限（第 8 节）。合并调用，或改用原生独占通道。
-
-**能自己定义新的协议级能力吗？**
-不能。自定义中间件可以做日志、诊断、策略；新的根能力需要在 Core 内实现。
-
-## 13. Probe
-
-`@migaia/rpc-core/probe` 是运行时无关的观察契约入口，导出阶段、方向、kind、outcome 的数值常量与同顺序名称表，以及 `defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey`、`probePlugin`、`readProbeStages`、`subscribeProbeStages`，以及既有 `hostRethrowReporter` / `IpcReporterContext` reporter。
-
-Core Peer 的 `probe` 与 Endpoint 的 `probePlugin` 安装同一 emitter。事件同步交给所订阅的 Probe；throw、reject、redact 或 describe 失败通过 `onError` 报告 `PROBE_FAILED`，原始错误留在 `cause`，不进入业务管道。没有 `onError` 时使用宿主 reporter。Process、Thread、Browser Peer、pool member 与 managed spawn 均转发原 Probe 引用；监督退出与重启由既有生命周期 owner 发出 peer 事件。
-
-### 13.1 定义与交入 Peer
-
-```ts doc-test=run group=useguide-probe-peer file=main.ts
-import assert from 'node:assert/strict'
-import { MessageChannel } from 'node:worker_threads'
-import { createThreadPeer, createNodeThreadChannel } from '@migaia/rpc-threads'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
-
-/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */
-const host = { name: 'metrics' }
-/** 同步计数确认示例实际收到了元数据，未保留复用 view。 */
-let observedEvents = 0
-/** 此 Probe 只读 message 元数据，不捕获业务内容。 */
-const probe = defineProbe(
-  {
-    stages: ['message'],
-    emit(view) {
-      observedEvents += 1
-      console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
-    }
-  },
-  host
-)
-console.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'
-
-/** 创建方拥有实际 MessagePort；Peer 只负责自己的 Endpoint。 */
-const { port1, port2 } = new MessageChannel()
-try {
-  const [client, server] = await Promise.all([
-    createThreadPeer<{ echo(value: string): string }>({
-      self: { name: 'client', instanceId: 'probe-client' },
-      probe,
-      connect: async (context) =>
-        createNodeThreadChannel(port1, 'probe-server', {
-          scheduler: systemScheduler,
-          capabilities: context.capabilities
-        })
-    }),
-    createThreadPeer({
-      self: { name: 'server', instanceId: 'probe-server' },
-      provide: { echo: (value: string) => value },
-      connect: async (context) =>
-        createNodeThreadChannel(port2, 'probe-client', {
-          scheduler: systemScheduler,
-          capabilities: context.capabilities
-        })
-    })
-  ])
-  await using observed = client
-  await using provider = server
-  assert.equal(await observed.request('echo', 'ready'), 'ready')
-  assert.ok(observedEvents > 0)
-} finally {
-  port1.close()
-  port2.close()
-}
-```
-
-`probe` 可以是单个 handle 或 readonly 数组。`defineProbe` 在定义时验证选项并编译 `stageMask`、`captureMask`、`methods` 与 `sampleThreshold`；返回对象被冻结，私有状态保留原 `definition.emit` callback。定义失败抛出原生 `TypeError`，带 `@migaia/rpc/core` / `INVALID_CONFIG`。
-
-调用方已有对象需要同时提供其它 API 时，使用 revision 2 的 `defineProbe(definition, host)`。它直接为 `host` 添加 Probe 字段，以该对象的身份注册私有状态，然后冻结 `host`；返回类型为 `THost & IRpcProbe`，不复制或合并到另一个对象。原有成员与引用保持不变，省略 `host` 的形式仍返回独立 handle。
-
-```ts doc-test=check
-import { defineProbe } from '@migaia/rpc-core/probe'
-
-/** 已有对象的额外成员不参与 Core 热路径的状态读取。 */
-const host = { name: 'metrics' }
-/** definition 与 host 直接注册在同一对象身份下，不复制 host。 */
-const probe = defineProbe(
-  {
-    stages: ['message'],
-    emit(view) {
-      console.log(view.seq)
-    }
-  },
-  host
-)
-console.log(probe === host, Object.isFrozen(host), probe.name)
-```
-
-`host` 必须为可扩展、未冻结的非 null 对象，不能已经拥有 `stageMask`、`captureMask`、`methods`、`sampleThreshold`、`setStages`，也不能已经注册为 Probe。所有验证在修改对象之前完成；失败以 `TypeError` / `INVALID_CONFIG` 拒绝，`host` 不变。已有 `host.emit` 允许保留，附加操作不会覆盖它；Probe 私有状态使用 `definition.emit`。后续 emitter 在安装时从私有 WeakMap 读取编译状态，放入自己的固定形状记录；热路径读取该记录，不读取带额外成员的 `host`。
-
-| 配置                          | 契约                                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `stages`                      | 定义时必须为非空的已知阶段名称数组                                                                      |
-| `capture`                     | 默认关闭；定义时必须为 `stages` 子集                                                                    |
-| `redact`                      | 处理显式捕获的内容；不会因此开启未选择阶段的 capture                                                    |
-| `methods`                     | 只过滤携带 method 的 `message` 与 `envelope`；没有 method 的 variation 通过该过滤，其它阶段只按采样过滤 |
-| `sample`                      | 范围 `(0, 1]`，默认全部；阈值在定义时计算                                                               |
-| `describe`、`emit`、`onError` | 描述、同步事件消费者与错误报告 callback                                                                 |
-
-`rpcProbeSampleKey(senderId, messageId)` 对二者拼接后的 UTF-8 字节计算 FNV-1a 32 位键。调用方与接收方使用相同标识，所以同一交互的两侧采样决定一致；它不是认证机制或唯一身份。
-
-`IRpcProbeEventView.variation` 在 variation envelope 的 `message` 与 `envelope` 事件中保留原 `route.variation` 字符串引用，包括 `ping`、`pong`、`close`、`abort` 与已注册的用户 subtype。`abort` 的 kind 仍为 `cancel`，其余 variation 为 `control`；request、response 与其它阶段的 variation 为 `undefined`。`methods: ['echo']` 保留 echo 的方法事件及没有 method 的 variation，排除其它 method；variation 仍受已配置的采样规则约束。
-
-### 13.2 View 生命周期与内容捕获
-
-每个 emitter 复用固定形状的 `IRpcProbeEventView`。只能在同步 `emit` 中读取它；需要稍后读取时使用快照：
-
-```ts doc-test=check
-import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
-
-/** 此示例选择保留事件；分配发生在消费者，而非 Core 观察点。 */
-const saved: Readonly<IRpcProbeEventView>[] = []
-/** 内容捕获按 frame/protected 显式启用，随后统一脱敏。 */
-const probe = defineProbe({
-  stages: ['frame', 'protected'],
-  capture: ['frame', 'protected'],
-  redact() {
-    return '<redacted>'
-  },
-  emit(view) {
-    // 调用方显式请求顶层事件快照。
-    saved.push(snapshotProbeEvent(view))
-  }
-})
-
-probe.setStages([]) // 暂停，captureMask 保持原值。
-probe.setStages(['frame', 'protected']) // 恢复选定阶段。
-```
-
-`snapshotProbeEvent` 是显式复制请求：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界，或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。
-
-`protected` 仅在认证保护路径存在时产生；没有该能力的路径不会伪造该阶段。内容捕获包括 protected 内容都必须显式启用。Descriptor 的 `stageMask` 描述 endpoint 能产生且当前已订阅的阶段，不证明所有路径都会经历每个阶段。
-
-`sizeBytes` 只读取已知的原生字节 backing/view 长度。所有字符串与 opaque container 均为 `-1`，包括 string transport；metadata 不扫描、编码或规范化 payload。Byte carrier 复用其现成 frame 长度。各载体与 Core 复用 `adapter/internal-advanced` 的 `carrierSizeBytes` owner。
-
-`setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。`readProbeStages(probe)` 读取当前有效 mask；`subscribeProbeStages(probe, listener)` 在每次实际变更后通知一次，返回可重复调用的释放函数。两者用于冷控制边界，不加入消息热路径。
-
-### 13.3 Endpoint 安装与生命周期
-
-Endpoint 用户在激活前安装 `probePlugin`。Peer 用户只需传入 `probe`。Core 在激活后交付一次 descriptor；只有载体实际提供 `observe` 才调用它，释放函数由现有 resource scope 在关闭时执行。Peer 阶段覆盖 handshake、ready、exit、restart、directory 与 closing。冷 `subscribeProbeStages` listener 抛错时，`setStages` 仍先通知其余 listener，使已安装 emitter 采用新 mask，再传播 `CALLBACK_FAILED`；单个可附码原生错误保留身份。
-
-`setStages([])` 暂停后不再构造所选事件；关闭后不再发送事件。
-
-```ts doc-test=run group=useguide-probe-endpoint file=main.ts
-import assert from 'node:assert/strict'
 import { connect, createEndpoint } from '@migaia/rpc-core'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
 
-/** 在同步回调中读标量，不保留复用 view。 */
-let events = 0
-const probe = defineProbe({
-  stages: ['message'],
-  emit() {
-    events += 1
-  }
-})
 const [left, right] = createMemoryTransportPair()
 const server = await createEndpoint({
   id: 'server',
   transport: right,
   middlewares: [connect({ transport: right })]
 })
-server.provide('echo', (context) => context.success(context.data))
+server.provide('version', (context) => context.success('原处理函数'))
+try {
+  server.provide('version', (context) => context.success('替换处理函数'))
+} catch (error) {
+  console.log((error as { code: string }).code)
+}
 const client = await createEndpoint({
   id: 'client',
   targetIds: ['server'],
   transport: left,
-  middlewares: [probePlugin(probe), connect({ transport: left })]
+  middlewares: [connect({ transport: left })]
+})
+console.log(await client.send('server', 'version', null))
+await client.dispose()
+await server.dispose()
+left.close()
+```
+
+### 输出与边界
+
+```text
+PROVIDER_DUPLICATED
+原处理函数
+```
+
+逐行输出 `PROVIDER_DUPLICATED`、`原处理函数`；重复登记被同步拒绝，没有覆盖第一个处理函数。
+
+方法名由应用约定，在同一端点内必须唯一；这不提供热替换，也不会自动重试失败初始化。释放端点以清理登记，再单独关闭调用者拥有的通道对。
+
+## 释放端点，同时保留借入的传输通道
+
+组件结束 RPC 工作时，另一个所有者仍在管理物理通道；若把端点清理等同于无条件关闭传输资源，就可能过早拆掉共享资源。
+
+包装器拥有调用 `close` 的能力，并不代表它拥有底层资源；资源创建与端点订阅可能属于不同所有者，生命周期也不同。
+
+内存通道对声明借用关系；先释放端点并检查两侧 `closed`，再由创建通道对的调用者显式执行最终关闭。
+
+### 本例参数
+
+createMemoryTransportPair() 无选项，默认原生微任务交付；它声明 ownership: borrowed、topology: exclusive；endpoint.dispose 不关闭 pair，left.close 无参数且会关闭双方。
+
+```ts doc-test=run
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+
+const [left, right] = createMemoryTransportPair()
+const endpoint = await createEndpoint({
+  id: 'local',
+  transport: left,
+  middlewares: [connect({ transport: left })]
+})
+await endpoint.dispose()
+console.log(left.closed, right.closed)
+left.close()
+console.log(left.closed, right.closed)
+```
+
+### 输出与边界
+
+```text
+false false
+true true
+```
+
+逐行输出 `false false`、`true true`；端点释放后两侧借入通道仍打开，随后显式关闭一侧会关闭整个内存通道对。
+
+这是当前适配器的所有权规则，不能推广到所有传输对象；端点订阅与在途操作仍会清理。拥有型传输对象可在释放时关闭，应按实际适配器契约确定关闭责任。
+
+## 只覆盖某次请求的继承期限
+
+多数调用共用等待预算，但已过期请求应立即失败，明确的长任务又需要取消期限；修改共享超时配置会影响无关工作。
+
+在 `send` 外另做计时竞速，会让请求登记与远端等待不知道该期限；把 `false` 与省略选项当成同一值，也会丢失调用者明确取消期限的选择。
+
+安装 `timeout({ timeoutMs: 5000 })`，再逐次为 `send` 覆盖 `timeoutMs`；零预算在提交请求前拒绝，`false` 取消当前调用期限，不改变已安装默认值。
+
+### 本例参数
+
+timeout 配置默认 {}，本例 timeoutMs: 5000；单次 timeoutMs: 0 发送前到期，false 取消当前期限，省略则继承；有限非负数（含小数）或 false 合法；timeout({}) 无期限，完全未装中间件时 fallback 为 1000 毫秒。
+
+```ts doc-test=run
+import { connect, createEndpoint, timeout } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({
+  id: 'server',
+  transport: right,
+  middlewares: [connect({ transport: right })]
+})
+server.provide('double', (context) => context.success((context.data as number) * 2))
+const client = await createEndpoint({
+  id: 'client',
+  targetIds: ['server'],
+  transport: left,
+  middlewares: [connect({ transport: left }), timeout({ timeoutMs: 5000 })]
 })
 try {
-  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')
-  assert.ok(events > 0)
-} finally {
-  await client.dispose()
-  await server.dispose()
+  await client.send('server', 'double', 21, { timeoutMs: 0 })
+} catch (error) {
+  console.log((error as { code: string }).code)
 }
+console.log(await client.send('server', 'double', 21, { timeoutMs: false }))
+await client.dispose()
+await server.dispose()
+left.close()
 ```
 
-### 13.4 Revision 3 的关联边界
+### 输出与边界
 
-`IRpcProbeEventView.carrierSeq` 是同一 emitter 的 inbound carrier 序号；没有链接时为 `-1`。Core 在同步 receive 入口取走它，并沿原 physical record 穿过异步 unprotect/decode。Collector 在读取时，按原 endpoint 字符串及 source 序号转换为自己的全局 wire 序号，无链接字段省略。尚未解析的 origin 若已从主环、record 与 watch 的所有保留窗口淘汰，首次读取不能恢复该链接；已读取解析的链接在其 dependent 行仍保留时继续有效。读取时观察到同一 endpoint 的 source 序号重置，会给旧 origin 保留 cutoff，阻止其关联 cutoff 后的新行，同时保留历史链接；collector 不在摄取时维护额外 generation 历史。
-
-Outbound carrier 借用本次 send 的原 envelope，携带 messageId、senderId、targetId、trace；同步 send 返回后立即清空。仓库载体都在 send 内同步 emit；第三方载体若跨异步间隙再 emit，没有这份 context。Physical batch 使用其第一个实际成员作代表，不展开 payload 成员。
-
-Byte 业务 receive 的 carrier 事件在实际交付 Core 前发出。启动时排队的帧在交付时各发一次，时间是交付时间；关闭或溢出前未交付的业务帧不发业务 carrier 事件。Byte detail 是复用引用：`frameBytes` 是当前帧跨度，`drainMs` 初始 `-1`，native writer 的真实 false/drain 随后更新最近借用 detail；观察本身不改变原 write settlement，也不追加异步 carrier 事件。
-
-`probePlugin` 保留 fast/native/batch/chunk 选择。Fast-capable descriptor 仍包含可能产生的 frame 阶段，单次 fast send 不伪造 frame。认证 descriptor 从既有配置读取 sign 或 encrypt-sign。
-
-采样在解密前没有 sender/message identity；不能保证与后续逻辑阶段采用相同 key。Native Peer 调用选项不携带 trace，应用在自己的 Endpoint.send 边界显式传递已有 trace。多块消息完成解码前的匿名 carrier/protected/frame 当前不能全部归入 hub interaction；完成解码的最后一块可通过 carrierSeq 关联，前序原始记录保留，不猜测身份。
-
-捕获容器中的 nested transferable 保留原引用，不遍历 getter、不深扫描或复制；其成员可能在实际 transfer 后分离。只有直接捕获且确会分离的 backing/view 才保存字节。
-
-```ts doc-test=check
-import { defineProbe, readProbeStages, subscribeProbeStages } from '@migaia/rpc-core/probe'
-
-/** 冷控制读取实际订阅；host 的初始公开字段不作为当前状态。 */
-const probe = defineProbe({ stages: ['message'], emit() {} }, {})
-/** 解除控制订阅不改变业务资源或 Probe 身份。 */
-const release = subscribeProbeStages(probe, () => console.log(readProbeStages(probe)))
-probe.setStages(['message', 'carrier'])
-console.log(readProbeStages(probe)) // 66
-release()
+```text
+DEADLINE_EXCEEDED
+42
 ```
 
-### Controlling asynchronous memory delivery
+逐行输出 `DEADLINE_EXCEEDED`、`42`；首个调用已无剩余预算，第二个明确取消本地期限并取得处理结果。
 
-```ts
+`timeout({})` 的期限配置为 `undefined`，完全不安装插件时 Core 则回退到 `1000` 毫秒；取值须为有限非负毫秒或 `false`。期限限制等待，不能抢占同步业务代码。
+
+## 让已经运行的处理函数协作停止
+
+调用者离开页面时，处理任务已经启动；若只拒绝本地 Promise，远端操作没有收到取消信号，仍会继续消耗资源。
+
+外部 Promise 竞速无法通知处理方停止哪项在途操作；反过来，若认为取消能打断任意用户代码，又超出了信号本身的能力。
+
+在两端安装 `abort()`，向 `send` 传入 `AbortController` 信号；等处理函数已启动后取消调用方，处理函数收到 `context.signal` 取消通知后自行结束。
+
+### 本例参数
+
+abort() 无参数，两端安装；send 的 signal 默认 undefined，本例使用真实 AbortController；context.signal 属于该次提供方调用，处理函数收到取消后自行结束，controller.abort 不抢占同步代码。
+
+```ts doc-test=run
+import { abort, connect, createEndpoint } from '@migaia/rpc-core'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { createManualScheduler } from '@migaia/utils/testing';
 
-const clock = createManualScheduler()
-const [sender, receiver] = createMemoryTransportPair({ scheduler: clock })
-const messages: unknown[] = []
-const stop = receiver.subscribe(({ data }) => { messages.push(data) })
-sender.send('payload')
-clock.advance(0)
-console.log(messages) // ['payload']
-stop()
-await sender.close()
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({
+  id: 'server',
+  transport: right,
+  middlewares: [connect({ transport: right }), abort()]
+})
+let started!: () => void
+let stopped!: () => void
+let providerSawAbort = false
+const providerStarted = new Promise<void>((resolve) => {
+  started = resolve
+})
+const providerStopped = new Promise<void>((resolve) => {
+  stopped = resolve
+})
+server.provide('wait', async (context) => {
+  started()
+  await new Promise<void>((resolve) => {
+    context.signal.addEventListener(
+      'abort',
+      () => {
+        resolve()
+      },
+      { once: true }
+    )
+  })
+  providerSawAbort = context.signal.aborted
+  stopped()
+  return context.success(null)
+})
+const client = await createEndpoint({
+  id: 'client',
+  targetIds: ['server'],
+  transport: left,
+  middlewares: [connect({ transport: left }), abort()]
+})
+const controller = new AbortController()
+const outcome = client.send('server', 'wait', null, { signal: controller.signal }).then(
+  () => 'fulfilled',
+  (error: unknown) => (error as { code: string }).code
+)
+await providerStarted
+controller.abort()
+console.log(await outcome)
+await providerStopped
+console.log(providerSawAbort)
+await client.dispose()
+await server.dispose()
+left.close()
 ```
 
-This is a deterministic in-process adapter example. The factory returns both transport ends, not one endpoint transport. Its optional scheduler is captured before subscriptions are acquired. Zero-argument construction keeps the original delivery-before-later-Promise order. Remote bindings and provider governors defer through their own already captured scheduler; custom clocks own those control jobs as well as timers. An old two-method clock receives deferred jobs through schedule(callback,0); drive it while awaiting manually controlled setup/readiness. Deferred notifications keep their existing post-close checks and callback error reporting.
+### 输出与边界
+
+```text
+CANCELLED
+true
+```
+
+逐行输出 `CANCELLED`、`true`；调用方以取消码拒绝，独立的处理完成门确认正在运行的处理函数已观察到取消信号。
+
+`abort()` 没有选项，启用远端协作取消；处理函数须观察信号并自行释放资源，同步工作不会被抢占。预先取消时的本地准入拒绝属于 Core 行为，不能单独证明远端取消。
+
+## 契约细节
+
+### 分层、安装与入口
+
+本包拥有运行时中立的 RPC 调用、路由、取消、期限、准入、错误还原与生命周期语义，不创建操作系统进程或 Worker，也没有 node: 导入。Coroutine 使用受支持宿主的全局 MessageChannel，在当前事件循环运行。Process、Threads、Browser 等平台包依赖这一内层，线上格式归 rpc-contract。
+
+安装时显式添加 @migaia/rpc-core 与其 peer 依赖 @migaia/rpc-contract；不要把工作区当前同版本误读为运行时的版本相等校验。其余直接依赖为 event-subscriber、lifecycle、plugin-host、serialize、supervision、utils。Node 引擎要求 >=18。运行时/平台工厂的具体可用性仍取决于宿主能力。
+
+| 入口                                                           | 用途                                                                                          |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 根入口                                                         | createEndpoint（即 createFullEndpoint）、createFullOneWayEndpoint、中间件、错误守卫与幂等存储 |
+| ./remote                                                       | Runtime Peer、受管理 Peer、Runtime/Coroutine 插件、契约、出口和事件                           |
+| ./testing                                                      | createPeerPair，在真实内存载体上组装两个原 Peer，不是 Endpoint 替身                           |
+| ./client / ./provider / ./full / ./composed                    | 客户端、提供方、双向与显式 Feature 组合工厂                                                   |
+| ./features/outbound / one-way / provider / discovery / control | 为组合工厂选择根能力                                                                          |
+| ./stream                                                       | 流式与分片功能                                                                                |
+| ./adapters/memory                                              | createMemoryTransportPair                                                                     |
+| ./adapters/message-port                                        | Node 与浏览器 MessagePort transport                                                           |
+| ./adapters/web-worker                                          | Dedicated Worker / self transport                                                             |
+| ./plugins/log / send-queue / flow-control                      | 可选诊断与发送策略中间件                                                                      |
+| ./transport-kit / ./transport-constants                        | 自定义载体的工具、平台/拓扑/归属值                                                            |
+| ./adapter                                                      | defineMessageAdapter / defineByteAdapter，适配器作者的任务级定义                              |
+| ./adapter/internal-advanced                                    | 原生 Process、Threads、Bridge 需要的低级接入，不是常用起点                                    |
+| ./probe                                                        | 同步观察、阶段常量、快照、采样和 Endpoint 安装                                                |
+
+| 应用任务                                       | 入口选择                                               |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| 子进程、本机进程或 Python/Go/Rust 服务         | rpc-process                                            |
+| Worker 线程                                    | rpc-threads                                            |
+| 当前进程内受监督任务                           | remote 的 createCoroutinePlugin                        |
+| iframe、SharedWorker、可靠有序 RTCDataChannel  | rpc-browser 的 createBrowserPeer                       |
+| 标签广播、ServiceWorker、WebTransport datagram | rpc-browser transport 加本包 Endpoint                  |
+| 已有 MessagePort 或 Dedicated Worker           | 本包 adapters/message-port 或 adapters/web-worker      |
+| 新平台、新物理 I/O                             | 本包 adapter；测试内对端可用 testing 的 createPeerPair |
+
+发布保留 dist 与 schema，以及以上 24 个实际导出路径；根入口源码归 core/index，而不是顶层 index。按需工厂限制所装能力，实际产物由构建器决定，不写未经测量的体积或速度承诺。
+
+### Endpoint：按目标与方法路由
+
+Endpoint 适合已有 transport 的调用方；它用目标 id 和方法名路由，不自动交换 Runtime 方法目录。createEndpoint(config) 异步完成中间件安装后返回实际 Endpoint，调用方负责 dispose。
+
+| 构造字段                        | 含义                                                                  |
+| ------------------------------- | --------------------------------------------------------------------- |
+| id                              | 必填，无默认；非空本端稳定标识                                        |
+| targetIds                       | 默认 []；已知目标去重并排除本端 id，自动发现可再解析目标              |
+| transport                       | 可由 factory 或 connect 提供同一个实际载体，无内置物理资源默认        |
+| middlewares                     | 必填中间件元组，构造时原子安装                                        |
+| features                        | 可选有限元组，同步 Feature 组合                                       |
+| scheduler                       | 默认 systemScheduler；单调时钟，Endpoint 期限与内部 Host 使用同一实例 |
+| wallClock                       | 默认宿主墙钟，仅用于 wire sentAt、hook at 等诊断                      |
+| providerLimits                  | 入站额度与拒绝观察                                                    |
+| replay                          | 出站消息标识保留策略                                                  |
+| construction.signal / timeoutMs | 取消安装或设置安装期限，timeoutMs: false 不设期限                     |
+
+完整工厂提供 send、provide、discovery、control 等默认根，ping/pingAll 的公开类型仍由选中的 ping 中间件决定。createClientEndpoint 只发起调用；createProviderEndpoint 提供方法并保留出站调用；createFullEndpoint 双向；createComposedEndpoint(config, roots) 显式选择 Feature 根。createFullOneWayEndpoint 等 one-way 预设增加 sendOneWay，其 Promise 只表示物理发送，不表示业务完成。
+
+provide(method, handler) 返回 Endpoint，可链式注册；重复方法拒绝，不覆盖旧 handler。handler 通过 context.data 读取输入，通过 context.success(value) 或 context.failed(message, code) 结算；不完成会得到 PROVIDER_NOT_SETTLED，过期 context 的 success/failed 返回 ok:false 与 PROVIDER_CONTEXT_EXPIRED，应检查该返回值。
+
+`send<T>`(target, method, data, options?) 等待结果，前三参数必填，无载荷时传 null。sendAll(method, data, options?) 对已知目标汇总 fulfilled/rejected；dispatch(target, method, data) 与 dispatchAll(method, data) 同步返回 void，不等待结果。根 Endpoint 没有 Runtime Peer 的 notify 方法。group/outcome 需要实际组合的能力；ping 需要中间件；on 和 hooks.on 订阅相应事件，返回的释放句柄不代替整个 Endpoint 的 dispose。
+
+send 的 options 可含 signal、timeoutMs、idempotencyKey、trace、transfer。未装 timeout 中间件时，Endpoint 使用 1000 毫秒 fallback；安装 timeout({}) 时未配置值为 undefined，反而不设期限，显式 timeoutMs: false 同样不计时。单次 timeoutMs: 0 在发送前拒绝，false 关闭默认；Runtime Peer 的 30000 毫秒是另一层默认，不能混用。abort() 接入远端取消通知，本地预先取消的 signal 即使没有该中间件也会拒绝。取消或超时不能证明对端没有执行。dispose 注销监听并拒绝在途等待；借用载体不会因此自动关闭，已产生的业务副作用也不回滚。
+
+createRuntimeApiEndpoint(config, channel) 是高级 Runtime 组装入口，同步返回后先 await endpoint.ready。单参数形式限于 { binding }，必须提供完整、真实的 owned binding operations，不能交入假 Endpoint。其 facade 重复及同步重入 dispose 共用首次结算 Promise，底层只调用一次。
+
+该高级配置还支持 protocol、codec、framer、provider、idempotency、providerLimits、replay、middlewares、features 与 construction；transport 接收 framer 的输出，codec 输出必须匹配 framer 输入。provider 在构造完成前登记，idempotency 只用于带键的调用，不自动把所有方法变成幂等操作。
+
+### 中间件与扩展边界
+
+| 中间件                                                                 | 参数与作用                                                                                                 |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| connect({ transport })                                                 | 连接与发现，按 sourceProof 过滤来源                                                                        |
+| contract({ version, acceptVersions?, schemas?, maxIdentifierLength? }) | 业务版本与 schema；标识长度限制 discovery 的 targetId/receiverId/uniqueTargetId/variation id，不限制方法名 |
+| protocol()                                                             | 标准协议帧                                                                                                 |
+| codec(descriptor) / framer(descriptor)                                 | 选编码与分帧，必须匹配实际 transport                                                                       |
+| abort()                                                                | 接入取消                                                                                                   |
+| timeout({ timeoutMs })                                                 | 设置默认调用期限，可用单次 options 覆盖                                                                    |
+| ping()                                                                 | 接入 ping / pingAll                                                                                        |
+| authentication({ sign, verify, encrypt, decrypt, encodedType? })       | 逐帧认证/加密；encodedType 为 any/string/uint8array                                                        |
+| hooks({ listeners, onHookError? })                                     | 观察生命周期，钩子错误走回调，不改变业务结果                                                               |
+| uuid({ generate })                                                     | 自定义消息标识生成                                                                                         |
+
+defineMiddleware / defineFeature 使用原 owner 扩展日志、诊断或策略；公开扩展不能自行引入新的协议级根能力。功能与中间件声明的字段不能冲突；两端编码、分帧和能力组合必须兼容。connect 的 discoveryMode 默认 automatic，可选 manual；useBaseIdVerifyOnly 仅显式 false 时才调用自定义 identifier，此时缺 identifier 拒绝 INVALID_CONFIG，uniqueTargetId 也只在该组合生效。construction.timeoutMs 省略或 false 均不设期限，内部 Host 的 mutation/drain 沿 construction.timeoutMs ?? false。构造失败会回滚已接纳资源，不留下可用的半安装 Endpoint。
+
+### 载体、归属与调度
+
+IRpcTransport 提供 send(message, options?)、subscribe(listener) 与可选 close，并声明 platform、可选 topology/ownership/encodedType/sourceProof/onTransportError/onListenerError。sourceProof 为多路载体提供来源证明；普通地址字符串不构成认证。ownership 省略按 owned 处理，表示关闭时释放底层；borrowed 只撤销自己的监听，物理资源由原 owner 关闭。
+
+createMemoryTransportPair(options?) 默认 {}，返回两端而非单个 transport。双方都是 borrowed、exclusive 的同进程载体；关闭任一端会关闭整个 pair，之后 send 抛错。默认异步交付沿原生微任务顺序；传入 scheduler 只控制 pair delivery，不替代 Endpoint 自己的期限时钟。先 dispose 两 Endpoint，再由创建方 close pair。
+
+createBrowserMessagePortTransport 的 ownership 默认 owned，可选 borrowed；后者只撤监听，端口由调用者关闭。createNodeMessagePortTransport 使用真实 Node 风格端口。createWebWorkerTransport 接收实际 Worker 或 self，capabilities 是静态约定列表，双方须一致；peerId 标识对端，这个低层载体不做握手。更具体的 window、广播、SharedWorker、ServiceWorker、WebRTC、WebTransport 场景由 rpc-browser 的载体或 Peer 负责。
+
+transport-kit 复用监听器集合、失败收集/报告和安全属性读取，不应在各适配器中另造同一套 listener owner。手动时钟必须推进零时间工作，以执行 deferred reconciliation、departure 通知与策略关闭；旧的两方法时钟通过 schedule(callback, 0) 接收延后工作。默认 deadline 的 schedule(0) 语义不变，迟到回调仍检查关闭与报告边界。
+
+### Runtime Peer 与方法目录
+
+Runtime Peer 位于 Endpoint 之上，用 request/notify/stream/group/outcome 按点分方法路径调用，并在握手交换能力与方法目录。createRuntimePeer(options) 的 spawn/connect/listen 必须且只能有一个，Core 层均为回调；平台包才可提供对象式来源。
+
+| Peer 字段                | 默认与约束                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| self                     | 可省略；显示名 peer 与生成的唯一 instanceId，显式值保持原样，name 不用于认证 |
+| provide                  | 本端方法树，可省略                                                           |
+| spawn / connect / listen | 来源回调收到 self 和真实编译 capabilities，返回已完成协议协商的实际 channel  |
+| defaultTimeoutMs         | 30000；request/stream 使用的有限正数默认期限                                 |
+| providerLimits           | maxPerPeer 64、maxGlobal 256，可用 onRejected 观察拒绝                       |
+| authentication           | 可选，沿原认证 owner 配置签名 native transfer                                |
+| contract                 | 可选模式、幂等声明与 schema                                                  |
+| keyFactory / retryPort   | 可选键生成与重试端口                                                         |
+| endpointFactory          | 可选高级组装，接收真实 channel 视图                                          |
+| probe                    | 可选单个 Probe 或 readonly 数组                                              |
+| report                   | 可省略，后台错误默认 console.error                                           |
+
+provide 只读自身可枚举数据属性，嵌套普通对象生成 math.double 等点分路径。getter、循环、非法名字、重复路径在打开来源前拒绝。对端只能调用已协商目录。输入/返回值遵循可移植值域：JSON 值与协商后二进制，Date/Map/类实例等拒绝。没有 API 泛型时无静态可调用的方法；IRuntimeDynamicSurface 只放宽编译检查，运行时仍校验目录。流方法返回 IterableIterator 或 AsyncIterableIterator，类型才会被 stream 识别；IRuntimeSurface 从 Host/插件提取纯类型，不生成运行时代码。
+
+| 方法                                | 完成与生命周期                                     |
+| ----------------------------------- | -------------------------------------------------- |
+| request(method, payload?, options?) | 等待结果                                           |
+| notify(method, payload?, options?)  | 仅确认发出，不确认业务成功                         |
+| stream(method, payload?, options?)  | 惰性，首次 next 才发送，提前 return 通知提供方停止 |
+| group(steps, options?)              | steps 按序执行，首错后余项 not-executed，不回滚    |
+| outcome(key)                        | pending/done/unknown；unknown 不证明未执行         |
+| describe(options?)                  | 本地身份、连接与目录查询                           |
+| close()                             | 拒绝新调用并关闭原 owner，重复返回同一 Promise     |
+| on(event, listener)                 | 返回幂等取消订阅，不重放首次 ready                 |
+| Symbol.asyncDispose                 | 原 close 函数本身，支持 await using                |
+
+调用选项含 timeoutMs、signal、idempotencyKey、orderKey、cancel、transfer。request/stream 默认 30000 毫秒，单次 false 关闭默认、0 立即到期，并受来源单次上限约束；重试和等待下一代沿用同一个绝对期限，不在新代次重置。signal 为协作取消；cancel: 'before-start' 只撤销尚未开始的调用，已开始则保留真实结果。同 orderKey 在提供方串行。transfer 仅支持已协商的线程能力，不适用于普通内存 pair。
+
+非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。
+
+### Host 出口、安装与 Coroutine
+
+createRuntimePlugin、createCoroutinePlugin 及平台插件安装到原 Plugin Host；同族连接共享 host.process/thread/coroutine，RuntimePluginKey 给出名称。request/notify/stream/group/outcome 先传连接名或 { name, instanceId } 精确目标，同名多实例不能唯一确定时拒绝。
+
+list/get/describe 默认对象，查询可选文本格式；不可知事实用 unavailable，不伪造为 0。on 支持 ready/exit/degraded/restart/terminal/liquidated；watch 是有界异步迭代器，超过 100 个事件积压以 RUNTIME_EVENT_OVERFLOW 报告并结束，先用当前查询重新对账。broadcast 汇总各目标结果，不保证全部成功。
+
+stop/kill/restart/replace 仅适用于真正由 spawn 或 coroutine task 创建的单元；对 connect/listen 借入连接拒绝 CAPABILITY_CONFLICT。expose 默认不公开本端 Host 方法，必须显式列出。本地 Feature expose 在安装未提交期间的调用等候原 Host batch commit；回滚以 TARGET_UNKNOWN 拒绝，不能把此保证扩展到 forward/catalog。ready 只代表目录可达，不是任意远端安装事务已完成的确认。
+
+首次 ready 已包含 factory await，不向后来订阅重放。受监督 Peer 的后续 exit/restart/degraded 来自真实 supervisor，listener ready 来自实际接纳 session；raw Peer 不伪造原生 exit 或后续 ready。unsubscribe 不关闭执行单元；释放必须 close / await using，开始关闭时撤销事件订阅。
+
+Coroutine 父模式 createCoroutinePlugin({ name, task, supervisor? }) 在同一事件循环监督 task，每代拥有 MessageChannel；子模式 { name, connect } 只接入该 task 收到的 opaque connect，不能传任意 MessagePort。task/connect 必须二选一，都可 provide/expose，expose 的本端 provider 须先安装。
+
+task 收到 signal、heartbeat()、connect，自行在 finally 释放所创建子 Host。resolve 表示 exited，reject 表示 crashed，重启按 supervisor 策略。默认每插件占一个 coroutine 单元；replace(name, { task }) 更换下一代，非函数以 INVALID_CONFIG 拒绝而旧单元保留。取消靠 task 合作；忽略 signal 可延迟结束、预算租约保持到 settlement，阻塞事件循环的 task 无法强制终止。terminal 事件保留终止重启链的 source/code 与连接名，不用逻辑关闭伪装原生退出。
+
+### 准入、重放与幂等结果
+
+request/notify/stream 都占入站额度，默认每对端 64、全局 256。超限时业务函数不被调用；调用方只见 OVERLOADED，要区分并发或其它准入原因，用提供方 providerLimits.onRejected 的 RpcProviderRejectionReason。createProviderAdmissionScope 可让多个 Endpoint 共享原额度 owner，不以客户端在途数冒充提供方并发。
+
+原生 Process/Threads launcher 证明的独占通道只记录在途调用，不套用普通载体的结果保留窗口。其它载体使用有界账本：出站每 Endpoint 默认 maxEntries 4096、ttlMs 310000；入站每对端 maxReplayEntriesPerPeer 1024、全局 4096，同样保留 310000 毫秒。它们限制保留窗口内的接纳总量，不能把 burst 能力或容量/TTL 推导当作实测吞吐量。
+
+createRpcIdempotencyStore 默认 retentionMs 300000、maxEntries 1024、maxEntriesPerScope 256、maxBytes 8 MiB、maxOutcomeBytes 1 MiB，均为正安全整数。pending 不按 retention 自动过期；容量可保留结果不可用的 tombstone，outcome 因而可能 unavailable，而非重新执行。内存 owner 重启会丢状态，不保证跨重启连续性或无限期至多一次。
+
+### 二进制、转发与重试边界
+
+ArrayBuffer / Uint8Array 需要双方协商二进制；视图 offset/length 保留。inline 只携带可见字节，native 线程清单保留全 backing 并验证摘要；SharedArrayBuffer、Atomics 与其它 TypedArray 不属于支持路径。transfer 在真实提交后分离 buffer，失败也不能恢复，不保留输入副本且不自动重试；签名认证/能力不满足以 CAPABILITY_UNSUPPORTED 拒绝，不降级成复制。
+
+expose 可让第三方经插件转发已接纳连接的方法前缀；每跳绑定当时目标代次，最多三跳，环路/超限拒绝，中继不缓存业务结果。最终提供方认证的是直接上一跳，而不是最初调用者。
+
+超时、取消、断线、连接恢复、unknown 都不能证明业务未执行。仅有独立未执行证据时（如明确并发拒绝或成功的 before-start 撤销）才可直接重试；其余通过同 idempotencyKey 查 outcome 或业务对账。不要通过换键重发逃避未知结果，总预算与退避由调用者控制。
+
+### 为真实物理 I/O 定义适配器
+
+defineMessageAdapter({ open, launch? }) 的 open 取得真实端口，可选 launch 执行原启动操作；结果创建独立 peer 或 host.thread 插件。defineByteAdapter({ open, listen?, dial? }) 接入有序字节 I/O，生成 Peer 或 host.process 插件。它们不接受成品 Peer、channel、已协商能力、可信身份或自称 ownership 的替身。
+
+消息 Peer 创建方保有借入端口的物理关闭责任；字节 I/O 提供真实 write/onData/onClose/close，Core 沿同一握手、分帧、能力与目录 owner 完成连接。launch 返回原生端口、exited、terminate；冷启动取消、握手失败或关闭由原 termination-once owner 释放，不重造 supervisor。平台 managed 来源仍使用既有监督/代次 owner。
+
+governor 沿原 rate/payload/连续超时/idle 策略，disposer 归实际连接 close。adapter.scope(store?) 创建 provider scope，共享者须等所有 Peer 关闭后 scope.close。会话幂等范围依赖从实际认证连接捕获的 principal，普通地址字符串无此权限；字节 responder 须由实际 auth.verify 建立认证身份。
+
+字节 auth.verify 失败原对象通过本地 cause 和 report 保留，对端只收到净化拒绝摘要，不泄露验证器原链。第三方适配器使用 utils attachErrorIdentity 附自己的 source/code，保留原错在 cause，不冒充 Core/Contract 身份。
+
+### 错误与归因
+
+错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。
+
+| source             | 常量 / 表                                         |
+| ------------------ | ------------------------------------------------- |
+| @migaia/rpc/core   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
+| @migaia/rpc/remote | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
+
+isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。
+
+| Core code                                                       | 处理含义                                                             |
+| --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| DEADLINE_EXCEEDED / CANCELLED                                   | TimeoutError / AbortError；结果可能未知，查账而非盲重试              |
+| OVERLOADED                                                      | 准入拒绝，具体原因看提供方 onRejected                                |
+| TRANSPORT                                                       | 载体失败，已送达与否需对账                                           |
+| PROVIDER_NOT_FOUND / PROVIDER_DUPLICATED / PROVIDER_NOT_SETTLED | 路径缺失、重复登记、未结算                                           |
+| PROVIDER_CONTEXT_EXPIRED                                        | 过期 context 结算返回 ok:false                                       |
+| PAYLOAD_INVALID / SCHEMA_INVALID                                | 值域、尺寸、二进制或 schema 错误                                     |
+| CONTRACT_INVALID / PROTOCOL_INVALID                             | 方法/模式/键或协议消息非法                                           |
+| CAPABILITY_UNSUPPORTED / CAPABILITY_CONFLICT                    | 能力未协商或归属/实例有歧义                                          |
+| INVALID_CONFIG                                                  | 配置非法，含不适用的 transfer                                        |
+| TARGET_UNKNOWN / TARGET_NOT_IDENTIFIABLE                        | 无目标或同名实例不唯一                                               |
+| ENDPOINT_DISPOSED                                               | 实例终结，需新建                                                     |
+| AUTHENTICATION_FAILED                                           | 认证失败，先修会话/凭据                                              |
+| STREAM_RESULT_UNKNOWN                                           | 已交付项以外的流结果未知                                             |
+| IDEMPOTENCY_RESULT_UNAVAILABLE                                  | 业务已执行，结果未保留，不换键重执行                                 |
+| PROVIDER_GENERATION_MISMATCH / PROVIDER_GENERATION_RETIRED      | 目标代次不符/退役，转发调用可能已执行                                |
+| FORWARD_LOOP / FORWARD_HOP_LIMIT                                | 环路或超过三跳                                                       |
+| MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING                      | 组装重复或缺失                                                       |
+| CHUNK_INVALID                                                   | 分片重组失败                                                         |
+| PROPERTY_READ_FAILED / STRING_CONVERSION_FAILED                 | 属性访问或转字符串失败，保留原因                                     |
+| CALLBACK_FAILED                                                 | 冷 Probe listener、中间件安装或 reporter 失败，检查 cause / 宿主队列 |
+| INTERNAL                                                        | 内部失败，不默认重试                                                 |
+
+认证 reason 为 RpcAuthenticationRejectionReason.sessionUnknown（重新发现会话）或 challengeInvalid（修正帧）。手动 connect.query 取消保留原生 DOMException/AbortError，CANCELLED 的 cause 指向 signal.reason。Core serializeRpcError/deserializeRpcError 还保留本层脱敏与转发路由元数据；树结构与 JSON-RPC 映射由 rpc-contract 拥有。
+
+| Remote code             | 处理含义                            |
+| ----------------------- | ----------------------------------- |
+| REMOTE_START_FAILED     | 来源/握手失败，检查 cause           |
+| REMOTE_CLOSED           | 连接/代次已关，不自动转投同名后继   |
+| REMOTE_RESULT_UNKNOWN   | 业务可能已执行，outcome 或对账      |
+| REMOTE_CONTRACT_INVALID | 目录或契约非法                      |
+| REMOTE_HOST_NOT_ADOPTED | 先完成对应 hostUse                  |
+| RUNTIME_EVENT_OVERFLOW  | 超过 100 条积压，查当前状态后重订阅 |
+
+owned supervisor 即使 Endpoint 释放失败，仍尝试关闭 channel 与原生资源；primary 沿 cause/errors 可达。迟到物理发送拒绝仍被观察；用户 reporter 自身 throw 经既有宿主异常队列可见，不制造未处理 reaction Promise。
+
+### Probe：同步观察与保留边界
+
+Probe 从 ./probe 导入，不改变请求/结果的业务路径。导出阶段、方向、kind、outcome 的数值常量与同序名称表，以及 defineProbe、snapshotProbeEvent、rpcProbeSampleKey、probePlugin、readProbeStages、subscribeProbeStages、既有 hostRethrowReporter / IpcReporterContext。Peer 传 probe，Endpoint 激活前安装 probePlugin，两者使用同一 emitter。
+
+defineProbe(definition, host?) 定义时验证 stages 非空且为已知名称；capture 默认关闭且须为 stages 子集；sample 默认全采样，范围 (0, 1]；methods 只过滤 message/envelope 中的方法，没有 method 的 variation 通过该过滤，其它阶段只受采样。redact 处理显式捕获，不打开未选择 capture；describe/emit/onError 分别负责描述、同步消费与错误报告。定义错误保留 TypeError / INVALID_CONFIG。
+
+省略 host 返回独立冻结 handle；提供 host 则直接添加 stageMask/captureMask/methods/sampleThreshold/setStages 五字段，以原对象身份登记并冻结，返回 THost & IRpcProbe，不复制。host 必须可扩展、未冻结、非 null，不能已有这些字段或已注册为 Probe；验证先于修改，失败保持原样。已有 host.emit 不被替换，definition.emit 由私有状态持有。
+
+每 emitter 复用事件 view，只能在同步 emit 中读取。snapshotProbeEvent 显式复制并冻结顶层，detail/error/content 仍保留原引用与所有权，不是深快照。未知 sizeBytes/chunk/members/durationMs 使用 -1；字符串和 opaque 容器的 sizeBytes 恒为 -1，不为观察而额外编码/扫描。已有字节 backing/view 长度直接读取；nested transferable 不遍历 getter、不深扫描/复制，可能在真实 transfer 后分离，直接捕获且将分离的 backing/view 才保存字节。
+
+protected 只在真实认证路径存在且显式 capture 时出现，不伪造事件。setStages([]) 暂停，设置已知阶段可恢复，captureMask 保持定义值；host.stageMask 是初始值，独立 handle getter 反映私有当前值。readProbeStages 读有效 mask，subscribeProbeStages 只在实际改变后通知，返回幂等释放；无效阶段以 INVALID_CONFIG 保持旧值。冷 listener 抛错时先通知其余监听、使 emitter 采用新 mask，再传播 CALLBACK_FAILED。
+
+emit、redact、describe 的 throw/reject 通过 onError 报 PROBE_FAILED，cause 保留原错，无回调则用宿主 reporter，不进入业务管线。激活后交付一次 descriptor，只有载体实际提供 observe 才调用，disposer 归原资源 scope；关闭后停止事件。managed spawn 与 Process/Thread/Browser/pool 均沿原 Probe 引用，不以观察重造生命周期。
+
+variation 字段保留原 route.variation，含 ping/pong/close/abort 和已登记 subtype；abort kind 为 cancel，其余为 control，request/response 等无 variation。rpcProbeSampleKey 对 senderId/messageId 拼接的 UTF-8 计算 FNV-1a 32 位键，是采样关联，不是认证或唯一身份。
+
+carrierSeq 是同一 emitter 的 inbound carrier 序号，无关联时 -1；Core receive 捕获它并随原物理记录经过异步 unprotect/decode。collector 按原 Endpoint/source 序号转为全局 wire 序号；已淘汰的未解析 origin 不能恢复，已读链接在 dependent 行保留时仍有效，source 序号重置为旧 origin 留 cutoff，防止误连新行，不在摄取时新增代次历史。
+
+outbound carrier 借用本次 send 的 envelope（messageId/senderId/targetId/trace），同步返回后清空；仓库载体同步 emit，第三方跨异步间隙 emit 没有该 context。physical batch 只取首个实际成员代表，不展开业务内容。Byte carrier 在实际交付前发出，启动排队帧以交付时间各发一次，关闭/溢出前未交付帧不发业务事件；复用 detail 的 frameBytes 表示跨度，drainMs 初值 -1，真实 writer false/drain 后更新，不改变原 write 结算，也不补异步事件。
+
+观察保留 fast/native/batch/chunk 选择：descriptor 可含 frame，fast send 不伪造 frame；认证 descriptor 读取 sign 或 encrypt-sign。解密前缺 sender/message 身份，无法保证与后续阶段同采样键；多块匿名记录不猜测身份，仅最后解码块可经 carrierSeq 关联。Native Peer 调用选项不带 trace，应用在自己的 Endpoint.send 显式传已有 trace。

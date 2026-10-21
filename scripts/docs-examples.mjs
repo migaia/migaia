@@ -521,7 +521,7 @@ export async function runDocumentationExamples() {
     linkPackages(scratch, repositoryRoot, packages)
     /** Maintained document order is deterministic across platforms and repeated invocations. */
     const examples = packages.flatMap((packageRoot) =>
-      ['README.md', 'USEGUIDE.md'].flatMap((name) => {
+      ['README.md', 'README.en.md', 'USEGUIDE.md', 'USEGUIDE.en.md'].flatMap((name) => {
         const document = join(packageRoot, name)
         if (!existsSync(document)) return []
         const extracted = extractExamples(

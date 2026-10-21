@@ -5,6 +5,7 @@
  * Disposal propagates a single cleanup failure unchanged, and aggregates only multiple failures.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText, ITypeDoc } from './contract.js'
+import { storeDevtoolsCases } from './store-devtools-cases.js'
 /** Builds bilingual text without locale fallback. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Documents one diagnostic value. */
@@ -95,8 +96,8 @@ const members: Record<string, IMemberDoc> = {
       )
     },
     returns: t(
-      'No return value; unknown IDs throw native RangeError tagged UNKNOWN_HISTORY_ENTRY. Hydration or clone failures propagate and replay suppression is restored.',
-      '无返回值；未知标识抛出带 `UNKNOWN_HISTORY_ENTRY` 的原生 `RangeError`，注水或克隆失败原样传播，回放抑制状态仍会恢复。'
+      'No return value; unknown IDs throw RangeError/UNKNOWN_HISTORY_ENTRY. Unclassified replay clone failures receive CALLBACK_FAILED, while complete foreign identities stay unchanged; frozen errors and primitive values remain on cause. Store hydration failures propagate from Store without this catch; replay suppression is restored in either case.',
+      '无返回值；未知标识抛出 `RangeError/UNKNOWN_HISTORY_ENTRY`。回放克隆的未分类失败附 `CALLBACK_FAILED`，完整外包身份保持不变，冻结错误或原始值保留在 `cause` 上；Store 注水失败不进入此 catch，仍由 Store 传播。两种失败后都会恢复回放抑制状态。'
     ),
     example: session
   },
@@ -179,8 +180,8 @@ const types: Record<string, ITypeDoc> = {
           '至少为一的安全整数，限制状态历史条目数量，超限时按时间顺序淘汰旧条目。'
         ),
         default: t(
-          '100 history entries; it does not bound the action queue.',
-          '默认保留一百条历史，不限制动作队列。'
+          '`100` history entries; it does not bound the action queue.',
+          '默认保留 `100` 条历史，不限制动作队列。'
         )
       },
       maxTrace: {
@@ -189,8 +190,8 @@ const types: Record<string, ITypeDoc> = {
           '至少为一的安全整数，分别限制运行时追踪与动作两个队列。'
         ),
         default: t(
-          '1000 entries per queue for actions and runtime trace.',
-          '默认动作与运行时追踪各保留一千条记录。'
+          '`1000` entries per queue for actions and runtime trace.',
+          '默认动作与运行时追踪各保留 `1000` 条记录。'
         )
       },
       captureRuntimeTrace: {
@@ -199,9 +200,19 @@ const types: Record<string, ITypeDoc> = {
           '为假时跳过运行时订阅及自动完成动作捕获，仍可手动记录动作。'
         ),
         default: t(
-          'true: capture runtime events and completed action outcomes.',
-          '默认开启，捕获运行时事件及已完成动作结果。'
-        )
+          '`true`: capture runtime-wide events and completed action outcomes.',
+          '默认 `true`，捕获整个 Runtime 的事件及已完成动作结果。'
+        ),
+        values: {
+          true: t(
+            'Subscribe to the Store Runtime, including other Stores using it.',
+            '订阅该 Store 的整个 Runtime，包括共用它的其他 Store。'
+          ),
+          false: t(
+            'Skip Runtime trace and automatic actions; manual recordAction remains enabled.',
+            '跳过 Runtime 追踪与自动动作，仍可手动 recordAction。'
+          )
+        }
       },
       now: {
         ...p(
@@ -215,12 +226,12 @@ const types: Record<string, ITypeDoc> = {
       },
       clone: {
         ...p(
-          'Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot preparation classifies unowned failures as CALLBACK_FAILED; automatic capture reports them without failing business writes. Replay propagates clone failures. Apply redaction here.',
-          '同步 `(state)` 接收 `store.$plain()` 或保留的回放快照并返回诊断副本；快照准备期未归属失败附 `CALLBACK_FAILED`，自动捕获报告而不影响业务写入，回放传播克隆失败，可在此脱敏。'
+          'Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot and replay cloning classify unowned failures as CALLBACK_FAILED; automatic capture reports them, while manual record and replay throw. Store hydration errors retain their own path. Apply redaction here.',
+          '同步 `(state)` 接收 `store.$plain()` 或保留的回放快照并返回诊断副本；快照与回放克隆的未归属失败附 `CALLBACK_FAILED`，自动捕获报告，手动记录与回放抛出。Store 注水错误仍保留自身传播路径，可在此回调脱敏。'
         ),
         default: t(
           'ClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed.',
-          '默认使用 `@migaia/store-middleware/tolerant-clone` 的 `ClonePolicy.diagnostic` 尽力克隆；原生结构化克隆可能把类实例转成普通对象，不保证引用共享或原型保留。'
+          '默认使用 `@migaia/store-middleware/tolerant-clone` 的 `ClonePolicy.diagnostic` 尽力克隆；原生结构化克隆可能把类实例转成普通对象，失败回退可共享引用，不保证完全隔离或保留原型。'
         )
       }
     }
@@ -352,6 +363,11 @@ const types: Record<string, ITypeDoc> = {
 const symbols: Record<string, ISymbolDoc> = {
   createStoreDevTools: {
     role: 'factory',
+    cases: storeDevtoolsCases.createStoreDevTools,
+    exampleIntro: {
+      en: "Directly install `@migaia/store-light` and `@migaia/reactive` for these real Store/Runtime examples. `createStore({ count: 0 }, { runtime })` borrows the supplied Runtime; without it Store uses defaultRuntime, and its scalar equality defaults to Object.is. Here `createRuntime({ schedulerStrategy: run => run() })` uses synchronous scheduling solely for deterministic output; the Runtime default delegates to adapter.scheduleMicrotask. The failure example also supplies `onError(error)`, returning void and retaining the original diagnostic; omitted onError uses the Runtime's adapter reporter. Devtools options default to `{}`: maxHistory `100`, maxTrace `1000`, captureRuntimeTrace `true`, now `Date.now`, and clone `ClonePolicy.diagnostic`. The examples set captureRuntimeTrace false to isolate history/manual actions; this disables the Runtime-wide subscription, not only this Store's action events. Manual action name is required; payload, durationMs and error default to undefined. record() label defaults to 'state change'; construction and clear use 'initial'. Dispose tools before the caller-owned Store. The bounded-queue example explicitly supplies now: () => 100 for fixed diagnostic timestamps, not performance measurement.",
+      zh: "示例直接导入真实 Store/Runtime，请同时安装 `@migaia/store-light`、`@migaia/reactive`。`createStore({ count: 0 }, { runtime })` 借用指定 Runtime；省略时使用 `defaultRuntime`，标量相等比较默认 `Object.is`。这里 `createRuntime({ schedulerStrategy: run => run() })` 仅为确定输出而同步调度；Runtime 默认委托 `adapter.scheduleMicrotask`。失败例还提供 `onError(error)`，返回 void 并保存原始诊断；省略时使用 Runtime 的 adapter 报告入口。诊断选项默认 `{}`：maxHistory 为 `100`，maxTrace 为 `1000`，captureRuntimeTrace 为 `true`，now 为 `Date.now`，clone 为 `ClonePolicy.diagnostic`。示例把 captureRuntimeTrace 设为 false，以单独观察历史和手动动作；这会关闭整个 Runtime 的订阅，而非只筛选此 Store 的动作。手动动作 name 必填，payload、durationMs、error 默认 undefined。`record()` 的 label 默认 'state change'，构造和 clear 使用 'initial'。先释放诊断会话，再由调用方释放 Store。容量例显式用 `now: () => 100` 固定诊断时间戳，不用于性能测量。"
+    },
     purpose: t(
       'Subscribes to an existing reactive store to collect bounded state history, completed actions and optional runtime trace. Replay hydrates local state and never reverses business side effects; dispose the session after inspection.',
       '订阅已有响应式存储，收集有界状态历史、已完成动作及可选运行时追踪；回放只注水本地状态，不会撤销业务副作用，检查结束后须释放会话。'
@@ -367,10 +383,15 @@ const symbols: Record<string, ISymbolDoc> = {
       'Caller-owned IStoreDevTools. Construction snapshots options and initial state; invalid options throw Error/INVALID_OPTION, while unclassified initial clock or clone failures carry CALLBACK_FAILED. Existing foreign identities remain unchanged.',
       '返回调用方拥有的 `IStoreDevTools`；构造时保存选项与初始快照，非法选项抛普通 `Error/INVALID_OPTION`，未分类初始时钟或克隆失败附 `CALLBACK_FAILED`，已有外包身份保持不变。'
     ),
-    example: session
+    example: storeDevtoolsCases.createStoreDevTools![0]!.example
   },
   getDependencyTree: {
     role: 'operation',
+    cases: storeDevtoolsCases.getDependencyTree,
+    exampleIntro: {
+      en: 'Directly install `@migaia/reactive`. `createRuntime()` uses its default adapter and scheduling. `signal(1, { debugName })` creates a source; `computed(read, { debugName })` reads it lazily, and `effect(read, { debugName })` establishes the actual graph with its initial run enabled by default. Each debugName is an optional diagnostic label, default undefined. Reading left then right determines the existing Set order shown here. `getDependencyTree(root, maxDepth)` accepts this real effect/computed handle; maxDepth defaults to `20`, must be a nonnegative safe integer, and `0` omits all direct edges. The returned ordinary mutable tree is a snapshot; traversal creates no observer. Dispose the effect, derived values and signal through their public handles.',
+      zh: '还需直接安装 `@migaia/reactive`。`createRuntime()` 使用默认 adapter 和调度。`signal(1, { debugName })` 创建来源，`computed(read, { debugName })` 惰性读取它，`effect(read, { debugName })` 默认立即执行一次，建立真实图关系。debugName 是可选诊断标签，默认 undefined。先读 left、再读 right，决定这里展示的既有 Set 顺序。`getDependencyTree(root, maxDepth)` 接受真实 effect/计算值句柄；maxDepth 默认 `20`，必须是非负安全整数，`0` 不展开直接边。返回的是普通可变树快照，遍历不创建观察者。最后通过公开句柄释放 effect、计算值和信号。'
+    },
     purpose: t(
       'Traverses upstream dependencies from a runtime effect or computed handle, without requiring a store session. Current-path cycle detection marks recursion loops while allowing shared diamond nodes to appear on each branch.',
       '从运行时副作用或计算值句柄向上遍历依赖，无须诊断会话；按当前路径检测并标记递归环，允许共享菱形节点在各分支分别出现。'
@@ -381,18 +402,23 @@ const symbols: Record<string, ISymbolDoc> = {
         '同一响应式运行时返回的公开副作用或计算句柄，也可传扩展层 `IObserver` 节点。'
       ),
       maxDepth: t(
-        'Optional safe nonnegative integer, default 20; zero returns only the root and no direct edges.',
-        '可选非负安全整数，默认二十；为零时只返回根节点，不展开直接依赖边。'
+        'Optional nonnegative safe integer, default `20`; `0` returns only the root and no direct edges.',
+        '可选非负安全整数，默认 `20`；`0` 时只返回根节点，不展开直接依赖边。'
       )
     },
     returns: t(
       'IDependencyTreeNode snapshot. Invalid depth throws RangeError tagged INVALID_OPTION; no resource or subscription is created.',
       '返回 `IDependencyTreeNode` 快照；非法深度抛出带 `INVALID_OPTION` 的 `RangeError`，不创建资源或订阅。'
     ),
-    example: `${treeSetup}\nconsole.log(getDependencyTree(view, 3))\nview.dispose()`
+    example: storeDevtoolsCases.getDependencyTree![0]!.example
   },
   getObserverTree: {
     role: 'operation',
+    cases: storeDevtoolsCases.getObserverTree,
+    exampleIntro: {
+      en: "Directly install `@migaia/reactive`. `createRuntime()` uses the default adapter and scheduling; the signal starts at `2`, the computed callback reads count times two, and both effect callbacks read the computed value. Optional debugName defaults to undefined; effects run immediately by default to establish subscriptions. Read `getObserverTree(root, maxDepth)` from the actual signal/computed handle; maxDepth defaults to `20`, accepts nonnegative safe integers, and `0` omits direct subscriber edges. The first effect's public dispose removes its subscription while the second remains active. No diagnostic session is needed; the returned mutable tree describes this call's graph rather than subscribing to future changes.",
+      zh: '还需直接安装 `@migaia/reactive`。`createRuntime()` 使用默认 adapter 和调度；信号初始值为 `2`，计算回调读取 count 并乘以二，两个 effect 回调分别读取计算值。可选 debugName 默认 undefined，effect 默认立即执行以建立订阅。从真实信号/计算值句柄调用 `getObserverTree(root, maxDepth)`；maxDepth 默认 `20`，接受非负安全整数，`0` 不展开直接订阅边。第一个 effect 的公开 dispose 移除自身订阅，第二个仍存活。无需创建诊断会话；新返回的可变树只描述本次调用时的图，不订阅后续变化。'
+    },
     purpose: t(
       'Traverses downstream subscribers from a runtime signal or computed handle, without a store session. Depth bounds and current-path cycle flags describe an instantaneous graph view, not a live subscription.',
       '从运行时信号或计算句柄向下遍历订阅者，无须存储会话；深度上限与当前路径环标记描述瞬时图视图，不建立实时订阅。'
@@ -403,15 +429,15 @@ const symbols: Record<string, ISymbolDoc> = {
         '来自 `createRuntime()` 的公开信号或计算句柄，也可传扩展层 `IObservable` 图节点。'
       ),
       maxDepth: t(
-        'Optional safe nonnegative integer, default 20; zero omits all subscriber edges.',
-        '可选非负安全整数，默认二十；为零时省略全部订阅边。'
+        'Optional nonnegative safe integer, default `20`; `0` omits all subscriber edges.',
+        '可选非负安全整数，默认 `20`；`0` 时省略全部订阅边。'
       )
     },
     returns: t(
       'IDependencyTreeNode snapshot; invalid depth throws RangeError tagged INVALID_OPTION, without creating a subscription.',
       '返回 `IDependencyTreeNode` 快照；非法深度抛出带 `INVALID_OPTION` 的 `RangeError`，不创建订阅。'
     ),
-    example: `${treeSetup}\nconsole.log(getObserverTree(count, 3))\nview.dispose()`
+    example: storeDevtoolsCases.getObserverTree![0]!.example
   },
   STORE_DEVTOOLS_SOURCE: {
     role: 'error',

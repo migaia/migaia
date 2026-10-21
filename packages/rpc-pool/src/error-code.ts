@@ -5,14 +5,24 @@ export const RPC_POOL_ERROR_SOURCE = '@migaia/rpc-pool'
 export const RpcPoolErrorCode = {
   /** Invalid construction or resize arguments are rejected before any native acquisition. */
   invalidOptions: 'INVALID_OPTIONS',
-  /** A closing pool rejects new work while draining operations already accepted. */
+  /** Closing/closed admission rejects new calls, first stream next or resize; create another pool. */
   poolClosed: 'POOL_CLOSED',
-  /** A full bounded FIFO rejects the new operation without calling a Peer. */
+  /**
+   * All available slots are reserved and the bounded FIFO is full; the new call never reaches a
+   * Peer.
+   */
   queueFull: 'QUEUE_FULL',
-  /** Cancellation removes only an operation still waiting in the pool FIFO. */
+  /**
+   * Queued cancellation removes only its FIFO entry; a native AbortError retains the signal reason
+   * on cause.
+   */
   callAborted: 'CALL_ABORTED',
-  /** All member closes were attempted and their original failures are collected. */
+  /**
+   * Final close attempted all members but retained one or more close failures, including earlier
+   * retirement failures. Inspect AggregateError.errors/cause; the pool is terminal, not reopened.
+   */
   closeFailed: 'CLOSE_FAILED'
 } as const
 
+/** Registered pool-owned failure values; original Peer errors keep their own identities. */
 export type IRpcPoolErrorCode = (typeof RpcPoolErrorCode)[keyof typeof RpcPoolErrorCode]

@@ -16,7 +16,8 @@ export const LIBRARY_INDEX = libraryIndexManifest.libraries as readonly {
 export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   capability: '按开关启停可选功能，为不同租户隔离功能开关，并按依赖启动和释放功能。',
   'event-subscriber': '在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。',
-  lifecycle: '将多项资源交给同一作用域管理，并在退出时等待任务结束和释放资源。',
+  lifecycle:
+    '让关闭、取消和替换在并发下也不出错：按顺序释放资源、只采用最新请求的结果、限时等待进行中的工作。',
   logger: '将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。',
   'middleware-pipeline':
     '把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。',
@@ -44,7 +45,8 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'store-ssr': '隔离每个 SSR 请求的 Store 与 Resource，并将服务端初始状态恢复到浏览器。',
   'store-wasm': '在 WASM 中管理可订阅的数值、字符串、数组和记录状态。',
   'store-worker': '把耗时计算和数据编解码移到 Worker，并为请求使用取消、去重和缓存功能。',
-  supervision: '限制执行单元数量，检查健康状态，重启故障单元，并按时限管理关闭过程。',
+  supervision:
+    '看管后台任务、子进程和线程：崩溃后间隔递增地重启，失败太多就停下，停止有时限，真正退出后才释放名额。',
   tray: '启动、查找、调用和重启一组插件宿主，包括 Node Worker 与子进程，并在退出时释放它们。',
   utils: '为代码添加超时、取消与错误追踪，并处理常见的数据转换和对象更新。',
   wasm: '分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。'
@@ -57,7 +59,7 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   'event-subscriber':
     'Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.',
   lifecycle:
-    'Manage resources within a shared scope and wait for ongoing work and cleanup when shutting down.',
+    'Keep shutdown, cancellation and replacement correct under concurrency: release resources in order, accept only the latest result, and wait for work in flight with a deadline.',
   logger:
     'Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.',
   'middleware-pipeline':
@@ -109,7 +111,7 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   'store-worker':
     'Move expensive computation and data encoding and decoding into Workers and use cancellation, deduplication, and caching for requests.',
   supervision:
-    'Limit execution units, check their health, restart failures, and manage shutdown within a time budget.',
+    'Watch background tasks, child processes and threads: restart crashes with a growing delay, give up when failures pile up, stop on time, and free a slot only after a real exit.',
   tray: 'Start, find, call, and restart plugin hosts, including Node Workers and child processes, and release them on shutdown.',
   utils:
     'Add deadlines, cancellation, and error tracing to code and handle common data conversions and object updates.',

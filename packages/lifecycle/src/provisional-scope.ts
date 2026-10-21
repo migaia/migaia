@@ -48,9 +48,13 @@ type IEntry = {
 }
 
 /**
- * A two-phase ownership transaction for async `setup()` work: resources accumulate here first, then
- * either move to a real owner via prefix transfer + awaited compensation (`commitTo`) or get torn
- * down (`rollback`) — never both, never neither.
+ * Creates a temporary owner for multi-step initialisation: register what each step creates, then
+ * either hand everything to the long-lived scope with `commitTo(parent)` or release it with
+ * `rollback()` when a step fails — never both, never neither.
+ *
+ * `rollback()` releases in reverse order. If the parent refuses partway through `commitTo()`, what
+ * was handed over stays with the parent and the rest is released and awaited before the error is
+ * rethrown (wrapped as `PROVISIONAL_PARENT_CLOSED` when the parent was closing).
  */
 export function createProvisionalScope(options: IProvisionalScopeOptions = {}): IProvisionalScope {
   const createController = captureAbortControllerFactory()

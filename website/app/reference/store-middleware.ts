@@ -6,6 +6,7 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { pluginHostReference } from './plugin-host.js'
+import { storeMiddlewareCases } from './store-middleware-cases.js'
 
 /** Builds localized prose without a fallback language. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -231,7 +232,7 @@ const policyMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Exact fn result. A mutable native uncoded callback error keeps its object/type/stack and receives CALLBACK_FAILED; frozen or non-Error values remain reachable through cause/errors. Foreign coded failures keep their owner. Returned promises are not awaited and do not extend action scope.',
-      '返回精确回调结果。可扩展且未编码的原生回调错误保持对象、类型与堆栈，并附 `CALLBACK_FAILED`；冻结错误或非错误值经原因或聚合列表可达，外包带码失败保留拥有者。返回的承诺不被等待，也不延长动作作用域。'
+      '返回精确回调结果。可扩展且未编码的原生回调错误保持对象、类型与堆栈，并附 `CALLBACK_FAILED`；冻结错误或非错误值经原因或聚合列表可达，外包带码失败保留拥有者。返回的 Promise 不被等待，也不延长动作作用域。'
     ),
     example: policyExample
   }
@@ -649,8 +650,8 @@ export const storeMiddlewareReference: ILibraryReference = {
       ),
       params: {
         mode: t(
-          'off admits writes; actions-only requires nonzero synchronous action depth. Optional default is off.',
-          '关闭约束值接纳写入，动作限定值要求同步动作深度非零，默认关闭约束。'
+          '`off` admits writes; `actions-only` requires nonzero synchronous action depth. Omitted: `off`.',
+          '`off` 接纳写入；`actions-only` 要求同步动作深度非零，省略时使用 `off`。'
         )
       },
       returns: t(
@@ -667,15 +668,20 @@ export const storeMiddlewareReference: ILibraryReference = {
       ),
       params: {
         mode: t(
-          'Optional IMutationPolicyMode; off is the default and actions-only enables action depth checks.',
-          '可选变更策略模式，默认无约束，动作限定启用深度检查。'
+          'Optional `IMutationPolicyMode`: `off` is the default and admits writes; `actions-only` checks synchronous action depth.',
+          '可选 `IMutationPolicyMode`：默认 `off` 接纳写入，`actions-only` 检查同步动作深度。'
         )
       },
       returns: t(
         'New MutationPolicy with independent synchronous action depth, initially zero; no resource cleanup is required and the caller must share this exact guard with protected stores.',
         '返回独立持有初始零同步动作深度的新策略，无需资源清理，调用者须向受保护状态容器共享此精确守卫。'
       ),
-      example: policyExample
+      example: storeMiddlewareCases.MutationPolicy![0]!.example,
+      exampleIntro: t(
+        '`new MutationPolicy(mode?)` and `createMutationPolicy(mode?)` have the same defaults. `runInAction(fn)` accepts a no-argument callback and returns its exact result; returning a Promise does not keep the scope open. `insideAction` reports current synchronous depth. `assertMutationAllowed(operation?)` takes an optional diagnostic label, default `mutation`, and returns void or throws `ACTION_SCOPE_REQUIRED` in strict mode outside the scope. The policy allocates no disposable resource.',
+        '`new MutationPolicy(mode?)` 与 `createMutationPolicy(mode?)` 使用相同默认值；`runInAction(fn)` 接收无参数回调并返回其原始结果，回调返回 Promise 也不延长作用域。`insideAction` 表示当前同步动作深度是否大于零，`assertMutationAllowed(operation?)` 接收可选诊断标签，默认 `mutation`，通过时无返回值，严格模式的作用域外抛 `ACTION_SCOPE_REQUIRED`；策略本身不分配需要释放的资源。'
+      ),
+      cases: storeMiddlewareCases.MutationPolicy
     },
     createStoreMiddlewareHost: {
       role: 'factory',
@@ -688,7 +694,12 @@ export const storeMiddlewareReference: ILibraryReference = {
         'The canonical frozen managed IStoreMiddlewareHost with domain members, live getters and fluent returns retaining this same handle; dispose returns structured cleanup results. Invalid host options use INVALID_OPTION and delegated lifecycle failures retain plugin-host identity.',
         '返回规范冻结受管句柄，领域成员、实时读取器及链式返回共用同一句柄，销毁返回结构化清理结果，非法宿主选项使用 `INVALID_OPTION`，委托生命周期失败保留插件宿主身份。'
       ),
-      example: hostExample
+      example: storeMiddlewareCases.createStoreMiddlewareHost![0]!.example,
+      exampleIntro: t(
+        'Install `@migaia/reactive` directly for `createRuntime`. Its optional `onError(error, context)` receives reported diagnostics; these examples collect the error and ignore context, while omission uses the Runtime adapter reporter. `runtime` and the synchronous zero-argument `getState` are required Host fields. `execution.mutationTimeoutMs` and `execution.pipelineDrainTimeoutMs` are also required, each a nonnegative finite number or `false` for no deadline. `runAction(name, fn, metadata?)` takes a label and callback, with metadata omitted by default, and returns the callback result. `loggerMiddleware(sink?)` receives `(event, state)`; its default sink prints `[store]`, event, and state. `attachBindingDisposer(disposer)` accepts a synchronous no-argument cleanup. Plugin `name` identifies registration; `install(core)` registers resources with `core.onDispose` and returns extensions. `dispose()` takes no arguments and returns the shared structured disposal Promise.',
+        '使用 `createRuntime` 时须直接安装 `@migaia/reactive`；其可选 `onError(error, context)` 接收诊断报告，本例收集错误并忽略上下文，省略时使用运行时适配器的报告方法。宿主字段 `runtime` 与同步无参数 `getState` 必填，`execution.mutationTimeoutMs`、`execution.pipelineDrainTimeoutMs` 也必填，分别接受非负有限毫秒数或不设置截止时间的 `false`。`runAction(name, fn, metadata?)` 接收标签与回调，默认省略元数据，返回回调结果；`loggerMiddleware(sink?)` 的接收器获得 `(event, state)`，默认输出 `[store]`、事件与状态。`attachBindingDisposer(disposer)` 接收同步无参数清理函数；插件 `name` 标识登记，`install(core)` 通过 `core.onDispose` 登记资源并返回扩展。`dispose()` 无参数，返回共享的结构化释放 Promise。'
+      ),
+      cases: storeMiddlewareCases.createStoreMiddlewareHost
     },
     bindStoreMiddleware: {
       role: 'factory',
@@ -707,7 +718,12 @@ export const storeMiddlewareReference: ILibraryReference = {
         'The same canonical frozen managed IStoreMiddlewareBinding with original store reference, live revision and fluent returns retaining store/domain members. Partial subscription failure rolls back; secondary rollback failures produce CLEANUP_FAILED aggregate with original primary first.',
         '返回含原存储引用、实时修订及领域成员的同一规范冻结受管绑定，链式返回保留这些成员，部分订阅失败会回滚，次要回滚失败产生主失败在首位的 `CLEANUP_FAILED` 聚合错误。'
       ),
-      example: bindingExample
+      example: storeMiddlewareCases.bindStoreMiddleware![1]!.example,
+      exampleIntro: t(
+        'Install `@migaia/store-light` directly for `createStore`. The examples supply an ordinary state shape with count and an increment action; optional Store `mutationPolicy` reuses this package’s policy object. Other Store options are omitted: Runtime defaults to `defaultRuntime`, while omitting Store `mutationPolicy` leaves it `undefined` without an extra guard. The binding requires explicit `execution` budgets: both timeout fields accept nonnegative finite milliseconds or `false`, with no implicit budget. `host.use(plugin)` installs `loggerMiddleware`, whose optional sink receives `(event, state)` and defaults to console output. The event type is `action`, `state`, or `error`; action start/end are forwarded, not wrapped in another action. `store.$runtime.flush()` drains pending state observation synchronously. `host.runAction(name, fn)` enters the shared policy; `host.mutationPolicy` exposes that same object. Binding `dispose()` detaches observers, while the caller later awaits `store.$dispose()` separately.',
+        '使用 `createStore` 时须直接安装 `@migaia/store-light`；示例传入含 `count` 字段与 `increment` 动作的普通状态结构，可选 Store 选项 `mutationPolicy` 复用本包策略对象，其他 Store 选项省略，运行时默认 `defaultRuntime`；Store 的 `mutationPolicy` 省略时为 `undefined`，不附加额外守卫。绑定的 `execution` 必须显式提供，两个超时字段均接受非负有限毫秒数或 `false`，没有隐式预算。`host.use(plugin)` 安装 `loggerMiddleware`，其可选接收器获得 `(event, state)`，默认输出到控制台；事件类型为 `action`、`state` 或 `error`，动作开始与结束直接转发，不再包一层动作。`store.$runtime.flush()` 同步排空待处理状态观察，`host.runAction(name, fn)` 进入共享策略，`host.mutationPolicy` 暴露同一策略对象；绑定的 `dispose()` 只分离观察者，之后由调用者另行等待 `store.$dispose()`。'
+      ),
+      cases: storeMiddlewareCases.bindStoreMiddleware
     },
     loggerMiddleware: {
       role: 'enhancer',
@@ -809,7 +825,12 @@ export const storeMiddlewareReference: ILibraryReference = {
         'Groups three existing operation functions: immutable(value) requires independence or throws, opaque(value) returns identical input, diagnostic(value) permits unsupported subtree aliases. These are executable functions rather than mode strings.',
         '组合三个已有操作函数，不可变函数要求独立否则抛错，不透明函数原样返回，诊断函数允许不支持子树共享，成员是可调用函数而非模式字符串。'
       ),
-      example: cloneExample
+      example: storeMiddlewareCases.ClonePolicy![0]!.example,
+      exampleIntro: t(
+        'Import only from the public `@migaia/store-middleware/tolerant-clone` subpath. Each member takes one `value` and no options: `immutable(value)` requires an independent supported data graph or throws; `opaque(value)` returns the original value; `diagnostic(value)` attempts copying but may keep unsupported subtree references. The returned independent clone is not frozen. The example’s enumerable accessor is rejected by immutable admission before its getter executes; callback identity is intentionally retained by diagnostic fallback.',
+        '从公开子入口 `@migaia/store-middleware/tolerant-clone` 导入；每个成员都只接收一个 `value`，没有选项：`immutable(value)` 要求支持的数据图得到独立副本，否则抛错，`opaque(value)` 返回原值，`diagnostic(value)` 尽力复制，仍可能保留不支持子树的引用。独立副本并未冻结；本例可枚举访问器在 getter 执行前被严格策略拒绝，诊断回退则有意保留回调身份。'
+      ),
+      cases: storeMiddlewareCases.ClonePolicy
     },
     createStoreMiddlewareError: {
       role: 'operation',
@@ -1058,7 +1079,10 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         },
         mutationPolicy: {
           ...domainMembers.mutationPolicy!,
-          default: t('A new off MutationPolicy instance.', '默认新建无约束变更策略实例。')
+          default: t(
+            "`createMutationPolicy('off')`: a new permissive policy.",
+            "`createMutationPolicy('off')`：新建不附加写入限制的策略。"
+          )
         },
         pipeline: {
           summary: t(
@@ -1105,15 +1129,15 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         mutationPolicy: {
           ...domainMembers.mutationPolicy!,
           default: t(
-            'A new off policy; strict binding must explicitly share the Store policy.',
-            '默认新建无约束策略，严格绑定必须显式共享存储策略。'
+            "`createMutationPolicy('off')`; strict binding must explicitly share the Store policy.",
+            "默认 `createMutationPolicy('off')`，严格绑定必须显式共享 Store 策略。"
           )
         },
         actionPrefix: f(
           'Application string prefix for forwarded Runtime action names; state subscriptions are not filtered by it.',
           '转发运行时动作名使用的应用字符串前缀，不用于筛选状态订阅。',
-          'No prefix filter; all action traces are forwarded.',
-          '默认无前缀筛选，转发全部动作追踪。'
+          '`undefined`: no prefix filter; all action traces are forwarded.',
+          '`undefined`：不筛选前缀，转发全部动作追踪。'
         ),
         clone: {
           summary: t(
@@ -1131,8 +1155,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
             '返回记录快照，独立性取决于选定复制实现。'
           ),
           default: t(
-            'ClonePolicy.diagnostic, with unsupported subtree references retained when necessary.',
-            '默认诊断复制策略，必要时保留不支持子树引用。'
+            '`state => ClonePolicy.diagnostic(state)`, retaining unsupported subtree references when necessary.',
+            '`state => ClonePolicy.diagnostic(state)`：必要时保留不支持子树引用。'
           ),
           example: bindingExample
         }

@@ -8,19 +8,29 @@ import {
   tryReadProperty
 } from '@migaia/utils/error'
 
+/**
+ * Package semantic failure with a stable code, optional structured detail and native cause chain.
+ * Use code/source for classification; detail describes the operation without replacing its cause.
+ * Installation and cleanup producers retain original failures through cause or error collections.
+ */
 export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
   /** The `source` component of `(source, code)`, always `'@migaia/plugin-host'`. */
   readonly source: string
+  /** Stable scenario code from PluginHostErrorCode, independent of the human-readable message. */
   readonly code: IPluginHostErrorCode
   /**
    * Structured diagnostics, such as queue timeout `owner` and `waitedMs`, kept separate from
    * `cause`.
    */
   readonly detail?: TDetail
+  /** Constructs a semantic error without rewriting the original error carried by options.cause. */
   constructor(
     code: IPluginHostErrorCode,
     message: string,
-    options?: ErrorOptions & { readonly detail?: TDetail }
+    options?: ErrorOptions & {
+      /** Optional producer-owned diagnostic payload, retained by identity rather than copied. */
+      readonly detail?: TDetail
+    }
   ) {
     super(message, options)
     this.name = 'PluginHostError'
@@ -67,7 +77,7 @@ export function formatPluginHostDiagnostic(target: object, message: string): str
  * Attaches `(source, code)` to an existing error without changing `message`, `name`, `stack`, or
  * other fields. Use this for input validation that retains a native type for checks such as
  * `instanceof TypeError`. The return type exposes `source` and `code` while preserving the original
- * error type. See `docs/contracts/error-codes.md`.
+ * error type.
  */
 export function tagPluginHostError<E extends Error>(
   error: E,
@@ -142,7 +152,7 @@ const PREFIX = '[plugin-host] '
 /** Uses stable English package text; consumers localize by `(source, code)` at their boundary. */
 const prefixed = (en: string): string => `${PREFIX}${en}`
 
-/** PluginHost 错误与诊断文本集中维护处，便于调用方和维护者查找。 */
+/** PluginHost 错误与诊断文本集中维护处；按稳定 code 分类，文本工厂只格式化消息而不创建错误。 */
 const ERROR_TEXT = {
   /** Public callback failures need a stable fallback when their original error cannot be annotated. */
   CALLBACK_FAILED: prefixed('host callback failed'),
@@ -150,10 +160,13 @@ const ERROR_TEXT = {
   HOST_IDENTITY_ENTROPY: prefixed('host node identity requires secure randomness'),
   /** Stable validation text for the optional human-readable Host identity name. */
   HOST_IDENTITY_NAME: prefixed('host identity name must be a non-empty string'),
+  /** 拒绝已进入终态的 Host 操作；需要新建 Host 而非重试旧实例。 */
   HOST_DISPOSED: prefixed('host is disposed'),
+  /** 拒绝正在关闭的 Host 的新操作，区别于已完成关闭。 */
   HOST_DISPOSING: prefixed('host is disposing'),
   /** Stable text for a composition target this package never registered as a managed host. */
   COMPOSITION_TARGET_UNMANAGED: prefixed('target is not a managed host of this package'),
+  /** 构造参数的 runner 模式不属于公开四种模式时使用。 */
   INVALID_PIPELINE_MODE: prefixed('invalid pipeline mode'),
   /** Stable text distinguishing a temporarily disabled Feature prerequisite owner. */
   PREREQUISITE_DISABLED: (key: PropertyKey, owner: string) =>
@@ -179,15 +192,23 @@ const ERROR_TEXT = {
   CONFIG_CYCLE_REJECTED: (path: string) => prefixed(`config contains a cycle: ${path}`),
   /** Feature definition validation uses these stable boundary messages under `INVALID_OPTION`. */
   FEATURE_FACTORY_REQUIRED: prefixed('feature factory must be a function'),
+  /** Dependency aliases must live in a plain record rather than an arbitrary instance or array. */
   FEATURE_DEPENDENCIES_RECORD: prefixed('feature dependencies must be a plain record'),
+  /** Captured dependency records cannot contain accessors, symbols or hidden fields. */
   FEATURE_DEPENDENCIES_DATA: prefixed(
     'feature dependencies must contain enumerable string data properties'
   ),
+  /** Dependency entries must retain trusted Feature/reference identities rather than lookalikes. */
   FEATURE_DEPENDENCIES_DEFINED: prefixed('feature dependencies must contain defined features'),
+  /** Local Feature cycles fail planning before any factory runs. */
   FEATURE_DEPENDENCIES_CYCLE: prefixed('feature dependencies must not cycle'),
+  /** Factories must publish synchronous object outputs; async methods on those objects are allowed. */
   FEATURE_FACTORY_OUTPUT: prefixed('feature factory must return a synchronous object'),
+  /** Definition admission accepts an explicit expose object or a synchronous expose factory. */
   PLUGIN_FEATURE_EXPOSE: prefixed('plugin featureExpose must be an object or function'),
+  /** Registration construction rejects an expose factory that does not return an object. */
   PLUGIN_FEATURE_EXPOSE_OUTPUT: prefixed('plugin featureExpose must return an object'),
+  /** Only captured own enumerable methods become guarded Feature capabilities. */
   PLUGIN_FEATURE_EXPOSE_DATA: prefixed(
     'plugin featureExpose must contain enumerable method data properties'
   ),
@@ -234,6 +255,7 @@ const ERROR_TEXT = {
     prefixed(`config callable is unsupported: ${reason}`),
   /** Public readonly facades use this stable text for every attempted object mutation. */
   CONFIG_READONLY: prefixed('config is readonly'),
+  /** 标明不受 runner 支持的阶段提升组合，供调用方选择兼容模式。 */
   PIPELINE_MODE_MISMATCH: (hostMode: string, stageMode: string) =>
     prefixed(`host is in ${hostMode} mode and cannot register a ${stageMode} stage`),
   /** Pipeline stage 对同一次 step 重复调用了 next()。 */
@@ -244,6 +266,7 @@ const ERROR_TEXT = {
   PIPELINE_NEXT_CALLED_LATE: prefixed(
     'pipeline stage called next() after returning or completing; the call was ignored'
   ),
+  /** 拒绝在当前执行窗口里改动阶段集合，保持本次 traversal 的快照边界。 */
   PIPELINE_EXECUTING: prefixed('pipeline stages cannot be registered during pipeline execution'),
   /** `pipeline.ts#runAsyncPipeline` 同时观测到 stage 与 downstream 失败时使用。 */
   PIPELINE_STAGE_AND_DOWNSTREAM_FAILED: 'pipeline stage and downstream failed',
@@ -291,6 +314,7 @@ const ERROR_TEXT = {
   PLUGIN_DEFINITION_INVALID: prefixed('plugin definition contains unsupported fields'),
   /** 插件卸载存在清理失败。 */
   PLUGIN_DISPOSE_FAILED: (name: string) => prefixed(`plugin "${name}" failed to dispose`),
+  /** 安装或发布失败的主错误消息，原失败保留在 cause，回滚失败另行记录。 */
   PLUGIN_INSTALL_FAILED: (name: string) => prefixed(`plugin "${name}" failed to install`),
   /** `useSync` rejects a setup plugin before any hook runs; callers use the async path. */
   SETUP_REQUIRES_ASYNC_INSTALL: (name: string) =>
@@ -302,19 +326,23 @@ const ERROR_TEXT = {
   /** Reports failure to release a resource registered after setup closed. */
   SETUP_LATE_RELEASE_FAILED: (name: string) =>
     prefixed(`plugin "${name}" late setup resource release failed`),
+  /** 安装主失败后的次要回滚诊断，不替换原始构造失败。 */
   PLUGIN_ROLLBACK_FAILED: (name: string) => prefixed(`plugin "${name}" install rollback failed`),
   /** 资源注册不在 install 生命周期内。 */
   RESOURCE_OUTSIDE_INSTALL: prefixed('resources can only be registered during plugin install()'),
   /** A plugin resource must expose a disposer for install and late setup cleanup. */
   PLUGIN_RESOURCE_DISPOSER: 'plugin resource must provide a disposer',
+  /** 在生命周期钩子的受保护窗口内重入结构变更时拒绝，避免等待自身事务。 */
   LIFECYCLE_MUTATION: prefixed('Host mutations are forbidden during plugin lifecycle callbacks'),
   /** 插件名称重复。 */
   PLUGIN_DUPLICATE: (name: string) => prefixed(`plugin "${name}" is already installed`),
   /** 插件扩展属性冲突。 */
   EXTENSION_DUPLICATE: (name: string, key: PropertyKey) =>
     prefixed(`plugin "${name}" extension "${String(key)}" is already occupied`),
+  /** 扩展不能占据 Object.prototype 的协议键；消息同时定位插件与冲突键。 */
   EXTENSION_OBJECT_PROTOTYPE: (name: string, key: PropertyKey) =>
     prefixed(`plugin "${name}" extension "${String(key)}" conflicts with the Object prototype`),
+  /** 扩展不能覆盖 Host 保留能力，调用方须改用不冲突的公开名称。 */
   EXTENSION_RESERVED: (name: string, key: PropertyKey) =>
     prefixed(`plugin "${name}" extension "${String(key)}" is reserved`),
   /** 正式 SLA：mutation 在 FIFO 队列中等待超过阈值。 */

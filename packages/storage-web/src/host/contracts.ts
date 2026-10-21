@@ -171,8 +171,14 @@ export type IStorageNativeFeatureExpose<
   TFeatures extends IFeatureRecord,
   TStore extends IKeyValueStore = IKeyValueStore
 > = {
+  /**
+   * Read this registration's original Store after registration; it cannot substitute another
+   * backend.
+   */
   readonly getStore: () => TStore
+  /** Read this registration's exact backend id. */
   readonly getBackendId: () => string
+  /** FeatureExpose must stay synchronous and cannot be thenable. */
   readonly then?: never
 } & IFeatureRecordRequiredExpose<TFeatures>
 
@@ -181,17 +187,31 @@ export type IStoragePluginCore<
   TStore extends IKeyValueStore = IKeyValueStore,
   TFeatures extends IFeatureRecord = Record<never, never>
 > = {
+  /**
+   * Register the exact Store once during install; Host assumes its rollback/disposal ownership
+   * after admission.
+   */
   readonly registerStore: (store: TStore) => void
+  /** Read this registration's Store after registerStore has succeeded. */
   readonly getStore: () => TStore
+  /** Read the bounded id assigned to this backend registration. */
   readonly getBackendId: () => string
+  /** Resolved outputs of this definition's direct native Feature dependencies. */
   readonly features: IFeatureOutputs<TFeatures>
+  /** Registration-local Store access bridge for native Features. */
   readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>
 }
 
 /** Native descriptor vocabulary owned by Storage's short public definition form. */
 export type IStorageNativePluginDescriptor = {
+  /**
+   * Optional setup hook registering the Store and returning extension data; rejection rolls back
+   * the Host batch.
+   */
   readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>
+  /** Optional synchronous public extension projection. */
   readonly expose?: () => Record<string, unknown>
+  /** Optional synchronous Feature bridge; reserved Store access fields remain Storage-owned. */
   readonly featureExpose?: () => object
 }
 
@@ -225,7 +245,11 @@ type IStorageFeatureStoreCompatibility<
     ? unknown
     : { readonly storageFeatureStoreMustSatisfyRequiredExpose: never }
 
-/** Defines a Storage Feature with the registration-local Store capabilities available by default. */
+/**
+ * Define a synchronous native Feature with registration-local Store access and optional direct
+ * Feature dependencies. The factory runs during Host installation; its immutable token grants no
+ * Store until that registration admits one.
+ */
 export const defineFeature = <
   const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
   TOutput extends object = Record<never, never>
@@ -501,7 +525,11 @@ export const readStorageNativePluginMetadata = (plugin: object) => nativePluginM
 export const readStorageNativePluginDefinition = (plugin: object) =>
   nativePluginDefinitions.get(plugin)
 
-/** Validates the bounded, case-sensitive backend identifier contract before any mutation. */
+/**
+ * Validate a case-sensitive backend id before mutation: an ASCII letter followed by up to 63
+ * letters, digits, dots, underscores or hyphens. Invalid input throws a native TypeError with
+ * BACKEND_ID_INVALID.
+ */
 export const assertStorageBackendId: (id: unknown) => asserts id is string = (id) => {
   if (typeof id !== 'string' || !/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(id)) {
     throw createStorageTypeError(

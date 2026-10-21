@@ -52,15 +52,21 @@ function readRegistrationOwned(options: unknown): boolean {
   }
 }
 
+/** Scalar snapshot values; runtime validation admits only finite numbers. */
 export type IJSONPrimitive = string | number | boolean | null
+/** Plain JSON tree without native objects, unsupported primitives or ancestor cycles. */
 export type IJSONValue =
   | IJSONPrimitive
   | readonly IJSONValue[]
   | { readonly [key: string]: IJSONValue }
 
+/** Versioned Store/resource payload shared by dehydration, script encoding and hydration. */
 export type ISSRState = {
+  /** Supported outer SSR version, independent of resource cache versions. */
   readonly version: 1
+  /** Store snapshots indexed by nonempty registration keys other than **proto**. */
   readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>
+  /** Optional cache map; omission is accepted, while dehydration emits an empty map. */
   readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>
 }
 
@@ -74,30 +80,47 @@ export type ITrustedSSRState = ISSRState & {
   readonly [trustedSSRBrand]: true
 }
 
+/** Minimal Store contract; cleanup belongs to the scope only for owned registrations. */
 export type ISSRStore = {
+  /** Exact Runtime identity required to match the receiving scope. */
   readonly $runtime: IRuntime
+  /** Whether Store cleanup already ran inside or outside this scope. */
   readonly $disposed: boolean
+  /** Return current plain state; dehydrate copies it while the trusted path retains it. */
   $plain(): Record<string, unknown>
+  /** Apply state under Store policy; thrown failures remain observable. */
   $hydrate(state: Record<string, unknown>): void
+  /** Release owned work; async completion is observed by scope.disposeAsync(). */
   $dispose(): void | PromiseLike<void>
 }
 
+/** Minimal Resource contract for prefetch waiting, cache hydration and synchronous release. */
 export type ISSRResource = {
+  /** Exact Runtime identity required to match the receiving scope. */
   readonly runtime: IRuntime
+  /** Whether resource-owned work was already released. */
   readonly disposed: boolean
+  /** Current work identity; replacement Promises participate in later wait rounds. */
   readonly promise: Promise<unknown>
+  /** Return includable cache state, or undefined to omit this resource from the payload. */
   dehydrate(): IResourceCacheSnapshot<unknown> | undefined
+  /** Apply cache state under Resource-owned validation and lifetime policy. */
   hydrate(snapshot: IResourceCacheSnapshot<unknown>): void
+  /** Release work synchronously; SSR does not await a returned value. */
   dispose(): void
 }
 
+/** Lifetime policy committed only after matching pending hydration succeeds. */
 export type ISSRRegistrationOptions = {
-  /** Request scopes own registered stores by default. */
+  /** Defaults to true for Stores/resources; false leaves cleanup with the caller. */
   readonly owned?: boolean
 }
 
+/** Select an existing Runtime or options for a fresh one; the scope never disposes it. */
 export type ISSRRequestScopeOptions = {
+  /** Optional existing Runtime; sharing it does not create request isolation. */
   readonly runtime?: IRuntime
+  /** Optional new-Runtime configuration; supplying both this and runtime fails. */
   readonly runtimeOptions?: IRuntimeOptions
 }
 
@@ -115,22 +138,29 @@ type ISSRResourceRegistration = {
   readonly order: 0
 }
 
+/** Local prefetch diagnostic, not automatically embedded in dehydrated state. */
 export type ISSRResourceFailure = {
+  /** Registration whose work failed, could not be read, or exceeded its deadline. */
   readonly key: string
+  /** Original rejection/read failure, or a package-owned RESOURCE_TIMEOUT error. */
   readonly error: unknown
 }
 
+/** Wait and diagnostic policy applied before taking a validated snapshot. */
 export type IDehydrateAsyncOptions = {
-  /** Overrides the default resource failure reporting through `Runtime.onError`. */
+  /** Optional hook replacing default Runtime reporting; its own failure does not stop dehydration. */
   readonly onResourceError?: (failure: ISSRResourceFailure) => void
   /**
    * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking
-   * rendering indefinitely.
+   * rendering indefinitely. Omission sets no deadline; zero expires pending work immediately.
+   * Finite 0..2147483647 millisecond values are accepted, including fractions.
    */
   readonly timeoutMs?: number
 }
 
+/** Shared wall-clock wait budget; it does not cancel underlying Resource work. */
 export type IAwaitResourcesOptions = {
+  /** Defaults to no deadline; finite 0..2147483647 ms is accepted, with zero expiring pending work. */
   readonly timeoutMs?: number
 }
 
@@ -200,6 +230,7 @@ async function raceOutcome<T>(
  * `await`. Ownership and internal graph maps use object identity instead of request identity.
  */
 export class SSRRequestScope {
+  /** Runtime retained for equality checks and reporting; never disposed by this scope. */
   readonly runtime: IRuntime
   /** Stores accepted by this request; ownership transfers only after pending hydration succeeds. */
   #registrations = new Map<string, ISSRRegistration>()
@@ -227,6 +258,11 @@ export class SSRRequestScope {
     this.#resolveDisposedSignal = resolve
   })
 
+  /**
+   * Create a request registry with a fresh Runtime by default, or retain the supplied Runtime.
+   * Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION. Create separate
+   * scopes and Runtimes for request isolation; construction creates no Stores or resources.
+   */
   constructor(options: ISSRRequestScopeOptions = {}) {
     assertOptionObject(options)
     let runtime: IRuntime | undefined
@@ -249,10 +285,18 @@ export class SSRRequestScope {
     claimOwnership(this, this.runtime)
   }
 
+  /** True as soon as teardown starts, before any owned cleanup callback runs. */
   get disposed(): boolean {
     return this.#disposed
   }
 
+  /**
+   * Register a same-Runtime Store under a unique nonempty key other than **proto**. Ownership
+   * defaults to true. Pending hydration runs before commit; a hydration throw while the scope stays
+   * active leaves the key free and state retained. Reentrant scope closure rejects admission
+   * without taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes
+   * and cross-Runtime Stores fail with their corresponding SSR code.
+   */
   register(key: string, store: ISSRStore, options: ISSRRegistrationOptions = {}): void {
     this.#assertActive()
     const owned = readRegistrationOwned(options)
@@ -284,6 +328,11 @@ export class SSRRequestScope {
     if (hydration) this.#pendingHydration.delete(key)
   }
 
+  /**
+   * Remove a Store, returning false when absent. disposeOwned defaults to true and starts cleanup
+   * only for owned entries; async cleanup is tracked for disposeAsync(). Removal precedes cleanup,
+   * so a thrown Store failure does not restore registration. Closed scopes throw SCOPE_DISPOSED.
+   */
   unregister(key: string, disposeOwned = true): boolean {
     this.#assertActive()
     const registration = this.#registrations.get(key)
@@ -295,7 +344,10 @@ export class SSRRequestScope {
     return true
   }
 
-  /** Remove a registration without disposing it; ownership transfers to the caller. */
+  /**
+   * Remove a Store without cleanup and return its exact reference, or undefined when absent. The
+   * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED.
+   */
   detach(key: string): ISSRStore | undefined {
     this.#assertActive()
     const registration = this.#registrations.get(key)
@@ -304,6 +356,13 @@ export class SSRRequestScope {
     return registration.store
   }
 
+  /**
+   * Register a same-Runtime resource with ownership defaulting to true. Store/resource keys use
+   * separate registries. Pending hydration runs before commit; a throw while the scope stays active
+   * leaves the key free and state retained. Reentrant scope closure rejects admission without
+   * taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes and
+   * cross-Runtime resources fail with their corresponding SSR code.
+   */
   registerResource(
     key: string,
     resource: ISSRResource,
@@ -338,6 +397,11 @@ export class SSRRequestScope {
     if (hydration) this.#pendingResourceHydration.delete(key)
   }
 
+  /**
+   * Remove a resource, returning false when absent. disposeOwned defaults to true; owned cleanup
+   * runs before deletion, so a thrown cleanup leaves this registration present. Nonowned resources
+   * are only unregistered. Closed scopes throw SCOPE_DISPOSED.
+   */
   unregisterResource(key: string, disposeOwned = true): boolean {
     this.#assertActive()
     const registration = this.#resources.get(key)
@@ -347,6 +411,10 @@ export class SSRRequestScope {
     return true
   }
 
+  /**
+   * Remove a resource without cleanup and return its exact reference, or undefined when absent. The
+   * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED.
+   */
   detachResource(key: string): ISSRResource | undefined {
     this.#assertActive()
     const registration = this.#resources.get(key)
@@ -360,7 +428,9 @@ export class SSRRequestScope {
    * its own hydration; every other entry is still attempted and failures are collected. The
    * contracts provide no stage/commit/rollback protocol, so successful changes remain applied.
    * Pending hydration records always reflect the entries actually consumed, including when a later
-   * entry fails. Callers must handle partial application rather than assume rollback.
+   * entry fails. Callers must handle partial application rather than assume rollback. Each call
+   * replaces pending tables for unregistered keys. One hydration callback failure is rethrown by
+   * identity; several become HYDRATE_FAILED with ordered errors.
    */
   hydrate(state: ISSRState): void {
     this.#assertActive()
@@ -409,6 +479,12 @@ export class SSRRequestScope {
     }
   }
 
+  /**
+   * Copy/freeze JSON Store state and includable resource data, sorting keys and omitting disposed
+   * or valueless entries. Getters may execute. Unsupported values, cycles or depth/node limits fail
+   * with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or waiting
+   * occurs.
+   */
   dehydrate(): ISSRState {
     this.#assertActive()
     const stores: Record<string, Readonly<Record<string, IJSONValue>>> = Object.create(null)
@@ -436,11 +512,13 @@ export class SSRRequestScope {
   }
 
   /**
-   * Returns live dehydration references without copying, freezing or validation. Later mutations
-   * can change the payload before serialization, including across an await; this is not a snapshot.
-   * Use only for known-safe JSON data that stays immutable through serialization, such as owned
+   * Returns live business references without copying, deep-freezing or validation. Outer state and
+   * registration maps are shallow-frozen; later mutations to retained business values can change
+   * the payload before serialization, including across an await; this is not a snapshot. Use only
+   * for known-safe JSON data that stays immutable through serialization, such as owned
    * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate()
-   * instead. Select this fast path only when skipping validation and copying is justified.
+   * instead. Select this unchecked path only when skipping validation and copying is justified. The
+   * TypeScript brand is not runtime validation; closed scopes throw SCOPE_DISPOSED.
    */
   dehydrateTrusted(): ITrustedSSRState {
     this.#assertActive()
@@ -472,7 +550,10 @@ export class SSRRequestScope {
    * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same
    * key is awaited. One resource failure does not block other prefetches. Thrown promise getters
    * and timeouts are included in the failure list. Disposal during the wait returns results already
-   * collected without marking remaining resources as failures.
+   * collected without marking remaining resources as failures. The timeout is one total budget,
+   * with no deadline by default; waiting observes late rejection but never aborts resource work.
+   * Nonconverging waterfalls reject RESOURCE_ROUND_LIMIT, invalid budgets reject INVALID_OPTION,
+   * and an already-closed scope rejects SCOPE_DISPOSED.
    */
   async awaitResources(
     options: IAwaitResourcesOptions = {}
@@ -571,8 +652,10 @@ export class SSRRequestScope {
    * result; the failure list does not independently filter payload keys.
    *
    * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client
-   * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting
-   * instead.
+   * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead.
+   * Resource failures do not independently remove payload keys: each resource decides inclusion.
+   * Disposal during waiting can make the final dehydrate() reject SCOPE_DISPOSED. Timeout options
+   * use awaitResources() semantics; returned state has not yet been HTML-encoded.
    */
   async dehydrateAsync(options: IDehydrateAsyncOptions = {}): Promise<ISSRState> {
     let onResourceError: IDehydrateAsyncOptions['onResourceError']
@@ -615,6 +698,13 @@ export class SSRRequestScope {
     return this.dehydrate()
   }
 
+  /**
+   * Close admission, interrupt waits, clear state and start owned cleanup once: resources in
+   * reverse registration order, then Stores in reverse order. Disposed/nonowned entries are skipped
+   * and the Runtime stays caller-owned. All cleanup is attempted before a sole sync failure is
+   * rethrown or several become SCOPE_DISPOSAL_FAILED. Async Store jobs are observed by
+   * disposeAsync(); repeated dispose() is a no-op.
+   */
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
@@ -710,11 +800,20 @@ export class SSRRequestScope {
   }
 }
 
+/**
+ * Create a request scope with a fresh Runtime by default or a supplied Runtime by identity. Invalid
+ * configuration throws INVALID_OPTION. Register request-local values and close the scope; use
+ * disposeAsync() when Store cleanup must settle before request completion.
+ */
 export function createSSRRequestScope(options: ISSRRequestScopeOptions = {}): SSRRequestScope {
   return new SSRRequestScope(options)
 }
 
-/** JSON text safe inside an application/json script element and HTML streams. */
+/**
+ * Validate state and return JSON escaping <, >, &, U+2028 and U+2029 for inline script content.
+ * State is not copied/frozen before stringify. Validation failures keep their SSR code; this
+ * creates no element or client hydration. Use createSSRStateScript for the complete script tag.
+ */
 export function serializeSSRState(state: ISSRState): string {
   assertSSRState(state)
   return escapeJSONForHTML(JSON.stringify(state))
@@ -723,7 +822,8 @@ export function serializeSSRState(state: ISSRState): string {
 /**
  * Serializes the value produced by `dehydrateTrusted()` — not a snapshot; see that method's doc
  * comment. Call this immediately after `dehydrateTrusted()`, before anything else can mutate the
- * state it references.
+ * state it references. HTML-sensitive characters are escaped, but no runtime brand or JSON-domain
+ * validation runs. JSON.stringify failures propagate; use serializeSSRState otherwise.
  */
 export function serializeTrustedSSRState(state: ITrustedSSRState): string {
   return escapeJSONForHTML(JSON.stringify(state))
@@ -747,6 +847,11 @@ function escapeJSONForHTML(json: string): string {
   return json.replace(HTML_UNSAFE_IN_JSON, (character) => HTML_JSON_ESCAPES[character])
 }
 
+/**
+ * Parse JSON and validate SSR state, returning the parsed object without freezing or hydration. Bad
+ * JSON retains its native SyntaxError with INVALID_STATE_SCRIPT; invalid shape/value keeps its SSR
+ * validation code. Input is serialized text rather than a complete HTML tag.
+ */
 export function deserializeSSRState(serialized: string): ISSRState {
   /** Parsing creates a native SyntaxError; classify it without replacing its class or stack. */
   let parsed: unknown
@@ -762,6 +867,11 @@ export function deserializeSSRState(serialized: string): ISSRState {
   return parsed
 }
 
+/**
+ * Return an application/json script tag with validated HTML-escaped SSR JSON. The id defaults to
+ * **STORE_STATE**, starts with a letter/underscore and allows letters, digits, _, :, . and - after
+ * it. Invalid ids throw INVALID_STATE_SCRIPT before serialization. This writes no DOM.
+ */
 export function createSSRStateScript(state: ISSRState, elementId = '__STORE_STATE__'): string {
   if (!SSR_ID_PATTERN.test(elementId)) {
     throw createStoreSsrError(
@@ -774,13 +884,20 @@ export function createSSRStateScript(state: ISSRState, elementId = '__STORE_STAT
 
 /** Minimal document surface accepted by the runtime-neutral SSR decoder. */
 export type ISSRDocument = {
+  /** Read an existing state element; no global document is accessed implicitly. */
   getElementById(elementId: string): {
+    /** Encoded payload without its surrounding script tag; null means no text. */
     readonly textContent: string | null
+    /** Read recorded codec/wire attributes; null selects decoder defaults. */
     getAttribute(name: string): string | null
   } | null
 }
 
-/** Reads an SSR payload from an injected document-like host. */
+/**
+ * Read plain SSR JSON from an injected document-like host; the id defaults to **STORE_STATE**.
+ * Missing host, element or empty text returns undefined. Present text is parsed/validated; host
+ * failures propagate. No DOM mutation or hydration occurs, and base64 is not interpreted here.
+ */
 export function readSSRStateFromDocument(
   elementId = '__STORE_STATE__',
   documentValue?: ISSRDocument
@@ -815,9 +932,13 @@ function assertElementId(elementId: string): void {
   }
 }
 
+/** Registry and HTML carrier selection for asynchronous state-script creation. */
 export type ISSRScriptOptions = {
+  /** Required registry; primaryType selects the format recorded in data-codec. */
   readonly codecs: ISerializeRegistry
+  /** Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding. */
   readonly elementId?: string
+  /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */
   readonly signal?: IAbortSignal
 }
 
@@ -829,6 +950,11 @@ export type ISSRScriptOptions = {
  * JSON text uses JSON-compatible escapes for characters such as `<`. Applying those escapes to YAML
  * or binary data would corrupt it. Other payloads use base64, whose alphabet excludes `<`, `>`,
  * `&`, and line separators. Base64 increases payload size by approximately one third.
+ *
+ * The required registry's primaryType chooses the recorded codec; only json + text uses direct
+ * application/json content. Other text/bytes chunks produce text/plain with data-wire=b64. Value
+ * chunks reject CODEC_CONTRACT. The default element id is **STORE_STATE**; invalid ids fail before
+ * encoding. The optional signal is forwarded to the registry, and this function writes no DOM.
  */
 export async function createSSRStateScriptWith(
   state: ISSRState,
@@ -864,14 +990,24 @@ export async function createSSRStateScriptWith(
   return `<script type="text/plain" id="${escapeAttribute(elementId)}" data-codec="${escapeAttribute(type)}" data-wire="b64">${payload}</script>`
 }
 
+/** Explicit codec/document selection for reading state without applying client hydration. */
 export type ISSRReadOptions = {
+  /** Required registry; the recorded data-codec selects its decoder. */
   readonly codecs: ISerializeRegistry
+  /** Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion. */
   readonly elementId?: string
+  /** Optional supplied host; omission returns undefined without a global lookup. */
   readonly document?: ISSRDocument
+  /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */
   readonly signal?: IAbortSignal
 }
 
-/** Reads a codec-tagged SSR payload from an injected document-like host. */
+/**
+ * Decode a registry-tagged script and validate the result without hydrating. Missing host, element
+ * or empty text returns undefined. Missing attributes default codec to json and wire to text; b64
+ * selects a bytes chunk, all other wire values select text. An unregistered codec rejects
+ * CODEC_CONTRACT; decoding/base64/validation failures retain their owning error boundary.
+ */
 export async function readSSRStateFromDocumentWith(
   options: ISSRReadOptions
 ): Promise<ISSRState | undefined> {
@@ -947,7 +1083,9 @@ function identifySnapshotFailure(error: unknown): Error {
 
 /**
  * Validates the public unknown input boundary without allowing inaccessible properties to escape
- * bare.
+ * bare. Checks outer version 1, Store JSON records and optional version-2 cache snapshots without
+ * copying, freezing or hydration. Getters may execute; malformed values retain their SSR/native
+ * failure identity. Each JSON value tree is bounded to depth 256 and one million visited nodes.
  */
 export function assertSSRState(value: unknown): asserts value is ISSRState {
   try {
@@ -1003,8 +1141,7 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
 /**
  * 校验专用的遍历。
  *
- * 之前这里直接借用 `toJSONObject`：它一边校验一边深拷贝并冻结整棵树，而校验路径 只需要「合不合法」这一个布尔——拷出来的那棵树当场就被丢掉。载荷越大浪费越大， 10k
- * 会话的量级上，纯校验 2.1ms、拷贝加冻结 5.7ms。
+ * 仅校验共享 JSON 值域，不创建或冻结副本；需要独立快照时由拷贝路径负责。
  *
  * 错误信息与路径与拷贝版逐条对齐：两者的判定顺序必须一致，否则同一份非法载荷在 dehydrate 与 serialize 两条路上会报出不同的原因。
  */
@@ -1139,8 +1276,7 @@ function toJSONValue(
       primitive: (entry) => entry,
       array: (entries) => Object.freeze([...entries]),
       object: (entries) => {
-        // 字面量而不是 Object.create(null)：无原型对象在 V8 里走字典模式，同一份
-        // 载荷 JSON.stringify 要慢近一倍，而这棵树的唯一用途就是被序列化。
+        // 使用普通对象承载待序列化的 JSON 副本。
         // `__proto__` 这个键仍不能直接赋值（那会改原型），单独走 defineProperty。
         const result: Record<string, IJSONValue> = {}
         for (const [key, converted] of entries) {

@@ -947,7 +947,7 @@ describe('decodeStream 与 collectStream', () => {
 
   it('keeps Option A as one documented stream receiver boundary', () => {
     const source = readFileSync(new URL('../src/stream.ts', import.meta.url), 'utf8')
-    expect(source).toContain('MRC-C-R02-only receiver boundary')
+    expect(source).toContain('Captured encoder receiver boundary')
     expect(source).toContain('invokeCollectEncoderWithReceiver')
     expect(source.match(/Reflect\.apply/g)).toHaveLength(6)
   })

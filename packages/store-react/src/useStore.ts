@@ -16,6 +16,12 @@ import {
 import { createObserverBinding, type ICapture } from '@migaia/reactive/extension'
 import { notifyReact } from './notify-react.js'
 
+/**
+ * Read an IStoreResource render snapshot and subscribe through its external-store protocol.
+ * Committed layouts acquire/release captures, with deferred cleanup tolerating StrictMode replay;
+ * speculative/server renders do not commit a lease. The resource owner controls value creation and
+ * retirement, and capture/read failures propagate from that protocol.
+ */
 export function useStoreResource<T>(resource: IStoreResource<T>): T {
   useSyncExternalStore(resource.subscribe, resource.getSnapshot, resource.getSnapshot)
   const leaseState = useRef<{
@@ -111,9 +117,13 @@ function createTrackingInstance<T>(
   }
 }
 
-// Keeps subscriptions stable and prevents render loops.
-// The committed reader is stored in a ref. The subscription effect reads that ref, so inline selectors do not recreate subscriptions.
-// `getSnapshot` returns an atomic selector snapshot and reuses equal snapshots. React checks the same value returned by the hook.
+/**
+ * Track a pure selector across React renders using the chosen Runtime, default defaultRuntime.
+ * Equality defaults to Object.is and reuses equal snapshot values. Render captures become active
+ * dependencies only at commit; abandoned selectors do not replace committed dependencies. React
+ * cleanup releases the observer, while Runtime and selected values remain caller-owned. Selectors
+ * and equality functions can be evaluated repeatedly and must not perform application mutations.
+ */
 export function useTracked<T>(
   read: () => T,
   isEqual: (a: T, b: T) => boolean = Object.is,
@@ -287,7 +297,11 @@ export function useTracked<T>(
   return snapshot.value
 }
 
-/** Subscribes to a public signal view and retains a setter bound to that signal's identity. */
+/**
+ * Read a Runtime-owned signal and return [value, setter], keeping setter identity until s changes.
+ * The setter assigns a value, not an updater function. Mounted observation is released by React;
+ * the signal and its Runtime are borrowed, and render/server snapshots use its current peek value.
+ */
 export function useSignal<T>(s: IReactiveSignal<T>) {
   // 快路径：Signal 的依赖集合恒为它自己，不需要 useTracked 的捕获/提交记账
   const value = useNodeValue(s, s.runtime)
@@ -300,7 +314,11 @@ export function useSignal<T>(s: IReactiveSignal<T>) {
   return [value, set] as const
 }
 
-// Provides selective store subscriptions with a `use`-prefixed hook name for React Compiler.
+/**
+ * Select Store fields through its own Runtime, subscribing only to captured reads. isEqual defaults
+ * to Object.is; an async Store first uses its readiness Promise and can suspend/reject in render.
+ * The hook releases its observer on unmount without disposing the borrowed Store or Runtime.
+ */
 export function useStore<S extends Record<string, unknown>, R>(
   store: IReactiveStore<S>,
   selector: (state: IStoreShape<S>) => R,
@@ -311,7 +329,11 @@ export function useStore<S extends Record<string, unknown>, R>(
   return useTracked(read, isEqual, store.$runtime)
 }
 
-// Subscribes to resource state and renders again when state changes, such as `pending`, `success`, or `error`.
+/**
+ * Read the Resource state union and subscribe to its transitions in the Resource's Runtime. This
+ * hook returns error/pending states instead of throwing them for Suspense; useResourceValue selects
+ * that render behavior. React releases only this subscription, not the borrowed Resource.
+ */
 export function useResource<T>(res: Resource<T>): IResourceState<T> {
   // Resource identity already captures the complete read semantics. Keep this
   // selector stable so each state transition can reuse the Effect candidate.

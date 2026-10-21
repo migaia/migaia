@@ -25,12 +25,14 @@ export const RemoteCatalogLimit = {
 
 /** The single method-mode domain used by TypeScript and the schema mirror. */
 export const RemoteMethodMode = {
-  request: 'request',
-  oneWay: 'one-way',
-  generator: 'generator',
-  asyncGenerator: 'async-generator'
+  /** Scalar call requiring a returned result. */ request: 'request',
+  /** Physical notification with no provider completion reply. */ oneWay: 'one-way',
+  /** Declared synchronous generator served through the stream owner. */ generator: 'generator',
+  /** Declared asynchronous generator served through the stream owner. */ asyncGenerator:
+    'async-generator'
 } as const
 
+/** Declared scalar, one-way or generator method execution mode. */
 export type RemoteMethodMode = (typeof RemoteMethodMode)[keyof typeof RemoteMethodMode]
 
 /** Stable grammar for plugin, feature, and method segments. */
@@ -49,19 +51,28 @@ export const REMOTE_METHOD_MODES: readonly RemoteMethodMode[] = Object.freeze(
 
 /** One explicitly declared remote method. */
 export type IRemoteMethodContract = Readonly<{
+  /** Declared request, one-way, generator or async-generator execution mode. */
   mode: RemoteMethodMode
+  /**
+   * Whether request replay after a lost generation is permitted; other modes cannot claim request
+   * replay.
+   */
   idempotent: boolean
 }>
 
 /** One feature's nonempty declared method table. */
 export type IRemoteFeatureContract = Readonly<{
+  /** Nonempty validated method-name table for this declared Feature. */
   methods: Readonly<Record<string, IRemoteMethodContract>>
 }>
 
 /** Portable application-level method description. */
 export type IRemoteContract = Readonly<{
+  /** Description grammar version; this advanced contract requires 1. */
   schemaVersion: 1
+  /** Validated plugin name that prefixes declared remote methods. */
   plugin: string
+  /** Validated Feature-name table defining the callable method whitelist. */
   features: Readonly<Record<string, IRemoteFeatureContract>>
 }>
 

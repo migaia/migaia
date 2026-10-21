@@ -7,6 +7,25 @@ import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
 const entry = fileURLToPath(new URL('./fixtures/lifecycle-worker.mjs', import.meta.url))
 
 describe('Node thread launcher', () => {
+  it('classifies native Worker option rejection and retains the native diagnostic on cause', async () => {
+    /** A rejected native runtime flag fails construction before any Worker can be acquired. */
+    const launching = createNodeThreadLauncher({ execArgv: ['--eval'] }).launch(
+      { entry },
+      { signal: new AbortController().signal }
+    )
+    await expect(launching).rejects.toBeInstanceOf(Error)
+    await expect(launching).rejects.toMatchObject({
+      source: '@migaia/rpc/core',
+      code: 'INVALID_CONFIG',
+      cause: {
+        code: 'ERR_WORKER_INVALID_EXEC_ARGV',
+        name: 'Error',
+        message: expect.stringContaining('invalid execArgv'),
+        stack: expect.any(String)
+      }
+    })
+    await expect(launching).rejects.toHaveProperty('cause', expect.any(Error))
+  })
   it('captures threadId once and resolves only after native exit', async () => {
     const launcher = createNodeThreadLauncher()
     const handle = await launcher.launch({ entry }, { signal: new AbortController().signal })

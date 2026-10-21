@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, redirect, useNavigate, type MetaFunction as IMetaFunction } from 'react-router'
 import {
   API_SEGMENT,
+  apiDisplayKind,
   README_SEGMENT,
   domainPath,
   guidePath,
@@ -109,9 +110,12 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   const packageHome = domain === 'guides' && topic === 'index'
   /** The README page renders only the maintained package README. */
   const readmePage = domain === 'guides' && topic === README_SEGMENT
+  /** English pages load only the English README; other English prose comes from guide journeys. */
   const documentation =
     locale !== 'zh'
-      ? 'none'
+      ? readmePage
+        ? 'readme'
+        : 'none'
       : readmePage
         ? 'readme'
         : domain === 'docs' || (packageHome && !journeyExists)
@@ -126,6 +130,7 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   /** Guide pages also receive the light API index because they share the library sidebar. */
   let content = await loadLibraryRouteContent(librarySlug, {
     documentation,
+    locale: guideLocale,
     includeApiIndex: true,
     selectedModule: domain === 'docs' ? 'index' : undefined
   })
@@ -136,6 +141,7 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
     selectedSymbolPath = selection.symbolPath
     content = await loadLibraryRouteContent(librarySlug, {
       documentation,
+      locale: guideLocale,
       includeApiIndex: true,
       selectedModule,
       selectedSymbol: selectedSymbolPath
@@ -500,6 +506,7 @@ function DocsLibrary({
         libraryApis={libraryApis}
         librarySlug={library.slug}
         locale={locale}
+        readmeLocales={library.readmeLocales}
         selectedSymbol={selectedPageSymbol}
       />
     ),
@@ -509,6 +516,7 @@ function DocsLibrary({
       typeEntryLinks,
       journeyTopics,
       library.slug,
+      library.readmeLocales,
       libraryApis,
       locale,
       selectedPageSymbol
@@ -589,8 +597,8 @@ function DocsLibrary({
           />
           {selectedPageSymbol ? (
             <p className="eyebrow api-eyebrow">
-              <span className="kind-badge" data-kind={selectedPageSymbol.kind}>
-                {apiKindLabel(locale, selectedPageSymbol.kind)}
+              <span className="kind-badge" data-kind={apiDisplayKind(selectedPageSymbol)}>
+                {apiKindLabel(locale, apiDisplayKind(selectedPageSymbol))}
               </span>
               <span>
                 {library.slug}
@@ -691,9 +699,12 @@ function LibraryNavigation({
   libraryApis,
   librarySlug,
   locale,
+  readmeLocales,
   selectedSymbol
 }: {
   readonly activeTopic?: string
+  /** Locales with a maintained README for this library. */
+  readonly readmeLocales: readonly ILocale[]
   readonly api: IApi | undefined
   readonly apiLinks: readonly IGuideApiLink[]
   readonly typeEntryLinks: readonly IGuideApiLink[]
@@ -703,34 +714,43 @@ function LibraryNavigation({
   readonly locale: ILocale
   readonly selectedSymbol: IApiSymbol | undefined
 }) {
+  /** The package home journey is linked as the overview instead of being listed among guides. */
+  const homeTopic = journeyTopics.find((entry) => entry.topic === 'index')
+  /** The quick start sits right under the overview: it is the first page a new reader runs. */
+  const startTopic = journeyTopics.find((entry) => entry.topic === 'getting-started')
+  /** Remaining task guides, rendered after the API tree. */
+  const guideTopics = journeyTopics.filter(
+    (entry) => entry.topic !== 'index' && entry.topic !== 'getting-started'
+  )
   return (
     <nav aria-label={copyFor(locale).libraryModules}>
       <strong>{librarySlug}</strong>
-      {journeyTopics.length > 0 ? (
-        <div className="left-rail-group left-rail-primary">
-          <span>{locale === 'zh' ? '指南' : 'Guides'}</span>
-          <div className="left-rail-children">
-            {journeyTopics.map((entry) => (
-              <Link
-                className={entry.topic === activeTopic ? 'active' : ''}
-                key={entry.topic}
-                to={guidePath(locale, librarySlug, entry.topic)}
-              >
-                {entry.title}
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
       <div className="left-rail-group left-rail-primary">
+        {/* Readers start at the package home, then go straight to the API they came for. */}
+        {homeTopic ? (
+          <Link
+            className={activeTopic === homeTopic.topic ? 'active' : ''}
+            to={guidePath(locale, librarySlug, homeTopic.topic)}
+          >
+            {locale === 'zh' ? '概览' : 'Overview'}
+          </Link>
+        ) : null}
+        {startTopic ? (
+          <Link
+            className={activeTopic === startTopic.topic ? 'active' : ''}
+            to={guidePath(locale, librarySlug, startTopic.topic)}
+          >
+            {locale === 'zh' ? '快速开始' : 'Quick start'}
+          </Link>
+        ) : null}
         <Link
           className={api?.module === 'index' && !selectedSymbol ? 'active' : ''}
           to={docsModulePath(locale, librarySlug, 'index')}
         >
           {locale === 'zh' ? 'API 参考' : 'API reference'}
         </Link>
-        {/* Maintained READMEs are Chinese only, so the English rail does not link an empty page. */}
-        {locale === 'zh' ? (
+        {/* The English rail links a README only when the package maintains `README.en.md`. */}
+        {readmeLocales.includes(locale) ? (
           <Link
             className={activeTopic === README_SEGMENT ? 'active' : ''}
             to={guidePath(locale, librarySlug, README_SEGMENT)}
@@ -753,6 +773,23 @@ function LibraryNavigation({
         locale={locale}
         selectedSymbol={selectedSymbol}
       />
+      {/* Task guides follow the API tree: readers arrive with a purpose and look for the API first. */}
+      {guideTopics.length > 0 ? (
+        <div className="left-rail-group left-rail-primary">
+          <span>{locale === 'zh' ? '场景指南' : 'Guides'}</span>
+          <div className="left-rail-children">
+            {guideTopics.map((entry) => (
+              <Link
+                className={entry.topic === activeTopic ? 'active' : ''}
+                key={entry.topic}
+                to={guidePath(locale, librarySlug, entry.topic)}
+              >
+                {entry.title}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </nav>
   )
 }
@@ -1294,6 +1331,7 @@ function referenceSections(
     return [
       'overview',
       ...(symbolDoc.example ? ['quick-start'] : []),
+      ...(symbolDoc.cases.length > 0 ? ['cases'] : []),
       ...(Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns ? ['contract'] : []),
       ...(constantMembers(symbol).length > 0 || hasValueGuide ? ['values'] : []),
       ...(symbol.configuration.length > 0 || Object.keys(symbolDoc.options).length > 0
@@ -1403,16 +1441,19 @@ function ModuleOverview({
             </div>
           </details>
         </section>
-        {selectedSurface.members.length > 0 ? (
+        {selectedSurface.members.length > 0 || selectedGuide ? (
           <ClassMemberReference
             api={api}
             bases={selectedSurface.bases}
+            documented={selectedGuide?.members}
             eyebrow={referenceSectionLabel(locale, 'members', true)}
             heading={referenceSectionLabel(locale, 'members', true)}
             libraryApis={libraryApis}
             locale={locale}
             memberDoc={memberDocResolver(reference, api.module, selectedSurface.owners)}
             members={selectedSurface.members}
+            nestedDocs={nestedDocResolver(reference, api.module, selectedSurface.owners)}
+            parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
             strict={Boolean(reference)}
             symbol={selectedType}
           />
@@ -1879,6 +1920,7 @@ function InstalledCapabilities({
 function ClassMemberReference({
   api,
   bases = [],
+  documented,
   eyebrow,
   heading,
   id,
@@ -1887,12 +1929,20 @@ function ClassMemberReference({
   guide,
   memberDoc,
   members,
+  nestedDocs,
+  parameterTypeDoc,
   strict = false,
   symbol
 }: {
   readonly api: IApi
   /** Composed types whose members could not be resolved on this page; shown as links. */
   readonly bases?: readonly string[]
+  /**
+   * Maintained member docs of the type itself. A documented member that the resolved surface does
+   * not list (inherited from another library's type, or added by a conditional or generic part of
+   * the declaration) still renders, so no maintained explanation is dropped from the page.
+   */
+  readonly documented?: Readonly<Record<string, ILocalizedMemberDoc>>
   /** Type articles supply a member label; runtime articles retain the instance capability label. */
   readonly eyebrow?: React.ReactNode
   /** Section heading; defaults to the generic instance API title. */
@@ -1906,11 +1956,20 @@ function ClassMemberReference({
   /** Resolves the reference doc of one member across the surface's composed types. */
   readonly memberDoc?: (name: string) => ILocalizedMemberDoc | undefined
   readonly members: readonly IApiMember[]
+  /** Resolves the reference doc of a parameter's object type so its fields render in place. */
+  readonly parameterTypeDoc?: (typeName: string) => ILocalizedTypeDoc | undefined
+  /** Lists documented nested fields (`restart.mode`) of one member, keyed by dotted path. */
+  readonly nestedDocs?: (name: string) => readonly (readonly [string, ILocalizedMemberDoc])[]
   /** True for audited libraries: never substitute declaration comments for reference text. */
   readonly strict?: boolean
   readonly symbol: IApiSymbol
 }) {
-  if (members.length === 0 && bases.length === 0 && !guide) return null
+  /** Documented members the resolved surface does not list; dotted keys render under their parent. */
+  const documentedOnly = Object.entries(documented ?? guide?.members ?? {}).filter(
+    ([name]) => !name.includes('.') && !members.some((member) => member.name === name)
+  )
+  if (members.length === 0 && bases.length === 0 && !guide && documentedOnly.length === 0)
+    return null
   /** Section anchor shared by the outline and member entry ids. */
   const sectionId = id ?? `${symbol.fragment}--members`
   /** Locale labels used by every member entry. */
@@ -2000,37 +2059,166 @@ function ClassMemberReference({
                 method={member.kind === 'method'}
                 name={member.name}
                 parameters={member.parameterDetails}
+                parameterTypeDoc={parameterTypeDoc}
                 resultType={member.returns}
                 showUsage={firstOverload}
               />
+              {firstOverload ? (
+                <NestedFieldDocs
+                  entries={nestedDocs?.(member.name) ?? []}
+                  library={api.library}
+                  locale={locale}
+                  symbols={api.symbols}
+                />
+              ) : null}
             </section>
           )
         })}
-        {Object.entries(guide?.members ?? {})
-          .filter(([name]) => !members.some((member) => member.name === name))
-          .map(([name, doc]) => (
-            <section
-              className="option-entry class-member-entry"
-              id={`${sectionId}--documented-${optionAnchor(name)}`}
-              key={name}
-            >
-              <div className="option-heading">
-                <h3>
-                  <code>{name}</code>
-                </h3>
-              </div>
-              <ReferenceParagraphs library={api.library} locale={locale} text={doc.summary} />
-              <ReferenceMemberDetails
-                api={api}
-                doc={doc}
-                libraryApis={libraryApis}
-                locale={locale}
-                name={name}
-              />
-            </section>
-          ))}
+        {documentedOnly.map(([name, doc]) => (
+          <section
+            className="option-entry class-member-entry"
+            id={`${sectionId}--documented-${optionAnchor(name)}`}
+            key={name}
+          >
+            <div className="option-heading">
+              <h3>
+                <code>{name}</code>
+              </h3>
+            </div>
+            <ReferenceParagraphs library={api.library} locale={locale} text={doc.summary} />
+            <ReferenceMemberDetails
+              api={api}
+              doc={doc}
+              libraryApis={libraryApis}
+              locale={locale}
+              name={name}
+              parameterTypeDoc={parameterTypeDoc}
+            />
+            <NestedFieldDocs
+              entries={nestedDocs?.(name) ?? []}
+              library={api.library}
+              locale={locale}
+              symbols={api.symbols}
+            />
+          </section>
+        ))}
       </div>
     </section>
+  )
+}
+
+/**
+ * Reduces a parameter type such as `T | undefined`, `Readonly<IFoo>` or `IFoo<TValue>` to its named
+ * type, so the documented fields of a generic object type still render under the parameter.
+ */
+function parameterTypeName(type: string): string {
+  const withoutUndefined = type.replace(/\s*\|\s*undefined\s*$/, '').trim()
+  const unwrapped = withoutUndefined.match(/^Readonly<([\s\S]+)>$/)?.[1] ?? withoutUndefined
+  return unwrapped.match(/^([A-Za-z_$][\w$]*)(?:<[\s\S]*>)?$/)?.[1] ?? unwrapped
+}
+
+/**
+ * Lists the fields of a parameter whose object type is documented, so a reader of `own(resource,
+ * descriptor)` sees what `descriptor` may contain without leaving the page.
+ */
+function ParameterTypeFields({
+  library,
+  locale,
+  typeDoc
+}: {
+  readonly library: string
+  readonly locale: ILocale
+  readonly typeDoc: ILocalizedTypeDoc | undefined
+}) {
+  const fields = Object.entries(typeDoc?.members ?? {})
+  if (fields.length === 0) return null
+  return (
+    <ul className="member-parameter-fields">
+      {fields.map(([field, fieldDoc]) => (
+        <li key={field}>
+          <code>{field}</code>
+          {' — '}
+          <InlineText library={library} locale={locale} text={fieldDoc.summary} />
+          {fieldDoc.default ? (
+            <>
+              {locale === 'zh' ? ' 默认：' : ' Default: '}
+              <InlineText library={library} locale={locale} text={fieldDoc.default} />
+            </>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * Lists the documented nested fields of one member (`restart.mode`, `restart.initialDelayMs`), with
+ * their defaults and allowed values, directly under that member.
+ */
+function NestedFieldDocs({
+  entries,
+  library,
+  locale,
+  symbols
+}: {
+  readonly entries: readonly (readonly [string, ILocalizedMemberDoc])[]
+  readonly library: string
+  readonly locale: ILocale
+  /** Module declarations used to resolve constant-backed values to their literals. */
+  readonly symbols: readonly IApiSymbol[]
+}) {
+  if (entries.length === 0) return null
+  return (
+    <div className="nested-field-docs">
+      <p className="eyebrow">{locale === 'zh' ? '嵌套字段' : 'Nested fields'}</p>
+      <ul className="member-parameter-fields">
+        {entries.map(([path, fieldDoc]) => (
+          <li key={path}>
+            <code>{path}</code>
+            {' — '}
+            <InlineText library={library} locale={locale} text={fieldDoc.summary} />
+            {Object.keys(fieldDoc.params).length > 0 ? (
+              <ul>
+                {Object.entries(fieldDoc.params).map(([param, text]) => (
+                  <li key={param}>
+                    <code>{param}</code>
+                    {' — '}
+                    <InlineText library={library} locale={locale} text={text} />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {fieldDoc.returns ? (
+              <div>
+                {locale === 'zh' ? '返回：' : 'Returns: '}
+                <InlineText library={library} locale={locale} text={fieldDoc.returns} />
+              </div>
+            ) : null}
+            {fieldDoc.default ? (
+              <div>
+                {locale === 'zh' ? '默认：' : 'Default: '}
+                <InlineText library={library} locale={locale} text={fieldDoc.default} />
+              </div>
+            ) : null}
+            {fieldDoc.values.length > 0 ? (
+              <ValueList
+                library={library}
+                locale={locale}
+                symbols={symbols}
+                values={fieldDoc.values}
+              />
+            ) : null}
+            {fieldDoc.example ? (
+              <CodeBlock
+                code={fieldDoc.example}
+                label={locale === 'zh' ? `${path} 示例` : `${path} example`}
+                locale={locale}
+              />
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -2047,6 +2235,7 @@ function ReferenceMemberDetails({
   method = false,
   name,
   parameters = [],
+  parameterTypeDoc,
   resultType,
   showDefault = true,
   showValues = true,
@@ -2059,6 +2248,8 @@ function ReferenceMemberDetails({
   readonly method?: boolean
   readonly name: string
   readonly parameters?: IApiMember['parameterDetails']
+  /** Resolves a documented object type so a parameter of that type lists its fields in place. */
+  readonly parameterTypeDoc?: (typeName: string) => ILocalizedTypeDoc | undefined
   readonly resultType?: string
   readonly showDefault?: boolean
   readonly showValues?: boolean
@@ -2111,6 +2302,15 @@ function ReferenceMemberDetails({
                             />
                           </>
                         ) : null}
+                        <ParameterTypeFields
+                          library={api.library}
+                          locale={locale}
+                          typeDoc={
+                            parameter
+                              ? parameterTypeDoc?.(parameterTypeName(parameter.type))
+                              : undefined
+                          }
+                        />
                       </li>
                     )
                   })}
@@ -2267,7 +2467,7 @@ function inlineTextParts(text: string): readonly string[] {
       .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
       .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
       .split(
-        /(\[[^\]\n]+\]\((?:\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
+        /(\[[^\]\n]+\]\((?:\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)|\[[^\]\n]+\]\(\.\/(?:README|USEGUIDE)(?:\.en)?\.md(?:#[^)\s]*)?\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
       )
   )
 }
@@ -2499,7 +2699,7 @@ function ApiHero({
   const headlines = signatureHeadlines(symbol.signature)
   const importLine = importStatement(api, symbol)
   return (
-    <section className="api-hero" data-kind={symbol.kind} aria-label={symbol.name}>
+    <section className="api-hero" data-kind={apiDisplayKind(symbol)} aria-label={symbol.name}>
       <div className="api-hero-row">
         <span className="api-hero-label">{ui.importLabel}</span>
         <code className="api-hero-import">{highlightTypeScript(importLine)}</code>
@@ -2741,6 +2941,19 @@ function SingleApiReference({
     }
   })
   /** Nested anonymous fields retain their authored contracts when extraction lists only the parent. */
+  /** Top-level option names already explained field by field in the options section below. */
+  const optionNames = new Set(configuration.map((field) => field.name.split('.')[0]))
+  /**
+   * Documented object type of one parameter, so its fields list under the parameter. A parameter
+   * whose fields the options section already explains is not expanded a second time.
+   */
+  const parameterFieldsDoc = (parameter: { readonly type: string } | undefined) => {
+    const typeDoc = parameter
+      ? instanceGuideFor(reference, api.module, parameterTypeName(parameter.type))
+      : undefined
+    const fields = Object.keys(typeDoc?.members ?? {}).filter((name) => !name.includes('.'))
+    return fields.length > 0 && fields.every((name) => optionNames.has(name)) ? undefined : typeDoc
+  }
   const unlistedOptions = Object.entries(symbolDoc?.options ?? {}).filter(
     ([name]) => !options.some((field) => fieldIdentity(field.name) === fieldIdentity(name))
   )
@@ -2850,6 +3063,26 @@ function SingleApiReference({
           ) : null}
         </section>
       ) : null}
+      {symbolDoc && symbolDoc.cases.length > 0 ? (
+        <section className="section-block compact" id={`${symbol.fragment}--cases`}>
+          <h2>{locale === 'zh' ? '它解决的问题' : 'Problems it solves'}</h2>
+          {symbolDoc.cases.map((item, index) => (
+            // Numbered anchors let landing-page pain and highlight links open the exact case.
+            <div
+              className="reference-case"
+              id={`${symbol.fragment}--case-${index + 1}`}
+              key={item.title}
+            >
+              <h3>
+                <InlineText library={library.slug} locale={locale} text={item.title} />
+              </h3>
+              <ReferenceParagraphs library={library.slug} locale={locale} text={item.problem} />
+              <CodeBlock code={item.example} label={symbol.name} locale={locale} />
+              <ReferenceParagraphs library={library.slug} locale={locale} text={item.result} />
+            </div>
+          ))}
+        </section>
+      ) : null}
       {symbolDoc && (Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns) ? (
         <section className="section-block compact" id={`${symbol.fragment}--contract`}>
           <h2>{locale === 'zh' ? '参数与返回' : 'Parameters and result'}</h2>
@@ -2886,6 +3119,11 @@ function SingleApiReference({
                           ) : null}
                           {' — '}
                           <InlineText library={library.slug} locale={locale} text={text} />
+                          <ParameterTypeFields
+                            library={library.slug}
+                            locale={locale}
+                            typeDoc={parameterFieldsDoc(parameter)}
+                          />
                         </li>
                       )
                     })}
@@ -3120,6 +3358,8 @@ function SingleApiReference({
           guide={ownGuide}
           memberDoc={memberDocResolver(reference, api.module, [symbol.name, ...ownSurface.owners])}
           members={ownSurface.members}
+          nestedDocs={nestedDocResolver(reference, api.module, [symbol.name, ...ownSurface.owners])}
+          parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
           strict={Boolean(reference)}
           symbol={symbol}
         />
@@ -3143,6 +3383,8 @@ function SingleApiReference({
           guide={guide}
           memberDoc={memberDocResolver(reference, api.module, [symbol.name, ...surface.owners])}
           members={surface.members}
+          nestedDocs={nestedDocResolver(reference, api.module, [symbol.name, ...surface.owners])}
+          parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
           strict={Boolean(reference)}
           symbol={symbol}
         />
@@ -3336,6 +3578,24 @@ function memberDocResolver(
       if (doc) return doc
     }
     return undefined
+  }
+}
+
+/** Lists documented dotted descendants (`restart.mode`) of one member across the owning types. */
+function nestedDocResolver(
+  reference: ILocalizedReference | undefined,
+  module: string,
+  owners: readonly string[]
+): ((name: string) => readonly (readonly [string, ILocalizedMemberDoc])[]) | undefined {
+  if (!reference) return undefined
+  return (name) => {
+    const prefix = `${name}.`
+    for (const owner of owners) {
+      const members = instanceGuideFor(reference, module, owner)?.members ?? {}
+      const nested = Object.entries(members).filter(([key]) => key.startsWith(prefix))
+      if (nested.length > 0) return nested
+    }
+    return []
   }
 }
 
@@ -3982,14 +4242,14 @@ function errorReferencePath(locale: ILocale, library: string | undefined): strin
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
 const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   supervision:
-    '用于可靠地管理进程、线程和协程：它们可能意外退出、启动失败、健康检查不通过，或在被替换时与新实例同时存在。监督器负责启动、观察和停止这些单元，它通过平台对应的启动器创建单元，并用预算限制同时运行的数量；每个单元在真正退出之前都占着一个名额。新单元报告准备就绪后才被当作可用；每次启动的实例都带一个代次编号，用来区分重启或替换前后的新旧实例。停止、等待手头工作完成和强制结束，都交给启动这个单元的启动器去做。启动器做不到的操作会被明确报告，监督器不会仅凭平台名称就假定有严格隔离或不占资源。',
+    '用于看管后台任务、子进程和工作线程：它们会启动就崩溃、跑着跑着卡死、停止时迟迟不退出。监督器限制同时运行的数量，确认可用后才交给调用方，失败后按递增的间隔重启，失败太多就进入终态并说明原因；停止分段限时，单元真正退出后才释放它占用的名额。进程创建由应用提供的启动器负责，本包管理启动之后的一切。',
   capability:
     '用于把可选功能从零散的 if 判断提升为可治理的能力：统一处理开关、依赖、启停、替换和资源释放。核心设计是由 Host 持有能力定义与上下文，只有满足 flag 和依赖的能力才能启用，并通过句柄消费和关闭；它不是业务状态容器。',
   docs: '用于生成和维护仓库的文档清单、公开 API 索引与站点内容，让源码契约能够被稳定检索和校验。核心设计是从包元数据与源码生成结构化清单，再由网站按路由投影；它不承载运行时业务逻辑。',
   'event-subscriber':
     '用于进程内的一对多事件通知，以及一次性、截止时间、对象订阅者和并行/串行发布等场景。它用显式订阅句柄管理退订和监听器失败，解决手写 listener 数组容易泄漏、重入和错误相互污染的问题；它不是持久化消息队列或跨进程总线。',
   lifecycle:
-    '用于一组资源必须随同一 owner 关闭、旧代工作必须失效，或释放过程需要静默期、超时降级和错误聚合的场景。它把“谁拥有资源、何时不再接收工作、按什么顺序释放”建模为 scope、generation、terminal controller 与 dispose transaction，避免散落的 try/finally 在竞态中漏清理；它不负责事件分发、业务排队或依赖图。',
+    '用于让关闭、取消和替换在并发下也不出错：一组资源随同一个作用域按登记的相反顺序释放，一项失败不影响其余资源；新请求开始时旧请求自动失效；进行中的工作可以在截止时间前等待完成；初始化失败时自动回收已创建的资源。它不负责事件分发、业务排队或依赖图。',
   logger:
     '用于生产环境的结构化日志、稳定级别、上下文字段、批量写出和最终 flush。核心设计把日志记录、过滤、传输和故障上报分开，使调用方不依赖具体控制台或后端；它不是指标系统，也不替代业务错误处理。',
   'middleware-pipeline':
@@ -4105,6 +4365,23 @@ function InlineText({
           {label}
         </Link>
       )
+    }
+    /**
+     * Package README/USEGUIDE files link to each other with relative paths that do not exist on the
+     * site: a README link opens the package README page, other targets keep only their label.
+     */
+    const packageDocumentLink = part.match(
+      /^\[([^\]\n]+)\]\(\.\/(README|USEGUIDE)(?:\.en)?\.md(?:#[^)\s]*)?\)$/
+    )
+    if (packageDocumentLink) {
+      const [, label, document] = packageDocumentLink
+      if (document === 'README' && library)
+        return (
+          <Link className="text-link" key={index} to={guidePath(locale, library, README_SEGMENT)}>
+            {label}
+          </Link>
+        )
+      return <span key={index}>{label}</span>
     }
     const inlineCode = part.startsWith('`') && part.endsWith('`')
     const value = inlineCode ? part.slice(1, -1) : part
@@ -4254,10 +4531,20 @@ function DomainLibrary({
         libraryApis={libraryApis}
         librarySlug={library.slug}
         locale={locale}
+        readmeLocales={library.readmeLocales}
         selectedSymbol={undefined}
       />
     ),
-    [apiLinks, typeEntryLinks, journeyTopics, library.slug, libraryApis, locale, topic]
+    [
+      apiLinks,
+      typeEntryLinks,
+      journeyTopics,
+      library.slug,
+      library.readmeLocales,
+      libraryApis,
+      locale,
+      topic
+    ]
   )
   usePageNavigation(pageNavigation)
   return (
@@ -4313,10 +4600,9 @@ function DomainLibrary({
             />
           ) : null}
           {(topic === README_SEGMENT || (topic === 'index' && !journey)) &&
-          locale === 'zh' &&
           library.documentation.readme ? (
             <section className="section-block" aria-labelledby="package-readme">
-              <h2 id="package-readme">包说明</h2>
+              <h2 id="package-readme">{locale === 'zh' ? '包说明' : 'About this package'}</h2>
               <MaintainedDocument
                 document={library.documentation.readme}
                 domain="guides"
@@ -5032,6 +5318,7 @@ function referenceSectionLabel(locale: ILocale, section: string, type = false): 
   const labels: Readonly<Record<string, readonly [string, string]>> = {
     overview: ['Purpose', '作用'],
     'quick-start': ['Minimal example', '最小示例'],
+    cases: ['Problems it solves', '它解决的问题'],
     examples: ['Production scenarios', '场景实战'],
     values: ['Values', '取值'],
     configuration: ['Configuration', '配置参考'],

@@ -20,18 +20,29 @@ import { createJsonRpcBridgeError } from './error.js'
 
 /** Caller owns launch, authentication issuance, clocks and the physical byte connection. */
 export type IAdapterJsonRpcChannelOptions = Readonly<{
+  /** Actual ordered byte I/O held by this adapter. */
   byte: IRuntimeByteIO
+  /** Direct peer address for the bridge. */
   peerId: string
+  /** Explicit plugin contract or Host catalog selecting the bridge method whitelist. */
   target:
     | Readonly<{ kind: 'plugin'; contract: IRemoteContract }>
     | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog }>
+  /** Local capability proposal; the bridge supplies its existing JSON/authentication fields. */
   offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>
+  /** Local authentication token consumed by the handshake; never put it in diagnostics. */
   token: string
+  /** Borrowed monotonic scheduler for local deadlines. */
   scheduler: IScheduler
+  /** Borrowed epoch clock for handshake wall-time fields. */
   wallClock: IWallClock
+  /** Original flow-control and diagnostic configuration for this byte connection. */
   ipc: IRuntimeConnectionOptions['ipc']
+  /** Cancel the original handshake/opening operation. */
   signal?: import('@migaia/utils/promise').IAbortSignal
+  /** Optional non-negative handshake budget; omission uses the canonical 10000 ms default. */
   handshakeTimeoutMs?: number
+  /** Required reporter for background and secondary failures. */
   report(error: unknown): void
 }>
 

@@ -37,4 +37,5 @@ export const RpcContractErrorCode = {
   handshakeRejected: 'HANDSHAKE_REJECTED'
 } as const
 
+/** Union of this layer's stable semantic failure values, independent of serialized remote codes. */
 export type IRpcContractErrorCode = (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode]

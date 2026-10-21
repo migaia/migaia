@@ -3,12 +3,25 @@ import { RpcContractErrorCode } from '../error-code.js'
 
 /** A custom byte carrier consumes one bootstrap and retains at most one following handshake frame. */
 export type IRpcBootstrapFrameReceiver = Readonly<{
+  /** Resolves with the exact first complete payload; fail before reception rejects it. */
   readonly bootstrap: Promise<Uint8Array>
+  /** Whether a first payload was accepted, independent of later activation. */
   readonly receivedBootstrap: boolean
+  /** Whether the carrier explicitly activated its normal frame-limit phase. */
   readonly ready: boolean
+  /**
+   * Accept bootstrap, hand off attached traffic or retain one following frame; extra queued data
+   * errs.
+   */
   accept(frame: Uint8Array): Error | undefined
+  /** Reject bootstrap or deliver/retain the original decoder error; does not close physical I/O. */
   fail(error: Error): void
+  /**
+   * Transfer a queued error or frame once, then deliver directly; returned cleanup detaches
+   * callbacks.
+   */
   attach(onFrame: (frame: Uint8Array) => void, onError: (error: Error) => void): () => void
+  /** Advance this receiver's frame-limit phase without acquiring channel authority. */
   activate(): void
 }>
 

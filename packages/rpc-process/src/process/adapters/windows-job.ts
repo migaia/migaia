@@ -16,7 +16,11 @@ const WINDOWS_JOB_CAPABILITIES = Object.freeze({
   [ProcessCapability.bootstrapFd]: CapabilityLevel.unsupported
 })
 
-/** Reject direct launch as well as supervision admission until native handles are proven. */
+/**
+ * Return an explicitly unsupported Windows Job launcher, not a native isolation guarantee. Every
+ * capability is unsupported and direct launch rejects PROCESS_CHANNEL_CONNECT_FAILED. Select an
+ * implemented launcher instead; creating this object does not load koffi or create native handles.
+ */
 export function createWindowsJobProcessLauncher(): IProcessLauncher {
   return Object.freeze({
     capabilities: WINDOWS_JOB_CAPABILITIES,

@@ -172,7 +172,7 @@ const typedPeerMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Promise of IRpcRuntimeOutcomeResult; support and availability come from the accepted remote runtime contract.',
-      '返回 `IRpcRuntimeOutcomeResult` 承诺，支持程度与可用性取决于已接受的远端运行时契约。'
+      '返回 `IRpcRuntimeOutcomeResult` Promise，支持程度与可用性取决于已接受的远端运行时契约。'
     ),
     example: `await worker.request('orders.create', order, { idempotencyKey: 'order-42' })\nconsole.log(await worker.outcome('order-42'))`
   },
@@ -189,7 +189,7 @@ const typedPeerMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Promise of local detail or formatted text, following the selected query format.',
-      '根据所选查询格式返回本地详情或格式化文本的承诺。'
+      '根据所选查询格式返回本地详情或格式化文本的 Promise。'
     ),
     example: `console.log(await worker.describe())\nconsole.log(await worker.describe({ format: 'json' }))`
   },
@@ -205,7 +205,7 @@ const typedPeerMembers: Readonly<Record<string, IMemberDoc>> = {
       ),
       listener: t(
         'Callback receives IRuntimeEvent from this connection; return is ignored and throws or rejected thenables are reported.',
-        '回调接收来自本连接的 `IRuntimeEvent`，返回值不消费，抛错或类承诺拒绝会报告。'
+        '回调接收来自本连接的 `IRuntimeEvent`，返回值不消费，抛错或类 Promise 对象拒绝会报告。'
       )
     },
     returns: t(
@@ -221,18 +221,18 @@ const typedPeerMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     returns: t(
       'Shared completion Promise retaining the original close operation identity; no new calls are admitted once closing begins.',
-      '返回保持原始关闭操作身份的共享完成承诺，关闭开始后不再接纳新调用。'
+      '返回保持原始关闭操作身份的共享完成 Promise，关闭开始后不再接纳新调用。'
     ),
     example: `await worker.close()\nawait worker.close()`
   },
   '[Symbol.asyncDispose]': {
     summary: t(
       'Scoped asynchronous cleanup is the exact original close operation, including its Promise identity.',
-      '作用域异步清理使用原始关闭操作本身，并保持其完成承诺身份。'
+      '作用域异步清理使用原始关闭操作本身，并保持其完成 Promise 身份。'
     ),
     returns: t(
       'The same completion Promise as close(), including platform-owned resource cleanup.',
-      '返回与 `close()` 相同的完成承诺，包含平台拥有资源的清理。'
+      '返回与 `close()` 相同的完成 Promise，包含平台拥有资源的清理。'
     ),
     example: `await worker[Symbol.asyncDispose]()`
   },
@@ -318,7 +318,7 @@ export const runtimePeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   endpointFactory: {
     summary: t(
       'Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.',
-      '高级端点工厂在取得通道后接收该通道与原生中止信号，其承诺须返回 `IRemoteServeEndpoint`，失败会触发构造回滚。'
+      '高级端点工厂在取得通道后接收该通道与原生中止信号，其 Promise 须返回 `IRemoteServeEndpoint`，失败会触发构造回滚。'
     ),
     params: {
       channel: t(
@@ -332,7 +332,7 @@ export const runtimePeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Promise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.',
-      '返回为此精确通道组装的端点承诺，抛错或拒绝保留原始构造失败。'
+      '返回为此精确通道组装的端点 Promise，抛错或拒绝保留原始构造失败。'
     ),
     default: t(
       'Omitted: the canonical runtime endpoint is assembled from the acquired channel and common options.',
@@ -409,7 +409,7 @@ export const runtimePeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   report: {
     summary: t(
       'Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.',
-      '同步回调以错误参数接收后台或隔离的失败，不消费返回值，失败处理仍归原运行时报告拥有者。'
+      '同步回调以错误参数接收后台或隔离的失败，不消费返回值，失败处理仍归既有运行时报告拥有者。'
     ),
     params: {
       error: t(
@@ -598,7 +598,7 @@ try {
       carrier: {
         summary: t(
           'Name of the physical carrier, such as a MessagePort or stdio.',
-          '物理载体的名称，例如 MessagePort 或 stdio。'
+          '底层传输通道的名称，例如 MessagePort 或 stdio。'
         )
       },
       connection: {

@@ -1,6 +1,99 @@
-# @migaia/middleware-pipeline
+# `@migaia/middleware-pipeline`
 
-运行时中立的中间件流水线。一个入口 `createPipeline()` 通过 `mode` 选择同步、异步、生成器或异步生成器执行代数；pipeline 本身无可变运行状态，可以安全复用。
+[English](./README.en.md)
+
+`@migaia/middleware-pipeline` 把校验、转换和前后收尾拆成可复用步骤，用明确的继续、短路与取消规则按顺序执行。
+
+## 你可能遇到过
+
+- **异步任务没结束，计时和收尾已经完成**：手写回调链没有把下游 Promise 交回外层等待。
+- **复用同步步骤后，next 后面的代码顺序变了**：为了接入异步流程，改写时混淆了“提交值”和“立即执行下游”。
+- **请求已取消，下一步仍开始执行**：复用的流水线只检查应用默认信号，没有采用本次请求的信号。
+- **校验拒绝了值，保存步骤仍然运行**：生成器返回了业务值，没有明确选择整链短路。
+- **清空缓存时，终点回调却没有执行**：生成器把普通 undefined 返回当成了结束，而不是要交付的空值。
+
+## 为什么选它
+
+- **外层可以等待并包裹整个下游。** 手写回调容易在异步结束前收尾；async 模式的 next 返回下游原 Promise，[计时示例](./USEGUIDE.md#下游完成后再执行外层收尾)把收尾留到终点之后。
+- **同步步骤提升后仍保持同步顺序。** 直接改成异步回调可能改变 next 后面的代码时序；lift 保留“先返回、再下游”的规则，[复用示例](./USEGUIDE.md#复用同步步骤时保留原来的顺序)展示了这个顺序。
+- **每次运行可以选择自己的取消边界。** 只看应用默认信号会遗漏请求取消；run 的 `control.signal` 覆盖默认值并传给步骤，[取消示例](./USEGUIDE.md#采用单次请求的信号取消后不再进入下游)阻止了终点回调。
+- **生成器可以明确停止整条链。** 把校验失败的值继续返回会让保存照常执行；`GENERATOR_HALT` 是独立控制符，[短路示例](./USEGUIDE.md#生成器校验不通过时停止保存)没有执行保存或终点。
+- **空值与结束有不同含义。** 普通 return undefined 会停止生成器链；`GENERATOR_UNDEFINED` 明确交付 undefined，[空值示例](./USEGUIDE.md#把-undefined-交给终点而不是意外终止)的终点仍收到空值。
+
+## 从这里开始
+
+用 Node 24 直接运行。输入 2 先加 1，再乘 2；终点回调收到 6。next 是当前步骤把新值交给后续步骤的函数。
+
+```ts doc-test=run
+import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+
+const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {
+  console.log('结果:', value)
+})
+```
+
+输出：
+
+```text
+结果: 6
+```
+
+遇到异步前后收尾看[包裹下游](./USEGUIDE.md#下游完成后再执行外层收尾)，需要复用同步步骤看[lift](./USEGUIDE.md#复用同步步骤时保留原来的顺序)。
+
+## 手写时的隐患
+
+下面仅展示，不运行。它手写同一组数值转换，但没有区分同步继续时序，也没有限制 next 只能调用一次。
+
+```ts doc-test=check
+type IManualStage = (value: number, next: (value: number) => void) => void
+const stages: IManualStage[] = [
+  (value, next) => {
+    next(value + 1) // 隐患 1：立即递归，下游在这个同步步骤返回前就执行了。
+    console.log('当前步骤尾部')
+    next(value + 100) // 隐患 2：重复调用会让下游和终点再次执行。
+  },
+  (value, next) => next(value * 2)
+]
+const run = (index: number, value: number): void => {
+  const stage = stages[index]
+  if (stage) stage(value, (nextValue) => run(index + 1, nextValue))
+  else console.log('结果:', value)
+}
+run(0, 2)
+```
+
+上一节的 sync 模式只提交第一次 next 的值，当前步骤正常返回后才执行下游。重复或迟到的 next 会交给 `onViolation`，默认不重新执行下游；需要记录这些错误调用时显式提供回调。
+
+## 三分钟心智模型
+
+| 你要回答的问题                       | 选择                                    |
+| ------------------------------------ | --------------------------------------- |
+| 按顺序转换值，不等待异步？           | sync；next 只提交值。                   |
+| 要等待下游，再做外层收尾？           | async；await next 后继续收尾。          |
+| 一个步骤需要多次 yield，再决定终值？ | generator；异步迭代用 async-generator。 |
+| 要复用另一种模式的现有步骤？         | lift，先核对允许方向。                  |
+| 请求取消后不再进入下一步？           | run 的 `control.signal`，步骤协作退出。 |
+
+| 术语     | 白话含义                                       |
+| -------- | ---------------------------------------------- |
+| pipeline | 执行规则固定、可以重复使用的步骤执行器。       |
+| stage    | 处理当前值的一步；决定继续、停止或失败。       |
+| next     | 提交下一步的输入；异步模式还返回下游 Promise。 |
+| done     | 所有步骤都继续后，接收最终值的终点回调。       |
+| 洋葱模型 | 外层先进入，等待下游完成后再收尾。             |
+| sentinel | 表示继续、停止或显式空值的专用 symbol。        |
+
+## 典型场景
+
+| 场景                                   | 怎么组合                          | 详细说明                                                       |
+| -------------------------------------- | --------------------------------- | -------------------------------------------------------------- |
+| 让多个步骤依次处理同一个值             | `sync + run`                      | [完整示例](./USEGUIDE.md#让多个步骤依次处理同一个值)           |
+| 下游完成后再执行外层收尾               | `async + await next`              | [完整示例](./USEGUIDE.md#下游完成后再执行外层收尾)             |
+| 复用同步步骤时保留原来的顺序           | `lift(sync) + async run`          | [完整示例](./USEGUIDE.md#复用同步步骤时保留原来的顺序)         |
+| 采用单次请求的信号，取消后不再进入下游 | `run + control.signal`            | [完整示例](./USEGUIDE.md#采用单次请求的信号取消后不再进入下游) |
+| 生成器校验不通过时停止保存             | `generator + GENERATOR_HALT`      | [完整示例](./USEGUIDE.md#生成器校验不通过时停止保存)           |
+| 把 undefined 交给终点，而不是意外终止  | `generator + GENERATOR_UNDEFINED` | [完整示例](./USEGUIDE.md#把-undefined-交给终点而不是意外终止)  |
 
 ## 安装
 
@@ -8,133 +101,30 @@
 pnpm add @migaia/middleware-pipeline
 ```
 
-## 快速开始
+只有根入口；运行时仅依赖 `@migaia/utils`，无需 DOM 或 Node，包标记为 `sideEffects: false`。
 
-```ts
-import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+## 常用 API
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+| API                                           | 作用                                               |
+| --------------------------------------------- | -------------------------------------------------- |
+| `createPipeline(options)`                     | 固定模式、取消默认值与错误处理，返回可复用执行器。 |
+| `pipeline.run(stages, value, done, control?)` | 为一次输入执行固定快照的步骤列表。                 |
+| `pipeline.lift(stage, from)`                  | 在允许方向复用已有步骤，不改原模式语义。           |
 
-pipeline.run(
-  [
-    (value, next) => next(value + 1),
-    (value, next) => next(value * 2)
-  ],
-  2,
-  (result) => console.log(result) // 6
-)
-```
+## 契约细节
 
-同步 stage 不调用 `next()` 时短路。同步模式是线性 reduce：`next()` 只提交值，stage 返回后才执行下游。异步模式保留洋葱模型：`next()` 立即启动下游并返回同一个下游 Promise。
+pipeline 只含只读 mode、lift 和 run，自身没有可变运行状态。每次 run 的值、索引和取消上下文隔离；stage 列表在入口复制，之后修改调用方数组不会改写当前轮。构造选项和自定义信号字段只读取一次并冻结，getter 失败以 `INVALID_OPTION` 保留原始原因。
 
-## 选择模式
+四种模式是 sync、async、generator、async-generator。同步 next 只提交值，stage 返回后下游才开始；不调用就短路。异步 next 立即启动下游并返回同一个下游 Promise，即使 stage 没有 await，runner 也等待已经启动的下游。同步和 generator 同步抛错，async 和 async-generator 的 run 返回 Promise。
 
-```ts
-const sync = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })
-const async = createPipeline<string>({ mode: MiddlewarePipelineMode.async })
-const generator = createPipeline<string>({ mode: MiddlewarePipelineMode.generator })
-const asyncGenerator = createPipeline<string>({
-  mode: MiddlewarePipelineMode.asyncGenerator
-})
-```
+lift 只允许同模式、sync 到 async/generator/async-generator，以及 generator 到 async-generator；不支持 async 到 async-generator。同模式保持函数身份。被提升的 sync 步骤仍先执行完 next 后的同步代码再进入下游，抛错时不启动下游。
 
-| `mode` | stage | `run()` 返回值 | 下游何时开始 |
-| --- | --- | --- | --- |
-| `sync` | `(value, next, context?) => void` | `void` | stage 返回后；`next()` 只提交值 |
-| `async` | `(value, next, context?) => void \| Promise<void>` | `Promise<void>` | 调用 `next()` 时（洋葱模型） |
-| `generator` | generator function | `void` | stage 结束后 |
-| `async-generator` | async generator function | `Promise<void>` | stage 结束后 |
+生成器普通 return 值继续，`GENERATOR_CONTINUE` 使用最后一个 yield（没有 yield 时使用输入），`GENERATOR_HALT` 和隐式 undefined 终止，`GENERATOR_UNDEFINED` 显式以 undefined 继续且要求 `TValue` 包含 undefined。自定义三个 symbol 必须互不相同，在创建时快照，也用于 sync lift；控制符不作为业务值传到 done。公开类型的 `TSignals` 与 `TValue` 分离，默认控制集保留精确 unique symbol 类型。
 
-`mode` 是只读属性，调用方可用它记录或检查当前代数。每次 `run()` 相互隔离。
+run 的 `control.signal` 覆盖构造 signal；未提供时回退。只有有效信号存在时才向 stage/done 追加 context。四种模式在入口、每步开始前/返回后、done 前检查取消；生成器每次迭代后也检查。已开始的用户代码不会被强制打断。`assertActive` 复用宿主规则，入口和每步后检查；异步外层返回时即使 done 已执行也复核，但不会撤销已发生的 done。控制器和宿主仍由调用方持有。
 
-## 提升 stage
+同一步重复或结束后调用 next 分别报告 duplicate、late，默认回调为空操作。原生 Error 尽量保留类型、身份与 stack；未分类执行失败附 `EXECUTION_FAILED`，已有完整外部 source/code 不覆盖。取消 reason 使用 `ABORTED`；其他值通过 cause 保留，不保证是原生 AbortError。普通业务失败不会被之后的取消替换。
 
-`lift(stage, from)` 只允许无损方向：
+独立 stage/downstream 失败默认聚合，或交给 `combineStageAndDownstreamError`；await next 传播的同一个对象只保留一次，相等 primitive 仍可能独立。组合器自身失败时保留它和两个原错；组合器成功返回的自定义结果需要调用方履行原错可达契约。生成器取消时驱动 finally 清理；清理再次失败使用 `ABORT_CLEANUP_FAILED`，取消主错在前。
 
-| 目标模式 | 允许的来源 |
-| --- | --- |
-| `sync` | `sync` |
-| `async` | `sync`、`async` |
-| `generator` | `sync`、`generator` |
-| `async-generator` | `sync`、`generator`、`async-generator` |
-
-```ts
-const pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })
-const trim = pipeline.lift((value, next) => next(value.trim()), MiddlewarePipelineMode.sync)
-
-await pipeline.run([trim], '  ready  ', async (result) => {
-  console.log(result) // ready
-})
-```
-
-提升不改变 sync stage 的线性 reduce 语义：在任何目标模式中，sync stage 里写在 `next()` 之后的代码总是先于下游执行；stage 抛错时下游不启动。
-
-不支持的方向在运行时抛出带 `source` 与 `code` 的原生 `TypeError`，同时也会被类型系统拒绝。
-
-## Generator 信号
-
-```ts
-import {
-  createPipeline,
-  GENERATOR_CONTINUE,
-  GENERATOR_HALT,
-  MiddlewarePipelineMode
-} from '@migaia/middleware-pipeline'
-
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })
-
-pipeline.run(
-  [
-    function* (value) {
-      yield value + 1
-      return GENERATOR_CONTINUE
-    },
-    function* () {
-      return GENERATOR_HALT
-    }
-  ],
-  1,
-  () => {
-    throw new Error('halt 后不会到达 done')
-  }
-)
-```
-
-`GENERATOR_CONTINUE` 采用最后一次 `yield` 的值继续；`GENERATOR_HALT` 终止整条流水线；`GENERATOR_UNDEFINED` 用于把 `undefined` 作为显式终值。也可以在构造时通过 `signals` 注入兼容的三个 sentinel：必须为互不相同的 symbol，构造时只读取一次并快照，后续修改调用方对象不影响管道。
-
-## 生命周期、取消与违约
-
-```ts
-const controller = new AbortController()
-const pipeline = createPipeline<string>({
-  mode: MiddlewarePipelineMode.async,
-  signal: controller.signal,
-  assertActive: () => host.assertActive(),
-  onViolation: (kind) => diagnostics.report(kind),
-  combineStageAndDownstreamError: (stage, downstream) =>
-    new AggregateError([stage, downstream], 'middleware stage and downstream failed')
-})
-
-await pipeline.run(stages, input, consume, { signal: request.signal })
-```
-
-- `run()` 的 `control.signal` 优先于构造时的 `signal`。
-- Error reason 尽量保留原生类型/对象；未分类 Error 附 ABORTED，已有外部 source/code 不改写；primitive/undefined reason 用普通 Error/ABORTED 的 cause 保留，未必是原生 AbortError。
-- 四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及 `done` 前检查 signal；generator 类还会在每次迭代后检查。
-- 已开始的 stage 不会被强制打断；它可以从 `context.signal` 读取本次运行实际采用的 signal 并协作退出。
-- 用户代码已经抛出普通失败时，该失败保持为主错误，之后观察到的取消不会替换它；async stage 与下游分别失败时仍按组合器或 `EXECUTION_FAILED` 处理。
-- `assertActive` 在入口和每个 stage 之后执行，生命周期由 host 拥有。
-- 同一 stage 重复或返回后调用 `next()` 会报告 `duplicate` 或 `late`；默认处理器为空操作。
-- 同步与 generator 模式在调用栈内抛错；异步与 async-generator 模式返回 rejected Promise。
-
-## 公开入口
-
-根入口公开 `createPipeline`、`MiddlewarePipelineMode`、generator 信号、stage/control/context 类型，以及 `MiddlewarePipelineErrorCode` 与 `MIDDLEWARE_PIPELINE_SOURCE`。模式的具体执行器和适配器属于包内实现，不是根入口 API。
-
-完整契约和更多示例见 [USEGUIDE.md](./USEGUIDE.md)。
-
-自定义 generator 控制集也用于 sync lift 的 halt/continue，控制 symbol 不作为 payload 送到 done。公开 IGeneratorMiddlewareStage/IAsyncGeneratorMiddlewareStage 与 IMiddlewarePipeline/IMiddlewarePipelineStage 的 TSignals 参数将控制域与 TValue 分开；提供自定义 signals 的工厂重载接受该控制集，number payload 仍为 number。默认控制集保留精确 unique symbol 类型，GENERATOR_UNDEFINED 仍要求 TValue 包含 undefined。
-
-async 洋葱返回时每个外层 stage 都复核取消/host active，包括 done 已执行的情况；这不会撤销已发生的 done。await next 传播的同一个对象失败只保留一次（相等的 primitive 值仍可能代表独立失败，保持组合），不制造两个相同 entries 的 AggregateError。独立 stage/downstream 失败才组合；combiner 自身抛错时，其原错误尽量作为 primary，两已发生错误在 errors/cause 链可达。成功返回的自定义组合结果仍需由调用方履行 cause 可达合同。
-
-IMiddlewarePipelineSyncMode 仅是 Done/RunResult 的包内条件类型中间项，已从根入口撤回。消费者使用公开 IMiddlewarePipelineDone/IMiddlewarePipelineRunResult，无兼容 alias。
+根入口公开工厂、模式、生成器信号与阶段/控制/上下文类型，以及错误码和 source；具体执行器和适配器不公开。`IAbortSignal` 从 `@migaia/utils/promise` 导入；`IMiddlewarePipelineSyncMode` 只是包内中间类型，已从根入口撤回，没有兼容别名，使用 `IMiddlewarePipelineDone`/`IMiddlewarePipelineRunResult`。完整字段、模式表、提升矩阵和四个错误码见[使用指南](./USEGUIDE.md#创建选项及全部默认值)。

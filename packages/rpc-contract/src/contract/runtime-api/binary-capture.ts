@@ -31,20 +31,32 @@ import {
 export type IRpcBinaryDigest = (backing: ArrayBuffer) => Promise<string>
 
 /** Closed wire metadata describes complete unique backings, including bytes outside a view. */
-export type IRpcBinaryBacking = Readonly<{ byteLength: number; sha256: string }>
+export type IRpcBinaryBacking = Readonly<{
+  /** Actual full ArrayBuffer length, including bytes outside any referenced view. */
+  byteLength: number
+  /** Canonical lowercase SHA-256 hex digest over that entire backing. */
+  sha256: string
+}>
 
 /** Only portable business slots in the original runtime union are tagged. */
 export type IRpcBinaryManifest = Readonly<{
+  /** Closed portable-binary grammar discriminator. */
   profile: typeof RpcBinaryProfile
+  /** Inline embeds bytes; native references the separately supplied backing list. */
   storage: RpcBinaryStorage
+  /** Runtime metadata with only its business-value slots represented by tagged binary data. */
   envelope: IRpcRuntimeEnvelope
+  /** Ordered unique full-backing integrity records; empty for inline storage. */
   backings: readonly IRpcBinaryBacking[]
 }>
 
 /** Prepared native buffers preserve the exact original identity for explicit ownership transfer. */
 export type IRpcPreparedBinary = Readonly<{
+  /** Frozen manifest ready for the original protection/codec owner. */
   manifest: IRpcBinaryManifest
+  /** Frozen list of original native backings; the buffers themselves are not copied or frozen. */
   sidecars: readonly ArrayBuffer[]
+  /** Charged full-backing or inline allocation bytes, including view prefixes. */
   backingBytes: number
 }>
 
@@ -160,8 +172,11 @@ export function readRpcNativeBinary(
   limit: number
 ):
   | Readonly<{
+      /** Still-opaque protected manifest; the authentication owner must validate it next. */
       protectedMetadata: unknown
+      /** Admitted unique genuine ArrayBuffers, retaining their original identities. */
       sidecars: readonly ArrayBuffer[]
+      /** Sum of complete backing lengths charged against the supplied limit. */
       backingBytes: number
     }>
   | undefined {
@@ -191,9 +206,14 @@ export function readRpcNativeBinary(
 }
 
 /** The only supported native view is Uint8Array on a non-shared ArrayBuffer. */
-export function rpcBinaryView(
-  value: Uint8Array
-): Readonly<{ backing: ArrayBuffer; offset: number; length: number }> {
+export function rpcBinaryView(value: Uint8Array): Readonly<{
+  /** Genuine non-shared original backing, without copying. */
+  backing: ArrayBuffer
+  /** Actual internal byte offset of the view. */
+  offset: number
+  /** Actual visible byte length, separate from the full backing charge. */
+  length: number
+}> {
   /** A shared backing fails its genuine ArrayBuffer brand, even when exposed through a Uint8Array. */
   const backing = Reflect.apply(bufferGetter, value, []) as ArrayBuffer
   if (!isArrayBuffer(backing)) invalid()

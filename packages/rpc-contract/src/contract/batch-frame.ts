@@ -6,7 +6,9 @@ import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 
 /** Physical grouping is independent of protocol 1.1's semantic envelope union. */
 export type IRpcBatchFrame = Readonly<{
+  /** Physical wrapper discriminator, separate from each member's semantic kind. */
   kind: typeof RpcBatchPhysical.kind
+  /** Nonempty semantic member list; each member still requires its own admission. */
   envelopes: readonly IRpcEnvelope[]
 }>
 
@@ -43,7 +45,9 @@ export function assertRpcPhysicalFrameSize(value: unknown, limit: number): void 
 
 /** A real encoded-frame measurement can partition its caller's queue without measuring it again. */
 export type IRpcPhysicalFrameInspection = Readonly<{
+  /** Single measured complete-frame size, using UTF-8 for strings and JSON object representations. */
   readonly bytes: number
+  /** Retain an in-budget list or bisect an oversize list; an oversize singleton throws. */
   splitBatch<T>(members: T[]): readonly T[][]
 }>
 

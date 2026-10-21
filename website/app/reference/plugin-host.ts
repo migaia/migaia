@@ -4,6 +4,7 @@
  * cleanup-runtime.ts, state-constants.ts, error-code.ts) and USEGUIDE on 2026-10-18.
  */
 import type { IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
+import { pluginHostCases } from './plugin-host-cases.ts'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -277,15 +278,53 @@ const pluginMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   config: {
     summary: t(
-      'Initial configuration. The host deep-copies and freezes it at install; read it with `core.config.get()` and change it with `host.config.update(name, recipe)`. Only plain data is accepted (`INVALID_CONFIG_VALUE`, `CONFIG_CYCLE_REJECTED`).',
-      '初始配置。宿主在安装时深拷贝并冻结它；插件用 `core.config.get()` 读取，应用用 `host.config.update(name, recipe)` 修改。只接受普通数据（否则抛 `INVALID_CONFIG_VALUE`、`CONFIG_CYCLE_REJECTED`）。'
+      'Optional configuration: definePlugin snapshots and recursively freezes it at definition time; installation creates a registration-owned copy. Plain records/arrays and supported primitive or function leaves are admitted, while invalid values and cycles reject. Read core.config.get() or host.config.get(path); commit changes with host.config.update().',
+      '可选配置，`definePlugin` 在定义时快照并递归冻结，安装再创建登记自有副本；接纳普通记录、数组及支持的原始值或函数叶值，非法值与环会拒绝，通过 `core.config.get()` 或 `host.config.get(path)` 读取，以 `host.config.update()` 提交修改。'
+    ),
+    default: t(
+      'Omitted; the public definition.config is undefined and the host uses an empty configuration record.',
+      '默认省略，公开定义的 `config` 为 `undefined`，宿主使用空配置记录。'
     )
   },
   features: {
     summary: t(
-      'Features this plugin provides (defined with `defineFeature()`) and Features it consumes (references from `provider.getFeature(name)`). The host installs providers first and injects outputs as `core.features.<name>`.',
-      '本插件提供的 Feature（用 `defineFeature()` 定义）以及消费的 Feature（来自 `provider.getFeature(name)` 的引用）。宿主先安装 provider，再把输出注入为 `core.features.<name>`。'
+      'Record of named roots created by defineFeature. Their dependency maps can reference provider.getFeature(name). The host installs required providers first and injects resolved root outputs as core.features.<name>.',
+      '由 `defineFeature` 创建的具名根记录，其依赖映射可引用 `provider.getFeature(name)`；宿主先安装必需提供方，再把解析的根输出注入 `core.features.<name>`。'
+    ),
+    default: t('Omitted; no Feature roots.', '默认省略，没有功能根。')
+  },
+  install: {
+    summary: t(
+      'Required object-form hook. Receives the domain core plus config, operation, lifecycle, onDispose and pipeline registration methods; declared Feature outputs are ready. Return an extension record, or an awaitable record through asynchronous use(). Own enumerable data properties must be configurable; frozen extension records are rejected.',
+      '对象形式的必填钩子，收到领域内核及配置、操作、生命周期、`onDispose` 和管线登记方法，声明的功能输出已就绪；返回扩展记录，异步 `use()` 也接收异步记录，自有可枚举数据属性须允许重配置，冻结扩展记录会拒绝。'
+    ),
+    params: {
+      core: t(
+        'Registration-local capabilities. onDispose(resource) is allowed only during install: pass a void/PromiseLike<void> cleanup function or a disposable object; resources are released in reverse order after the plugin disposer.',
+        '登记本地能力，`onDispose(resource)` 仅安装期间可用，接收返回空值或异步空值的清理函数或可释放对象，资源在插件释放钩子之后按逆序释放。'
+      ),
+      setupOutput: t(
+        'Second argument only when setup is declared; exact resolved setup output. Otherwise install receives only core.',
+        '仅声明 `setup` 时提供第二参数，为原始已完成准备结果，否则只传 `core`。'
+      )
+    }
+  },
+  setup: {
+    summary: t(
+      'Optional preparation hook before Feature construction and install. Receives config.get(), operation.signal/deadlineAt/now(), lifecycle.signal and onDispose(resource), but no Features or pipeline registration. Its exact resolved result becomes the second install/featureExpose argument.',
+      '功能构造与安装前的可选准备钩子，收到配置读取、操作信号与截止时间和时钟、生命周期信号及资源接管，但没有功能输出或管线登记，完成结果按原身份成为安装及暴露钩子的第二参数。'
+    ),
+    default: t(
+      'Omitted; no preparation phase or second hook argument.',
+      '默认省略，没有准备阶段或钩子第二参数。'
     )
+  },
+  featureExpose: {
+    summary: t(
+      'Optional object of methods or synchronous hook producing it. Feature factories receive only this explicit read-only method facade, not the whole install core; methods are revoked when the registration ends.',
+      '可选方法对象或同步返回它的钩子，功能工厂只收到这份显式只读方法表面，不取得整个安装内核，登记结束后方法撤销。'
+    ),
+    default: t('Omitted; an empty expose object.', '默认省略，使用空暴露对象。')
   },
   activation: {
     summary: t(
@@ -659,6 +698,103 @@ await host.dispose()`
 const alias = (en: string, zh: string) => ({ summary: t(en, zh), members: {} })
 
 /** Reference of `@migaia/plugin-host`. */
+/** Host-owned option fields are reused verbatim on class and functional construction pages. */
+const hostOptionMembers: Readonly<Record<string, IMemberDoc>> = {
+  identity: {
+    summary: t(
+      'Readable host name `{ name }`; a unique id is added by the runtime.',
+      '宿主的可读名称 `{ name }`；运行时会另外分配唯一 id。'
+    ),
+    default: t(
+      'Omitted; identity.name defaults to DEFAULT and the runtime issues a unique id.',
+      '默认省略，`identity.name` 为 `DEFAULT`，运行时签发唯一 `id`。'
+    )
+  },
+  'identity.name': {
+    summary: t(
+      'Readable host name used in errors and diagnostics.',
+      '宿主的可读名称，出现在错误与诊断信息中。'
+    ),
+    default: t(
+      'Omission uses DEFAULT as the name. The generated id combines that name with a sequence number, allowing diagnostics to distinguish host instances.',
+      '省略时名称为 DEFAULT。自动生成的 id 由名称和序号组成，诊断信息可据此区分不同宿主实例。'
+    )
+  },
+  'execution.mutationTimeoutMs': {
+    summary: t(
+      'Required nonnegative finite milliseconds or false, with no default. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.',
+      '必填非负有限毫秒数或 `false`，无默认值；限制准备、安装及更新，到期取消并以 `MUTATION_EXECUTION_TIMEOUT` 回滚，`false` 关闭此期限，卸载钩子与释放另用 `disposeStepTimeoutMs`。'
+    )
+  },
+  'execution.pipelineDrainTimeoutMs': {
+    summary: t(
+      'Required nonnegative finite milliseconds or false; no default. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.',
+      '必填非负有限毫秒数或 `false`，无默认值；约束卸载、替换及宿主销毁时的管线排空，`false` 等待全部租约结束。'
+    )
+  },
+  execution: {
+    summary: t(
+      'Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.',
+      '必填执行预算：变更时限约束准备、安装及更新，排空时限约束管线且作为托管卸载共享清理期限；普通卸载步骤用独立步骤时限，传 `false` 关闭对应期限。'
+    )
+  },
+  pipeline: {
+    summary: t(
+      'Optional pipeline record. mode is sync, async, generator or async-generator; defaults to sync and is fixed after construction.',
+      '可选管线配置，`mode` 可为 `sync`、`async`、`generator`、`async-generator`，默认 `sync`，构造后固定。'
+    ),
+    default: t('`{ mode: "sync" }`.', '`{ mode: "sync" }`，同步模式。')
+  },
+  diagnostic: {
+    summary: t(
+      'Receives notable events that are not errors (`PIPELINE_NEXT_LATE`, `EXTENSION_NON_ENUMERABLE_IGNORED`, rollback failures, queue waits) as `(message, code?, error?)`. Its own failures never affect the host.',
+      '接收值得关注但不构成错误的事件（`PIPELINE_NEXT_LATE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、回滚失败、排队等待等），参数为 `(message, code?, error?)`。它自身出错不会影响宿主。'
+    ),
+    default: t('Not set: diagnostics are dropped.', '不设置：诊断信息被丢弃。')
+  },
+  onDiagnosticFailure: {
+    summary: t(
+      'Receives the error when `diagnostic` itself throws or rejects.',
+      '`diagnostic` 自身抛错或 reject 时，接收那个错误。'
+    ),
+    default: t(
+      'Not set: the failure goes to `globalThis.reportError` when it exists.',
+      '不设置：交给 `globalThis.reportError`（如果存在）。'
+    )
+  },
+  scheduler: {
+    summary: t(
+      'Clock and timers for queue and disposal timeouts; inject a manual scheduler in tests.',
+      '队列与清理超时使用的时钟和计时器；测试中可注入手动调度器。'
+    ),
+    default: t('The system scheduler.', '系统调度器 `systemScheduler`。')
+  },
+  queueAdmissionTimeoutMs: {
+    summary: t(
+      'How long a change may wait in the FIFO queue. A number rejects waiting work with `MUTATION_QUEUE_TIMEOUT` (running work is not interrupted); `false` disables queue timers and diagnostics.',
+      '变更在先进先出队列中最多等待多久。传数值时，等待超时的工作以 `MUTATION_QUEUE_TIMEOUT` 被拒绝（正在执行的工作不受影响）；传 `false` 关闭所有排队计时与诊断。'
+    ),
+    default: t(
+      'Not set: long waits are only reported through `diagnostic`, never rejected.',
+      '不设置：等待过久只经 `diagnostic` 提示，永远不会被拒绝。'
+    )
+  },
+  queueAdmissionDiagnosticMs: {
+    summary: t(
+      'Wait time after which a queued change is reported through `diagnostic` (only when `queueAdmissionTimeoutMs` is not set); `false` disables it.',
+      '变更排队超过多久后经 `diagnostic` 提示（仅在未设置 `queueAdmissionTimeoutMs` 时生效）；`false` 关闭。'
+    ),
+    default: t('`1000` milliseconds.', '`1000` 毫秒：排队超过 1 秒时提示一次。')
+  },
+  disposeStepTimeoutMs: {
+    summary: t(
+      'Maximum wait for one cleanup step (a stage disposer, a plugin `dispose`, a resource). A timed-out step is recorded as `DISPOSE_STEP_TIMEOUT` and cleanup continues; `false` waits forever.',
+      '单个清理步骤（步骤清理函数、插件 `dispose`、资源释放）的最长等待时间。超时的步骤记为 `DISPOSE_STEP_TIMEOUT` 并继续后续清理；`false` 表示一直等待。'
+    ),
+    default: t('`5000` milliseconds per step.', '每个步骤 `5000` 毫秒。')
+  }
+}
+
 export const pluginHostReference: ILibraryReference = {
   modules: {
     index: {
@@ -726,77 +862,73 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
         '返回携带 `TPublicSurface` 的规范冻结句柄，领域表面默认空。运行时获取前捕获表面选项及自有描述符；读取未分类失败附 `CALLBACK_FAILED` 并保留原错。'
       ),
       options: 'IDefineHostOptions',
-      example: `import { defineHost } from '@migaia/plugin-host'
-
-const surface = { ping: () => 'pong' }
-const host = defineHost<{ send(text: string): void }, string, readonly [], typeof surface>({
-  host: { ${execution} },
-  surface,
-  domainCore: () => ({ send: (text) => console.log('send', text) })
-})
-const same = host.usePipeline((value, next) => next(value.trim()))
-console.log(same === host, same.ping())
-await host.runPipeline('  hello  ', (value) => console.log(value)) // hello
-await host.dispose()`
+      exampleIntro: pluginHostCases.defineHost![0]!.problem,
+      example: pluginHostCases.defineHost![0]!.example,
+      exampleResult: pluginHostCases.defineHost![0]!.result,
+      cases: pluginHostCases.defineHost
     },
     definePlugin: {
       role: 'enhancer',
       purpose: t(
-        'Defines a plugin without installing it. Function form `definePlugin(name, (core) => ({ install, expose, featureExpose }), features?)` builds a fresh descriptor per install; object form `definePlugin({ name, config, setup, install, features, update, dispose, ... })` also declares configuration and lifecycle hooks. Nothing runs until `host.use(plugin)`.',
-        '定义插件但不安装。函数形式 `definePlugin(name, (core) => ({ install, expose, featureExpose }), features?)` 每次安装都生成新的描述；对象形式 `definePlugin({ name, config, setup, install, features, update, dispose, ... })` 还可声明配置和生命周期钩子。在 `host.use(plugin)` 之前不会执行任何代码。'
+        'Defines a plugin without running installation hooks. Function form builds a fresh descriptor per registration; object form also declares configuration, setup and lifecycle hooks. Config is captured when defining, not when the caller later mutates it.\n\nExamples pass host.execution.mutationTimeoutMs and pipelineDrainTimeoutMs as 5000 ms: required active-mutation and pipeline-drain budgets, with no defaults; false explicitly removes either deadline. host.config.get(path) uses plugin-name dot paths and returns undefined for an absent path.',
+        '定义插件但不执行安装钩子，函数形式为各登记创建新描述，对象形式还声明配置、准备与生命周期钩子；配置在定义时捕获，不随调用者后续修改变化。\n\n示例把 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs` 均设为 `5000` 毫秒，分别为必填的活动变更和管线排空预算，无默认值，`false` 显式去掉对应截止时间；`host.config.get(path)` 使用插件名开头的点路径，缺席路径返回 `undefined`。'
       ),
       params: {
-        name: t('Plugin name (function form).', '插件名称（函数形式）。'),
+        name: t(
+          'Required function-form nonempty name, unique per host and without a dot.',
+          '函数形式的必填非空名称，在宿主内唯一且不含点号。'
+        ),
         descriptorFactory: t(
-          'Function form: receives the install core and returns `{ install, expose?, featureExpose? }` for one installation.',
-          '函数形式：接收安装时的 core，返回本次安装的 `{ install, expose?, featureExpose? }`。'
+          'Required synchronous function-form callback receiving the install core. Return an object with optional install(), expose() and featureExpose() hooks, all omitted by default. install may be awaitable through use(); expose and featureExpose must be synchronous. install/expose extension keys must be disjoint.',
+          '函数形式的必填同步回调，收到安装内核并返回可选的 `install()`、`expose()` 与 `featureExpose()` 钩子，三项默认省略；异步 `use()` 可等待安装，其他两项须同步，安装与公开扩展的键不得重复。'
         ),
         featureRecord: t(
-          'Function form: Features this plugin provides or consumes.',
-          '函数形式：本插件提供或消费的 Feature。'
+          'Optional function-form root Feature record; omitted means no roots. Dependencies are declared inside each defineFeature dependency map.',
+          '函数形式的可选根功能记录，默认没有根，依赖在各 `defineFeature` 的依赖映射内声明。'
         ),
-        definition: t('Object form: the whole plugin definition.', '对象形式：完整的插件定义对象。')
+        definition: t(
+          'Required object-form own-data definition; fields and hook inputs are documented below.',
+          '对象形式的必填自有数据定义，字段与钩子输入见下表。'
+        )
       },
+      optionDocs: pluginMembers,
       returns: t(
         'A plugin definition (`IDefinedPluginConstraint`) with `name`, the declared fields, and `getFeature(name)` for consumers. Invalid fields throw `INVALID_OPTION`; retired fields such as `shared` throw `PLUGIN_DEFINITION_INVALID`.',
         '插件定义（`IDefinedPluginConstraint`），带有 `name`、声明的字段，以及供消费者使用的 `getFeature(name)`。字段不合法抛 `INVALID_OPTION`；已退役的字段（如 `shared`）抛 `PLUGIN_DEFINITION_INVALID`。'
       ),
-      example: `import { definePlugin } from '@migaia/plugin-host'
-
-const health = definePlugin('health', () => ({ install: () => ({ check: () => ({ ok: true }) }) }))
-const prefix = definePlugin({
-  name: 'prefix',
-  config: { prefix: '[app]' },
-  install: (core) => ({ format: (text: string) => \`\${core.config.get().prefix} \${text}\` })
-})`
+      exampleIntro: pluginHostCases.definePlugin![0]!.problem,
+      example: pluginHostCases.definePlugin![0]!.example,
+      exampleResult: pluginHostCases.definePlugin![0]!.result,
+      cases: pluginHostCases.definePlugin
     },
     defineFeature: {
       role: 'enhancer',
       purpose: t(
-        'Defines a Feature: a capability one plugin provides to other plugins. The factory receives the provider core (with `featureExpose`) and the outputs of the Features it depends on, and returns the Feature output.',
-        '定义 Feature：一个插件提供给其它插件的能力。工厂函数收到 provider 的 core（含 `featureExpose`）以及它所依赖的 Feature 输出，返回该 Feature 的输出。'
+        'Defines an opaque Feature, a synchronous factory whose output supplies a plugin capability. Construction records the factory and dependencies without invoking them; installation resolves the dependency graph and freezes each output object.\n\nExamples create a host with required host.execution.mutationTimeoutMs and pipelineDrainTimeoutMs budgets of 5000 ms, with no implicit defaults; false removes the corresponding active-mutation or pipeline-drain deadline. The graph orders capability startup, not reactive data changes.',
+        '定义功能，即输出插件能力的同步工厂；定义阶段记录工厂与依赖而不调用，安装时解析依赖图并冻结各输出对象。\n\n示例创建宿主时提供必填的 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs`，均为 `5000` 毫秒，没有隐式默认值，`false` 去掉对应活动变更或管线排空期限；此图安排功能启动，不追踪响应式数据变化。'
       ),
       params: {
         factory: t(
-          '`(core, dependencies) => output`.',
-          '工厂函数 `(core, dependencies) => output`。'
+          'Required synchronous (core, dependencies) => object. core contains only featureExpose, the registration-owned method facade; no onDispose, host mutation or pipeline capability is supplied. Output must be a non-thenable object; its methods may be asynchronous.',
+          '必填同步 `(core, dependencies) => object`，`core` 仅含登记拥有的方法表面 `featureExpose`，不提供资源接管、宿主变更或管线能力；输出须为非 `PromiseLike` 对象，其中的方法可以异步。'
         ),
         dependencies: t(
-          'Feature references this Feature needs, e.g. `{ clock: clockPlugin.getFeature("clock") }`.',
-          '该 Feature 依赖的 Feature 引用，例如 `{ clock: clockPlugin.getFeature("clock") }`。'
+          'Optional own-enumerable-data alias map, default {}. Each value is a local defineFeature result or provider.getFeature(name) reference. The factory receives outputs under those aliases; references are required by default, while getFeature(name, { optional: true }) can resolve to undefined.',
+          '可选自有可枚举数据别名映射，默认 `{}`，各值为本地 `defineFeature` 结果或 `provider.getFeature(name)` 引用，工厂按别名收到输出；引用默认必需，`getFeature(name, { optional: true })` 可解析为 `undefined`。'
         ),
         descriptor: t(
-          'Object form `{ factory, dependencies }`.',
-          '对象形式 `{ factory, dependencies }`。'
+          'Alternate object form { install, dependencies? }; install is the same required synchronous factory and dependencies defaults to {}. These must be own data fields, not accessors.',
+          '另一对象形式为 `{ install, dependencies? }`，`install` 是同一必填同步工厂，`dependencies` 默认 `{}`，两者均须为自有数据字段，不能为访问器。'
         )
       },
       returns: t(
-        'An `IFeature` to put in a plugin `features` record.',
-        '一个 `IFeature`，放进插件的 `features` 中使用。'
+        'A trusted frozen opaque IFeature identity for a plugin features record. Invalid definitions throw INVALID_OPTION; missing required providers reject installation directly with PREREQUISITE_MISSING before installers run.',
+        '返回可放入插件 `features` 记录的可信冻结不透明 `IFeature` 身份，非法定义抛 `INVALID_OPTION`，缺少必需提供方在安装器执行前以 `PREREQUISITE_MISSING` 直接拒绝安装。'
       ),
-      example: `const format = defineFeature((core: { featureExpose: { format(text: string): string } }) => ({
-  format: core.featureExpose.format
-}))`
+      exampleIntro: pluginHostCases.defineFeature![0]!.problem,
+      example: pluginHostCases.defineFeature![0]!.example,
+      exampleResult: pluginHostCases.defineFeature![0]!.result,
+      cases: pluginHostCases.defineFeature
     },
     asyncDisposeKey: {
       role: 'constant',
@@ -1086,101 +1218,7 @@ await host.dispose()`,
         'Options of a host (`new PluginHost(options)` and `defineHost({ host })`).',
         '宿主的构造选项，用于 `new PluginHost(options)` 以及 `defineHost({ host })`。'
       ),
-      members: {
-        identity: {
-          summary: t(
-            'Readable host name `{ name }`; a unique id is added by the runtime.',
-            '宿主的可读名称 `{ name }`；运行时会另外分配唯一 id。'
-          ),
-          default: t(
-            'Not set: the host is unnamed and identified only by its id.',
-            '不设置：宿主没有名称，只用 id 区分。'
-          )
-        },
-        'identity.name': {
-          summary: t(
-            'Readable host name used in errors and diagnostics.',
-            '宿主的可读名称，出现在错误与诊断信息中。'
-          ),
-          default: t(
-            'Omission uses DEFAULT as the name. The generated id combines that name with a sequence number, allowing diagnostics to distinguish host instances.',
-            '省略时名称为 DEFAULT。自动生成的 id 由名称和序号组成，诊断信息可据此区分不同宿主实例。'
-          )
-        },
-        'execution.mutationTimeoutMs': {
-          summary: t(
-            'Mutation budget for installation/setup and update hooks; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. Removal hooks and disposers instead use disposeStepTimeoutMs, while pipeline draining uses its separate budget. false disables this mutation deadline.',
-            '安装、准备及更新钩子的变更预算；到期取消操作并以 `MUTATION_EXECUTION_TIMEOUT` 回滚。卸载钩子及释放步骤另用 `disposeStepTimeoutMs`，管线排空使用独立预算；传 `false` 关闭变更期限。'
-          )
-        },
-        'execution.pipelineDrainTimeoutMs': {
-          summary: t(
-            'Maximum time to wait for running pipelines before removal or replacement continues; `false` waits until none are running.',
-            '卸载或替换前等待正在运行的 pipeline 结束的最长时间；传 `false` 表示一直等到全部结束。'
-          )
-        },
-        execution: {
-          summary: t(
-            'Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.',
-            '必填执行预算：变更时限约束准备、安装及更新，排空时限约束管线且作为托管卸载共享清理期限；普通卸载步骤用独立步骤时限，传 `false` 关闭对应期限。'
-          )
-        },
-        pipeline: {
-          summary: t(
-            'Pipeline mode `{ mode }`; fixed after construction.',
-            'pipeline 模式配置 `{ mode }`，决定步骤的形状与执行方式，构造后不能更改。'
-          ),
-          default: t('`{ mode: "sync" }`.', '`{ mode: "sync" }`，同步模式。')
-        },
-        diagnostic: {
-          summary: t(
-            'Receives notable events that are not errors (`PIPELINE_NEXT_LATE`, `EXTENSION_NON_ENUMERABLE_IGNORED`, rollback failures, queue waits) as `(message, code?, error?)`. Its own failures never affect the host.',
-            '接收值得关注但不构成错误的事件（`PIPELINE_NEXT_LATE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、回滚失败、排队等待等），参数为 `(message, code?, error?)`。它自身出错不会影响宿主。'
-          ),
-          default: t('Not set: diagnostics are dropped.', '不设置：诊断信息被丢弃。')
-        },
-        onDiagnosticFailure: {
-          summary: t(
-            'Receives the error when `diagnostic` itself throws or rejects.',
-            '`diagnostic` 自身抛错或 reject 时，接收那个错误。'
-          ),
-          default: t(
-            'Not set: the failure goes to `globalThis.reportError` when it exists.',
-            '不设置：交给 `globalThis.reportError`（如果存在）。'
-          )
-        },
-        scheduler: {
-          summary: t(
-            'Clock and timers for queue and disposal timeouts; inject a manual scheduler in tests.',
-            '队列与清理超时使用的时钟和计时器；测试中可注入手动调度器。'
-          ),
-          default: t('The system scheduler.', '系统调度器 `systemScheduler`。')
-        },
-        queueAdmissionTimeoutMs: {
-          summary: t(
-            'How long a change may wait in the FIFO queue. A number rejects waiting work with `MUTATION_QUEUE_TIMEOUT` (running work is not interrupted); `false` disables queue timers and diagnostics.',
-            '变更在先进先出队列中最多等待多久。传数值时，等待超时的工作以 `MUTATION_QUEUE_TIMEOUT` 被拒绝（正在执行的工作不受影响）；传 `false` 关闭所有排队计时与诊断。'
-          ),
-          default: t(
-            'Not set: long waits are only reported through `diagnostic`, never rejected.',
-            '不设置：等待过久只经 `diagnostic` 提示，永远不会被拒绝。'
-          )
-        },
-        queueAdmissionDiagnosticMs: {
-          summary: t(
-            'Wait time after which a queued change is reported through `diagnostic` (only when `queueAdmissionTimeoutMs` is not set); `false` disables it.',
-            '变更排队超过多久后经 `diagnostic` 提示（仅在未设置 `queueAdmissionTimeoutMs` 时生效）；`false` 关闭。'
-          ),
-          default: t('`1000` milliseconds.', '`1000` 毫秒：排队超过 1 秒时提示一次。')
-        },
-        disposeStepTimeoutMs: {
-          summary: t(
-            'Maximum wait for one cleanup step (a stage disposer, a plugin `dispose`, a resource). A timed-out step is recorded as `DISPOSE_STEP_TIMEOUT` and cleanup continues; `false` waits forever.',
-            '单个清理步骤（步骤清理函数、插件 `dispose`、资源释放）的最长等待时间。超时的步骤记为 `DISPOSE_STEP_TIMEOUT` 并继续后续清理；`false` 表示一直等待。'
-          ),
-          default: t('`5000` milliseconds per step.', '每个步骤 `5000` 毫秒。')
-        }
-      }
+      members: hostOptionMembers
     },
     IDefineHostOptions: {
       summary: t(
@@ -1194,6 +1232,9 @@ await host.dispose()`,
             '与 `PluginHost` 构造函数相同的宿主选项。'
           )
         },
+        ...Object.fromEntries(
+          Object.entries(hostOptionMembers).map(([name, doc]) => [`host.${name}`, doc])
+        ),
         surface: {
           summary: t(
             'Domain public members installed on the canonical handle using own descriptors captured once before Runtime creation. Accessors stay live; canonical Host keys, including identity, remain reserved and take precedence. TPublicSurface defaults to an empty object.',
@@ -1216,10 +1257,13 @@ await host.dispose()`,
         },
         translateDisposalError: {
           summary: t(
-            'Maps host disposal errors to a domain error type.',
-            '把宿主释放过程中的错误转换为领域错误类型。'
+            'Retained counterpart of the class translateDisposalError hook. The default structured-cleanup result path does not invoke it and does not convert individual cleanupErrors through this callback.',
+            '保留的类 `translateDisposalError` 钩子对应选项；默认结构化清理结果路径不调用它，也不通过此回调逐项转换 `cleanupErrors`。'
           ),
-          default: t('Not set: errors are kept as they are.', '不设置：错误保持原样。')
+          default: t(
+            'Omitted; structured cleanup results retain their existing errors.',
+            '默认省略，结构化清理结果保留已有错误。'
+          )
         },
         dispose: {
           summary: t(

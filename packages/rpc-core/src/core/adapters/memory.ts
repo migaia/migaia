@@ -28,12 +28,17 @@ export type IMemoryTransportOptions = Readonly<{
   scheduler?: IScheduler
 }>
 
+/**
+ * One side of a reference-delivery pair. Closing either side retires the whole pair; endpoint
+ * disposal leaves this borrowed carrier open.
+ */
 export type IMemoryTransport = IRpcTransport & {
   /**
    * Tears down the whole pair — closing either side closes both; after this, `send()` on either
    * throws.
    */
   close(): void
+  /** Whether the shared pair has been retired. */
   readonly closed: boolean
 }
 

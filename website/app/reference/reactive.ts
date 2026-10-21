@@ -4,6 +4,7 @@
  * runtime/observer-binding.ts, error-code.ts) and USEGUIDE on 2026-10-17.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import { reactiveCases } from './reactive-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -319,6 +320,7 @@ field.track() // 在 computed/effect 中读取外部值前调用`
   symbols: {
     createRuntime: {
       role: 'factory',
+      cases: reactiveCases.createRuntime,
       purpose: t(
         'Creates an isolated reactive runtime: its own dependency graph, version clock and scheduler. Nodes created by one runtime cannot be read by computed values or effects of another (`CROSS_RUNTIME`). Create one per SSR request, per test, or per worker instead of sharing `defaultRuntime`.',
         '创建一个隔离的响应式 runtime：拥有自己的依赖图、版本时钟和调度器。一个 runtime 创建的节点不能被另一个 runtime 的 computed 或 effect 读取（`CROSS_RUNTIME`）。SSR 每个请求、每个测试用例、每个 worker 都应各自创建，而不是共用 `defaultRuntime`。'
@@ -345,6 +347,7 @@ field.track() // 在 computed/effect 中读取外部值前调用`
     },
     defaultRuntime: {
       role: 'constant',
+      cases: reactiveCases.defaultRuntime,
       purpose: t(
         'A process-wide runtime created when the module is imported. Convenient for scripts and single-page apps; SSR, tests and workers should call `createRuntime()` so their state stays isolated.',
         '模块导入时创建的进程级共享 runtime。适合脚本和单页应用；SSR、测试和 worker 应调用 `createRuntime()`，让各自状态互相隔离。'

@@ -36,12 +36,17 @@ const fromBase64 = (value: unknown): Uint8Array => {
   }
 }
 
+/**
+ * Backend-compatible codec route with optional base64 wrapping; input/output domain validation
+ * remains with the selected codec.
+ */
 export type ISelectedCodec = {
   /** Produces the string, bytes, or structured value that the selected route writes to storage. */
   encode(
     value: unknown,
     ctx?: { signal?: NonNullable<IOperationContext['signal']> }
   ): Promise<string | Uint8Array | unknown>
+  /** Restore one stored representation, forwarding the operation signal to the original codec. */
   decode(
     raw: string | Uint8Array | unknown,
     ctx?: { signal?: NonNullable<IOperationContext['signal']> }
@@ -50,11 +55,12 @@ export type ISelectedCodec = {
 
 /**
  * Selects a codec route from backend capabilities. A matching `codec.output` uses the codec
- * directly. A binary codec on a text-only backend uses a base64 wrapper with about 33% larger
- * output. When supplied, `onDiagnostic` reports that fallback once per route selection. A
- * structured codec on a text-only backend throws `UNSUPPORTED_CAPABILITY`. JSON cannot preserve
- * structured clone values such as `Blob`, `Map`, `Set`, or cycles, so this function does not
- * silently convert them and lose data.
+ * directly. A binary codec on a text-only backend uses a base64 wrapper with four times
+ * ceil(byteLength / 3) characters. onDiagnostic observes that fallback once per route selection;
+ * diagnostic failures are contained and cannot change the chosen route. A structured codec on a
+ * text-only backend throws `UNSUPPORTED_CAPABILITY`. JSON cannot preserve structured clone values
+ * such as `Blob`, `Map`, `Set`, or cycles, so this function does not silently convert them and lose
+ * data.
  */
 export const selectCodec = (
   codec: ICodec,

@@ -5,10 +5,55 @@ import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { persist } from '../src/light-index.js'
 import { createAtomStore, atomDef } from '@migaia/store-keyed'
 import { persistKeyed } from '../src/keyed-index.js'
-import { assertEnvelope, type IPersistHandle } from '../src/index.js'
+import { assertEnvelope, persistUnit, type IPersistHandle } from '../src/index.js'
 import { defaultJsonCodec, PersistState } from '../src/index.js'
 
 describe('store-persist audit regressions', () => {
+  it('hydrates with the admitted merge callback without rereading its getter', async () => {
+    /** The generic root engine uses a complete adapter over an actual Store. */
+    const store = createStore({ count: 0 })
+    /** Real archive contents make the custom merge observable after the asynchronous read. */
+    const backend = memoryStorageHost()
+    await backend.set(
+      'merge-once',
+      (await defaultJsonCodec.encode({ version: 0, state: { count: 9 } })) as string
+    )
+    /** Configuration is admitted once, before hydration resumes from storage. */
+    let reads = 0
+    /** A second getter invocation would fail after construction already validated the callback. */
+    const original = new TypeError('merge getter reread')
+    /** The explicit callback deliberately differs from the default persisted-first merge. */
+    const handle = persistUnit(
+      {
+        snapshot: () => store.$plain(),
+        restore: (state) => store.$hydrate(state),
+        subscribe: (onChange) => store.$subscribe(onChange, { fireImmediately: false })
+      },
+      {
+        key: 'merge-once',
+        runtime: store.$runtime,
+        storage: backend,
+        get merge() {
+          reads++
+          if (reads > 1) throw original
+          return (
+            _persisted: Partial<Record<string, unknown>>,
+            current: Record<string, unknown>
+          ) => ({ ...current, count: 7 })
+        }
+      }
+    )
+    try {
+      await expect(handle.ready).resolves.toBeUndefined()
+      expect(reads).toBe(1)
+      expect(store.count).toBe(7)
+    } finally {
+      handle.dispose()
+      await store.$dispose()
+      await backend.dispose()
+    }
+  })
+
   it('delivers the same real backend failure to concurrent strict flush calls', async () => {
     /** Public Store and backend own the actual state and write failure. */
     const runtime = createRuntime({ onError: () => {} })

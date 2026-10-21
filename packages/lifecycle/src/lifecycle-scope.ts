@@ -71,9 +71,16 @@ export type ILifecycleScope = ILifecycleOwner & {
 }
 
 /**
- * The general-purpose, async-only scope. Ported from `@migaia/reactive`'s `LifecycleScopeImpl`
- * baseline (sync/async reentrancy guard, atomic splice+reverse teardown) with the sync path removed
- * and error handling generalized to the four policies.
+ * Creates the general-purpose async scope: register each resource with `own(resource, descriptor)`
+ * where it is created, then release them all with one `dispose()` when the owner (a page, a
+ * connection, a service) ends.
+ *
+ * Release runs in reverse registration order, so a resource registered after the one it depends on
+ * is released first. Every resource is attempted even when one fails; failures surface through the
+ * error policy (`throw` by default, after everything ran; or `collect`/`report`). Concurrent
+ * `dispose()` calls share one Promise. After `close()` or `dispose()`, `own()` throws
+ * `SCOPE_CLOSED`/`SCOPE_TERMINAL`; calling `own()`/`dispose()` from inside one of its own disposers
+ * throws the reentrancy codes. Supports `await using`.
  */
 export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILifecycleScope {
   const errorPolicy = options.errorPolicy ?? 'throw'

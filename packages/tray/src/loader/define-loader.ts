@@ -3,7 +3,12 @@ import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'
 import type { ILoadedArtifact, ILoader, ILoaderContext } from './typing.js'
 
-/** Snapshots loader invocation once and assimilates foreign thenables safely. */
+/**
+ * Captures the load method once and returns a frozen reusable contract. Each call executes that
+ * method once and assimilates foreign thenables; this helper neither acquires custody nor releases
+ * artifacts. Invalid shapes throw LOADER_CONTRACT_INVALID. loadIntoHost owns result validation,
+ * execution-error classification and transaction cleanup when this loader is used there.
+ */
 export function defineLoader<TSource, TArtifact>(
   loader: ILoader<TSource, TArtifact>
 ): ILoader<TSource, TArtifact> {

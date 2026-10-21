@@ -373,7 +373,13 @@ export class Runtime implements IRuntime {
   }
 }
 
-/** Creates an isolated runtime, for example for one SSR request, test case, or worker. */
+/**
+ * Creates an isolated runtime with its own dependency graph, version clock and scheduler; use one
+ * per SSR request, test case or worker. Nodes of different runtimes cannot depend on each other (a
+ * cross read throws `CROSS_RUNTIME`). Effects flush in a microtask by default; a flush that exceeds
+ * `maxFlushPasses` (default 100) stops with `FLUSH_LOOP`. Invalid options throw a `TypeError` or
+ * `RangeError` with code `INVALID_OPTION`.
+ */
 export function createRuntime(options?: IRuntimeOptions): IRuntime {
   // 双实例自检（copy-check.ts）：创建 Runtime 是首个正确性边界，登记本副本，使
   // runtimeCopyCount()/assertSingleRuntimeCopy() 能发现「两份模块副本」的部署错误。

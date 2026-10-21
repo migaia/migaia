@@ -74,10 +74,15 @@ export type IRemoteHostPluginResolver = (name: string, config?: IRpcPortableValu
 
 /** Host ownership is limited to the public operations needed for catalog control. */
 export type IRemoteServeHostOptions = Readonly<{
+  /** Existing local Host; this service never assumes ownership of the whole Host. */
   host: Pick<IHostHandle<object, unknown, readonly []>, 'use' | 'unUse' | 'plugin' | 'revision'>
+  /** Explicit plugin contracts this connection may address. */
   catalog: IRemoteHostCatalog
+  /** Synchronous local resolver; plugin definitions never travel over the wire. */
   resolvePlugin: IRemoteHostPluginResolver
+  /** Dedicated endpoint closed by this service handle. */
   endpoint: IRemoteServeEndpoint
+  /** Reporter for background and secondary cleanup failures. */
   report(error: unknown): void
 }>
 

@@ -1461,6 +1461,12 @@
       "library": "lifecycle"
     },
     {
+      "path": "/en/docs/lifecycle/graceful-shutdown",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/en/docs/lifecycle/mutation-queue",
       "locale": "en",
       "domain": "docs",
@@ -17260,6 +17266,12 @@
     },
     {
       "path": "/zh/docs/lifecycle/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/graceful-shutdown",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"

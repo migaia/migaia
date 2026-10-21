@@ -9,6 +9,7 @@ import {
 } from '../app/api-guides.js'
 import { isCallableApiSymbol, resolveDocsSelection, type IApi } from '../app/content-contract.js'
 import { findGuideJourney } from '../app/guide-journeys.js'
+import { libraryReferences } from '../app/reference/index.js'
 
 /**
  * Reader-hostile generator text or unexplained implementation jargon forbidden in maintained
@@ -737,6 +738,14 @@ describe('site-wide task guide quality', () => {
 
   test('every extracted configuration field has a useful reader-facing explanation', () => {
     for (const { api, symbol } of callableSymbols) {
+      /**
+       * Pages render a referenced symbol's fields from its maintained reference doc, and the
+       * reference audit already requires every such field to be documented; only the remaining
+       * symbols depend on the guide and extracted text checked here.
+       */
+      const reference = libraryReferences[api.library as keyof typeof libraryReferences]
+      if (reference?.symbols[`${api.module}:${symbol.name}`] ?? reference?.symbols[symbol.name])
+        continue
       for (const field of symbol.configuration) {
         for (const locale of ['zh', 'en'] as const) {
           const guide = findApiGuide(api.library, api.module, symbol.name, locale)

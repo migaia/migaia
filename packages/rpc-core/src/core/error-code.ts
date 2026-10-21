@@ -4,9 +4,8 @@ export const ERROR_SOURCE = '@migaia/rpc/core'
 /**
  * Defines the error codes owned by `@migaia/rpc/core` in one place.
  *
- * The `(source, code)` pair uniquely identifies an error under `docs/contracts/error-codes.md`.
- * `source` is always `@migaia/rpc/core`. Throw sites reference these constants rather than inline
- * literals.
+ * The `(source, code)` pair uniquely identifies a public semantic failure. `source` is always
+ * `@migaia/rpc/core`. Throw sites reference these constants rather than inline literals.
  *
  * Code values are public API, so renaming one is a breaking change. Only codes with actual throw
  * sites remain here. Records historical reserved codes removed during migration.
@@ -45,8 +44,9 @@ export const RpcCoreErrorCode = {
   /**
    * An operation requires a capability that is not installed.
    *
-   * Examples include creating an endpoint without `connect`, calling `ping()` without `ping`, or
-   * passing `signal` without `abort`. The caller installs the corresponding middleware.
+   * Examples include creating an endpoint without `connect` or calling `ping()` without `ping`.
+   * Remote abort notification additionally needs `abort`; local signal cancellation alone does not.
+   * The caller installs the capability required by the intended operation.
    */
   middlewareMissing: 'MIDDLEWARE_MISSING',
 
@@ -57,8 +57,9 @@ export const RpcCoreErrorCode = {
   capabilityUnsupported: 'CAPABILITY_UNSUPPORTED',
 
   /**
-   * A factory, middleware, or transport descriptor or configuration field is invalid. Replay r12
-   * also rejects encrypt-only configuration, unavailable entropy, and exhausted counters.
+   * A factory, middleware, or transport descriptor or configuration field is invalid. Replay
+   * protection also rejects encrypt-only configuration, unavailable entropy, and exhausted
+   * counters.
    *
    * This code identifies argument and configuration failures. The caller corrects the configuration
    * using `detail` before retrying.
@@ -101,9 +102,9 @@ export const RpcCoreErrorCode = {
 
   /**
    * A codec payload violates its input rules, or sender-side error serialization degrades a read or
-   * data projection. This is the base code for `RpcSerializationError` and `RpcChunkError`.
-   * Physical batch shape/encoding failures preserve the contract cause; malformed semantic members
-   * are reported individually without discarding valid siblings.
+   * data projection. This is the base code for `RpcSerializationError`. Physical batch
+   * shape/encoding failures preserve the contract cause; malformed semantic members are reported
+   * individually without discarding valid siblings.
    *
    * The caller checks the data, codec, or thrown value. Do not retry the same payload if it is
    * already sent or cancellation has taken effect.
@@ -191,8 +192,8 @@ export const RpcCoreErrorCode = {
 
   /**
    * A per-frame authentication transform fails during encryption, signing, verification, or
-   * decryption (`RpcAuthenticationError`). Replay r12 rejects missing/invalid binding, duplicate
-   * counters and untrusted physical sessions.
+   * decryption (`RpcAuthenticationError`). Replay protection rejects missing/invalid binding,
+   * duplicate counters and untrusted physical sessions.
    *
    * The caller checks key and algorithm configuration. Failure details are not sent back to the
    * peer.
@@ -269,4 +270,5 @@ export const RpcAuthenticationRejectionReason = {
 export type RpcAuthenticationRejectionReason =
   (typeof RpcAuthenticationRejectionReason)[keyof typeof RpcAuthenticationRejectionReason]
 
+/** Semantic failure code owned by the canonical Core error source. */
 export type IRpcCoreErrorCode = (typeof RpcCoreErrorCode)[keyof typeof RpcCoreErrorCode]

@@ -120,9 +120,22 @@ function messageChannel(child: IElectronChild): IProcessMessageChannel {
 }
 
 /** Electron's handle exposes a message carrier and keeps termination on the supervisor. */
-export type IElectronProcessHandle = IProcessHandle & Readonly<{ channel: IProcessMessageChannel }>
+export type IElectronProcessHandle = IProcessHandle &
+  Readonly<{
+    /**
+     * Whole-message port; channel.close stops sends but native process termination stays
+     * supervised.
+     */
+    channel: IProcessMessageChannel
+  }>
 
-/** Construct a launcher whose unsupported capabilities are visible before any fork. */
+/**
+ * Create an Electron main-process utility launcher without importing the optional peer until
+ * launch. Launch requires app readiness, ignored stdin and no secret bootstrap; unsupported options
+ * reject INVALID_CONFIG. Fork/import failures reject PROCESS_CHANNEL_CONNECT_FAILED with the
+ * original cause. The handle exposes native messages, while its supervisor retains process
+ * termination.
+ */
 export function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectronProcessHandle> {
   return Object.freeze({
     capabilities: ELECTRON_CAPABILITIES,

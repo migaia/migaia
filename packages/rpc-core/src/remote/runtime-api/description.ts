@@ -16,7 +16,10 @@ import {
 } from './constants.js'
 
 /** Identity contains only safe routing/display data, never source configuration or bootstrap data. */
-export type IRuntimePeerIdentity = Readonly<{ name: string; instanceId: string }>
+export type IRuntimePeerIdentity = Readonly<{
+  /** Safe connection display/registration name. */ name: string
+  /** Exact accepted instance address, distinct from a physical attempt number. */ instanceId: string
+}>
 
 /** Directory modes describe actual installed routes rather than the erased handler signature. */
 export type IRuntimeMethodDescription = Readonly<{

@@ -2,82 +2,134 @@ import { CapabilityGraphErrorCode } from './error-code.js'
 import { graphFailure, graphMessageFor } from './errors.js'
 import type { ITopologyDependency, ITopologyIndexReader } from './topology.js'
 
+/** Pure-planner policies for mutations affecting required consumers; no lifecycle work is executed. */
 export const DependencyPolicy = {
+  /** Return a blocked plan when required consumers outside the requested roots are present. */
   reject: 'reject',
+  /** Give the full required-consumer closure the root mutation action. */
   cascade: 'cascade',
+  /** Mutate roots but suspend already activated required consumers instead of releasing them. */
   suspend: 'suspend'
 } as const
 
+/** Accepted mutation policies; planner requests supply one explicitly. */
 export type DependencyPolicy = keyof typeof DependencyPolicy
 
+/** Requested root mutation used to select release or disable actions. */
 export const DependencyMutationKind = {
+  /** Relinquish root resources and include release actions in a cascade. */
   remove: 'remove',
+  /** Disable roots and include disable actions in a cascade. */
   disable: 'disable'
 } as const
 
+/** Root mutation domain, separate from individual planned step actions. */
 export type DependencyMutationKind = keyof typeof DependencyMutationKind
 
+/** Instructions for a composition owner to execute; producing a plan performs none of these actions. */
 export const DependencyAction = {
+  /** Release the node's resources. */
   release: 'release',
+  /** Disable the node according to the composition owner's policy. */
   disable: 'disable',
+  /** Retain an activated instance while withholding service. */
   suspend: 'suspend',
+  /** Restore service from a retained, satisfiable instance. */
   resume: 'resume',
+  /** Update a direct consumer to a replacement binding in place. */
   rebind: 'rebind',
+  /** Reconstruct an activated instance against its providers. */
   restart: 'restart',
+  /** Start a required provider that has not yet activated. */
   activate: 'activate',
+  /** Mark a suspended retained instance stale rather than starting it immediately. */
   invalidate: 'invalidate'
 } as const
 
+/** Planned action labels consumed by an external execution owner. */
 export type DependencyAction = keyof typeof DependencyAction
 
+/** Additional status only for an optional edge whose provider is absent. */
 export const DependencyEdgeStatus = {
+  /** Optional provider is absent; this edge does not block activation or join required closure. */
   optionalAbsent: 'optional-absent'
 } as const
 
+/** Optional-edge diagnostic label, independent of node state. */
 export type IDependencyEdgeStatus = (typeof DependencyEdgeStatus)[keyof typeof DependencyEdgeStatus]
 
+/** Orthogonal runtime facts supplied by the composition owner; topology stores none of these flags. */
 export type IDependencyNodeState = Readonly<{
+  /** Whether the node has an activated instance, including a retained suspended instance. */
   readonly activated: boolean
+  /** Whether configuration currently allows this node to serve. */
   readonly enabled: boolean
+  /** Whether the activated instance is deliberately withheld from consumers. */
   readonly suspended: boolean
+  /** Whether a retained instance must restart before it can resume. */
   readonly stale: boolean
 }>
 
+/** Reads current facts for a known topology ID; callers own consistency and callback failures. */
 export type IDependencyStateReader = (id: string) => IDependencyNodeState
 
+/** One immutable instruction in execution order. */
 export type IDependencyPlanStep = Readonly<{
+  /** Node affected by this instruction. */
   readonly id: string
+  /** External work required; creating the instruction does not perform it. */
   readonly action: DependencyAction
 }>
 
+/** Edge evidence accompanying a plan, including optional consumers notified by an affected provider. */
 export type IDependencyPlanEdge = Readonly<{
+  /** Provider endpoint, which may be absent for an optional edge. */
   readonly provider: string
+  /** Present consumer declaring the edge. */
   readonly consumer: string
+  /** True for an edge excluded from required-dependent cascade semantics. */
   readonly optional: boolean
+  /** Optional-absent only when an optional provider is not present; otherwise omitted. */
   readonly status?: IDependencyEdgeStatus
 }>
 
+/** Deeply frozen result describing work and rejection facts without mutating topology or resources. */
 export type IDependencyPlan = Readonly<{
+  /** Ordered execution instructions; empty when reject policy reports blockers. */
   readonly steps: readonly IDependencyPlanStep[]
+  /** Node IDs projected from steps in the same order. */
   readonly order: readonly string[]
+  /** Required internal and affected optional edge evidence in canonical consumer order. */
   readonly edges: readonly IDependencyPlanEdge[]
+  /** Required consumers outside the roots that prevent a reject-policy mutation; otherwise empty. */
   readonly blockedBy: readonly string[]
 }>
 
+/** Explicit roots, root action, and required-consumer policy; no field receives a default. */
 export type IDependencyMutationRequest = Readonly<{
+  /** Present mutation roots; required-consumer closure includes these roots. */
   readonly roots: readonly string[]
+  /** Remove selects release; disable selects disable. */
   readonly kind: DependencyMutationKind
+  /** Reject, cascade, or suspend; unsupported values throw GRAPH_INVALID_OPTION. */
   readonly policy: DependencyPolicy
 }>
 
+/** Replacement target and the owner's decision about each direct consumer's rebind capability. */
 export type IDependencyReplacementRequest = Readonly<{
+  /** Present provider whose binding is changing. */
   readonly target: string
+  /** True when an activated direct consumer can accept the new binding without restart. */
   readonly canRebind: (id: string) => boolean
 }>
 
+/** Recovery inputs; stale state and changed provider generations determine restart versus rebind. */
 export type IDependencyResumeRequest = Readonly<{
+  /** Present provider from which to traverse the suspended required-consumer frontier. */
   readonly provider: string
+  /** Whether direct consumers need a new binding or restart, in addition to stale-state checks. */
   readonly generationChanged: boolean
+  /** Whether a direct consumer can change binding in place when its provider generation changed. */
   readonly canRebind: (id: string) => boolean
 }>
 
@@ -194,7 +246,11 @@ function collectResumeCandidates(
   return index.order(candidates)
 }
 
-/** Collects deterministic plan edges for one affected node set. */
+/**
+ * Returns frozen required internal edges plus affected optional relationships for the supplied
+ * affected set. Optional absent-provider evidence is included for affected consumers; unrelated
+ * edges are omitted. This projection neither changes the index nor executes lifecycle work.
+ */
 export function collectPlanEdges(
   index: ITopologyIndexReader,
   affected: ReadonlySet<string>
@@ -234,7 +290,12 @@ export function collectPlanEdges(
   return Object.freeze(edges.map((edge) => Object.freeze(edge)))
 }
 
-/** Plans reject, cascade, or suspend semantics without mutating the topology index. */
+/**
+ * Plans an explicit remove/disable request in dependent-first order. reject returns no steps plus
+ * blockedBy when other required consumers exist; cascade applies the root action to the closure;
+ * suspend retains activated consumers via suspend steps. Invalid policy or kind throws
+ * GRAPH_INVALID_OPTION; unknown IDs follow the index adapter. No mutation or release is executed.
+ */
 export function planDependencyMutation(
   index: ITopologyIndexReader,
   state: IDependencyStateReader,
@@ -280,7 +341,11 @@ export function planDependencyMutation(
   return createPlan(steps, edges)
 }
 
-/** Plans one dependent-first restart closure, excluding inactive nodes. */
+/**
+ * Returns dependent-first restart steps for activated roots and required consumers. Inactive nodes
+ * are omitted, and suspended instances receive invalidate instead of restart. Topology and state
+ * are only read; the caller executes the returned frozen plan.
+ */
 export function planRestart(
   index: ITopologyIndexReader,
   state: IDependencyStateReader,
@@ -304,7 +369,11 @@ export function planRestart(
   return createPlan(steps, collectPlanEdges(index, planned))
 }
 
-/** Plans direct rebinds first, then dependent-first restart closures. */
+/**
+ * Plans direct activated consumers as rebinds when canRebind permits, invalidates suspended
+ * consumers, then appends dependent-first restart closures for the rest. The target itself has no
+ * replacement step; its replacement remains the execution owner's responsibility.
+ */
 export function planReplacement(
   index: ITopologyIndexReader,
   state: IDependencyStateReader,
@@ -342,7 +411,11 @@ export function planReplacement(
   )
 }
 
-/** Plans recovery of satisfiable suspended dependents in provider-first canonical order. */
+/**
+ * Plans the suspended required-consumer frontier in provider-first order. Only nodes whose required
+ * providers can serve are recoverable; stale instances restart, changed direct bindings rebind or
+ * restart, and other recoverable instances resume. No startup, release, or state write occurs.
+ */
 export function planResume(
   index: ITopologyIndexReader,
   state: IDependencyStateReader,
@@ -410,7 +483,11 @@ export function planResume(
   )
 }
 
-/** Plans inactive required providers before the requested activation roots. */
+/**
+ * Plans inactive required providers in provider-first order, excluding the requested roots from
+ * steps. Traversal stops at already activated providers and ignores optional or absent providers;
+ * root activation itself remains the composition owner's responsibility.
+ */
 export function planActivation(
   index: ITopologyIndexReader,
   state: IDependencyStateReader,
@@ -443,7 +520,11 @@ export function planActivation(
   )
 }
 
-/** Resolves immediate batch installation from non-lazy members and required providers. */
+/**
+ * Returns a mutation-incapable set of non-lazy batch members and their required providers within
+ * the same batch, in canonical order. Lazy members are included when a selected member requires
+ * them; optional edges and providers outside the batch do not expand selection. Nothing starts.
+ */
 export function resolveInstallSet(
   index: ITopologyIndexReader,
   members: readonly string[],
@@ -472,7 +553,10 @@ export function resolveInstallSet(
   return createReadonlySet(index.order(selected))
 }
 
-/** Plans release of every present node in inverse canonical order. */
+/**
+ * Returns a frozen release plan for every present node in inverse canonical order; does not dispose
+ * resources.
+ */
 export function planTeardown(index: ITopologyIndexReader): IDependencyPlan {
   /** All present IDs in dependent-first order. */
   const order = [...index.order()].reverse()

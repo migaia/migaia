@@ -12,6 +12,7 @@ import { WorkerRpcIdentity } from './worker-constants.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 export type { IManagedRpcHandler } from './managed-rpc-handler.js'
+/** Borrowed Web-worker-shaped message port; logical adapter disposal does not terminate its host. */
 export type IWorkerPort = IWebWorkerLikePort
 
 /** Rejects JavaScript-boundary null/non-object option values before property access. */
@@ -81,11 +82,30 @@ function createWorkerEndpoint(
   })
 }
 
+/**
+ * Requests computations over one borrowed Worker-like port using the canonical RPC endpoint.
+ * Construction starts asynchronous endpoint setup; requests wait for it. Use portable primitive,
+ * array and plain-record data, with supported undefined/ArrayBuffer/Uint8Array wrappers, rather
+ * than assuming arbitrary JavaScript objects round-trip. The bridge reserves $worker markers and
+ * encodes bytes as base64url independently of native transfer lists.
+ *
+ * Close only stops admission; await dispose to release the endpoint, then release the physical
+ * Worker/port separately. RPC owns remote errors, cancellation and timeout outcomes.
+ */
 export class WorkerAdapter {
+  /** Shared endpoint initialization, awaited by both requests and asynchronous cleanup. */
   #endpoint: Promise<IWorkerContractEndpoint>
+  /** Admission fence set before waiting for endpoint cleanup. */
   #disposed = false
+  /** Stable cleanup result so repeated disposal neither repeats work nor hides its rejection. */
   #disposePromise: Promise<void> | undefined
 
+  /**
+   * Borrows port and captures client options once; options default to an empty object. clientId
+   * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default,
+   * leaving requests without an application deadline. Invalid options throw locally; endpoint setup
+   * failures surface through request/dispose rather than making the constructor async.
+   */
   constructor(
     port: IWorkerPort,
     options: { readonly clientId?: string; readonly timeoutMs?: number } = {}
@@ -94,10 +114,19 @@ export class WorkerAdapter {
     this.#endpoint = createWorkerEndpoint(port, snapshotWorkerClientOptions(options))
   }
 
+  /** Whether close/dispose has fenced new requests, independently of cleanup completion. */
   get disposed(): boolean {
     return this.#disposed
   }
 
+  /**
+   * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a
+   * static expectation rather than runtime schema validation. Captures optional signal and transfer
+   * once before asynchronous admission; both default to undefined. Transfer is explicit and may
+   * detach listed buffers when sent, without establishing zero-copy payload delivery. Invalid
+   * options or terminal admission reject, as do RPC/remote failures. Cancellation asks a
+   * cooperative provider to stop and does not undo completed effects or forcibly terminate it.
+   */
   request<Input, Output>(
     payload: Input,
     options: { signal?: IAbortSignal; transfer?: readonly unknown[] } = {}
@@ -137,7 +166,7 @@ export class WorkerAdapter {
   /**
    * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is
    * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls
-   * return the same promise.
+   * return the same promise. The borrowed physical port/Worker remains caller-owned.
    */
   dispose(): Promise<void> {
     if (this.#disposePromise === undefined) {
@@ -151,6 +180,17 @@ export class WorkerAdapter {
   }
 }
 
+/**
+ * Creates the worker-side managed message callback for one synchronous or asynchronous compute
+ * function. The caller connects native message.data to the returned callback and supplies the
+ * outbound post function; neither native listener installation nor physical Worker lifetime is
+ * owned here. compute receives a cooperative native signal, and its result/failure is returned
+ * through RPC rather than through the delivery callback's Promise.
+ *
+ * Options default to {}; timeoutMs is undefined and only configures requests originated by this
+ * endpoint, not a provider execution budget. Invalid callbacks/options throw before setup. Await
+ * handler.dispose to release its endpoint, and separately detach the caller's native listener.
+ */
 export function createWorkerHandler<Input, Output>(
   compute: (payload: Input, context: { signal: INativeAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
@@ -206,8 +246,14 @@ export function createWorkerHandler<Input, Output>(
   return handler
 }
 
+/**
+ * Resource options plus worker input transfer. Resource owns caching, dependency tracking and
+ * request cancellation; this type does not transfer ownership of the adapter or physical Worker.
+ */
 export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {
+  /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */
   readonly runtime?: IRuntime
+  /** Optional synchronous transfer-list selector per input; omitted means no explicit transfer list. */
   readonly transfer?: (input: Input) => readonly unknown[]
 }
 
@@ -263,6 +309,17 @@ function snapshotWorkerComputedOptions<Input, Output>(
   }
 }
 
+/**
+ * Builds a Resource whose fetcher synchronously selects input, then requests it through adapter.
+ * Reactive reads made during selectInput follow Resource dependency tracking; transfer, when
+ * provided, selects the explicit native transfer list for that same input. Known options are
+ * captured once before Resource ownership; invalid adapter/callback/options throw synchronously.
+ *
+ * Resource defaults apply: autoStart true, ttl Infinity, staleWhileRevalidate/keepAlive false,
+ * retry/retryDelay 0, initialSnapshot/debugName undefined and systemScheduler. Request failures
+ * follow Resource's state/Promise contract. Dispose the Resource before separately disposing the
+ * borrowed adapter; Resource cancellation does not terminate the Worker or undo remote effects.
+ */
 export function workerComputed<Input, Output>(
   adapter: WorkerAdapter,
   selectInput: () => Input,

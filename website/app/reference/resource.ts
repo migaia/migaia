@@ -4,6 +4,7 @@
  * and README on 2026-10-17.
  */
 import type { ILibraryReference, IText } from './contract.js'
+import { resourceCases } from './resource-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -126,6 +127,7 @@ export const resourceReference: ILibraryReference = {
       ),
       options: 'IResourceOptions',
       example: resourceExample,
+      cases: resourceCases.Resource,
       scenarios: resourceScenarios,
       avoid: [
         t(
@@ -148,7 +150,8 @@ export const resourceReference: ILibraryReference = {
         'Table of the stable error codes of this package. Each key names one failure; the values are the strings found on `error.code`.',
         '本包稳定错误码的对照表。每个键对应一种失败，值就是错误对象 `error.code` 上的字符串。'
       ),
-      example: `if (error.code === ResourceErrorCode.requestCancelled) return // 主动取消，不提示`
+      example: `if (error.code === ResourceErrorCode.requestCancelled) return // 主动取消，不提示`,
+      cases: resourceCases.ResourceErrorCode
     },
     ResourceFetchStatus: {
       role: 'constant',
@@ -164,7 +167,8 @@ export const resourceReference: ILibraryReference = {
         'Values of `state.status`: the five states of the data state machine (`idle`, `pending`, `success`, `error`, `cancelled`).',
         '`state.status` 的全部取值，即数据状态机的五种状态，界面据此决定显示加载、数据还是错误（`idle`、`pending`、`success`、`error`、`cancelled`）。'
       ),
-      example: `if (user.state.status === ResourceStatus.success) render(user.state.data)`
+      example: `if (user.state.status === ResourceStatus.success) render(user.state.data)`,
+      cases: resourceCases.ResourceStatus
     }
   },
   types: {

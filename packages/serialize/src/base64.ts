@@ -16,7 +16,10 @@ const CHUNK_BYTES = 0x7ffd - (0x7ffd % 3)
 /** RFC 4648 URL alphabet supplies the unused-bit check for portable bytes tags. */
 const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
 
-/** Encode bytes through the shared runtime-neutral RFC 4648 implementation. */
+/**
+ * Encodes bytes as one canonical padded RFC 4648 string without host btoa; does not mutate the
+ * input.
+ */
 export function bytesToBase64(bytes: Uint8Array): string {
   return encodeCanonicalBase64(bytes)
 }
@@ -24,13 +27,18 @@ export function bytesToBase64(bytes: Uint8Array): string {
 /**
  * Yields base64 text pieces to consumers that write to a sink, such as `WritableStream` or chunked
  * upload. The full base64 string never needs to be assembled at once. Use `bytesToBase64` when the
- * final consumer requires one string.
+ * final consumer requires one string. Pieces use three-byte boundaries so concatenation is the same
+ * padded spelling as one-shot encoding; input bytes are borrowed rather than copied into one
+ * additional full-size buffer.
  */
 export function* streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void> {
   yield* streamCanonicalBase64Chunks(bytes, CHUNK_BYTES)
 }
 
-/** Decode canonical padded base64 while preserving the legacy public diagnostic boundary. */
+/**
+ * Decodes canonical padded base64 into fresh bytes. Invalid alphabet, padding, or unused tail bits
+ * throw a serialize-owned TypeError INVALID_OPTION with the canonical decoder failure on cause.
+ */
 export function base64ToBytes(text: string): Uint8Array {
   try {
     return decodeCanonicalBase64(text)

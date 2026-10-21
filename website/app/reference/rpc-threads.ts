@@ -11,6 +11,7 @@
  * fingerprint there. Runtime parent identity lives separately in Core bootstrap.
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ISymbolDoc } from './contract.js'
+import { rpcThreadsCases } from './rpc-threads-cases.js'
 import {
   runtimePeerOptionMembers,
   runtimePluginOptionMembers,
@@ -53,7 +54,7 @@ const threadPeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
       'Receives background errors that no call can reject with.',
       '接收无法通过调用 reject 的后台错误。'
     ),
-    default: t('`console.error`.', '`console.error`：输出到控制台。')
+    default: t('`defaultRpcReporter`.', '`defaultRpcReporter`，使用默认控制台报告路径。')
   }
 }
 
@@ -175,8 +176,8 @@ const nodeLauncherOptions = {
   },
   execArgv: {
     summary: t(
-      'Caller-selected runtime argument list forwarded to each native Worker through a fresh array; use entry-appropriate flags.',
-      '调用方指定的运行时参数列表，每次通过新数组传给原生工作线程；参数须适用于目标入口。'
+      'Caller-selected runtime argument list copied for each native Worker. If new Worker throws synchronously, launch rejects with Core INVALID_CONFIG. An existing native code such as ERR_WORKER_INVALID_EXEC_ARGV is not overwritten: the original Error, code, name, message and stack remain on cause under the established conflict policy. This classification does not cover later asynchronous Worker business failures.',
+      '调用方指定的运行时参数列表，每次复制后传给原生 Worker。new Worker 同步抛错时，launch 以 Core INVALID_CONFIG 拒绝；已有 ERR_WORKER_INVALID_EXEC_ARGV 等原生 code 时，不覆盖它，而是按既有冲突策略包装，原 Error、code、name、message、stack 保留在 cause 上。此分类不适用于 Worker 之后的异步业务失败。'
     ),
     default: t(
       'Omitted: preserve Node’s native execution-argument inheritance.',
@@ -922,14 +923,19 @@ export const rpcThreadsReference: ILibraryReference = {
     createThreadPeer: {
       options: 'IRuntimeThreadPeerOptions',
       role: 'factory',
+      cases: rpcThreadsCases.createThreadPeer,
+      exampleIntro: {
+        en: "Install this package and its Core and Contract peers, save each complete ESM example as a real file, and run it with Node 24. Await `isThreadChild()` before any parent-only work: `spawn: true` reexecutes the entry, not just its provider. `provide` defaults to no methods; functions accept the request payload, and async generators supply streams. A short spawn selects the native runtime launcher, `systemScheduler`, a thread budget of `1`, and `isolation: 'best-effort'`; optional name/data/limits default to `undefined`. `defaultTimeoutMs` is `30000`, `report` defaults to `defaultRpcReporter`, and authentication defaults to `undefined`. ArrayBuffer and Uint8Array requests copy by default. The optional transfer list defaults to `undefined`; unsigned RPC rejects it before provider execution, so enabling native transfer requires real signing at both endpoints and actual capability negotiation. Node Workers share process.pid but have distinct threadId values; this is not process isolation.",
+        zh: "直接安装本包及 Core、Contract 两个 peer，把每个完整 ESM 示例保存为真实文件，用 Node 24 运行。父端操作前先等待 `isThreadChild()`；`spawn: true` 重新执行整个入口，不只是提供方函数。`provide` 默认没有方法；函数接收请求参数，异步生成器提供流。短启动选择原生运行时启动器、`systemScheduler`、容量为 `1` 的线程预算及 `isolation: 'best-effort'`；可选 name/data/limits 默认为 `undefined`。`defaultTimeoutMs` 默认 `30000`，`report` 默认 `defaultRpcReporter`，authentication 默认 `undefined`。ArrayBuffer、Uint8Array 请求默认复制。可选 transfer 列表默认 `undefined`；未签名的 RPC 会在执行提供方前拒绝转移，启用它需要双方真实签名及实际能力协商。Node Worker 共享 process.pid，但 threadId 不同，这不是进程级隔离。"
+      },
       purpose: t(
         'Opens a Runtime Peer to a Worker. In the parent, `spawn` starts the Worker (URL, path, `true` for the current entry, or a full source). Inside a library-launched Worker, calling it without a source connects back to the parent. Resolves after handshake.',
         '打开一个与 Worker 通信的 Runtime Peer。在父线程中，`spawn` 启动 Worker（URL、路径、表示当前入口的 `true`，或完整 source）。在由库启动的 Worker 内部，不传来源调用即可连回父线程。握手完成后 resolve。'
       ),
       params: {
         options: t(
-          'See `IRuntimeThreadPeerOptions`: `spawn` or `connect`, `provide` (methods this side offers), `report` (default `console.error`), `defaultTimeoutMs` (default 30000), `authentication`, `providerLimits`, `self`, `probe`.',
-          '见 `IRuntimeThreadPeerOptions`：`spawn` 或 `connect`、`provide`（本端提供的方法）、`report`（默认 `console.error`）、`defaultTimeoutMs`（默认 30000）、`authentication`、`providerLimits`、`self`、`probe`。'
+          'See `IRuntimeThreadPeerOptions`: `spawn` or `connect`, `provide`, `report` (default `defaultRpcReporter`), `defaultTimeoutMs` (default `30000`), `authentication`, `providerLimits`, `self` and `probe`.',
+          '见 `IRuntimeThreadPeerOptions`：`spawn` 或 `connect`、`provide`、`report`（默认 `defaultRpcReporter`）、`defaultTimeoutMs`（默认 `30000`）、`authentication`、`providerLimits`、`self`、`probe`。'
         ),
         runtime: t(
           'Advanced: custom Node `worker_threads` resource; default the real module.',
@@ -937,10 +943,10 @@ export const rpcThreadsReference: ILibraryReference = {
         )
       },
       returns: t(
-        'An `IRuntimeTypedPeer<TRemote>`; `close()` also terminates a spawned Worker. Bad configuration rejects with `INVALID_CONFIG`. Web close may report `REAP_TIMEOUT` and retain an abandoned lease because terminate has no actual-exit receipt.',
-        '一个 `IRuntimeTypedPeer<TRemote>`；关闭时请求终止所启动线程，配置错误以核心配置非法码拒绝；网页线程没有实际退出回执，关闭可能报告 `REAP_TIMEOUT` 并保留已放弃租约。'
+        'An `IRuntimeTypedPeer<TRemote>`; `close()` drains under its owner budget and requests termination of an owned Worker. Bad configuration rejects with `INVALID_CONFIG`. Web close may report `REAP_TIMEOUT` and retain an abandoned lease because terminate has no actual-exit receipt.',
+        '返回 `IRuntimeTypedPeer<TRemote>`；关闭时按所有者预算排空，并请求终止自己拥有的 Worker。配置错误以 `INVALID_CONFIG` 拒绝；Web 线程没有实际退出回执，关闭可能报告 `REAP_TIMEOUT` 并保留已放弃租约。'
       ),
-      example: peerExample,
+      example: rpcThreadsCases.createThreadPeer![0]!.example,
       scenarios: [
         t(
           'Move CPU-heavy parsing, compression or image work off the main thread.',
@@ -965,6 +971,11 @@ export const rpcThreadsReference: ILibraryReference = {
     createThreadPlugin: {
       options: 'IRuntimeThreadPluginOptions',
       role: 'enhancer',
+      cases: rpcThreadsCases.createThreadPlugin,
+      exampleIntro: {
+        en: "Directly install `@migaia/plugin-host`. `name: 'worker'` selects the Host outlet target, and `spawn: true` uses the guarded child branch. The child publishes `next`, whose local counter starts at zero in every fresh Worker. `provide` defaults to no methods and `expose` to an empty whitelist. `defineHost` requires `host.execution.mutationTimeoutMs` and `pipelineDrainTimeoutMs`; each is explicitly `false` here for no deadline, not an omitted default. `host.use()` installs the cold plugin. `request(name, method, payload?)` omits payload for this zero-argument method; `restart(name)` waits for the successor to enter the outlet directory before returning ready. `host.dispose()` releases the owned Worker; it does not copy the old Worker's local state into the new one.",
+        zh: "还需直接安装 `@migaia/plugin-host`。`name: 'worker'` 选择 Host 出口目标，`spawn: true` 使用已分支的子入口。子端发布 `next`，每个新 Worker 的局部计数器都从零开始。`provide` 默认没有方法，`expose` 默认空白名单。`defineHost` 必须提供 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs`；此例都显式设为 `false`，表示不设期限，并非省略后的默认值。`host.use()` 安装尚未启动的插件。`request(name, method, payload?)` 对零参数方法省略 payload；`restart(name)` 等待后继进入出口目录后才返回 ready。`host.dispose()` 释放它拥有的 Worker，不会把旧 Worker 的局部状态复制到新 Worker。"
+      },
       purpose: t(
         'Creates a plugin that installs one Worker connection into a PluginHost; the host owns and releases it and gains the `host.thread` outlet.',
         '创建一个把 Worker 连接安装进 PluginHost 的插件；宿主负责持有与释放该连接，并获得 `host.thread` 出口。'
@@ -980,7 +991,7 @@ export const rpcThreadsReference: ILibraryReference = {
         )
       },
       returns: t('A plugin for `host.use()`.', '可传给 `host.use()` 的插件对象。'),
-      example: pluginExample
+      example: rpcThreadsCases.createThreadPlugin![0]!.example
     },
     isThreadChild: {
       role: 'operation',
@@ -1067,8 +1078,8 @@ export const rpcThreadsReference: ILibraryReference = {
           '其 `load()` 返回 `worker_threads` 模块的对象。'
         ),
         options: t(
-          '`{ runtimeApi?, execArgv? }` as in `createNodeThreadLauncher`.',
-          '`{ runtimeApi?, execArgv? }`，含义与 `createNodeThreadLauncher` 相同。'
+          '`{ runtimeApi?, execArgv? }`, default {} as in `createNodeThreadLauncher`. A synchronous native Worker-constructor rejection is classified as Core INVALID_CONFIG; a native code conflict keeps that original error and its original diagnostic fields on cause.',
+          '`{ runtimeApi?, execArgv? }` 默认 {}，含义与 `createNodeThreadLauncher` 相同。原生 Worker 构造器同步拒绝时分类为 Core INVALID_CONFIG；原生 code 冲突时，把原错误及其原诊断字段保留在 cause 上。'
         )
       },
       returns: t(
@@ -1104,6 +1115,11 @@ export const rpcThreadsReference: ILibraryReference = {
     createNodeThreadChannel: {
       options: 'IThreadChannelOptions',
       role: 'factory',
+      cases: rpcThreadsCases.createNodeThreadChannel,
+      exampleIntro: {
+        en: "Directly install `@migaia/utils` for the required borrowed `systemScheduler`. Each port is a real end of Node's `MessageChannel`; peerId is its opposite routing label, not authentication. Omitted capabilities selects the synchronous fixed profile; passing Core `connect(context).capabilities` proposes runtime extensions and waits for actual bilateral ACK instead. `transport.subscribe(listener)` returns an unsubscribe; channel.close() shares one completion and does not close a borrowed native port. The first example uses Node `once(port, 'message')` to await actual delivery after logical close. The second observes the physical transport: capturing is a required boolean, emit(direction, sizeBytes, carrier, detail, content) returns void, and each new observer replaces the previous generation. `send(buffer, { transfer: [buffer] })` detaches that native buffer; captured transferred bytes are copied before detachment. The receiving subscription exposes message.data; both channel owners close before the caller closes the ports. This low-level path does not perform signed RPC admission.",
+        zh: "还需直接安装 `@migaia/utils`，为必填调度器传入借用的 `systemScheduler`。两个端口来自真实 Node `MessageChannel`；peerId 是对端路由标签，不构成认证。省略 capabilities 选择同步的固定基础配置；传入 Core 的 `connect(context).capabilities` 则提议运行时扩展，必须等待真实双边确认。`transport.subscribe(listener)` 返回退订函数；channel.close() 共用一次完成结果，不关闭借用的原生端口。第一例用 Node `once(port, 'message')` 等待逻辑关闭后的实际交付。第二例观察物理载体：capturing 为必填布尔值，`emit(direction, sizeBytes, carrier, detail, content)` 返回 `void`，每次新观察回调替换旧代次。`send(buffer, { transfer: [buffer] })` 让原生 buffer 失效；被捕获的转移字节会在失效前复制。接收订阅通过 message.data 提供内容；先关闭两个通道，再由调用方关闭原生端口。此底层路径不执行已签名 RPC 的准入。"
+      },
       purpose: t(
         'Builds a channel on a Node `MessagePort` you own, to connect two Peers over an existing `MessageChannel`.',
         '在你持有的 Node `MessagePort` 上构建通道，用于通过已有的 `MessageChannel` 连接两个 Peer。'
@@ -1126,7 +1142,7 @@ export const rpcThreadsReference: ILibraryReference = {
         'The channel (sync for the fixed profile, a Promise when extensions are negotiated).',
         '通道对象（固定能力时同步返回，协商扩展能力时返回 Promise）。'
       ),
-      example: borrowedPortExample(false)
+      example: rpcThreadsCases.createNodeThreadChannel![0]!.example
     },
     createWebThreadChannel: {
       options: 'IThreadChannelOptions',

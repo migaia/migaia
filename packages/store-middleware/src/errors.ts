@@ -10,7 +10,10 @@ function tagStoreMiddlewareError<E extends Error>(error: E, code: IStoreMiddlewa
   return attachErrorIdentity(error, { source: STORE_MIDDLEWARE_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Return a new native Error with the supplied code/message and package source, without throwing. An
+ * own cause option is retained even when undefined; the constructor-created stack stays intact.
+ */
 export function createStoreMiddlewareError(
   code: IStoreMiddlewareErrorCode,
   message: string,
@@ -23,7 +26,10 @@ export function createStoreMiddlewareError(
   return tagStoreMiddlewareError(error, code)
 }
 
-/** Builds a tagged AggregateError while retaining every cleanup failure. */
+/**
+ * Return a native AggregateError with the supplied code/message and original errors in order. It
+ * retains each value's identity and stack through errors, without throwing or adding a cause.
+ */
 export function createStoreMiddlewareAggregateError(
   code: IStoreMiddlewareErrorCode,
   errors: readonly unknown[],

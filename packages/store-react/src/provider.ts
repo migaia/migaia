@@ -30,6 +30,7 @@ export type {
   IStoreConfigValue
 } from './store-config.js'
 
+/** Read the nearest Provider registry synchronously; absence throws PROVIDER_REQUIRED in render. */
 export function useStoreRegistry() {
   const registry = useContext(StoreRegistryContext)
   if (!registry) {
@@ -41,14 +42,24 @@ export function useStoreRegistry() {
   return registry
 }
 
+/** Read the nearest registry's borrowed Runtime; absence of StoreProvider throws PROVIDER_REQUIRED. */
 export function useStoreRuntime(): IRuntime {
   return useStoreRegistry().runtime
 }
 
+/**
+ * Require the exact token from the nearest registry. Missing Provider/token and closed registry
+ * failures propagate during render. This lookup does not itself subscribe to registry replacement.
+ */
 export function useStoreFromProvider<T>(token: IStoreToken<T>): T {
   return useStoreRegistry().require(token)
 }
 
+/**
+ * Resolve a Store token, then use its Runtime for a selective React subscription. Equality defaults
+ * to Object.is through useStore; asynchronous Stores may suspend until ready.
+ * Store/registry/Runtime remain owned by their existing owners, not this hook.
+ */
 export function useProvidedStore<S extends Record<string, unknown>, Result>(
   token: IStoreToken<IReactiveStore<S>>,
   selector: (state: IStoreShape<S>) => Result,

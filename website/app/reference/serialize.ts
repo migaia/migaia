@@ -9,6 +9,7 @@
  * containing bytes, even if all chunks already carry bytes.
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import { serializeCases } from './serialize-cases.ts'
 
 /** Creates localized prose without locale fallback. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -198,14 +199,14 @@ for await (const rows of sliceByFrameBudget([1, 2], {
       '调用者持有的结构化 `IAbortSignal`，通常取自 `createAbortController().signal`，用于请求协作式取消。'
     ),
     default: t(
-      'No caller cancellation signal is installed when omitted.',
-      '省略时不安装调用者的取消信号。'
+      '`undefined`: no caller cancellation signal is installed.',
+      '`undefined`：不安装调用者的取消信号。'
     )
   },
   scheduler: {
     summary: t(
-      'Required `IScheduler` from `@migaia/utils/scheduler`, or an implementation with finite `now()` and cancellable `schedule()` tasks.',
-      '必填 `IScheduler`，可取自 `@migaia/utils/scheduler`，或提供有限时钟读数及可取消任务的实现。'
+      'Required `IScheduler`, with no default: `now()` returns finite monotonic milliseconds; `schedule(callback, delayMs)` asynchronously schedules the no-argument callback and returns a task with idempotent `cancel()` and optional `unref()`. An optional `defer(callback)` is part of the scheduler contract but is not required for slicing. Use `systemScheduler` from `@migaia/utils/scheduler` for host scheduling.',
+      '必填 `IScheduler`，没有默认值：`now()` 返回有限单调毫秒数；`schedule(callback, delayMs)` 异步安排无参数回调，返回含幂等 `cancel()` 和可选 `unref()` 的任务。调度器契约还可提供 `defer(callback)`，切片本身不要求它。宿主调度可使用 `@migaia/utils/scheduler` 的 `systemScheduler`。'
     )
   }
 }
@@ -898,20 +899,22 @@ for await (const rows of sliceByFrameBudget([1, 2, 3], { scheduler: systemSchedu
       ),
       params: {
         value: t(
-          'Application-owned finite portable own-data graph; TOML requires a record root, no null values and valid Unicode scalar strings.',
-          '应用拥有的有限可移植自有数据图；`TOML` 要求记录根、不含空值，且字符串为有效统一码标量。'
+          'Required caller-owned data: `null`, booleans, finite numbers, strings, dense arrays or plain/null-prototype records recursively containing these values. Own enumerable fields must be data properties; accessors, symbol keys, undefined, bigint, functions, cycles and class instances are rejected. TOML further requires a record root, no nested `null`, and Unicode scalar strings. The caller chooses field names such as `theme` and `retries`; they are not emitter options.',
+          '调用方必填数据：`null`、布尔值、有限数字、字符串、稠密数组，或递归包含这些值的普通及空原型记录。自有可枚举字段必须是数据属性；拒绝访问器、符号键、`undefined`、大整数、函数、环和类实例。TOML 还要求根为记录、不含嵌套 `null`，字符串为 Unicode 标量。`theme`、`retries` 等字段名由调用方选择，不是输出器选项。'
         ),
         format: t(
-          'Output format from SerializeTextFormat; defaults to json. This selects an emitter and never installs an input parser.',
-          '来自 `SerializeTextFormat` 的输出格式，默认 `json`；只选择输出器，不安装输入解析器。'
+          'Optional `SerializeTextFormat`: `json` (the default) emits one JSON value, `yaml` emits valid flow-style YAML, and `toml` emits record assignments. These are the only three values. This selects a text emitter, not an input parser or registry plugin.',
+          '可选 `SerializeTextFormat`，只有三种值：默认 `json` 输出一个 JSON 值，`yaml` 输出合法的流式 YAML，`toml` 输出记录赋值语句。只选择文本输出器，不安装输入解析器或注册表插件。'
         )
       },
       returns: t(
         'One complete string. Rejected format or graph throws native TypeError with INVALID_OPTION and no partial output.',
         '返回一个完整字符串；格式或数据图不被接受时抛带 `INVALID_OPTION` 的原生 `TypeError`，不产生部分输出。'
       ),
-      example: `import { emitOutput, SerializeTextFormat } from '@migaia/serialize'
-console.log(emitOutput({ count: 2 }, SerializeTextFormat.toml))`
+      exampleIntro: serializeCases.emitOutput![0]!.problem,
+      example: serializeCases.emitOutput![0]!.example,
+      exampleResult: serializeCases.emitOutput![0]!.result,
+      cases: serializeCases.emitOutput
     },
     asCodecValue: {
       role: 'operation',
@@ -1032,20 +1035,23 @@ console.log(toPortableValue({ bytes: new Uint8Array([1, 2]) }))`
       options: 'IJsonCodecOptions',
       role: 'factory',
       purpose: t(
-        'Creates a frozen synchronous JSON codec with explicit format version. Encoding projects and validates the portable graph; decoding parses JSON and validates the result without freezing it. This codec is independent from the registry JSON plugin.',
-        '创建带显式格式版本的冻结同步 `JSON` 编解码器；编码投影并校验可移植图，解码解析 `JSON` 后校验结果且不冻结结果，与注册表 `JSON` 插件相互独立。'
+        'Creates a frozen synchronous JSON codec with explicit version metadata. Its portable profile admits null, booleans, finite numbers, strings, dense arrays and ordinary records; encoding validates and projects supported data before stringify, while decoding parses and validates without freezing the result. Unsupported scalars such as NaN reject rather than silently becoming null. This differs from the native-JSON registry plugin, and the version is not embedded in the encoded text.',
+        '创建带显式版本元数据的冻结同步 JSON codec。portable 规则接纳 `null`、布尔值、有限数字、字符串、稠密数组与普通记录；编码先校验并投影支持的数据再字符串化，解码先解析再校验，不冻结结果。`NaN` 等不支持的标量会被拒绝，不会悄悄变成 `null`。这与保留原生 JSON 行为的注册表插件不同，版本也不会嵌入编码文本。'
       ),
       params: {
         options: t(
-          'Required IJsonCodecOptions containing a caller-selected positive safe integer version; there are no implicit codec versions.',
-          '必填 `IJsonCodecOptions`，包含调用者指定的正安全整数版本，不设置隐式版本。'
+          'Required `IJsonCodecOptions` with exactly one documented field, `version`: a caller-selected positive safe integer. The object and field have no defaults; `1` is an explicit choice in the example.',
+          '必填 `IJsonCodecOptions`，唯一字段 `version` 为调用方指定的正安全整数。对象及字段均无默认值，示例中的 `1` 是显式选择。'
         )
       },
       returns: t(
         'ICodec with id json, string output and the chosen version. Invalid options or portable values throw INVALID_OPTION; other encode/decode failures use ENCODE_FAILED or DECODE_FAILED with cause.',
         '返回标识为 `json`、输出字符串且携带所选版本的 `ICodec`；非法选项或可移植值使用 `INVALID_OPTION`，其他编解码失败使用 `ENCODE_FAILED` 或 `DECODE_FAILED` 并保留原因。'
       ),
-      example: codecExample
+      exampleIntro: serializeCases.defineJsonCodec![0]!.problem,
+      example: serializeCases.defineJsonCodec![0]!.example,
+      exampleResult: serializeCases.defineJsonCodec![0]!.result,
+      cases: serializeCases.defineJsonCodec
     },
     defineCBORCodec: {
       options: 'ICborCodecOptions',
@@ -1245,8 +1251,8 @@ console.log(await collectStream([['text', 'hello'], ['text', ' world']]))`
     encodeStream: {
       role: 'operation',
       purpose: t(
-        'Adaptively slices an application array, encodes each slice through a registry and yields ordered chunks with bounded in-flight encoding. Pair it with decodeStream to restore the independently encoded slices; concatenating JSON slice texts does not make one JSON document.',
-        '自适应切分应用数组，经注册表编码各片并按序产出分块，限制在途编码数量；搭配 `decodeStream` 还原独立编码的切片，拼接 `JSON` 切片文本并不构成一个 `JSON` 文档。'
+        'Adaptively slices an application array, encodes each slice through a registry and yields ordered chunks with bounded in-flight encoding. Pair it with a registry created by `createSerializeRegistry` and an installed parser such as `jsonPlugin`; the example consumes each chunk directly with `chunkToText`. A receiver can instead use `decodeStream` to restore separate arrays. Concatenating JSON slice texts does not make one JSON document. The runnable case imports `@migaia/utils/scheduler` directly: install `@migaia/utils` as a direct dependency alongside this package.',
+        '自适应切分应用数组，经注册表编码各片并按序产出分块，限制在途编码数量。搭配 `createSerializeRegistry` 创建并装好解析器的注册表使用，示例以 `jsonPlugin` 提供 JSON 解析器，再用 `chunkToText` 直接消费输出。需要还原切片数组时，可选择 `decodeStream` 作为消费方；拼接 JSON 切片文本并不构成一个 JSON 文档。可运行场景直接导入 `@migaia/utils/scheduler`，须将 `@migaia/utils` 与本包一同安装为直接依赖。'
       ),
       params: {
         registry: t(
@@ -1263,7 +1269,10 @@ console.log(await collectStream([['text', 'hello'], ['text', ' world']]))`
         'AsyncGenerator<ISerializeChunk> in original slice order. Breaking iteration cancels owned work; parser failures retain slice position and cause, while option admission uses INVALID_OPTION.',
         '按原切片顺序返回 `AsyncGenerator<ISerializeChunk>`；提前结束迭代会取消所属工作，解析失败保留切片位置及原因，选项接纳失败使用 `INVALID_OPTION`。'
       ),
-      example: streamExample
+      exampleIntro: serializeCases.encodeStream![0]!.problem,
+      example: serializeCases.encodeStream![0]!.example,
+      exampleResult: serializeCases.encodeStream![0]!.result,
+      cases: serializeCases.encodeStream
     },
     decodeStream: {
       optionDocs: {
@@ -1381,13 +1390,13 @@ console.log(chunkToBytes(['text', 'hello'], new TextEncoder()))`
     createSerializeRegistry: {
       role: 'factory',
       purpose: t(
-        'Creates a registry owning a nonempty set of parser plugins and their disposal lifecycle. The first plugin is the default; types and methods are captured at construction and duplicate types reject. Pair with jsonPlugin for the built-in JSON format.',
-        '创建拥有非空解析插件集合及其清理生命周期的注册表；首个插件为默认格式，构造时捕获格式与方法，重复格式拒绝；搭配 `jsonPlugin` 安装内置 `JSON` 格式。'
+        'Creates a registry owning a nonempty plugin set and parser cleanup. The first plugin selects default writes and reads; types and methods are captured at construction and duplicate types reject. Chunks carry only kind and payload, so older formats must be selected using their separately stored `type`. The migration case uses JSON parser options `replacer` and `reviver`: both receive the current property key (including an empty root key) and value, synchronously return its replacement, and default to `undefined`. The old reader maps numeric theme 0 to light through its reviver; `space` defaults to undefined (compact output), and `decoder` defaults to a host TextDecoder when bytes are decoded. Returning undefined from the replacer omits an object property. These plugin options are separate from registry options below.',
+        '创建持有非空插件集合及解析器清理职责的注册表。首个插件决定默认读写，构造时捕获类型和方法，拒绝重复类型。片段只携带种类和载荷，旧格式必须通过另存的 `type` 选择。迁移场景使用 JSON 解析器的 `replacer`、`reviver` 选项：两者接收当前属性名（含空串根名）与值，同步返回替代值，默认 `undefined`，旧读取器通过还原器将数字主题 0 映射为 light；`space` 默认 `undefined`，即紧凑文本；`decoder` 默认在解码字节时使用宿主 TextDecoder。替换器返回 `undefined` 会省略对象属性。这些插件选项与下面的注册表选项分开。'
       ),
       params: {
         plugins: t(
-          'Nonempty ordered list of ISerializePlugin from jsonPlugin or application-owned parser descriptors. Each format token must be unique; shared parser objects are disposed once.',
-          '来自 `jsonPlugin` 或应用维护描述的非空有序 `ISerializePlugin` 列表；格式标签必须唯一，共享解析器对象只清理一次。'
+          'Required nonempty ordered `ISerializePlugin` array. Every descriptor requires unique `type` matching `/^[a-z0-9][a-z0-9._-]{0,63}$/i` and `parser`. A parser requires diagnostic `name`, callable `encode(value, context)` and `decode(chunk, context)`; optional zero-argument `dispose()` defaults to absent. Context has required `signal` and string `context`. Encoding returns a chunk, Promise of one, or sync/async iterable of chunks; decoding returns a value or Promise. Chunk kinds are `["text", string]`, `["bytes", Uint8Array]` and `["value", unknown]`. There are no defaults for required fields. Shared parser objects are disposed once. The first type selects default writes and reads; persist the type separately when formats coexist.',
+          '必填非空有序 `ISerializePlugin` 数组。每项须有唯一且匹配 `/^[a-z0-9][a-z0-9._-]{0,63}$/i` 的 `type`，以及 `parser`。解析器须有诊断名称 `name`、可调用 `encode(value, context)` 与 `decode(chunk, context)`，可选无参数 `dispose()` 默认省略。上下文含必填 `signal` 与字符串 `context`。编码返回片段、单片段 Promise 或同步及异步片段迭代源，解码返回值或其 Promise。片段只有 `["text", string]`、`["bytes", Uint8Array]`、`["value", unknown]` 三类，必填字段没有默认值，共享解析器对象只清理一次。首个类型决定默认读写，多格式共存时应另存类型标签。'
         )
       },
       options: 'ISerializeRegistryOptions',
@@ -1395,7 +1404,10 @@ console.log(chunkToBytes(['text', 'hello'], new TextEncoder()))`
         'ISerializeRegistry with close and promise-idempotent dispose. Invalid lists or capabilities throw INVALID_OPTION; missing host encoding capabilities throw ENV_UNSUPPORTED. Construction validates before taking parser ownership.',
         '返回具有关闭及承诺幂等销毁能力的 `ISerializeRegistry`；非法列表或能力抛 `INVALID_OPTION`，缺少宿主编码能力抛 `ENV_UNSUPPORTED`，取得解析器所有权前完成构造校验。'
       ),
-      example: registryExample
+      exampleIntro: serializeCases.createSerializeRegistry![0]!.problem,
+      example: serializeCases.createSerializeRegistry![0]!.example,
+      exampleResult: serializeCases.createSerializeRegistry![0]!.result,
+      cases: serializeCases.createSerializeRegistry
     },
     jsonParser: {
       role: 'factory',
@@ -2168,7 +2180,7 @@ for await (const rows of sliceByFrameBudget([1, 2], { scheduler: systemScheduler
             '由调用者提供、在错误中定位逻辑数据流的诊断标签。'
           ),
           default: t(
-            'The literal stream label is used when omitted.',
+            'The literal `stream` label is used when omitted.',
             '默认使用字面量 `stream` 作为标签。'
           )
         },
@@ -2199,7 +2211,7 @@ console.log(await collectStream([], undefined, { empty: 'text', context: 'export
             '调用者提供、用于收集错误上下文与位置诊断的标签。'
           ),
           default: t(
-            'The literal stream label is used when omitted.',
+            'The literal `stream` label is used when omitted.',
             '默认使用字面量 `stream` 作为标签。'
           )
         },

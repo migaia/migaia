@@ -92,13 +92,20 @@ type IRuntimeControlledRegistration = IRuntimePluginRegistration &
 
 /** Filters keep local source selection distinct from the connection's remote direction. */
 export type IRuntimeListFilter = Readonly<{
+  /** Optional original supervisor state filter; omission admits every state. */
   state?: SupervisorState
+  /** Optional exact-name or prefix selection; supplying both is invalid. */
   name?: Readonly<{ exact: string; prefix?: never }> | Readonly<{ prefix: string; exact?: never }>
+  /** Optional spawn/connect/listen source-mode filter. */
   kind?: RuntimeSourceKind
+  /** Optional actual spawned/spawned-by/connect/listen direction filter. */
   direction?: RuntimeConnectionDirection
 }>
 /** Formatting never changes which canonical registration records the filter selects. */
-export type IRuntimeListOptions = IRuntimeQueryOptions & Readonly<{ filter?: IRuntimeListFilter }>
+export type IRuntimeListOptions = IRuntimeQueryOptions &
+  Readonly<{
+    /** Optional local selection; omission includes every current registration. */ filter?: IRuntimeListFilter
+  }>
 /** Format overloads preserve the safe object result when callers omit text formatting. */
 export type IRuntimeListQuery = {
   (options?: IRuntimeListOptions & Readonly<{ format?: undefined }>): Promise<IRuntimeOverview>

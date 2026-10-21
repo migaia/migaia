@@ -11,6 +11,10 @@ import { reportUnhandledError } from './host-report.js'
 
 export { UtilsAbortError } from './error.js'
 
+/**
+ * Structural abort signal accepted by every input in this module. Native `AbortSignal` objects from
+ * any host satisfy it, so callers need no DOM or Node type library.
+ */
 export type IAbortSignal = {
   readonly aborted: boolean
   readonly reason?: unknown
@@ -95,23 +99,42 @@ export function admitAbortSignal(candidate: unknown): IAbortSignalAdmission {
     return { kind: 'invalid', reason: 'listener-not-function' }
   return { kind: 'valid', signal, aborted }
 }
+/** Native Promise plus the `resolve` / `reject` functions that settle it; returned by `deferred()`. */
 export type IDeferred<T> = {
   readonly promise: Promise<T>
   readonly resolve: (value: T | PromiseLike<T>) => void
   readonly reject: (reason?: unknown) => void
 }
+/**
+ * Shared cancellation and timing options. `signal` and `signals` are mutually exclusive (passing
+ * both rejects with `INVALID_ARGUMENT`); any listed signal aborting cancels the wait. `scheduler`
+ * defaults to the system scheduler of `@migaia/utils/scheduler`; `unref: true` lets a Node timer
+ * stop holding the process open.
+ */
 export type IAsyncControls = {
   readonly signal?: IAbortSignal
   readonly signals?: readonly IAbortSignal[]
   readonly scheduler?: IScheduler
   readonly unref?: boolean
 }
+/**
+ * Context handed to each `retry` attempt: the 1-based `attempt`, a native `signal` aborted when
+ * this attempt must stop (outside abort, attempt deadline or total deadline), and `remainingMs` of
+ * the total budget when `totalTimeoutMs` is set.
+ */
 export type IRetryContext = {
   readonly attempt: number
   readonly signal: INativeAbortSignal
   readonly remainingMs?: number
 }
+/** Context passed to `shouldRetry` and a `delay` function after a failed attempt. */
 export type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number }
+/**
+ * Receives failures that happen after a result was already settled: late rejections, cleanup
+ * failures and failures of a custom reporter. `operation` names the API and `phase` the kind of
+ * failure. A rejection with the `reason` of the operation's own signal is a cancellation
+ * acknowledgement and never reaches the reporter.
+ */
 export type IUtilsReporter = (
   error: unknown,
   context: {
@@ -128,6 +151,11 @@ export type IUtilsReporter = (
 ) => void
 /** Reports a diagnostic to the host without creating an unhandled rejected Promise. */
 export const hostRethrowReporter: IUtilsReporter = reportUnhandledError
+/**
+ * Lazy operation for `withTimeout` / `raceWithAbort`. It receives a native `signal` that aborts at
+ * the deadline or on outside cancellation; pass it to I/O such as `fetch` so the work really
+ * stops.
+ */
 export type ITimeoutOperation<T> = (context: {
   readonly signal: INativeAbortSignal
 }) => T | PromiseLike<T>
@@ -176,6 +204,19 @@ function observeAbort(signals: readonly IAbortSignal[]): IAbortObservation {
   return { kind: 'none' }
 }
 
+/**
+ * Recognizes a late rejection that only acknowledges cancellation. A cooperative operation such as
+ * `fetch(url, { signal })` rejects with the exact `reason` of the aborted signal it received. After
+ * the race has already settled with that cancellation, this rejection is not a new failure, so it
+ * is not reported; any other late rejection still reaches the reporter.
+ */
+function acknowledgesCancellation(error: unknown, signal: IAbortSignal | undefined): boolean {
+  if (signal === undefined || !signal.aborted) return false
+  /** The reason is read through the shared guarded read, like every other owned reason site. */
+  const read = tryReadProperty(signal, 'reason')
+  return !read.threw && Object.is(error, read.value)
+}
+
 /** Reads one event-delivered abort reason without redundantly probing mutable aborted state. */
 function observeAbortReason(signal: IAbortSignal): unknown {
   /** The caller owns whether an inaccessible reason is reported or propagated. */
@@ -190,6 +231,10 @@ function snapshotSignals(
 ): readonly IAbortSignal[] {
   return Object.freeze([...(signalsOption ?? (signal === undefined ? [] : [signal]))])
 }
+/**
+ * Options of `createAbortTimeoutSignal`. Without `timeoutMs` the outside `signal` is returned as
+ * is. `timeoutReason` builds the abort reason at the deadline; `report` receives cleanup failures.
+ */
 export type IAbortTimeoutSignalOptions = {
   readonly signal?: IAbortSignal
   readonly timeoutMs?: number
@@ -197,6 +242,10 @@ export type IAbortTimeoutSignalOptions = {
   readonly timeoutReason?: () => unknown
   readonly report?: IUtilsReporter
 }
+/**
+ * Merged signal plus its idempotent `dispose`, which cancels the timer and removes listeners.
+ * `signal` is `undefined` only when neither an outside signal nor a time limit was given.
+ */
 export type IAbortTimeoutSignal = {
   readonly signal: IAbortSignal | undefined
   readonly dispose: () => void
@@ -279,6 +328,12 @@ export function createAbortTimeoutSignal(
 
 /** Describes a lazy operation whose cooperative cancellation observes the supplied signal. */
 export type IAbortOperation<T> = ITimeoutOperation<T>
+/**
+ * First-in-first-out task queue with a concurrency cap, returned by `createConcurrencyLimiter`.
+ * `run` queues a task (a queued task rejects with the abort reason when its `signal` aborts);
+ * `close` rejects queued tasks with `LIMITER_CLOSED`; `dispose` closes and waits for running
+ * tasks.
+ */
 export type IConcurrencyLimiter = {
   run<T>(
     task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,
@@ -314,7 +369,11 @@ export function toPromise<T>(run: () => T): Promise<Awaited<T>> {
   }
 }
 
-/** Resolves after a scheduler delay or rejects on cooperative abort. */
+/**
+ * Waits `delayMs` on the scheduler. Rejects with `UtilsAbortError` when a given signal aborts while
+ * waiting, and with `INVALID_ARGUMENT` for a negative or non-finite delay. Timer and listener
+ * cleanup always runs; cleanup failures go to `hostRethrowReporter`.
+ */
 export function sleep(delayMs: number, options?: IAsyncControls): Promise<void> {
   const schedulerOption = options?.scheduler
   const signal = options?.signal
@@ -418,9 +477,16 @@ type IWithTimeoutOptions = IAsyncControls & {
 }
 
 /**
- * Races a lazy operation against an abort-aware deadline. With cooperative cancellation on (the
- * default) the operation receives the host `AbortSignal` of an internal controller; when it may be
+ * Runs a lazy operation with a deadline. With cooperative cancellation on (the default) the
+ * operation receives the host `AbortSignal` of an internal controller; at the deadline that signal
+ * aborts first and the call then rejects with `UtilsTimeoutError` (`DEADLINE_EXCEEDED`, scope
+ * `operation`). An outside abort rejects with `UtilsAbortError`. When cooperative cancellation is
  * off, the operation receives a structural never-aborting signal instead.
+ *
+ * After settling, a late success is discarded and a late rejection goes to `report`, except a
+ * rejection with the `reason` of the operation's own signal, which only acknowledges the
+ * cancellation (as `fetch(url, { signal })` does). Cleanup failures reject the call, aggregated
+ * with any primary error.
  */
 export function withTimeout<T>(
   operation: ITimeoutOperation<T>,
@@ -557,7 +623,8 @@ export function withTimeout<T>(
         },
         (error) => {
           if (settled) {
-            reportDiagnostic(report, error, { operation: 'withTimeout', phase: 'late-rejection' })
+            if (!acknowledgesCancellation(error, controller?.signal))
+              reportDiagnostic(report, error, { operation: 'withTimeout', phase: 'late-rejection' })
             return
           }
           finish(() => reject(error), error)
@@ -569,7 +636,11 @@ export function withTimeout<T>(
   })
 }
 
-/** Races a lazy operation against one or more external abort signals without creating a timer. */
+/**
+ * Races a lazy operation against one or more outside abort signals without creating a timer. An
+ * abort rejects with `UtilsAbortError` and aborts the operation's own signal; late rejections other
+ * than that signal's `reason` go to `report`.
+ */
 export function raceWithAbort<T>(
   operation: IAbortOperation<T>,
   options: Pick<IAsyncControls, 'signal' | 'signals'> & {
@@ -662,10 +733,11 @@ export function raceWithAbort<T>(
         },
         (error) => {
           if (settled) {
-            reportDiagnostic(report, error, {
-              operation: 'raceWithAbort',
-              phase: 'late-rejection'
-            })
+            if (!acknowledgesCancellation(error, controller.signal))
+              reportDiagnostic(report, error, {
+                operation: 'raceWithAbort',
+                phase: 'late-rejection'
+              })
             return
           }
           finish(() => reject(error), error)
@@ -815,7 +887,13 @@ async function retryCore<T>(
   throw lastError
 }
 
-/** Enforces the retry task's outer deadline, including policy and backoff admission work. */
+/**
+ * Retries an operation serially. Each failure asks `shouldRetry`; `false` or the last of
+ * `maxAttempts` throws that original error unchanged. `delay` sets the wait between attempts,
+ * `attemptTimeoutMs` limits each attempt and `totalTimeoutMs` limits the whole run, waits included
+ * (`UtilsTimeoutError` with scope `attempt` / `total`). An outside abort ends the run with
+ * `UtilsAbortError`. Invalid limits reject with `INVALID_ARGUMENT`.
+ */
 export function retry<T>(
   operation: (context: IRetryContext) => T | PromiseLike<T>,
   options: Parameters<typeof retryCore<T>>[1]
@@ -919,7 +997,8 @@ function runWithAbort<T>(
         },
         (error) => {
           if (settled) {
-            reportDiagnostic(report, error, { operation: 'retry', phase: 'late-rejection' })
+            if (!acknowledgesCancellation(error, controller.signal))
+              reportDiagnostic(report, error, { operation: 'retry', phase: 'late-rejection' })
             return
           }
           settled = true
@@ -930,7 +1009,12 @@ function runWithAbort<T>(
   })
 }
 
-/** Limits active tasks with FIFO admission and cooperative queued cancellation. */
+/**
+ * Creates a queue that runs at most `concurrency` tasks at once and starts the rest in submission
+ * order. A queued task whose `run` signal aborts rejects with the abort reason and never starts; a
+ * running task only sees the cancellation on its `context.signal`. Throws `INVALID_ARGUMENT`
+ * (`RangeError`) when `concurrency` is not a positive safe integer.
+ */
 export function createConcurrencyLimiter(options: {
   readonly concurrency: number
   readonly report?: IUtilsReporter

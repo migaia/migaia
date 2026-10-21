@@ -56,6 +56,8 @@ export type ILocalizedSymbolDoc = Readonly<{
   example?: string
   exampleIntro?: string
   exampleResult?: string
+  /** Problems the API solves, each with its own example, in the page locale. */
+  cases: readonly Readonly<{ title: string; problem: string; example: string; result: string }>[]
   scenarios: readonly string[]
   avoid: readonly string[]
 }>
@@ -204,6 +206,12 @@ export function localizeReference(
             example: code(doc.example, locale),
             exampleIntro: doc.exampleIntro && text(doc.exampleIntro, locale),
             exampleResult: doc.exampleResult && text(doc.exampleResult, locale),
+            cases: (doc.cases ?? []).map((item) => ({
+              title: text(item.title, locale),
+              problem: text(item.problem, locale),
+              example: code(item.example, locale) ?? '',
+              result: text(item.result, locale)
+            })),
             scenarios: (doc.scenarios ?? []).map((value) => text(value, locale)),
             avoid: (doc.avoid ?? []).map((value) => text(value, locale))
           }
@@ -266,7 +274,11 @@ export function pageReference(
   const bare = (key: string) => key.slice(key.lastIndexOf(':') + 1)
   /** Reference entries reached from the roots, by bare name. */
   const reached = new Set<string>()
-  /** Names still to visit with their distance from a root; only roots are expanded. */
+  /**
+   * Names still to visit with their distance from a root. Roots and the types they reference are
+   * expanded, so a returned instance's method parameters (`own(resource, descriptor)`) keep the
+   * documentation of their own types on the page.
+   */
   const pending: Array<readonly [string, number]> = roots.map((name) => [name, 0])
   /** Every bare name the reference documents, so unrelated identifiers are ignored. */
   const documented = new Set(
@@ -282,7 +294,7 @@ export function pageReference(
     const owners = dependencies.filter((declaration) => declaration.name === name)
     for (const declaration of owners)
       for (const base of declaration.composes ?? []) if (!reached.has(base)) pending.push([base, 1])
-    if (depth > 0) continue
+    if (depth > 1) continue
     /** Only actual declarations and authored type surfaces establish direct type references. */
     const texts = owners.flatMap((declaration) => [
       declaration.signature,
@@ -292,7 +304,15 @@ export function pageReference(
     for (const [key, doc] of Object.entries(reference.symbols))
       if (bare(key) === name && doc.optionsType) texts.push(doc.optionsType)
     for (const [key, doc] of Object.entries(reference.types))
-      if (bare(key) === name && doc.surface) texts.push(doc.surface)
+      if (bare(key) === name) {
+        if (doc.surface) texts.push(doc.surface)
+        /**
+         * Authored parameter docs name the parameter's type even when the declaring type ships only
+         * as a compact link without a signature (`own(resource, descriptor)` on
+         * `ILifecycleOwner`).
+         */
+        for (const member of Object.values(doc.members)) texts.push(...Object.values(member.params))
+      }
     for (const text of texts)
       for (const token of text.match(IDENTIFIER) ?? [])
         if (documented.has(token) && !reached.has(token)) pending.push([token, depth + 1])
@@ -319,6 +339,7 @@ export function pageReference(
                     purpose: doc.purpose,
                     params: {},
                     options: {},
+                    cases: [],
                     scenarios: [],
                     avoid: []
                   }

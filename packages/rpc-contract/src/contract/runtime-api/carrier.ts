@@ -7,7 +7,10 @@ import { RpcRuntimeCarrier, RpcRuntimeField } from './constants.js'
 const prefix = encodeUtf8(RpcRuntimeCarrier.prefix)
 
 /** Selected protection output stays opaque until the canonical authentication owner consumes it. */
-export type IRpcRuntimeCarrierSelection = Readonly<{ frame: unknown }>
+export type IRpcRuntimeCarrierSelection = Readonly<{
+  /** Original protected output; selected Uint8Array data is a borrowed subarray of the input. */
+  frame: unknown
+}>
 
 /** Add only the parser selector, preserving the original protection output's value category. */
 export function wrapRuntimeCarrier(frame: unknown): unknown {

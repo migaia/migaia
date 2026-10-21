@@ -19,7 +19,13 @@ import type {
   ITrayPluginConstraint
 } from '../host/typing.js'
 
-/** Executes one atomic load/adapt/managed-mutation transaction with exact artifact custody. */
+/**
+ * Loads and adapts an artifact into an existing managed Host. Before commit the provisional scope
+ * owns rollback; a committed definition owns release even when it is blocked or the result is not
+ * ok. Returns the mutation observation and typed view. Execution failures retain their original
+ * identity or cause; secondary rollback failures are reported. The required timeout and optional
+ * caller signal only request cooperative cancellation, and their bridge ends when this call ends.
+ */
 export async function loadIntoHost<
   TSource,
   TArtifact,

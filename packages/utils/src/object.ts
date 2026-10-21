@@ -9,15 +9,18 @@ export function createSafeRecord<T>(): Partial<Record<string, T>> {
   return Object.create(null) as Partial<Record<string, T>>
 }
 
+/** Result of `probeProperty`: `missing`, the `value`, or `failed` with the getter's original error. */
 export type IProbePropertyResult<T> =
   | { readonly kind: 'missing' }
   | { readonly kind: 'value'; readonly value: T }
   | { readonly kind: 'failed'; readonly error: unknown }
+/** One degraded member of a diagnostic snapshot: its `path`, `reason` and original `cause`. */
 export type ISnapshotDiagnostic = {
   readonly path: readonly PropertyKey[]
   readonly reason: 'accessor' | 'read-failed' | 'unsupported'
   readonly cause: unknown
 }
+/** Best-effort snapshot `value` plus the `diagnostics` of members that were not fully copied. */
 export type IDiagnosticSnapshot<T> = {
   readonly value: T
   readonly diagnostics: readonly ISnapshotDiagnostic[]

@@ -1,43 +1,107 @@
 # `@migaia/capability`
 
-能力的运行时闸门：给每个可选功能一个统一的懒加载 + 启停生命周期 + 按租户隔离的开关表，登记一次，之后启用/关闭都走同一套状态机，不用每个调用点各写一遍资源释放的模板代码。
+[English](./README.en.md)
 
-## 本文中的 Host 是什么
+把可选功能的许可、启停和服务依赖放进明确的生命周期，避免重复启动、撤权后复活与启动失败造成的资源遗留。
 
-本文单独写 **Host** 时，始终指 `createCapabilityHost()` 创建的 **Capability Host**，不是全仓其他同名概念。它是一个进程内的功能开关与生命周期容器，持有能力注册表、共享 `context`、开关快照和启停状态；调用方通过 `register()` 登记功能，通过 `enable()`/`disable()` 启停功能，最后用 `dispose()` 关闭容器并释放已启用能力。
+## 你可能遇到过
 
-几个容易混淆的概念职责不同：
+- 开关未授权，功能却已经开始工作，根因是把“允许使用”和“立即启动”混在一起。
+- 页面两个位置建立重复连接，根因是只检查已有句柄，没有共享正在进行的激活。
+- 撤权后旧加载完成又把功能打开，根因是异步结果没有校验是否已经过期。
+- 页面抢在配置前启动，或失败后留下服务，根因是启动顺序和清理责任没有对应依赖关系。
+- 只想预览启动顺序，却已经申请资源，根因是把拓扑规划与生命周期执行耦在一起。
 
-- **Capability Host（本文的 Host）**：回答“这个功能现在是否允许启用，以及启用后如何关闭”；不计算能力之间的依赖顺序。
-- **Capability Graph**：回答“节点依赖谁、按什么顺序启动和反向释放”；它不是功能开关表。
-- **PluginHost**：负责插件定义的安装、注册视图、管线阶段与回滚；插件可以在内部使用 Capability Host，但两者不是同一个容器。
-- **Storage Host**：组合并按 ID 暴露多个 storage backend；它管理存储后端，不管理通用功能开关。
-- **Realm Host**：若未来发布，用于控制 Worker、线程或子进程的启动、健康、关闭与强制终止；它提供隔离边界，不负责业务能力登记。
+## 为什么选它
 
-因此，下文“Host 不承担依赖图编排”的完整含义是：**Capability Host 只管理每项能力自身的准入与启停，不读取 `provider → consumer` 依赖边，也不会替调用方决定跨能力的启动顺序。**
+- **许可与执行分开。** 常见布尔开关容易在授权时直接启动，Host 默认拒绝，setFlag(true) 只放行，enable 才激活。[运行证明](./USEGUIDE.md#把开关许可与实际启用分开)。
+- **并发调用共享正在进行的激活。** 只检查句柄会漏掉等待窗口，Host 在回调前发布 pending Promise，两个调用方只激活一次。[运行证明](./USEGUIDE.md#两个调用方等待时只激活一次)。
+- **晚到结果不能恢复已撤权的功能。** await 前检查一次不够，Host 用世代作废旧结果并释放晚到句柄。[运行证明](./USEGUIDE.md#撤回许可后释放晚到的句柄)。
+- **服务依赖同时决定启动和清理。** 按登记或完成顺序手写容易颠倒依赖，静态 Graph 按拓扑启动、逆序释放，并在启动失败时回滚。[顺序证明](./USEGUIDE.md#先启动提供方先释放消费方)、[失败证明](./USEGUIDE.md#消费方启动失败时回滚已启动的提供方)。
+- **先看计划，再决定是否申请资源。** 为看顺序就启动服务会产生副作用，纯拓扑入口只返回冻结的顺序与层级，不执行 start/release。[运行证明](./USEGUIDE.md#申请资源前先查看依赖启动顺序)。
 
-## 适用与不适用场景
+## 从这里开始
 
-**适用**：某个功能需要"开关关着时代码不下载"（配合 `activate()` 内部 `await import()`）、需要启停生命周期（启用给 handle，关闭必须真释放 I/O 连接/订阅/端口等资源）、或者需要按租户/按开关表隔离哪些能力当前允许启用——比如灰度发布、按租户开关实验性面板、线上不重新部署就能回退的功能开关。
+先尝试启用被拒绝的功能，再授予许可并显式启动：
 
-这里的“静态 required provider DAG”可以拆开理解：
+```ts doc-test=run
+import { createCapabilityHost } from '@migaia/capability'
 
-- **provider** 是提供能力的节点，例如配置服务、数据库连接或日志服务；**consumer** 是使用该能力的节点。
-- **required** 表示这是硬依赖：provider 未注册或启动失败时，consumer 不能启动；它不是“有则使用”的 optional 依赖。
-- **DAG** 是“有向无环图”（Directed Acyclic Graph）：依赖有明确方向，并且不允许 A 依赖 B、B 又间接依赖 A 的循环。
-- **静态** 表示所有节点和依赖边必须在首次 `ready()` 前登记完成；`ready()` 会冻结注册表。运行期间不能增加、删除或替换节点。
+const host = createCapabilityHost({ tenant: 'demo' })
+host.register({
+  name: 'export',
+  activate: ({ tenant }) => {
+    console.log('启用:', tenant)
+    return {
+      dispose: () => {
+        console.log('释放: export')
+      }
+    }
+  }
+})
+console.log('首次尝试:', (await host.enable('export')).status)
+host.setFlag('export', true)
+console.log('授权后:', host.state('export'))
+console.log('启用结果:', (await host.enable('export')).status)
+await host.dispose()
+```
 
-例如“配置服务 → 用户服务 → 结算面板”表示用户服务必须等配置服务就绪，结算面板又必须等用户服务就绪。Graph 会按这个方向启动，关闭时反向释放：先释放结算面板，再释放用户服务，最后释放配置服务。若你的需求只是独立功能开关，不存在这种跨能力启动顺序，就不需要 Graph。
+输出：
 
-**不适用**：Host 不承担上述依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`。如果只想检查“一组节点及其 required 依赖是否合法”并计算确定的启动顺序，不需要创建服务、不执行节点的 `start()`、也不管理 `release()`，则直接使用 `@migaia/capability/graph/topology`。
+```text
+首次尝试: gated
+授权后: off
+启用: demo
+启用结果: enabled
+释放: export
+```
 
-这里提到的其他能力边界分别是：
+遇到撤权后旧结果晚到，看[晚到句柄清理](./USEGUIDE.md#撤回许可后释放晚到的句柄)；遇到服务必须按依赖顺序启动，看[静态 Graph](./USEGUIDE.md#先启动提供方先释放消费方)。
 
-- **optional dependency（可选依赖）与 notification（变化通知）**：consumer 可以在 provider 缺失时继续运行，并在 provider 后来可用、失败、恢复或被替换时收到通知，再按策略选择继续、刷新快照或重启。例如“订单服务可以没有推荐引擎照常下单；推荐引擎上线后再启用推荐”。静态 Graph 当前只接受 `required: true`，不提供这套可选绑定与通知策略。
-- **dynamic replacement（运行时替换）**：Graph 已经运行后，仍可增加、删除或替换节点及依赖边，并只暂停、释放和重启受影响的 consumer。例如不重启整个应用就把支付插件 v1 换成 v2。静态 `@migaia/capability/graph` 会在 `ready()` 后冻结拓扑；确实需要这种能力时使用独立的 `@migaia/capability/graph/dynamic`，并由组合层负责被替换资源的物理释放。
-- **cross-realm adapter（跨运行域适配器）**：让能力实际运行在另一个 Worker、线程或子进程中，同时把启动、健康检查、关闭、强制终止和错误链映射回当前 Graph。它适合需要隔离同步死循环、重型任务或进程故障的场景，不等同于普通的 RPC。当前包没有发布这种 adapter；浏览器默认仍在同一 realm，不能用 Promise 超时冒充真正终止。
+## 手写时的隐患
 
-Host 也**不能**让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。
+用普通布尔值手写同一个功能闸门，很容易把检查和资源所有权分开。以下只展示隐患，不运行：
+
+```ts doc-test=check
+let allowed = false
+const activate = () => {
+  console.log('启用: demo')
+  return {
+    dispose: () => {
+      console.log('释放: export')
+    }
+  }
+}
+const handle = activate() // 隐患：检查许可前就已经启动。
+if (!allowed) console.log('当前禁止') // 隐患：只显示拒绝，没有释放已经创建的句柄。
+allowed = true
+console.log(allowed, handle)
+```
+
+上面的 Host 先判断许可，再调用 activate，并持有返回句柄负责释放。只改开关不会替用户执行启动；不需要为每个调用点重写登记、在途激活和收尾状态。
+
+## 三分钟心智模型
+
+| 你要解决的问题                        | 对应工具                         |
+| ------------------------------------- | -------------------------------- |
+| 独立可选功能按许可启停                | 根入口 Capability Host           |
+| 固定服务依赖与整体启动回滚            | graph 静态 Graph                 |
+| 配置校验、预览顺序、增量边维护        | graph/topology                   |
+| 根据依赖和当前状态计算下一步动作      | graph/dependency                 |
+| 运行时替换定义、管理精确 binding 世代 | graph/dynamic，与组合 owner 配合 |
+
+“句柄”是启用后交回的业务对象，dispose 负责收尾；“世代”区分仍有效和已经作废的异步工作；“提供方”是服务来源，“消费方”使用它；“required”是缺失就不能启动的硬依赖；“DAG”是没有循环的有向依赖图；“拓扑顺序”保证提供方在消费方前面。能力图管理服务资源，不计算响应式数据。
+
+## 典型场景
+
+| 场景                               | 怎么组合                  | 详细说明                                                     |
+| ---------------------------------- | ------------------------- | ------------------------------------------------------------ |
+| 把开关许可与实际启用分开           | `createCapabilityHost`    | [完整示例](./USEGUIDE.md#把开关许可与实际启用分开)           |
+| 两个调用方等待时只激活一次         | `createCapabilityHost`    | [完整示例](./USEGUIDE.md#两个调用方等待时只激活一次)         |
+| 撤回许可后释放晚到的句柄           | `createCapabilityHost`    | [完整示例](./USEGUIDE.md#撤回许可后释放晚到的句柄)           |
+| 先启动提供方，先释放消费方         | `createCapabilityGraph`   | [完整示例](./USEGUIDE.md#先启动提供方先释放消费方)           |
+| 消费方启动失败时回滚已启动的提供方 | `createCapabilityGraph`   | [完整示例](./USEGUIDE.md#消费方启动失败时回滚已启动的提供方) |
+| 申请资源前先查看依赖启动顺序       | `buildCapabilityTopology` | [完整示例](./USEGUIDE.md#申请资源前先查看依赖启动顺序)       |
 
 ## 安装
 
@@ -45,547 +109,226 @@ Host 也**不能**让一个静态 import 进来的能力变免费——体积只
 pnpm add @migaia/capability
 ```
 
-## 目录
-
-- [宿主创建与生命周期方法](#宿主创建与生命周期方法)
-- [状态与枚举常量](#状态与枚举常量)
-- [静态 Capability Graph](#静态-capability-graph)
-- [增量拓扑索引与依赖规划](#增量拓扑索引与依赖规划)
-- [Dynamic Graph generation leases](#dynamic-graph-generation-leases)
-- [错误码与错误结构](#错误码与错误结构)
-- [高阶组合示例](#高阶组合示例)
-- [构建门禁](#构建门禁)
-
-完整签名、边界行为与错误码，见 [USEGUIDE.md](./USEGUIDE.md)。
-
-<a id="静态-capability-graph"></a>
-
-## 静态 Capability Graph
-
-Graph 位于独立 public subpath：
-
-```ts
-import {
-  createCapabilityGraph,
-  type IGraphNodeId,
-  type IGraphNodeDefinition
-} from '@migaia/capability/graph'
-```
-
-它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按 level/ordinal 调用启动，同层并行等待，整层成功才启动下一层；本层全部 settle 后以规范顺序第一个失败为 primary，并保留其余失败于 errors 链，回滚本层及此前已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。
-
-无状态拓扑入口 `@migaia/capability/graph/topology` 的公开节点 `ordinal` 是一次性注册位置：对于 `nodeCount` 个节点，必须唯一且连续覆盖 `[0, nodeCount)`。不满足时通过调用方提供的 `onInvalid` 报告 `invalid-node` 或 `duplicate-ordinal`，不会静默排序或重写输入。
-
-```ts
-const graph = createCapabilityGraph({ onError: (error) => console.error(error) })
-const provider = 'provider' as IGraphNodeId
-graph.register({
-  id: provider,
-  kind: 'service',
-  dependencies: [],
-  start: () => ({ value: { ready: true }, release: () => undefined })
-})
-const consumer = 'consumer' as IGraphNodeId
-graph.register({
-  id: consumer,
-  kind: 'consumer',
-  dependencies: [{ provider, required: true }],
-  start: ({ get }) => ({ value: get(provider), release: () => undefined })
-})
-await graph.ready()
-const service = graph.get<{ readonly ready: boolean }>(consumer, provider)
-await graph.dispose()
-```
-
-静态 Graph core 只拥有 required 拓扑、启动顺序与生命周期协调，不反向依赖上层组合框架或平台适配器。optional/notification 与 cross-realm 仍是独立的未发布边界，dynamic replacement 则由 `@migaia/capability/graph/dynamic` 单独提供，避免把运行时 mutation 混入静态 Graph。
-
-## 增量拓扑索引与依赖规划
-
-运行期组合层可复用同一套纯图语义，而不用复制邻接表、闭包或排序算法：
-
-```ts
-import { createTopologyIndex } from '@migaia/capability/graph/topology'
-import {
-  DependencyMutationKind,
-  DependencyPolicy,
-  planDependencyMutation
-} from '@migaia/capability/graph/dependency'
-
-const index = createTopologyIndex({
-  onCycle: (path) => {
-    throw new Error(`cycle: ${path.join(' -> ')}`)
-  },
-  onInvalid: (reason, id) => {
-    throw new Error(`${reason}: ${id ?? '<unknown>'}`)
-  }
-})
-index.add({ id: 'provider', dependencies: [] })
-index.add({
-  id: 'consumer',
-  dependencies: [{ provider: 'provider', required: true }]
-})
-
-const plan = planDependencyMutation(
-  index,
-  () => ({ activated: true, enabled: true, suspended: false, stale: false }),
-  {
-  roots: ['provider'],
-  kind: DependencyMutationKind.remove,
-  policy: DependencyPolicy.cascade
-  }
-)
-plan.order // ['consumer', 'provider']
-```
-
-索引拥有节点、required/optional 边、缺席 provider、规范顺序与事务；顺序固定为 `(level, ordinal)`。规划器只读取索引和调用方提供的 `{ activated, enabled, suspended, stale }` 正交状态，返回深冻结的纯计划，不启动、释放或修改节点。`invalidate` 表示挂起实例的 provider 绑定已过期：调用方保持实例挂起并置 `stale`，之后由 `planResume` 产出 `restart`。恢复只遍历挂起前沿，不扫描 provider 的整个在服务依赖者闭包。生命周期、generation、lease 与物理资源仍由 `graph/dynamic` 或上层组合 owner 执行。
-
----
-
-<a id="宿主创建与生命周期方法"></a>
-
-## 宿主创建与生命周期方法
-
-```ts
-import {
-  createCapabilityHost,
-  type ICapabilityHandle,
-  type ICapabilityState,
-  type ICapabilityEnableResult,
-  type ICapabilityDefinition,
-  type ICapabilityHostOptions,
-  type ICapabilityHost
-} from '@migaia/capability'
-```
+运行时依赖 @migaia/lifecycle 和 @migaia/utils；没有 Store、DOM 或 Node 专属后端依赖。
 
-**`createCapabilityHost`｜10 秒上手** —— 创建一个能力容器：
+## 常用 API
 
-```ts
-import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'
+| API                                             | 什么时候用                           |
+| ----------------------------------------------- | ------------------------------------ |
+| createCapabilityHost                            | 为独立功能创建许可与生命周期容器     |
+| host.register                                   | 登记共享 context 的激活与清理定义    |
+| host.enable / host.handle                       | 等待结构化结果，再取得业务句柄       |
+| host.setFlag / host.setFlags                    | 更新单项或整份许可快照               |
+| host.disable / host.dispose                     | 等待单项或全部资源释放               |
+| createCapabilityGraph / graph.ready / graph.get | 按明确服务依赖启动，并读取直接提供方 |
 
-type INotificationCenter = ICapabilityHandle & {
-  show(message: string): void
-}
+## 契约细节
 
-const mount = document.querySelector<HTMLElement>('#notification-center')!
-const capabilities = createCapabilityHost({ mount }, { flags: { notificationCenter: true } })
+### 入口、依赖与职责
 
-capabilities.register<INotificationCenter>({
-  name: 'notificationCenter',
-  activate({ mount }) {
-    const panel = document.createElement('output')
-    mount.append(panel)
-    return {
-      show(message) {
-        panel.textContent = message
-      },
-      dispose() {
-        panel.remove()
-      }
-    }
-  }
-})
+根入口 @migaia/capability 提供 Capability Host、状态常量、错误身份和 readiness 快照。四个独立子入口分别是 @migaia/capability/graph（静态生命周期图）、@migaia/capability/graph/topology（纯拓扑与增量索引）、@migaia/capability/graph/dependency（纯依赖计划）和 @migaia/capability/graph/dynamic（运行时变更与 binding 所有权）。从实际入口导入，不把内部文件当公开路径。
 
-async function openNotificationCenter(message: string) {
-  const result = await capabilities.enable('notificationCenter')
-  if (result.status !== 'enabled') return
+本包依赖 @migaia/lifecycle 的世代、所有权、排空和队列原语，以及 @migaia/utils 的错误与 thenable 工具；不反向依赖 Store、UI、DOM、Node 或平台适配层。默认静态 Graph 需要宿主提供原生 AbortController/AbortSignal，只有 ESM 支持并不足够。
 
-  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')
-  notifications?.show(message)
-}
+本文的 Host 始终指 createCapabilityHost 创建的进程内功能容器。它保存定义、共享 context、开关与启停状态，不读取 provider → consumer 依赖边。PluginHost 负责插件安装、管线与回滚；Storage Host 组合存储后端；Worker、线程或进程的运行域管理负责隔离与物理终止，均不等于这里的 Host。
 
-async function closeNotificationCenter() {
-  await capabilities.disable('notificationCenter')
-}
+能力图描述资源和服务的启动依赖，不是响应式数据的计算依赖图。静态 Graph 只接受硬依赖；optional provider 缺席仍运行、变化通知和跨运行域适配并非该入口的功能。动态拓扑使用独立 dynamic 入口。当前包不发布跨运行域 adapter，Promise 超时不能终止同一运行域里的同步死循环。
 
-async function shutdownApplication() {
-  await capabilities.dispose()
-}
-```
+### Host 创建与输入快照
 
-这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。
+createCapabilityHost(context, options?) 返回 `ICapabilityHost<Context>`；Context 由实参推导。context 是交给全部 activate 的同一个引用，不会被冻结、读取或修改。调用方只放能力确实需要的应用数据。
 
-`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。
+options 默认空对象，必须是对象或函数，null/原始值触发带 INVALID_OPTION 的 TypeError。options.flags 与 options.onError 在创建时取得快照，后续改写原对象不改变行为。flags 省略时全部拒绝；onError 省略时没有用户诊断回调，提供时必须可调用。读取 options 字段失败以 INVALID_OPTION 保留原 cause；onError 的方法接收者保留为原 options 对象。
 
-签名：`createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>`。
+flags 只接受自有、可枚举、值严格为 true 的数据属性。继承属性不算允许，getter 不会被求值；`__proto__` 与 constructor 只是内部 Map 的普通键。原 flags 后续变化无效，必须调用 setFlag 或 setFlags。读取属性描述符失败会保留精确原因。
 
-第二参数 `ICapabilityHostOptions` 全部字段：
+### Host 类型与完整操作
 
-- `flags?: Readonly<Record<string, boolean>>` —— 开关表快照，只在**创建时**复制一份；只有自有、可枚举、值严格等于 `true` 的数据属性才算允许，之后必须调用 `setFlag()`/`setFlags()` 才能改变
-- `onError?: (name: string, error: unknown) => void` —— 激活/释放失败的上报口；reporter 自己的 throw/rejection 交 utils 共享宿主异常队列，不改变闸门状态机
+ICapabilityHandle 的唯一约束是 dispose(): void 或 `PromiseLike<void>`；业务方法由具体能力扩展，Host 不包装业务对象。`ICapabilityDefinition<Context, Handle>` 要求 name 和 activate(context)，Handle 默认 ICapabilityHandle。name 必须是 trim 后非空字符串；重复名字、无效名字和不可调用 activate 分别为 ALREADY_REGISTERED、INVALID_NAME、INVALID_ACTIVATE。
 
-`options` 本身必须是对象或函数（`null`/原始值会抛 `INVALID_OPTION` 的 `TypeError`）；`onError` 若提供必须是函数。
+register 在登记时读取并冻结 name/activate 快照。后续改原定义不会改已登记身份；方法形式的 activate 可读取冻结接收者上的 this.name。成功激活时，Host 还会捕获 handle.dispose，之后修改该属性不能替换释放责任。缺少可调用 dispose 或读取它失败是 INVALID_HANDLE 的 TypeError，能力进入 failed。
 
-**`ICapabilityHandle`｜3 秒上手** —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展：
+| 成员                   | 行为与边界                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| register(definition)   | 同步登记，不激活；Host 终态或重入窗口内拒绝。                                                         |
+| names                  | 每次返回当前登记名字的数组副本。                                                                      |
+| state(name)            | 返回该能力的状态；未登记抛 NOT_REGISTERED。                                                           |
+| `handle<Handle>`(name) | 返回 activate 创建的同一个业务句柄；未启用返回 undefined，未登记抛 NOT_REGISTERED。                   |
+| error(name)            | 返回当前代最近一次激活或释放失败；重启成功或重新配置后清空。                                          |
+| setFlag(name, enabled) | 只有严格 true 放行；false 同步作废在途激活、撤下已有句柄并开始释放；true 不自动激活。                 |
+| setFlags(flags)        | 原子替换整份允许表，遗漏名字即拒绝；读取失败先全部拒绝，再抛 INVALID_OPTION。                         |
+| enable(name)           | 返回结构化结果；并发调用共享同一次激活及其 pending Promise，已 on 不再激活，拒绝状态不调用 activate。 |
+| disable(name)          | 等待该能力全部在途激活和释放排空；此前为 on 返回 true，activating 时会取消并等清理但返回 false。      |
+| dispose()              | 终态关闭，按实际激活完成顺序反向释放并等待全部在途工作。                                              |
+| disposed               | 首次整体关闭时即为 true；只读诊断继续可用，变更不能恢复该 Host。                                      |
 
-```ts
-type ICapabilityHandle = { dispose(): void | PromiseLike<void> }
-```
+除上表各参数外没有隐藏选项。state/handle/error 的 name 必须已登记；setFlag 可先为之后登记的名字配置开关。enable/disable 对非法操作返回 rejected Promise；disable 先判断 HOST_DISPOSED，再判断名字。register/setFlag/setFlags 的准入错误同步抛出。
 
-例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。
+CapabilityState 与 ICapabilityState 的五个值为 off（允许但未启用）、gated（开关拒绝）、activating（正在激活）、on（持有有效句柄）、failed（激活失败）。释放失败记录 error 并上报，保持 off/gated，不把它们改成 failed。gated 与图的 blocked 不是同一状态。
 
-**`register`｜5 秒上手** —— 登记一个能力定义：
+CapabilityEnableStatus 的值为 enabled、gated、cancelled、failed。ICapabilityEnableResult 只有 failed 分支额外带 error；ICapabilityEnableStatusValue 是这些 status 的联合类型。enabled 表示结果已被采纳；初始拒绝或晚到结果完成时开关仍拒绝返回 gated；disable、dispose 或其它代际作废返回 cancelled；当前代激活抛错或句柄无效返回 failed，error 与 error(name) 一致。
 
-```ts
-capabilities.register({
-  name: 'greeting',
-  activate(ctx) {
-    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)
-    return { dispose: () => clearInterval(timer) }
-  }
-})
-```
+### Host 竞态、释放与重入
 
-参数 `ICapabilityDefinition<Context, Handle>` 全部字段：
+每次作废会推进 lifecycle 世代。activate 晚到时只在发起世代仍有效的情况下采纳；否则立即释放新得到的句柄，不能把已关闭的能力重新打开。旧代清理失败仍会报告，但不会污染已经健康的新句柄；当前代或尚无替代实例的适用清理失败留在 error(name)。
 
-- `name: string`（必填）—— 非空字符串；同名重复登记抛 `ALREADY_REGISTERED`
-- `activate(context: Context): Handle | Promise<Handle>`（必填）—— 允许异步，正是为了在里面 `await import()` 按需加载
+批量 setFlags 回退与 dispose 都按真实激活完成顺序反向释放，不按登记顺序或 enable 调用顺序。单项清理失败不阻断其他项；Host 保存并报告失败，正常清理策略不另造聚合拒绝。disable 只排空指定能力，dispose 排空全部能力；等待期间新增的晚到清理也包含在内。永不完成的 activate/释放会让相应排空等待持续进行。
 
-`name` 非字符串/空字符串抛 `INVALID_NAME`（`TypeError`）；`activate` 非函数抛 `INVALID_ACTIVATE`（`TypeError`）。
+首次 dispose 返回唯一 completion Promise。它完成前，后续 dispose 以 HOST_TRANSITIONING 拒绝；同步 disposer 重入会同步抛出，栈后重入返回 rejected Promise。首次完成后才返回同一个 canonical Promise。保留并等待首次结果，不用再次 dispose 加入正在进行的关闭。
 
-**`names`｜3 秒上手** —— 只读属性，当前已登记的全部名字：
+disposer/reporter 的同步转换窗口不允许同一 Host 的变更重入。register/setFlag/setFlags 同步抛 HOST_TRANSITIONING；enable/disable 返回拒绝的 Promise。onError(name, error) 观察激活、释放和异常 thenable 失败；它自己的 throw/rejection 交给 utils 的共享宿主异常队列，不改变开关状态或覆盖业务错误。
 
-```ts
-capabilities.names // ['greeting']
-```
+Host 没有 dependsOn，也不强制串行所有 activate。若 A 必须先于 B 启用，应先 await enable(A)，或使用静态 Graph。把动态 import() 的调用放进 activate，加载才跟随许可后的激活；是否拆包由构建器决定，静态 import 的体积不会因开关消失。多租户应各建一个 Host 和开关快照。旧 enableResult、enableLegacyBoolean、disableNow 已移除；需要布尔值时比较 enable 结果的 status，物理清理则等待 disable。
 
-无参数，无选项。
+### 静态 Graph：登记、启动与读取
 
-**`state`｜3 秒上手** —— 查询某个能力当前状态：
+createCapabilityGraph(options?) 的 options 默认空对象，仅有可选 onError，缺省无用户诊断回调。它在创建 lifecycle 根 scope 前读取并验证回调，getter 或不可调用值为 GRAPH_INVALID_OPTION。
 
-```ts
-capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'
-```
+IGraphNodeId 是带品牌的字符串类型。`IGraphNodeDefinition<T>` 的必填字段为 id、kind、dependencies、start；id/kind 为非空字符串，dependencies 为数组，边必须含 provider 和 required: true。start(context) 返回或异步返回 { value, release }，release 必须可调用，value 可以合法地为 undefined。静态注册读取并保存字段与冻结边快照；重复节点/边分别拒绝。所有定义在首次 ready 前登记，ready 后 GRAPH_FROZEN；关闭接纳时 GRAPH_ADMISSION_CLOSED，终态 GRAPH_DISPOSED。
 
-参数：`name: string`（必填）。未注册的名字抛 `NOT_REGISTERED`。返回值类型见下方 [`CapabilityState`](#状态与枚举常量)。
+ready 先检查缺失 provider、自环与依赖环，再按 level、ordinal 分层调用 start。同层按登记序号发起，并行等待整层全部 settle，整层成功才进下一层。失败以该层规范顺序首个失败为 primary，其余失败保留于 errors 链，再回滚本层成功节点和此前已启动节点。启动失败不隐式重试，但仍可 dispose 收尾。
 
-**`handle`｜3 秒上手** —— 取已启用能力的 handle：
+IGraphStartContext 提供 nodeId、原生 signal、get(provider)、own(resource, descriptor)。get 只允许已声明且 ready 的直接 provider，不取得 lease；启动上下文结束、作废或关闭后不能继续调用。own 将辅助资源交给 provisional scope，失败、取消、作废或关闭时回滚；descriptor 必须立即有可调用 force，错误为 GRAPH_INVALID_OPTION，原 lifecycle TypeError 经 cause 可达。不能把同一个 primary value 再作为辅助资源重复拥有。
 
-```ts
-const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined
-```
+primary value/release 只由 Graph 拥有一次，节点内先释放 primary 再释放 auxiliary，节点间逆拓扑释放。primary release(context) 收到结构化 signal、nodeId 和 report；清理失败走 Graph 的错误与诊断策略。
 
-参数：`name: string`（必填），泛型 `Handle` 可选指定返回类型。未注册的名字抛 `NOT_REGISTERED`。
+| 静态 Graph 成员              | 行为                                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| register(node)               | 只在 open 时登记定义。                                                                              |
+| ready()                      | 启动一次；重复调用保留同一 Promise，启动失败不自动 retry。                                          |
+| nodes                        | 冻结的登记 id 数组，终态仍可查询。                                                                  |
+| nodeState(id)                | 冻结的时间点诊断，含 id、kind、state、value、error；未知 id 为 GRAPH_UNKNOWN_NODE。                 |
+| `readValue<T>`(id)           | 直接读取同一原 payload，不创建诊断投影；仅整图 ready 时可见，其他时点为 undefined，未知 id 仍抛错。 |
+| `get<T>`(consumer, provider) | 校验 consumer 已声明该直接依赖且 provider ready；不等于任意节点查询。                               |
+| state / error                | 整图状态与保留的 primary 错误。                                                                     |
+| dispose()                    | 先关闭接纳、取消启动，再逆拓扑释放；重复调用返回同一 Promise。                                      |
 
-**`error`｜3 秒上手** —— 查上一次激活或释放失败的原因：
+整图状态为 open、starting、ready、failed、quiescing、terminal。节点状态为 registered、starting、ready、suspended、failed、blocked、rolled-back、released；静态入口不提供动态 suspend 方法。readValue 的 undefined 也可能是真实数据，需结合 graph.state 判断可用性；payload 保持原对象身份和可变性，旧诊断不随之变成新的状态快照。自写 ICapabilityGraph 实现必须包含 readValue。
 
-```ts
-capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空
-```
+同步生命周期回调重入同一 Graph 操作触发 GRAPH_REENTRANT_OPERATION。onError 观察 cleanup 和 late-result failure，不替换 primary；回调自身失败也交给共享宿主异常队列。Graph dispose 的失败可返回 GRAPH_DISPOSE_FAILED，和 Host 报告后继续完成的策略不同。
 
-参数：`name: string`（必填）。未注册的名字抛 `NOT_REGISTERED`。
+### 纯拓扑与增量索引
 
-**`setFlag`｜5 秒上手** —— 更新单个开关：
+buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) 只计算，不调用 start 或 release。四个参数均必填。节点为 { id, dependencies, ordinal }；ordinal 必须是唯一安全整数，连续覆盖 [0, nodeCount)，不静默重排或重写坏输入。边的 provider 非空、required 为 boolean；缺席 required provider 交 onUnknownProvider(nodeId, provider)，存在的 optional 边也参与层级和环检测。
 
-```ts
-capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle
-capabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()
-```
+结果 ICapabilityTopology 深冻结，包含 ordered，以及只读 providers、consumers、indegree、level、ordinal 映射。顺序为 (level, ordinal)：先依赖层级，同层再登记顺序。providers 为提供者到消费者，consumers 为消费者到依赖；indegree 是接纳时的依赖数。ReadonlyMap/ReadonlySet facade 不提供 mutation；forEach(callback, thisArg?) 保留标准接收者语义。
 
-参数：`name: string`（必填）、`enabled: boolean`（必填，只有严格等于 `true` 才算允许，非 `true` 一律视为拒绝）。无其他选项。
+onCycle(path) 与 onInvalid(reason, nodeId?, failure?) 由调用方决定抛出错误外壳。getter 失败的 failure 含精确 cause，即使 cause 为 undefined 也保留；纯拓扑 owner 将其留在 adapter 抛出错误的 cause/errors 链，不换掉可附加的原生错误身份。TopologyInvalidReason 的值为 invalid-node、duplicate-node、duplicate-edge、duplicate-ordinal、unknown-node、transaction-open、transaction-closed。
 
-**`setFlags`｜5 秒上手** —— 原子替换整份开关快照：
+createTopologyIndex(adapter) 要求 onCycle 与 onInvalid，不创建服务。增量输入只有 id/dependencies，索引自己持有单调 registrationOrdinal；删除不重编号，setDependencies 不更换登记序号。snapshot().ordinal 则把当前节点压缩为连续序号，供静态投影使用。required 与当前存在的 optional 边参与层级与环检测，缺席 optional provider 被记录但不阻塞节点。
 
-```ts
-capabilities.setFlags({ greeting: true, persistence: false })
-```
+| 索引操作                                            | 含义                                                           |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| size / has(id)                                      | 当前节点数与是否存在。                                         |
+| registrationOrdinal(id)                             | 读取原单调登记序号，未知节点由 onInvalid 处理。                |
+| add(node) / remove(id) / setDependencies(id, edges) | 原子更新节点或边，保留缺席 provider 的悬空事实。               |
+| dependencies(id) / dependents(id)                   | 冻结的直接边，或按 required/optional 分类的直接消费者。        |
+| missing(id)                                         | 当前缺席 provider 的边。                                       |
+| closure(roots)                                      | 包含 roots 的 required 消费者传递闭包，按规范顺序返回。        |
+| order(ids?)                                         | 全部或给定子集的规范顺序；省略即全部，子集去重，未知 id 拒绝。 |
+| snapshot()                                          | 深冻结的静态拓扑投影。                                         |
+| begin()                                             | 隔离事务，提供同一套 reader/writer 和 commit/rollback。        |
+
+事务提交前基础读保持原快照，基础写和嵌套 begin 被拒绝。commit 发布工作副本，rollback 丢弃它并保留全部可观察事实；完成后的事务连读取都拒绝。静态拓扑与增量索引复用同一私有结构/边准入，不公开可信构建助手。
+
+### 纯依赖计划
 
-参数：`flags: Readonly<Record<string, boolean>>`（必填）——新快照里没列出的能力一律按拒绝处理，不会保留旧快照里残留的 `true`。无其他选项。
+dependency 入口不启动、释放或修改索引。IDependencyStateReader 返回 activated、enabled、suspended、stale 四个独立 boolean：是否已激活、是否允许、是否挂起、保留绑定是否过期；没有一个合并的状态字符串。计划深冻结，含 steps（id/action）、order、edges（provider/consumer/optional/status?）和 blockedBy。
 
-**`enable`｜10 秒上手** —— 幂等启用，推荐入口：
+DependencyPolicy 为 reject、cascade、suspend；DependencyMutationKind 为 remove、disable。DependencyAction 为 release、disable、suspend、resume、rebind、restart、activate、invalidate。DependencyEdgeStatus.optionalAbsent 的值是 optional-absent，说明缺席的可选 provider。
 
-```ts
-const result = await capabilities.enable('greeting')
-// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }
-```
+| 规划器                                        | 输入和结果                                                                                                                                                             |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| planDependencyMutation(index, state, request) | request 必含 roots、kind、policy；reject 报告阻塞者，cascade 生成消费者优先计划，suspend 只暂停已激活且未挂起的消费者。remove 的根动作为 release，disable 为 disable。 |
+| planRestart(index, state, roots)              | 消费者优先重启闭包，跳过未激活节点；已挂起节点改为 invalidate。                                                                                                        |
+| planReplacement(index, state, request)        | request 含 target、canRebind；先安排直接 rebind，挂起消费者 invalidate，其余生成 restart 闭包。                                                                        |
+| planResume(index, state, request)             | request 含 provider、generationChanged、canRebind；只遍历挂起前沿，过期者 restart，仍缺 required provider 者继续阻塞。                                                 |
+| planActivation(index, state, roots)           | 仅规划尚未激活的 required 上游 provider，不把 roots 本身放进 activate steps。                                                                                          |
+| resolveInstallSet(index, members, isLazy)     | 选择批次内非 lazy 成员及其 required provider，返回规范顺序的只读 Set。                                                                                                 |
+| planTeardown(index)                           | 规划全部节点的逆规范释放顺序。                                                                                                                                         |
+| collectPlanEdges(index, affected)             | 投影受影响集合的 required 内部边与相关 optional 边。                                                                                                                   |
 
-参数：`name: string`（必填）。无其他选项。并发调用共享同一次 `activate()`；开关为假时直接返回 `{ status: 'gated' }`，不会"偷偷打开"。返回值全部字段见下方 [`ICapabilityEnableResult`](#状态与枚举常量) 说明。
+invalidate 表示现有挂起实例的绑定已过期，调用方保持挂起并置 stale；之后由 planResume 选择 restart。canRebind 是调用方的能力判断，不是规划器执行 rebind。执行、错误上报、世代、lease 和物理清理仍归组合 owner。非法 mutation kind/policy 触发 GRAPH_INVALID_OPTION。
 
-**`disable`｜5 秒上手** —— 关闭并等待 `dispose()`（含异步）真正完成：
+### 动态 Graph 与精确代际所有权
 
-```ts
-const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力
-```
+createDynamicCapabilityGraph(options) 必须提供 startBatch(entries) 与 releaseBatch(entries, fence)，缺少任何一个都为 GRAPH_INVALID_OPTION。没有默认节点级执行宿主；组合 owner 决定怎样启动 definition.start、建立值与释放 instance。start entries 含 id、binding、冻结定义；release entries 含 id、binding、instance，均对应精确旧实例，按提供方优先的规范顺序交付；owner 等待 fence 后自行倒序执行物理释放。
 
-参数：`name: string`（必填）。无其他选项。未注册抛 `NOT_REGISTERED`；host 已 disposed 抛 `HOST_DISPOSED`。
+可选 report 默认无用户回调；mutationAdmissionMs 默认 undefined，队列预算实际关闭，提供时必须为非负有限数；releaseBinding 默认不调用。普通 mutation 共用 FIFO，拒绝的前序任务不阻塞后来者。排队超过 admission 预算、尚未执行的任务以 GRAPH_MUTATION_ADMISSION_TIMEOUT 拒绝并保留 lifecycle 原错。最终 dispose 在同一 FIFO 等待已准入任务，但关闭自身 admission timeout，不强制中断前序工作。
 
-**`dispose`｜10 秒上手** —— 整体关闭 host，按真实激活顺序反向（LIFO）：
+register(node, binding?) 和 replace(node, binding?, options?) 在离开队列、开始执行时才读取 id/kind/start/dependencies，一次接纳为不可变定义与边快照。改原对象不改变身份、诊断或边；更改定义必须 replace。捕获的 start 保留原 definition 接收者与返回值，getter 失败为 GRAPH_INVALID_NODE，原错误或 cause 保留。binding 省略为 undefined；没有绑定时不能 acquireBinding。
 
-```ts
-await capabilities.dispose() // 之后 host 永久不可用
-```
+| 动态操作                          | 行为与默认值                                                                                                                       |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| register(node, binding?)          | 允许 required/optional 边，登记后尝试启动受影响前沿；缺席 optional 不阻塞。                                                        |
+| remove(id, options?)              | policy 默认 cascade；移除目标定义，释放受影响实例，仍保留的消费者因 removed 阻塞；reject 有 required 消费者时原子拒绝。            |
+| suspend(id, options?)             | 同样只接受 reject/cascade，默认 cascade；保留实例，不执行 release，依赖消费者被阻塞。                                              |
+| resume(id)                        | 目标必须 suspended，否则 GRAPH_NODE_NOT_SUSPENDED；恢复满足全部 required provider 的前沿，已有实例不重新 start。                   |
+| replace(node, binding?, options?) | restartDependents 默认启用；false 时用 onReplaced 通知直接 required 消费者，缺少回调或回调失败则重启相应闭包；失败先 report。      |
+| dependentsOf(id)                  | 返回 required/optional 两组直接消费者，未知 id 抛 GRAPH_UNKNOWN_NODE。                                                             |
+| ready()                           | 尝试启动当前 registered/blocked/failed 前沿，再将整图标记 ready，不冻结拓扑；仍可能保留 blocked 节点，不保证重复调用同一 Promise。 |
+| nodeState(id)                     | 返回新的、未冻结的 id/kind/state/value/error/reason/binding/generation/ordinal/rank/level 诊断记录。                               |
+| getBinding(id)                    | 非 owning 读取，不检查节点可用性；未知 id 或缺席绑定返回 undefined，不能据此持有异步使用权。                                       |
+| acquireBinding(id)                | 仅 ready 且存在 binding 时返回冻结 { value, release }；release 幂等。                                                              |
+| nodes / state / generation        | 当前登记 id、整图状态与变更世代。                                                                                                  |
+| dispose()                         | 关闭接纳，按规范释放路径收尾并清空定义，重复调用同 Promise。                                                                       |
 
-无参数，无选项。首次调用返回唯一的 completion Promise；该 Promise 完成前的后续调用立即以 `HOST_TRANSITIONING` 拒绝，完成后才恢复为返回同一个 canonical Promise。
+动态 remove/suspend 不接受纯规划器的 suspend 策略。默认 cascade 不删除所有消费者定义，而是按影响关闭/阻塞它们。optional 边不触发 required 级联，dependentsOf 仍会报告这些直接关系。顺序始终按 level/ordinal，不采用不同层级之间仅按最小 ordinal 的旧顺序。
 
-**`disposed`｜3 秒上手** —— 只读属性，host 是否已整体关闭：
+每个变更结果只有 affected、topologyChanged、generation，没有公开测试计数或计时字段。同边 replace 保留 ordinal/rank/level 的语义；改变边后重新计算诊断。GraphBlockedReason 的 missing、suspended、removed、failed 从 graph 入口导入；GraphBindingReleaseReason 的 remove、replace、dispose 从 dynamic 入口导入；readiness 的 ready/blocked/failed 使用根入口 GraphReadinessState。
 
-```ts
-capabilities.disposed // boolean
-```
+异步工作要在 acquireBinding 后用 finally 调用 lease.release。remove/replace/dispose 先 seal 旧 generation，把同一个不会 reject 的 fence 交给 releaseBatch；所有精确旧 lease 归零后 fence 才 resolve。组合 owner 不得在 fence 前启动物理 disposer。新 generation 使用不同 lease key，晚到旧 release 不会替新绑定解锁；releaseBinding 在所属实例清理后按 remove/replace/dispose 原因交回 binding custody。
 
-无参数。`disposed === true` 之后，`register`/`setFlag`/`setFlags`/`enable` 类方法都会抛错或被拒绝；`names`/`state`/`handle`/`error` 等只读诊断方法仍然可用。
+startBatch 单节点失败能归给该节点 failed；多节点批次无法归因时全部 blocked，reason 为 failed。nodeState.error 保留原始错误，GRAPH_START_FAILED 的 detail.nodes 列出整批节点。startBatch 部分启动成功后抛错时，Graph 不知道已创建的部分实例，组合 owner 必须回滚；静态 Graph 的整层回滚保证不能套用到这里。report 是最终观察口，自己的 throw/rejection 不改变 mutation 结果，交共享宿主异常队列。
 
----
+### Readiness 快照
 
-<a id="状态与枚举常量"></a>
+snapshotGraphReadiness(source) 是桥接外部 readiness source 的低层工具。严格先读 state，再读 error，各一次；只接受 GraphReadinessState.ready/blocked/failed，返回冻结 { state, error }。普通代码读取 Graph 本身状态即可，不应把这三个可用性值当 Host 的五个生命周期状态。
 
-## 状态与枚举常量
+原生且可附码的 getter Error 保持实例、类型和 stack，并附 INVALID_OPTION；primitive、不可变错误或冲突身份走 coded fallback，原值仍在 cause（包含抛出 undefined）。state 非法时立即拒绝，不继续读取 error。
 
-```ts
-import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'
-```
+### 错误身份与处理
 
-**`CapabilityState`｜5 秒上手** —— 能力生命周期的五个状态，用于 `switch`/比较：
+Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。
 
-```ts
-if (capabilities.state('greeting') === CapabilityState.on) {
-  /* ... */
-}
-```
+| Host code          | 触发点                                                            |
+| ------------------ | ----------------------------------------------------------------- |
+| HOST_DISPOSED      | 终态 Host 上调用变更方法。                                        |
+| HOST_TRANSITIONING | 同步生命周期重入，或首次 dispose 完成前再次调用。                 |
+| NOT_REGISTERED     | 查询或操作未登记能力。                                            |
+| ALREADY_REGISTERED | 重复登记名字。                                                    |
+| INVALID_NAME       | 名字不是 trim 后非空字符串，TypeError。                           |
+| INVALID_ACTIVATE   | activate 不可调用，TypeError。                                    |
+| INVALID_HANDLE     | 激活结果缺少可调用 dispose，TypeError。                           |
+| GATED              | 保留诊断码，当前 enable 返回 gated 而不抛此码。                   |
+| INVALID_OPTION     | options/flags/definition/readiness 准入或读取失败，保留原 cause。 |
 
-全部取值：
+CapabilityErrorCode 与 ICapabilityErrorCode 是以上常量表与值联合。code 是公开 API，不另造别名。
 
-- `off` —— 开关允许，但尚未启用
-- `gated` —— 开关明确拒绝（与"从未尝试启用"的 `off` 区分开）
-- `activating` —— `activate()` 正在执行，尚未 settle
-- `on` —— 已启用，持有一个有效 handle
-- `failed` —— 上一次激活失败；release 失败只记录 error，不把 off/gated 改为 failed
+| CapabilityGraphErrorCode 成员 | 码值与场景                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| graphDisposed                 | GRAPH_DISPOSED：终态变更或不允许的读取。                                                 |
+| graphFrozen                   | GRAPH_FROZEN：静态 ready 后登记。                                                        |
+| invalidNode                   | GRAPH_INVALID_NODE：定义、边或启动结果形状非法。                                         |
+| duplicateNode                 | GRAPH_DUPLICATE_NODE：id 重复。                                                          |
+| unknownProvider               | GRAPH_UNKNOWN_PROVIDER：静态 required provider 缺席。                                    |
+| duplicateEdge                 | GRAPH_DUPLICATE_EDGE：重复边。                                                           |
+| dependencyCycle               | GRAPH_DEPENDENCY_CYCLE：拓扑存在环。                                                     |
+| providerUnavailable           | GRAPH_PROVIDER_UNAVAILABLE：直接读取未声明/未 ready provider，或不能取得 binding lease。 |
+| startFailed                   | GRAPH_START_FAILED：启动失败，回滚或记录失败批次。                                       |
+| disposeFailed                 | GRAPH_DISPOSE_FAILED：Graph 资源清理失败。                                               |
+| admissionClosed               | GRAPH_ADMISSION_CLOSED：关闭中或已结束的启动 context 继续接纳工作。                      |
+| unknownNode                   | GRAPH_UNKNOWN_NODE：未知节点查询。                                                       |
+| reentrantOperation            | GRAPH_REENTRANT_OPERATION：同步生命周期回调重入。                                        |
+| invalidOption                 | GRAPH_INVALID_OPTION：选项或 own descriptor 不合法。                                     |
+| nodeHasDependents             | GRAPH_NODE_HAS_DEPENDENTS：reject 策略遇到 required 消费者。                             |
+| mutationAdmissionTimeout      | GRAPH_MUTATION_ADMISSION_TIMEOUT：尚未执行的普通变更排队超时。                           |
+| nodeNotSuspended              | GRAPH_NODE_NOT_SUSPENDED：resume 目标没有挂起。                                          |
 
-`ICapabilityState` 是这五个字符串字面量的联合类型。
+### 组合与排查
 
-**`CapabilityEnableStatus`｜5 秒上手** —— `enable()` 返回结果的 `status` 取值：
+持久化或其他可选功能的组合顺序为：创建包含所需应用对象的 context；登记在 activate 内 await import 的功能；等待 enable 结果，只有 enabled 时读取业务 handle；离开页面等待 disable；应用退出等待首次 dispose。错误上报只观察，不能反向改变生命周期。多租户分别创建容器，不共享开关状态。
 
-```ts
-if (result.status === CapabilityEnableStatus.failed) console.error(result.error)
-```
+enable 返回 gated 时先检查是否修改了原 flags、值是否严格为 true、是否忘了 setFlag；setFlags({}) 会撤回全部权限，只改单项用 setFlag。关掉后又自行出现时检查是否绕过 Host 直接执行 activate 或在清理回调里重入。需要服务依赖启动顺序时使用 Graph，而不是让 Host 猜测。
 
-全部取值：`enabled`、`gated`、`cancelled`、`failed`。对应的完整返回值类型 `ICapabilityEnableResult` 全部分支：
-
-- `{ status: 'enabled' }`
-- `{ status: 'gated' }` —— 初始 flag 拒绝时不尝试激活；已开始激活后撤回 flag 且当前仍拒绝时释放 late handle 并返回 gated
-- `{ status: 'cancelled' }` —— 激活在完成前被 disable、host dispose 或代际替换作废；flag 撤回且当前仍拒绝时返回 gated
-- `{ status: 'failed'; error: unknown }` —— `activate()` 抛错或返回值不是合法 handle
-
----
-
-<a id="错误码与错误结构"></a>
-
-## 错误码与错误结构
-
-```ts
-import {
-  CapabilityErrorCode,
-  type ICapabilityErrorCode,
-  CAPABILITY_SOURCE
-} from '@migaia/capability'
-```
-
-**`CapabilityErrorCode`｜5 秒上手** —— 本包全部错误的稳定 `code`，配合 `error.source === CAPABILITY_SOURCE` 按 `(source, code)` 二元组识别：
-
-```ts
-if (error.code === CapabilityErrorCode.hostDisposed) {
-  /* ... */
-}
-```
-
-全部取值：
-
-- `hostDisposed`（`HOST_DISPOSED`）—— 在已 `dispose()` 的 host 上调用变更方法（`register`/`setFlag`/`setFlags`/`enable`/`disable` 等）
-- `hostTransitioning`（`HOST_TRANSITIONING`）—— 在某个 disposer/reporter 的重入窗口内尝试调用变更方法，或在首次 `dispose()` 完成前再次调用 `dispose()`
-- `notRegistered`（`NOT_REGISTERED`）—— 按名字查询/操作一个从未 `register()` 过的能力
-- `alreadyRegistered`（`ALREADY_REGISTERED`）—— `register()` 传入的 `name` 已经登记过
-- `invalidName`（`INVALID_NAME`）—— `register()` 传入的 `name` 不是非空字符串（`TypeError`）
-- `invalidActivate`（`INVALID_ACTIVATE`）—— `register()` 传入的 `activate` 不是函数（`TypeError`）
-- `invalidHandle`（`INVALID_HANDLE`）—— `activate()` 的返回值缺少可调用的 `dispose`（`TypeError`）
-- `gated`（`GATED`）—— 保留给未来诊断/事件通道；当前 `enable()` 用结构化返回 `{ status: 'gated' }` 表达拒绝，从不抛出这个码
-- `invalidOption`（`INVALID_OPTION`）—— `options`/`flags`/`definition` 快照失败（例如恶意 Proxy 的 getter 抛错），或 `options` 本身不是对象/函数
-
-`ICapabilityErrorCode` 是这些取值的联合类型。
-
-**`CAPABILITY_SOURCE`｜3 秒上手** —— 本包抛出的每个错误上 `source` 字段的固定值：
-
-```ts
-CAPABILITY_SOURCE // '@migaia/capability'
-```
-
-常量字符串，无调用参数。
-
----
-
-<a id="高阶组合示例"></a>
-
-## 高阶组合示例
-
-### 1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾
-
-```ts
-import { createCapabilityHost } from '@migaia/capability'
-
-const capabilities = createCapabilityHost(
-  { store },
-  {
-    flags: { persistence: true },
-    onError: (name, error) => console.error('capability failed:', name, error)
-  }
-)
-
-capabilities.register({
-  name: 'persistence',
-  async activate({ store }) {
-    // 只有开关打开、真正 enable() 时才会下载这个 chunk
-    const [{ persist }, { memoryStorageHost }] = await Promise.all([
-      import('@migaia/store-persist/light'),
-      import('@migaia/storage-web/memory')
-    ])
-    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })
-    return { dispose: () => handle.dispose() }
-  }
-})
-
-const result = await capabilities.enable('persistence')
-if (result.status === 'enabled') console.log('持久化已启用')
-
-await capabilities.disable('persistence')
-await capabilities.dispose()
-```
-
-### 2. 多租户隔离：每个租户一份独立开关表
-
-```ts
-import { createCapabilityHost } from '@migaia/capability'
-
-function createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {
-  const host = createCapabilityHost({ tenant }, { flags })
-  host.register({
-    name: 'experimental-ai',
-    activate: async ({ tenant }) => {
-      const controller = await connectAiSidecar(tenant)
-      return { dispose: () => controller.close() }
-    }
-  })
-  return host
-}
-
-const acme = createTenantCapabilities('acme', { 'experimental-ai': true })
-const globex = createTenantCapabilities('globex', { 'experimental-ai': false })
-
-await acme.enable('experimental-ai') // { status: 'enabled' }
-await globex.enable('experimental-ai') // { status: 'gated' }
-```
-
-### 3. `setFlag(false)` 触发的原子回退：无需再手动调用 `disable()`
-
-```ts
-import { createCapabilityHost, CapabilityState } from '@migaia/capability'
-
-const host = createCapabilityHost({}, { flags: { worker: true } })
-host.register({
-  name: 'worker',
-  async activate() {
-    const port = await connectWorkerPort()
-    return { dispose: () => port.close() }
-  }
-})
-
-await host.enable('worker')
-host.state('worker') // CapabilityState.on
-
-host.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()
-host.state('worker') // CapabilityState.gated
-```
-
-### 4. 并发 `enable()` 幂等共享同一次激活
-
-```ts
-import { createCapabilityHost } from '@migaia/capability'
-
-const host = createCapabilityHost({}, { flags: { search: true } })
-let activateCalls = 0
-host.register({
-  name: 'search',
-  async activate() {
-    activateCalls++
-    const index = await buildSearchIndex()
-    return { dispose: () => index.close() }
-  }
-})
-
-const [a, b, c] = await Promise.all([
-  host.enable('search'),
-  host.enable('search'),
-  host.enable('search')
-])
-activateCalls // 1 —— 三个并发调用共享同一次 activate()
-```
-
-### 5. 能力启用失败后查询原因，再重新配置恢复
-
-```ts
-import { createCapabilityHost, CapabilityState } from '@migaia/capability'
-
-const host = createCapabilityHost({}, { flags: { flaky: true } })
-host.register({
-  name: 'flaky',
-  activate: async () => {
-    throw new Error('chunk 404')
-  }
-})
-
-const result = await host.enable('flaky')
-result // { status: 'failed', error: Error('chunk 404') }
-host.state('flaky') // CapabilityState.failed
-String(host.error('flaky')) // 包含 'chunk 404'
-
-host.setFlag('flaky', false) // 重新配置会清空 error(name)
-host.error('flaky') // undefined
-```
-
----
-
-<a id="构建门禁"></a>
-
-## 构建门禁
-
-```bash
-pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
-```
-
-## Dynamic Graph generation leases
-
-`@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner
-通过必填的 `startBatch(entries)` 收到 exact binding（`startBatch`/`releaseBatch` 缺一即 `GRAPH_INVALID_OPTION`）；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止
-使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence
-交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。
-
-mutation result 返回 `affected`、`topologyChanged` 和 `generation`。测试专用 metrics 已移除。Dynamic Graph 复用增量拓扑索引和依赖规划器，所有 frontier
-按 `(level, ordinal)` 的规范顺序执行；无依赖关系但层级不同的节点不再沿用旧的最小 ordinal 堆顺序。
-
-Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.
-
-CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disable(name)` 等待资源释放。`enableResult`、`enableLegacyBoolean`、`disableNow` 已移除；需要布尔值时比较 `(await host.enable(name)).status === CapabilityEnableStatus.enabled`。保留并等待 `disable()` 返回的 Promise，以确认物理清理已完成。
-
-### Graph node snapshots
-
-Dynamic register/replace capture id, kind, start and dependency facts once when the mutation leaves the queue. The stored definition and its edges are immutable snapshots; changing the original caller object after admission no longer changes graph identity, diagnostics or dependencies. Call replace explicitly to change a node. Captured start methods keep the original definition receiver and return value. Getter failures reject with GRAPH_INVALID_NODE while retaining the original native error or cause.
-
-Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a package export.
-
-
-### Canonical Graph values
-
-readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节点阻塞原因使用
-`@migaia/capability/graph` 的 `GraphBlockedReason`；binding 释放原因使用
-`@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。同名的 runtime/type domain 保持唯一入口；diagnostic `reason` 的取值不变。动态 remove/suspend 的
-`IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy.reject/cascade`，
-不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建，
-既有错误文案、native TypeError 和 code 保持原契约。
-
-
-### Static graph value reads
-
-`graph.readValue<T>(id)` reads the same payload as `graph.nodeState(id).value` without constructing a diagnostic snapshot. It returns the original object, and only exposes data while the whole graph is ready. An existing node may legitimately hold `undefined`; inspect `graph.state` to distinguish availability. An unknown identifier still throws `GRAPH_UNKNOWN_NODE`.
-
-Inside a node's `start`, keep using `context.get(provider)` and declared dependencies. The unscoped read is for an external composition root after startup. Custom implementations or mocks of the public `ICapabilityGraph` type must add `readValue`; factory callers receive the method automatically.
-
-拓扑准入 getter 失败通过 `onInvalid(reason, nodeId?, failure?: { cause: unknown })` 传递原值；纯拓扑 owner 同时把捕获的原错保留在 adapter 抛出错误的 cause/errors 链，沿用 caller 的外壳/语义 code，原生可附加时不替换其 identity。ReadonlyMap/ReadonlySet 的 `forEach(callback, thisArg?)` 按标准 receiver 语义调用，集合仍不可变。
-
-动态 Graph 的最终 dispose 与普通 mutation 共用 FIFO，但该任务关闭排队 admission timeout；它等待已准入前序任务后执行现有 release/fence/terminal 清理，不强制中断前序任务。三个诊断 sink 的自身 throw/rejection 统一交 utils 的共享宿主异常队列。
+本包提供 fmt、lint、typecheck、typecheck:test、test；构建使用 build。bench:resume 是仓库已有的规划测量入口，但本文不据此声明未核实的性能结论。

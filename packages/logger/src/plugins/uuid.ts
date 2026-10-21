@@ -1,5 +1,6 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
 
+/** Display policy separate from UUID generation and entry identity. */
 export type IUuidPluginConfig = {
   /**
    * Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults
@@ -10,6 +11,7 @@ export type IUuidPluginConfig = {
   display?: boolean
 }
 
+/** Stable registration/config key for per-entry UUID enrichment. */
 export const UUID_PLUGIN_NAME = 'uuid' as const
 
 /** UUID generation is delegated to runtime-manager so browser fallbacks and test runtimes work. */
@@ -39,6 +41,11 @@ class UuidPlugin implements ILoggerPlugin<IEmptyPluginExt, IUuidPluginConfig> {
   }
 }
 
+/**
+ * Create a pipeline enricher using the captured runtime randomUUID capability for entry.data.uuid.
+ * Display defaults to false but generation still occurs; the core id remains separately generated.
+ * Plugin removal revokes its stage without taking ownership of the borrowed identity generator.
+ */
 export const uuid = (
   config: IUuidPluginConfig = {}
 ): ILoggerPlugin<IEmptyPluginExt, IUuidPluginConfig> => new UuidPlugin(config)

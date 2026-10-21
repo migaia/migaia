@@ -72,6 +72,10 @@ export function opticDef<Source, Focus>(
   )
 }
 
+/**
+ * Defines one field of a writable source, up to three keys deep. Reads subscribe only to that
+ * field; writes produce a new source with the field replaced. Missing path segments throw.
+ */
 export function focusDef<Source, K1 extends keyof Source>(
   source: IStandardWritableDef<Source>,
   key1: K1
@@ -105,6 +109,7 @@ export function focusDef<Source>(
   })
 }
 
+/** Writable definition of one list item produced by `splitDef(...).of(key)`. */
 export type ISplitItemDef<T> = IWritableDerivedDefinition<T, readonly [IAtomUpdate<T>], void>
 
 /**
@@ -128,6 +133,11 @@ export type ISplitDefinition<T, Key> = {
   prune(store: IAtomStore): number
 }
 
+/**
+ * Splits a writable array definition into one writable definition per key, so each item is
+ * subscribed to and written on its own. Keys must be unique; reading or writing a removed key
+ * throws.
+ */
 export function splitDef<T, Key = number>(
   source: IStandardWritableDef<readonly T[]>,
   keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key

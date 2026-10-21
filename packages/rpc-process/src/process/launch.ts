@@ -12,6 +12,7 @@ import { createAdapterWebByteIO } from './web-byte-stream.js'
 export type IAdapterProcessLaunchContext = Parameters<IProcessLauncher['launch']>[1]
 /** Explicit bootstrap data remains the original caller opt-in, never a context/proof assertion. */
 export type IAdapterProcessLaunchOptions = Readonly<{
+  /** Optional explicit runtime metadata; undefined retains the ordinary token-only bootstrap. */
   runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions
 }>
 
@@ -70,7 +71,12 @@ export class AdapterProcessLaunch {
   }
 }
 
-/** A custom process launcher gives Core its actual spec/request and later its owned byte streams. */
+/**
+ * Prepare a custom launch before native spawn using its actual supervisor request. Options default
+ * to {}; optional runtime bootstrap requires piped stdin/stdout and existing stdin secret material.
+ * Invalid bootstrap configuration rejects before spawn; the returned operation checks cancellation
+ * and builds a channel from the real Web Streams without launching a process itself.
+ */
 export function createAdapterProcessLaunch(
   spec: IProcessSpec,
   context: IAdapterProcessLaunchContext,

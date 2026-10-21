@@ -21,20 +21,35 @@ const DEFINITION = Symbol.for('morning-watch.store.atom-definition')
 /** Reads another definition's current value within a store. */
 export type IAtomGet = <T>(definition: IAtomDefinition<T>) => T
 
-/** Writes another writable definition within a store. */
-export type IAtomSet = <T, Args extends readonly unknown[], Result>(
-  definition: IWritableAtomDefinition<T, Args, Result>,
-  ...args: Args
-) => Result
+/**
+ * Writes another writable definition within a store. The source-definition overload comes first so
+ * an updater's `previous` parameter is typed from the definition instead of falling back to `any`.
+ */
+export type IAtomSet = {
+  <T>(
+    definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
+    update: IAtomUpdate<T>
+  ): void
+  <T, Args extends readonly unknown[], Result>(
+    definition: IWritableAtomDefinition<T, Args, Result>,
+    ...args: Args
+  ): Result
+}
 
+/** Reads other definitions of the same store through `get` and returns the derived value. */
 export type IAtomRead<T> = (get: IAtomGet) => T
 
+/**
+ * Write logic of a writable derived definition; `get`/`set` act on the same store, `args` come from
+ * `store.set(def, ...args)`.
+ */
 export type IAtomWriter<Args extends readonly unknown[], Result> = (
   get: IAtomGet,
   set: IAtomSet,
   ...args: Args
 ) => Result
 
+/** A new value, or a function computing it from the previous one. */
 export type IAtomUpdate<T> = T | ((previous: T) => T)
 
 type IDefinitionBase = {
@@ -94,6 +109,7 @@ type IErasedWritableDerived<T> = IDefinitionBase & {
   readonly equals?: (a: T, b: T) => boolean
 }
 
+/** Any definition a store can read: source, factory source, derived or writable derived. */
 export type IAtomDefinition<T> =
   | IPrimitiveDefinition<T>
   | IPrimitiveFactoryDefinition<T>
@@ -147,6 +163,11 @@ export function assertNotThenable(value: unknown, context: string): void {
 
 // Constructors assemble descriptions without accessing a runtime.
 
+/**
+ * Defines source state with an initial value. The definition holds no value; each store keeps its
+ * own copy, cloning object and array initial values. Thenable initial values throw
+ * `INVALID_OPTION`.
+ */
 export function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T> {
   assertNotThenable(init, 'atomDef(init)')
   return Object.freeze({
@@ -157,6 +178,10 @@ export function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T
   })
 }
 
+/**
+ * Defines source state whose initial value comes from `create()`, called once per store on first
+ * read. Not allowed in `store.preview()`; use `previewSafeAtomDefFactory` for pure factories.
+ */
 export function atomDefFactory<T>(
   create: () => T,
   debugLabel?: string
@@ -188,6 +213,10 @@ export function previewSafeAtomDefFactory<T>(
   })
 }
 
+/**
+ * Defines a read-only value computed from other definitions of the same store; recomputed when what
+ * it reads changes, compared with `equals` (default `Object.is`).
+ */
 export function derivedDef<T>(
   read: IAtomRead<T>,
   debugLabel?: string,
@@ -202,6 +231,10 @@ export function derivedDef<T>(
   })
 }
 
+/**
+ * Defines a derived value with custom write logic: `store.set(def, ...args)` calls `write(get, set,
+ * ...args)` and returns its result.
+ */
 export function writableDef<T, Args extends readonly unknown[], Result>(
   read: IAtomRead<T>,
   write: IAtomWriter<Args, Result>,

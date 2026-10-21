@@ -3,14 +3,20 @@ import { StorageErrorText } from '../error-text.js'
 import type { ISchemaAdapter } from './types.js'
 
 /**
- * Defines the minimal [Standard Schema](https://standardschema.dev) contract. Zod ≥3.24, Valibot
- * ≥1.0, and ArkType ≥2.0 implement it, so one adapter supports all three. This package does not
- * import them or list them as peer dependencies.
+ * Minimal Standard Schema version-one protocol. Any validator implementing this structure can
+ * supply synchronous or asynchronous validation without becoming a dependency of storage-web.
  */
 export type IStandardSchemaV1<TInput = unknown, TOutput = TInput> = {
+  /** Captured version-one validator protocol; this property is read once at adapter construction. */
   readonly '~standard': {
+    /** Required protocol version; other versions reject adapter construction. */
     readonly version: 1
+    /** Nonempty validator label used to name this schema adapter. */
     readonly vendor: string
+    /**
+     * Return a value on acceptance or issues on refusal; synchronous and asynchronous validation
+     * share the same error boundary.
+     */
     validate(
       value: unknown
     ):
@@ -23,7 +29,11 @@ export type IStandardSchemaV1<TInput = unknown, TOutput = TInput> = {
   }
 }
 
-/** Adapts any validation library that implements Standard Schema. */
+/**
+ * Capture a valid Standard Schema version-one descriptor and expose it as an asynchronous schema
+ * adapter. Invalid descriptors throw INVALID_CONFIG; issues, malformed results or validator
+ * failures reject VALIDATION_FAILED with the original cause retained.
+ */
 export const fromStandardSchema = <T>(
   schema: IStandardSchemaV1<unknown, T>
 ): ISchemaAdapter<T, T> => {

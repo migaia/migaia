@@ -1,17 +1,21 @@
 /**
- * Defines the stable `source` shared by the default dual-failure factory in `errors.ts` and the
- * error-code registry.
+ * Stable source attached to package-owned input, execution, and cancellation failures. A failure
+ * already carrying another complete semantic source/code keeps that original identity.
  */
 export const MIDDLEWARE_PIPELINE_SOURCE = '@migaia/middleware-pipeline'
 
-/** Owns the package-boundary error-code declarations for `@migaia/middleware-pipeline`. */
+/**
+ * Stable codes for failures owned by this package. Branch on source/code rather than message text;
+ * native error types and originals remain available directly or through
+ * cause/AggregateError.errors.
+ */
 export const MiddlewarePipelineErrorCode = {
   /**
    * Reports failure in both the current stage and its started downstream when no error combiner is
    * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner
-   * failures while preserving native identity and every original error. Enforces Inspect both
-   * original failures in `AggregateError.errors`, or provide `combineStageAndDownstreamError` for
-   * domain errors.
+   * failures while preserving native identity where possible and retaining original failures.
+   * Inspect both independent failures in `AggregateError.errors`, or supply an error combiner that
+   * retains them through cause/errors when a domain-specific error is required.
    */
   executionFailed: 'EXECUTION_FAILED',
   /**
@@ -20,13 +24,17 @@ export const MiddlewarePipelineErrorCode = {
    */
   invalidOption: 'INVALID_OPTION',
   /**
-   * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay
-   * on cause.
+   * A cooperative checkpoint observes cancellation. Unclassified Error reasons gain identity where
+   * attachable; other reasons remain on cause. Started work is awaited, not forcibly interrupted.
    */
   aborted: 'ABORTED',
-  /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */
+  /** Iterator cleanup failed during cancellation. errors contains abort first, then cleanup failure. */
   abortCleanupFailed: 'ABORT_CLEANUP_FAILED'
 } as const
 
+/**
+ * Union of the package's semantic failure codes; next-call violations use a separate diagnostic
+ * domain.
+ */
 export type IMiddlewarePipelineErrorCode =
   (typeof MiddlewarePipelineErrorCode)[keyof typeof MiddlewarePipelineErrorCode]

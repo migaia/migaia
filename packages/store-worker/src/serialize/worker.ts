@@ -42,7 +42,9 @@ import { CursorQueue } from '../cursor-queue.js'
  */
 export type IWorkerFailureEvent = 'error' | 'messageerror'
 
+/** Borrowed Worker-like port with optional synchronous termination for explicitly owned cleanup. */
 export type IWorkerLike = IWebWorkerLikePort & {
+  /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */
   terminate?(): void
 }
 
@@ -231,33 +233,33 @@ function createWorkerFrameQueue(
   }
 }
 
-/**
- * Defines byte ownership across the worker boundary.
- *
- * Transfer detaches the underlying `ArrayBuffer` and every aliasing view. If the worker fails or
- * the request is cancelled, callers lose both the result and their input. The default is `copy`;
- * callers must explicitly request transfer.
- */
 /** Classifies a local codec payload; actual wire encoding remains owned by worker-contract. */
 function workerChunk(value: unknown): ISerializeChunk {
   return isUint8Array(value) ? [SerializeChunkKind.bytes, value] : [SerializeChunkKind.value, value]
 }
 
+/** Main-side parser/plugin configuration captured before creating the RPC bridge. */
 export type IWorkerPluginOptions = {
+  /** Required message port; borrowed unless terminateOnDispose explicitly requests host termination. */
   readonly worker: IWorkerLike
-  /** Names the format registered in the registry. It must match the encoding used by the worker. */
+  /**
+   * Local registry format/parser label, default worker; actual encode/decode behavior comes from
+   * the remote parser.
+   */
   readonly type?: string
   /**
    * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by
-   * default.
+   * default (false). Cleanup attempts optional terminate even when endpoint cleanup fails.
    */
   readonly terminateOnDispose?: boolean
   /**
-   * Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively
-   * owned and no longer used after handoff.
+   * Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an
+   * exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent
+   * transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input
+   * before retrying; this policy does not establish zero-copy portable payload delivery.
    */
   readonly ownership?: IByteOwnership
-  /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */
+  /** Local RPC endpoint id, default main; it is a captured string rather than an id factory. */
   readonly clientId?: string
 }
 
@@ -280,17 +282,20 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
 }
 
 /**
- * Only views covering the complete buffer are eligible for transfer.
- *
- * A `subarray()` shares memory with the original buffer. Transferring it would detach the whole
- * buffer and every other view. Partial views therefore fall back to copying.
- */
-/**
- * Moves encoding and decoding into a worker.
+ * Creates the main-side serialization parser for a caller-supplied Worker and remote parser. encode
+ * returns a streamed sequence of worker chunks with consumer acknowledgements; decode requests one
+ * chunk and returns its decoded payload. The format label defaults to worker. The remote parser
+ * owns format behavior, while the bridge validates chunk shapes and carries RPC errors and their
+ * causes; pre-cancellation produces REQUEST_ABORTED codec diagnostics.
  *
  * The portable RPC bridge base64url-encodes bytes before native send; transfer lists are separate.
- * Detaching input does not establish zero-copy payload delivery. Old raw-postMessage timings do not
- * describe this bridge; no current timing guarantee is made here.
+ * Detaching input does not establish zero-copy payload delivery. Supported values follow that
+ * bridge's portable profile, not arbitrary cyclic objects or custom-class preservation.
+ *
+ * Invalid options throw at creation. The returned parser's dispose shares one asynchronous cleanup
+ * result, closes the endpoint and optionally attempts terminate. Both failures are retained in
+ * CLEANUP_FAILED AggregateError; single failures retain their boundary identity. Without explicit
+ * termination ownership, the physical Worker remains caller-owned.
  */
 export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   assertWorkerParserOptions(options)
@@ -518,13 +523,9 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     name: optionType ?? WorkerDiagnosticType.worker,
     encode: (value, context) =>
       // 本地只分类 bytes/value；portable bridge 另编码载荷，transfer list 不代表零拷贝。
-      // 包成 value 段的话会退化成结构化克隆，把整份数据在主线程上复制一遍——
-      // 实测里这正是「丢给 worker 反而更慢」的成因。
       streamEncode(workerChunk(value), context),
     decode: async (chunk, context) => {
-      // 回包可能是 value 段（对象图，结构化克隆回来）也可能是 bytes 段
-      // （parser 配了 decodeTo: 'jsonBytes'，走 transfer 回来）。两种情况
-      // 要的都是段里的负载本身。
+      // 回包按 value/bytes 分类；两种情况都返回段内负载，不返回段外壳。
       const result = await request(WorkerSerializePhase.decode, chunk, context)
       return result[1]
     },
@@ -535,6 +536,12 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   }
 }
 
+/**
+ * Creates workerParser and pairs its name with the parser in a registry plugin descriptor. Use when
+ * installing a worker-backed format in createSerializeRegistry. Options, failures and parser
+ * disposal are identical to workerParser; the descriptor does not create another Worker or
+ * automatically own a caller-supplied Worker without terminateOnDispose.
+ */
 export const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => {
   const parser = workerParser(options)
   return { type: parser.name, parser }
@@ -544,8 +551,16 @@ export const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin =>
  * Installs an ordinary parser on the worker side and responds through the serialization message
  * protocol.
  *
- * Like `createWorkerHandler` in `core/worker.ts`, it converts operation failures into replies. This
- * prevents unhandled worker errors from leaving the caller's request promise unresolved.
+ * The caller forwards native message.data to the returned managed callback and supplies post for
+ * outbound frames/optional transfers. Encode accepts a single chunk or synchronous/asynchronous
+ * chunk iterable; chunks travel incrementally with a two-credit acknowledgement window rather than
+ * merging a complete result. Decode returns the remote parser's decoded value through RPC.
+ *
+ * Invalid parser/post inputs throw INVALID_OPTION, preserving existing error identity or cause.
+ * Operation failures travel through RPC with original/iterator-cleanup causes, and cancellation is
+ * cooperative. Handler delivery completion is not parser completion. Await handler.dispose for its
+ * endpoint cleanup, then separately detach the native listener and dispose the borrowed parser or
+ * physical host if their owner requires it; this handler does not dispose the parser.
  */
 export function createSerializeWorkerHandler(
   parser: ISerializeParser,

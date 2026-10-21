@@ -11,24 +11,43 @@ import {
 
 /** Contract-owned route metadata shared by every protocol 1.0 envelope. */
 export type IRpcRouteHeader = Readonly<{
+  /** Stable route grammar discriminator, independent of application payloads. */
   profile: typeof RpcRouteProfile
+  /** Selects which operation-specific optional fields are admitted. */
   type: IRpcRouteType
+  /** Nonempty bounded version label owned by the application. */
   applicationVersion: string
+  /** Nonempty bounded sender identity for this route. */
   senderId: string
+  /** Nonempty bounded intended target identity. */
   targetId: string
+  /** Nonnegative safe-integer sending timestamp; this validator does not enforce clock freshness. */
   sentAt: number
+  /** Optional addressed receiver, when admitted by the selected route type. */
   receiverId?: string
+  /** Optional request dispatch intent; omission is preserved rather than replaced with false. */
   dispatchOnly?: boolean
+  /** Original request method; required by response routes. */
   method?: string
+  /** Optional discovery intent retained as data, without initiating discovery here. */
   manual?: boolean
+  /** Actual resolved target; required by discovery responses. */
   resolvedTargetId?: string
+  /** Optional bounded platform label on discovery responses. */
   platform?: string
+  /** Optional discovery acceptance result. */
   accepted?: boolean
+  /** Optional response or discovery diagnostic text. */
   message?: string
+  /** Optional discovery-response removal notification. */
   operation?: 'unregister'
+  /** Required variation token on variation routes. */
   variation?: string
+  /** Optional integer relative duration from zero through the wire duration limit. */
   timeoutMs?: number
+  /** Optional bounded request identity token; this module owns no idempotency store. */
   idempotencyKey?: string
+  /** Optional bounded printable-ASCII request trace value. */
   trace?: string
   /** Signed route contains the origin followed by at most three actual forwarding Hosts. */
   forwardRoute?: readonly string[]
@@ -36,13 +55,17 @@ export type IRpcRouteHeader = Readonly<{
 
 /** A normalized data slot with contract-owned routing and portable application data. */
 export type IRpcEnvelopeData = Readonly<{
+  /** Contract-normalized routing snapshot. */
   route: IRpcRouteHeader
+  /** Optional independently normalized portable business value. */
   payload?: IRpcPortableValue
 }>
 
 /** Control payloads stay opaque until the owning control subtype decodes them. */
 export type IRpcControlData = Readonly<{
+  /** Contract-normalized routing snapshot. */
   route: IRpcRouteHeader
+  /** Optional subtype-owned value, intentionally not interpreted by the ordinary envelope parser. */
   payload?: unknown
 }>
 

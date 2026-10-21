@@ -7,6 +7,7 @@
  * initial/runtime/options.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import { storeIndexedCases } from './store-indexed-cases.js'
 
 /** Builds one bilingual sentence. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -72,8 +73,8 @@ const options: Readonly<Record<string, IMemberDoc>> = {
       '调用方持有的 `@migaia/store-light` 变更守卫；每次写入前用操作名称调用许可检查，已有外包来源与错误码保持不变；未分类且可扩展的原生错误在原对象上附 `CALLBACK_FAILED`，冻结错误与其他值经原因或聚合列表保留。失败阻止本次外层写入，不回滚回调自己的副作用。'
     ),
     default: t(
-      'Omitted: mutations have no additional policy guard.',
-      '省略时写入没有额外策略守卫。'
+      '`undefined`: mutations have no additional policy guard.',
+      '`undefined`：写入没有额外策略守卫。'
     )
   },
   debugName: {
@@ -82,8 +83,8 @@ const options: Readonly<Record<string, IMemberDoc>> = {
       '应用指定的字符串前缀，用于内部信号诊断与变更操作标签。'
     ),
     default: t(
-      'The concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet.',
-      '默认使用具体集合类名，区分对象、数组、映射与集合。'
+      'The concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`.',
+      '默认分别使用具体类名 `ObservableObject`、`ObservableArray`、`ObservableMap` 或 `ObservableSet`。'
     )
   }
 }
@@ -123,14 +124,18 @@ const factory = (
 ): ISymbolDoc => ({
   role: 'factory',
   purpose: t(
-    `Creates an explicit reactive ${kind} with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options.`,
-    `创建显式响应式${zhKind}，按需建立条目信号并由集合持有释放责任。构造参数依次为初值、运行时、选项。`
+    'Creates an explicit reactive ' +
+      kind +
+      ' with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose.',
+    '创建显式响应式' +
+      zhKind +
+      '，按需为所观察条目建立信号，并由集合负责释放这些信号；构造参数依次为初值、运行时、选项，选项默认 `{}`。传入的运行时只被借用，不随集合一起释放。'
   ),
   params: {
     initial,
     runtime: t(
-      'IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.',
-      '来自 `@migaia/reactive` 的运行时，省略时使用默认运行时；观察此集合应使用其依赖图。'
+      '`IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.',
+      '来自 `@migaia/reactive` 的 `IRuntime`，省略时使用 `defaultRuntime`；观察此集合应使用其依赖图，集合释放不会释放运行时。'
     )
   },
   options: 'IObservableCollectionOptions',
@@ -138,7 +143,12 @@ const factory = (
     `Caller-owned ${name}; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.`,
     `返回调用方持有的${zhKind}实例；观察者释放后应释放集合。非法输入抛带无效选项错误码的原生类型错误。`
   ),
-  example
+  exampleIntro: t(
+    'Examples that import `createRuntime` require a direct installation of `@migaia/reactive` as well as this package. `createRuntime({ schedulerStrategy: (run) => run() })` selects synchronous effect flushing for deterministic output; it is a Runtime option, not a collection option. The callback receives the pending flush function and must return void. If omitted, Reactive schedules that function through the Runtime adapter’s `scheduleMicrotask`. `runtime.effect(callback)` tracks reads during the callback and returns an observer to dispose. Release observers before disposing their collection. The collection constructors’ own options are omitted in these examples: `mutationGuard` is `undefined`, and `debugName` is the class name.',
+    '示例直接导入 `createRuntime` 时，须同时直接安装本包与 `@migaia/reactive`。`createRuntime({ schedulerStrategy: (run) => run() })` 选择同步执行响应式刷新，让输出确定；这是运行时选项，不是集合选项。该回调接收待执行的刷新函数，必须返回 `void`；省略时，响应式内核通过运行时适配器的 `scheduleMicrotask` 安排刷新。`runtime.effect(callback)` 追踪回调执行期间的读取，并返回需要释放的观察者；先释放观察者，再释放集合。本例省略集合自身选项，`mutationGuard` 为 `undefined`，`debugName` 使用类名。'
+  ),
+  example: storeIndexedCases[name]?.[0]?.example ?? example,
+  cases: storeIndexedCases[name]
 })
 /** Error construction retains native identity and original cause. */
 const errorFactory = (native: string, withCause: boolean): ISymbolDoc => ({
@@ -204,8 +214,8 @@ export const storeIndexedReference: ILibraryReference = {
       '索引数组',
       arrayExample,
       t(
-        'Initial iterable or omitted for an empty array; strings are accepted.',
-        '初始可迭代值，省略时为空数组，也接受字符串。'
+        'Initial iterable, default `[]` for an empty array; strings are accepted as characters.',
+        '初始可迭代值，默认 `[]` 创建空数组，字符串按字符接受。'
       )
     ),
     ObservableMap: factory(
@@ -214,8 +224,8 @@ export const storeIndexedReference: ILibraryReference = {
       '键值映射',
       mapExample,
       t(
-        'Initial map or entry iterable, omitted for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw INVALID_OPTION and preserve the old collection.',
-        '初始映射或条目可迭代值，省略时为空映射；构造与替换均先按原生映射规则验证条目，再取得所有权或改写数据，非法条目抛 `INVALID_OPTION` 且旧集合不变。'
+        'Initial map or entry iterable, default `[]` for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw `INVALID_OPTION` and preserve the old collection.',
+        '初始映射或条目可迭代值，默认 `[]` 创建空映射；构造与替换均先按原生映射规则验证条目，再取得所有权或改写数据，非法条目抛 `INVALID_OPTION` 且旧集合不变。'
       )
     ),
     ObservableSet: factory(
@@ -224,8 +234,8 @@ export const storeIndexedReference: ILibraryReference = {
       '成员集合',
       setExample,
       t(
-        'Initial iterable or omitted for an empty membership set.',
-        '初始可迭代值，省略时为空成员集合。'
+        'Initial iterable, default `[]` for an empty membership set; strings are accepted as characters and duplicates collapse under native Set semantics.',
+        '初始可迭代值，默认 `[]` 创建空成员集合；字符串按字符接受，重复成员按原生 `Set` 语义合并。'
       )
     ),
     createStoreIndexedError: errorFactory('Error', true),
@@ -339,7 +349,7 @@ export const storeIndexedReference: ILibraryReference = {
             key,
             updater: t(
               'Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited. Existing error identity is preserved; otherwise CALLBACK_FAILED is attached to the original native error or retains the original through cause/errors.',
-              '同步回调接收当前值并返回替换值；不会等待承诺；保留已有错误身份，否则在原生错误上附 `CALLBACK_FAILED`，或经原因与聚合列表保留原值。'
+              '同步回调接收当前值并返回替换值，不会等待 Promise；保留已有错误身份，否则在原生错误上附 `CALLBACK_FAILED`，或经原因与聚合列表保留原值。'
             )
           },
           t(
@@ -503,7 +513,7 @@ export const storeIndexedReference: ILibraryReference = {
             ),
             deleteCount: t(
               'Omitted removes through the end; explicitly undefined means zero removals.',
-              '省略时删除到末尾；显式空值表示不删除元素。'
+              '省略时删除到末尾；显式 `undefined` 表示不删除元素。'
             ),
             items: t(
               'Application values inserted at the selected position.',

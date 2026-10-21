@@ -20,11 +20,27 @@ import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal datagram surface accepted by the WebTransport adapter. */
 export type IWebTransportDatagrams = {
+  /** Unlocked outgoing datagram stream; construction immediately acquires its sole writer. */
   writable: WritableStream<Uint8Array>
+  /** Incoming datagram stream; the first subscription acquires the transport-owned reader. */
   readable: ReadableStream<Uint8Array>
 }
 
-/** Wraps WebTransport datagrams; protocol middleware owns encoding and decoding. */
+/**
+ * Adapt datagram streams as an owned exclusive byte transport. Every send must be Uint8Array; other
+ * sends throw TypeError/INVALID_CONFIG. An Endpoint integration needs both a byte codec and a
+ * framer that emits only Uint8Array; this package supplies no ready-made combination. Datagrams do
+ * not provide the ordered reliable delivery required by Runtime Peer.
+ *
+ * The writer is acquired now and the reader on first subscribe. Unsubscribe does not stop that
+ * reader. Read failure or EOF marks closed, clears business listeners and reports TRANSPORT; late
+ * error subscribers receive the terminal failure. Write rejection preserves its native exception or
+ * cause through Core's boundary. Probe/listener failures use onListenerError.
+ *
+ * Close returns one shared Promise, cancels and joins the reader, closes/releases the writer and
+ * rejects with cleanup failures without skipping the remaining cleanup. Later send/subscribe
+ * reject. Only these stream resources are owned; the caller still closes the WebTransport session.
+ */
 export function createWebTransportDatagramTransport(
   datagrams: IWebTransportDatagrams
 ): IRpcTransport<Uint8Array> {

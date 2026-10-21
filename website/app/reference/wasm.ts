@@ -6,6 +6,7 @@
  * ConversionResult objects. Underscore-prefixed ABI internals remain owned by generated glue.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import { wasmCases } from './wasm-cases.js'
 
 /** Keeps documentation text in both supported locales. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -21,60 +22,19 @@ const len = t(
   'Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.',
   '应用实际写入的精确输入字节数，不得超过 `byte_len_of(id)`；取整容量不是文档长度。'
 )
-/** Complete public-wrapper example that releases both arena and metadata ownership. */
-const conversionExample = `import init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'
-
-const wasm = await init()
-const bytes = new TextEncoder().encode(JSON.stringify({ count: 2 }))
-const inputId = alloc_bytes(bytes.length)
-if (inputId === 0) throw new Error('allocation failed')
-let outputId = 0
-try {
-  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), bytes.length).set(bytes)
-  const result = json_to_msgpack(inputId, bytes.length)
-  try {
-    if (result.id === 0) throw new Error(result.error)
-    outputId = result.id
-    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()
-    console.log(packed)
-  } finally {
-    result.free()
-  }
-} finally {
-  dealloc_bytes(inputId)
-  if (outputId !== 0) dealloc_bytes(outputId)
-}`
-/** Both converters preserve their own metadata and have independent allocation owners. */
-const roundtripExample = `import init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack, msgpack_to_json } from '@migaia/wasm'
-const wasm = await init()
-const bytes = new TextEncoder().encode('{"count":2}')
-const inputId = alloc_bytes(bytes.length)
-if (inputId === 0) throw new Error('allocation failed')
-let packedId = 0
-let jsonId = 0
-try {
-  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), bytes.length).set(bytes)
-  const packed = json_to_msgpack(inputId, bytes.length)
-  try {
-    if (packed.id === 0) throw new Error(packed.error)
-    packedId = packed.id
-    const restored = msgpack_to_json(packedId, packed.len)
-    try {
-      if (restored.id === 0) throw new Error(restored.error)
-      jsonId = restored.id
-      const json = new Uint8Array(wasm.memory.buffer, ptr_of(jsonId), restored.len).slice()
-      console.log(new TextDecoder().decode(json))
-    } finally { restored.free() }
-  } finally { packed.free() }
-} finally {
-  dealloc_bytes(inputId)
-  if (packedId !== 0) dealloc_bytes(packedId)
-  if (jsonId !== 0) dealloc_bytes(jsonId)
-}`
+/** Complete conversion examples initialize from bytes in Node and release both ownership kinds. */
+const conversionExample = wasmCases.json_to_msgpack[0].example
+/** MessagePack decoding uses the received byte count rather than rounded arena capacity. */
+const roundtripExample = wasmCases.msgpack_to_json[0].example
+/** Initialization used by these examples is explained on every page where it appears. */
+const initializationNote = t(
+  'The example reads the bundled WASM resource beside the resolved package entry. In `init({ module_or_path: bytes })`, `module_or_path` is that file’s bytes; it also accepts a request string, `Request`, `URL`, `Response`, `BufferSource`, precompiled `WebAssembly.Module`, or a Promise of any of these. Omitting the argument fetches the bundled `wasm_provider_bg.wasm` URL. Node hosts should pass bytes or a module because fetching a local file URL is unsupported.',
+  '示例通过解析后的包入口读取相邻的 WASM 资源。`init({ module_or_path: bytes })` 的 `module_or_path` 是该文件的字节；它还接受请求字符串、`Request`、`URL`、`Response`、`BufferSource`、预编译 `WebAssembly.Module` 或这些来源的 Promise。省略参数时获取包内 `wasm_provider_bg.wasm` 网址。Node 不支持获取本地文件网址，应传入字节或模块。'
+)
 /** Native input choices belong to the host WebAssembly API. */
 const initInput = t(
-  'Application module source: `RequestInfo`, `URL`, `Response`, `BufferSource` or precompiled `WebAssembly.Module`; wrap it in `{ module_or_path }` to avoid deprecated positional initialization.',
-  '应用提供的模块来源：`RequestInfo`、`URL`、`Response`、`BufferSource` 或预编译 `WebAssembly.Module`；包装为 `{ module_or_path }`，避免已弃用的位置参数初始化。'
+  'Optional initialization argument. Use `{ module_or_path: source }`, where source is `RequestInfo`, `URL`, `Response`, `BufferSource`, a precompiled `WebAssembly.Module`, or `Promise<InitInput>`. Omitting the argument selects the bundled `wasm_provider_bg.wasm` URL; Node should supply bytes or a module instead of fetching a local file URL. Positional input is deprecated.',
+  '可选的初始化参数。使用 `{ module_or_path: source }`；来源为 `RequestInfo`、`URL`、`Response`、`BufferSource`、预编译 `WebAssembly.Module` 或 `Promise<InitInput>`。省略参数时默认获取包内 `wasm_provider_bg.wasm` 网址；Node 应提供字节或模块，避免获取本地文件网址。位置参数形式已弃用。'
 )
 /** Raw result pointers belong to generated glue, unlike stable arena IDs. */
 const rawResult = t(
@@ -224,15 +184,16 @@ export const reference: ILibraryReference = {
       role: 'factory',
       purpose: t(
         'Default async initializer imported as init; fetches the bundled wasm asset when omitted, or instantiates application-provided bytes/module. Call before any allocation or conversion. The first completed initialization publishes the exports; concurrent calls return that same memory/arena as named wrappers. Concurrent instantiation may still occur: Promise identity and single compilation are not promised.',
-        '默认异步初始化器，以默认导入使用；省略输入时获取包内编译资源，也可实例化应用字节或模块。任何分配及转码前必须完成初始化；首个完成初始化的结果发布导出，并发调用与具名包装函数返回同一内存及字节区；仍可能并发实例化，不承诺承诺对象相同或只编译一次。'
+        '默认异步初始化器，以默认导入使用；省略输入时获取包内编译资源，也可实例化应用字节或模块。任何分配及转码前必须完成初始化；首个完成初始化的结果发布导出，并发调用与具名包装函数返回同一内存及字节区；仍可能并发实例化，不承诺同一个 Promise 或只编译一次。'
       ),
       params: { module_or_path: initInput },
       returns: t(
         'Promise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes.',
-        '返回 `InitOutput` 承诺；已登记的原生透传例外使 `WebAssembly.CompileError`、`WebAssembly.LinkError`、`WebAssembly.RuntimeError` 原样越界，不附 `source/code`。加载失败会拒绝，本包未定义自有错误码。'
+        '返回 `InitOutput` 的 Promise；已登记的原生透传例外使 `WebAssembly.CompileError`、`WebAssembly.LinkError`、`WebAssembly.RuntimeError` 原样越界，不附 `source/code`。加载失败会拒绝，本包未定义自有错误码。'
       ),
-      example:
-        "import init from '@migaia/wasm'\nconst wasm = await init()\nconsole.log(wasm.memory.buffer.byteLength)"
+      exampleIntro: initializationNote,
+      cases: wasmCases.__wbg_init,
+      example: wasmCases.__wbg_init[0].example
     },
     initSync: {
       role: 'factory',
@@ -242,8 +203,8 @@ export const reference: ILibraryReference = {
       ),
       params: {
         module: t(
-          'Application `SyncInitInput` wrapped as `{ module: bytesOrModule }`; positional bytes/module remain accepted but emit a deprecation warning.',
-          '应用提供的 `SyncInitInput`，包装为 `{ module: bytesOrModule }`；位置字节或模块仍可使用，但会输出弃用警告。'
+          'Required application `SyncInitInput`, wrapped as `{ module: bytesOrModule }`: bytes or a precompiled `WebAssembly.Module`, with no default and no fetch. Positional bytes/module remain accepted but emit a deprecation warning.',
+          '应用提供的必填 `SyncInitInput`，包装为 `{ module: bytesOrModule }`：字节或预编译 `WebAssembly.Module`，没有默认值，不发起获取。位置字节或模块仍可使用，但会输出弃用警告。'
         )
       },
       returns: t(
@@ -251,7 +212,7 @@ export const reference: ILibraryReference = {
         '返回 `InitOutput`；已登记透传的 `WebAssembly.CompileError`、`WebAssembly.LinkError`、`WebAssembly.RuntimeError` 保持类型、身份与堆栈，不附 `source/code`。'
       ),
       example:
-        "import { initSync } from '@migaia/wasm'\nconst wasm = initSync({ module: wasmBytes })\nconsole.log(wasm.memory.buffer.byteLength)"
+        "import { readFileSync } from 'node:fs'\nimport { initSync } from '@migaia/wasm'\nconst bytes = readFileSync(new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm')))\nconst wasm = initSync({ module: bytes })\nconsole.log(wasm.memory.buffer.byteLength > 0)"
     },
     alloc_bytes: {
       role: 'operation',
@@ -269,8 +230,9 @@ export const reference: ILibraryReference = {
         'A stable nonzero arena ID or zero when memory/identifier space is exhausted. Call dealloc_bytes for every successful allocation, including zero-length allocations.',
         '返回稳定非零字节区标识；内存或标识空间耗尽时返回零。每次成功分配都须释放，包括零长度分配。'
       ),
-      example:
-        "import init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\nawait init()\nconst id = alloc_bytes(9)\nif (id !== 0) { console.log(byte_len_of(id)); dealloc_bytes(id) }"
+      exampleIntro: initializationNote,
+      cases: wasmCases.alloc_bytes,
+      example: wasmCases.alloc_bytes[0].example
     },
     ptr_of: {
       role: 'operation',
@@ -283,10 +245,12 @@ export const reference: ILibraryReference = {
         'Eight-byte-aligned offset valid until this allocation is released; unknown or dead IDs return zero.',
         '返回释放前有效且八字节对齐的偏移；未知或已释放标识返回零。'
       ),
-      example:
-        "import init, { alloc_bytes, ptr_of, dealloc_bytes } from '@migaia/wasm'\nconst wasm = await init()\nconst id = alloc_bytes(8)\nif (id !== 0) { const view = new Float64Array(wasm.memory.buffer, ptr_of(id), 1); view[0] = 42; dealloc_bytes(id) }"
+      exampleIntro: initializationNote,
+      cases: wasmCases.ptr_of,
+      example: wasmCases.ptr_of[0].example
     },
     byte_len_of: {
+      exampleIntro: initializationNote,
       role: 'operation',
       purpose: t(
         'Returns actual rounded arena capacity for a live allocation. Pair with alloc_bytes when sizing numeric views; use ConversionResult.len instead for the exact converted document length.',
@@ -297,8 +261,7 @@ export const reference: ILibraryReference = {
         'Capacity in bytes rounded upward to eight; unknown or dead IDs return zero.',
         '返回向上取整为八倍数的容量字节数；未知或已释放标识返回零。'
       ),
-      example:
-        "import init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\nawait init()\nconst id = alloc_bytes(9)\nif (id !== 0) { console.log(byte_len_of(id)); dealloc_bytes(id) }"
+      example: wasmCases.alloc_bytes[0].example
     },
     dealloc_bytes: {
       role: 'operation',
@@ -311,36 +274,42 @@ export const reference: ILibraryReference = {
         'True if a live allocation was removed, false for zero, unknown or already released IDs; repeated release is harmless.',
         '移除活动分配时返回真；零、未知或已释放标识返回假，重复释放无害。'
       ),
-      example:
-        "import init, { alloc_bytes, dealloc_bytes } from '@migaia/wasm'\nawait init()\nconst id = alloc_bytes(8)\nconsole.log(dealloc_bytes(id), dealloc_bytes(id))"
+      exampleIntro: initializationNote,
+      cases: wasmCases.dealloc_bytes,
+      example: wasmCases.dealloc_bytes[0].example
     },
     json_to_msgpack: {
       role: 'operation',
       purpose: t(
         'Synchronously transcodes exactly one UTF-8 JSON document to MessagePack within the arena; trailing JSON whitespace is accepted. Pair with alloc_bytes and dealloc_bytes to own input and output separately. Preservation is limited to JSON data and representable numbers.',
-        '在字节区内同步把一个完整文本对象文档转为紧凑二进制，允许尾随空白。搭配 `alloc_bytes` 和 `dealloc_bytes` 分别管理输入与输出；保真范围限于文本数据模型及可表示数值。'
+        '在字节区内同步把一个完整 JSON 文档转为 MessagePack，允许尾随空白。搭配 `alloc_bytes` 和 `dealloc_bytes` 分别管理输入与输出；保真范围限于 JSON 数据模型及可表示数值。'
       ),
       params: { id, len },
       returns: t(
         'An owned `ConversionResult`: success has nonzero id, exact len and empty error; invalid ID/length, parsing/trailing-document or allocation failure has id/len zero and error text. Input stays owned by the caller.',
         '返回所属 `ConversionResult`：成功含非零标识、精确长度和空错误；标识或长度非法、解析、多文档及分配失败含零标识、零长度和错误文本。输入仍归调用方。'
       ),
-      example: conversionExample
+      exampleIntro: initializationNote,
+      cases: wasmCases.json_to_msgpack,
+      example: wasmCases.json_to_msgpack[0].example
     },
     msgpack_to_json: {
       role: 'operation',
       purpose: t(
         'Synchronously transcodes exactly one MessagePack document to UTF-8 JSON, rejecting any trailing bytes. Pair with dealloc_bytes to release the new output allocation; bin/ext, non-string map keys and out-of-range integers are not promised reversible JSON forms.',
-        '同步把一个完整紧凑二进制文档转为文本对象，并拒绝任何尾随字节。搭配 `dealloc_bytes` 释放新输出分配；二进制扩展、非字符串映射键和超范围整数不保证往返可逆。'
+        '同步把一个完整 MessagePack 文档转为 JSON，并拒绝任何尾随字节。搭配 `dealloc_bytes` 释放新输出分配；二进制扩展、非字符串映射键和超范围整数不保证往返可逆。'
       ),
       params: { id, len },
       returns: t(
         'An independently owned `ConversionResult`; zero id/len and error text report failure without throwing a package error. Each successful output and every input remain separately releasable.',
         '返回独立所属 `ConversionResult`；零标识、零长度和错误文本报告失败，不抛包错误。每次成功输出和所有输入分别负责释放。'
       ),
-      example: roundtripExample
+      exampleIntro: initializationNote,
+      cases: wasmCases.msgpack_to_json,
+      example: wasmCases.msgpack_to_json[0].example
     },
     ConversionResult: {
+      exampleIntro: initializationNote,
       role: 'constant',
       purpose: t(
         'Generated metadata class returned by both conversion functions; its constructor is private. It owns the Rust result struct, while its output id names a separate arena allocation that free() does not release.',

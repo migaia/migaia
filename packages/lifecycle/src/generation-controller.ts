@@ -133,9 +133,13 @@ function createAdmissionFailure(
 }
 
 /**
- * Merges `@migaia/reactive`'s `RequestControllerImpl`+`GenerationController` with `web-rpc`'s
- * `OperationScope`: token identity, an `AbortSignal` per generation, an optional per-generation
- * timeout, and automatic abort when a parent's closing signal fires.
+ * Creates a controller that keeps only the latest async request's result, for search suggestions,
+ * route loads, refreshes and reconnects.
+ *
+ * Each `begin()` returns a token and an `AbortSignal` and makes the previous request stale by
+ * aborting its signal. Check `isCurrent(token)` before using a result, or let `adopt()` hand a
+ * stale value to a release function. Optional `timeoutMs` and `parentSignal` abort the current
+ * request too. After `dispose()`, `begin()` throws `GENERATION_DISPOSED`.
  */
 export function createGenerationController(
   options: IGenerationControllerOptions = {}

@@ -5,7 +5,9 @@ import { isNativeErrorValue } from '@migaia/utils/error'
 
 /** Read-only Host boundary consumed once during Graph admission. */
 export type ICapabilityReadinessSource = {
+  /** Availability to capture; only ready, blocked, or failed is admitted. */
   readonly state: unknown
+  /** Paired diagnostic read after valid state; retained by reference without interpretation. */
   readonly error: unknown | undefined
 }
 
@@ -19,18 +21,22 @@ export const GraphReadinessState = {
   failed: 'failed'
 } as const
 
+/** Admitted availability labels; independent of Host activation and Graph container states. */
 export type GraphReadinessState = keyof typeof GraphReadinessState
 
 /** Immutable, one-time readiness fact passed to Graph and direct consumers. */
 export type IGraphReadinessSnapshot = {
+  /** Availability at capture time; later changes to the source are not observed. */
   readonly state: GraphReadinessState
+  /** Exact diagnostic captured with the state; undefined is allowed for any admitted state. */
   readonly error: unknown | undefined
 }
 
 /**
- * Reads Host readiness in fixed state-then-error order and freezes the result. Error instances
- * retain native identity when annotatable and receive INVALID_OPTION; other thrown values remain
- * reachable through cause on the coded fallback.
+ * Captures readiness once in state-then-error order and freezes the two-field record; this does not
+ * freeze its error payload or subscribe to source changes. Invalid state throws INVALID_OPTION
+ * before error is read. Throwing getters retain native Error identity when annotatable; other
+ * failures remain reachable through cause on a coded fallback.
  */
 export function snapshotGraphReadiness(
   source: ICapabilityReadinessSource

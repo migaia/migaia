@@ -30,16 +30,23 @@ const processStringFramer: IRpcFramer<string, string, 'process-stream', 1> = Obj
 
 /** Unknown byte-port values enter the same string-domain check before their original operation. */
 export const remoteProcessStringFramer = Object.freeze({
+  /** Canonical whole-message process-string component identity. */
   id: processStringFramer.id,
+  /** Component grammar version, independent of the negotiated RPC version. */
   version: processStringFramer.version,
+  /** Only complete string carriers enter this adapter. */
   inputEncodedType: processStringFramer.inputEncodedType,
+  /** Output remains a complete string, without another fragmentation wrapper. */
   outputEncodedType: processStringFramer.outputEncodedType,
+  /** Return the original string once; nonstrings throw INVALID_FRAME as a native TypeError. */
   frame: (value: unknown, context: IRpcFrameContext) =>
     processStringFramer.frame(asStringFrame(value), context),
+  /** Complete immediately with the original string; nonstrings throw rather than return rejected. */
   accept: (value: unknown, _context?: IRpcFrameContext) => ({
     status: 'complete' as const,
     value: asStringFrame(value)
   }),
+  /** Stateless cleanup; physical transport closure and decoder lifetime belong to the carrier. */
   close: (reason?: unknown) => processStringFramer.close(reason)
 })
 

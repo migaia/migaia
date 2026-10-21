@@ -42,7 +42,9 @@ const RATE_WINDOW_MS = 60_000
 export type IRuntimeProviderGovernor = Readonly<{
   /** Attach the canonical local core refusal notification before endpoint construction. */
   limits(limits: IRpcProviderLimits, configured?: IRpcProviderLimits): IRpcProviderLimits
+  /** Apply the held connection's provider policy to its actual prepared endpoint. */
   endpoint(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
+  /** Retire this governor's timers and diagnostic subscriptions. */
   close(): void
 }>
 

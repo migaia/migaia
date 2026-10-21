@@ -125,13 +125,19 @@ export type { IRuntimePeerIdentity } from './description.js'
 
 /** The source learns only safe identity and the capabilities implemented by the shared endpoint. */
 export type IRuntimePeerSourceContext = Readonly<{
+  /** Safe local name and instance identity already admitted by Core. */
   self: IRuntimePeerIdentity
+  /** Capabilities implemented by this actual compiled endpoint offer. */
   capabilities: readonly string[]
 }>
 
 /** Platform bootstrap owns cold receive buffering and transfers it only after endpoint registration. */
 export type IRuntimePeerSourceResult = IRemoteChannel &
   Readonly<{
+    /**
+     * Release captured early receives only after endpoint registration; omission needs no
+     * activation step.
+     */
     activateReceive?: () => void
   }>
 
@@ -151,11 +157,20 @@ export type IRuntimePeerOptions = Pick<
       channel: IRemoteChannelResources,
       signal: INativeAbortSignal
     ): Promise<IRemoteServeEndpoint>
+    /** Optional local identity; omission generates an instance id with the display name peer. */
     self?: IRuntimePeerIdentity
+    /**
+     * Explicit nested own-data method groups; defaults to no application methods and rejects
+     * accessors during compilation.
+     */
     provide?: IRuntimePeerProvide
+    /** Owned source opener; exactly one of spawn, connect or listen is required. */
     spawn?: IRuntimePeerSource
+    /** Connected source opener; exactly one source is required. */
     connect?: IRuntimePeerSource
+    /** Listener source opener; exactly one source is required. */
     listen?: IRuntimePeerSource
+    /** Provider quotas, defaulting to 256 global and 64 per verified peer. */
     providerLimits?: IRpcProviderLimits
     /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */
     authentication?: IRpcAuthenticationConfig
@@ -178,18 +193,26 @@ type IRuntimePeerEndpoint = Omit<ReturnType<typeof createRuntimeApiEndpoint>, 's
 
 /** Hot calls return the original operation result; only local description queries are asynchronous. */
 export type IRuntimePeer = Readonly<{
+  /** Accepted safe local identity; it grants no native execution authority. */
   self: IRuntimePeerIdentity
+  /**
+   * Invoke one accepted scalar route and await its portable result; call admission or remote
+   * failure rejects.
+   */
   request(
     method: string,
     payload?: unknown,
     options?: IRuntimeCallOptions
   ): Promise<IRpcPortableValue | undefined>
+  /** Send an accepted scalar notification; settlement confirms local send, not provider completion. */
   notify(method: string, payload?: unknown, options?: IRuntimeCallOptions): Promise<void>
+  /** Open an accepted iterable route; the caller owns iteration and early return cleanup. */
   stream(
     method: string,
     payload?: unknown,
     options?: IRuntimeCallOptions
   ): AsyncIterableIterator<IRpcPortableValue>
+  /** Submit one admitted scalar group and retain its individual step outcomes. */
   group(
     steps: readonly IRpcRuntimeStep[],
     options?: Omit<
@@ -201,10 +224,13 @@ export type IRuntimePeer = Readonly<{
     > &
       Pick<import('../../core/index.js').ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
   ): Promise<readonly IRpcRuntimeStepOutcome[]>
+  /** Query the existing logical key without invoking the provider again. */
   outcome(idempotencyKey: string): Promise<IRpcRuntimeOutcomeResult>
+  /** Read a cold safe local detail projection; optional json/yaml/toml formatting returns text. */
   describe: IRuntimeQuery<IRuntimeDetail>
   /** Subscribe from now on; factory resolution already represents initial accepted readiness. */
   on: IRuntimeEventPublisher['on']
+  /** Idempotently retire the original endpoint/channel ownership and share terminal cleanup. */
   close(): Promise<void>
   /** Scoped cleanup is the exact original close operation, including its Promise identity. */
   [Symbol.asyncDispose](): Promise<void>

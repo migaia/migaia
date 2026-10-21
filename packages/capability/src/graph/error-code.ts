@@ -49,5 +49,6 @@ export const CapabilityGraphErrorCode = {
   nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED'
 } as const
 
+/** Graph error values shared by static lifecycle, dynamic composition, and pure-planner validation. */
 export type ICapabilityGraphErrorCode =
   (typeof CapabilityGraphErrorCode)[keyof typeof CapabilityGraphErrorCode]

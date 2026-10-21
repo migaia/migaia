@@ -6,18 +6,34 @@ import type { IRpcRuntimeGeneration } from './types.js'
 
 /** Existing private startup spellings remain stable for same-version message adapters. */
 export const RuntimeMessageControl = {
+  /** Initial cloned-data wrapper discriminator, separate from ordinary RPC frames. */
   data: 'migaia.thread.data',
+  /** Legacy readiness acknowledgement; it contributes no capability proposal. */
   ready: 'migaia.thread.data.ack',
+  /** Independent runtime capability acknowledgement discriminator. */
   acknowledgement: 'migaia.thread.runtime.ack',
+  /** Closed startup metadata version required by admission. */
   version: 1,
+  /** Startup acknowledgement budget consumed by the adapter's existing timer owner. */
   timeoutMs: 10_000,
+  /** Stable adapter diagnostic when the initial data bootstrap is not acknowledged. */
   failureText: 'Thread data bootstrap was not acknowledged'
 } as const
 
 /** Pure control admission reports the original field without constructing another package's error. */
 export type IRuntimeMessageControlResult<T> =
-  | Readonly<{ valid: true; value: T }>
-  | Readonly<{ valid: false; field: string }>
+  | Readonly<{
+      /** Structural admission succeeded; no physical-source authority is implied. */
+      valid: true
+      /** Admitted projected data for the original startup owner. */
+      value: T
+    }>
+  | Readonly<{
+      /** Structural admission failed without constructing an adapter-owned error. */
+      valid: false
+      /** Original failure field used by the adapter's existing diagnostic boundary. */
+      field: string
+    }>
 
 /** Closed native startup identity contains only the original bounded routing/display fields. */
 type IRuntimeMessageIdentity = Readonly<{ name: string; instanceId: string }>
@@ -178,10 +194,12 @@ function intersectRuntimeMessageCapabilities(
 /** The canonical control descriptor supplies grammar, never a completed agreement or receipt. */
 export const rpcMessageCapabilityControl = Object.freeze({
   ...RuntimeMessageControl,
+  /** Built-in message-carrier stream and physical-batch baseline, not an accepted peer agreement. */
   staticCapabilities: Object.freeze([
     RpcCapability.stream,
     RpcCapability.batch
   ]) as readonly string[],
+  /** Validate and freeze a bounded duplicate-free independent capability proposal. */
   readOffer: readRuntimeMessageCapabilityOffer,
   /** Canonical clone carriers offer native storage only alongside their actual portable-binary root. */
   localOffer(capabilities: readonly string[]): IRuntimeMessageControlResult<readonly string[]> {
@@ -192,8 +210,11 @@ export const rpcMessageCapabilityControl = Object.freeze({
         : capabilities
     )
   },
+  /** Admit the closed versioned ACK; invalid grammar returns its original field diagnostic. */
   readAcknowledgement: readRuntimeMessageAcknowledgement,
+  /** Admit the address/data wrapper; invalid portable business data keeps its Contract error. */
   readData: readRuntimeMessageData,
+  /** Freeze the shared declarations in local order without expanding dependency closure. */
   intersect: intersectRuntimeMessageCapabilities,
   /** Initial launch messages retain the original wrapper and are read as raw control input. */
   isInitial(value: unknown): boolean {

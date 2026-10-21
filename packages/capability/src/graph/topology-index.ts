@@ -11,7 +11,9 @@ import {
   type ITopologyNode
 } from './topology.js'
 
+/** Required caller-owned error policy, copied when the empty index is created. */
 export type ITopologyIndexAdapter = Readonly<{
+  /** Throws the caller's error for a stable closed cycle path, before a mutation is committed. */
   readonly onCycle: (path: readonly string[]) => never
   /** Getter failures include their exact cause; the pure owner preserves it on the thrown error. */
   readonly onInvalid: (
@@ -21,45 +23,74 @@ export type ITopologyIndexAdapter = Readonly<{
   ) => never
 }>
 
+/** Incremental node input; the index assigns its own monotonic registration ordinal. */
 export type ITopologyIndexNode = Readonly<{
+  /** Unique nonempty ID retained through dependency replacement. */
   readonly id: string
+  /** Captured edges; missing providers remain as dangling facts until admitted. */
   readonly dependencies: readonly ITopologyDependency[]
 }>
 
+/** Frozen direct-consumer IDs partitioned by edge kind, each in registration order. */
 export type IGraphDependents = Readonly<{
+  /** Consumers whose service requires this provider. */
   readonly required: readonly string[]
+  /** Consumers observing this provider without joining required-dependent closure. */
   readonly optional: readonly string[]
 }>
 
+/** Read-only topology view shared by an index and its isolated transaction working view. */
 export type ITopologyIndexReader = Readonly<{
+  /** Number of currently present nodes. */
   readonly size: number
+  /** Reports whether an ID is present without rejecting an unknown ID. */
   has(id: string): boolean
   /**
    * Stable registration ordinal owned by the index; unlike snapshot ordinals, removals do not
    * renumber it.
    */
   registrationOrdinal(id: string): number
+  /** Returns the frozen captured edges; unknown IDs use the adapter's unknown-node failure. */
   dependencies(id: string): readonly ITopologyDependency[]
+  /** Returns required and optional direct consumers for a present provider. */
   dependents(id: string): IGraphDependents
+  /** Returns declared edges whose providers are absent, preserving declaration order. */
   missing(id: string): readonly ITopologyDependency[]
+  /** Returns roots and transitive required consumers in canonical level/ordinal order. */
   closure(roots: readonly string[]): readonly string[]
+  /** Returns all IDs by default, or a deduplicated known subset, in canonical order. */
   order(ids?: Iterable<string>): readonly string[]
+  /** Returns a frozen static projection with mutation-incapable maps and newly dense ordinals. */
   snapshot(): ICapabilityTopology
 }>
 
+/** Atomic topology edits; structural failures use the supplied adapter before committing changes. */
 export type ITopologyIndexWriter = Readonly<{
+  /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */
   add(node: ITopologyIndexNode): void
+  /** Removes a present node, retaining its consumers' edges as dangling provider references. */
   remove(id: string): void
+  /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */
   setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void
 }>
 
+/** Isolated working topology; every read and write rejects after either settlement operation. */
 export type ITopologyTransaction = ITopologyIndexReader &
   ITopologyIndexWriter &
-  Readonly<{ commit(): void; rollback(): void }>
+  Readonly<{
+    /** Publishes the working changes to the base and permanently closes this transaction. */
+    commit(): void
+    /** Discards working changes, releases the base writer, and permanently closes this transaction. */
+    rollback(): void
+  }>
 
+/** Mutable topology owner with one transaction writer at a time and stable base readers. */
 export type ITopologyIndex = ITopologyIndexReader &
   ITopologyIndexWriter &
-  Readonly<{ begin(): ITopologyTransaction }>
+  Readonly<{
+    /** Opens an isolated working view; base mutations and a second begin reject until settlement. */
+    begin(): ITopologyTransaction
+  }>
 
 type IStoredTopologyNode = Readonly<{
   readonly id: string
@@ -734,7 +765,12 @@ class TopologyTransaction implements ITopologyTransaction {
   }
 }
 
-/** Creates an empty mutable topology index with caller-owned error construction. */
+/**
+ * Creates an empty incremental dependency index with required cycle/invalid-input adapters. Edits
+ * update ordering and reverse adjacency without resource lifecycle effects. Readers return frozen
+ * facts; missing providers are allowed and retained. Use begin for isolated multi-edit changes, and
+ * always commit or roll back before editing the base again.
+ */
 export function createTopologyIndex(adapter: ITopologyIndexAdapter): ITopologyIndex {
   return new TopologyIndex(adapter)
 }

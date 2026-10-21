@@ -12,6 +12,47 @@ import {
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
 describe('bindStoreMiddleware', () => {
+  it.each([false, true])(
+    'classifies initial clone failure without losing the original (frozen: %s)',
+    (frozen) => {
+      /** A supported application snapshot callback can fail before the binding acquires resources. */
+      const original = new TypeError('snapshot preparation failed')
+      /**
+       * Classification must preserve the original native stack whether attachment is possible or
+       * not.
+       */
+      const originalStack = original.stack
+      if (frozen) Object.freeze(original)
+      /** Use the real public Store rather than a partial substitute for its binding contract. */
+      const store = createStore({ value: 1 })
+      /** Observe the package boundary once so native identity and fallback cause can be checked. */
+      let failure: unknown
+      try {
+        try {
+          bindStoreMiddleware(store, {
+            execution,
+            clone: () => {
+              throw original
+            }
+          })
+        } catch (error) {
+          failure = error
+        }
+        expect(failure).toMatchObject({
+          source: '@migaia/store-middleware',
+          code: 'CALLBACK_FAILED'
+        })
+        if (frozen) expect((failure as Error).cause).toBe(original)
+        else expect(failure).toBe(original)
+        expect(original.stack).toBe(originalStack)
+        store.value = 2
+        expect(store.value).toBe(2)
+      } finally {
+        store.$dispose()
+      }
+    }
+  )
+
   it('contains a reporter that itself throws during binding rollback', async () => {
     // 原用例用 `spyOn(StoreMiddlewareHost.prototype, 'dispose').mockRejectedValue(...)` 制造宿主
     // 清理失败。宿主改为冻结句柄后没有原型可 spy——更要紧的是，dispose 中间件本来就捕获并转换

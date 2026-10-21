@@ -18,7 +18,11 @@ const indexedDbReactiveFeature = defineNativeReactiveFeature(
   indexedDbBackendKind
 )
 
-/** Creates the canonical IndexedDB reactive fast-path plugin with private preparation. */
+/**
+ * Define a IndexedDB backend plus its exact reactive adapter; default id indexed-db. Consistency is
+ * hybrid/origin-eventual, polling every 1000 ms. Host installation owns Store/source rollback and
+ * disposal; eventual observation does not make cross-context writes transactional.
+ */
 export const indexedDbReactive = {
   indexedDbReactive: <const TId extends string = 'indexed-db'>(
     options: IIndexedDbOptions & IBuiltInPluginId<TId> = {}

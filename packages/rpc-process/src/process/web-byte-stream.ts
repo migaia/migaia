@@ -126,7 +126,13 @@ export function webByteStream(
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 
-/** The moved public Web Streams operation retains the original owned byte pump and close scope. */
+/**
+ * Acquire one reader/writer and expose their ordered byte channel without adding framing. Reads
+ * begin when subscribed; writes await the native writer. close shares its Promise, cancels the
+ * reader and aborts the writer, aggregating observer/cleanup failures as PROCESS_CHANNEL_CLOSED.
+ * Reader/writer acquisition failure is tagged PROCESS_CHANNEL_CONNECT_FAILED; callers must avoid
+ * separately locking or consuming these same streams after successful acquisition.
+ */
 export function createAdapterWebByteIO(
   readable: ReadableStream<Uint8Array>,
   writable: WritableStream<Uint8Array>

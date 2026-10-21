@@ -26,13 +26,21 @@ let nextServiceSequence = 0
 
 /** A served endpoint is exclusively owned by one returned close handle. */
 export type IRemoteServePluginOptions = Readonly<{
+  /** Existing local Host whose target Feature registration the service depends on. */
   host: Pick<
     IHostHandle<object, unknown, readonly IPluginConstraint<any>[]>,
     'use' | 'unUse' | 'plugin'
   >
+  /** Validated explicit method whitelist for this one plugin service. */
   contract: IRemoteContract
+  /** Dedicated endpoint transferred to the returned service close operation. */
   endpoint: IRemoteServeEndpoint
+  /** Reporter for background and secondary cleanup failures. */
   report(error: unknown): void
+  /**
+   * Optional local projection passed to the served method; it is not serialized as application
+   * parameters.
+   */
   invocationContext?(context: IRpcContext): unknown
 }>
 

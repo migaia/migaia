@@ -126,7 +126,11 @@ declare const installedPluginsBrand: unique symbol
 /** Module-instance authority for Host-generated disposal nodes; duplicate instances fail closed. */
 const pluginHostDisposalProvenance = new WeakMap<object, IPluginHostDisposalProvenance>()
 
-/** Reads provenance only from this exact PluginHost module instance. */
+/**
+ * Reads frozen producer provenance for a disposal node issued by this package instance. Unknown
+ * values return undefined without inspecting properties; matching public fields cannot forge it.
+ * Translators can use this distinction without changing the node's original error identity.
+ */
 export const readPluginHostDisposalProvenance = (
   value: unknown
 ): IPluginHostDisposalProvenance | undefined => {
@@ -165,7 +169,12 @@ const DEFAULT_QUEUE_ADMISSION_DIAGNOSTIC_MS = 1000
  * turned off (`false`).
  */
 const DEFAULT_DISPOSE_STEP_TIMEOUT_MS = 5000
-/** Runtime-neutral plugin host. All external mutation enters one Promise queue. */
+/**
+ * Runtime-neutral owner of plugin registration, configuration, pipeline leases and resource
+ * cleanup. Async mutations share a FIFO queue; synchronous owner installation is a separate
+ * explicit path. Handles address names, while captured callable views retain exact-generation
+ * revocation guards.
+ */
 export class PluginHost<
   TDomainCore extends object,
   TValue = never,
@@ -248,6 +257,13 @@ export class PluginHost<
   /** Shared activation Promises keyed by lazy registration name. */
   #activationRequests = new Map<string, Promise<IPluginHandle<IPluginConstraint<any>>>>()
 
+  /**
+   * Creates an empty Host with required execution budgets. Numeric budgets must be finite and
+   * nonnegative; false explicitly waits without a deadline. Pipeline mode defaults to sync,
+   * diagnostics to no-op, queue diagnostics to 1000 ms and disposal steps to 5000 ms. Invalid
+   * options fail admission; the scheduler defaults to systemScheduler and secure Host identity
+   * requires host cryptographic randomness.
+   */
   constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader) {
     this.#trustedDefinitionReader = trustedDefinitionReader
     // Validate the mandatory execution policy before reading the remaining options. Field
@@ -694,6 +710,7 @@ export class PluginHost<
     )
   }
 
+  /** Current runner mode; closing or disposed Hosts reject access with their lifecycle code. */
   get pipelineMode(): IMiddlewarePipelineMode {
     this.#assertActive()
     return this.#pipelineMode
@@ -766,9 +783,9 @@ export class PluginHost<
   }
 
   /**
-   * Transforms the final Host disposal error inside the sole disposal Promise. The base Host
-   * returns its PluginHostError unchanged; subclasses may translate the boundary error without
-   * creating a second lifecycle Promise.
+   * Retained protected translation hook, returning the supplied error unchanged by default. The
+   * current structured cleanup-result path does not invoke it; overriding it does not translate
+   * each cleanupErrors entry or replace the Host's disposal completion protocol.
    */
   protected translateDisposalError(error: PluginHostError): Error {
     return error
@@ -818,6 +835,12 @@ export class PluginHost<
     }
   }
 
+  /**
+   * Runs an immutable stage snapshot under Host and registration leases. done receives a delivered
+   * final value; a halted traversal need not reach it. The return follows the runner's sync/async
+   * mode. Closing rejects new work and cooperatively signals existing stages, without preempting
+   * I/O.
+   */
   protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void> {
     try {
       return executePluginHostPipeline(
@@ -831,7 +854,11 @@ export class PluginHost<
     }
   }
 
-  /** Host-side pipeline registration for application composition. */
+  /**
+   * Adds a Host-owned sync stage and advances revision, returning this same Host. Registration
+   * during execution throws PIPELINE_EXECUTING; incompatible lifting throws
+   * PIPELINE_MODE_MISMATCH.
+   */
   usePipeline(stage: ISyncMiddlewareStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, MiddlewarePipelineMode.sync)
@@ -839,6 +866,7 @@ export class PluginHost<
     return this
   }
 
+  /** Adds a Host-owned async stage under the same liveness, execution and mode-lifting guards. */
   useAsyncPipeline(stage: IAsyncMiddlewareStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, MiddlewarePipelineMode.async)
@@ -846,6 +874,10 @@ export class PluginHost<
     return this
   }
 
+  /**
+   * Adds a Host-owned generator stage; its return/yield values follow the canonical runner
+   * protocol.
+   */
   useGeneratorPipeline(stage: IGeneratorMiddlewareStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, MiddlewarePipelineMode.generator)
@@ -853,6 +885,7 @@ export class PluginHost<
     return this
   }
 
+  /** Adds a Host-owned async-generator stage; new runs see it only after registration commits. */
   useAsyncGeneratorPipeline(stage: IAsyncGeneratorMiddlewareStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, MiddlewarePipelineMode.asyncGenerator)
@@ -860,6 +893,13 @@ export class PluginHost<
     return this
   }
 
+  /**
+   * Captures input definitions now, then queues atomic installation and returns frozen handles in
+   * input order. Dependencies determine execution order; eager consumers activate needed lazy
+   * providers. Preflight failure runs no install hooks. Later construction failure rolls back this
+   * batch in reverse order, retaining the primary cause under PLUGIN_INSTALL_FAILED and rollback
+   * details; previously committed registrations remain installed.
+   */
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
     ...plugins: TPlugins &
       IUniquePluginNames<TPlugins> &
@@ -892,7 +932,11 @@ export class PluginHost<
     })
   }
 
-  /** Explicitly activates one lazy plugin; concurrent callers receive one Promise identity. */
+  /**
+   * Activates a lazy registration and required lazy providers, sharing one pending Promise per
+   * name. Missing, disabled or suspended targets fail explicitly. Failed attempts clean up and may
+   * be retried; success returns a name-addressed handle. Do not await this activation from itself.
+   */
   activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>> {
     this.#assertActive()
     // Direct hook nesting must reject before coalescing. After an await, callers share the
@@ -939,7 +983,12 @@ export class PluginHost<
     return activation
   }
 
-  /** Atomically installs a replacement before revoking the previous registration generation. */
+  /**
+   * Installs a same-name replacement before revoking the previous generation. Candidate failure
+   * leaves the old provider live; after publication, dependent rebind/restart failures do not roll
+   * the new provider back. Old captured callable extensions reject, while name-addressed handles
+   * resolve the successor. Names that differ reject with REPLACE_NAME_MISMATCH before enqueue.
+   */
   replace<TPlugin extends IPluginConstraint<any>>(
     name: string,
     next: TPlugin
@@ -1162,14 +1211,20 @@ export class PluginHost<
     })
   }
 
+  /** Stable config facade; each read/update still checks current Host and registration state. */
   get config(): IPluginHostConfigFor<TInstalled> {
     return this.#configRuntime.getFacade()
   }
 
+  /** Plans dependency-safe removal without revoking registrations or changing revision. */
   unUse(
     name: string,
     options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
   ): Promise<IPluginDependencyPlan>
+  /**
+   * Removes according to default reject, cascade or suspend policy; returns actual affected
+   * changes.
+   */
   unUse(
     name: string,
     options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
@@ -1243,7 +1298,12 @@ export class PluginHost<
     })
   }
 
-  /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */
+  /**
+   * Closes admission immediately, signals running stages and returns the same Promise on every
+   * call. Default runtime cleanup returns logicalTerminal/cleanupErrors; incomplete physical work
+   * is exposed through physicalCompletion rather than treated as forcibly stopped. Cleanup failure
+   * does not reopen the Host. Functional defineHost middleware can separately reject its chain.
+   */
   dispose(): Promise<import('./typing.js').IPluginHostDisposalResult> {
     return this.#hostDisposalRuntime.dispose()
   }

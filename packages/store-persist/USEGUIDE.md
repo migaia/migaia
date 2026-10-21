@@ -1,499 +1,504 @@
-# 使用手册
+# `@migaia/store-persist` 使用手册
 
-本文是 `@migaia/store-persist` 的完整参考手册。先看 [README.md](./README.md#persist) 的最小示例，跑起来之后再回来查这里的细节——README 讲"是什么、适合什么场景、怎么跑起来"，本文讲每一层的精确语义。
+按状态形状选择持久化适配器，分别管理水合、写入结果和资源所有权。最短入口见 [README](./README.md)。
 
-## 目录
+## 按场景查找
 
-1. [核心引擎：`IPersistUnit` / `persistUnit()`](#1-核心引擎ipersistunit--persistunit)
-2. [`persist()` 完整参考（store-light）](#2-persist-完整参考store-light)
-3. [`persistCollection()` 完整参考（store-indexed）](#3-persistcollection-完整参考store-indexed)
-4. [`persistKeyed()` + `clearFamily()` 完整参考（store-keyed）](#4-persistkeyed--clearfamily-完整参考store-keyed)
-5. [存档格式与版本迁移](#5-存档格式与版本迁移)
-6. [`IPersistHandle` 完整 API 参考](#6-ipersisthandle-完整-api-参考)
-7. [与 storage-web 的 codec 集成](#7-与-storage-web-的-codec-集成)
-8. [错误参考](#8-错误参考)
-9. [生产环境完整示例](#9-生产环境完整示例)
-10. [底层导出：envelope 工具、状态常量与错误构造函数](#10-底层导出envelope-工具状态常量与错误构造函数)
-11. [常见问题排查](#11-常见问题排查)
+| 需要做什么                 | 怎么组合                                                | 完整示例                                  |
+| -------------------------- | ------------------------------------------------------- | ----------------------------------------- |
+| 恢复存档时保留启动期修改   | persist → local edit → ready → flush                    | [代码与输出](#恢复存档时保留启动期修改)   |
+| 修复坏存档后再恢复写入     | ready rejection → repair storage → retryHydrate → flush | [代码与输出](#修复坏存档后再恢复写入)     |
+| 迁移旧设置并只保存指定字段 | version / migrate → partialize → flush                  | [代码与输出](#迁移旧设置并只保存指定字段) |
+| 完整恢复 Map 条目          | persistCollection → flush → new Map → ready             | [代码与输出](#完整恢复-map-条目)          |
+| 独立停止某个键的持久化     | persistKeyed × 2 → ready → dispose one → flush          | [代码与输出](#独立停止某个键的持久化)     |
+| 清理存档而不重置内存值     | clearFamily → inspect memory → change → flush           | [代码与输出](#清理存档而不重置内存值)     |
 
----
+## 运行准备
 
-## 1. 核心引擎：`IPersistUnit` / `persistUnit()`
+每个示例独立保存为 .ts，在 ESM 项目用 Node 24 运行。它们使用真实 memoryStorageHost，不需要浏览器 localStorage 或 IndexedDB；内存后端的内容只在该实例存活期间保留。按所需模型安装，下面覆盖全部六例：
 
-```ts
-type IPersistUnit<TState> = {
-  snapshot(): TState; // 同步读当前可持久化状态
-  restore(state: TState): void; // 同步写回一份状态（hydrate 用）
-  subscribe(onChange: () => void): IDisposer; // 注册变化通知
-};
-
-function persistUnit<TState>(
-  unit: IPersistUnit<TState>,
-  options: IPersistUnitOptions<TState>
-): IPersistHandle;
+```bash
+pnpm add @migaia/store-persist @migaia/storage-web @migaia/store-light @migaia/store-indexed @migaia/store-keyed @migaia/reactive
 ```
 
-`persist()`/`persistCollection()`/`persistKeyed()` 内部各自把自己的原生 API 适配成 `IPersistUnit<TState>`，然后统一调 `persistUnit()`——hydrate 竞态、防抖写回、dispose 清理只在这一个函数里实现一遍，三条路径不重复代码，行为也因此完全一致。一般不需要直接调用 `persistUnit()`，除非你要接入一种全新的 store 形状（第四种，本包目前没有内置适配）。
+## 恢复存档时保留启动期修改
 
-`IPersistUnitOptions<TState>` 完整字段：
+设置存档里有旧计数，用户却在启动恢复完成前改了计数。
 
-| 选项         | 类型                                                      | 必填性 | 默认值                                                               | 说明                                                                                                                        |
-| ------------ | --------------------------------------------------------- | ------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `key`        | `string`                                                  | 必填   | 无                                                                   | 存档在 storage 里的键                                                                                                       |
-| `runtime`    | `IRuntime`                                                | 必填   | 无                                                                   | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
-| `storage`    | `{ capabilities, get, set, remove, keys }`                | 必填   | 无                                                                   | 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear |
-| `codec`      | `ICodec`                                                  | 可选   | `defaultJsonCodec`                                                   | 见 [§7](#7-与-storage-web-的-codec-集成)                                                                                    |
-| `version`    | `number`                                                  | 可选   | `0`                                                                  | schema 版本，必须是安全非负整数                                                                                             |
-| `migrate`    | `(persisted: TState, fromVersion: number) => TState`      | 可选   | 无                                                                   | 见 [§5](#5-存档格式与版本迁移)                                                                                              |
-| `partialize` | `(state: TState) => Partial<TState>`                      | 可选   | 恒等函数                                                             | 写入前裁剪                                                                                                                  |
-| `merge`      | `(persisted: Partial<TState>, current: TState) => TState` | 可选   | 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 | 读取后合并回内存，见下方"默认 merge 的语义"                                                                                 |
-| `debounceMs` | `number`                                                  | 可选   | `0`（不防抖）                                                        | 变化后延迟多久发起写入                                                                                                      |
-| `maxWaitMs` | `number` | 可选 | 无 | 首次水合成功后首个变更起的最大防抖窗口，非 IO deadline；0 为下一次0ms调度 |
-| `scheduler` | `IScheduler` | 可选 | canonical system scheduler | 单调时钟与可取消任务，三 facade 共同传入同一引擎 |
+直接用存档覆盖整个对象会丢掉新计数；完全跳过恢复，又会丢掉用户尚未修改的已存字段。
 
-### 默认 `merge` 的语义（容易踩的坑）
+先接入 `persist`，再允许编辑并等待 `ready`；默认普通对象合并逐字段对照启动快照，保留本地修改，再用 `flush` 保存合并结果。
 
-默认 `merge` 对 plain object 使用**三向字段合并**：记录异步读取开始时的内存快照；读取期间本地改过的字段优先，本地未改过的字段接受持久化值。这样同字段启动竞态不会覆盖本地新写。数组、Map、Set 等非 plain shape 仍整体替换，避免对象展开破坏容器语义。
+### 示例参数
 
-- `partialize` 保持默认（恒等函数）时，"替换"和"合并"是同一件事，行为符合直觉。
-- 一旦你自定义 `partialize` 只持久化状态的一部分（比如 `persistKeyed()` 里"只存 refreshToken"这种场景），默认 plain-object 三向合并会保留未持久化字段；如果状态含数组、Map/Set 或需要深层语义，**必须**提供匹配的 `merge`。
+memoryStorageHost() 提供本例真实内存后端，初始存档 key 为 settings。defaultJsonCodec 编码完整 version: 0 / state 信封；createStore 初值为 light / 0，省略 Runtime 使用默认实例。persist 必填 key 与 storage，未传 version 为 0、debounceMs 为 0、partialize 为恒等；普通对象默认浅三向合并，最后 await flush 确定本次写入结束。
 
-`persist()`（store-light）是个例外：它的 `restore()` 最终调用 `store.$hydrate()`，那本身就是"宽松写回、未知字段跳过"的部分合并语义，跟这里的 `merge` 默认值互不影响——即使只 `partialize` 出一部分字段，`$hydrate()` 也只会覆盖这些字段，不会动其余字段。
+```ts doc-test=run
+import { createStore } from '@migaia/store-light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
 
----
-
-<a id="2-persist-完整参考store-light"></a>
-
-文中的 `IPersistStorage` 是说明性最小投影，不是新增包根导出：
-
-```ts
-type IPersistStorage = Pick<import('@migaia/storage-contract').IKeyValueStore,
-  'capabilities' | 'get' | 'set' | 'remove' | 'keys'> & {
-  readonly getBytes?: import('@migaia/storage-contract').IRecordStore['getBytes'];
-  readonly setBytes?: import('@migaia/storage-contract').IRecordStore['setBytes'];
-  readonly removeBytes?: import('@migaia/storage-contract').IRecordStore['removeBytes'];
-};
-```
-
-## 2. `persist()` 完整参考（store-light）
-
-```ts
-function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;
-
-type IPersistableStore = {
-  readonly $runtime: IRuntime;
-  $plain(): Record<string, unknown>;
-  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;
-  $hydrate(
-    partial: Record<string, unknown>,
-    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }
-  ): void;
-};
-
-type IPersistOptions = {
-  key: string;
-  storage: IPersistStorage;
-  codec?: ICodec;
-  version?: number;
-  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;
-  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;
-  debounceMs?: number;
-  maxWaitMs?: number;
-  scheduler?: import('@migaia/utils/scheduler').IScheduler;
-};
-```
-
-`IPersistableStore` 是结构类型，不 import `@migaia/store-light` 的具体类型——`createStore()` 的返回值天然满足这个接口，传进来不需要任何改动。适配表：
-
-| `IPersistUnit` 成员 | 对应 store-light API                                                    |
-| ------------------- | ----------------------------------------------------------------------- |
-| `snapshot()`        | `store.$plain()`（只含 signal 支撑的标量字段，排除 computed/wasm/方法） |
-| `restore(state)`    | `store.$hydrate(state)`（宽松写回，未知字段跳过）                       |
-| `subscribe(fn)`     | `store.$subscribe(fn, { fireImmediately: false })`                      |
-
-```ts
-import { createStore } from '@migaia/store-light';
-import { indexedDbHost } from '@migaia/storage-web/indexed-db';
-import { persist } from '@migaia/store-persist/light';
-
-const store = createStore({ theme: 'light', fontSize: 14 });
-const handle = persist(store, {
-  key: 'settings:v1',
-  storage: indexedDbHost({ dbName: 'app' }),
-  version: 1,
-  partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存
-});
-```
-
----
-
-<a id="3-persistcollection-完整参考store-indexed"></a>
-
-## 3. `persistCollection()` 完整参考（store-indexed）
-
-```ts
-function persistCollection<TState>(
-  collection: IPersistableCollection<TState>,
-  options: IPersistCollectionOptions<TState>
-): IPersistHandle;
-
-type IPersistableCollection<TState> = {
-  readonly runtime: IRuntime;
-  snapshot(): TState;
-  replace(state: TState): void;
-};
-
-type IPersistCollectionOptions<TState> = {
-  key: string;
-  storage: IPersistStorage;
-  codec?: ICodec;
-  version?: number;
-  migrate?: (persisted: TState, fromVersion: number) => TState;
-  partialize?: (state: TState) => Partial<TState>;
-  merge?: (persisted: Partial<TState>, current: TState) => TState;
-  debounceMs?: number;
-  maxWaitMs?: number;
-  scheduler?: import('@migaia/utils/scheduler').IScheduler;
-};
-```
-
-支持 `@migaia/store-indexed` 的四种集合：`ObservableObject`、`ObservableArray`、`ObservableMap`、`ObservableSet`——全部有 `snapshot()`（tracked 读）和 `replace(state)`（原子整体替换，`ObservableMap`/`ObservableSet` 的 `replace()` 是跟本包这一版一起补的，之前只有 Object/Array 有）。不用泛型重载区分四种集合——直接把 collection 传进去，TypeScript 从参数结构推导 `TState`。
-
-变化订阅的实现方式（跟 `persist()`/`persistKeyed()` 不同）：四种集合都**没有**现成的 `subscribe()` 方法，`toPersistUnit()` 内部用 `collection.runtime.effect(() => { collection.snapshot(); ... })` 包一层——`snapshot()` 内部读了一个 tracked 的内部结构 Signal，包进 Effect 就能感知任何结构变化；Effect 构造自带的首次同步执行会被跳过，不当成一次真正的变化。
-
-```ts
-import { observableMap } from '@migaia/store-indexed';
-import { localStorageHost } from '@migaia/storage-web/local-storage';
-import { persistCollection } from '@migaia/store-persist/indexed';
-
-const cart = observableMap<string, number>(); // sku -> 数量
-const handle = persistCollection(cart, {
-  key: 'cart:v1',
-  storage: localStorageHost()
-});
-
-cart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）
-```
-
-### 原子 hydrate 的保证
-
-四种集合的 `replace()` 都是"一次性整体替换，只触发一次结构变化通知"——hydrate 失败（存档损坏、版本不匹配无 migrate）不会让 collection 停在"部分写入"的中间态：要么整份替换成功，要么 `restore()` 根本不被调用、collection 保持 hydrate 前的状态。
-
----
-
-<a id="4-persistkeyed--clearfamily-完整参考store-keyed"></a>
-
-## 4. `persistKeyed()` + `clearFamily()` 完整参考（store-keyed）
-
-```ts
-function persistKeyed<T>(
-  atomStore: IAtomStore,
-  def: IWritableAtomDefinition<T>,
-  id: string,
-  options: IPersistKeyedOptions<T>
-): IPersistKeyedHandle<T>;
-function clearFamily(storage: IPersistStorage, namespace: string): Promise<number>;
-
-type IPersistKeyedOptions<T> = {
-  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`
-  storage: IPersistStorage;
-  codec?: ICodec;
-  version?: number;
-  debounceMs?: number;
-  maxWaitMs?: number;
-  scheduler?: import('@migaia/utils/scheduler').IScheduler;
-  partialize?: (value: T) => Partial<T>;
-  merge?: (persisted: Partial<T>, current: T) => T;
-};
-
-// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加首次水合前捕获的 value 快照（不是实时 AtomStore 值）
-type IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };
-```
-
-### 为什么持久化单位是"一个 key"，不是"整个 family"
-
-`AtomStore`/`familyDef` 都不能回答"当前存在哪些 key"——这是 `@migaia/store-keyed` 刻意的设计（缓存策略是私事，不该被外部依赖）。所以 `persistKeyed()` 不是"给整个 family 接一份持久化"，是**每次调用各自创建一个独立的持久化单位**，`dispose()` 只影响这一个 key：
-
-```ts
-import { createAtomStore, familyDef } from '@migaia/store-keyed';
-import { indexedDbHost } from '@migaia/storage-web/indexed-db';
-import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
-
-type Session = { accessToken: string; refreshToken: string };
-const session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));
-const storage = indexedDbHost({ dbName: 'app' });
-const atomStore = createAtomStore(runtime);
-
-// 每个 session id 首次使用时调用一次
-function getSession(id: string) {
-  return persistKeyed(atomStore, session(id), id, {
-    namespace: 'sessions',
-    storage,
-    partialize: (v) => ({ refreshToken: v.refreshToken }), // 只存 refreshToken
-    merge: (persisted, current) => ({ ...current, ...persisted }) // 其余字段保留内存值
-  });
+const storage = memoryStorageHost()
+await storage.set(
+  'settings',
+  (await defaultJsonCodec.encode({
+    version: 0,
+    state: { theme: 'dark', count: 10 }
+  })) as string
+)
+const settings = createStore({ theme: 'light', count: 0 })
+const handle = persist(settings, { key: 'settings', storage })
+settings.count = 1
+await handle.ready
+console.log('恢复：', settings.theme, settings.count)
+await handle.flush()
+const saved = (await defaultJsonCodec.decode(await storage.get('settings'))) as {
+  state: { theme: string; count: number }
 }
-
-const { value, dispose } = getSession('u1');
-// ... 使用完毕
-dispose();
+console.log('保存：', saved.state.theme, saved.state.count)
+handle.dispose()
+await settings.$dispose()
+storage.dispose()
 ```
 
-### `clearFamily()`：批量清空
-
-`clearFamily(storage, namespace)` **绕开** `AtomStore`——直接从传入的 `@migaia/storage-contract` `IKeyValueStore` 读取该 storage 下全部 key（`await storage.keys()`），过滤出 `${namespace}:` 前缀的，逐个删除，返回枚举时匹配的记录数（不统计 remove 的 boolean 成功数）。storage-web 的 exact backend 子路径只是该契约的一个实现来源。它**不会**、也不能顺带清理内存里已经实例化的 `AtomStore` 状态：调用方如果还持有对应的 `persistKeyed()` handle，那些 handle 的内存值不受影响，只是失去了持久化落地；下次这些 key 的值再变化，会重新写回一条新记录（因为它们各自的 `subscribe` 还挂着，跟 `clearFamily()` 无关）。需要连内存也清空，调用方须另外通过 AtomStore 写入或释放对应定义；handle.dispose() 只停止持久化。
-
-```ts
-async function logout(userId: string) {
-  await clearFamily(storage, 'sessions'); // 清空全部用户的持久化 session
-  currentSessionHandle?.dispose(); // 退订并停止持久化；不清除 AtomStore 业务值
-}
-```
-
----
-
-## 5. 存档格式与版本迁移
+输出：
 
 ```text
-{ "version": <number>, "state": <任意 JSON 兼容值> }
+恢复： dark 1
+保存： dark 1
 ```
 
-- `version`：调用方传入的 schema 版本，`migrate(persisted, fromVersion)` 处理跨版本转换。
-- `state`：`partialize(unit.snapshot())` 的结果——对 `persist()` 是（裁剪后的）`Record<string,unknown>`；对 `persistCollection()` 是（裁剪后的）collection 快照；对 `persistKeyed()` 是（裁剪后的）单个 key 的 value。
+依次输出 `恢复： dark 1`、`保存： dark 1`：主题来自存档，计数保留启动后的本地值。
 
-`version` 与配置的当前版本不一致、且没有提供 `migrate`：hydrate 直接失败（`ready` reject，`status` 变 `error`），不会把未迁移的旧数据当成已迁移的新数据用。
+`version` 默认 `0`，`debounceMs` 默认 `0`；普通对象按字段做浅层 `Object.is` 比较，数组、`Map`、`Set` 则整体替换。
 
----
+## 修复坏存档后再恢复写入
 
-## 6. `IPersistHandle` 完整 API 参考
+启动时读到了损坏存档，恢复失败后用户仍在修改内存中的设置。
 
-`persist()`/`persistCollection()` 返回完整的 `IPersistHandle`；`persistKeyed()` 返回完整 handle，加初始 value 快照；它同样提供 status/ready/flush/retry 等成员。
+这时立即保存默认值，会在排查或修复前覆盖原存档；把等待结束误当成恢复成功，也会造成同样的问题。
 
-| 成员                                 | 类型                                                            | 同步/异步 | 说明                                                              |
-| ------------------------------------ | --------------------------------------------------------------- | --------- | ----------------------------------------------------------------- |
-| `status`                             | `IReactiveComputed<'loading' \| 'ready' \| 'error' \| 'disposed'>` | —         | 整体状态机                                                        |
-| `error`                              | `IReactiveComputed<unknown>`                                       | —         | hydration/write 任一失败时的错误；两者都失败返回 `AggregateError` |
-| `hydrated`                           | `IReactiveComputed<boolean>`                                       | —         | 等价于 `hydrationStatus.value === 'success'`                      |
-| `hydrationStatus` / `hydrationError` | `IReadonlyPersistValue<...>`                                    | —         | 最近一次水合尝试的结果；retry 再经历 loading/success/error                                        |
-| `writeStatus` / `writeError`         | `IReadonlyPersistValue<...>`                                    | —         | 最近一次写操作的结果，会反复变化                                  |
-| `ready`                              | `Promise<void>`                                                 | 异步      | 首次 hydrate 成功 resolve，失败或完成前被 dispose 中断则 reject                                 |
-| `settled`                            | `Promise<void>`                                                 | 异步      | 不管成功失败都 resolve                                            |
-| `retryHydrate()`                     | `() => Promise<void>`                                           | 异步      | 首次 hydrate 失败后重新读取；成功后恢复有序写入                    |
-| `flush()`                            | `() => Promise<void>`                                           | 异步      | 立即写并等待完成；这次写入失败会 reject 给调用方                  |
-| `clear()`                            | `() => Promise<void>`                                           | 异步      | 按当前 codec 通道删除单个存档，不重置内存状态                                          |
-| `disposed`                           | `boolean`                                                       | 同步      | 是否已 `dispose()`                                                |
-| `dispose()`                          | `() => void`                                                    | 同步      | 退订、清防抖 timer、abort 在途 I/O                                |
+捕获 `ready` 的失败并修复真实存储记录，再等待 `retryHydrate` 成功后调用 `flush`；只有成功读取与恢复后才重新开放写入。
 
-`dispose()` 之后再调用 `flush()`/`clear()` 会立即 reject，错误是 `name === 'AbortError'` 的 `Error`。
+### 示例参数
 
----
+storage.set 先写入坏 JSON，本例保留首次 ready 和错误对象。ready 拒绝不会把内存改动写回，retryHydrate 无参数并重新读取已修复存档；之后等待该次重试与 flush。settled 不等于恢复成功，ready 不因 retry 替换。所有 key / codec / 防抖默认与上一例相同。
 
-## 7. 与 storage-web 的 codec 集成
+```ts doc-test=run
+import { createStore } from '@migaia/store-light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
 
-`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可：
-`memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需
-`getBytes`/`setBytes` 供读写，`removeBytes` 供按 key 清除。
+const storage = memoryStorageHost()
+await storage.set('settings', '{')
+const settings = createStore({ count: 0 })
+const handle = persist(settings, { key: 'settings', storage })
+const initialReady = handle.ready
+const failure = await initialReady.catch((error: unknown) => error)
+settings.count = 2
+const writeFailure = await handle.flush().catch((error: unknown) => error)
+console.log('写入暂停：', handle.status.value, writeFailure === failure)
+console.log('原档未变：', (await storage.get('settings')) === '{')
+await storage.set(
+  'settings',
+  (await defaultJsonCodec.encode({
+    version: 0,
+    state: { count: 10 }
+  })) as string
+)
+await handle.retryHydrate()
+await handle.flush()
+console.log('恢复完成：', handle.status.value, settings.count, handle.ready === initialReady)
+console.log('首次尝试：', (await handle.ready.catch((error: unknown) => error)) === failure)
+handle.dispose()
+await settings.$dispose()
+storage.dispose()
+```
 
-`codec` 默认是本包自带的 `defaultJsonCodec`（`name: 'migaia-collections-json-v1'`、`output: 'text'`，遵循 `@migaia/storage-contract` 的 `ICodec` 契约；本包不运行时依赖 storage-web 的具体 codec 值）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
+输出：
 
-- `Map`/`Set` → 使用 storage-contract 所有的 `migaia-collections-json-v1` 版本化标记编码，解码时还原成真正的 `Map`/`Set` 实例。
-- 旧存档中的 `__migaia_persist_map__`/`__migaia_persist_set__` 仅按精确标签显式迁移；其他相似字段不会被猜测为集合。
+```text
+写入暂停： error true
+原档未变： true
+恢复完成： ready 2 true
+首次尝试： true
+```
 
-这不是可选的锦上添花——`JSON.stringify(new Map(...))` 产出 `"{}"`，**静默丢光内容而不报错**，`persistCollection()` 接的 `ObservableMap`/`ObservableSet` 的 `snapshot()` 就是真实的 `Map`/`Set` 实例，不处理这个坑会导致 keyed/indexed 场景下的 Map/Set 数据悄悄消失。
+依次输出 `写入暂停： error true`、`原档未变： true`、`恢复完成： ready 2 true`、`首次尝试： true`。
 
-传 binary codec 时，后端必须具备字节通道，codec 必须编码完整的 `{ version, state }` envelope。例如可将 `defaultJsonCodec` 的字符串编码为 UTF-8 bytes，并在 decode 时反向转换；`clear()` 会按同一 codec 选择 `removeBytes`。`storage-web` 的 `binaryCodec` 直接处理 Uint8Array payload，适合公开 `writeEnvelope`/`readEnvelope` helper 的原始字节操作；用于 `persist*` 时需有完整 envelope 的编码层。
+恢复失败会暂停自动写入，`flush` 也拒绝并保留同一个失败对象；重试仍使用原启动快照，且不替换 `ready`，`settled` 只等待首次尝试结束。
 
-本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 读写在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败；binary clear 缺 `removeBytes` 时同样拒绝，不回落到 text 删除。不会自动 base64 降级。
+## 迁移旧设置并只保存指定字段
 
----
+新版本重命名了已存字段，同时有些会话数据只应留在内存里。
 
-## 8. 错误参考
+把旧数据当成新结构读取会漏掉改名字段；每次保存整个对象又会把临时数据写进存档。
 
-所有包边界错误都带 `source: '@migaia/store-persist'` 与稳定 `code`。重点检查
-`ENVELOPE_INVALID`、`ENCODE_FAILED`、`BACKEND_CAPABILITY`、`CODEC_OUTPUT_MISMATCH` 和
-`ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate 失败会保留原始错误并阻塞
-`flush()`/`clear()`，直到一次成功的 `retryHydrate()` 重新打开有序写入。
+显式设置 `version: 2`，用同步 `migrate` 转换旧状态，再用 `partialize` 选择保存字段；本例读取版本 `1`，写入时只保留主题。
 
-| `StorePersistErrorCode` | 码值 | 触发条件 / 处理 |
-| --- | --- | --- |
-| `codecNotResolved` | `CODEC_NOT_RESOLVED` | 没有为 key 解析到 codec；显式提供 codec 或修复默认解析 |
-| `codecOutputMismatch` | `CODEC_OUTPUT_MISMATCH` | codec output 与实际 payload/后端能力不一致；修正 codec 实现或选路 |
-| `backendCapability` | `BACKEND_CAPABILITY` | binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec |
-| `envelopeInvalid` | `ENVELOPE_INVALID` | 存档 envelope/版本非法；修复数据或提供 migrate |
-| `encodeFailed` | `ENCODE_FAILED` | 值无法编码；检查 `cause` 与待存值 |
-| `hydrateAndWriteFailed` | `HYDRATE_AND_WRITE_FAILED` | hydrate 与随后的写回都失败；展开 `AggregateError.errors` |
-| `abortedByDispose` | `ABORTED_BY_DISPOSE` | dispose 中止操作；按原生 `AbortError` 处理，不重用 handle |
-| `invalidOption` | `INVALID_OPTION` | version 等配置非法；修正后再构造 |
+### 示例参数
 
-| 触发条件                                                     | 错误类型                                   | 说明                                                      |
-| ------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------- |
-| `version` 不是安全非负整数                                   | `TypeError`                                | 构造时同步抛出                                            |
-| 存档不是合法信封（不是对象/缺 `version`/缺 `state`）         | `PersistEnvelopeError`（继承 `TypeError`） | hydrate 阶段，反映在 `hydrationError`/`ready` reject      |
-| hydrate 失败后调用 `flush()`/`clear()`                        | 原始 hydrate 错误                          | 写入保持阻塞并保留 dirty 状态；成功的 `retryHydrate()` 才恢复写入 |
-| `version` 与存档不一致且未提供 `migrate`                     | `Error`                                    | 消息含 `provide migrate()`                                |
-| codec 编码失败（比如值包含循环引用）                         | `TypeError`                                | `defaultJsonCodec` 保留原始错误为 `cause` 并附加 `ENCODE_FAILED` |
-| `codec.output === 'structured'` 但存储不支持                 | `TypeError`                                | 见 [§7](#7-与-storage-web-的-codec-集成)                  |
-| binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes` | `TypeError`                                | 同上                                                      |
-| `persistKeyed()` 未传 `namespace`                            | TypeScript 编译期错误                      | namespace 既有编译期约束，也在运行时校验字符串，非法值抛 INVALID_OPTION TypeError                    |
-| `dispose()` 后调用 `flush()`/`clear()`                       | `Error`（`name: 'AbortError'`）            | 消息为 `[store] persist operation was aborted by dispose` |
+目标 version 从默认 0 覆盖为 2，旧 envelope.version 为 1。migrate 接收旧 state 和 fromVersion，必须同步返回新 state；partialize 只返回 theme，覆盖默认完整保存。temporary 未持久化但保留在当前 Store；默认 merge 仍基于启动快照，light 恢复走 $hydrate。字符串转换是本例 schema 规则，不是通用迁移策略。
 
----
+```ts doc-test=run
+import { createStore } from '@migaia/store-light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
 
-## 9. 生产环境完整示例
-
-```ts
-import { createStore } from '@migaia/store-light';
-import { createAtomStore, familyDef } from '@migaia/store-keyed';
-import { observableSet } from '@migaia/store-indexed';
-import { indexedDbHost } from '@migaia/storage-web/indexed-db';
-import { persist } from '@migaia/store-persist/light';
-import { persistCollection } from '@migaia/store-persist/indexed';
-import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
-import { createRuntime } from '@migaia/reactive';
-
-const runtime = createRuntime();
-const storage = indexedDbHost({ dbName: 'app' });
-
-// 1. 扁平设置
-const settings = createStore({ theme: 'light' });
-const settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });
-
-// 2. 最近浏览过的商品（indexed）
-const recentlyViewed = observableSet<string>(undefined, {}, runtime);
-const recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });
-
-// 3. 按用户的 session（keyed，只存 refreshToken）
-const atomStore = createAtomStore(runtime);
-const session = familyDef(() => ({ accessToken: '', refreshToken: '' }));
-function getSession(userId: string) {
-  return persistKeyed(atomStore, session(userId), userId, {
-    namespace: 'sessions',
-    storage,
-    partialize: (v) => ({ refreshToken: v.refreshToken }),
-    merge: (persisted, current) => ({ ...current, ...persisted })
-  });
+const storage = memoryStorageHost()
+await storage.set(
+  'settings',
+  (await defaultJsonCodec.encode({
+    version: 1,
+    state: { legacyTheme: 'dark' }
+  })) as string
+)
+const settings = createStore({ theme: 'light', temporary: 'session-only' })
+let migratedFrom = 0
+const handle = persist(settings, {
+  key: 'settings',
+  storage,
+  version: 2,
+  migrate: (state, fromVersion) => {
+    migratedFrom = fromVersion
+    return { theme: String(state.legacyTheme) }
+  },
+  partialize: (state) => ({ theme: state.theme })
+})
+await handle.ready
+console.log('迁移：', migratedFrom, settings.theme, settings.temporary)
+settings.theme = 'contrast'
+await handle.flush()
+const saved = (await defaultJsonCodec.decode(await storage.get('settings'))) as {
+  version: number
+  state: { theme: string; temporary?: string }
 }
+console.log('存档：', saved.version, saved.state.theme, Object.hasOwn(saved.state, 'temporary'))
+handle.dispose()
+await settings.$dispose()
+storage.dispose()
+```
 
-async function logout(userId: string, activeHandle: { dispose(): void }) {
-  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);
-  await clearFamily(storage, 'sessions');
-  activeHandle.dispose();
+输出：
+
+```text
+迁移： 1 dark session-only
+存档： 2 contrast false
+```
+
+依次输出 `迁移： 1 dark session-only`、`存档： 2 contrast false`：旧主题完成转换，临时字段没有进入存档。
+
+`version` 默认 `0`，不匹配且未提供 `migrate` 会恢复失败；`partialize` 默认原样保存，两个回调都必须同步返回。`migrate` 转换待恢复状态，本例等待 `flush` 确认新版存档写入。
+
+## 完整恢复 Map 条目
+
+购物车使用可观察的 `Map`，重新创建集合后仍需恢复条目。
+
+直接做普通 JSON 序列化会把 `Map` 变成空对象；只向新集合追加条目，也可能留下已经过时的键。
+
+把真实 `ObservableMap` 交给 `persistCollection`，释放前等待 `flush`；默认编解码器保留 `Map` 条目，恢复时调用集合的 `replace`。
+
+### 示例参数
+
+ObservableMap 初始为空，恢复目标初始只有 stale: 99，两者均省略 Runtime 使用各自默认选择。persistCollection 接受集合及 key / storage，不需要额外订阅包装；默认 codec 支持 Map，version 与 debounceMs 都为 0。Map 缺省整替换，所以旧目标中的 stale 会消失；部分保存时需显式匹配的 merge。
+
+```ts doc-test=run
+import { ObservableMap } from '@migaia/store-indexed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+import { persistCollection } from '@migaia/store-persist/indexed'
+
+const storage = memoryStorageHost()
+const cart = new ObservableMap<string, number>()
+const first = persistCollection(cart, { key: 'cart', storage })
+await first.ready
+cart.set('book', 2)
+await first.flush()
+first.dispose()
+cart.dispose()
+const restored = new ObservableMap<string, number>([['stale', 99]])
+const second = persistCollection(restored, { key: 'cart', storage })
+await second.ready
+console.log('恢复：', restored.get('book'), restored.has('stale'))
+const saved = (await defaultJsonCodec.decode(await storage.get('cart'))) as { state: unknown }
+console.log('映射：', saved.state instanceof Map)
+second.dispose()
+restored.dispose()
+storage.dispose()
+```
+
+输出：
+
+```text
+恢复： 2 false
+映射： true
+```
+
+依次输出 `恢复： 2 false`、`映射： true`：书籍数量恢复，过时键消失，解码后的存档仍包含真正的 `Map`。
+
+`codec` 默认 `defaultJsonCodec`，`version` 和 `debounceMs` 默认 `0`；`Map` 恢复会整体替换，裁剪后需要特殊合并时应显式提供 `merge`。
+
+## 独立停止某个键的持久化
+
+两个用户资料来自同一定义族，离开其中一个页面时只需停止保存该用户。
+
+整族共用一个保存订阅会耦合无关的键；把 `handle.value` 当成实时值读取，还会一直看到恢复前捕获的快照。
+
+为每个定义和显式 `id` 创建独立的 `persistKeyed` 句柄；等待 `ready` 后从 `AtomStore` 读取当前值，只释放不再需要保存的那一个句柄。
+
+### 示例参数
+
+createAtomStore 使用本例显式创建的 Runtime；familyDef 初始化各 key 为 name 为空字符串。persistKeyed 的 def、字符串 id、namespace、storage 都明确传入；storage key 为 users:u1 / users:u2，不从定义自动推导。first.value 是初始快照，实时值用 atoms.peek；两个 handle 独立，释放后不会销毁 AtomStore。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, familyDef } from '@migaia/store-keyed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+import { persistKeyed } from '@migaia/store-persist/keyed'
+
+const storage = memoryStorageHost()
+await storage.set(
+  'users:u1',
+  (await defaultJsonCodec.encode({
+    version: 0,
+    state: { name: 'Ada' }
+  })) as string
+)
+const atoms = createAtomStore(createRuntime())
+const profile = familyDef(() => ({ name: '' }))
+const first = persistKeyed(atoms, profile('u1'), 'u1', { namespace: 'users', storage })
+const second = persistKeyed(atoms, profile('u2'), 'u2', { namespace: 'users', storage })
+await Promise.all([first.ready, second.ready])
+console.log('初始值：', first.value.name === '', atoms.peek(profile('u1')).name)
+atoms.set(profile('u1'), { name: 'Grace' })
+atoms.set(profile('u2'), { name: 'Linus' })
+await Promise.all([first.flush(), second.flush()])
+first.dispose()
+atoms.set(profile('u1'), { name: 'Changed' })
+atoms.set(profile('u2'), { name: 'Barbara' })
+await second.flush()
+const one = (await defaultJsonCodec.decode(await storage.get('users:u1'))) as {
+  state: { name: string }
 }
-```
-
----
-
-## 10. 底层导出：envelope 工具、状态常量与错误构造函数
-
-以下是 `persistUnit()`/`persist()`/`persistCollection()`/`persistKeyed()` 内部用来读写/编解码存档的底层函数与常量。它们都从包根（`.` 导出）导出，一般不需要在业务代码里直接调用——除非要接入一种全新的 store 形状（`persistUnit()` 之外的第四种适配），或需要绕开三个高层函数手动读写某个 key 的存档。
-
-```ts
-import {
-  assertEnvelope,
-  PersistEnvelopeError,
-  type IEnvelope,
-  defaultJsonCodec,
-  writeEnvelope,
-  readEnvelope,
-  removeEnvelope,
-  PersistState,
-  PersistCodecOutput,
-  STORE_PERSIST_SOURCE,
-  createStorePersistError,
-  createStorePersistAbortError,
-  createStorePersistTypeError,
-  createStorePersistAggregateError
-} from '@migaia/store-persist';
-```
-
-```ts
-function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState>;
-class PersistEnvelopeError extends TypeError {
-  constructor(message: string, options?: { readonly cause?: unknown });
+const two = (await defaultJsonCodec.decode(await storage.get('users:u2'))) as {
+  state: { name: string }
 }
+console.log('两个存档：', one.state.name, two.state.name)
+console.log('内存：', atoms.peek(profile('u1')).name)
+second.dispose()
+atoms.dispose()
+storage.dispose()
 ```
 
-`assertEnvelope(value, key)` 校验 `value` 是 `{ version: number; state: unknown }` 形状的信封：`value` 非对象/是数组、`version` 不是安全非负整数、或缺失/`null`/`undefined` 的 `state`，都会抛出 `PersistEnvelopeError`（继承 `TypeError`，携带 `code: 'ENVELOPE_INVALID'`）。属性反射/getter 失败也以该类报告，原错误保留为 cause；version/state 各捕获一次。校验通过时返回收窄类型后的 `{ version, state: TState }`。`key` 只用于错误消息里标注是哪个存档。
+输出：
 
-```ts
-const defaultJsonCodec: ICodec; // { name: 'migaia-collections-json-v1', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }
+```text
+初始值： true Ada
+两个存档： Grace Barbara
+内存： Changed
 ```
 
-本包自带的默认 codec 遵循 `@migaia/storage-contract` 的 `ICodec` 形状，额外原生支持 `Map`/`Set` 往返（写入 canonical migaia-collections-json-v1 版本化元组；旧对象标签只用于读取迁移，解码时还原成真正的 `Map`/`Set` 实例），避免 `JSON.stringify(new Map(...))` 静默丢空的问题。需要 storage-web 的 binary codec 时，从 `@migaia/storage-web/serialize` exact 子路径导入。`encode` 遇到不可序列化的值（如循环引用）抛 `TypeError`（`code: 'ENCODE_FAILED'`）；`decode` 收到非字符串输入抛 `TypeError`（`code: 'ENVELOPE_INVALID'`）。
+依次输出 `初始值： true Ada`、`两个存档： Grace Barbara`、`内存： Changed`：停止 `u1` 后它的旧存档保留，`u2` 继续保存。
 
-```ts
-function writeEnvelope(
-  storage: IPersistStorage,
-  key: string,
-  codec: ICodec,
-  value: unknown,
-  ctx: { signal?: AbortSignal }
-): Promise<void>;
-function readEnvelope(
-  storage: IPersistStorage,
-  key: string,
-  codec: ICodec,
-  ctx: { signal?: AbortSignal }
-): Promise<unknown | undefined>;
-function removeEnvelope(
-  storage: IPersistStorage,
-  key: string,
-  ctx: { signal?: AbortSignal },
-  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用
-): Promise<void>;
+存储键是 `namespace:id`，`id` 不从定义推导；`value` 是接入时快照。释放持久化不会释放 `AtomStore` 或重置业务值，`version` 和 `debounceMs` 默认 `0`。
+
+## 清理存档而不重置内存值
+
+退出流程清除了某个命名空间的存档，已挂载页面却仍持有当前值。
+
+删除记录不会重置内存或移除订阅；误以为两者一起完成，下一次编辑就会重新创建已经清理的存档。
+
+用 `clearFamily` 移除匹配记录，再分别决定是否重置业务值、释放持久化句柄；本例故意保留句柄，展示后续变更再次写入。
+
+### 示例参数
+
+clearFamily 的 storage 与 namespace 两参数必填，users 只匹配 users: 前缀，不匹配 other:u1。返回匹配键数；不会删除内存定义或订阅。本例 active handle 仍存活，atoms.set 后再 await flush 就会重建存档；应用要永久停止保存时需另外 dispose 对应 handle。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, familyDef } from '@migaia/store-keyed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'
+
+const storage = memoryStorageHost()
+await storage.set('other:u1', 'keep')
+const atoms = createAtomStore(createRuntime())
+const counter = familyDef(() => 0)
+const def = counter('u1')
+const handle = persistKeyed(atoms, def, 'u1', { namespace: 'users', storage })
+await handle.ready
+atoms.set(def, 7)
+await handle.flush()
+console.log('匹配数：', await clearFamily(storage, 'users'))
+console.log(
+  '清理后：',
+  await storage.get('users:u1'),
+  atoms.peek(def),
+  await storage.get('other:u1')
+)
+atoms.set(def, 8)
+await handle.flush()
+console.log('重新保存：', (await storage.get('users:u1')) !== null)
+handle.dispose()
+atoms.dispose()
+storage.dispose()
 ```
 
-- `writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。
-- `readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。
-- `removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。
+输出：
 
-```ts
-const PersistState: { idle; loading; writing; ready; success; error; disposed }; // 见下
-const PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };
+```text
+匹配数： 1
+清理后： null 7 keep
+重新保存： true
 ```
 
-`PersistState` 是公开 hydration/write/terminal 状态词表的唯一声明处，`IPersistHandle.status`/`hydrationStatus`/`writeStatus` 的类型都是它的子集（分别是 `IPersistStatus`/`IHydrationStatus`/`IWriteStatus`，见 [§6](#6-ipersisthandle-完整-api-参考)）；诊断代码可以直接比较 `handle.status.value === PersistState.error` 而不必写字符串字面量。`PersistCodecOutput` 是 `ICodec.output` 的合法取值表，与 `@migaia/storage-web` 的编码通道一一对应。
+依次输出 `匹配数： 1`、`清理后： null 7 keep`、`重新保存： true`：只删除 `users:u1`，内存仍是 `7`，后续编辑再次生成存档。
 
-```ts
-const STORE_PERSIST_SOURCE: '@migaia/store-persist';
-function createStorePersistError(code, message, options?: { cause?: unknown }): Error;
-function createStorePersistAbortError(code, message, cause?: unknown): DOMException;
-function createStorePersistTypeError(code, message, options?: { cause?: unknown }): TypeError;
-function createStorePersistAggregateError(
-  code,
-  errors: readonly unknown[],
-  message: string
-): AggregateError;
-```
+返回值是枚举时以命名空间加冒号匹配的键数，不累计移除操作的布尔结果；移除按顺序执行，不是事务，后续后端调用失败不会撤回已经删除的记录。
 
-本包构造全部错误时使用的同一套工厂函数，统一打上 `source: STORE_PERSIST_SOURCE` 与 `IStorePersistErrorCode` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）。`createStorePersistAbortError` 构造原生 `DOMException('...', 'AbortError')`，用于 `dispose()` 之后取消在途操作（保持 `name === 'AbortError'` 这一约定，见 [§8](#8-错误参考)）。日常业务代码通常不需要直接调用它们；导出给需要"以 `@migaia/store-persist` 身份抛出自定义诊断错误"的高级集成方，例如自定义 `IPersistUnit` 适配实现。
+## 契约细节
 
----
+### 职责、入口与安装边界
 
-## 11. 常见问题排查
+本包把状态变化接到存储读写：加载存档、协调水合期间的本地修改、排队写入、管理防抖与释放。它不提供具体存储后端、加密或页面卸载时的可靠保存保证。只需一次性读写而不需要状态同步时，直接使用 storage-contract 和所需后端即可。敏感数据应由应用选择合适的存储与加密 codec，不要把默认 JSON 编码当作加密。
 
-**Q: hydrate 完成之后，我改的字段没有被存进去？**
-检查 `debounceMs`——如果设置了防抖，需要等待或调用 `handle.flush()`；也检查 `partialize` 是不是把这个字段裁掉了。
+| 入口                            | 公开内容                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `@migaia/store-persist`         | persistUnit 核心、handle / options / envelope 类型、codec 工具、状态与错误。根入口不导出三个 Store 适配函数。 |
+| `@migaia/store-persist/light`   | persist、IPersistableStore、IPersistOptions。                                                                 |
+| `@migaia/store-persist/indexed` | persistCollection、IPersistableCollection、IPersistCollectionOptions。                                        |
+| `@migaia/store-persist/keyed`   | persistKeyed、clearFamily、IPersistKeyedOptions、IPersistKeyedHandle。                                        |
 
-**Q: 用了 `partialize` 之后，其他字段刷新页面变成 `undefined` 了？**
-三条 facade 对 plain object 都按启动快照进行三向合并，保留水合期间本地改动及未归档字段；数组/Map/Set 等非 plain shape 才整替换。自定义 shape 可明确提供 merge，见 §1。
+reactive、storage-contract、utils、lifecycle 是运行时依赖。store-light、store-indexed、store-keyed 是可选 peer，只安装所用模型；storage-web 仅在使用其后端或 codec 时安装。代码直接导入的包应直接安装，不能依赖传递依赖恰好可见。memoryStorageHost、localStorageHost、indexedDbHost 从 storage-web 的精确后端子入口取得；本包不在运行时依赖具体 storage-web 值。
 
-**Q: `persistCollection()` 存的 Map 读回来变成普通对象了？**
-确认没有传自定义 `codec` 覆盖掉默认的 `defaultJsonCodec`——自定义 codec 需要自己处理 Map/Set 往返，或者继续用默认 codec。
+### 共同配置与同步回调
 
-**Q: `clearFamily()` 之后，页面上还显示着旧数据？**
-`clearFamily()` 只删 storage，不清内存——见 [§4](#4-persistkeyed--clearfamily-完整参考store-keyed)，dispose 只停止该 handle 的持久化；要清业务值，调用方还需通过 AtomStore 写入/释放对应定义。
+persistUnit(unit, options) 是三个适配器共用的引擎。unit 必须提供同步 snapshot()、同步 restore(state) 和 subscribe(onChange)，后者返回退订函数。核心 options 必填 key、runtime、storage；三个 facade 自动使用 Store / collection / AtomStore 自己的 Runtime。状态单位、Runtime 和 storage 均为借用资源。
 
-## 构建、测试与排查
+| 选项       | 默认值与含义                                                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| key        | 必填字符串；决定存档键，字符串不被强制转型。                                                                                   |
+| runtime    | 仅核心显式必填；持有状态信号，facade 自动提供。                                                                                |
+| storage    | 必填，满足最小 KeyValueStore 投影；见后文选路。                                                                                |
+| codec      | defaultJsonCodec；编码完整的 version / state 信封，而不只编码 state。                                                          |
+| version    | 0；必须是非负安全整数。                                                                                                        |
+| migrate    | 未设置；存档版本不同时执行 migrate(persisted, fromVersion)，缺失则水合失败。keyed facade 不公开此选项。                        |
+| partialize | 恒等函数；写入前从当前快照裁出需要保存的字段。                                                                                 |
+| merge      | 核心 / indexed / keyed 可自定义 merge(persisted, current)；缺省浅三向合并普通对象，其他形状整体替换。light 不公开 merge 选项。 |
+| debounceMs | 0，不防抖；有限数，范围 0 到 2147483647，允许小数。                                                                            |
+| maxWaitMs  | 未设置；同一数值范围，限制防抖窗口，不是 I/O 期限。                                                                            |
+| scheduler  | canonical systemScheduler；提供单调 now 与可取消 schedule 任务。                                                               |
 
-仓库根目录：`pnpm --filter @migaia/store-persist fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。hydrate 失败检查 `handle.ready`/`hydrationError`；写入失败检查 `writeError`，并确认 codec output 与后端能力匹配。
+facade 先捕获 options 自身属性；getter 使用原 options 作为 receiver 读取一次。核心也在创建时捕获配置字段，恢复使用已捕获并验证的 merge，不重新读取调用方的 getter。非对象、反射或 getter 失败以 INVALID_OPTION TypeError 报告，捕获的原因为 cause。key、namespace、id 在拼接前检查字符串，不把对象或数字悄悄转成键，也不额外要求非空字符串。容量时间、version 与回调形状在创建持久化状态前按实际配置校验。
 
-防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。
+migrate、partialize、merge 都是同步回调，不能返回 Promise / thenable；异步结果或读取 then 失败以 INVALID_OPTION 拒绝，避免 Promise 被当作业务状态写入。普通同步业务回调或后端异常保留原来的公共错误路径；不要把所有失败都改判为某一个本包码。
 
-严格 flush 请求与后台写共享实际 drain，所有并发等待者都能观察同一次原始失败；调度恢复链不代替实际结果。ready 是首次水合尝试本身的 Promise，settled 是始终 resolve 的等待屏障；完成前取消时 ready 以 ABORTED_BY_DISPOSE/AbortError 拒绝，settled 仍完成。
+### 三个状态适配器
 
-默认 codec 先识别既有旧存档语法：存在精确旧 marker 时沿用原 legacy reviver，不把其中普通应用数组重新解释为新格式元组；否则委托 canonical 新格式解码。只有唯一自有键为 __migaia_persist_map__ 或 __migaia_persist_set__ 且值为数组的对象属于保留旧 wire marker；多字段同名 lookalike 保留全部字段，不跳过新格式 Map/Set。旧 sole-marker 形状继续保留给旧存档读取，不把它声明为普通数据记录。写入格式与 codec name 不变。
+| 适配器                                    | 接受的状态面                                                                     | 读写与订阅                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| persist(store, options)                   | $runtime、$plain、$subscribe、$hydrate 的结构类型，createStore 返回值满足。      | snapshot 用 $plain，restore 用 $hydrate，subscribe 显式 fireImmediately: false。           |
+| persistCollection(collection, options)    | runtime、snapshot()、replace(state)，支持 ObservableObject / Array / Map / Set。 | runtime.effect 读取 tracked snapshot，跳过 Effect 构造时的首次同步执行，之后变化触发写入。 |
+| persistKeyed(atomStore, def, id, options) | AtomStore 与可写定义。                                                           | peek 取快照，set 恢复，sub 订阅；每次调用建立一个独立单位。                                |
 
-keyed.value 是水合前初始快照；实时值从 AtomStore 读取。keyed.disposed 保留原引擎 getter，dispose 立即可见。dispose/clearFamily 不清业务内存，登出若要清状态须另外操作 AtomStore。
+light 的 $plain 只包含 signal 支撑字段，不含 computed、WASM 字段或方法。$hydrate 是宽松写回：只更新已知 signal 字段，未知字段默认跳过。因此 partialize 只保存部分字段时，不会要求恢复未保存字段；本适配器不另设 merge。核心普通对象合并仍负责水合期间的同字段本地修改。
 
-API convergence：移除重复类型 IPersistCodecOutput，类型消费者直接使用 `@migaia/storage-contract` 的 ICodecOutput；PersistCodecOutput 运行时词表保留。PersistState.active 与 IPersistState 的 active 成员收回，私有开放状态只作布尔 reactive projection，不对外返回或新增状态名。其他公开状态和四个入口保持，外部旧类型/成员引用需破坏版本迁移，无兼容 alias。
+indexed 的 snapshot 保持各集合自身形状，replace 遵循集合整体替换的原子准入；坏存档、版本不匹配等水合前置失败不会调用 restore，不能把“没有进入恢复”夸大为任意外部副作用可回滚。数组 / Map / Set 的部分持久化需要应用提供匹配的 merge，否则缺省整替换可能丢掉未存部分。普通对象的浅字段规则也不代替深层业务合并。
+
+keyed 必填 namespace、storage，其他共同选项按其公开类型提供；实际存储键是 namespace + ':' + id。它没有枚举整个 family 的能力，每个 handle 只管理这一个定义与键。handle.value 是水合前首次获取的值快照，不是实时 AtomStore 值；实时值从 AtomStore 读取。扩展保留原引擎的 live disposed getter，dispose 后立即反映终态。
+
+clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<number>`。它枚举 storage.keys()，按 namespace + ':' 前缀筛选后逐个 await remove；返回枚举时匹配的数量，不是 remove 返回 true 的独占计数。它不清 AtomStore 内存、不停止现有 handle；活跃值下次变化可再次写入。登出若要同时清业务值，应用还须操作 AtomStore，并按需先停止相关持久化，避免把删除当成永久禁写。
+
+### 加载、版本迁移与本地修改
+
+构造时先捕获启动快照并建立变化订阅，再异步读取存档。存档不存在时水合成功，保留内存初值。存档存在时先解码、验证 envelope，再在 version 不同且提供 migrate 时迁移，最后合并并同步 restore。版本相同不调用 migrate；版本不同而未提供 migrate 以 ENVELOPE_INVALID 拒绝，不把旧值冒充新 schema。
+
+缺省 merge 对普通对象（Object.prototype 或 null 原型）按字段浅比较：以构造时启动快照为基线，用 Object.is 比较当前字段；本地已改字段保留当前值，未改字段接受存档值，同时保留未归档的当前字段。它不是深度冲突解决，嵌套引用内部变化不自动得到逐层比较；重试也沿用这一启动基线。非普通对象、数组、Map、Set 等整体接受持久化形状，自定义 merge 则负责应用自己的规则。
+
+水合期间通知只标 dirty，不提前覆盖未知存档；恢复时的同步通知也归入这个窗口。水合成功后有 dirty 才重新安排写入。水合失败保留错误和 dirty 状态，flush / clear 不写而抛原水合错误；修复配置或存档后，成功 retryHydrate 才重新打开写入。恢复期间再次调用不会另起并行重读，但不保证它等待当前恢复或返回相同 Promise；需要恢复结果时等待发起重试的那次调用。
+
+### Handle 状态与等待
+
+| 成员                 | 取值或行为                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| status               | loading / ready / error / disposed；disposed 优先，水合 loading 次之，水合或写入失败为 error。写入中由独立 writeStatus 表示。 |
+| error                | hydrationError 或 writeError；两者都有时生成 HYDRATE_AND_WRITE_FAILED AggregateError，errors 按水合、写入顺序保留。           |
+| hydrated             | hydrationStatus 是否为 success，不等同于 handle 尚未释放。                                                                    |
+| hydrationStatus      | loading / success / error，重试时重新经历该状态。                                                                             |
+| hydrationError       | 当前水合错误，成功后清除。                                                                                                    |
+| writeStatus          | idle / writing / error / disposed。                                                                                           |
+| writeError           | 最近写入错误；正常成功写入清除，释放后的最终写入失败也可保留在这里。                                                          |
+| ready                | 首次 hydrate 尝试的 Promise：成功 resolve，失败或完成前被释放中断则 reject；重试不替换原 Promise。                            |
+| settled              | 首次尝试无论成功失败都 resolve 的等待屏障，不表示以后 retry 已完成。                                                          |
+| retryHydrate()       | 无参数；失败后重读，成功恢复写入；应等待此调用本身判断恢复结果。                                                              |
+| flush() / clear()    | 无参数，返回 `Promise<void>`，具体串行与删除规则见后文。                                                                      |
+| disposed / dispose() | live 布尔 getter / 同步幂等释放。                                                                                             |
+
+status、error、hydrated 是 Runtime computed；hydration / write 的细分状态通过 IReadonlyPersistValue.value 暴露。公开 PersistState 只有 idle、loading、writing、ready、success、error、disposed；没有 active。IPersistCodecOutput 已移除，类型使用 storage-contract 的 ICodecOutput；运行时 PersistCodecOutput 仍保留 text / structured / binary。旧类型与成员导入需迁移，没有兼容 alias。
+
+### 写入、防抖、flush 与 clear
+
+写入先读最新 unit.snapshot，再同步 partialize，构造 { version, state } 后交给 codec。所有写入和删除沿一条串行链，防止慢的旧写入在新写入后覆盖它。变化会合并为写入请求，但每次实际编码使用排到执行时的快照，不承诺每个中间值都形成一份存档。
+
+debounceMs 大于 0 时等待安静间隔；maxWaitMs 从成功水合后第一个待写变化起固定窗口上限，后续变化只延长安静间隔。maxWaitMs 为 0 是下一次 0ms 调度请求入队；debounceMs 为 0 则直接请求写入，不使用这一防抖窗口。maxWait 只限制请求入队时间，不限制排队等待或后端完成时间。
+
+flush 取消当前防抖窗口，等待首次水合屏障；若水合失败抛原错，否则等待它已经观察到的实际写入，再请求当前快照写入并等待。并发严格 flush 与后台写共享真实 drain 结果，全部等待者能看到同一次原始失败；仅供后续调度恢复的 catch 链不会把这次失败改成成功。各 async 方法的公开 Promise 不被声明为相同 identity。
+
+clear 同样取消窗口并等待水合，然后在写队列后删除此键，不重置业务内存。之后状态变化仍可重新写回。clearFamily 只处理匹配的存储键，不与所有活跃 keyed handle 合成原子事务。浏览器 beforeunload 也不保证等待 flush；应在明确的应用保存边界 await flush，并理解后端完成语义，而非只在卸载事件里 fire-and-forget。
+
+### dispose、取消与最终快照
+
+dispose 同步、幂等：标记终态、请求 abort 所有在途适配器操作、取消防抖窗口、停止订阅。它不 dispose 借用的 Store、collection、AtomStore、Runtime 或 storage。释放后 flush / clear / retryHydrate 拒绝为带 ABORTED_BY_DISPOSE 的原生 AbortError，不复用旧 handle。
+
+如果释放截断了一个已排定但未触发的防抖 timer，会当场捕获最后快照，并在既有写链之后发起一次最终写入。该写入不等待、不传已中止的 signal；最终编码 / I/O 或捕获失败保留在 writeError，即使 status 已 disposed。没有 pending timer 时不能笼统声称 dispose 总会额外保存一次。
+
+取消复用 lifecycle 的原生 AbortController 工厂与默认 AbortError reason。后端若忽略 signal，已经发出的操作仍可能完成；等待者会在实际操作结算后观察终态，晚到原始失败保留在 AbortError cause。dispose 不是硬期限或强制终止后端的机制。需要确定保存结果时在资源仍可用时 await flush，再按应用顺序释放 handle 和业务资源。
+
+### 存档、默认 codec 与兼容读取
+
+信封格式为 version（非负安全整数）与 state（非 null / undefined）。assertEnvelope(value, key) 拒绝非对象、数组、非法 version 或缺失 state，返回捕获的 version / state；两属性各读一次，属性访问或反射失败由 PersistEnvelopeError 包装并在 cause 保留。PersistEnvelopeError 继承 TypeError、携带 ENVELOPE_INVALID，key 用于标明存档身份。
+
+defaultJsonCodec 名称为 migaia-collections-json-v1，output 为 text；委托 storage-contract 的 collectionsJsonCodec，支持真实 Map / Set（含跨 realm）往返，避免普通 JSON 将集合静默编码为空对象。它仍继承 JSON 的循环引用、BigInt 等限制，不是任意对象图的无损编码。新格式用版本化元组，其精确保留形状不是可任意占用的普通业务数组。
+
+读取旧存档时，仅唯一自有键为 `__migaia_persist_map__` 或 `__migaia_persist_set__` 且值为数组的对象是旧保留 marker；多字段同名 lookalike 保持全部数据。发现精确旧 marker 后沿 legacy reviver 读取，不把其中原本的普通应用数组重新解释为新元组；没有精确旧 marker 才委托新格式解码。新写入格式与 codec name 不变，不使用相似字段猜集合。
+
+defaultJsonCodec.encode 失败抛 ENCODE_FAILED TypeError，原因为 cause；decode 非字符串或坏 JSON / marker 抛 ENVELOPE_INVALID TypeError，解析失败的原因为 cause。默认 codec 不做加密或脱敏；自定义 codec 必须处理自己声明的数据形状。
+
+### 存储投影与 codec 选路
+
+IPersistStorage 是内部最小类型投影，不作为包入口具名导出：capabilities、get、set、remove、keys 来自 IKeyValueStore；不要求 backend、has、clearValues、clearAll 或 dispose。可选 getBytes / setBytes / removeBytes 来自 IRecordStore，不是 IKeyValueStore 本身。binary codec 的 clear() 用 removeBytes 只删除这个 byte key，不清空其他 byte key 或 text/record 通道；声明 binary 却缺少 removeBytes 时，clear 以 BACKEND_CAPABILITY 的 TypeError 拒绝，不回落到 text 删除。后端和 codec 的错误保留各自公共身份与原因，不保证都改成本包 source。
+
+| 工具                                           | 选路与失败                                                                                                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| writeEnvelope(storage, key, codec, value, ctx) | ctx 必填，可为空对象，signal 可省略；structured output 写入明确 CODEC_OUTPUT_MISMATCH，不走 record 通道。                                                                                   |
+| binary 写入                                    | capabilities.binary 为真时要求两个字节方法，缺失为 BACKEND_CAPABILITY；编码值必须是 Uint8Array，否则 CODEC_OUTPUT_MISMATCH。                                                                |
+| 其余写入分支                                   | 编码值必须为 string，交 storage.set；不自动 base64 降级。                                                                                                                                   |
+| readEnvelope(storage, key, codec, ctx)         | binary 且 capabilities.binary 为真时走 getBytes，再 codec.decode；缺方法为 BACKEND_CAPABILITY，binary 能力为假则 CODEC_OUTPUT_MISMATCH。非 binary 走 get + decode。不存在时返回 undefined。 |
+| removeEnvelope(storage, key, ctx, codec?)      | 按 codec 选择通道删除单个存档：默认 text 走 storage.remove；binary codec 且后端声明 binary 时走 removeBytes，缺少时抛 BACKEND_CAPABILITY 的 TypeError。不改变内存状态。                     |
+
+二进制写入按真实 Uint8Array brand 判断，支持其他 realm 的 intrinsic / 子类，不接受只是包装了 Uint8Array 的 Proxy 冒充。仅有 text 后端却配置 binary 时应选合适后端或 text codec；不要认为有某个方法或一个 output 字符串就建立全部后端能力。
+
+### 错误与排查
+
+STORE_PERSIST_SOURCE 为 @migaia/store-persist；稳定码由 StorePersistErrorCode 维护：
+
+| 属性 / 码                                        | 含义                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| codecNotResolved / CODEC_NOT_RESOLVED            | 未解析到 codec，显式配置或修正默认解析。                      |
+| codecOutputMismatch / CODEC_OUTPUT_MISMATCH      | codec output、实际 payload 与后端路由不一致。                 |
+| backendCapability / BACKEND_CAPABILITY           | 进入 binary 分支但缺字节方法。                                |
+| envelopeInvalid / ENVELOPE_INVALID               | 坏存档、版本不合法或不匹配且无 migrate。                      |
+| encodeFailed / ENCODE_FAILED                     | 默认 codec 编码失败，查看 cause 与待存值。                    |
+| hydrateAndWriteFailed / HYDRATE_AND_WRITE_FAILED | 水合和写入均失败，展开 AggregateError.errors。                |
+| abortedByDispose / ABORTED_BY_DISPOSE            | 释放中止，保持 DOMException / AbortError 及原始 cause。       |
+| invalidOption / INVALID_OPTION                   | key、namespace、version、时间、回调、scheduler 或配置不合法。 |
+
+配置 version 非负安全整数等非法项同步 TypeError；信封问题由 PersistEnvelopeError 报告。水合失败后 flush / clear 继续抛 hydrationError，成功 retry 才解锁；写入失败查 writeError，并检查 codec 与后端是否匹配。已释放 handle 不能重用，业务内存和存档删除需分别管理。
+
+公开错误工厂 createStorePersistError / createStorePersistTypeError 接收必填 code、message 和可选 options.cause；createStorePersistAbortError 接收 code、message、可选 cause，返回原生 DOMException，保持 name 为 AbortError；createStorePersistAggregateError 接收 code、errors、message，errors 保留原失败。code 类型为 IStorePersistErrorCode，工厂附加身份但不覆盖 stack。底层工具不需要在普通 Store 使用中自行重复实现。
+
+包已有 fmt、lint、typecheck、typecheck:test、test、build 和 test:packed 脚本；实际报告说明哪些被执行，不以手册列出命令当成验证结论。排查未保存字段先看 partialize 与 debounce，再看 hydrationError / writeError；Map / Set 形状不对时检查是否换用了不支持集合的 codec。

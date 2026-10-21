@@ -17,7 +17,11 @@ const localStorageReactiveFeature = defineNativeReactiveFeature(
   localStorageBackendKind
 )
 
-/** Creates the canonical localStorageHost reactive fast-path plugin. */
+/**
+ * Define a localStorage backend plus its exact reactive adapter; default id local. Consistency is
+ * hybrid/document-eventual, polling every 1000 ms. Host installation owns Store/source rollback and
+ * disposal; eventual observation does not make cross-context writes transactional.
+ */
 export const localStorageReactive = {
   localStorageReactive: <const TId extends string = 'local'>(
     options: ILocalStorageOptions & IBuiltInPluginId<TId> = {}

@@ -10,7 +10,12 @@ function tagStoreWorkerError<E extends Error>(error: E, code: IStoreWorkerErrorC
   return attachErrorIdentity(error, { source: STORE_WORKER_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Constructs a tagged native Error for an explicit code/message without rewriting its stack. A
+ * defined options.cause retains the original value by identity; this factory creates a new error
+ * rather than changing an existing exception. Ordinary callers usually inspect RPC or Resource
+ * outcomes instead of constructing local errors.
+ */
 export function createStoreWorkerError(
   code: IStoreWorkerErrorCode,
   message: string,
@@ -23,7 +28,10 @@ export function createStoreWorkerError(
   return tagStoreWorkerError(error, code)
 }
 
-/** Builds a tagged aggregate while preserving cleanup error order and identity. */
+/**
+ * Constructs a tagged native AggregateError retaining supplied failure order and identities in
+ * errors. It neither deduplicates failures nor replaces their original stacks.
+ */
 export function createStoreWorkerAggregateError(
   code: IStoreWorkerErrorCode,
   errors: readonly unknown[],

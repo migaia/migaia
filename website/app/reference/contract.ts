@@ -183,6 +183,22 @@ export type IEnumDoc = Readonly<{
   values: Readonly<Record<string, IText>>
 }>
 
+/**
+ * One problem an API solves, told the way a developer meets it: the situation that goes wrong, the
+ * code that fixes it with this API, and what the reader observes. Every case carries code, so a
+ * claim about the API is always backed by something the reader can run.
+ */
+export type ICaseDoc = Readonly<{
+  /** Short task-shaped heading, e.g. "Stop a crash loop". */
+  title: IText
+  /** The situation and why hand-written code gets it wrong, before the example. */
+  problem: IText
+  /** Runnable example that solves the problem with this API. */
+  example: ICode
+  /** What the reader observes when running it, and which guarantee that demonstrates. */
+  result: IText
+}>
+
 /** Documentation of one exported runtime symbol (function, class, const). */
 export type ISymbolDoc = Readonly<{
   role: SymbolRole
@@ -205,6 +221,8 @@ export type ISymbolDoc = Readonly<{
   exampleIntro?: IText
   /** Observable result explained immediately after the minimal example. */
   exampleResult?: IText
+  /** Problems this API solves, each with a runnable example; rendered after the minimal example. */
+  cases?: readonly ICaseDoc[]
   /** When to use it. */
   scenarios?: readonly IText[]
   /** When not to use it, with the alternative. */

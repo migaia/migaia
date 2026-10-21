@@ -30,8 +30,11 @@ import {
 import { UtilsErrorCode } from '@migaia/utils/error'
 
 /**
- * Real independent copy, or throw. Prefers `structuredClone`; the engine not having it at all is
- * itself a reason to refuse rather than guess.
+ * Return an independent native structured clone of admitted data without freezing the result. Plain
+ * records/arrays, current-realm native Map/Set/Date/RegExp and non-shared buffer/view storage are
+ * supported, including cycles and shared graph identity. Custom classes/accessors are rejected
+ * before cloning. Unsupported input throws CLONE_UNSUPPORTED; missing structuredClone throws
+ * ENV_UNSUPPORTED. Caught admission/clone failures remain reachable as cause.
  */
 export function immutableSnapshotClone<T>(value: T): T {
   /** Admission is policy-owned here; Utils remains the single graph-cloning owner. */
@@ -77,24 +80,21 @@ export function opaqueReferenceClone<T>(value: T): T {
 }
 
 /**
- * Best-effort snapshot used by diagnostics and middleware. Structured cloning is preferred, but a
- * non-cloneable raw value (a function, a DOM handle, a host object embedded somewhere in the tree)
- * must never break the binding.
- *
- * The fallback used to copy only the _top_ level: `output[key] = descriptor.value` for a nested
- * object just copies the reference. A "previous" snapshot captured for a middleware event, or a
- * devtools time-travel entry, would then share its nested objects with the live store — the next
- * business mutation of `state.a.b` silently rewrites the "snapshot" you already reported as the
- * _old_ value too, which defeats the entire point of taking one. The fallback recurses through
- * plain objects/arrays and only stops at the actual non-cloneable value, so everything cloneable
- * around it still gets a real, independent copy.
+ * Return a best-effort, unfrozen diagnostic copy through the shared structured-clone-first owner.
+ * Fallback copies inspectable plain objects/arrays recursively and retains unsupported or unsafe
+ * subtrees by reference. It favors a usable diagnostic over strict independence; no deep-history
+ * guarantee follows for aliased subtrees. The companion diagnostic details are not returned here.
  */
 export function diagnosticClone<T>(value: T): T {
   return structuredDiagnosticSnapshot(value).value
 }
 
+/** Explicit clone functions from this subentry; no mode is selected implicitly by this object. */
 export const ClonePolicy = {
+  /** Independent admitted data copy or a classified failure; does not freeze the result. */
   immutable: immutableSnapshotClone,
+  /** Exact input identity, with no copying or freezing. */
   opaque: opaqueReferenceClone,
+  /** Best-effort diagnostic copy that may retain unsupported subtrees by reference. */
   diagnostic: diagnosticClone
 } as const

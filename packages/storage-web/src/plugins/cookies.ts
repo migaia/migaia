@@ -7,7 +7,11 @@ import {
 } from '../host/builtin-kinds.js'
 import type { IStorageBackendPlugin } from '../host/types.js'
 
-/** Creates a cookie plugin while preserving canonical factory options. */
+/**
+ * Define a cookie backend plugin with default id cookies. Store acquisition waits for Host install,
+ * which owns rollback and final disposal; this ordinary plugin adds no reactive adapter. Backend
+ * options retain their factory defaults.
+ */
 export const cookieBackendPlugin = <const TId extends string = 'cookies'>(
   options: ICookiesOptions & IBuiltInPluginId<TId> = {}
 ): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId> =>

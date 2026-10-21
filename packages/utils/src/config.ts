@@ -2,13 +2,33 @@ import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { parseObjectPath, probeObjectPath, type IObjectPathTupleFor } from './object-path.js'
 
+/**
+ * Input domains of an owned config: `data` (default) accepts portable plain data and rejects
+ * functions; `richRuntime` also accepts functions and classes for configs that carry callbacks.
+ */
 export const ConfigProfile = { data: 'data', richRuntime: 'richRuntime' } as const
+/** Value union of `ConfigProfile`. */
 export type IConfigProfile = (typeof ConfigProfile)[keyof typeof ConfigProfile]
+/**
+ * Patch value meaning "delete this root key" in `patchConfig` and conflict decisions of
+ * `combineConfig`.
+ */
 export const CONFIG_DELETE: unique symbol = Symbol('CONFIG_DELETE')
+/** Config root shape: a plain record with string keys (symbol keys are rejected at runtime). */
 export type IConfigRecord = Record<PropertyKey, unknown>
+/**
+ * Config accepted by `ownConfig`. Ownership is tracked at runtime, so an object that only carries
+ * this type is still rejected by `readonlyConfig`, `patchConfig`, `readConfigPath` and
+ * `combineConfig`.
+ */
 export type IOwnedConfig<T extends IConfigRecord> = T & {
   readonly __utilsOwnedConfigBrand?: unique symbol
 }
+/**
+ * Safety limits of a config graph (defaults: depth 256, nodes 100000, keys 1000000, path length
+ * 4096, segment length 512). They can only be tightened; exceeding one throws
+ * `CONFIG_LIMIT_EXCEEDED`.
+ */
 export type IConfigLimits = {
   readonly maxDepth: number
   readonly maxNodes: number
@@ -16,17 +36,31 @@ export type IConfigLimits = {
   readonly maxPathLength: number
   readonly maxSegmentLength: number
 }
+/** Options of `ownConfig`: the input `profile` and tighter `limits`. */
 export type IOwnConfigOptions = {
   readonly profile?: IConfigProfile
   readonly limits?: Partial<IConfigLimits>
 }
+/** Root-level patch for `patchConfig`; a key set to `CONFIG_DELETE` is removed. */
 export type IConfigPatch<T extends IConfigRecord> = {
   readonly [K in keyof T]?: T[K] | typeof CONFIG_DELETE
 } & Readonly<Record<PropertyKey, unknown>>
+/**
+ * Options of `patchConfig`. `reuseUnchangedRoot` (default `true`) returns the base itself for an
+ * empty patch; `profile` must match the base and `limits` may only tighten it.
+ */
 export type IConfigPatchOptions = IOwnConfigOptions & { readonly reuseUnchangedRoot?: boolean }
+/**
+ * Result of `readConfigPath`: `missing` when the key does not exist, otherwise the (possibly
+ * `undefined`) value.
+ */
 export type IConfigReadResult =
   | { readonly kind: 'missing' }
   | { readonly kind: 'value'; readonly value: unknown }
+/**
+ * How `combineConfig` merges each kind of value. Defaults: records `merge`, arrays / maps / sets
+ * `replace`, and an explicit right-side `undefined` is `ignore`d.
+ */
 export type IConfigMergeStrategies = {
   readonly record: 'merge' | 'replace'
   readonly array: 'replace' | 'concat' | 'mergeByIndex'
@@ -34,20 +68,30 @@ export type IConfigMergeStrategies = {
   readonly set: 'replace' | 'union'
   readonly undefined: 'ignore' | 'assign'
 }
+/**
+ * What `onConflict` returns: keep `left`, take `right`, `delete` the key, or use a replacement
+ * `value`.
+ */
 export type IConfigConflictDecision =
   | { readonly kind: 'left' }
   | { readonly kind: 'right' }
   | { readonly kind: 'delete' }
   | { readonly kind: 'value'; readonly value: unknown }
+/** Arguments of `onConflict`: the key `path` plus the existing `left` and incoming `right` values. */
 export type IConfigConflictContext = {
   readonly path: readonly PropertyKey[]
   readonly left: unknown
   readonly right: unknown
 }
+/** Merge strategies for keys under one path `prefix`; the longest matching prefix wins. */
 export type IConfigPathRule = {
   readonly prefix: readonly PropertyKey[]
   readonly strategies: Partial<IConfigMergeStrategies>
 }
+/**
+ * Options of `combineConfig`: global `strategies`, per-prefix `pathRules`, and a synchronous
+ * `onConflict` for values that cannot be merged automatically.
+ */
 export type IConfigCombineOptions = IOwnConfigOptions & {
   readonly strategies?: Partial<IConfigMergeStrategies>
   readonly pathRules?: readonly IConfigPathRule[]
@@ -104,7 +148,13 @@ const intrinsicPrototypes = new Set<object>([
   URIError.prototype
 ])
 
-/** Creates a validated isolated graph with a runtime ownership brand. */
+/**
+ * Deep-copies `value` into an independent config the library owns, so later edits to the caller's
+ * object never reach it. Calling it again on an owned config with the same options returns it as
+ * is. Throws `CONFIG_UNSUPPORTED` for a non-record root or unsupported values,
+ * `CONFIG_LIMIT_EXCEEDED` past the limits and `CONFIG_CONFLICT` for an owned config with different
+ * options.
+ */
 export function ownConfig<T extends IConfigRecord>(
   value: T,
   options?: IOwnConfigOptions
@@ -134,14 +184,23 @@ export function ownConfig<T extends IConfigRecord>(
   return result as IOwnedConfig<T>
 }
 
-/** Creates a cached readonly facade that rejects structural mutation. */
+/**
+ * Returns a cached read-only view of an owned config. Every write, including `Map` / `Set` / `Date`
+ * mutators and nested values, throws a `TypeError` with `CONFIG_READONLY`; reads see the owned data
+ * without copying it. Throws `CONFIG_UNSUPPORTED` when `value` did not come from `ownConfig`.
+ */
 export function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T {
   if (!metadata.has(value as object))
     throw configError(UtilsErrorCode.configUnsupported, 'config', 'value is not owned')
   return readonlyWrap(value) as T
 }
 
-/** Applies a root-level copy-on-write overlay. */
+/**
+ * Creates a new owned config from `base` with root keys replaced or removed (`CONFIG_DELETE`);
+ * unchanged subtrees are shared and `base` stays as it was. Only root keys are patched: compute a
+ * changed nested subtree with `set` first. Throws `CONFIG_UNSUPPORTED` for an unowned base or
+ * invalid patch and `CONFIG_PATH_INVALID` for dangerous keys.
+ */
 export function patchConfig<T extends IConfigRecord>(
   base: IOwnedConfig<T>,
   patch: IConfigPatch<T>,
