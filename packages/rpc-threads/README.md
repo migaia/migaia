@@ -252,21 +252,23 @@ probe 失败经 onListenerError 报 Core TRANSPORT，原异常保留在 cause，
 
 ### 错误与重试
 
+下表区分线程采样、监督、Core 与 Remote 的错误来源。线程 API 从 `@migaia/rpc-threads` 导入；Core 与 Remote API 分别从 `@migaia/rpc-core` 和 `@migaia/rpc-core/remote` 导入，`source` 值保留各自的错误身份。
+
 | source / code                                    | 含义与处理                                                                      |
 | ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| @migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED | 线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。 |
+| `@migaia/rpc/threads` / THREAD_USAGE_SAMPLE_FAILED | 线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。 |
 | @migaia/supervision / EXIT_UNOBSERVABLE          | 退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。                  |
-| @migaia/rpc/core / INVALID_CONFIG                | 入口、来源、bootstrap、能力 ACK、portable data 或配置不合法；检查字段与 cause。 |
-| @migaia/rpc/core / TRANSPORT                     | 原生消息 I/O / 启动资源边界失败，保留原生错误类型和原因。                       |
-| @migaia/rpc/core / DEADLINE_EXCEEDED             | TimeoutError；Worker 可能已执行，先对账。                                       |
-| @migaia/rpc/core / CANCELLED                     | AbortError；协作取消，不能证明业务未执行。                                      |
-| @migaia/rpc/core / OVERLOADED                    | 并发额度满，provider 未调用，降低并发后重试。                                   |
-| @migaia/rpc/core / CAPABILITY_UNSUPPORTED        | 需要未协商能力，例如未签名的 transfer。                                         |
-| @migaia/rpc/core / TARGET_UNKNOWN                | 当前目录没有该目标，检查名字和当前代次。                                        |
-| @migaia/rpc/remote / REMOTE_CLOSED               | 连接或代次已关闭，重新选择目标，并对已发调用对账。                              |
+| `@migaia/rpc/core` / INVALID_CONFIG                | 入口、来源、bootstrap、能力 ACK、portable data 或配置不合法；检查字段与 cause。 |
+| `@migaia/rpc/core` / TRANSPORT                     | 原生消息 I/O / 启动资源边界失败，保留原生错误类型和原因。                       |
+| `@migaia/rpc/core` / DEADLINE_EXCEEDED             | TimeoutError；Worker 可能已执行，先对账。                                       |
+| `@migaia/rpc/core` / CANCELLED                     | AbortError；协作取消，不能证明业务未执行。                                      |
+| `@migaia/rpc/core` / OVERLOADED                    | 并发额度满，provider 未调用，降低并发后重试。                                   |
+| `@migaia/rpc/core` / CAPABILITY_UNSUPPORTED        | 需要未协商能力，例如未签名的 transfer。                                         |
+| `@migaia/rpc/core` / TARGET_UNKNOWN                | 当前目录没有该目标，检查名字和当前代次。                                        |
+| `@migaia/rpc/remote` / REMOTE_CLOSED               | 连接或代次已关闭，重新选择目标，并对已发调用对账。                              |
 
 Node launcher 的原生 Worker 构造参数被拒绝时，使用 Core INVALID_CONFIG 标识；若已有原生 code，则以包装错误保留原 Error、name、message、stack 和原生 code 于 cause，不覆盖它们。此分类只描述 Node 构造边界，不泛化为所有 Web 构造器异常。
 
-本包本地错误码对象 RpcThreadErrorCode 只有 usageSampleFailed，值为 THREAD_USAGE_SAMPLE_FAILED，RPC_THREAD_ERROR_SOURCE 为 @migaia/rpc/threads。调用、监督和 Host 边界各使用自己的 source，不把所有失败改成本包采样码。按 source / code 分支，不匹配 message 文本；业务异常跨 Worker 后保留原生类型、message、stack、source/code 与 cause / errors 链，不能承诺接收端对象与发送端同一 identity。
+本包本地错误码对象 RpcThreadErrorCode 只有 usageSampleFailed，值为 THREAD_USAGE_SAMPLE_FAILED，RPC_THREAD_ERROR_SOURCE 为 `@migaia/rpc/threads`。调用、监督和 Host 边界各使用自己的 source，不把所有失败改成本包采样码。按 source / code 分支，不匹配 message 文本；业务异常跨 Worker 后保留原生类型、message、stack、source/code 与 cause / errors 链，不能承诺接收端对象与发送端同一 identity。
 
 Worker 单独运行配置失败通常是没有库 launcher bootstrap；默认 buffer 未失效是复制语义；Worker 是否重启取决于 restart 策略。需人工恢复时用 Host 的 restart / replace，并查看 list / get 的当前代次与退出信息。

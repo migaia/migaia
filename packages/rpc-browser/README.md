@@ -197,7 +197,9 @@ adapter 返回 IRpcTransport，使用 createEndpoint({id,transport,middlewares:[
 
 Window、SharedWorker、ServiceWorker、BroadcastChannel、RTC 都借用原生载体，Endpoint.dispose 与 Peer.close 释放订阅，创建者仍负责 close。WebTransport 只有其取得的 reader/writer 随 transport 释放。正常退订幂等；原生 remover 失败可能抛错并保留该登记，调用原 disposer 可再次尝试。不要声称所有清理都不失败。
 
-| 本包 code（source=@migaia/rpc/browser） | 触发与处理                                                      |
+表中的 `source` 标识浏览器错误的归属；本包公开 API 的导入路径是 `@migaia/rpc-browser`。
+
+| 本包 code（source=`@migaia/rpc/browser`） | 触发与处理                                                      |
 | --------------------------------------- | --------------------------------------------------------------- |
 | WINDOW_ORIGIN_REQUIRED                  | Window Peer 缺少非空 origin；填写明确对端源                     |
 | RTC_CHANNEL_UNRELIABLE                  | Peer 的频道不是可靠有序；改用受支持配置                         |

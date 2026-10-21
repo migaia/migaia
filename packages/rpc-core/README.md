@@ -283,10 +283,12 @@ governor 沿原 rate/payload/连续超时/idle 策略，disposer 归实际连接
 
 错误保留原生类型、message、stack 与 cause；错误形状用 IRpcError，平台/拓扑值域用 IRpcPlatformValue / IRpcTransportTopologyValue。按稳定 source/code 而非 message 分支，远端身份只作诊断，不授予本地控制权。
 
+下表的 `source` 是错误的身份值，不是导入路径。Core API 从 `@migaia/rpc-core` 导入，Remote API 从 `@migaia/rpc-core/remote` 导入。
+
 | source             | 常量 / 表                                         |
 | ------------------ | ------------------------------------------------- |
-| @migaia/rpc/core   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
-| @migaia/rpc/remote | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
+| `@migaia/rpc/core`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
+| `@migaia/rpc/remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
 
 isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。
 
