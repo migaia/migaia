@@ -567,8 +567,7 @@ async function pageLoad(version: number, work: (add: (sku: string) => void) => v
   await owned.persistence?.ready
   console.log(\`version \${version} starts with\`, owned.state.items.get())
   work((sku) => owned.commands.add(sku))
-  await new Promise((resolve) => setTimeout(resolve, 20)) // the user keeps browsing
-  await hub.dispose()
+  await hub.dispose() // waits for the write of the item just added
 }
 
 await pageLoad(1, (add) => add('sku-1'))
@@ -594,8 +593,7 @@ async function pageLoad(version: number, work: (add: (sku: string) => void) => v
   await owned.persistence?.ready
   console.log(\`版本 \${version} 启动时：\`, owned.state.items.get())
   work((sku) => owned.commands.add(sku))
-  await new Promise((resolve) => setTimeout(resolve, 20)) // 用户继续浏览
-  await hub.dispose()
+  await hub.dispose() // 等刚加入的商品写入存储
 }
 
 await pageLoad(1, (add) => add('sku-1'))
@@ -603,8 +601,8 @@ await pageLoad(1, (add) => add('sku-2')) // 刷新页面
 await pageLoad(2, () => {}) // 发布新的主版本`
       },
       result: t(
-        "The first load prints `version 1 starts with []` and adds `sku-1`. The reload prints `version 1 starts with [ 'sku-1' ]`. The load with version 2 prints `version 2 starts with []`, the contract's initial value.\n\n`persistence.ready` resolves after the first read-back; wait for it before showing saved fields. A write made while the saved data is being read back is kept and not overwritten by it.",
-        "第一次加载打印 `版本 1 启动时： []`，并加入 `sku-1`。刷新后打印 `版本 1 启动时： [ 'sku-1' ]`。版本 2 加载时打印 `版本 2 启动时： []`，也就是契约的初始值。\n\n`persistence.ready` 在首次读回后兑现；显示保存的字段前先等待它。读回期间发生的写入会保留，不会被保存的数据覆盖。"
+        "The first load prints `version 1 starts with []` and adds `sku-1`. The reload prints `version 1 starts with [ 'sku-1' ]`. The load with version 2 prints `version 2 starts with []`, the contract's initial value. `hub.dispose()` waits for the write of the item added just before it, so nothing is lost when the page closes right after a change.\n\n`persistence.ready` resolves after the first read-back; wait for it before showing saved fields. A write made while the saved data is being read back is kept and not overwritten by it.",
+        "第一次加载打印 `版本 1 启动时： []`，并加入 `sku-1`。刷新后打印 `版本 1 启动时： [ 'sku-1' ]`。版本 2 加载时打印 `版本 2 启动时： []`，也就是契约的初始值。`hub.dispose()` 会等刚加入的商品写入存储，所以变化之后立即关闭页面也不会丢数据。\n\n`persistence.ready` 在首次读回后兑现；显示保存的字段前先等待它。读回期间发生的写入会保留，不会被保存的数据覆盖。"
       )
     }
   ]
