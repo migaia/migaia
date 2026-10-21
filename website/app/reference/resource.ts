@@ -4,7 +4,7 @@
  * and README on 2026-10-17; `createResource`, `mutate`, `subscribe` and `select` verified against
  * create-resource.ts and resource.class.ts on 2026-10-21.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { resourceCases } from './resource-cases.js'
 
 /** Builds one bilingual text. */
@@ -192,7 +192,29 @@ const resourceOptionMembers: Readonly<Record<string, IMemberDoc>> = {
       'Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.',
       '每次重试前等待的毫秒数，或用于退避的 `(failureCount, error) => 毫秒`。回调抛错或返回非法值时，通过 `cause` 或 `errors` 保留加载失败；策略错误附 `INVALID_OPTION`，已有外部身份除外。'
     ),
-    default: t('`0`: retry immediately.', '`0`：立即重试。')
+    default: t('`0`: retry immediately.', '`0`：立即重试。'),
+    whenToUse: t(
+      'Pass a function when the server is overloaded or rate limited: immediate retries add load at the worst moment. `failureCount` starts at 1, so `1000 * 2 ** (failureCount - 1)` waits 1 s, 2 s, 4 s. You can also read `error` and wait longer for a 429 than for a network error. A plain number is enough when failures are short network blips.',
+      '服务端过载或限流时传函数：立即重试会在最糟的时候继续加压。`failureCount` 从 1 开始，所以 `1000 * 2 ** (failureCount - 1)` 依次等待 1 秒、2 秒、4 秒。也可以读取 `error`，对 429 等得比网络错误更久。如果失败只是短暂的网络抖动，传一个固定毫秒数就够了。'
+    ),
+    example: {
+      en: `import { Resource } from '@migaia/resource'
+
+const report = new Resource(({ signal }) => fetchReport(signal), runtime, {
+  retry: 3,
+  // 1st retry after 1 s, 2nd after 2 s, 3rd after 4 s; 429 waits at least 10 s
+  retryDelay: (failureCount, error) =>
+    isRateLimited(error) ? 10_000 : 1000 * 2 ** (failureCount - 1)
+})`,
+      zh: `import { Resource } from '@migaia/resource'
+
+const report = new Resource(({ signal }) => fetchReport(signal), runtime, {
+  retry: 3,
+  // 第 1 次重试等 1 秒，第 2 次 2 秒，第 3 次 4 秒；遇到 429 至少等 10 秒
+  retryDelay: (failureCount, error) =>
+    isRateLimited(error) ? 10_000 : 1000 * 2 ** (failureCount - 1)
+})`
+    }
   },
   keepAlive: {
     summary: t(
@@ -222,6 +244,230 @@ const resourceOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
+
+/**
+ * Configuration cases of `IResourceOptions`, shared by `new Resource()` and `createResource()`.
+ * Verified by running each example against the built package on 2026-10-21.
+ */
+const resourceOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t(
+      'Cache a price list for a minute and refresh it in the background',
+      '价格列表缓存一分钟，过期后在后台刷新'
+    ),
+    problem: t(
+      'Prices change rarely, so requesting them on every read wastes requests; but after a minute they must be refreshed. With only `ttl`, an expired list switches to `pending` and the table flashes a spinner. `staleWhileRevalidate` keeps the old list on screen while the refresh runs and sets `refreshing`, so the page can show a small indicator instead. `debugName` names the resource in trace output and request errors.',
+      '价格很少变化，每次读取都请求是浪费；但一分钟后必须刷新。只设置 `ttl` 时，过期的列表会切换为 `pending`，表格闪一下加载状态。`staleWhileRevalidate` 让旧列表在刷新期间继续显示，并把 `refreshing` 设为 `true`，页面只需显示一个小提示。`debugName` 让 trace 输出和请求错误里能看出是哪个资源。'
+    ),
+    example: {
+      en: `import { Resource, ResourceStatus } from '@migaia/resource'
+
+const prices = new Resource(({ signal }) => fetchPrices(signal), runtime, {
+  debugName: 'prices',
+  ttl: 60_000,
+  staleWhileRevalidate: true
+})
+
+runtime.effect(() => {
+  const state = prices.state
+  if (state.status === ResourceStatus.success) renderTable(state.data, { updating: state.refreshing })
+})
+// after 60 s the next read returns { status: 'success', data: oldPrices, refreshing: true },
+// then { status: 'success', data: newPrices }`,
+      zh: `import { Resource, ResourceStatus } from '@migaia/resource'
+
+const prices = new Resource(({ signal }) => fetchPrices(signal), runtime, {
+  debugName: 'prices',
+  ttl: 60_000,
+  staleWhileRevalidate: true
+})
+
+runtime.effect(() => {
+  const state = prices.state
+  if (state.status === ResourceStatus.success) renderTable(state.data, { updating: state.refreshing })
+})
+// 60 秒后，下一次读取得到 { status: 'success', data: 旧价格, refreshing: true }，
+// 刷新完成后变为 { status: 'success', data: 新价格 }`
+    },
+    result: t(
+      'Within a minute reads cost no request; after it, the table keeps the old prices with an "updating" hint until the new ones arrive.',
+      '一分钟内读取不发请求；过期后表格保留旧价格并显示“更新中”，直到新价格返回。'
+    ),
+    covers: ['debugName', 'ttl', 'staleWhileRevalidate']
+  },
+  {
+    title: t('Retry a flaky endpoint', '自动重试不稳定的接口'),
+    problem: t(
+      'A gateway sometimes answers 503 for a moment. Without `retry`, the first failure goes straight to the `error` state and the user has to reload. `retry: 2` makes up to two more attempts before the state becomes `error`; while they run the state stays `pending`, so the page keeps its loading view.',
+      '网关偶尔会短暂返回 503。不设置 `retry` 时，第一次失败就进入 `error` 状态，用户只能刷新页面。`retry: 2` 会在进入 `error` 之前最多再尝试两次；重试期间状态保持 `pending`，页面继续显示加载中。'
+    ),
+    example: `import { Resource } from '@migaia/resource'
+
+const orders = new Resource(({ signal }) => fetchOrders(signal), runtime, {
+  retry: 2,
+  retryDelay: 500
+})`,
+    result: t(
+      'Attempt 1 fails, attempt 2 starts after 500 ms; the reader sees `pending` until one attempt succeeds or all three fail.',
+      '第 1 次失败后，500 毫秒再发第 2 次；读者一直看到 `pending`，直到某次成功或三次全部失败。'
+    ),
+    covers: ['retry']
+  },
+  {
+    title: t(
+      'Show server-rendered data without a second request',
+      '直接显示服务端渲染的数据，不再请求一次'
+    ),
+    problem: t(
+      'The server already loaded the user and rendered the page. If the browser starts from `idle`, it requests the same user again and the page shows a loading state over correct content. `dehydrate()` on the server produces a snapshot with the data and its remaining lifetime; passing it as `initialSnapshot` starts the browser resource in `success` and only revalidates once that lifetime runs out.',
+      '服务端已经加载过用户并渲染了页面。如果浏览器从 `idle` 开始，就会再请求一次同一个用户，页面在正确内容上又显示加载状态。服务端调用 `dehydrate()` 得到包含数据和剩余有效期的快照；把它作为 `initialSnapshot` 传入，浏览器端资源直接从 `success` 开始，直到有效期用完才重新验证。'
+    ),
+    example: {
+      en: `import { Resource } from '@migaia/resource'
+
+// server
+const serverUser = new Resource(() => loadUser(id), runtime, { ttl: 30_000 })
+await serverUser.promise
+const html = renderPage({ snapshot: serverUser.dehydrate() })
+// { version: 2, data: { name: 'Ada' }, ageMs: 1, remainingTtlMs: 29999 }
+
+// browser
+const user = new Resource(({ signal }) => fetchUser(id, signal), runtime, {
+  ttl: 30_000,
+  initialSnapshot: window.__SNAPSHOT__
+})
+user.state // { status: 'success', data: { name: 'Ada' } }, no request sent`,
+      zh: `import { Resource } from '@migaia/resource'
+
+// 服务端
+const serverUser = new Resource(() => loadUser(id), runtime, { ttl: 30_000 })
+await serverUser.promise
+const html = renderPage({ snapshot: serverUser.dehydrate() })
+// { version: 2, data: { name: 'Ada' }, ageMs: 1, remainingTtlMs: 29999 }
+
+// 浏览器
+const user = new Resource(({ signal }) => fetchUser(id, signal), runtime, {
+  ttl: 30_000,
+  initialSnapshot: window.__SNAPSHOT__
+})
+user.state // { status: 'success', data: { name: 'Ada' } }，没有发出请求`
+    },
+    result: t(
+      'The browser renders the server data immediately and sends its first request only after the 30-second lifetime ends.',
+      '浏览器立即显示服务端的数据，30 秒有效期结束后才发出第一次请求。'
+    ),
+    covers: ['initialSnapshot']
+  },
+  {
+    title: t('Load a panel only when it opens', '面板展开时才加载'),
+    problem: t(
+      'A settings page has a collapsed "audit log" panel that most users never open. With the default `autoStart: true`, every page view requests the log. `autoStart: false` keeps the resource in `idle` until something first reads `state` (or calls `read()` / `refetch()`), so the request happens only for users who open the panel.',
+      '设置页有一个默认折叠的“审计日志”面板，大多数用户从不展开。默认 `autoStart: true` 时，每次打开页面都会请求日志。`autoStart: false` 让资源停在 `idle`，直到第一次读取 `state`（或调用 `read()` / `refetch()`）才发请求，所以只有展开面板的用户才会触发。'
+    ),
+    example: {
+      en: `import { Resource } from '@migaia/resource'
+
+const auditLog = new Resource(({ signal }) => fetchAuditLog(signal), runtime, {
+  autoStart: false
+})
+auditLog.peekState() // { status: 'idle' }: nothing requested
+
+panel.addEventListener('toggle', () => {
+  // the first read of state starts the request
+  if (panel.open) runtime.effect(() => renderLog(auditLog.state))
+}, { once: true })`,
+      zh: `import { Resource } from '@migaia/resource'
+
+const auditLog = new Resource(({ signal }) => fetchAuditLog(signal), runtime, {
+  autoStart: false
+})
+auditLog.peekState() // { status: 'idle' }：没有发出请求
+
+panel.addEventListener('toggle', () => {
+  // 第一次读取 state 时才发出请求
+  if (panel.open) runtime.effect(() => renderLog(auditLog.state))
+}, { once: true })`
+    },
+    result: t(
+      'Page views that never open the panel send no request; opening it shows `pending` and then the log.',
+      '没有展开面板的访问不发请求；展开后先显示 `pending`，再显示日志。'
+    ),
+    covers: ['autoStart']
+  },
+  {
+    title: t('Prefetch the next page while nobody shows it', '没人显示时也预取下一页'),
+    problem: t(
+      'A pager prefetches the next page so that clicking "next" is instant. Nothing renders that resource yet, so by default it disconnects from `page` and only refetches when it is read, which is exactly when the user clicks. `keepAlive: true` keeps the dependency on `page` connected while unobserved, so every page change starts the prefetch right away.',
+      '分页器预取下一页，让点击“下一页”时立即显示。这个资源此时还没有被任何地方显示，默认情况下它会断开与 `page` 的依赖，只在被读取时才重新请求，而那正是用户点击的时刻。`keepAlive: true` 让它在无人观察时也保持对 `page` 的依赖，每次翻页都会立刻开始预取。'
+    ),
+    example: {
+      en: `import { Resource } from '@migaia/resource'
+
+const page = runtime.signal(1)
+const nextPage = new Resource(
+  ({ signal }) => fetchPage(page.value + 1, signal),
+  runtime,
+  { keepAlive: true }
+)
+
+page.value = 2 // requests page 3 now, although nothing reads nextPage yet`,
+      zh: `import { Resource } from '@migaia/resource'
+
+const page = runtime.signal(1)
+const nextPage = new Resource(
+  ({ signal }) => fetchPage(page.value + 1, signal),
+  runtime,
+  { keepAlive: true }
+)
+
+page.value = 2 // 现在就请求第 3 页，尽管还没有地方读取 nextPage`
+    },
+    result: t(
+      'When the user clicks "next", the data is usually already in `success`; without `keepAlive` the click would start the request and show `pending`.',
+      '用户点击“下一页”时，数据通常已经是 `success`；没有 `keepAlive` 时，点击才开始请求，先显示 `pending`。'
+    ),
+    covers: ['keepAlive']
+  },
+  {
+    title: t(
+      'Fast-forward cache expiry and retry waits in tests',
+      '在测试里快进缓存过期与重试等待'
+    ),
+    problem: t(
+      'A test for "refresh after one minute" should not wait a minute, and fake timers that patch globals also affect unrelated code. `scheduler` gives the resource its own clock and timers; `createManualScheduler()` from `@migaia/utils/testing` moves time only when the test calls `advance()`.',
+      '测试“一分钟后刷新”不应该真的等一分钟，而替换全局计时器的假时钟会影响无关代码。`scheduler` 为资源提供独立的时钟和计时器；`@migaia/utils/testing` 的 `createManualScheduler()` 只在测试调用 `advance()` 时推进时间。'
+    ),
+    example: {
+      en: `import { Resource } from '@migaia/resource'
+import { createManualScheduler } from '@migaia/utils/testing'
+
+const scheduler = createManualScheduler()
+let version = 0
+const prices = new Resource(async () => \`v\${++version}\`, runtime, { ttl: 60_000, scheduler })
+
+await prices.promise // 'v1'
+scheduler.advance(60_001)
+prices.isStale // true
+await prices.refetch() // 'v2'`,
+      zh: `import { Resource } from '@migaia/resource'
+import { createManualScheduler } from '@migaia/utils/testing'
+
+const scheduler = createManualScheduler()
+let version = 0
+const prices = new Resource(async () => \`v\${++version}\`, runtime, { ttl: 60_000, scheduler })
+
+await prices.promise // 'v1'
+scheduler.advance(60_001)
+prices.isStale // true
+await prices.refetch() // 'v2'`
+    },
+    result: t(
+      'The test runs in milliseconds and only this resource sees the advanced time.',
+      '测试几毫秒就跑完，而且只有这个资源看到时间被推进。'
+    ),
+    covers: ['scheduler']
+  }
+]
 
 /** Reference of `@migaia/resource`. */
 export const resourceReference: ILibraryReference = {
@@ -603,7 +849,46 @@ runtime.effect(() => console.log(count.value))`
             '使用 `@migaia/reactive` 导出的默认运行时 `defaultRuntime`。'
           )
         }
-      }
+      },
+      optionCases: [
+        ...resourceOptionCases,
+        {
+          title: t('Give each test its own runtime', '每个测试使用独立的 runtime'),
+          problem: t(
+            'Without `runtime`, every resource joins the shared `defaultRuntime`, so effects and pending flushes from one test can still run during the next. Passing a runtime created per test keeps the graph, its effects and its error reporting inside that test; the signals the fetcher reads must come from the same runtime.',
+            '不传 `runtime` 时，所有资源都加入共享的 `defaultRuntime`，上一个测试留下的 effect 和待执行的冲刷可能在下一个测试里继续运行。为每个测试创建一个 runtime 传进去，依赖图、effect 和错误上报都只属于这个测试；加载函数读取的信号也必须来自同一个 runtime。'
+          ),
+          example: {
+            en: `import { createResource } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+
+test('loads the selected user', async () => {
+  const runtime = createRuntime()
+  const userId = runtime.signal('1')
+  const user = createResource(() => async () => loadUser(userId.value), { runtime })
+
+  expect(await user.promise).toEqual({ id: '1' })
+  user.dispose() // nothing from this test reaches the next one
+})`,
+            zh: `import { createResource } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+
+test('加载选中的用户', async () => {
+  const runtime = createRuntime()
+  const userId = runtime.signal('1')
+  const user = createResource(() => async () => loadUser(userId.value), { runtime })
+
+  expect(await user.promise).toEqual({ id: '1' })
+  user.dispose() // 这个测试的任何东西都不会留到下一个测试
+})`
+          },
+          result: t(
+            'Each test starts from an empty graph, and a failing effect is reported to that test only.',
+            '每个测试都从空的依赖图开始，失败的 effect 只上报给当前测试。'
+          ),
+          covers: ['runtime']
+        }
+      ]
     },
     IResourceSetup: {
       summary: t(
@@ -766,7 +1051,8 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
         'Options of `new Resource()`: caching, retries, start-up and snapshots.',
         '`new Resource()` 的选项：缓存、重试、启动方式与快照。'
       ),
-      members: resourceOptionMembers
+      members: resourceOptionMembers,
+      optionCases: resourceOptionCases
     },
     IResourceRetryPolicy: {
       summary: t(
