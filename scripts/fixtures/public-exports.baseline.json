@@ -165,6 +165,42 @@
         "file"
       ]
     },
+    "@migaia/micro-hub": {
+      ".": [
+        "MICRO_HUB_SOURCE",
+        "MicroCapability",
+        "MicroHubErrorCode",
+        "MicroHubErrorText",
+        "MicroResourceStatus",
+        "createMicroHub",
+        "createMicroHubError",
+        "createMicroHubTypeError",
+        "defineContract",
+        "event",
+        "getMicroHub",
+        "keyed",
+        "request",
+        "resource"
+      ],
+      "./events": [
+        "events"
+      ],
+      "./state": [
+        "state",
+        "stateDriverOf"
+      ],
+      "./persist": [
+        "persist"
+      ],
+      "./resource": [
+        "resources"
+      ],
+      "./web-component": [
+        "MICRO_APP_CONTEXT",
+        "consumeMicroApp",
+        "provideMicroApp"
+      ]
+    },
     "@migaia/middleware-pipeline": {
       ".": [
         "GENERATOR_CONTINUE",
