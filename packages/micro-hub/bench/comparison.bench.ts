@@ -146,7 +146,7 @@ it('captures all six scenarios with paired A/A rounds and independent execution 
   /** Package root stays stable whether Vitest starts here or via a filtered workspace command. */
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   /** Evidence remains ignored workspace-local documentation. */
-  const evidenceRoot = resolve(packageRoot, '../../docs/micro-hub/bench')
+  const evidenceRoot = resolve(process.env.MICRO_HUB_BENCH_OUTPUT ?? resolve(packageRoot, '../../docs/micro-hub/bench'))
   mkdirSync(resolve(evidenceRoot, 'raw'), { recursive: true })
   /** Unique run identity prevents combining samples after a fixture/settings change. */
   const runId = `${Settings.date}-${Date.now()}-${process.pid}-${randomBytes(3).toString('hex')}`
