@@ -88,35 +88,35 @@ const options: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
-/** A collection guard rejects writes after the application removes edit permission. */
+/** Application permissions reject a cart mutation before the shared view changes. */
 const guardedCollectionExample = `import { ObservableMap } from '@migaia/store-indexed'
 import { createRuntime } from '@migaia/reactive'
-const runtime = createRuntime()
-let canEdit = true
-const quantities = new ObservableMap<string, number>([['item-1', 1]], runtime, {
+
+const quantities = new ObservableMap<string, number>([['item-1', 1]], createRuntime(), {
   mutationGuard: {
-    assertMutationAllowed: () => {
-      if (!canEdit) throw new Error('editing disabled')
-    }
+    assertMutationAllowed: () => permissions.assertCanEdit('cart')
   }
 })
-quantities.set('item-1', 2)
-canEdit = false
-try { quantities.set('item-1', 3) } catch (error) { console.log((error as Error).message) }
-console.log(quantities.get('item-1'))
-quantities.dispose()`
-/** A custom name makes mutation operation labels recognizable to the application guard. */
+try {
+  quantities.set(itemId, nextQuantity)
+  renderCart(quantities.snapshot())
+} catch (error) {
+  showReadOnlyMessage(error)
+}`
+/** Feature names make the cart's reactive nodes recognizable in the trace panel. */
 const namedCollectionExample = `import { ObservableArray } from '@migaia/store-indexed'
 import { createRuntime } from '@migaia/reactive'
-const runtime = createRuntime()
-const operations: (string | undefined)[] = []
-const rows = new ObservableArray([10], runtime, {
-  debugName: 'cartRows',
-  mutationGuard: { assertMutationAllowed: (operation) => { operations.push(operation) } }
+
+const runtime = createRuntime({ onTrace: (event) => appendTraceToPanel(event) })
+const rows = new ObservableArray([10], runtime, { debugName: 'cartRows' })
+const view = runtime.effect(() => {
+  renderCartRows(rows.snapshot())
 })
 rows.push(20)
-console.log(operations, rows.snapshot())
-rows.dispose()`
+onCartClosed(() => {
+  view.dispose()
+  rows.dispose()
+})`
 /** Object example shows tracked reading and explicit lifecycle ownership. */
 const objectExample = `const user = new ObservableObject({ name: 'Ada', age: 30 })
 const watch = user.runtime.effect(() => console.log(user.get('name')))
@@ -200,34 +200,57 @@ const errorFactory = (native: string, withCause: boolean): ISymbolDoc => ({
     ? {
         optionCases: [
           {
-            title: t('Keep the original exception', '保留原始异常'),
+            title: t('Explain why cart rows could not be imported', '说明购物车行导入失败'),
             problem: t(
-              'An application adds a collection-specific explanation to a failure. Pass cause to keep the original exception; omitting it creates an error without that link.',
-              '应用为失败添加集合相关的说明时，传入 cause 可保留原始异常；省略它时，新错误没有这个关联。'
+              'A cart importer decodes uploaded rows before adding them to a collection. A short import error should not hide the decoder exception. Keep it in `cause` so monitoring can inspect that exception while the page describes the failed operation.',
+              '购物车导入器先解码上传行，再加入集合。简短的导入提示不应掩盖解码异常。用 `cause` 保留它，页面说明失败操作，监控仍能查看原始异常。'
             ),
-            example: `import { createStoreIndexed${native === 'Error' ? '' : 'Type'}Error, StoreIndexedErrorCode } from '@migaia/store-indexed'
-const cause = new TypeError('invalid imported rows')
-const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(StoreIndexedErrorCode.invalidOption, 'cannot import rows', { cause })
-console.log(error.cause === cause)`,
+            example: `import {
+  createStoreIndexed${native === 'Error' ? '' : 'Type'}Error,
+  StoreIndexedErrorCode
+} from '@migaia/store-indexed'
+
+try {
+  await importCartRows(upload)
+} catch (cause) {
+  const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(
+    StoreIndexedErrorCode.invalidOption,
+    'Cart rows could not be imported',
+    { cause }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
             result: t(
-              'Prints true; the original exception remains reachable.',
-              '输出 true；仍可找到原始异常。'
+              'The cart shows an import error, with the original decoder exception retained in monitoring.',
+              '购物车显示导入失败提示，监控记录保留原始解码异常。'
             ),
             covers: ['cause']
           },
           {
-            title: t('Keep structured import details', '保留结构化导入详情'),
+            title: t('Keep the row rejected by import validation', '保留导入校验拒绝的行详情'),
             problem: t(
-              'An importer reports a row number instead of throwing Error. cause accepts that object, preserving details without converting them to message text.',
-              '导入器可能返回行号详情，而非抛出 Error。cause 接受该对象，无需把详情转换成消息文本。'
+              'Cart import validation returns the row and field that failed. Converting that record to a message loses the structured details. Keep it in `cause` when reporting the rejected upload.',
+              '购物车导入校验会返回失败的行号和字段。只把记录变成文字会丢失结构化详情。报告上传被拒绝时，把记录保留在 `cause` 中。'
             ),
-            example: `import { createStoreIndexed${native === 'Error' ? '' : 'Type'}Error, StoreIndexedErrorCode } from '@migaia/store-indexed'
-const cause = { row: 3, field: 'quantity' }
-const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(StoreIndexedErrorCode.invalidOption, 'cannot import rows', { cause })
-console.log(error.cause === cause)`,
+            example: `import {
+  createStoreIndexed${native === 'Error' ? '' : 'Type'}Error,
+  StoreIndexedErrorCode
+} from '@migaia/store-indexed'
+
+const rejection = validateCartRows(upload)
+if (rejection) {
+  const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(
+    StoreIndexedErrorCode.invalidOption,
+    'Cart upload rejected',
+    { cause: rejection }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
             result: t(
-              'Prints true; cause is the same details object.',
-              '输出 true；cause 是同一个详情对象。'
+              'The page reports the rejected upload, and monitoring keeps its row and field details.',
+              '页面提示上传被拒绝，监控中保留对应的行号和字段。'
             ),
             covers: ['cause']
           }
@@ -345,23 +368,23 @@ export const storeIndexedReference: ILibraryReference = {
           ),
           example: guardedCollectionExample,
           result: t(
-            'Prints editing disabled and 2; the rejected write does not replace the value.',
-            '输出 editing disabled 和 2；被拒绝的写入没有替换原值。'
+            'An edit rejected by the permission policy shows the read-only message and leaves the stored quantity unchanged.',
+            '权限策略拒绝编辑时，页面显示只读提示，已保存数量保持不变。'
           ),
           covers: ['mutationGuard']
         },
         {
           title: t('Name collection writes in diagnostics', '为诊断中的集合写入命名'),
           problem: t(
-            'Several arrays use one mutation policy, and their default ObservableArray label does not identify the owning feature. debugName prefixes operation labels and internal signal diagnostics. The guard can collect those labels before allowing each write.',
-            '多个数组共用一种写入策略，默认的 ObservableArray 标签无法区分所属功能。debugName 为操作标签和内部信号诊断添加前缀。守卫可以先收集标签，再允许写入。'
+            'A support trace panel shows several observable arrays. Their default ObservableArray names do not identify the cart. Set `debugName` to name the cart signals in trace events, so support can locate changes from this view.',
+            '支持追踪面板中有多个响应式数组。默认的 ObservableArray 名称无法识别购物车。用 `debugName` 为追踪事件中的购物车信号命名，支持人员就能定位该视图的变化。'
           ),
           example: namedCollectionExample,
           result: t(
-            "Prints ['cartRows.push'] and [10, 20]. The application name appears in the write label.",
-            "输出 ['cartRows.push'] 和 [10, 20]；写入标签包含应用指定的名称。"
+            'The cart shows both rows, and its changed signals appear under the `cartRows` prefix in the trace panel.',
+            '购物车显示两行数据，追踪面板中变化的信号以 `cartRows` 为前缀。'
           ),
-          covers: ['debugName', 'mutationGuard']
+          covers: ['debugName']
         }
       ]
     },
