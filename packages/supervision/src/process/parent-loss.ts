@@ -4,7 +4,14 @@ import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/u
 import { ParentLossExitCode } from './constants.js'
 import { invalidProcessOption } from './spec.js'
 
-/** Initiates one bounded shutdown after a parent disappearance signal. */
+/**
+ * Runs inside a child process: when the parent connection is lost, `trigger()` starts `shutdown`
+ * once and guarantees a call to `exit` within `graceMs` (default 5000).
+ *
+ * `exit` receives `ParentLossExitCode.completed` when shutdown settles in time, or `forced` when
+ * the grace period ends first or shutdown fails; a shutdown failure is also sent to `report`. When
+ * the grace period ends, the signal passed to `shutdown` aborts. Repeated triggers have no effect.
+ */
 export function createParentLossGuard(options: {
   readonly shutdown: (signal: IAbortSignal) => PromiseLike<void>
   readonly exit: (code: ParentLossExitCode) => void

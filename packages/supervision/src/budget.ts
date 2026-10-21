@@ -30,7 +30,16 @@ function positive(value: unknown, field: string, integer = false, zero = false):
   return value
 }
 
-/** Admits units in FIFO order while retaining lifecycle leases for occupied slots. */
+/**
+ * Creates the slots a group of supervisors shares: how many units of one kind may run at once, how
+ * many may start per window, and how long a start may queue.
+ *
+ * Requests are admitted first in, first out. `acquire()` resolves with a granted lease or a stable
+ * rejection reason and never throws for capacity; `tryAcquire()` answers immediately. A supervisor
+ * releases its lease only after the unit has actually exited, so a unit that ignores stop keeps its
+ * slot. `close()` rejects queued and future requests while existing leases stay valid. Malformed
+ * limits throw a coded `RangeError` or `TypeError` before any queue or timer exists.
+ */
 export function createUnitBudget<TKind extends string>(
   options: IUnitBudgetOptions<TKind>
 ): IUnitBudget<TKind> {

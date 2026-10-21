@@ -25,7 +25,14 @@ export function validateThreadCapabilities(
   }
 }
 
-/** Admit thread-only policy, then delegate every lifecycle transition to core. */
+/**
+ * Supervises a worker thread created by an application-supplied launcher, with the same budget,
+ * restart, health and bounded-stop policy as other units.
+ *
+ * A thread shares its parent process: it cannot isolate crashes or limit CPU, so choose a process
+ * when either is required. `limits.heapBytes` is accepted only when the launcher enforces heap
+ * limits, and a launcher that cannot observe exit reliably must be paired with a `health` check.
+ */
 export function createThreadSupervisor<THandle extends IThreadHandle>(
   options: IThreadSupervisorOptions<THandle>
 ): IThreadSupervisor<THandle> {

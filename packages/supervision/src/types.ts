@@ -326,19 +326,42 @@ export type ISupervisorEvent<THandle> =
     }
 /** Public command and inspection surface of a supervisor. */
 export type ISupervisor<THandle, TSpec> = {
+  /** Current lifecycle state; changes are also published as `state` events. */
   readonly state: SupervisorState
+  /** Number of the latest start attempt; a successful start identifies the serving unit. */
   readonly generation: number
+  /**
+   * Starts the unit, retrying through backoff, and resolves with a stable answer: `ready` with the
+   * unit, `stopped` (possibly with a budget rejection) or `terminal`. Unit failures never reject;
+   * only a disposed supervisor rejects. Calling it while ready or starting joins the same answer.
+   */
   start(): Promise<IReadyOutcome<THandle>>
+  /** Waits for the next stable answer without starting anything; `signal` abandons the wait. */
   whenReady(signal?: IAbortSignal): Promise<IReadyOutcome<THandle>>
+  /**
+   * Stops the current attempt and unit through the bounded drain, exit and reap phases, then
+   * settles in `stopped`. It returns on time even if the unit ignores stop; that unit keeps its
+   * budget slot until it actually exits. Concurrent calls share one promise; `graceMs` shortens the
+   * drain phase.
+   */
   stop(options?: ISupervisorStopOptions): Promise<void>
   /** Immediately upgrades the original slot teardown; joiners retain the pending stop promise. */
   kill(): Promise<void>
+  /** Clears the failure window, stops the current unit and starts a fresh one, even from `terminal`. */
   restart(): Promise<IReadyOutcome<THandle>>
+  /**
+   * Replaces the serving unit, optionally with a new spec. `stop-then-start` (default) stops first;
+   * `start-then-switch` switches only after the new unit is ready, then stops the old one. A failed
+   * replacement resolves `failed` or `rejected` and leaves a still-serving old unit in place.
+   */
   replace(options?: {
     readonly strategy?: ReplaceStrategy
     readonly spec?: TSpec
   }): Promise<IReplaceOutcome>
+  /** Reads state, last exit, failure window, health and degradation without side effects. */
   inspect(): ISupervisorSnapshot
+  /** Registers an event listener and returns its unsubscribe function; listener errors are reported. */
   subscribe(listener: (event: ISupervisorEvent<THandle>) => void): () => void
+  /** Stops like `stop()` and closes the supervisor for good; later commands are rejected. */
   dispose(): Promise<void>
 }

@@ -55,7 +55,15 @@ type IIdle<THandle extends IProcessHandle> = {
   output?: IProcessLaunchContext['output']
 }
 
-/** Launches bounded idle units without adding a second restart policy. */
+/**
+ * Keeps `size` idle processes started ahead of time so a supervisor can take one instead of
+ * spawning.
+ *
+ * The pool must share the same budget, launcher and spec objects with the supervisor that takes
+ * from it, and every idle process holds a budget slot. Taking hands over the handle and its lease;
+ * the supervisor still runs its own readiness check. Idle processes are ended after `idleTimeoutMs`
+ * (default 60000). The pool has no restart policy of its own; it only refills toward its size.
+ */
 export function createPrewarmPool<THandle extends IProcessHandle>(
   options: IPrewarmPoolOptions<THandle>
 ): IPrewarmPool<THandle> {

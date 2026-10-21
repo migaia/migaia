@@ -13,7 +13,16 @@ export type IOrphanReclaimResult = {
   readonly failures: readonly ICollectedError[]
 }
 
-/** Reclaims only matching fingerprints and retains failed records for another attempt. */
+/**
+ * Cleans up processes recorded by an earlier run of the parent, typically right after startup and
+ * before creating supervisors.
+ *
+ * For each record in `namespace`, the launcher probes the process: a live process with a matching
+ * fingerprint is terminated, while a gone or reused pid only has its record removed, so an
+ * unrelated program is never killed. Each failed record stays in the registry for a later attempt
+ * and is reported as `ORPHAN_RECLAIM_FAILED`; the result lists terminated ids, removed ids and
+ * collected failures. A failed listing touches no record.
+ */
 export async function reclaimOrphanProcesses(options: {
   readonly registry: IProcessRegistry
   readonly namespace: string
