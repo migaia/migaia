@@ -365,6 +365,7 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
   capability: ['graph', 'graph-dynamic', 'graph-topology', 'graph-dependency', 'troubleshooting'],
   reactive: ['reactive', 'runtime', 'troubleshooting'],
   lifecycle: [
+    'graceful-shutdown',
     'scope',
     'disposal',
     'abort',
@@ -1317,8 +1318,11 @@ function classMembers(declaration: string) {
     )
     // Object-literal property types (`execution: { a: number; b: number }`) contain `;`, so the
     // type is everything after the colon up to the member's own final semicolon.
-    const property = normalized.match(/^([A-Za-z_$][\w$]*)[!?]?\s*:\s*([\s\S]+?);?$/)
-    const name = accessor?.[2] ?? method?.[1] ?? property?.[1]
+    // Quoted keys (`readonly 'async-generator': …`) are real members; the name drops its quotes.
+    const property = normalized.match(
+      /^([A-Za-z_$][\w$]*|'[^']+'|"[^"]+")[!?]?\s*:\s*([\s\S]+?);?$/
+    )
+    const name = accessor?.[2] ?? method?.[1] ?? property?.[1]?.replace(/^(['"])(.*)\1$/, '$2')
     if (!name) continue
     const kind = accessor?.[1] ?? (method ? 'method' : 'property')
     const open = parameterListStart(signature)
@@ -1338,7 +1342,7 @@ function classMembers(declaration: string) {
     members.push({
       name,
       kind,
-      optional: /^[\w$]+\?\s*[:(<]/.test(normalized),
+      optional: /^(?:[\w$]+|'[^']+'|"[^"]+")\?\s*[:(<]/.test(normalized),
       signature,
       description: classMemberDoc(body, start),
       parameterDetails,
@@ -1491,6 +1495,8 @@ function typeExpressionShape(expression: string): {
   /** Parse each utility separately: a trailing intersection is not part of its omitted key list. */
   if (/^(?:Omit|Pick|Partial|Required|Extract)</.test(target) || /\[['"][^'"]+['"]\]$/.test(target))
     return { members: [], composes: [target] }
+  /** `{ ... }[TMode]` looks one member type up; the literal's keys are not the alias's members. */
+  if (target.startsWith('{') && target.endsWith(']')) return none
   return {
     members: parts.filter((part) => part.startsWith('{')).flatMap((part) => classMembers(part)),
     composes: parts
@@ -2618,9 +2624,16 @@ function buildLibraryEntries() {
         description: typeof manifest.description === 'string' ? manifest.description : null,
         version: typeof manifest.version === 'string' ? manifest.version : null,
         exports,
+        /** Locales whose package README exists; the English rail links a README only when present. */
+        readmeLocales: ['zh', ...(existsSync(join(directory, 'README.en.md')) ? ['en'] : [])],
         documentation: {
           readme: maintainedDocument(join(directory, 'README.md')),
-          guide: maintainedDocument(join(directory, 'USEGUIDE.md'))
+          guide: maintainedDocument(join(directory, 'USEGUIDE.md')),
+          /** English READMEs and usage guides live beside the Chinese files as `*.en.md`. */
+          en: {
+            readme: maintainedDocument(join(directory, 'README.en.md')),
+            guide: maintainedDocument(join(directory, 'USEGUIDE.en.md'))
+          }
         },
         ...(() => {
           const publicSymbols = buildPublicSymbols(directory, manifest, exports)
