@@ -5,7 +5,13 @@
  * drain, and the default codec reads exact legacy markers while writing the canonical collections
  * representation.
  */
-import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import type {
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  ISymbolDoc,
+  IText
+} from './contract.js'
 import { storePersistCases } from './store-persist-cases.js'
 
 /** Constructs one bilingual explanation. */
@@ -54,6 +60,362 @@ const lightExample = storePersistCases.persist![0]!.example
 const indexedExample = storePersistCases.persistCollection![0]!.example
 /** One writable definition gets one archive and one independent handle. */
 const keyedExample = storePersistCases.persistKeyed![0]!.example
+/** Configuration cases run against the built persistence engine and each public adapter. */
+const persistOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  IPersistUnitOptions: [
+    {
+      title: {
+        en: 'Upgrade an archive while keeping session state',
+        zh: '升级存档并保留会话状态'
+      },
+      problem: {
+        en: 'An archive uses schema version 1, while the application now writes version 2 and keeps temporary fields only in memory. Without migrate a version mismatch fails hydration. partialize selects stored fields; merge adds restored fields to the current state. key is application-owned, storage and runtime are borrowed, and codec handles the complete version/state envelope.',
+        zh: '存档使用第 1 版结构，而应用现在写入第 2 版，并把临时字段留在内存。省略 migrate 时版本不匹配会恢复失败。partialize 选择保存字段，merge 把恢复字段合入当前状态。key 由应用指定，storage 和 runtime 由调用方持有，codec 处理完整版本与状态信封。'
+      },
+      example: `import { createRuntime } from '@migaia/reactive'
+import { persistUnit, type IPersistUnit } from '@migaia/store-persist'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+type IState = { count: number; temporary?: string }
+let state: IState = { count: 0, temporary: 'session-only' }
+let notify = () => {}
+const unit: IPersistUnit<IState> = {
+  snapshot: () => ({ ...state }),
+  restore: (next) => { state = next },
+  subscribe: (listener) => { notify = listener; return () => { notify = () => {} } }
+}
+const runtime = createRuntime()
+await storage.set('draft', await defaultJsonCodec.encode({ version: 1, state: { count: 2 } }) as string)
+const handle = persistUnit(unit, {
+  key: 'draft', runtime, storage, codec: defaultJsonCodec, version: 2,
+  migrate: (saved, fromVersion) => ({ ...saved, count: saved.count + fromVersion }),
+  partialize: (current) => ({ count: current.count }),
+  merge: (saved, current) => ({ ...current, ...saved })
+})
+await handle.ready
+console.log(state.count, state.temporary)
+await handle.flush()
+const archive = await defaultJsonCodec.decode(await storage.get('draft')) as { version: number; state: IState }
+console.log(archive.version, Object.hasOwn(archive.state, 'temporary'))
+await handle.disposeAsync()
+console.log(handle.disposed)
+storage.dispose()`,
+      result: {
+        en: 'It prints 3 session-only, then 2 false. The counter is migrated, the new archive omits temporary, and the final true confirms disposal.',
+        zh: '先输出 3 session-only，再输出 2 false。计数完成迁移，新存档不含 temporary，最后的 true 表示句柄已释放。'
+      },
+      covers: ['key', 'runtime', 'storage', 'codec', 'version', 'migrate', 'partialize', 'merge']
+    },
+    {
+      title: {
+        en: 'Coalesce typing without postponing every save',
+        zh: '合并连续输入并限制保存推迟'
+      },
+      problem: {
+        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
+        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
+      },
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+import { createRuntime } from '@migaia/reactive'
+import { persistUnit, type IPersistUnit } from '@migaia/store-persist'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+type IState = { count: number; temporary?: string }
+let state: IState = { count: 0, temporary: 'session-only' }
+let notify = () => {}
+const unit: IPersistUnit<IState> = {
+  snapshot: () => ({ ...state }),
+  restore: (next) => { state = next },
+  subscribe: (listener) => { notify = listener; return () => { notify = () => {} } }
+}
+const runtime = createRuntime()
+const scheduler = createManualScheduler()
+const handle = persistUnit(unit, { key: 'timed', runtime, storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+await handle.ready
+state.count = 1
+notify()
+scheduler.advance(50)
+state.count = 2
+notify()
+scheduler.advance(50)
+state.count = 3
+notify()
+scheduler.advance(49)
+console.log((await storage.get('timed')) == null)
+scheduler.advance(1)
+await new Promise((resolve) => setTimeout(resolve, 0))
+const archive = await defaultJsonCodec.decode(await storage.get('timed')) as { state: { count: number } | Map<string, number> }
+console.log((archive.state as { count: number }).count)
+await handle.disposeAsync()
+storage.dispose()`,
+      result: {
+        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
+        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
+      },
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ],
+  IPersistOptions: [
+    {
+      title: {
+        en: 'Save preferences without session-only fields',
+        zh: '保存偏好并排除会话字段'
+      },
+      problem: {
+        en: 'Saved preferences need a version upgrade, but temporary UI state must survive only in memory. migrate converts the old archive and partialize selects the next write. The adapter uses the Store runtime and its hydration method, so it exposes no custom merge option.',
+        zh: '保存的偏好需要升级版本，但临时界面状态只应留在内存。migrate 转换旧存档，partialize 选择下一次保存的字段。适配器使用原状态容器的运行时与恢复方法，因此不提供自定义 merge 选项。'
+      },
+      example: `import { createStore } from '@migaia/store-light'
+import { persist } from '@migaia/store-persist/light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+await storage.set('draft', await defaultJsonCodec.encode({ version: 1, state: { count: 2 } }) as string)
+const store = createStore({ count: 0, temporary: 'session-only' })
+const handle = persist(store, {
+  key: 'draft', storage, codec: defaultJsonCodec, version: 2,
+  migrate: (saved, fromVersion) => ({ count: Number(saved.count) + fromVersion }),
+  partialize: (state) => ({ count: state.count })
+})
+await handle.ready
+console.log(store.count, store.temporary)
+await handle.flush()
+const archive = await defaultJsonCodec.decode(await storage.get('draft')) as { version: number; state: Record<string, unknown> }
+console.log(archive.version, Object.hasOwn(archive.state, 'temporary'))
+await handle.disposeAsync()
+console.log(handle.disposed)
+await store.$dispose()
+storage.dispose()`,
+      result: {
+        en: 'The counter is 3, the session field remains in memory, and the version-2 archive omits it. The final true confirms handle disposal.',
+        zh: '计数变为 3，会话字段保留在内存，第 2 版存档不包含它。最后的 true 表示句柄已释放。'
+      },
+      covers: ['key', 'storage', 'codec', 'version', 'migrate', 'partialize']
+    },
+    {
+      title: {
+        en: 'Coalesce typing without postponing every save',
+        zh: '合并连续输入并限制保存推迟'
+      },
+      problem: {
+        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
+        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
+      },
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+import { createStore } from '@migaia/store-light'
+import { persist } from '@migaia/store-persist/light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+const store = createStore({ count: 0 })
+const runtime = store.$runtime
+const scheduler = createManualScheduler()
+const handle = persist(store, { key: 'timed', storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+await handle.ready
+store.count = 1
+runtime.flush()
+scheduler.advance(50)
+store.count = 2
+runtime.flush()
+scheduler.advance(50)
+store.count = 3
+runtime.flush()
+scheduler.advance(49)
+console.log((await storage.get('timed')) == null)
+scheduler.advance(1)
+await new Promise((resolve) => setTimeout(resolve, 0))
+const archive = await defaultJsonCodec.decode(await storage.get('timed')) as { state: { count: number } | Map<string, number> }
+console.log((archive.state as { count: number }).count)
+await handle.disposeAsync()
+await store.$dispose()
+storage.dispose()`,
+      result: {
+        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
+        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
+      },
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ],
+  IPersistCollectionOptions: [
+    {
+      title: {
+        en: 'Keep local Map entries when restoring an archive',
+        zh: '恢复存档时保留本地 Map 条目'
+      },
+      problem: {
+        en: 'Default Map restoration replaces the whole collection. A cart also has a local-only entry that must survive restoration but must not be stored. migrate upgrades saved quantities, merge retains current entries, and partialize leaves the local entry out of the archive. The codec preserves real Map values.',
+        zh: 'Map 默认恢复会替换整个集合。购物车还包含只在本地存在的条目，恢复时应保留，保存时应排除。migrate 升级已保存数量，merge 保留当前条目，partialize 从存档中排除本地条目。编解码器保留真正的 Map。'
+      },
+      example: `import { ObservableMap } from '@migaia/store-indexed'
+import { persistCollection } from '@migaia/store-persist/indexed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+await storage.set('cart', await defaultJsonCodec.encode({ version: 1, state: new Map([['book', 2]]) }) as string)
+const cart = new ObservableMap<string, number>([['local', 99]])
+const handle = persistCollection(cart, {
+  key: 'cart', storage, codec: defaultJsonCodec, version: 2,
+  migrate: (saved, fromVersion) => new Map([...saved].map(([key, value]) => [key, value + fromVersion] as const)),
+  partialize: (state) => new Map([...state].filter(([key]) => key !== 'local')),
+  merge: (saved, current) => new Map([...current, ...(saved instanceof Map ? saved : [])])
+})
+await handle.ready
+console.log(cart.get('book'), cart.get('local'))
+await handle.flush()
+const archive = await defaultJsonCodec.decode(await storage.get('cart')) as { version: number; state: Map<string, number> }
+console.log(archive.version, archive.state.has('local'))
+await handle.disposeAsync()
+console.log(handle.disposed)
+cart.dispose()
+storage.dispose()`,
+      result: {
+        en: 'It prints 3 99, then 2 false: book is upgraded, local survives in memory, and the new archive omits local. The final true confirms disposal.',
+        zh: '先输出 3 99，再输出 2 false：book 完成升级，local 留在内存，新存档不含 local。最后的 true 表示已释放。'
+      },
+      covers: ['key', 'storage', 'codec', 'version', 'migrate', 'partialize', 'merge']
+    },
+    {
+      title: {
+        en: 'Coalesce typing without postponing every save',
+        zh: '合并连续输入并限制保存推迟'
+      },
+      problem: {
+        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
+        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
+      },
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+import { ObservableMap } from '@migaia/store-indexed'
+import { persistCollection } from '@migaia/store-persist/indexed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+const cart = new ObservableMap<string, number>()
+const runtime = cart.runtime
+const scheduler = createManualScheduler()
+const handle = persistCollection(cart, { key: 'timed', storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+await handle.ready
+cart.set('book', 1)
+runtime.flush()
+scheduler.advance(50)
+cart.set('book', 2)
+runtime.flush()
+scheduler.advance(50)
+cart.set('book', 3)
+runtime.flush()
+scheduler.advance(49)
+console.log((await storage.get('timed')) == null)
+scheduler.advance(1)
+await new Promise((resolve) => setTimeout(resolve, 0))
+const archive = await defaultJsonCodec.decode(await storage.get('timed')) as { state: { count: number } | Map<string, number> }
+console.log((archive.state as Map<string, number>).get('book'))
+await handle.disposeAsync()
+cart.dispose()
+storage.dispose()`,
+      result: {
+        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
+        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
+      },
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ],
+  IPersistKeyedOptions: [
+    {
+      title: {
+        en: 'Archive one named draft without its session fields',
+        zh: '保存具名草稿并排除会话字段'
+      },
+      problem: {
+        en: 'One writable definition needs its own archive. namespace and the explicit id form drafts:alice; neither comes from the definition itself. partialize selects stored fields and merge preserves current session fields. This adapter does not offer migration, so the archive version must match.',
+        zh: '一个可写定义需要独立存档。namespace 和显式 id 组成 drafts:alice，两者都不是从定义中取得。partialize 选择保存字段，merge 保留当前会话字段。此适配器不提供迁移，因此存档版本必须匹配。'
+      },
+      example: `import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, atomDef } from '@migaia/store-keyed'
+import { persistKeyed } from '@migaia/store-persist/keyed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+type IState = { count: number; temporary?: string }
+await storage.set('drafts:alice', await defaultJsonCodec.encode({ version: 0, state: { count: 2 } }) as string)
+const atoms = createAtomStore(createRuntime())
+const draft = atomDef<IState>({ count: 0, temporary: 'session-only' })
+const handle = persistKeyed(atoms, draft, 'alice', {
+  namespace: 'drafts', storage, codec: defaultJsonCodec, version: 0,
+  partialize: (state) => ({ count: state.count }),
+  merge: (saved, current) => ({ ...current, ...saved })
+})
+await handle.ready
+console.log(atoms.peek(draft).count, atoms.peek(draft).temporary)
+await handle.flush()
+const archive = await defaultJsonCodec.decode(await storage.get('drafts:alice')) as { state: IState }
+console.log(Object.hasOwn(archive.state, 'temporary'))
+await handle.disposeAsync()
+console.log(handle.disposed)
+atoms.dispose()
+storage.dispose()`,
+      result: {
+        en: 'It prints 2 session-only, then false: the archived counter is restored while the session field remains local. The final true confirms handle disposal.',
+        zh: '先输出 2 session-only，再输出 false：计数从存档恢复，会话字段仍只在本地。最后的 true 表示句柄已释放。'
+      },
+      covers: ['namespace', 'storage', 'codec', 'version', 'partialize', 'merge']
+    },
+    {
+      title: {
+        en: 'Coalesce typing without postponing every save',
+        zh: '合并连续输入并限制保存推迟'
+      },
+      problem: {
+        en: 'Typing every 50 ms keeps resetting a 100 ms quiet interval. debounceMs coalesces these edits and maxWaitMs still requests a write after 150 ms from the first edit. scheduler injects an independent manual clock; it controls enqueueing, not storage latency.',
+        zh: '每 50 毫秒输入一次，会不断重置 100 毫秒的安静间隔。debounceMs 合并这些修改，maxWaitMs 仍在首次修改后的 150 毫秒请求写入。scheduler 注入独立手动时钟，只控制入队，不限制存储延迟。'
+      },
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, atomDef } from '@migaia/store-keyed'
+import { persistKeyed } from '@migaia/store-persist/keyed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { defaultJsonCodec } from '@migaia/store-persist'
+
+const storage = memoryStorageHost()
+const runtime = createRuntime()
+const atoms = createAtomStore(runtime)
+const draft = atomDef({ count: 0 })
+const scheduler = createManualScheduler()
+const handle = persistKeyed(atoms, draft, 'alice', { namespace: 'timed', storage, debounceMs: 100, maxWaitMs: 150, scheduler })
+await handle.ready
+atoms.set(draft, { count: 1 })
+runtime.flush()
+scheduler.advance(50)
+atoms.set(draft, { count: 2 })
+runtime.flush()
+scheduler.advance(50)
+atoms.set(draft, { count: 3 })
+runtime.flush()
+scheduler.advance(49)
+console.log((await storage.get('timed:alice')) == null)
+scheduler.advance(1)
+await new Promise((resolve) => setTimeout(resolve, 0))
+const archive = await defaultJsonCodec.decode(await storage.get('timed:alice')) as { state: { count: number } | Map<string, number> }
+console.log((archive.state as { count: number }).count)
+await handle.disposeAsync()
+atoms.dispose()
+storage.dispose()`,
+      result: {
+        en: 'At 149 ms no archive exists. At 150 ms the latest value, 3, is written even though the final quiet interval has not ended.',
+        zh: '149 毫秒时尚无存档；150 毫秒时写入最新值 3，此时最后一次安静间隔尚未结束。'
+      },
+      covers: ['debounceMs', 'maxWaitMs', 'scheduler']
+    }
+  ]
+}
+
 /** Canonical options reused only where the public wrapper exposes them. */
 const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   key: { summary: key },
@@ -85,6 +447,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   migrate: {
+    whenToUse: t(
+      'Set it when stored schema versions differ. The callback receives the saved state and its version and must return the current shape synchronously. Without it a mismatch fails; returning a Promise also fails hydration.',
+      '存档版本与当前结构不同时设置。回调接收保存状态及其版本，必须同步返回当前形状。省略时版本不匹配会失败，返回 Promise 也会使恢复失败。'
+    ),
+    example: persistOptionCases.IPersistUnitOptions![0]!.example,
     summary: t(
       'Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.',
       '版本不一致时同步调用，接收解码后的保存状态与存档版本；抛错或返回可等待对象会使水合失败。'
@@ -109,6 +476,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   partialize: {
+    whenToUse: t(
+      'Use it to keep session-only or derived fields out of storage. It selects each write without changing live memory. Omission stores the complete snapshot. The callback must return synchronously.',
+      '需要从存档排除会话或派生字段时设置。它为每次写入选择内容，不改变内存。省略时保存完整快照，回调必须同步返回。'
+    ),
+    example: persistOptionCases.IPersistUnitOptions![0]!.example,
     summary: t(
       'Synchronous callback before each write, receiving the latest unit snapshot and selecting its persisted portion. Throws and thenables become write failures.',
       '每次写入前同步调用，接收最新单元快照并选择需要保存的部分；抛错与可等待结果成为写入失败。'
@@ -126,6 +498,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     default: t('Identity: persist the complete snapshot.', '默认原样返回，保存完整快照。')
   },
   merge: {
+    whenToUse: t(
+      'Set it when archived partial state needs shape-specific reconciliation with live state. Return a complete synchronous state. Default plain-object merging preserves edits since attachment; non-object shapes are replaced by the archive.',
+      '保存的部分状态需要按形状与内存协调时设置。必须同步返回完整状态。默认普通对象合并保留接入后发生的修改，其它形状使用存档整体替换。'
+    ),
+    example: persistOptionCases.IPersistUnitOptions![0]!.example,
     summary: t(
       'Synchronous hydration callback receiving persisted partial state and the latest current state; return the complete state to restore. Throws or thenables fail hydration.',
       '同步水合回调接收保存的部分状态与最新当前状态，返回需要恢复的完整状态；抛错或可等待结果使水合失败。'
@@ -178,18 +555,36 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 /** Collection wrappers infer runtime from the owned source. */
-const collectionOptions = Object.fromEntries(
-  Object.entries(unitOptions).filter(([name]) => name !== 'runtime')
-)
+const collectionOptions: Readonly<Record<string, IMemberDoc>> = {
+  ...Object.fromEntries(Object.entries(unitOptions).filter(([name]) => name !== 'runtime')),
+  migrate: {
+    ...unitOptions.migrate!,
+    example: persistOptionCases.IPersistCollectionOptions![0]!.example
+  },
+  partialize: {
+    ...unitOptions.partialize!,
+    example: persistOptionCases.IPersistCollectionOptions![0]!.example
+  },
+  merge: {
+    ...unitOptions.merge!,
+    example: persistOptionCases.IPersistCollectionOptions![0]!.example
+  }
+}
 /** Light wrappers expose neither a runtime override nor a custom merge. */
-const lightOptions = Object.fromEntries(
-  Object.entries(collectionOptions).filter(([name]) => name !== 'merge')
-)
+const lightOptions: Readonly<Record<string, IMemberDoc>> = {
+  ...Object.fromEntries(Object.entries(collectionOptions).filter(([name]) => name !== 'merge')),
+  migrate: { ...unitOptions.migrate!, example: persistOptionCases.IPersistOptions![0]!.example },
+  partialize: {
+    ...unitOptions.partialize!,
+    example: persistOptionCases.IPersistOptions![0]!.example
+  }
+}
 /** Keyed options use namespace instead of an archive key and expose no migration callback. */
 const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(
     Object.entries(collectionOptions).filter(([name]) => name !== 'key' && name !== 'migrate')
   ),
+  merge: { ...unitOptions.merge!, example: persistOptionCases.IPersistKeyedOptions![0]!.example },
   namespace: {
     summary: t(
       'Required application-selected string prefix; the full key is namespace followed by a colon and the caller id. Missing or nonstring values throw INVALID_OPTION at runtime; clearFamily filters that exact prefix.',
@@ -198,6 +593,7 @@ const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   },
   partialize: {
     ...unitOptions.partialize!,
+    example: persistOptionCases.IPersistKeyedOptions![0]!.example,
     params: {
       value: t(
         'Latest value peeked from the writable definition in AtomStore.',
@@ -298,6 +694,16 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     'await handle.ready\nawait handle.clear()'
   ),
+  disposeAsync: method(
+    'Stops scheduling like dispose, then waits for admitted writes/removals and any final debounce snapshot. It does not wait for borrowed reads or dispose the source, storage or runtime.',
+    '先按 dispose 的方式停止调度，再等待已接纳的写入、移除与最终防抖快照完成；不等待借用的读取，也不释放源状态、存储或运行时。',
+    {},
+    t(
+      'Promise resolving after the write chain settles. A synchronous cleanup failure rejects afterwards; final-write failures remain available on writeError.',
+      '写入链结算后兑现的 Promise。同步清理失败会在此后拒绝，最终写入失败保留在 writeError 中。'
+    ),
+    'await handle.disposeAsync()\nconsole.log(handle.disposed)'
+  ),
   dispose: method(
     'Idempotently stops persistence subscriptions, cancels the debounce timer and aborts active adapter operations. A pending debounce window starts one unawaited final snapshot write. It does not clear business values or dispose the source state.',
     '幂等停止持久化订阅、取消防抖定时器并中止活跃适配器操作；存在待执行防抖窗口时，启动一次不等待的最终快照写入。不清业务值或释放源状态。',
@@ -324,6 +730,39 @@ const handleType = {
   example: lightExample,
   members: handleMembers
 }
+/** Native failures and structured inputs remain reachable through cause. */
+const persistErrorOptionCases = (name: string, envelope = false): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Keep the original decoder failure', '保留原始解码失败'),
+    problem: t(
+      'Adding archive context with only a new message loses the original error and stack. Supply cause to preserve that exact object.',
+      '只用新消息添加存档上下文会丢失原始错误及堆栈。提供 cause 可以保留同一个错误对象。'
+    ),
+    example: `import { ${name}, StorePersistErrorCode } from '@migaia/store-persist'
+const cause = new SyntaxError('invalid archive')
+const error = ${envelope ? 'new ' : ''}${name}(${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid, '}'archive rejected', { cause })
+console.log(error.cause === cause)`,
+    result: t('The identity check prints true.', '身份比较输出 true。'),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep the rejected archive description', '保留被拒绝的存档描述'),
+    problem: t(
+      'A loader can describe a rejected input with a record rather than an Error. Passing the record as cause keeps its fields available; omission attaches no cause.',
+      '加载器可能用记录对象描述被拒绝的输入，而不是提供 Error。把记录作为 cause 可保留其字段；省略时不附加原因。'
+    ),
+    example: `import { ${name}, StorePersistErrorCode } from '@migaia/store-persist'
+const cause = { key: 'draft', version: -1 }
+const error = ${envelope ? 'new ' : ''}${name}(${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid, '}'archive rejected', { cause })
+console.log(error.cause === cause)`,
+    result: t(
+      'The original record remains on error.cause and the comparison prints true.',
+      '原始记录保留在 error.cause 上，比较输出 true。'
+    ),
+    covers: ['cause']
+  }
+]
+
 /** Error helpers preserve native objects and cause identity. */
 const errorFactory = (
   name: string,
@@ -362,6 +801,7 @@ const errorFactory = (
   },
   ...(mode === 'options'
     ? {
+        optionCases: persistErrorOptionCases(name),
         optionDocs: {
           cause: {
             summary: t(
@@ -658,6 +1098,7 @@ export const storePersistReference: ILibraryReference = {
       'errors'
     ),
     PersistEnvelopeError: {
+      optionCases: persistErrorOptionCases('PersistEnvelopeError', true),
       role: 'error',
       purpose: t(
         'Native TypeError subclass identifying invalid archive envelopes with this package source and ENVELOPE_INVALID code.',
@@ -742,6 +1183,7 @@ export const storePersistReference: ILibraryReference = {
       }
     },
     IPersistUnitOptions: {
+      optionCases: persistOptionCases.IPersistUnitOptions!,
       summary: t(
         'Complete generic engine configuration, including caller-owned runtime, backend and synchronous state transformation callbacks.',
         '通用引擎完整配置，包含调用方运行时、后端及同步状态转换回调。'
@@ -749,6 +1191,7 @@ export const storePersistReference: ILibraryReference = {
       members: unitOptions
     },
     IPersistOptions: {
+      optionCases: persistOptionCases.IPersistOptions!,
       summary: t(
         'Light adapter options; source runtime is inferred and restoration uses the Store hydration behavior.',
         '轻量适配选项，从源存储取得运行时，恢复使用原存储水合行为。'
@@ -756,6 +1199,7 @@ export const storePersistReference: ILibraryReference = {
       members: lightOptions
     },
     IPersistCollectionOptions: {
+      optionCases: persistOptionCases.IPersistCollectionOptions!,
       summary: t(
         'Collection adapter options; source runtime is inferred and custom shape reconciliation can use merge.',
         '集合适配选项，从源集合取得运行时，可用合并回调定义形状协调。'
@@ -763,6 +1207,7 @@ export const storePersistReference: ILibraryReference = {
       members: collectionOptions
     },
     IPersistKeyedOptions: {
+      optionCases: persistOptionCases.IPersistKeyedOptions!,
       summary: t(
         'One writable definition archive configuration; namespace and explicit id determine the storage key.',
         '单个可写定义存档配置；命名空间与显式标识共同决定存储键。'
