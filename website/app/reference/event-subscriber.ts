@@ -3,7 +3,7 @@
  * Verified against `packages/event-subscriber/src` (types.ts, channel.ts, hub.ts, async.ts,
  * style.ts, state-constants.ts, error-code.ts) on 2026-10-17.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { eventSubscriberCases } from './event-subscriber-cases.js'
 
 /** Builds one bilingual text. */
@@ -16,9 +16,54 @@ const subscriptionOptionDocs: Readonly<Record<string, IMemberDoc>> = {
       'Caller-assigned non-empty registration name, selected later by `filterTaskId()` or `invokeTask()`.',
       '调用方为本次订阅指定的非空登记名称，之后由 `filterTaskId()` 或 `invokeTask()` 选中。'
     ),
-    default: t('Not set: the registration has no task name.', '不设置：这条登记没有任务名称。')
+    default: t('Not set: the registration has no task name.', '不设置：这条登记没有任务名称。'),
+    example: `subscribeOnce(ready, ({ value }) => render(value), { taskId: 'first-render' })`
   }
 }
+
+/** Named helper registrations support selecting work without publishing to every listener. */
+const subscriptionOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Select the first render by task name', '按任务名选中首次渲染'),
+    problem: t(
+      'Startup has several listeners, but this step must invoke only the first-render task. Without taskId that registration cannot be selected by name. The one-shot helper removes it before calling it.',
+      '启动时有多个监听者，但这一步只需执行首次渲染任务。不设置 taskId 就无法按名称选中这条登记。单次订阅会先移除登记，再调用监听者。'
+    ),
+    example: `import { createEventChannel, invokeTask } from '@migaia/event-subscriber'
+import { subscribeOnce } from '@migaia/event-subscriber/subscriber'
+
+const ready = createEventChannel<string>()
+subscribeOnce(ready, ({ value }) => { console.log(value) }, { taskId: 'first-render' })
+await invokeTask(ready, 'first-render', 'ready')
+console.log(ready.size)`,
+    result: t(
+      'It prints ready, then 0: the named registration is already removed.',
+      '先输出 ready，再输出 0：这条具名登记已移除。'
+    ),
+    covers: ['taskId']
+  },
+  {
+    title: t('Name work owned by an open page', '给当前页面持有的任务命名'),
+    problem: t(
+      'A page needs selected refresh requests until it closes. taskId lets invokeTask select its listener; subscribeUntil removes it when the page signal aborts, so later work cannot reach the closed page.',
+      '页面在关闭前需要接收选中的刷新请求。taskId 让 invokeTask 选中它的监听者；页面信号取消时 subscribeUntil 移除登记，后续任务不会送到已关闭页面。'
+    ),
+    example: `import { createEventChannel, invokeTask } from '@migaia/event-subscriber'
+import { subscribeUntil } from '@migaia/event-subscriber/subscriber'
+
+const page = new AbortController()
+const updates = createEventChannel<string>()
+subscribeUntil(updates, page.signal, ({ value }) => { console.log(value) }, { taskId: 'page-refresh' })
+await invokeTask(updates, 'page-refresh', 'updated')
+page.abort()
+console.log(updates.size)`,
+    result: t(
+      'It prints updated, then 0 after the page aborts.',
+      '先输出 updated，页面取消后输出 0。'
+    ),
+    covers: ['taskId']
+  }
+]
 
 /** `report` field shared by channel and hub options. */
 const reportField = (hub: boolean): IMemberDoc => ({
@@ -29,6 +74,10 @@ const reportField = (hub: boolean): IMemberDoc => ({
   default: t(
     'Not set: late failures go to `terminalReport`, then to the host error reporter.',
     '不设置：迟到的失败交给 `terminalReport`，再交给宿主的错误上报（`reportError`）。'
+  ),
+  whenToUse: t(
+    'Set a reporter when listeners return promises, such as saving a job. It receives late rejections and projection failures; synchronous throws still leave publish() as PUBLISH_FAILED. Without it, terminalReport handles these diagnostics.',
+    '监听者返回 Promise 时设置，例如保存任务。它接收稍后的拒绝和值路径读取失败；同步抛错仍由 publish() 以 PUBLISH_FAILED 抛出。不设置时，这些诊断交给 terminalReport。'
   ),
   example: `const channel = createEventChannel<IJob>({
   report: ({ event, error }) => logger.error('job failed', event.value, error)
@@ -44,6 +93,10 @@ const terminalReportField: IMemberDoc = {
   default: t(
     'Not set: the failure is passed to the host `reportError` with code `UNHANDLED_LISTENER_FAILURE`.',
     '不设置：失败以 `UNHANDLED_LISTENER_FAILURE` 码交给宿主的 `reportError`。'
+  ),
+  whenToUse: t(
+    'Use a separate final sink when the main reporter can fail, for example when telemetry is offline. It receives failures missed by report; without it, the host diagnostic fallback receives them. It does not change publish() results.',
+    '主要上报渠道可能失败时设置独立的最终出口，例如遥测服务离线。report 未能处理的失败会交给它；不设置时交给宿主诊断通道。它不改变 publish() 的结果。'
   ),
   example: `createEventChannel<IJob>({
   report: ({ error }) => telemetry.capture(error),
@@ -76,6 +129,10 @@ const styleField: IMemberDoc = {
       '增加 `listen`、`fire`，句柄上增加 `unlisten`。'
     )
   },
+  whenToUse: t(
+    'Choose the names your integration already uses: on-emit adds on/emit/off, on-trigger adds on/trigger/off, and listen-fire adds listen/fire/unlisten. A custom map supplies your own names. Omit it or use subscribe-publish for canonical names only; every choice preserves delivery and cancellation behavior.',
+    '接入已有代码时选择它熟悉的名称：on-emit 增加 on/emit/off，on-trigger 增加 on/trigger/off，listen-fire 增加 listen/fire/unlisten。自定义名称表使用你自己的名称。省略或传 subscribe-publish 时只提供标准名称；所有选择都保持交付和取消行为。'
+  ),
   example: `const events = createEventChannel<number>({ style: 'on-emit' })
 const stop = events.on(({ value }) => console.log(value))
 events.emit(1)
@@ -660,6 +717,7 @@ if (result.status === 'fulfilled') console.log(result.value)`
     subscribeOnce: {
       role: 'operation',
       optionDocs: subscriptionOptionDocs,
+      optionCases: subscriptionOptionCases,
       purpose: t(
         'Subscribes a listener that runs at most once: the registration is removed before the listener is called, so a re-entrant publish, a throw or a rejection cannot call it a second time.',
         '订阅一个最多执行一次的 listener：在调用 listener 之前就先退订，所以重入发布、抛错或 reject 都不会让它第二次执行。'
@@ -706,6 +764,7 @@ const stop = subscribeSubscriber(numbers, new Counter())`
     subscribeUntil: {
       role: 'operation',
       optionDocs: subscriptionOptionDocs,
+      optionCases: subscriptionOptionCases,
       purpose: t(
         'Subscribes a listener that is removed automatically when `signal` aborts. Aborting only stops future deliveries; a listener that is already running is not interrupted. With an already-aborted signal no registration is made (or `ABORTED` is thrown when the channel has `throwOnAborted: true`).',
         '订阅一个随 `signal` 取消而自动退订的 listener。取消只阻止之后的交付，不会中断正在执行的 listener。传入已取消的信号时不会登记（若 channel 设置了 `throwOnAborted: true`，则抛 `ABORTED`）。'
@@ -815,6 +874,55 @@ const stop = subscribeSubscriber(numbers, new Counter())`
       }
     },
     IEventChannelOptions: {
+      optionCases: [
+        {
+          title: t(
+            'Finish the current notification before its follow-up',
+            '先处理完当前通知，再处理后续通知'
+          ),
+          problem: t(
+            'One listener publishes a second value while another listener still needs the first. Default recursive delivery can show the second value first. queued finishes each snapshot in order; publishBudget bounds the total listener calls of this publish.',
+            '一个监听者发布第二个值时，另一个还没收到第一个值。默认递归交付可能让它先看到第二个值。queued 按顺序完成每一轮交付；publishBudget 限制这次发布的监听者调用总数。'
+          ),
+          example: `import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
+
+const events = createEventChannel<number>({
+  dispatchPolicy: EventDispatchPolicy.queued,
+  publishBudget: 10
+})
+const seen: number[] = []
+events.subscribe(({ value }) => { if (value === 1) events.publish(2) })
+events.subscribe(({ value }) => { seen.push(value) })
+events.publish(1)
+console.log(seen)`,
+          result: t(
+            'The second listener sees [1, 2]. Four calls fit within the budget of 10.',
+            '第二个监听者收到 [1, 2]。共四次调用，没有超过 10 次预算。'
+          ),
+          covers: ['dispatchPolicy', 'publishBudget']
+        },
+        {
+          title: t('Release all copies of a view listener', '释放视图监听者的全部登记'),
+          problem: t(
+            'A view has registered the same callback twice. With default handle removal, releasing one handle leaves the other active. multiple keeps both registrations, while listener-all lets one handle release both.',
+            '一个视图把同一回调登记了两次。默认按句柄移除时，释放一个仍会留下另一个。multiple 保留两条登记，listener-all 则让一个句柄同时释放它们。'
+          ),
+          example: `import { createEventChannel, EventAdmissionPolicy, EventRemovalPolicy } from '@migaia/event-subscriber'
+
+const events = createEventChannel<number>({
+  admissionPolicy: EventAdmissionPolicy.multiple,
+  removalPolicy: EventRemovalPolicy.listenerAll
+})
+const render = ({ value }: { value: number }) => { console.log(value) }
+const stop = events.subscribe(render)
+events.subscribe(render)
+console.log(events.size)
+stop()
+console.log(events.size)`,
+          result: t('The registration count changes from 2 to 0.', '登记数从 2 变为 0。'),
+          covers: ['admissionPolicy', 'removalPolicy']
+        }
+      ],
       summary: t(
         'Options of `createEventChannel()`. All fields are optional and fixed at creation.',
         '`createEventChannel()` 的选项。全部字段可选，在创建时确定，之后不能修改。'
@@ -832,6 +940,10 @@ const stop = subscribeSubscriber(numbers, new Counter())`
             '`EventDispatchPolicy.recursive`：立即交付内层的值，交付完再继续外层发布。'
           ),
           values: { enum: 'EventDispatchPolicy' },
+          whenToUse: t(
+            'Use queued when listeners publish follow-up events and every listener must finish the current value first. recursive delivers the nested value immediately. Omitting it selects recursive.',
+            '监听者会发布后续事件，且所有监听者都应先处理完当前值时选 queued。recursive 会立即交付嵌套值；省略时使用 recursive。'
+          ),
           example: `createEventChannel<number>({ dispatchPolicy: EventDispatchPolicy.queued })`
         },
         admissionPolicy: {
@@ -844,10 +956,20 @@ const stop = subscribeSubscriber(numbers, new Counter())`
             '`EventAdmissionPolicy.multiple`：每次订阅都建立一条独立登记。'
           ),
           values: { enum: 'EventAdmissionPolicy' },
-          example: `const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
+          whenToUse: t(
+            'Use unique when repeated setup calls must reuse the same listener and task label. multiple gives each call an independent registration and is the default. Different task labels are not merged.',
+            '重复初始化必须复用同一函数和任务名时选 unique。multiple 让每次调用各自登记，也是默认值。不同任务名不会被合并。'
+          ),
+          example: {
+            en: `const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
+const a = channel.subscribe(render)
+const b = channel.subscribe(render) // reuses the same registration
+console.log(channel.size) // 1`,
+            zh: `const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
 const a = channel.subscribe(render)
 const b = channel.subscribe(render) // 复用同一条登记
 console.log(channel.size) // 1`
+          }
         },
         removalPolicy: {
           summary: t(
@@ -859,6 +981,10 @@ console.log(channel.size) // 1`
             '`handle`：句柄只移除它自己建立的那一条登记。'
           ),
           values: { enum: 'EventRemovalPolicy' },
+          whenToUse: t(
+            'Use listener-all when releasing one handle must also remove other registrations of that function. handle removes only its own registration and is the default. This matters when admissionPolicy is multiple.',
+            '释放一个句柄时也要移除同一函数的其它登记，选 listener-all。handle 只移除自己的登记，也是默认值。此区别适用于 admissionPolicy 为 multiple 的情况。'
+          ),
           example: `createEventChannel<number>({ removalPolicy: EventRemovalPolicy.listenerAll })`
         },
         publishBudget: {
@@ -888,6 +1014,10 @@ console.log(channel.size) // 1`
               '抛出带 `ABORTED` 码的 `TypeError`；适合把“用已取消的信号订阅”视为调用方错误的场景。'
             )
           },
+          whenToUse: t(
+            'Use true when subscribing after cancellation is a caller error: subscribeUntil throws ABORTED. false and omission return a no-op handle without registering. Neither choice interrupts an already-running listener.',
+            '取消后仍然订阅属于调用错误时设为 true，subscribeUntil 会抛 ABORTED。false 或省略时不登记，返回空操作句柄。两者都不会中断已经运行的监听者。'
+          ),
           example: `createEventChannel<number>({ throwOnAborted: true })`
         },
         style: styleField,
@@ -895,6 +1025,62 @@ console.log(channel.size) // 1`
       }
     },
     IEventHubOptions: {
+      optionCases: [
+        {
+          title: t(
+            'Route typed notifications with familiar method names',
+            '用熟悉的方法名分发带类型的通知'
+          ),
+          problem: t(
+            'An integration uses on/emit names and reads an id nested inside each payload. Without style it has only subscribe/publish; without valueConfig each listener must read the path itself. These options add aliases while keeping the original payload.',
+            '接入代码使用 on/emit 名称，并读取每份数据深处的 id。省略 style 时只有 subscribe/publish；省略 valueConfig 时每个监听者都要自己读取路径。这两个选项添加别名，同时保留原始数据。'
+          ),
+          example: `import { createEventHub } from '@migaia/event-subscriber'
+
+const valueConfig = { readPath: 'data.id', alias: 'resourceId' } as const
+const events = createEventHub<{ changed: { data: { id: number } } }, 'on-emit', typeof valueConfig>({
+  style: 'on-emit',
+  valueConfig
+})
+const stop = events.on('changed', (event) => {
+  console.log(event.resourceId, event.value.data.id)
+})
+events.emit('changed', { data: { id: 7 } })
+stop.off()`,
+          result: t(
+            'The listener prints 7 7. off() then removes the registration.',
+            '监听者输出 7 7，随后 off() 移除登记。'
+          ),
+          covers: ['style', 'valueConfig']
+        },
+        {
+          title: t(
+            'Keep a final sink for failed background work',
+            '为失败的后台任务保留最终上报出口'
+          ),
+          problem: t(
+            'A background listener rejects after publish() returns. A synchronous try/catch around publish() cannot catch that failure. report receives the key and failure; terminalReport still sees a diagnostic if report itself throws.',
+            '后台监听者在 publish() 返回后才拒绝。包住 publish() 的同步 try/catch 接不到这个失败。report 接收事件名和失败；如果 report 自身抛错，terminalReport 仍会收到诊断。'
+          ),
+          example: `import { createEventHub } from '@migaia/event-subscriber'
+
+const diagnostics: string[] = []
+const events = createEventHub<{ saved: number }>({
+  report: ({ key }) => { diagnostics.push(String(key)); throw new Error('telemetry offline') },
+  terminalReport: () => { diagnostics.push('fallback') }
+})
+events.subscribe('saved', async () => { throw new Error('save failed') })
+events.publish('saved', 7)
+await new Promise((resolve) => setTimeout(resolve, 0))
+console.log(diagnostics)
+events.clear()`,
+          result: t(
+            'The diagnostic list is ["saved", "fallback"]. publish() returns before either callback runs.',
+            '诊断列表为 ["saved", "fallback"]。publish() 先返回，随后执行这两个回调。'
+          ),
+          covers: ['report', 'terminalReport']
+        }
+      ],
       summary: t(
         'Options of `createEventHub()`. Dispatch, admission, removal, budget and aborted-signal behaviour are fixed for hubs; only reporting, method aliases and the value alias can be set.',
         '`createEventHub()` 的选项。hub 的分发、登记、移除、预算和已取消信号的行为是固定的，只能设置失败上报、方法别名和值别名。'
