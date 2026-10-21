@@ -5,7 +5,7 @@
  * registration. Late graceful failures and accidental asynchronous hook failures remain observed
  * through the existing report boundary.
  */
-import { lifecycleCases } from './lifecycle-cases.js'
+import { lifecycleCases, lifecycleOptionCases, lifecycleOptionExamples } from './lifecycle-cases.js'
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 
 /** Builds the two localized versions of one reference sentence. */
@@ -137,6 +137,11 @@ const schedulerOption: IMemberDoc = {
 
 /** One policy choice controls how release failures leave a scope or transaction. */
 const errorPolicyOption: IMemberDoc = {
+  whenToUse: t(
+    'Keep default throw to propagate release failures. Choose collect to inspect a returned list, report to deliver every failure to a required reporter, or firstError to throw the first and report later ones. Every item still receives its release attempt.',
+    '保留默认 throw 可传播释放失败。collect 用于检查返回列表；report 将每个失败交给必需的上报器；firstError 抛首错并上报后续错误。每个项目仍会尝试释放。'
+  ),
+  example: lifecycleOptionExamples.scopeReport,
   summary: t(
     'Selects the release error outcome from `LifecycleErrorPolicy`. Every admitted item still receives its release attempt; `report` and `firstError` require a reporter when creating a scope or transaction.',
     '从 `LifecycleErrorPolicy` 选择释放错误的交付方式。每个已接纳项目仍会尝试释放；创建作用域或事务时，`report` 与 `firstError` 必须提供上报回调。'
@@ -150,6 +155,10 @@ const errorPolicyOption: IMemberDoc = {
 
 /** Reporter callbacks are the final diagnostic boundary, not release operations. */
 const reportOption: IMemberDoc = {
+  whenToUse: t(
+    'Supply a synchronous receiver when cleanup failures must reach monitoring. It is required with report or firstError policies; omission otherwise provides no diagnostic sink. Return no value; reporter failures are contained.',
+    '清理失败需要交给监控时提供同步接收方。report 或 firstError 策略必须设置；其它情况下省略则没有诊断接收方。不返回值，上报器失败会被隔离。'
+  ),
   summary: t(
     'Receives each diagnostic or policy-routed `error` from lifecycle. Return nothing synchronously; accidental thenable rejections and synchronous throws are contained. A scope or transaction requires this callback for `report` and `firstError` policies.',
     '接收本包传入的诊断错误或策略转交的 `error`。应同步返回空值；同步抛错和意外返回的异步拒绝都会被隔离。作用域或事务选择 `report`、`firstError` 时必须提供。'
@@ -168,8 +177,7 @@ const reportOption: IMemberDoc = {
     'No value is consumed; callback failures do not replace the operation result.',
     '不使用返回值；回调失败不会替换操作结果。'
   ),
-  example: `const scope = createLifecycleScope({ errorPolicy: 'report', report: (error) => console.error(error) })
-await scope.dispose()`
+  example: lifecycleOptionExamples.scopeReport
 }
 
 /** Shared absolute deadline never grants a fresh budget to subsequent resources. */
@@ -869,6 +877,7 @@ console.log(await wait)`
     },
     boundedWait: {
       role: 'operation',
+      optionCases: lifecycleOptionCases.bounded,
       cases: lifecycleCases.boundedWait,
       purpose: t(
         'Observes one task until an existing absolute deadline without cancelling that task. A task rejection before timeout stays primary even if timer cancellation fails: secondary cleanup is attached through cause/errors. Synchronous timer completion waits for its handle before settling, cancels once, and applies the same cleanup policy. Late rejection remains observed.',
@@ -892,6 +901,11 @@ console.log(await wait)`
         scheduler: schedulerOption,
         reportCleanup: {
           ...reportOption,
+          whenToUse: t(
+            'Set it when timer cleanup failure should be observed without replacing the winning task or deadline result. Without it, timer cleanup failure rejects the wait.',
+            '需要观察定时器清理失败，同时保留任务或截止时刻的胜出结果时设置。不设置则清理失败会拒绝等待。'
+          ),
+          example: lifecycleOptionExamples.boundedCleanup,
           summary: t(
             'Receives the raw timer-cancellation `error`; return void synchronously. Reporter throws and rejections are contained so the original task/deadline winner remains the result.',
             '接收定时器取消时的原始 `error`，应同步返回空值。上报回调抛错和拒绝被隔离，因此仍保留任务与截止时刻的原有胜出结果。'
@@ -1258,6 +1272,7 @@ const scheduler = resolveScheduler(systemScheduler)
 console.log(scheduler.now())`
     },
     resolveSchedulerOption: {
+      optionCases: lifecycleOptionCases.scheduler,
       role: 'operation',
       purpose: t(
         'Reads the optional scheduler field once, snapshots a supplied scheduler, and otherwise returns the caller-provided fallback unchanged. Without a fallback it deliberately preserves absence instead of inventing a clock.',
@@ -1348,6 +1363,7 @@ console.log(await scope.dispose())`
         'Caller-owned configuration for asynchronous scope failure delivery and shared release timing.',
         '调用方持有的异步作用域配置，决定错误交付方式与共享释放计时。'
       ),
+      optionCases: lifecycleOptionCases.scope,
       members: {
         errorPolicy: errorPolicyOption,
         report: reportOption,
@@ -1360,7 +1376,11 @@ console.log(await scope.dispose())`
         'Caller-owned configuration for synchronous release error delivery without asynchronous timing.',
         '调用方持有的同步作用域配置，决定同步释放错误的交付方式。'
       ),
-      members: { errorPolicy: errorPolicyOption, report: reportOption }
+      optionCases: lifecycleOptionCases.syncScope,
+      members: {
+        errorPolicy: { ...errorPolicyOption, example: lifecycleOptionExamples.syncReport },
+        report: { ...reportOption, example: lifecycleOptionExamples.syncReport }
+      }
     },
     ILifecycleScope: {
       summary: t(
@@ -1491,6 +1511,7 @@ scope.own({}, { syncSafe: true, force: () => undefined })`
         'Configuration connecting temporary setup work to an externally owned cancellation signal.',
         '把临时初始化工作关联到外部所有取消信号的配置。'
       ),
+      optionCases: lifecycleOptionCases.provisional,
       members: {
         parentSignal: {
           summary: t(
@@ -1765,6 +1786,7 @@ release()`,
         'Caller configuration for parent cancellation, generation timeout scheduling and release diagnostics.',
         '调用方提供的父级取消、世代超时排程和释放诊断配置。'
       ),
+      optionCases: lifecycleOptionCases.generation,
       members: {
         parentSignal: {
           summary: t(
@@ -1778,6 +1800,10 @@ release()`,
         },
         scheduler: schedulerOption,
         onSuperseded: {
+          whenToUse: t(
+            'Set it to notice a late result that cannot be adopted. It runs before releasing that stale value. Omission sends no superseded diagnostic; it does not affect which token is current.',
+            '需要发现无法接纳的晚到结果时设置。在释放过期值之前调用。省略时不发舍弃诊断，也不影响哪个令牌是当前令牌。'
+          ),
           summary: t(
             'Synchronous `(info) => void` diagnostic called before releasing a stale adopted result. The supplied `ILifecycleError` has `GENERATION_SUPERSEDED`; its return is ignored, synchronous throws and asynchronous rejections go to the existing `report` boundary. Reporter failures reach the shared utils host exception queue without changing adoption.',
             '同步 `(info) => void` 诊断回调，在释放过期结果前调用。传入的 `ILifecycleError` 带 `GENERATION_SUPERSEDED`；不使用返回值，同步抛错与异步拒绝进入既有 `report` 通道；上报器失败进入工具包共享宿主异常队列，不改变接纳结果。'
@@ -1796,14 +1822,15 @@ release()`,
             'No value is consumed; accidental asynchronous rejection is observed through `report`.',
             '不使用返回值；意外的异步拒绝通过 `report` 观察。'
           ),
-          example: `const controller = createGenerationController({ onSuperseded: (info) => console.log(info.code) })
-const old = controller.begin()
-controller.begin()
-controller.adopt(old.token, {}, () => undefined)
-controller.dispose()`
+          example: lifecycleOptionExamples.superseded
         },
         report: {
           ...reportOption,
+          whenToUse: t(
+            'Set it to observe stale-result release failures or asynchronous generation cleanup failures without a per-call receiver. Omission drops those last-boundary diagnostics; adoption still returns its own result.',
+            '过期结果释放失败或异步代次清理失败没有逐次接收方时设置。省略时丢弃这些最终边界诊断；接纳仍返回自身结果。'
+          ),
+          example: lifecycleOptionExamples.superseded,
           summary: t(
             'Final synchronous diagnostic sink for stale-result release failures without a per-call reporter and asynchronous timeout cleanup failures. Receives `error`; throws and rejections are contained.',
             '过期结果释放缺少每次调用上报器时，以及异步超时清理失败时的最终同步诊断回调。接收 `error`，抛错和拒绝被隔离。'
@@ -2085,8 +2112,14 @@ await tracker.drain()`
         'Admission and diagnostics configuration for serial mutations; no option imposes a running-task timeout.',
         '串行变更的接纳和诊断配置；所有选项均不限制已运行任务的执行时长。'
       ),
+      optionCases: lifecycleOptionCases.queue,
       members: {
         queueAdmissionTimeoutMs: {
+          whenToUse: t(
+            'Use milliseconds to reject an overdue waiting task. false disables rejection and diagnostic timers; undefined, the default, allows diagnostics without rejecting. Running tasks are never interrupted.',
+            '用毫秒数拒绝等待过期的任务。false 关闭拒绝与诊断定时器；默认 undefined 允许诊断但不拒绝。不会中断运行中的任务。'
+          ),
+          example: lifecycleOptionExamples.queueTimeout,
           summary: t(
             'Per-waiting-task admission budget: a number rejects and removes an overdue task, false disables timers, and undefined permits diagnostics without rejection.',
             '每个排队任务的接纳预算：数字使超时任务被拒绝并移除，假值关闭定时器，空值允许诊断但不拒绝。'
@@ -2103,6 +2136,11 @@ await tracker.drain()`
           }
         },
         admissionDiagnosticMs: {
+          whenToUse: t(
+            'Set milliseconds to change the default 1000 ms queue warning threshold, or false to disable it. It applies only with undefined admission timeout and an onAdmissionDiagnostic callback; it never rejects work.',
+            '用毫秒数修改默认 1000 毫秒排队提示阈值，或用 false 关闭。仅在接纳超时为 undefined 且提供 onAdmissionDiagnostic 时生效，不会拒绝工作。'
+          ),
+          example: lifecycleOptionExamples.queueDiagnostic,
           summary: t(
             'Diagnostic delay used only when admission timeout is undefined and a diagnostic callback exists; false disables the diagnostic timer.',
             '仅在接纳超时为空且存在诊断回调时使用的诊断延迟；假值关闭诊断定时器。'
@@ -2119,6 +2157,10 @@ await tracker.drain()`
           }
         },
         onAdmissionDiagnostic: {
+          whenToUse: t(
+            'Set it to observe the owner and elapsed wait without rejecting the queued task. Without it no diagnostic-only timer is installed. Callback failures are contained.',
+            '需要观察所有者和已等待时间，而不拒绝任务时设置。不设置则不安装仅用于诊断的定时器。回调失败会被隔离。'
+          ),
           summary: t(
             'Synchronous `(info) => void` notification with caller-issued `info.owner` and elapsed `info.waitedMs` from the scheduler clock. The return is ignored; synchronous throws and accidental async rejections are contained.',
             '同步 `(info) => void` 通知，包含调用方指定的 `info.owner` 和调度器时钟测得的 `info.waitedMs`。不使用返回值；同步抛错和意外异步拒绝均被隔离。'
@@ -2137,8 +2179,7 @@ await tracker.drain()`
             'No value is consumed and callback failure does not change queue results.',
             '不使用返回值，回调失败不改变队列结果。'
           ),
-          example: `const queue = createMutationQueue({ onAdmissionDiagnostic: (info) => console.log(info.owner, info.waitedMs) })
-await queue.enqueue(() => 1, { owner: 'settings' })`
+          example: lifecycleOptionExamples.queueDiagnostic
         },
         scheduler: schedulerOption
       }
@@ -2332,9 +2373,10 @@ subscription.unsubscribe()`
         'Per-transaction failure policy and shared release context forwarded unchanged to each run’s items.',
         '每个事务的失败策略和共享释放上下文，传给每次运行的全部项目。'
       ),
+      optionCases: lifecycleOptionCases.transaction,
       members: {
-        errorPolicy: errorPolicyOption,
-        report: reportOption,
+        errorPolicy: { ...errorPolicyOption, example: lifecycleOptionExamples.transactionErrors },
+        report: { ...reportOption, example: lifecycleOptionExamples.transactionErrors },
         deadlineAt: deadlineOption,
         scheduler: schedulerOption,
         signal: {
@@ -2368,6 +2410,11 @@ subscription.unsubscribe()`
           )
         },
         'pending.drain': {
+          whenToUse: t(
+            'Supply it when releases start work that must settle after all items. Return Promise<void>; rejection becomes a transaction-pending failure. Omitting pending skips this final drain.',
+            '释放会启动需要在全部项目之后结算的工作时提供。返回 Promise<void>；拒绝会成为事务排空失败。省略 pending 则跳过最终排空。'
+          ),
+          example: lifecycleOptionExamples.transactionDrain,
           summary: t(
             'Caller-provided no-argument callback invoked after all release items; return a Promise<void> that settles when pending work drains. Synchronous throws or rejection become transaction-pending failures.',
             '调用方提供的无参数回调，在全部释放项目后调用；返回未结工作排空时结算的完成承诺，同步抛错或拒绝会成为事务排空失败。'

@@ -1,7 +1,393 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Scope error routing is identical across async and sync release, with explicit descriptors. */
+const scopeOptionsExample = (
+  sync: boolean,
+  collect = false
+): string => `import { create${sync ? 'Sync' : ''}LifecycleScope } from '@migaia/lifecycle'
+const reported: unknown[] = []
+const failure = new Error('release failed')
+const scope = create${sync ? 'Sync' : ''}LifecycleScope({ errorPolicy: '${collect ? 'collect' : 'report'}', report: (error) => { reported.push(error) } })
+scope.own({}, { syncSafe: true, force: () => { throw failure } })
+const errors = ${sync ? '' : 'await '}scope.dispose()
+console.log(reported.includes(failure), errors.length)`
+
+/** Every option example uses public entries and keeps its timing clock local. */
+export const lifecycleOptionExamples = {
+  scopeReport: scopeOptionsExample(false),
+  syncReport: scopeOptionsExample(true),
+  syncCollect: scopeOptionsExample(true, true),
+  deadline: `import { createLifecycleScope } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+const scheduler = createManualScheduler()
+const scope = createLifecycleScope({ scheduler, deadlineAt: scheduler.now() + 100 })
+scope.own({}, { force: (context) => { console.log(context.deadlineAt, context.scheduler?.now()) } })
+await scope.dispose()`,
+  provisionalAbort: `import { createProvisionalScope } from '@migaia/lifecycle'
+const parent = new AbortController()
+let active = true
+const temporary = createProvisionalScope({ parentSignal: parent.signal })
+temporary.own({}, { force: () => { active = false } })
+parent.abort(new Error('setup cancelled'))
+console.log(temporary.signal.aborted, active)
+await temporary.rollback()
+console.log(active)`,
+  provisionalCommit: `import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
+const parent = new AbortController()
+const permanent = createLifecycleScope()
+const temporary = createProvisionalScope({ parentSignal: parent.signal })
+let released = 0
+temporary.own({}, { force: () => { released++ } })
+await temporary.commitTo(permanent)
+console.log(released)
+await permanent.dispose()
+console.log(released)`,
+  generationCancel: `import { createGenerationController } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+const scheduler = createManualScheduler()
+const parent = new AbortController()
+const controller = createGenerationController({ scheduler, parentSignal: parent.signal })
+const timed = controller.begin({ timeoutMs: 10 })
+scheduler.advance(11)
+console.log(timed.signal.aborted, controller.isCurrent(timed.token))
+const next = controller.begin()
+parent.abort(new Error('page closed'))
+console.log(next.signal.aborted, controller.isCurrent(next.token))
+controller.dispose()`,
+  superseded: `import { createGenerationController } from '@migaia/lifecycle'
+const codes: string[] = []
+const failures: unknown[] = []
+const controller = createGenerationController({
+  onSuperseded: (info) => { codes.push(info.code) },
+  report: (error) => { failures.push(error) }
+})
+const old = controller.begin()
+controller.begin()
+console.log(controller.adopt(old.token, {}, () => { throw new Error('stale release failed') }))
+console.log(codes, (failures[0] as Error).message)
+controller.dispose()`,
+  queueTimeout: `import { createMutationQueue } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+const scheduler = createManualScheduler()
+const release = Promise.withResolvers<void>()
+const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler })
+const running = queue.enqueue(() => release.promise)
+const waiting = queue.enqueue(() => 'saved').catch((error: unknown) => error)
+scheduler.advance(11)
+console.log((await waiting as { code?: string }).code)
+release.resolve()
+await running`,
+  queueDiagnostic: `import { createMutationQueue } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+const scheduler = createManualScheduler()
+const release = Promise.withResolvers<void>()
+const seen: unknown[] = []
+const queue = createMutationQueue({
+  admissionDiagnosticMs: 10, scheduler,
+  onAdmissionDiagnostic: (info) => { seen.push([info.owner, info.waitedMs]) }
+})
+const running = queue.enqueue(() => release.promise, { owner: 'first' })
+const waiting = queue.enqueue(() => 'saved', { owner: 'settings' })
+scheduler.advance(11)
+release.resolve()
+await Promise.all([running, waiting])
+console.log(seen)`,
+  transactionErrors: `import { createDisposeTransaction } from '@migaia/lifecycle'
+const reported: unknown[] = []
+const failure = new Error('close failed')
+const transaction = createDisposeTransaction({ kind: 'plan' }, {
+  errorPolicy: 'report', report: (error) => { reported.push(error) }
+})
+const errors = await transaction.run([{ source: 'connection', descriptor: { force: () => { throw failure } } }])
+console.log(reported.includes(failure), errors.length)`,
+  transactionClock: `import { createDisposeTransaction } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+const scheduler = createManualScheduler()
+const caller = new AbortController()
+const transaction = createDisposeTransaction({ kind: 'plan' }, {
+  scheduler, deadlineAt: scheduler.now() + 100, signal: caller.signal
+})
+await transaction.run([{ source: 'connection', descriptor: { force: (context) => {
+  console.log(context.deadlineAt, context.signal.aborted)
+} } }])
+console.log(caller.signal.aborted)`,
+  transactionDrain: `import { createLifecycleScope, createDisposeTransaction } from '@migaia/lifecycle'
+const scope = createLifecycleScope()
+const order: string[] = []
+scope.own({}, { force: async (ownerContext) => {
+  const transaction = createDisposeTransaction({ kind: 'plan' }, {
+    disposer: ownerContext.disposer,
+    pending: { drain: async () => { order.push('drain') } }
+  })
+  await transaction.run([{ source: 'inner', descriptor: { force: (context) => {
+    console.log(context.disposer === ownerContext.disposer)
+    order.push('release')
+  } } }])
+} })
+await scope.dispose()
+console.log(order)`,
+  boundedTimeout: `import { boundedWait } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+const scheduler = createManualScheduler()
+const task = Promise.withResolvers<void>()
+const waiting = boundedWait(task.promise, scheduler.now() + 10, { scheduler })
+scheduler.advance(10)
+console.log(await waiting)
+task.resolve()`,
+  boundedCleanup: `import { boundedWait } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/testing'
+import type { IScheduler } from '@migaia/utils/scheduler'
+const clock = createManualScheduler()
+const cleanup = new Error('timer cleanup failed')
+const scheduler: IScheduler = { ...clock, schedule: (task, delay) => {
+  const scheduled = clock.schedule(task, delay)
+  return { ...scheduled, cancel: () => { scheduled.cancel(); throw cleanup } }
+} }
+const failures: unknown[] = []
+console.log(await boundedWait(Promise.resolve(), 100, {
+  scheduler, reportCleanup: (error) => { failures.push(error) }
+}))
+console.log(failures[0] === cleanup)`,
+  scheduler: `import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
+const selected = resolveSchedulerOption({ scheduler: createManualScheduler() })
+console.log(selected?.now())`,
+  schedulerFallback: `import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+const selected = resolveSchedulerOption({ scheduler: undefined }, systemScheduler)
+console.log(selected === systemScheduler)`
+}
+
+/** Common release policy scenarios remain specific to each public factory. */
+const releaseCases = (sync: boolean): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Report cleanup failures without throwing', '上报清理失败而不抛出'),
+    problem: t(
+      'Cleanup must attempt every resource while sending failures to monitoring. Choose report and supply its required reporter. The default throw policy instead throws after release; collect returns failures, and firstError throws the first while reporting later ones.',
+      '清理需要尝试每个资源，同时向监控交付失败。选择 report 并提供必需的上报器。默认 throw 在释放后抛错；collect 返回失败，firstError 抛出首错并上报后续错误。'
+    ),
+    example: sync ? lifecycleOptionExamples.syncReport : lifecycleOptionExamples.scopeReport,
+    result: t(
+      'Prints true 0; the original failure was reported and none are returned.',
+      '输出 true 0；原始失败已上报，返回列表为空。'
+    ),
+    covers: ['errorPolicy', 'report']
+  },
+  sync
+    ? {
+        title: t('Inspect synchronous cleanup failures', '检查同步清理失败'),
+        problem: t(
+          'A caller wants to inspect release failures itself. collect returns them instead of using the reporter or throwing after disposal.',
+          '调用方希望自行检查释放失败。collect 返回这些失败，不调用上报器，也不在释放后抛错。'
+        ),
+        example: lifecycleOptionExamples.syncCollect,
+        result: t(
+          'Prints false 1; the caller receives one failure without reporting.',
+          '输出 false 1；调用方取得一个失败，没有上报。'
+        ),
+        covers: ['errorPolicy', 'report']
+      }
+    : {
+        title: t('Share one release clock and deadline', '共享释放时钟和截止时刻'),
+        problem: t(
+          'Several releases need one absolute deadline rather than a fresh budget per item. Use deadlineAt from the same scheduler clock. Omission has no shared deadline and uses the system scheduler.',
+          '多个释放需要共用绝对截止时刻，而非每项重新计算预算。deadlineAt 必须来自同一个 scheduler 时钟。省略时没有共享截止时刻，并使用系统调度器。'
+        ),
+        example: lifecycleOptionExamples.deadline,
+        result: t(
+          'The release callback prints the shared deadline 100 and current time 0.',
+          '释放回调输出共享截止时刻 100 和当前时间 0。'
+        ),
+        covers: ['deadlineAt', 'scheduler']
+      }
+]
+
+/** Related timing, cancellation and error-routing fields form complete configuration stories. */
+export const lifecycleOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  scope: releaseCases(false),
+  syncScope: releaseCases(true),
+  provisional: [
+    {
+      title: t('Cancel temporary setup, then roll it back', '取消临时初始化后执行回滚'),
+      problem: t(
+        'Parent cancellation must reach setup work, but cancellation alone does not choose rollback. parentSignal forwards the reason; the caller must still roll back owned resources. Without it, no parent signal is observed.',
+        '父级取消需要传给初始化工作，但取消本身不会选择回滚。parentSignal 转发原因；调用方仍需回滚已持有资源。不设置则不观察父级信号。'
+      ),
+      example: lifecycleOptionExamples.provisionalAbort,
+      result: t(
+        'Prints true true before rollback, then false after resource release.',
+        '回滚前输出 true true，资源释放后输出 false。'
+      ),
+      covers: ['parentSignal']
+    },
+    {
+      title: t('Commit cancellable setup to its permanent owner', '把可取消初始化转交永久所有者'),
+      problem: t(
+        'Successful setup transfers its resources to a long-lived owner. The provisional parent signal is detached at settlement; permanent cleanup is now the target scope responsibility.',
+        '初始化成功后，把资源转交长期所有者。临时父级信号在结算时解除订阅；永久清理由目标作用域负责。'
+      ),
+      example: lifecycleOptionExamples.provisionalCommit,
+      result: t(
+        'Prints 0 after transfer, then 1 when the permanent scope releases it.',
+        '转交后输出 0，永久作用域释放时输出 1。'
+      ),
+      covers: ['parentSignal']
+    }
+  ],
+  generation: [
+    {
+      title: t('Cancel generations by time or parent', '按时间或父级信号取消代次'),
+      problem: t(
+        'A page request should become stale after its deadline or page closure. scheduler controls generation timeouts; parentSignal invalidates the current token. Defaults use the system clock and no parent subscription.',
+        '页面请求应在截止期限或页面关闭后失效。scheduler 控制代次超时；parentSignal 使当前令牌失效。默认使用系统时钟，不订阅父级信号。'
+      ),
+      example: lifecycleOptionExamples.generationCancel,
+      result: t(
+        'Both deadline and parent cancellation print true false: aborted and no longer current.',
+        '截止期限和父级取消均输出 true false：已中止且不再是当前代次。'
+      ),
+      covers: ['scheduler', 'parentSignal']
+    },
+    {
+      title: t('Observe discarded results and failed release', '观察舍弃结果及释放失败'),
+      problem: t(
+        'A late result must be released instead of adopted. onSuperseded observes the discard; report receives a failing stale-result release when no per-call reporter is supplied. Omission drops those diagnostics.',
+        '晚到结果必须释放，不能接纳。onSuperseded 观察舍弃；没有逐次上报器时，report 接收过期结果释放失败。省略时丢弃这些诊断。'
+      ),
+      example: lifecycleOptionExamples.superseded,
+      result: t(
+        'Prints false, GENERATION_SUPERSEDED and stale release failed.',
+        '接纳结果为 false，诊断码为 GENERATION_SUPERSEDED，并报告 stale release failed。'
+      ),
+      covers: ['onSuperseded', 'report']
+    }
+  ],
+  queue: [
+    {
+      title: t('Reject overdue waiting work', '拒绝等待过期的工作'),
+      problem: t(
+        'A save is queued behind a running task. A numeric queueAdmissionTimeoutMs removes it when its admission wait expires. The default only diagnoses; false disables timers. Already running work is unaffected.',
+        '保存操作排在运行中任务之后。数值 queueAdmissionTimeoutMs 在接纳等待过期时移除它。默认仅诊断；false 关闭定时器。运行中的工作不受影响。'
+      ),
+      example: lifecycleOptionExamples.queueTimeout,
+      result: t(
+        'Prints QUEUE_ADMISSION_TIMEOUT; releasing the first task finishes it normally.',
+        '输出 QUEUE_ADMISSION_TIMEOUT；放行首个任务后，它正常完成。'
+      ),
+      covers: ['queueAdmissionTimeoutMs', 'scheduler']
+    },
+    {
+      title: t('Warn about waiting without rejecting', '提示等待而不拒绝'),
+      problem: t(
+        'A settings save may wait, but should remain queued. admissionDiagnosticMs changes the default 1000 ms warning threshold; onAdmissionDiagnostic receives owner and waitedMs. Without a callback no diagnostic-only timer is installed.',
+        '设置保存可以等待，但应保留在队列中。admissionDiagnosticMs 修改默认 1000 毫秒提示阈值；onAdmissionDiagnostic 接收 owner 和 waitedMs。不设回调则不安装仅用于诊断的定时器。'
+      ),
+      example: lifecycleOptionExamples.queueDiagnostic,
+      result: t(
+        "Prints [['settings', 10]]; the save still completes.",
+        "输出 [['settings', 10]]；保存仍然完成。"
+      ),
+      covers: ['admissionDiagnosticMs', 'onAdmissionDiagnostic', 'scheduler']
+    }
+  ],
+  transaction: [
+    {
+      title: t('Report all transaction release failures', '上报事务释放失败'),
+      problem: t(
+        'A transaction must finish every release and report failures rather than throw. errorPolicy report requires report; the default throw policy throws after all items.',
+        '事务需要完成每项释放并上报失败，不直接抛错。errorPolicy report 必须提供 report；默认 throw 在全部项目结束后抛错。'
+      ),
+      example: lifecycleOptionExamples.transactionErrors,
+      result: t(
+        'Prints true 0: the original failure was reported, with no returned failures.',
+        '输出 true 0：原始失败已上报，返回失败列表为空。'
+      ),
+      covers: ['errorPolicy', 'report']
+    },
+    {
+      title: t('Forward the caller signal and shared deadline', '转发调用者信号和共享截止时刻'),
+      problem: t(
+        'Release callbacks need the caller cancellation source and the same absolute deadline. The transaction mirrors signal without aborting the caller controller. Omitted signal stays inert; omitted deadlineAt gives no shared deadline.',
+        '释放回调需要调用者取消来源和统一的绝对截止时刻。事务镜像 signal，不会中止调用者控制器。省略信号时保持静止；省略 deadlineAt 时没有共享截止时刻。'
+      ),
+      example: lifecycleOptionExamples.transactionClock,
+      result: t(
+        'Prints 100 false, then false for the caller signal.',
+        '输出 100 false，然后输出调用者信号的 false。'
+      ),
+      covers: ['signal', 'deadlineAt', 'scheduler']
+    },
+    {
+      title: t('Drain work after owner-bound releases', '在绑定所有者的释放后排空工作'),
+      problem: t(
+        'A scope-owned transaction must retain its supplied disposer capability and drain work started by releases. Forward context.disposer; generic callers omit it. pending.drain runs last and is skipped when pending is absent.',
+        '作用域持有的事务需要保留已有 disposer 能力，并排空释放期间启动的工作。转发 context.disposer；普通调用方省略它。pending.drain 最后执行，省略 pending 时跳过。'
+      ),
+      example: lifecycleOptionExamples.transactionDrain,
+      result: t(
+        "Prints true and ['release', 'drain']; the exact owner capability is forwarded.",
+        "输出 true 和 ['release', 'drain']；原所有者能力被原样转发。"
+      ),
+      covers: ['disposer', 'pending', 'pending.drain']
+    }
+  ],
+  bounded: [
+    {
+      title: t('Observe an absolute deadline without cancellation', '观察绝对截止期限而不取消任务'),
+      problem: t(
+        'A caller stops waiting after ten clock units, but still owns the task. Use the same scheduler to produce the deadline and drive the wait. Without scheduler, the helper uses the system clock.',
+        '调用方在十个时钟单位后停止等待，但仍持有任务。使用同一个 scheduler 产生截止时刻并驱动等待。不设置则使用系统时钟。'
+      ),
+      example: lifecycleOptionExamples.boundedTimeout,
+      result: t(
+        'Prints false at the deadline; the task can still resolve afterwards.',
+        '截止时刻输出 false；任务之后仍可完成。'
+      ),
+      covers: ['scheduler']
+    },
+    {
+      title: t(
+        'Report timer cleanup without changing the winner',
+        '上报定时器清理而不改变胜出结果'
+      ),
+      problem: t(
+        'A timer cancellation can fail after the task has already won. reportCleanup receives that failure while retaining the task result. Without it, cleanup failure rejects the wait.',
+        '任务已经胜出后，定时器取消仍可能失败。reportCleanup 接收该失败，并保留任务结果。不设置时，清理失败会拒绝等待。'
+      ),
+      example: lifecycleOptionExamples.boundedCleanup,
+      result: t(
+        'Prints true true: the task won and the original cleanup error was reported.',
+        '输出 true true：任务胜出，原清理错误已上报。'
+      ),
+      covers: ['scheduler', 'reportCleanup']
+    }
+  ],
+  scheduler: [
+    {
+      title: t('Select a local clock', '选择局部时钟'),
+      problem: t(
+        'A component needs deterministic timers without replacing global clocks. Supply scheduler to select and validate that implementation.',
+        '组件需要确定的定时器，但不替换全局时钟。传入 scheduler 可选择并校验该实现。'
+      ),
+      example: lifecycleOptionExamples.scheduler,
+      result: t('Prints the manual clock initial time 0.', '输出手动时钟初始时间 0。'),
+      covers: ['scheduler']
+    },
+    {
+      title: t('Use an explicit fallback', '使用显式后备实现'),
+      problem: t(
+        'Optional application configuration may omit scheduler. Pass a fallback to retain that exact object; without either the result is undefined.',
+        '应用可选配置可能省略 scheduler。传入后备值会保留该对象；两者都没有则返回 undefined。'
+      ),
+      example: lifecycleOptionExamples.schedulerFallback,
+      result: t('Prints true; the fallback object is preserved.', '输出 true；保留后备对象。'),
+      covers: ['scheduler']
+    }
+  ]
+}
 
 /**
  * Problems each lifecycle API solves, told as a situation, a runnable fix and the observed output.
