@@ -1,6 +1,274 @@
 # `@migaia/reactive` 使用指南
 
-本指南列出两个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 [README](./README.md)。
+[English](./USEGUIDE.en.md)
+
+包的定位、亮点和心智模型见 [README](./README.md)。本指南先按场景给出可以直接运行的示例（Node 24），再列出两个公开入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类是内部实现。
+
+## 按场景查找
+
+| 你遇到的问题 | 看这一节 |
+| --- | --- |
+| 派生值要在每个修改点手动更新 | [派生值自动更新](#派生值自动更新) |
+| 切换房间、页面后旧订阅还在 | [切换订阅时先清理旧的](#切换订阅时先清理旧的) |
+| 同时改两个值，页面闪过一半新一半旧的结果 | [多次写入只更新一次](#多次写入只更新一次) |
+| 关着的面板也在重算 | [没人读取的派生值不计算](#没人读取的派生值不计算) |
+| 两个副作用互相触发，标签页卡死 | [副作用互相触发时不会卡死](#副作用互相触发时不会卡死) |
+| 服务端渲染时请求之间串数据 | [服务端每个请求一个 Runtime](#服务端每个请求一个-runtime) |
+
+## 派生值自动更新
+
+把购物车合计单独存在一个变量里，单价或数量一变，页面就该显示新的合计。
+
+手写时每个修改单价或数量的地方都得记得重新计算合计，漏掉一处页面就显示旧值；依赖关系只存在于开发者的记忆里。
+
+用 Runtime 时，`computed` 只需根据它读到的值把合计声明一次；读取它的 `effect` 会在任一依赖变化后重跑。不需要列出依赖：在函数里读了 `price.value`，就自动依赖它。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const price = runtime.signal(30)
+const quantity = runtime.signal(2)
+// 合计由单价和数量推导出来，不需要在每个修改的地方手动更新
+const total = runtime.computed(() => price.value * quantity.value)
+
+const render = runtime.effect(() => {
+  console.log(`购物车合计：${total.value} 元`)
+})
+
+quantity.value = 3 // 改数量
+runtime.flush() // 示例里手动冲刷；平时由微任务自动完成
+price.value = 25 // 改单价
+runtime.flush()
+
+render.dispose()
+total.dispose()
+```
+
+输出：
+
+```text
+购物车合计：60 元
+购物车合计：90 元
+购物车合计：75 元
+```
+
+先输出 `购物车合计：60 元`，改数量后输出 `90 元`，改单价后输出 `75 元`。
+
+副作用在创建时运行一次，之后每次变化运行一次；`runtime.flush()` 只是让时机更明确，不写它时默认的微任务冲刷也得到同样的输出。
+
+## 切换订阅时先清理旧的
+
+聊天窗口每次切换房间都加入新房间，却从不离开旧房间，最后会收到所有去过的房间的消息。
+
+手写订阅时，“离开”要写在切换房间的每个分支里，还要记得在关闭窗口时再写一次；漏掉任何一处，旧订阅就一直留着。
+
+`effect` 可以返回一个清理函数，Runtime 会在副作用重跑之前、以及 `dispose()` 时调用它，所以“离开”总是先于下一次“进入”。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const room = runtime.signal('大厅')
+
+const chat = runtime.effect(() => {
+  const name = room.value
+  console.log(`进入 ${name}`)
+  // 返回的函数会在下次重跑之前、以及 dispose() 时执行
+  return () => console.log(`离开 ${name}`)
+})
+
+room.value = '技术交流'
+runtime.flush()
+chat.dispose() // 用户关闭聊天窗口
+```
+
+输出：
+
+```text
+进入 大厅
+离开 大厅
+进入 技术交流
+离开 技术交流
+```
+
+依次输出 `进入 大厅`、`离开 大厅`、`进入 技术交流`，`dispose()` 后输出 `离开 技术交流`。
+
+每次清理拿到的都是它那一次运行的房间，因为闭包捕获的是那一次的 `name`。
+
+## 多次写入只更新一次
+
+同时改名和姓，页头先显示 “Grace Lovelace” 这种混合值，再显示正确的名字。
+
+如果每次写入都立刻通知监听者，监听者会在两次写入之间运行，读到只改了一半的数据，页面也因此多渲染一次。
+
+Runtime 写入时只把下游标记为过期，副作用在下一次冲刷（默认是微任务）时才运行，所以同一段同步代码里的写入会被一起看到。从多条路径读取同一组值的派生值（`initials` 和 `label` 都读了名字）也按最终输入重新计算。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const first = runtime.signal('Ada')
+const last = runtime.signal('Lovelace')
+const initials = runtime.computed(() => `${first.value[0]}.${last.value[0]}.`)
+const label = runtime.computed(() => `${first.value} ${last.value}（${initials.value}）`)
+
+let effectRuns = 0
+const header = runtime.effect(() => {
+  effectRuns += 1
+  console.log('页头显示:', label.value)
+})
+
+// 同一段同步代码里改了两个值
+first.value = 'Grace'
+last.value = 'Hopper'
+await Promise.resolve() // 等默认的微任务冲刷
+console.log('副作用一共执行了', effectRuns, '次')
+header.dispose()
+```
+
+输出：
+
+```text
+页头显示: Ada Lovelace（A.L.）
+页头显示: Grace Hopper（G.H.）
+副作用一共执行了 2 次
+```
+
+创建时输出 `页头显示: Ada Lovelace（A.L.）`，两次写入后只输出一次 `Grace Hopper（G.H.）`；`副作用一共执行了 2 次`。
+
+没有任何一行出现名和姓混搭的值：同一轮里的写入合并成一次副作用运行。
+
+## 没人读取的派生值不计算
+
+一个昂贵的统计放在可以收起的面板里，面板关着时，数据每变一次它仍然重算一次。
+
+手写的派生值通常在写入时立刻重算，不管有没有人在看，关着的面板也在消耗时间。
+
+`computed` 是惰性的：没人读取就不运行。最后一个读取者（这里是副作用）被释放后，它会和输入断开，之后的写入不再引发重算；下次读取时先检查输入是否变化，变了才重算一次。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const orders = runtime.signal([120, 80, 45])
+let computations = 0
+const report = runtime.computed(() => {
+  computations += 1 // 假设这是一段昂贵的统计
+  return orders.value.reduce((sum, amount) => sum + amount, 0)
+})
+
+orders.value = [...orders.peek(), 60] // 还没人读取 report
+console.log('没人读取时计算次数:', computations)
+
+const panel = runtime.effect(() => console.log('报表面板:', report.value))
+orders.value = [...orders.peek(), 10]
+runtime.flush()
+console.log('面板打开期间计算次数:', computations)
+
+panel.dispose() // 面板关闭，最后一个读者离开
+orders.value = [...orders.peek(), 99]
+orders.value = [...orders.peek(), 1]
+console.log('面板关闭后计算次数:', computations)
+console.log('再次读取:', report.value, '计算次数:', computations)
+```
+
+输出：
+
+```text
+没人读取时计算次数: 0
+报表面板: 305
+报表面板: 315
+面板打开期间计算次数: 2
+面板关闭后计算次数: 2
+再次读取: 415 计算次数: 3
+```
+
+`没人读取时计算次数: 0`；面板打开期间每次变化计算一次（共 2 次）；面板关闭后又写入两次，计数仍是 2；再次读取得到 415，计数变为 3。
+
+计算只发生在有人读取的时候，关闭面板后的写入不会触发任何计算。
+
+## 副作用互相触发时不会卡死
+
+用两个副作用实现摄氏度和华氏度的双向同步，每个都写对方读取的值；两个值始终对不上时，标签页卡死。
+
+手写的双向同步没有轮数限制，两个监听者会无限互相触发，卡在循环里的页面失去响应，也看不到是哪两段代码在打架。
+
+每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime({
+  maxFlushPasses: 20, // 默认 100
+  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)
+})
+const celsius = runtime.signal(0, { debugName: 'celsius' })
+const fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })
+
+// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发
+runtime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })
+runtime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })
+
+await new Promise((resolve) => setTimeout(resolve, 10))
+console.log('页面仍可响应，celsius =', Math.round(celsius.peek()))
+```
+
+输出：
+
+```text
+async-flush FLUSH_LOOP
+页面仍可响应，celsius = 12
+```
+
+先由 `onError` 输出 `async-flush FLUSH_LOOP`，再输出 `页面仍可响应，celsius = 12`。
+
+循环在 20 轮（示例里设的 `maxFlushPasses`）后被截断，而不是一直运行下去；报告里带的 `debugName` 指出了互相触发的副作用。
+
+## 服务端每个请求一个 Runtime
+
+服务端给很多用户渲染页面，一个用户的数据出现在另一个用户的页面上。
+
+`defaultRuntime` 是整个进程共用的一个 Runtime；把请求状态放在这张共享的依赖图里，一个请求写入的值会被另一个请求读到，而且很难发现。
+
+为每个请求用 `createRuntime()` 创建自己的 Runtime。不同 Runtime 的节点不能互相依赖：跨 Runtime 读取会立刻抛出 `CROSS_RUNTIME`，而不是悄悄把数据混在一起。
+
+```ts doc-test=run
+import { createRuntime } from '@migaia/reactive'
+
+// 服务端渲染：每个请求一个 Runtime，用户之间的状态互不可见
+function renderPage(user: string) {
+  const runtime = createRuntime()
+  const name = runtime.signal(user)
+  const greeting = runtime.computed(() => `你好，${name.value}`)
+  return { runtime, greeting }
+}
+
+const pageA = renderPage('Ada')
+const pageB = renderPage('Grace')
+console.log(pageA.greeting.value, '|', pageB.greeting.value)
+
+// 把 A 的节点拿到 B 的 Runtime 里使用，会立刻报错，而不是悄悄串数据
+const leaked = pageB.runtime.computed(() => pageA.greeting.value)
+try {
+  leaked.value
+} catch (error) {
+  console.log('跨 Runtime 读取:', (error as { code?: string }).code)
+}
+```
+
+输出：
+
+```text
+你好，Ada | 你好，Grace
+跨 Runtime 读取: CROSS_RUNTIME
+```
+
+输出 `你好，Ada | 你好，Grace`：每个请求有自己的状态。
+
+把节点带到别的 Runtime 里读取时输出 `跨 Runtime 读取: CROSS_RUNTIME`：串用会在出错的那一行暴露出来。
+
+---
 
 ## 目录
 
@@ -48,7 +316,7 @@ import {
 
 ### `IReactiveSignal<T>`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IReactiveSignal<T> = IDisposable & {
   readonly runtime: IRuntime
   readonly debugName?: string
@@ -64,7 +332,7 @@ type IReactiveSignal<T> = IDisposable & {
 
 可写原子——响应式图里唯一的"真值来源"：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const runtime = createRuntime()
 const count = runtime.signal(1)
 count.value // 1，在 Computed/Effect 内读取会建立依赖
@@ -84,7 +352,7 @@ count.value // 抛 NODE_DISPOSED
 
 ### `IReactiveComputed<T>`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IComputedOptions<T> = {
   equals?: (a: T, b: T) => boolean
   keepAlive?: boolean
@@ -106,7 +374,7 @@ type IReactiveComputed<T> = IDisposable & {
 
 惰性求值、带缓存的派生值——写只标脏（push），值只在被读时重算（pull）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const doubled = runtime.computed(() => count.value * 2)
 doubled.value // 首次读取才真正计算
 doubled.value // 依赖未变则直接返回缓存，不重算
@@ -128,7 +396,7 @@ const custom = runtime.computed(
 
 ### `IReactiveEffect`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IReactiveEffect = IDisposable & {
   readonly runtime: IRuntime
   readonly debugName?: string
@@ -139,7 +407,7 @@ type IReactiveEffect = IDisposable & {
 
 副作用——唯一真正"被执行"的观察者（`Computed` 只标脏不重跑，只有 `Effect` 会被调度器实际 `tick`）：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const seen: number[] = []
 const effect = runtime.effect(() => {
   seen.push(doubled.value)
@@ -157,12 +425,12 @@ effect.dispose() // 释放：清理依赖边 + 跑最后一次 cleanup（untrack
 
 ### `createRuntime` / `defaultRuntime`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createRuntime(options?: IRuntimeOptions): IRuntime
 const defaultRuntime: IRuntime
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IRuntimeOptions = {
   adapter?: Partial<IReactiveRuntimeAdapter> // scheduleMicrotask/now/timestamp/reportError
   onError?: (error: unknown, context: IRuntimeErrorContext) => void
@@ -175,7 +443,7 @@ type IRuntimeOptions = {
 
 新建一个隔离运行时：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const runtime = createRuntime({
   maxFlushPasses: 50,
   onError: (e, ctx) => console.error(ctx.phase, e)
@@ -192,7 +460,7 @@ const runtime = createRuntime({
 
 `IRuntime` 的公开方法（品牌字段省略）：
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IRuntime = {
   signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>
   computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>
@@ -245,7 +513,7 @@ import {
 
 ### `createObserverBinding`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createObserverBinding(runtime: IRuntime): IObserverBinding
 
 type IObserverBinding = {
@@ -261,7 +529,7 @@ type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer'
 
 为一个订阅者建立三段式绑定：**render 期只读地捕获依赖，commit 期才把依赖装到订阅者上**，中间的渲染可能被并发渲染丢弃，捕获阶段绝不建边。绑定自持一个内部 `Effect`：适配层能完成 capture/observe/commit/retrack，却拿不到 `deps`、版本或强制调度入口：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const binding = createObserverBinding(runtime)
 const dispose = binding.observe(() => {
   // 真正的订阅者体；依赖变化后被正常调度重跑
@@ -305,7 +573,7 @@ import {
 - `assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：普通未登记值放行，foreign copy 品牌先拒绝（第三方可以把普通值注册进 Registry，不涉及图）；只有**登记过且归属不符**才抛 `CROSS_RUNTIME`。
 - `assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void` —— 内核图边界使用的严格断言：未登记直接抛 `NOT_RUNTIME_OWNED`；登记了但不属于当前 `runtime` 抛 `CROSS_RUNTIME`。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const runtime = createRuntime()
 const node = {}
 claimOwnership(node, runtime)
@@ -321,7 +589,7 @@ assertOwnedBy(node, otherRuntime, 'my-node') // 抛 CROSS_RUNTIME
 import { createFieldSource, type IRuntimeFieldSource } from '@migaia/reactive/extension'
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createFieldSource(
   runtime: IRuntime,
   debugName?: string
@@ -337,7 +605,7 @@ function createFieldSource(
 
 为扩展层创建一条受控 Source（如 Wasm 字段、SharedArrayBuffer 支持的值）。调用方只拿到 `track`/`notify`/`commit`/`dispose` 四个能力，拿不到底层节点、`subs`、版本或 `Tracker`，因而不能制造单边依赖、伪造版本、通知另一张 `Runtime` 图：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const field = createFieldSource(runtime, 'wasm-counter')
 function read(): number {
   field.track() // 建立依赖，不返回值——真实值由外部存储持有
@@ -437,7 +705,7 @@ import {
 
 `subscribeTrace(listener)` 收到的事件是以下判别联合之一：
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IRuntimeTraceEvent =
   | {
       type: 'observable-change'
@@ -533,7 +801,7 @@ function useReactiveValue<T>(read: () => T): T {
 
 ### 3. 批处理 + 错误优先级：一次动作里业务失败与收尾冲刷失败的顺序
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const runtime = createRuntime()
 try {
   runtime.batch(() => {
@@ -548,7 +816,7 @@ try {
 
 ### 4. 自定义调度策略：切到 `requestAnimationFrame`
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const runtime = createRuntime({
   schedulerStrategy: (flush) => {
     requestAnimationFrame(() => flush())
@@ -565,7 +833,7 @@ const runtime = createRuntime({
 - **读取节点抛 `NODE_DISPOSED`**：节点已 `dispose()`，绝不会静默返回旧值；停止持有该引用，改用重新创建的实例。
 - **抛 `CROSS_RUNTIME`/`NOT_RUNTIME_OWNED`**：跨 `Runtime` 混用了节点，或传入的对象不是由 `createRuntime()` 创建；确认节点与消费它的 `Runtime` 是同一个。
 - **`Computed` 抛 `CIRCULAR_DEPENDENCY`**：依赖图里存在自读环（`a` 直接或间接又读了 `a` 自己）；检查依赖图，拆掉循环引用。
-- **`flush()` 抛 `FLUSH_LOOP`**：依赖图里存在自触发环（典型是某个 `Effect` 的写操作又落回了它自己的依赖）；错误信息列出了被丢弃的待办 `debugName`，据此定位并拆环。
+- **`flush()` 抛 `FLUSH_LOOP`（自动冲刷时交给 `onError`，phase 为 `async-flush`）**：副作用之间互相触发停不下来，典型是两个 `Effect` 各自写对方读取的值，而两个值始终对不上；错误信息列出了被丢弃的待办 `debugName`，据此定位并拆环。单个 `Effect` 在运行中写自己读取的值不会让自己重跑。
 - **`createObserverBinding().observe()` 抛 `BINDING_DUPLICATE`**：同一个 binding 在已处于 observed 状态时又被 `observe()` 了一次；再次调用前先确认当前是否已在观察中，或为新一轮渲染创建新的 binding。
 - **`commit()` 返回 `'stale'`**：这不是错误，是正常的竞态处理信号；作废当前快照，重新 `capture()`/`commit()`，不要在 commit 阶段直接 pull 脏节点。
 - **`COPY_CONFLICT`/`BRAND_CORRUPTED`**：进程内存在本库的多份模块副本；去重依赖（多数打包器问题），或在应用启动时调用 `assertSingleRuntimeCopy()` 主动 fail-fast。
@@ -578,7 +846,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。
 
-`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export.
+`@migaia/reactive/extension` 提供 `getDefaultRuntime()`，给需要在导入时保持不创建任何东西的适配层使用。它在第一次调用时创建共享的默认 Runtime，返回的对象与根入口的 `defaultRuntime` 完全相同；导入根入口的 `defaultRuntime` 仍在导入时创建。`ReactiveErrorPhase` 也可以从扩展入口导入，与根入口导出的是同一个对象。
 
 ```ts
 import { getDefaultRuntime } from '@migaia/reactive/extension'
@@ -591,7 +859,7 @@ console.log(node.value)
 node.dispose()
 ```
 
-`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources.
+`@migaia/reactive/extension` 的 `deferRuntimeCleanup(runtime, task)` 通过该 Runtime 的 `scheduleIdle` 通道安排一次同步的适配层清理（默认使用微任务）。清理抛出的错误交给 Runtime 的 `reportError`。它不返回可修改的调度器或依赖图能力，也不负责异步资源。
 
 ```ts
 import { createRuntime } from '@migaia/reactive'

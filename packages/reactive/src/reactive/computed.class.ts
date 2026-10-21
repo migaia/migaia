@@ -10,11 +10,16 @@ import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorPhase } from '../runtime/trace-constants.js'
 import { ReactiveErrorText } from '../error-text.js'
 
+/**
+ * Options of `runtime.computed`: `equals` (default `Object.is`) decides whether a new value counts
+ * as a change; `keepAlive: true` keeps computing without readers; `debugName` labels traces.
+ */
 export type IComputedOptions<T> = {
   equals?: (a: T, b: T) => boolean
   keepAlive?: boolean
   debugName?: string
 }
+/** Second argument of `runtime.computed`: the options object or just an `equals` function. */
 export type IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean)
 
 // Lazy derivation: writes mark dirty (push), and reads recompute the value when needed (pull).

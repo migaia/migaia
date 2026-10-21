@@ -45,6 +45,10 @@ type ITrackingFrame =
 
 // Capture 的依赖与 Tracker 身份只存在于私有 WeakMap；调用者只能读取结果并交回整个 token。
 declare const CAPTURE_TOKEN: unique symbol
+/**
+ * Opaque token returned by `IObserverBinding.capture`: `result` is what the read returned; the
+ * captured dependencies stay private until `commit` installs them.
+ */
 export type ICapture<R> = {
   readonly result: R
   readonly [CAPTURE_TOKEN]: true

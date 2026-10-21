@@ -176,4 +176,5 @@ export const ReactiveErrorCode = {
   invalidOption: 'INVALID_OPTION'
 } as const
 
+/** Value union of `ReactiveErrorCode`; compare `error.code` against these values. */
 export type IReactiveErrorCode = (typeof ReactiveErrorCode)[keyof typeof ReactiveErrorCode]

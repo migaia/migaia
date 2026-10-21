@@ -17,6 +17,10 @@ import {
  */
 export const RUNTIME_BRAND: unique symbol = Symbol('store.runtime')
 
+/**
+ * Options of `runtime.signal` / `runtime.effect`; `debugName` labels the node in traces and
+ * `FLUSH_LOOP` messages.
+ */
 export type IReactiveNodeOptions = {
   debugName?: string
 }
@@ -66,6 +70,11 @@ export type IRuntimeNodeDescriptor = Readonly<{
   debugName?: string
 }>
 
+/**
+ * Read-only diagnostic event delivered to `subscribeTrace` and `onTrace`: a value change, a
+ * dependency connection or disconnection, an effect run, or a traced action. Nodes appear as
+ * descriptors.
+ */
 export type IRuntimeTraceEvent =
   | {
       readonly type: typeof ReactiveTraceType.observableChange
@@ -147,8 +156,10 @@ export type IRuntime = {
   subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer
 }
 
+/** Value union of `ReactiveErrorPhase`: where a reported error came from. */
 export type IRuntimeErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase]
 
+/** Second argument of `onError`: the `phase` plus descriptors of the observer / observable involved. */
 export type IRuntimeErrorContext = {
   phase: IRuntimeErrorPhase
   observer?: IRuntimeNodeDescriptor
@@ -183,6 +194,11 @@ export type IReactiveRuntimeAdapter = {
   reportError(error: unknown, context: IRuntimeErrorContext): void
 }
 
+/**
+ * Options of `createRuntime`. `onError` receives errors that cannot be thrown to a caller (for
+ * example `FLUSH_LOOP` from an automatic flush); `maxFlushPasses` caps recomputation passes per
+ * flush; `schedulerStrategy` chooses when flushes run.
+ */
 export type IRuntimeOptions = {
   /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */
   adapter?: Partial<IReactiveRuntimeAdapter>

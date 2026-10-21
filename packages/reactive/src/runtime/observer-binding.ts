@@ -70,6 +70,10 @@ export function createTrackedObserver(observer: IObserver): ITrackedObserverBind
  *   ready.
  */
 export type IObserverCommitResult = 'committed' | 'stale' | 'no-observer'
+/**
+ * Result of `retrack()`: whether the observer's dependencies or versions changed, or no observer
+ * exists.
+ */
 export type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer'
 
 /**
