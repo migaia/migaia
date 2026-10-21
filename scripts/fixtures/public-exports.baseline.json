@@ -241,7 +241,8 @@
         "Resource",
         "ResourceErrorCode",
         "ResourceFetchStatus",
-        "ResourceStatus"
+        "ResourceStatus",
+        "createResource"
       ]
     },
     "@migaia/rpc-browser": {
@@ -1418,8 +1419,11 @@
     },
     "@migaia/utils": {
       ".": [
+        "AsyncTaskStrategy",
         "CONFIG_DELETE",
+        "ConfigOwner",
         "ConfigProfile",
+        "IdentifyError",
         "MAX_NATIVE_RECURSION_DEPTH",
         "ThenableProbeKind",
         "UtilsAbortError",
@@ -1428,10 +1432,12 @@
         "UtilsTimeoutError",
         "admitAbortSignal",
         "assimilateCapturedThen",
+        "asyncTask",
         "attachErrorIdentity",
         "attachSecondaryErrors",
         "base64ToBytes",
         "bytesToBase64",
+        "coalesce",
         "collect",
         "combineConfig",
         "combineErrors",
@@ -1440,6 +1446,7 @@
         "createNumberFormatter",
         "createPathAccessor",
         "createSafeRecord",
+        "debounce",
         "decodeUtf8",
         "deferTask",
         "deferred",
@@ -1458,6 +1465,7 @@
         "immutableSnapshot",
         "inspectThenable",
         "isArrayBuffer",
+        "isAsyncTaskSupported",
         "isBlankString",
         "isEmptyValue",
         "isNativeErrorValue",
@@ -1488,6 +1496,8 @@
         "readConfigPath",
         "readUrlHref",
         "readonlyConfig",
+        "repeat",
+        "resolveAsyncTaskStrategy",
         "retry",
         "safeErrorReason",
         "sanitizeErrorText",
@@ -1500,13 +1510,18 @@
         "structuredDiagnosticSnapshot",
         "systemScheduler",
         "systemWallClock",
+        "throttle",
+        "timeSlice",
+        "timeSliceMap",
+        "timeSliceReduce",
         "toError",
         "toPromise",
         "tryReadProperty",
         "tryString",
         "utf8ByteLength",
         "walkErrorCauses",
-        "withTimeout"
+        "withTimeout",
+        "yieldToHost"
       ],
       "./promise": [
         "UtilsAbortError",
@@ -1522,11 +1537,24 @@
         "withTimeout"
       ],
       "./scheduler": [
+        "AsyncTaskStrategy",
+        "asyncTask",
+        "coalesce",
+        "debounce",
         "deferTask",
+        "isAsyncTaskSupported",
+        "repeat",
+        "resolveAsyncTaskStrategy",
         "systemScheduler",
-        "systemWallClock"
+        "systemWallClock",
+        "throttle",
+        "timeSlice",
+        "timeSliceMap",
+        "timeSliceReduce",
+        "yieldToHost"
       ],
       "./error": [
+        "IdentifyError",
         "UtilsAbortError",
         "UtilsError",
         "UtilsErrorCode",
@@ -1586,6 +1614,7 @@
       "./typing": [],
       "./config": [
         "CONFIG_DELETE",
+        "ConfigOwner",
         "ConfigProfile",
         "combineConfig",
         "ownConfig",
