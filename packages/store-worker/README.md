@@ -154,11 +154,11 @@ IWorkerPort 是 Core IWebWorkerLikePort 的别名，要求 postMessage、addEven
 
 同一 Adapter 可并发 request；Core 按请求关联结果、隔离 deadline 与取消。独立请求可用 Promise.all，让支持 batch@1 的内建载体在物理写进行时合并已就绪请求或响应；空闲时立即单帧发送，有依赖的串行 await 不会因此变成批处理。request 等处理结果，内部 one-way notify 仅等物理发送，不是业务执行回执。
 
-| 成员      | 生命周期                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------- |
-| disposed  | `adapter.disposed` 在 `adapter.close()` 或 `adapter.dispose()` 开始时同步变为 `true`，表示该适配器已停止接纳请求。                                                             |
-| close()   | 无参数，同步幂等标记不可用；新 request 拒绝 ADAPTER_DISPOSED，不释放 Endpoint。             |
-| dispose() | 无参数，唯一异步释放入口；先 close，等初始化，再关闭 Endpoint，重复调用返回同一个 Promise。 |
+| 成员      | 生命周期                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------ |
+| disposed  | `adapter.disposed` 在 `adapter.close()` 或 `adapter.dispose()` 开始时同步变为 `true`，表示该适配器已停止接纳请求。 |
+| close()   | 无参数，同步幂等标记不可用；新 request 拒绝 ADAPTER_DISPOSED，不释放 Endpoint。                                    |
+| dispose() | 无参数，唯一异步释放入口；先 close，等初始化，再关闭 Endpoint，重复调用返回同一个 Promise。                        |
 
 Adapter.dispose 不 terminate 借用的 Worker / port。清理失败以 rejected Promise 暴露，不吞掉；close-before-ready 也不能在稍后初始化完成后继续派发已退休请求。物理 Worker 由创建者按应用顺序终止；端点完成清理不等于得到了原生线程退出回执。
 
@@ -172,13 +172,13 @@ Adapter.dispose 不 terminate 借用的 Worker / port。清理失败以 rejected
 
 ### IManagedRpcHandler 的关闭与清理
 
-| 成员             | 行为                                                                               |
-| ---------------- | ---------------------------------------------------------------------------------- |
-| handler(message) | 接收已解析的原始消息值；关闭后 resolve 并忽略，不处理晚到队列残留。                |
-| pendingCount     | 已接纳、正在等待 Endpoint 初始化或交付消息的数量，不代表 provider compute 已完成。 |
-| disposed         | `handler.disposed` 在 `handler.close()` 或 `handler.dispose()` 开始时同步变为 `true`，表示该处理器不再接收消息。                                                    |
-| close()          | 同步幂等停止接纳，不执行 Endpoint 或用户清理。                                     |
-| dispose()        | 先 close，等待初始化，再执行 Endpoint 清理；同一个 Promise，失败保持拒绝。         |
+| 成员             | 行为                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| handler(message) | 接收已解析的原始消息值；关闭后 resolve 并忽略，不处理晚到队列残留。                                              |
+| pendingCount     | 已接纳、正在等待 Endpoint 初始化或交付消息的数量，不代表 provider compute 已完成。                               |
+| disposed         | `handler.disposed` 在 `handler.close()` 或 `handler.dispose()` 开始时同步变为 `true`，表示该处理器不再接收消息。 |
+| close()          | 同步幂等停止接纳，不执行 Endpoint 或用户清理。                                                                   |
+| dispose()        | 先 close，等待初始化，再执行 Endpoint 清理；同一个 Promise，失败保持拒绝。                                       |
 
 初始化期间已经接纳的消息在 close 后也不再交付，pendingCount 最终回到 0。不要把该计数当成安全 terminate 的静默门禁；端点 provider drain 和清理由 Core 契约负责，应等待 dispose 并按物理资源 owner 规则处理 Worker。此接口没有 disposeAsync。序列化 handler 也只释放自己的 Endpoint / provider 注册，不自动调用借入 parser.dispose，parser 生命周期仍归创建者。
 
