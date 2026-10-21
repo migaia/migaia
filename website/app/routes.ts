@@ -7,5 +7,7 @@ import { type RouteConfig, index, route } from '@react-router/dev/routes'
 export default [
   index('routes/home.tsx'),
   route(':lang', 'routes/language.tsx'),
+  // Retired `/<locale>/<library>` links redirect to the library page under `/<locale>/docs`.
+  route(':lang/:library', 'routes/legacy-library.tsx'),
   route(':lang/docs/*', 'routes/docs.tsx', { id: 'routes/docs' })
 ] satisfies RouteConfig
