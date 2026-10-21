@@ -431,7 +431,7 @@ class LoggerCore {
 
   /**
    * Fires hooks against the live hook list: hooks registered during dispatch participate in the
-   * current pass, while an off() call replaces the list and does not mutate the active iterator.
+   * current pass, while an off() call removes only that handle's registration.
    */
   fireHook(name: string, entry: ILogEntry): void {
     const channel = this.#hooks.get(name)
@@ -506,9 +506,9 @@ class LoggerCore {
 
   /**
    * `deadlineAt` defaults to a fresh 3s budget for a standalone `flush()` call, but shutdown()
-   * passes in the same absolute deadline it already used for the shutdown-handler loop — see — so a
-   * single shutdown() invocation spends at most one 3s budget total instead of handlers and flush
-   * each getting their own independent window.
+   * passes in the same absolute deadline it already used for the shutdown-handler loop, so a single
+   * shutdown() invocation spends at most one 3s budget total instead of handlers and flush each
+   * getting their own independent window.
    *
    * `deadlineAt` is an absolute deadline in this logger's monotonic `scheduler` clock (the same
    * clock `boundedWait` reads), not a Unix epoch; compute it with `scheduler.now() + budgetMs`.
@@ -1032,6 +1032,9 @@ class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
  *
  * Use `log.use(...)` to add plugins and `log.unUse(name)` to remove them from an existing instance.
  * Both belong to `ILoggerCore` and are implemented by `LoggerCore` without another wrapper.
+ * Execution budgets are required; omitted plugins install no sink or level methods. Instances
+ * capture, but never dispose, the selected runtime manager. Constructor admission failures throw;
+ * ordinary sink/hook/pipeline failures are observed through Logger diagnostics instead.
  */
 export const Logger: IStaticLoggerCtor = LoggerImpl as unknown as IStaticLoggerCtor
 

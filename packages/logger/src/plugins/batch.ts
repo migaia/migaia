@@ -14,8 +14,14 @@ import {
 } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
 
+/**
+ * Per-batcher settings override plugin defaults; buffers and scheduler tasks belong to that
+ * batcher.
+ */
 export type IBatchPluginConfig = {
+  /** Size-triggered batch threshold, defaulting to 20 items. */
   maxSize?: number
+  /** Delay from the first buffered item to timer-triggered flushing, defaulting to 2000 ms. */
   maxWaitMs?: number
   /** Maximum number of batches executing at once. Defaults to one for lossless delivery. */
   maxConcurrentBatches?: number
@@ -36,18 +42,31 @@ export type IBatchPluginConfig = {
   asyncOutput?: boolean
 }
 
+/** Producer handle to one plugin-owned bounded queue; it owns no external transport itself. */
 export type IBatcher<T> = {
+  /** Buffer an item; overflow is reported with dropped counts, and a disposed batcher ignores input. */
   push(item: T): void
+  /**
+   * Drain buffer/queue until its flushTimeoutMs budget; timeout does not cancel in-flight
+   * callbacks.
+   */
   flush(): Promise<void>
 }
 
-/** Factory contract for the batch plugin's shared batching capability. */
+/**
+ * Create a queue using per-call overrides and a required delivery callback. The provider owns its
+ * timer, flusher and final cleanup; retained factories become inert after provider removal.
+ */
 export type ICreateBatcher = <T>(
   config: IBatchPluginConfig,
   onBatch: (items: T[]) => void | Promise<void>
 ) => IBatcher<T>
 
-export type IBatchShared = { createBatcher: ICreateBatcher }
+/** Feature output consumed by HTTP/file plugins instead of depending on their input array order. */
+export type IBatchShared = {
+  /** Create a queue whose callback jobs and cleanup remain owned by this provider installation. */
+  createBatcher: ICreateBatcher
+}
 
 /** Feature output carrying the plugin-owned batcher factory. */
 export const loggerBatchFeature = defineFeature<IBatchShared, Record<never, never>, IBatchShared>(
@@ -58,6 +77,7 @@ export type IBatchController<T> = IBatcher<T> & {
   dispose(): readonly unknown[] | Promise<readonly unknown[]>
 }
 
+/** Stable registration/config key for the queue provider; the plugin itself is not an output sink. */
 export const BATCH_PLUGIN_NAME = 'batch' as const
 
 /** Batch 插件本身不假设"被批量处理的对象一定是日志 entry"——它只提供批量回调能力，消费插件通过可选 Feature 依赖取得工厂。 */
@@ -420,6 +440,13 @@ const batchFeatureContract = definePlugin({
 /** Optional batch dependency shared by delivery plugins. */
 export const optionalBatchFeature = batchFeatureContract.getFeature('batch', { optional: true })
 
+/**
+ * Create a shared bounded batching provider, without emitting logs itself. Defaults are 20 items,
+ * 2000 ms, one concurrent batch, 1024 pending batches, a 3000 ms drain and async size-triggered
+ * output. Overflow drops the oldest queued batch, or incoming data when every slot is in flight,
+ * and reports BATCH_OVERFLOW. Uninstall closes admission, drains, cancels timers and reports
+ * drops.
+ */
 export const batch = (
   config: IBatchPluginConfig = {}
 ): ILoggerPlugin<

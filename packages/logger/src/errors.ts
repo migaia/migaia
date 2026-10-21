@@ -4,7 +4,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { LoggerErrorCode, type ILoggerErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/** Source identity for package-owned failures; upstream/plugin errors retain their own boundary. */
 export const LOGGER_SOURCE = '@migaia/logger'
 
 /** Attaches logger metadata, or returns an attachable wrapper that keeps the original as `cause`. */

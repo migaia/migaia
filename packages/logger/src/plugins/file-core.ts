@@ -12,10 +12,13 @@ import {
   type IBatchShared
 } from './batch.js'
 
+/** Newline-delimited JSON delivery with per-batch rotation, independent of cumulative file size. */
 export type IFilePluginConfig = {
+  /** Required nonempty destination passed to the selected append capability. */
   readonly path: string
+  /** Optional queue overrides; shared-provider defaults or private standard defaults apply. */
   readonly batch?: IBatchPluginConfig
-  /** Per-batch rotation threshold; injected fs supplies the rotation operation. */
+  /** Optional per-batch thresholds; omission disables rotation, and injected fs supplies rotate. */
   readonly rotate?: {
     /** Rotate after appending a batch whose UTF-8 diagnostic buffer reaches this byte limit. */
     readonly maxBytes?: number
@@ -24,6 +27,7 @@ export type IFilePluginConfig = {
   }
 }
 
+/** Stable registration/config key for the conditional file sink. */
 export const FILE_PLUGIN_NAME = 'file' as const
 
 /** Optional batch output resolved once for one file registration. */

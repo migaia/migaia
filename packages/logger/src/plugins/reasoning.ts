@@ -4,8 +4,15 @@ import { defineFeature } from '@migaia/plugin-host'
 import { optionalColorFeature, type IColorShared } from './color.js'
 import { LoggerReasoningPhase } from '../plugin-constants.js'
 
+/** Streaming-display policy; completed text is separately dispatched as a silent audit entry. */
 export type IReasoningPluginConfig = {
-  labels?: { thinking?: string; response?: string }
+  /** Optional labels used when a phase call omits its own label. */
+  labels?: {
+    /** Defaults to Thinking... for a thinking phase. */
+    thinking?: string
+    /** Defaults to absent, so response output has no heading. */
+    response?: string
+  }
   /**
    * Schedules this plugin's streaming and complete entry output asynchronously when enabled.
    * Defaults to `false`.
@@ -13,17 +20,25 @@ export type IReasoningPluginConfig = {
   asyncOutput?: boolean
 }
 
+/** Explicit phase controls; finish a phase to emit its accumulated audit entry. */
 export type IReasoningPluginExt = {
+  /** Start/reset thinking; switching from a response first dispatches its buffered text. */
   startThinking(label?: string): void
+  /** Append/stream a thinking delta, starting the phase automatically when necessary. */
   thinking(delta: string): void
+  /** Finish thinking and dispatch nonempty accumulated text with data.silent=true. */
   endThinking(): void
+  /** Start/reset a response; switching from thinking first dispatches its buffered text. */
   startResponse(label?: string): void
+  /** Append/stream a response delta, starting the phase automatically when necessary. */
   response(delta: string): void
+  /** Finish a response and dispatch nonempty accumulated text with data.silent=true. */
   endResponse(): void
 }
 
 type IPhase = (typeof LoggerReasoningPhase)[keyof typeof LoggerReasoningPhase]
 
+/** Stable registration/config key for streaming thinking/response display. */
 export const REASONING_PLUGIN_NAME = 'reasoning' as const
 
 /** Resolved optional color capability captured once during reasoning installation. */
@@ -159,6 +174,12 @@ class ReasoningPlugin implements ILoggerPlugin<
   }
 }
 
+/**
+ * Create thinking/response methods with synchronous raw output by default and optional coloring.
+ * Token writes bypass the pipeline; a finished phase dispatches its whole text for other sinks
+ * while the color sink skips its silent marker. End/switch phases explicitly: disposal does not
+ * automatically publish an unfinished buffer. This plugin owns phase state, not the host writer.
+ */
 export const reasoning = (
   config: IReasoningPluginConfig = {}
 ): ILoggerPlugin<

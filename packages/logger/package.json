@@ -10,7 +10,9 @@
   "files": [
     "dist",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -37,7 +39,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
-    "fmt": "oxfmt src test e2e logger.test.ts",
+    "fmt": "oxfmt src test e2e logger.test.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",
     "typecheck:browser": "bun check -p tsconfig.browser.json",

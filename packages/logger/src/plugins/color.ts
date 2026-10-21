@@ -15,15 +15,24 @@ import { LoggerConsoleTag, LoggerEntryDataKey } from '../plugin-constants.js'
 import { serializeErrorChain } from '@migaia/utils/error'
 import { LoggerColorMode, type ILoggerColorMode } from '../plugin-constants.js'
 
+/**
+ * Auto detects host output, pretty preserves native console arguments, and json emits one JSON
+ * record.
+ */
 export type IOutputFormat = 'auto' | 'pretty' | 'json'
 
+/** Console renderer options resolved from this plugin's owned configuration snapshot. */
 export type IColorPluginConfig = {
+  /** Defaults to auto; `always` forces ANSI and `never` disables it, regardless of host detection. */
   color?: ILoggerColorMode
+  /** Defaults to auto: LOG_FORMAT wins, then CI/TTY selects pretty, otherwise json. */
   format?: IOutputFormat
+  /** Defaults to true for pretty output; JSON always keeps its structured time field. */
   timestamp?: boolean
   /**
    * Message argument coloring range. Defaults to `none`, leaving the message and its arguments
-   * uncolored.
+   * uncolored. head colors the message; tail colors the last argument or an argument-free message;
+   * head-tail combines them; all colors the message and primitive arguments, preserving objects.
    */
   colorMessage?: 'head' | 'tail' | 'head-tail' | 'all' | 'none'
   /**
@@ -44,6 +53,7 @@ export const loggerColorFeature = defineFeature<IColorShared, Record<never, neve
 // Other plugins, such as reasoning, also import those types from `typing.ts`
 // instead of this file, avoiding direct dependencies between plugins.
 
+/** Stable registration/config key for the color renderer and its optional painting Feature. */
 export const ANSIS_PLUGIN_NAME = 'ansis' as const
 
 class ColorPlugin implements ILoggerPlugin<
@@ -245,6 +255,11 @@ const colorFeatureContract = definePlugin({
 /** Optional color dependency shared by reasoning plugins. */
 export const optionalColorFeature = colorFeatureContract.getFeature('color', { optional: true })
 
+/**
+ * Create the optional console sink/painting provider with auto color/format and timestamps by
+ * default. It skips data.silent entries and routes warn/error/fatal to matching host methods.
+ * Installation/removal owns only sink registration, not the borrowed console or runtime manager.
+ */
 export const color = (
   config: IColorPluginConfig = {}
 ): ILoggerPlugin<

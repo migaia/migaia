@@ -1,8 +1,8 @@
 /**
  * The single declaration site for `@migaia/logger` error codes.
  *
- * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
- * `source` is always `'@migaia/logger'`. Throw sites use these constants instead of inline values.
+ * The pair `(source, code)` identifies package-owned failures with source `'@migaia/logger'`. Throw
+ * sites use these constants instead of inline values.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -129,4 +129,5 @@ export const LoggerErrorCode = {
   fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'
 } as const
 
+/** Stable semantic failure values, interpreted with LOGGER_SOURCE and the original cause chain. */
 export type ILoggerErrorCode = (typeof LoggerErrorCode)[keyof typeof LoggerErrorCode]
