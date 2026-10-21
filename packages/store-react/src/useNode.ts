@@ -4,30 +4,23 @@ import { assertReactiveOwnedBy } from '@migaia/reactive/extension'
 import { notifyReact } from './notify-react.js'
 
 /**
- * Provides subscriptions for stable nodes with a fixed `{node}` dependency set.
- *
- * `useTracked` supports arbitrary closures and changing dependencies. It captures dependencies
- * during render, commits captures, records candidate values and versions, and retracks changed
- * selectors. `useSignal` and `useAtomValue` do not need that bookkeeping because their node
- * identity and dependency set are stable.
- *
- * This path retains required commit validation. It makes no performance guarantee. Effect lifecycle
- * and `useSyncExternalStore` scheduling still have a cost.
- *
- * Subscriptions use `Effect`, preserving ownership checks, observed and unobserved lifecycle, and
- * tracing. `peek()` reads the current value without tracking, including rereads between render and
- * subscription or after an abandoned transition. Snapshots are not cached separately from the node
- * value.
- *
- * This path keeps `useSyncExternalStore` rather than adopting Jotai's bypass, which depends on
- * different internal constraints. Bypassing it here could reintroduce selector and concurrency
- * failures.
+ * Stable reactive source already registered to its Runtime. Its tracked value and untracked peek
+ * must describe the same current state; unchanged object snapshots must retain identity for React's
+ * external-store checks. A plain lookalike object does not establish Runtime ownership.
  */
 export type IStableNode<T> = {
+  /** Tracked read used by the mounted subscription's Runtime Effect. */
   readonly value: T
+  /** Current untracked snapshot used in render, server rendering and commit consistency checks. */
   peek(): T
 }
 
+/**
+ * Subscribe to one stable node rather than capturing an arbitrary selector. Ownership is checked
+ * during render, with dependency-owned NOT_RUNTIME_OWNED/CROSS_RUNTIME failures. enabled defaults
+ * to true; false disables the Effect subscription but still validates ownership and reads peek.
+ * React cleanup disposes the observer, leaving the node and Runtime with their existing owner.
+ */
 export function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled = true): T {
   // Fail in render, where an Error Boundary can handle it. Waiting until the
   // subscription Effect runs would surface the ownership error in commit.

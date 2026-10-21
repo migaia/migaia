@@ -1,9 +1,8 @@
 /**
  * Declares the public error codes for `@migaia/store-react` in one place.
  *
- * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/store-react'`. Throw sites use these constants instead of inline
- * literals.
+ * Pair these codes with source `@migaia/store-react`; complete upstream error identities retain
+ * their actual package owner. Throw sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -68,10 +67,12 @@ export const StoreReactErrorCode = {
   invalidConfig: 'INVALID_CONFIG',
 
   /**
-   * The provider readiness barrier rejected before rendering could continue. The caller should
-   * inspect `cause` and fix the underlying store/resource failure.
+   * A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause`
+   * for the original reason; Error rejections, including frozen Errors, retain their identity
+   * instead of receiving this code.
    */
   readyRejected: 'READY_REJECTED'
 } as const
 
+/** Public union of package-owned failure values for inspecting or constructing boundary errors. */
 export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode]

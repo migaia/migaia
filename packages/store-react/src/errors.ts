@@ -11,7 +11,11 @@ function tagStoreReactError<E extends Error>(error: E, code: IStoreReactErrorCod
   return attachErrorIdentity(error, { source: STORE_REACT_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Return a new native Error with the supplied code/message and package source, without throwing. A
+ * defined cause is retained by reference; omitted/undefined cause creates no cause property. The
+ * new error keeps its constructor-created stack.
+ */
 export function createStoreReactError(
   code: IStoreReactErrorCode,
   message: string,
@@ -24,7 +28,7 @@ export function createStoreReactError(
   return tagStoreReactError(error, code)
 }
 
-/** Builds a `(source, code)`-tagged `AggregateError`, preserving `errors[]` as a cause path. */
+/** Return a tagged native AggregateError retaining the supplied errors in order, without throwing. */
 export function createStoreReactAggregateError(
   code: IStoreReactErrorCode,
   errors: readonly unknown[],

@@ -13,6 +13,11 @@ function useAtomStore(): IAtomStore {
   return useStoreRegistry().atomStore
 }
 
+/**
+ * Read a definition from the nearest Provider's isolated atom store; no Provider throws
+ * PROVIDER_REQUIRED. Render/server snapshots use preview without committing dependency edges;
+ * mounted subscription uses store.sub, and React cleanup releases that subscription.
+ */
 export function useAtomDefinition<T>(definition: IAtomDefinition<T>): T {
   const store = useAtomStore()
   const subscribe = useCallback(
@@ -25,6 +30,11 @@ export function useAtomDefinition<T>(definition: IAtomDefinition<T>): T {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
+/**
+ * Return a writer for the nearest Provider's atom store, stable until definition/store changes.
+ * Calls forward args/result to store.set, without subscribing or disposing the definition/store.
+ * Missing Provider throws PROVIDER_REQUIRED during render.
+ */
 export function useSetAtomDefinition<T, Args extends readonly unknown[], Result>(
   definition: IWritableAtomDefinition<T, Args, Result>
 ): (...args: Args) => Result {

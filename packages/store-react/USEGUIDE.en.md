@@ -1,0 +1,518 @@
+# `@migaia/store-react` usage guide
+
+These six examples run through real React 19 and ReactDOM server entries. They prove SSR reads, isolation, and error behavior; an explicit second render is not a mounted client update. Client contracts are documented separately below.
+
+## Find a scenario
+
+| Scenario                                                     | API                 | Details                                                                           |
+| ------------------------------------------------------------ | ------------------- | --------------------------------------------------------------------------------- |
+| Render a Store projection without a Provider                 | `useStore`          | [Complete example](#render-a-store-projection-without-a-provider)                 |
+| Show readiness fallback on the first server render           | `StoreProvider`     | [Complete example](#show-readiness-fallback-on-the-first-server-render)           |
+| Render the same token from separate request registries       | `useProvidedStore`  | [Complete example](#render-the-same-token-from-separate-request-registries)       |
+| Distinguish a missing Provider from an unregistered token    | `useProvidedStore`  | [Complete example](#distinguish-a-missing-provider-from-an-unregistered-token)    |
+| Keep one atom definition local to each registry              | `useAtomDefinition` | [Complete example](#keep-one-atom-definition-local-to-each-registry)              |
+| Render a preloaded Resource without creating another request | `useResourceValue`  | [Complete example](#render-a-preloaded-resource-without-creating-another-request) |
+
+## Running the examples
+
+```bash
+pnpm add @migaia/store-react @migaia/store-light @migaia/store-keyed @migaia/reactive @migaia/resource react react-dom
+```
+
+react/react-dom must satisfy `>=19`; the other listed packages are directly imported by examples. createElement avoids JSX, so each example is a standalone TypeScript file. renderToString does not run client effects. Explicit owners release external Registries, Stores, and Resources instead of relying on server unmount callbacks.
+
+## Render a Store projection without a Provider
+
+A server response needs a total derived from two Store fields. A later response must read updated values without moving the Store into React context.
+
+Copying fields into view state creates another value to synchronize. A second server render also does not prove a mounted client subscription.
+
+Install React 19, react-dom, and store-light directly. useStore evaluates the selector; renderToString generates HTML, and a second explicit render reads the changed price.
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { createStore } from '@migaia/store-light'
+import { useStore } from '@migaia/store-react'
+
+const store = createStore({ price: 3, quantity: 2 })
+function Total() {
+  const total = useStore(store, (state) => state.price * state.quantity)
+  return createElement('output', null, String(total))
+}
+console.log(renderToString(createElement(Total)))
+store.price = 4
+console.log(renderToString(createElement(Total)))
+await store.$dispose()
+```
+
+Output:
+
+```text
+<output>6</output>
+<output>8</output>
+```
+
+Prints `<output>6</output>` and `<output>8</output>`. Each explicit server render evaluates the projection from current Store values.
+
+This proves SSR reads, not mounted subscription updates. Provider is optional for useStore; equality defaults to Object.is and Runtime comes from the Store. The caller disposes the Store after both renders.
+
+### Example parameters
+
+The createStore shape contains price=3 and quantity=2. useStore requires store and selector, which multiplies those fields; isEqual defaults to Object.is and Runtime comes from the Store. Each renderToString evaluates createElement(Total) independently. A field write here does not prove mounted notification. The caller finally invokes $dispose.
+
+## Show readiness fallback on the first server render
+
+Initialization has fulfilled, but a new Provider still needs to observe its readiness barrier before rendering children. The first server response needs an explicit fallback.
+
+A fulfilled input Promise is not a settled normalized barrier. renderToString neither runs client effects nor waits for them to update the tree.
+
+Pass a stable ready list and fallback in StoreProvider.config. Await the input, render with an explicit caller-owned registry, then dispose that registry yourself.
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { StoreProvider, createStoreRegistry } from '@migaia/store-react'
+
+const registry = createStoreRegistry()
+const ready = [Promise.resolve()]
+await ready[0]
+let reads = 0
+function Content() {
+  reads += 1
+  return createElement('p', null, 'Content')
+}
+try {
+  const html = renderToString(
+    createElement(StoreProvider, {
+      registry,
+      config: { ready, fallback: createElement('p', null, 'Waiting for initialization') },
+      children: createElement(Content)
+    })
+  )
+  console.log(html)
+  console.log(reads)
+} finally {
+  await registry.disposeAsync()
+}
+```
+
+Output:
+
+```text
+<p>Waiting for initialization</p>
+0
+```
+
+Prints `<p>Waiting for initialization</p>` and `0`. The first render shows fallback even with fulfilled input, and Content is not evaluated.
+
+This SSR run does not prove a later client readiness update. With default WASM-off features, omitted ready means no barrier; fallback defaults to null. An external registry defaults to no disposal on unmount, and SSR runs no unmount cleanup.
+
+### Example parameters
+
+registry is explicitly caller-owned, disposeOnUnmount defaults to false, and children is the required Content element. config.ready is a stable Promise array; omitting it with default wasm=false means no barrier. config.fallback is a p element here, defaulting to null. Awaiting input does not settle a newly normalized barrier synchronously.
+
+## Render the same token from separate request registries
+
+Two server requests render one component and token but hold different counter values. Their responses must not read a shared module-level Store.
+
+A global token-to-Store table exposes the latest registration to both requests. Separate component instances alone do not create separate state owners.
+
+Create a registry and matching-Runtime Store per request. Register one shared token with owned: true and pass each registry to StoreProvider; useProvidedStore selects the current Provider’s Store.
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { createStore, type IReactiveStore } from '@migaia/store-light'
+import {
+  StoreProvider,
+  createStoreRegistry,
+  createStoreToken,
+  useProvidedStore
+} from '@migaia/store-react'
+
+type ICounter = { count: number }
+const token = createStoreToken<IReactiveStore<ICounter>>('counter')
+const first = createStoreRegistry()
+const second = createStoreRegistry()
+first.register(token, createStore({ count: 1 }, { runtime: first.runtime }), { owned: true })
+second.register(token, createStore({ count: 9 }, { runtime: second.runtime }), { owned: true })
+function Counter() {
+  return createElement('output', null, String(useProvidedStore(token, (state) => state.count)))
+}
+try {
+  console.log(
+    renderToString(
+      createElement(StoreProvider, { registry: first, children: createElement(Counter) })
+    )
+  )
+  console.log(
+    renderToString(
+      createElement(StoreProvider, { registry: second, children: createElement(Counter) })
+    )
+  )
+} finally {
+  await first.disposeAsync()
+  await second.disposeAsync()
+}
+```
+
+Output:
+
+```text
+<output>1</output>
+<output>9</output>
+```
+
+Prints `<output>1</output>` and `<output>9</output>`. One token resolves to different registered Stores in the two server trees.
+
+This proves explicit SSR scope isolation, not automatic request management. Registration owned defaults to false; true lets registry.disposeAsync await Store cleanup. Registered reactive values must match the registry Runtime.
+
+### Example parameters
+
+The token requires a nonempty debugName and is typed as IReactiveStore<ICounter>. Each Store options.runtime matches its Registry.runtime. register options.owned is true here and defaults to false. StoreProvider receives explicit registry and required children. useProvidedStore selects count and uses default Object.is equality.
+
+## Distinguish a missing Provider from an unregistered token
+
+A server component cannot find its Store. The caller needs to distinguish a missing Provider boundary from an omitted registration in that request.
+
+A silent global fallback hides configuration errors and may expose another request’s data. Returning undefined instead delays failure until a later field read.
+
+useProvidedStore first requires a Provider, then requires the token in that registry. Render both invalid trees with real React and inspect their distinct public error codes.
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import type { IReactiveStore } from '@migaia/store-light'
+import {
+  StoreProvider,
+  createStoreRegistry,
+  createStoreToken,
+  useProvidedStore
+} from '@migaia/store-react'
+
+type ICounter = { count: number }
+const token = createStoreToken<IReactiveStore<ICounter>>('counter')
+const registry = createStoreRegistry()
+function Counter() {
+  return createElement('output', null, String(useProvidedStore(token, (state) => state.count)))
+}
+try {
+  try {
+    renderToString(createElement(Counter))
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error)) throw error
+    console.log(error.code)
+  }
+  try {
+    renderToString(createElement(StoreProvider, { registry, children: createElement(Counter) }))
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error)) throw error
+    console.log(error.code)
+  }
+} finally {
+  await registry.disposeAsync()
+}
+```
+
+Output:
+
+```text
+PROVIDER_REQUIRED
+STORE_MISSING
+```
+
+Prints `PROVIDER_REQUIRED` and `STORE_MISSING`. The first tree has no Provider; the second has a valid empty registry without the requested registration.
+
+Both fail during server rendering. Tokens are identity keys, not their debug-name strings; registration and reading must use the same token. This example does not demonstrate a client Error Boundary.
+
+### Example parameters
+
+The identical token is read twice; its debug name does not replace identity. The first tree lacks a Provider and the second receives a valid empty Registry. children is supplied explicitly, and absent config means no readiness barrier. renderToString is the error-catching boundary, with external Registry cleanup in finally.
+
+## Keep one atom definition local to each registry
+
+Two panels share one reactive Runtime and atom definition. Each Provider registry still needs its own current value.
+
+Caching atom state only by Runtime merges independent panels into one state owner. Reusing a definition should share its description, not every Provider’s value.
+
+Install reactive and store-keyed directly. Create two registries on one Runtime, set the definition in each registry.atomStore, and render useAtomDefinition under the matching Provider.
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { createRuntime } from '@migaia/reactive'
+import { atomDef } from '@migaia/store-keyed/atom/definition'
+import { StoreProvider, createStoreRegistry, useAtomDefinition } from '@migaia/store-react'
+
+const runtime = createRuntime()
+const definition = atomDef(0)
+const first = createStoreRegistry(runtime)
+const second = createStoreRegistry(runtime)
+first.atomStore.set(definition, 5)
+second.atomStore.set(definition, 8)
+function Counter() {
+  return createElement('output', null, String(useAtomDefinition(definition)))
+}
+try {
+  console.log(first.runtime === second.runtime)
+  console.log(
+    renderToString(
+      createElement(StoreProvider, { registry: first, children: createElement(Counter) })
+    )
+  )
+  console.log(
+    renderToString(
+      createElement(StoreProvider, { registry: second, children: createElement(Counter) })
+    )
+  )
+} finally {
+  await first.disposeAsync()
+  await second.disposeAsync()
+}
+```
+
+Output:
+
+```text
+true
+<output>5</output>
+<output>8</output>
+```
+
+Prints `true`, `<output>5</output>`, and `<output>8</output>`. One Runtime is shared, while the same atom definition reads different scoped values.
+
+This proves SSR reads from each registry’s atomStore, not mounted rerenders. useAtomDefinition requires a Provider; atomDef starts at the supplied 0. Explicitly disposing each registry leaves the borrowed Runtime alone.
+
+### Example parameters
+
+createRuntime() has no custom options. Both createStoreRegistry(runtime) calls borrow that same instance. atomDef(0) starts at zero, then atomStore.set(definition,5/8) sets separate local values. useAtomDefinition takes only the required definition and needs a Provider. Each Provider has explicit registry/children, and each Registry is disposed asynchronously.
+
+## Render a preloaded Resource without creating another request
+
+A server loader already owns a fetched profile. Several explicit HTML renders need that result without creating another Resource and request for each tree.
+
+Creating another Resource on each render duplicates ownership and may send another request. Reading while pending also needs an SSR Suspense strategy.
+
+Install reactive and resource directly. Create one Resource outside React, await its promise, read it with useResourceValue in two server renders, then dispose it.
+
+```ts doc-test=run
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '@migaia/resource'
+import { useResourceValue } from '@migaia/store-react'
+
+let requests = 0
+const resource = new Resource(async () => {
+  requests += 1
+  return { name: 'Ada' }
+}, createRuntime())
+await resource.promise
+function Profile() {
+  return createElement('p', null, useResourceValue(resource).name)
+}
+try {
+  console.log(renderToString(createElement(Profile)))
+  console.log(renderToString(createElement(Profile)))
+  console.log(requests)
+} finally {
+  resource.dispose()
+}
+```
+
+Output:
+
+```text
+<p>Ada</p>
+<p>Ada</p>
+1
+```
+
+Prints `<p>Ada</p>` twice, then `1`. Both server renders read the preloaded Resource, and the fetcher runs once.
+
+This proves cached SSR reads, not client subscriptions. Resource defaults autoStart to true and ttl to Infinity. useResourceValue throws its Promise for idle/pending or its stored error for error/cancelled; pending SSR needs a suitable Suspense strategy.
+
+### Example parameters
+
+The Resource fetcher returns profile data and counts calls. Its second argument is explicit createRuntime(); omitted options use autoStart=true and ttl=Infinity. Await resource.promise before reading. useResourceValue takes one required Resource without taking over disposal. Both renderToString calls share it; the owner finally calls resource.dispose.
+
+## Contract details
+
+### Ownership, installation, and environment
+
+This package connects existing state models to React. It does not implement a Store, Atom, Resource, or global-state framework. store-light owns Stores and their async fields, store-keyed owns Atom definitions and AtomStore, resource owns standalone Resource values, and reactive owns the dependency graph. lifecycle and utils supply shared cleanup and utilities. Ordinary shared variables do not become reactive without reading reactive nodes.
+
+The ESM package exposes only `@migaia/store-react`, with no subpaths. Both react and react-dom are peers requiring `>=19`; async Stores use React 19's use. Explicitly install store-light, store-keyed, reactive, or resource when importing them directly. SSR examples use real ReactDOM server rendering and prove server reads/rendering, not client subscriptions or effect cleanup.
+
+### Runtime, state, and scope
+
+A Runtime contains one reactive dependency graph. A shared ownership protocol identifies the Runtime of a node, Store, or Atom; subscriptions cannot connect different graphs. A Provider Registry/AtomStore belongs to a Runtime without owning that Runtime's lifetime.
+
+store-light turns ordinary fields, get accessors, and methods into Signals, Computeds, and Actions. This binding uses $runtime, the async Store $async/storeReady protocol, and resource protocols. Ordinary-field export/hydration still belong to Store APIs such as $plain/$hydrate. $snapshot() provides a Store snapshot, and $batch(recipe) groups synchronous writes for notification; recipe receives `IStoreShape<S>`. useStore/useSignal can read module singletons without a Provider, but adding a Provider does not make an already-shared singleton request-local.
+
+Atom definitions are frozen descriptions without runtime state. The same atomDef/derivedDef/writableDef/familyDef description is instantiated independently in different AtomStores. Each Registry owns an atomStore; multiple Registries can therefore share one Runtime while retaining separate Atom state. Create a request/application Registry first, create injected Stores/Resources with its runtime, register them before rendering, and release them through an explicit owner.
+
+### StoreProvider props and ownership
+
+IStoreProviderProps requires children:ReactNode. registry, runtime, disposeOnUnmount, and config are optional.
+
+| registry/runtime input | Default behavior                                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Neither supplied       | Creates a Runtime and Registry; disposeOnUnmount defaults to true                                               |
+| runtime only           | Creates a Registry borrowing that Runtime; disposeOnUnmount defaults to true                                    |
+| registry only          | Uses the external Registry; disposeOnUnmount defaults to false                                                  |
+| Both supplied          | Requires registry.runtime===runtime, otherwise INVALID_CONFIG; the external Registry is not disposed by default |
+
+The Provider never destroys a Runtime. disposeOnUnmount controls Registry cleanup, including its atomStore and owned registrations. Explicit disposeOnUnmount:true can transfer an external Registry's unmount cleanup. Changing an internally managed runtime prop selects a new candidate Registry and switches after commit; the old committed instance follows effect cleanup rather than mixing its reads into the new graph.
+
+On the client, RegistryBoundary retains in an effect and releases in cleanup. The last release defers to setTimeout(0), then rechecks reference count and generation, protecting immediate StrictMode remount. Explicitly owned external Registries use the same path. SSR runs none of these effects, so there is no automatic unmount cleanup: a request owner must await disposeAsync in finally. React supplies no reliable permanently-abandoned-render callback for uncommitted candidates. Timers do not guess that state; use an externally observable owner for deterministic release. useMemo stabilizes identity without owning cleanup.
+
+### Configuration, features, and readiness
+
+| config field                                            | Default and behavior                                                                                    |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| features.wasm?:boolean                                  | false; only literal true enables it; enabling it without ready creates a rejected configuration barrier |
+| features.experimental?:Readonly<Record<string,boolean>> | Empty allowlist; only own enumerable data properties whose value is exactly true enable a feature       |
+| ready?:readonly IStoreReadyBarrier[]                    | No barrier, producing normalized ready:null; entries are Promises or zero-argument factories            |
+| fallback?:ReactNode                                     | null; displayed while pending rather than retaining old children                                        |
+| defaults.warnAsyncActions?:boolean                      | false; a configuration snapshot only, not automatically passed to createStore                           |
+
+An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An Error reason retains its identity, including frozen Errors. A non-Error reason becomes READY_REJECTED with the original cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition.
+
+Within one Provider/barrierScope, the same ready array identity reuses its list Promise. A new array creates another readiness generation and ReadyBoundary even with the same entries; old completion cannot unlock it. Factory results have a separate scope+factory cache: pending/successful results can be shared by different lists, while failure removes that factory's cache entry. Reusing the old array still reuses its cached rejected list Promise. A new array alone does not necessarily rerun a successful factory. Different Providers/request scopes remain isolated. Factory execution is not guaranteed exactly once across abandoned renders; an application owner should supply a stable Promise for non-idempotent initialization.
+
+Even an already-settled Promise updates tracked status in a then microtask, so the first synchronous render can remain pending. A client effect rechecks; SSR renderToString does not run that effect. Keep ready arrays, Stores/Signals/Resources, and selector/equality identities stable. Configuration is readonly input: supply a new object for changes, do not write state during render, and do not create resource-owning business instances on each render.
+
+Normalized features.wasm is boolean, features.experimental is a shallow-frozen null-prototype allowlist, defaults contains warnAsyncActions, and ready is null or an object with promise/status()/error(). Its states are pending/ready/error. Only the experimental allowlist is frozen; the outer features/defaults/ready containers are not guaranteed frozen. StoreProviderState/IStoreProviderState exports those three values; states are not error codes. Sorted experimental-key encoding makes input key order irrelevant. Accessors are ignored as enabling data without invoking their getters; `__proto__` remains an ordinary key.
+
+| API                                         | Arguments, defaults, and result                                                                                               |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| useStoreConfig()                            | Current IStoreConfigValue, or null without a Provider                                                                         |
+| useStoreFeature(path)                       | path is `'wasm' or experimental.${string}`; false without a Provider or an enabled entry                                      |
+| useAssertStoreFeature(path,apiName?)        | apiName defaults to `'this API'`; missing Provider is PROVIDER_REQUIRED, a disabled feature is FEATURE_DISABLED               |
+| readStoreFeature(config,path)               | Non-hook query with required config; unknown paths or an empty experimental key return false                                  |
+| assertStoreFeature(config,path,apiName?)    | Non-hook assertion accepting null, with the same default name                                                                 |
+| normalizeStoreConfig(config?,barrierScope?) | config defaults to undefined; scope defaults to a fresh `{}` per call; an explicit stable scope defines ready-cache isolation |
+
+Failed configuration reads, invalid ready entries, or experimental-feature reflection failures produce INVALID_CONFIG with the original cause when available. defaults.warnAsyncActions is application-readable configuration; explicitly pass the Store option to affect Store behavior.
+
+### Store, Signal, and general read hooks
+
+| API                                                | Arguments, defaults, and behavior                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `useStore<S,R>(store,selector,isEqual?):R`         | Required Store and selector; Object.is by default; uses store.$runtime and does not require a Provider |
+| `useSignal<T>(signal):readonly [T,(next:T)=>void]` | Required signal, using its runtime; setter stays stable for the same Signal                            |
+| `useTracked<T>(read,isEqual?,runtime?):T`          | Required read; defaults to Object.is/defaultRuntime and tracks actual node reads                       |
+| `useNodeValue<T>(node,runtime,enabled?):T`         | Required node/runtime; enabled defaults to true; fixed-node subscription                               |
+
+useStore first calls use(storeReady(store)) when store.$async is true, suspending beneath an outer Suspense until ready. The selector receives `IStoreShape<S>`. useTracked captures reads during render and publishes the selector/snapshot and dependencies at commit. An abandoned render does not change committed subscription semantics. Changing Runtime rebuilds the binding without running an old reader against the new graph. Changing selector/equality identity recaptures without requiring a subscription teardown each time. Equal results reuse snapshots rather than returning a new wrapper on repeated getSnapshot calls.
+
+The public `IStableNode<T>` shape is readonly value:T and peek():T, but the node must also satisfy reactive's actual ownership protocol. useNodeValue checks node/runtime during render. enabled=false disables only subscription, not ownership checks or reading. The initial subscription run records dependencies without notifying; snapshots read node.peek directly without another old-value cache. useSignal uses this fixed-node path instead of dynamic dependency capture. This is a mechanism distinction, not a speed claim.
+
+Client notification invokes the React listener through runtime.untracked and reports listener failures in the subscription-listener phase without polluting the current graph's dependencies. useSyncExternalStore connects that behavior to React's subscription model. A server getServerSnapshot read does not establish a client subscription.
+
+### Two async-value protocols
+
+| Source                                 | Hook                           | Protocol                                                    |
+| -------------------------------------- | ------------------------------ | ----------------------------------------------------------- |
+| `Resource<T>` from resource            | useResource / useResourceValue | Independent async state machine, using resource.runtime     |
+| Async atom with resource:`Resource<T>` | useAsyncAtomValue              | Delegates to useResourceValue(atom.resource)                |
+| `IStoreResource<T>` from store-light   | useStoreResource               | Store async field with version capture and committed leases |
+
+All take one required argument and no options. Resource and IStoreResource are not interchangeable. useResource returns `IResourceState<T>`: idle, pending, success (data and optional refreshing), error (error), or cancelled (DOMException error). useResourceValue returns successful data, throws error/cancelled errors during render, and throws resource.promise for idle/pending beneath Suspense. Business Promises/errors are not thrown from the scheduler's Effect callback. The hook does not take over Resource disposal from its application owner.
+
+useStoreResource subscribes through resource.subscribe/getSnapshot, captures a version with captureSnapshot(existingLease) in render, and commitCapture in layout releases the prior lease. Unmount cleanup uses a microtask and epoch check to protect StrictMode replay. This manages captured-version leases rather than transferring the whole resource lifetime to React. The read/preload/retry/captureSnapshot/commitCapture protocol must come from a real IStoreResource.
+
+### Atom hooks
+
+| API                                                                       | Behavior                                                                                                 |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| useAtomValue(atom:`IReadableAtom<T>`)                                     | Uses registry.atomStore when a Provider and atom.atomDefinition exist; otherwise reads the node directly |
+| useSetAtom(atom:`IWritableAtom<T,Args,Result>`)                           | Stable writer selecting atomStore.set or atom.write(...args) under the same condition                    |
+| useAtom(atom)                                                             | readonly [useAtomValue(atom),useSetAtom(atom)]                                                           |
+| useAtomDefinition(definition:`IAtomDefinition<T>`)                        | Requires a Provider; subscribes through sub and reads preview snapshots                                  |
+| useSetAtomDefinition(definition:`IWritableAtomDefinition<T,Args,Result>`) | Requires a Provider; stable wrapper of atomStore.set(definition,...args)                                 |
+
+Args is a readonly unknown[] tuple and Result is the write result. Each hook has one required argument and no options. Generic protocols come from store-keyed/reactive/atom, without requiring a particular factory; definitions come from atom/definition. Provider and direct paths use enabled to select one subscription source without changing hook order. A disabled direct path still runs useNodeValue's ownership check. Definition reads use preview: derived previews do not publish committed dependency edges and retain identity within one Runtime version. sub owns the actual subscription. A definition describes state; AtomStore owns each scope's values.
+
+### Provider lookup hooks
+
+All four hooks require an enclosing StoreProvider; absence produces PROVIDER_REQUIRED.
+
+| API                                               | Arguments, result, and errors                                                                                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| useStoreRegistry()                                | No arguments; returns the current StoreRegistry                                                                                                                                             |
+| useStoreRuntime()                                 | No arguments; returns the current Registry.runtime                                                                                                                                          |
+| `useStoreFromProvider<T>(token:IStoreToken<T>):T` | Required token; calls registry.require(token), with STORE_MISSING when absent; looks up the instance without subscribing to its fields                                                      |
+| useProvidedStore(token,selector,isEqual?)         | Required `IStoreToken<IReactiveStore<S>>` and selector:(state:`IStoreShape<S>`)=>R; isEqual defaults to Object.is; looks up the Store and delegates its projection subscription to useStore |
+
+### Tokens and StoreRegistry
+
+`createStoreToken<T>(debugName:string):IStoreToken<T>` returns frozen {key:symbol,debugName}; the name must be a nonempty string. Tokens with identical names still contain different Symbols. new StoreRegistry(runtime?) and createStoreRegistry(runtime?) both default to a fresh Runtime, borrow that Runtime, and own their atomStore.
+
+| Member                                     | Arguments, defaults, and behavior                                                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| register(token,value,options?)             | options defaults to {}, owned to false; duplicate token is STORE_DUPLICATE; returns an idempotent disposer tied to this exact entry |
+| replace(token,value,options?)              | owned defaults to false; publishes the new entry and disposes an owned old value only when its reference changes                    |
+| get / require / has(token)                 | Missing values yield undefined / STORE_MISSING / false; all reject after closing                                                    |
+| remove(token,disposeOwned?)                | disposeOwned defaults to true; reports whether removed; false detaches without disposal                                             |
+| retain(disposeOnRelease:boolean)           | Required; returns an idempotent release, deferring a final true release to a task and rechecking before closure                     |
+| dispose()                                  | Synchronously and idempotently starts whole-owner cleanup; synchronous failures can throw                                           |
+| disposeAsync()                             | Stable single Promise awaiting whole-owner cleanup and rejecting with the retained failure chain                                    |
+| whenTerminal()                             | Waits only for terminal state, without replacing disposeAsync's error outcome                                                       |
+| runtime / atomStore / lifecycle / disposed | Readonly; open→closing→terminal, with disposed true once not open                                                                   |
+
+IStoreRegistrationOptions contains only owned?:boolean. Nonobject options, failed reads, or a nonboolean flag produce INVALID_CONFIG; owned is captured once. register/replace use ownerOf to check declared ownership. A different Runtime produces CROSS_RUNTIME; plain values without a declared owner are accepted. get/require/has are queries, but still check active state. Whole-owner disposal seals admission and clears entries before invoking owned callbacks, preventing reentrant registration.
+
+Owned cleanup prefers $dispose(), then dispose(), and otherwise does nothing. Borrowed values are merely detached. Whole cleanup starts owned callbacks in reverse current-entry order, then atomStore cleanup, without serially awaiting each. lifecycle reads a thenable's then once and invokes it with its original receiver. Synchronous dispose does not await Promises; late failure is observed and reported in the Runtime's lifecycle-hook phase. disposeAsync after synchronous dispose waits for the same pending plan. Its completion Promise is published before callbacks, so reentrant cleanup can share it.
+
+One synchronous failure can retain its native Error with REGISTRY_DISPOSAL_FAILED attached; multiple failures use AggregateError. Frozen/non-Error reasons remain reachable through cause/errors, and foreign identity is preserved. The stable completion replays synchronous and asynchronous failures. whenTerminal means cleanup has settled, not that it succeeded.
+
+remove, replace, and register's returned disposer perform separate per-entry cleanup. Async rejection is reported but does not enter a later whole-owner disposeAsync wait ledger. To await a removed object's actual asynchronous release, retain its owner's completion protocol rather than treating Registry completion as a barrier for every historical cleanup.
+
+### Errors and migration
+
+| StoreReactErrorCode property | code                     | Situation                                                  |
+| ---------------------------- | ------------------------ | ---------------------------------------------------------- |
+| registryDisposed             | REGISTRY_DISPOSED        | Registry admission or query after closing/terminal         |
+| registryDisposalFailed       | REGISTRY_DISPOSAL_FAILED | Owned cleanup failure                                      |
+| providerRequired             | PROVIDER_REQUIRED        | Provider-only hook or feature assertion without a Provider |
+| featureDisabled              | FEATURE_DISABLED         | Feature not explicitly enabled                             |
+| storeMissing                 | STORE_MISSING            | require of an unregistered token                           |
+| storeDuplicate               | STORE_DUPLICATE          | Duplicate register for one token                           |
+| crossRuntime                 | CROSS_RUNTIME            | Cross-graph injection into a Registry                      |
+| invalidConfig                | INVALID_CONFIG           | Invalid token/Provider/owned/ready/feature configuration   |
+| readyRejected                | READY_REJECTED           | Wrapper for a non-Error readiness rejection reason         |
+
+STORE_REACT_SOURCE is `'@migaia/store-react'`. Errors created here carry source/code; foreign identities and underlying reactive ownership failures retain their actual owner. `createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` returns native Error. options defaults to undefined and forwards cause when it is not undefined. `createStoreReactAggregateError(code,errors:readonly unknown[],message)` returns native AggregateError. Arguments are required as shown, and both factories construct without automatically throwing, attach nonwritable source/code, and preserve stack and errors/cause chains.
+
+| Stable diagnostic                                                                 | Response                                                        |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `[store] StoreProvider registry/runtime ownership mismatch`                       | Supply registry alone or the identical runtime                  |
+| `[store] hook requires a StoreProvider`                                           | Put the Provider-only hook under its scope                      |
+| `[store] provider registry is disposed`                                           | Create a new Registry                                           |
+| `[store] duplicate provider store token: X` / `[store] missing provider store: X` | Correct registration order/token identity or explicitly replace |
+| `[store] provider store "X" belongs to a different Runtime`                       | Align actual ownership                                          |
+| `[store] IStoreToken requires a debug name`                                       | Supply a nonempty string                                        |
+| `[store] ready barrier rejected`                                                  | Inspect cause and use an outer Error Boundary                   |
+| `[store] provider registry disposal failed`                                       | Inspect AggregateError.errors or the individual original error  |
+
+Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. The minimum React/react-dom version moved to 19. The no-op prepareForRender method and ineffective second retain argument were removed; retain takes only disposeOnRelease.
+
+### Troubleshooting and development commands
+
+For a missing Provider, inspect the actual React parent tree: Context follows React ancestry, not DOM placement, and a portal retains its React parent's context. For missing updates, check actual selector reads, equality, and values cached outside tracking. For a stuck readiness fallback, inspect Promise settlement, stable arrays, and an Error Boundary. Use an external request Registry for SSR and await disposeAsync in finally.
+
+```bash
+pnpm run fmt
+pnpm run lint
+pnpm run typecheck
+pnpm run typecheck:test
+pnpm run test
+pnpm run typecheck:e2e
+pnpm run test:e2e
+pnpm run build
+```
+
+Browser integration requires Playwright browsers. Listing commands does not claim this documentation task ran them.

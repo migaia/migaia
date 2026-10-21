@@ -34,9 +34,13 @@ export function normalizeStoreReadyError(reason: unknown): Error {
       })
 }
 
+/** Provider inputs separating registry ownership, Runtime selection and optional readiness gating. */
 export type IStoreProviderProps = {
+  /** Required subtree shown after readiness, if any, permits rendering. */
   readonly children: ReactNode
+  /** Existing registry to borrow; omission creates a Provider-local registry and atom store. */
   readonly registry?: StoreRegistry
+  /** Runtime for an internal registry; when registry is supplied, this must be its exact Runtime. */
   readonly runtime?: IRuntime
   /**
    * Internal registries dispose on unmount by default. External registries remain caller-owned
@@ -50,6 +54,15 @@ export type IStoreProviderProps = {
   readonly config?: IStoreProviderConfig
 }
 
+/**
+ * Supply registry and feature configuration to the subtree. An external registry is borrowed by
+ * default; an internal registry retires after the last disposing committed retain is released.
+ * Mounted effects handle retention and delayed cleanup; SSR performs no effect cleanup, so an
+ * explicitly supplied request registry remains the server caller's responsibility. Readiness shows
+ * fallback while pending and throws its normalized rejection during render; settled promises may
+ * still be pending on the first synchronous render. Registry/Runtime mismatch throws
+ * INVALID_CONFIG.
+ */
 export function StoreProvider({
   children,
   registry,
@@ -144,7 +157,7 @@ export function StoreProvider({
   )
 }
 
-/** 就绪屏障。Promise 身份由上层稳住；已 settle 时尽量首帧直接放行（track 状态）。 */
+/** 就绪屏障。复用上层追踪状态；新追踪的 Promise 即使已结算，也要等微任务更新状态后才放行。 */
 function ReadyBoundary({
   ready,
   fallback,

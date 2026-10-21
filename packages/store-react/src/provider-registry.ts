@@ -40,12 +40,17 @@ function reportRegistryFailure(runtime: IRuntime, error: unknown): void {
 
 /** Typed immutable key shared by registration and synchronous lookup within a registry. */
 export type IStoreToken<T> = Readonly<{
+  /** Unique symbol used for registration; equal debug labels do not make tokens interchangeable. */
   key: symbol
+  /** Human-readable error label, not a lookup key. */
   debugName: string
+  /** Type-only value association; factory-created tokens contain no runtime payload here. */
   readonly [STORE_TOKEN_VALUE]?: (value: T) => T
 }>
 
+/** Explicit per-registration cleanup ownership; ordinary registration borrows its value. */
 export type IStoreRegistrationOptions = {
+  /** Defaults to false; true releases this entry through $dispose, or dispose when absent. */
   readonly owned?: boolean
 }
 
@@ -88,6 +93,10 @@ type IRegistryEntry = {
   readonly owned: boolean
 }
 
+/**
+ * Create a frozen typed token with a fresh symbol. debugName must be a nonempty string or
+ * INVALID_CONFIG is thrown; reuse this exact token for both registration and lookup.
+ */
 export function createStoreToken<T>(debugName: string): IStoreToken<T> {
   if (typeof debugName !== 'string' || debugName.length === 0) {
     throw createStoreReactError(
@@ -101,8 +110,14 @@ export function createStoreToken<T>(debugName: string): IStoreToken<T> {
   })
 }
 
-/** Runtime-bound registry shared by React Provider and SSR request scopes. */
+/**
+ * Runtime-bound token registry and isolated atom store for a Provider or explicit SSR request
+ * scope. Registered values are borrowed unless marked owned. Registration lookups are synchronous
+ * rather than reactive; owned cleanup and atom-store retirement belong to the registry, not its
+ * Runtime.
+ */
 export class StoreRegistry implements IDisposable {
+  /** Selected Runtime; even a registry-created Runtime is not disposed by registry cleanup. */
   readonly runtime: IRuntime
   /** Provider-local atom state/override boundary. Same Runtime may host many registries. */
   readonly atomStore: IAtomStore
@@ -117,6 +132,7 @@ export class StoreRegistry implements IDisposable {
   /** Published before cleanup callbacks; also closes registry admission during ledger plan assembly. */
   #disposingAsync: Promise<void> | undefined
 
+  /** Create an isolated atom store in the supplied Runtime, or a fresh Runtime when omitted. */
   constructor(runtime: IRuntime = createRuntime()) {
     this.runtime = runtime
     this.atomStore = createAtomStore(runtime)
@@ -138,10 +154,16 @@ export class StoreRegistry implements IDisposable {
     return this.#disposalLedger.whenTerminal()
   }
 
+  /** True from closing onward, before asynchronous owned cleanup has necessarily settled. */
   get disposed(): boolean {
     return this.lifecycle !== LifecycleState.open
   }
 
+  /**
+   * Register one token, defaulting owned to false. Duplicate token, foreign Runtime ownership and
+   * closed-registry admission reject. The returned idempotent disposer removes only this entry;
+   * owned cleanup starts synchronously, with later rejection reported rather than awaited.
+   */
   register<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): IDisposer {
     this.#assertActive()
     const owned = readRegistrationOwned(options, false)
@@ -165,6 +187,12 @@ export class StoreRegistry implements IDisposable {
     }
   }
 
+  /**
+   * Publish a new entry, defaulting owned to false, then release a different previously owned
+   * value. An old registration disposer cannot remove this replacement. Cleanup failure does not
+   * restore the old entry; asynchronous cleanup is reported and not added to whole-registry
+   * completion.
+   */
   replace<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): void {
     this.#assertActive()
     const owned = readRegistrationOwned(options, false)
@@ -179,11 +207,16 @@ export class StoreRegistry implements IDisposable {
     }
   }
 
+  /**
+   * Read a registered value or undefined; use has to distinguish an explicitly registered
+   * undefined.
+   */
   get<T>(token: IStoreToken<T>): T | undefined {
     this.#assertActive()
     return this.#entries.get(token.key)?.value as T | undefined
   }
 
+  /** Read a registered value or throw STORE_MISSING; registry closure throws REGISTRY_DISPOSED. */
   require<T>(token: IStoreToken<T>): T {
     this.#assertActive()
     const entry = this.#entries.get(token.key)
@@ -196,11 +229,16 @@ export class StoreRegistry implements IDisposable {
     return entry.value as T
   }
 
+  /** Test exact token membership while open, without creating a reactive dependency. */
   has<T>(token: IStoreToken<T>): boolean {
     this.#assertActive()
     return this.#entries.has(token.key)
   }
 
+  /**
+   * Remove a token and return whether it existed. By default start owned cleanup; false detaches
+   * without disposing. Later cleanup rejection is reported, not awaited by disposeAsync.
+   */
   remove<T>(token: IStoreToken<T>, disposeOwned = true): boolean {
     this.#assertActive()
     const entry = this.#entries.get(token.key)
@@ -211,8 +249,9 @@ export class StoreRegistry implements IDisposable {
   }
 
   /**
-   * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an
-   * internally-owned registry between those two phases.
+   * Retain a committed Provider and return an idempotent release. If this release requests disposal
+   * and leaves no retainers, schedule a task to recheck the count/generation before disposing. A
+   * newer retain cancels that scheduled retirement, including StrictMode effect replay.
    */
   retain(disposeOnRelease: boolean): IDisposer {
     this.#assertActive()
@@ -356,6 +395,7 @@ export class StoreRegistry implements IDisposable {
   }
 }
 
+/** Create a token registry with its own atom store, using a fresh Runtime when one is omitted. */
 export function createStoreRegistry(runtime: IRuntime = createRuntime()): StoreRegistry {
   return new StoreRegistry(runtime)
 }

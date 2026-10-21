@@ -6,11 +6,18 @@ import { useResource } from './useStore.js'
 import { useNodeValue } from './useNode.js'
 import { StoreRegistryContext } from './provider-context.js'
 
+/** Resource-bearing atom shape accepted by the async value hook; ownership stays with its caller. */
 type IAsyncAtom<T> = {
+  /** Resource whose data or pending/error outcome is read during rendering. */
   readonly resource: Resource<T>
 }
 
-/** Subscribe to any synchronous atom with Runtime-safe dependency tracking. */
+/**
+ * Read a synchronous atom and subscribe to its selected source. With a Provider and atomDefinition,
+ * use that registry's atom store; otherwise observe the atom in its own Runtime. The unused direct
+ * subscription stays disabled so one atom has one source. Atom/registry ownership remains
+ * external.
+ */
 export function useAtomValue<T>(atom: IReadableAtom<T>): T {
   const registry = useContext(StoreRegistryContext)
   const definition = atom.atomDefinition
@@ -35,7 +42,12 @@ export function useAtomValue<T>(atom: IReadableAtom<T>): T {
   return scopedStore && definition ? scopedValue : directValue
 }
 
-/** Stable writer callback; writes remain batched by writable derived atoms. */
+/**
+ * Return a writer stable while atom/definition/registry identities remain unchanged.
+ * Provider-backed definitions write through the scoped atom store; otherwise delegate exact
+ * args/result to atom.write. This hook does not subscribe or take ownership; write batching and
+ * failures belong to the atom.
+ */
 export function useSetAtom<T, Args extends readonly unknown[], Result>(
   atom: IWritableAtom<T, Args, Result>
 ): (...args: Args) => Result {
@@ -50,6 +62,7 @@ export function useSetAtom<T, Args extends readonly unknown[], Result>(
   )
 }
 
+/** Combine the current writable-atom value with useSetAtom's stable writer, using the same scope. */
 export function useAtom<T, Args extends readonly unknown[], Result>(
   atom: IWritableAtom<T, Args, Result>
 ): readonly [T, (...args: Args) => Result] {
@@ -57,8 +70,9 @@ export function useAtom<T, Args extends readonly unknown[], Result>(
 }
 
 /**
- * Suspense-safe Resource read. The subscription observes only the state machine; the Promise/error
- * is thrown from render, never from the scheduler's Effect callback.
+ * Read successful Resource data using React Suspense/Error Boundary semantics. Idle/pending throws
+ * resource.promise; error/cancelled throws the state's error. The subscription observes only state,
+ * so the Promise/error is thrown from render. The Resource remains borrowed and is not disposed.
  */
 export function useResourceValue<T>(resource: Resource<T>): T {
   const state = useResource(resource)
@@ -74,6 +88,10 @@ export function useResourceValue<T>(resource: Resource<T>): T {
   }
 }
 
+/**
+ * Read an async atom's Resource with the same render-time Suspense/error behavior as
+ * useResourceValue.
+ */
 export function useAsyncAtomValue<T>(atom: IAsyncAtom<T>): T {
   return useResourceValue(atom.resource)
 }
