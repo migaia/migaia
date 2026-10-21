@@ -135,89 +135,100 @@ const arrayOptionCases = (name: string): readonly IOptionCaseDoc[] => {
   const create = `${name === 'SharedInt32Array' ? 'new ' : ''}${name}`
   return [
     {
-      title: t('Start a counter array from saved values', '用已保存的值初始化计数数组'),
+      title: t('Restore the dashboard counters', '恢复看板计数'),
       problem: t(
-        'A dashboard restores two counters into an array with three cells. Without `initialValues`, every new cell starts at zero. Supply the saved prefix; cells beyond that prefix keep zero.',
-        '看板需要把两个已保存的计数恢复到三个格子的数组里。不传 `initialValues` 时，新格子全部为零。传入已保存的前缀后，其余格子仍保持零。'
+        'A ticket dashboard restores open and resolved counts, while a new archived count has no saved value. Without `initialValues`, all three begin at zero. Supply the saved prefix to restore the two existing counts and leave the new one at zero.',
+        '工单看板要恢复未解决和已解决计数，新加的归档计数还没有保存值。不传 `initialValues` 时，三个计数都会从零开始。传入已保存的前缀可以恢复已有计数，新加的一项仍为零。'
       ),
       example: `import { createRuntime } from '@migaia/reactive'
 import { ${name} } from '@migaia/store-shared'
 
-const counters = ${create}(createRuntime(), 3, { initialValues: [12, 7] })
-console.log([...counters.snapshot()])
-counters.dispose()`,
+const counters = ${create}(createRuntime(), 3, {
+  initialValues: [12, 7]
+})
+renderTicketCounts(counters.snapshot())
+onDashboardClosed(() => counters.dispose())`,
       result: t(
-        'The snapshot prints `[12, 7, 0]`. The third cell has no supplied initial value.',
-        '快照输出 `[12, 7, 0]`。第三个格子没有提供初值。'
+        'The dashboard opens with 12 open tickets, 7 resolved tickets and no archived tickets.',
+        '看板打开时显示 12 个未解决工单、7 个已解决工单，归档数为零。'
       ),
       covers: ['initialValues']
     },
     {
-      title: t('Attach another reader without resetting counters', '接入新读者时保留已有计数'),
+      title: t('Show the same counters in another view', '在另一视图显示同一组计数'),
       problem: t(
-        'Another runtime needs the same counters. Omitting `buffer` creates separate storage. Pass the writer buffer with the same length to share its data; `initialValues` is ignored when attaching, so the reader cannot reset existing counters.',
-        '另一个运行时需要读取同一组计数。不传 `buffer` 会创建独立存储。传入写者的缓冲区，并使用相同长度，就能共享数据。附着时忽略 `initialValues`，不会把已有计数重置。'
+        'A summary view must read the counters already owned by the dashboard. Without `buffer`, it gets separate storage and misses dashboard updates. Attach the dashboard buffer with the same length, then synchronize the local reader when the application receives a counter update.',
+        '汇总视图需要读取看板已经维护的计数。不传 `buffer` 会创建独立存储，看不到看板更新。以相同长度附着看板缓冲区，并在应用收到计数更新通知时同步本地读者。'
       ),
       example: `import { createRuntime } from '@migaia/reactive'
 import { ${name} } from '@migaia/store-shared'
 
-const writer = ${create}(createRuntime(), 2, { initialValues: [4, 8] })
-const reader = ${create}(createRuntime(), 2, {
-  buffer: writer.buffer,
-  initialValues: [99, 99]
+const summary = ${create}(createRuntime(), 3, {
+  buffer: dashboardCounters.buffer
 })
-console.log([...reader.snapshot()])
-writer.set(0, 9)
-reader.sync(0)
-console.log(reader.get(0))
-reader.dispose()
-writer.dispose()`,
+renderTicketCounts(summary.snapshot())
+onCountersChanged(() => {
+  summary.sync()
+  renderTicketCounts(summary.snapshot())
+})
+onSummaryClosed(() => summary.dispose())`,
       result: t(
-        'The first output is `[4, 8]`, then `9` after the write. Both wrappers read the same storage.',
-        '先输出 `[4, 8]`，写入后输出 `9`。两个包装读取的是同一块存储。'
+        'The summary starts with the dashboard counts and shows later changes without resetting the shared data.',
+        '汇总视图直接显示看板已有计数，之后继续显示更新，不会重置共享数据。'
       ),
-      covers: ['buffer', 'initialValues']
+      covers: ['buffer']
     }
   ]
 }
 
-/** Error helpers retain either a native failure or an application-provided reason. */
-const errorOptionCases = (name: string, native: string): readonly IOptionCaseDoc[] => [
+/** Error helpers keep application context and the original input failure together. */
+const errorOptionCases = (name: string): readonly IOptionCaseDoc[] => [
   {
-    title: t('Keep the initialization failure', '保留初始化的原始失败'),
+    title: t('Explain why saved counters could not be restored', '说明保存的计数为何恢复失败'),
     problem: t(
-      'An adapter adds context to failed counter initialization. A new message alone loses the original error and stack. Pass that error as `cause` so callers can inspect the failure that led to this one.',
-      '适配器需要为计数初始化失败补充上下文。只有新消息会丢失原始错误及堆栈。把它传给 `cause`，调用方就能查看导致当前错误的原始失败。'
+      'The dashboard loads saved counters before allocating shared state. If the saved input cannot be read, a new initialization message alone hides the input failure. Keep it in `cause` so the page can explain the operation and monitoring can inspect the original failure.',
+      '看板在创建共享状态前读取已保存计数。输入读取失败时，只创建初始化消息会掩盖原始原因。用 `cause` 保留它，页面说明失败的操作，监控继续查看原始失败。'
     ),
     example: `import { ${name}, StoreSharedErrorCode } from '@migaia/store-shared'
 
-const original = new Error('saved counters could not be read')
-const error = ${name}(StoreSharedErrorCode.invalidOption, 'counter initialization failed', {
-  cause: original
-})
-console.log(error instanceof ${native}, error.cause === original)`,
+try {
+  await restoreDashboardCounters()
+} catch (cause) {
+  const error = ${name}(
+    StoreSharedErrorCode.invalidOption,
+    'Dashboard counters could not be restored',
+    { cause }
+  )
+  showDashboardError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'Both comparisons print `true`; the native error class and original cause are preserved.',
-      '两个比较都输出 `true`；原生错误类型及原始原因都得到保留。'
+      'The dashboard shows a restoration error, and the monitoring record retains the saved-input failure.',
+      '看板显示计数恢复失败，监控记录保留保存数据读取失败的原因。'
     ),
     covers: ['cause']
   },
   {
-    title: t('Keep a structured input rejection', '保留结构化的输入拒绝原因'),
+    title: t('Keep the details of a rejected counter import', '保留计数导入的拒绝详情'),
     problem: t(
-      'An input loader returns a rejection record rather than an Error. Without `cause`, converting that record into a message loses its fields. The option keeps the record itself for later inspection.',
-      '输入加载器用记录对象说明拒绝原因，而不是返回 Error。只把记录转成消息会丢失其中的字段。`cause` 保留记录本身，便于稍后检查。'
+      'A counter importer returns a rejection record naming the invalid column. Turning it into a message loses those fields. Pass the record as `cause` so support can find the rejected column while the user sees a short import error.',
+      '计数导入器用拒绝记录指出无效列。只把记录转换为文字会丢失其中的字段。把记录传给 `cause`，用户看到简短导入提示，支持人员仍能找到被拒绝的列。'
     ),
     example: `import { ${name}, StoreSharedErrorCode } from '@migaia/store-shared'
 
-const reason = { field: 'initialValues', value: 'unknown' }
-const error = ${name}(StoreSharedErrorCode.invalidOption, 'counter input rejected', {
-  cause: reason
-})
-console.log(error.cause === reason)`,
+const rejection = validateCounterImport(upload)
+if (rejection) {
+  const error = ${name}(
+    StoreSharedErrorCode.invalidOption,
+    'Counter import rejected',
+    { cause: rejection }
+  )
+  showImportError(error.message)
+  reportToMonitoring(error)
+}`,
     result: t(
-      'The comparison prints `true`; `error.cause` still contains the original record.',
-      '比较输出 `true`；`error.cause` 仍保存原始记录。'
+      'The user sees why the import stopped; the complete rejection record remains available in monitoring.',
+      '用户知道导入已停止，监控中仍保留完整的拒绝记录。'
     ),
     covers: ['cause']
   }
@@ -417,7 +428,7 @@ console.log(StoreSharedErrorCode.bufferTooSmall)`
               default: t('Omitted; no supplied cause is attached.', '默认省略，不附提供的原因。')
             }
           },
-          optionCases: errorOptionCases(name!, native!),
+          optionCases: errorOptionCases(name!),
           returns: t(
             `Tagged native ${native} for the caller to return or throw.`,
             `返回供调用者返回或抛出的带码原生 \`${native}\`。`
