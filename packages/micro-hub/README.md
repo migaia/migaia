@@ -1,5 +1,7 @@
 # `@migaia/micro-hub`
 
+[English](./README.en.md)
+
 微前端（Module Federation remote 与 Web Components）之间的通信与共享存储。整个页面只有一个 hub：主应用创建它，主应用和每个子应用用同样的 `connect(name)` 拿到同形状的句柄，再通过**契约**读写状态、收发事件、发起请求。
 
 ## 为什么用它
@@ -157,6 +159,8 @@ class CheckoutElement extends HTMLElement {
 ## 错误
 
 所有错误带 `source: '@migaia/micro-hub'` 和 `code`（`MicroHubErrorCode`）：`HUB_ALREADY_CREATED`、`HUB_NOT_CREATED`、`APP_ALREADY_CONNECTED`、`APP_DISCONNECTED`、`PLUGIN_MISSING`、`CONTRACT_VERSION_MISMATCH`、`CONTRACT_OWNED`、`WRITE_DENIED`、`EMIT_DENIED`、`COMMAND_ASYNC`、`HANDLER_DUPLICATED`、`OWNER_ABSENT`、`OWNER_TIMEOUT`、`OWNER_GONE`、`INVALID_OPTION`。每个码的触发条件与处理方式见 [USEGUIDE](./USEGUIDE.md#错误码)。
+
+需要按错误分支时，比较 `error.source === MICRO_HUB_SOURCE` 和 `error.code`，不要匹配消息文字。`MicroHubErrorText` 导出全部消息文字，测试或日志需要核对原文时引用它。
 
 listener 和订阅回调抛出的错误不会打断其它 listener，也不会抛给 emit 方，而是交给 `createMicroHub({ report })`（默认 `globalThis.reportError`）。
 

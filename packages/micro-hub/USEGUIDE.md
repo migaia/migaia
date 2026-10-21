@@ -1,5 +1,7 @@
 # `@migaia/micro-hub` 使用手册
 
+[English](./USEGUIDE.en.md)
+
 ## 目录
 
 - [1. Hub](#1-hub)
@@ -11,6 +13,7 @@
 - [7. 共享异步值](#7-共享异步值)
 - [8. Web Components](#8-web-components)
 - [9. 生命周期与并发](#9-生命周期与并发)
+- [10. 公开常量](#10-公开常量)
 - [错误码](#错误码)
 
 ## 1. Hub
@@ -123,6 +126,23 @@ Lit consumer 可能早于 provider 连接时，在共同祖先先连接 `Context
 - 每个应用是 hub 内部 plugin-host 中的一个插件；`disconnect()` 先同步释放资源，再异步卸载插件，因此卸载过程中不会有回调到达已卸载的应用。立即以同名重新连接是允许的。
 - command 同步执行，同一 realm 内天然串行。订阅回调中再调用 command，写入在当前批次结束后提交。
 - owner 断开后状态保留；新的 owner 认领后可继续写。
+
+## 10. 公开常量
+
+根入口导出的三个常量对象都是冻结的字面量，取值本身就是公开约定。
+
+| 常量 | 取值 | 用途 |
+| --- | --- | --- |
+| `MicroResourceStatus` | `idle`、`pending`、`success`、`error`、`cancelled` | `resources.<name>.state.get().status` 的取值。`idle` 表示 owner 还没有 `provide`；`cancelled` 表示请求被新的请求取代或 owner 已释放。比较状态时写 `status === MicroResourceStatus.success`。 |
+| `MicroCapability` | `events`、`state`、`persist`、`resource` | 能力插件的种类名。每个插件声明一种；`PLUGIN_MISSING` 的消息里出现的就是这些名字。编写自定义插件或按缺失能力给出提示时使用。 |
+| `MicroHubErrorText` | 每个错误码对应的消息文字或消息工厂 | 本包抛出的所有消息都来自这里，例如 `MicroHubErrorText.appDisconnected('cart')`。分支判断请用 `code`；只有在测试或日志里需要核对原文时才引用它。 |
+
+```ts
+import { MicroResourceStatus } from '@migaia/micro-hub'
+
+const { status, data } = view.resources.profile.state.get()
+if (status === MicroResourceStatus.success) render(data)
+```
 
 ## 错误码
 
