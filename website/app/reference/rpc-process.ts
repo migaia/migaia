@@ -23,6 +23,8 @@ import type {
 } from './contract.js'
 import {
   rpcProcessCases,
+  processReaderOptionFields,
+  processFullPluginOptionCases,
   processPeerOptionCases,
   processTransportOptionCases,
   processOfferOptionCases,
@@ -1242,107 +1244,7 @@ const legacyReplaceExample: ICode = {
 }
 
 /** Doc of a `report(error)` callback member. */
-const fullProcessPluginOptionCases: readonly IOptionCaseDoc[] = [
-  {
-    title: t(
-      'Own a full remote-plugin deployment with explicit registration',
-      '用明确登记持有完整远程插件部署'
-    ),
-    problem: t(
-      'An application needs the advanced proxy API and its own replay dispatch. Supply the actual installing Host, endpoint factory and borrowed governor before acquiring the child.',
-      '应用需要高级代理接口及自己的重放派发。取得子进程前，提供实际安装宿主、端点工厂和借用的治理对象。'
-    ),
-    example: processExampleVariant(legacyReplaceExample, (code) =>
-      code
-        .replace('  createProcessPlugin,', '  createProcessPlugin,\n  createProcessResilience,')
-        .replaceAll('idempotent: false', 'idempotent: true')
-        .replace('hooks, ping }', 'hooks, ping, type IRpcEndpoint }')
-        .replace('endpoint: { endpoint },', 'endpoint: { endpoint: endpoint as IRpcEndpoint },')
-        .replace('return { endpoint }', 'return { endpoint: endpoint as IRpcEndpoint }')
-        .replaceAll('      ping()\n    ]', '      ping()\n    ] as const')
-        .replaceAll('          ping()\n        ]', '          ping()\n        ] as const')
-        .replace(
-          '  const plugin = createProcessPlugin<INodeProcessHandle>({',
-          `  const resilience = createProcessResilience({ scheduler: systemScheduler, report })
-  let keys = 0
-  let retries = 0
-  const plugin = createProcessPlugin<INodeProcessHandle>({`
-        )
-        .replace(
-          "    registrationOwner: { name: 'service', host },",
-          `    registrationOwner: { name: 'service', host }, resilience,
-    keyFactory: () => { keys++; return crypto.randomUUID() },
-    retryPort: { dispatch: input => { retries++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } },`
-        )
-        .replace(
-          "    const result = await plugin.replace({ strategy: 'stop-then-start' })\n    console.log(result.strategy)\n    if (result.strategy === 'stop-then-start') console.log(result.outcome.kind)",
-          '    console.log(keys, retries)'
-        )
-        .replace(
-          '  } finally {\n    await host.dispose()\n  }\n}',
-          '  } finally {\n    await host.dispose()\n    await resilience.close()\n  }\n}'
-        )
-    ),
-    result: t(
-      'Output is `42` and `1 1`: the explicit proxy invokes the key factory and dispatch port for the idempotent method. Host disposal releases its child, then the caller closes the borrowed governor. Unsupported native guarantees remain diagnostics.',
-      '输出为 `42`、`1 1`：显式代理为幂等方法调用键工厂和派发端口。宿主释放其子进程，随后由调用方关闭借用的治理对象。不支持的原生保证仍属于诊断。'
-    ),
-    covers: [
-      'name',
-      'contract',
-      'registrationOwner',
-      'registrationOwner.name',
-      'registrationOwner.host',
-      'resilience',
-      'host',
-      'endpointFactory',
-      'report',
-      'keyFactory',
-      'retryPort',
-      'deployment'
-    ]
-  },
-  {
-    title: t('Reject a registration owner naming another plugin', '拒绝指向其他插件的登记拥有者'),
-    problem: t(
-      'A copied deployment points cleanup at another registration. Reject the mismatch before dialing, constructing an endpoint or installing anything.',
-      '复制的部署把清理指向其他登记。应在拨号、构造端点或安装之前拒绝名称不匹配。'
-    ),
-    example: `import { defineHost } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-const host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
-let acquired = 0
-const unavailable = async (): Promise<never> => { acquired++; throw new Error('must not acquire') }
-try {
-  createProcessPlugin({
-    name: 'service', contract: { schemaVersion: 1, plugin: 'service', features: { api: { methods: { read: { mode: 'request', idempotent: true } } } } },
-    registrationOwner: { name: 'another', host },
-    host: { disable: (name, options) => host.plugin.disable(name, options), enable: name => host.plugin.enable(name) },
-    endpointFactory: unavailable, report: error => { console.error(error) },
-    deployment: { kind: 'connect', address: 'tcp://127.0.0.1:0', token: crypto.randomUUID(), dial: unavailable, establish: unavailable }
-  })
-} catch (error) {
-  const failure = error as Error & { code?: string }
-  if (failure.code !== 'PROCESS_PLUGIN_INVALID_OPTION') throw error
-  console.log(failure.code, acquired)
-} finally { await host.dispose() }`,
-    result: t(
-      'Output is `PROCESS_PLUGIN_INVALID_OPTION 0`: the actual Host remains unchanged and no acquisition callback runs.',
-      '输出为 `PROCESS_PLUGIN_INVALID_OPTION 0`：实际宿主保持原状，未执行取得资源的回调。'
-    ),
-    covers: [
-      'name',
-      'contract',
-      'registrationOwner',
-      'registrationOwner.name',
-      'registrationOwner.host',
-      'host',
-      'endpointFactory',
-      'report',
-      'deployment'
-    ]
-  }
-]
+const fullProcessPluginOptionCases: readonly IOptionCaseDoc[] = processFullPluginOptionCases
 
 /** Background diagnostics preserve original error identity at the application boundary. */
 const reportMember: IMemberDoc = {
@@ -2482,7 +2384,7 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
 }
 
 /** Reference of `@migaia/rpc-process`. */
-export const rpcProcessReference: ILibraryReference = {
+const processReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
@@ -4502,4 +4404,41 @@ console.log(event)`
       example: pluginExample
     }
   }
+}
+
+/** Reader option fields use short examples without mutating imported Core reference records. */
+const readerSymbols = { ...processReference.symbols }
+const readerTypes = { ...processReference.types }
+for (const [name, choices] of Object.entries(processReaderOptionFields)) {
+  const symbol = readerSymbols[name]
+  if (!symbol?.optionDocs) continue
+  const optionDocs = { ...symbol.optionDocs }
+  for (const [field, choice] of Object.entries(choices))
+    optionDocs[field] = { ...optionDocs[field]!, ...choice }
+  readerSymbols[name] = { ...symbol, optionDocs }
+}
+/** Standalone option types show the same focused fields as their owning public factory. */
+const readerTypeOwners: Readonly<Record<string, string>> = {
+  IRuntimeProcessPeerOptions: 'createProcessPeer',
+  IRuntimeProcessPluginOptions: 'createProcessPlugin',
+  IProcessResilienceOptions: 'createProcessResilience',
+  IProcessCommonOptions: 'createProcessTransport',
+  IProcessByteOptions: 'createProcessTransport',
+  IProcessMessageOptions: 'createProcessTransport',
+  IProcessJsonRpcChannelOptions: 'createProcessJsonRpcChannel',
+  IProcessPluginOptions: 'fullProcessPlugin',
+  IAdapterProcessLaunchOptions: 'createAdapterProcessLaunch'
+}
+for (const [name, owner] of Object.entries(readerTypeOwners)) {
+  const type = readerTypes[name]!
+  const members = { ...type.members }
+  for (const [field, choice] of Object.entries(processReaderOptionFields[owner] ?? {}))
+    if (members[field]) members[field] = { ...members[field]!, ...choice }
+  readerTypes[name] = { ...type, members }
+}
+/** The process reference preserves the original runtime and ownership explanations. */
+export const rpcProcessReference: ILibraryReference = {
+  ...processReference,
+  symbols: readerSymbols,
+  types: readerTypes
 }

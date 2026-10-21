@@ -1,1130 +1,2632 @@
 import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
-/** Option stories keep the same complete program in both language versions. */
-const t = (en: string, zh: string): IText => ({ en, zh })
-
-/** Public endpoints need the negotiated channel's actual pipeline and flow-control features. */
-const endpointFactoryCode = `const endpointFactory: NonNullable<IRuntimeProcessPeerOptions['endpointFactory']> = async (channel) => {
-  const [queue, log] = channel.features
-  const endpoint = createRuntimeApiEndpoint({
-    id: 'application', targetIds: [channel.peerId], transport: channel.transport,
-    scheduler: channel.scheduler,
-    features: [queue!, log!] as const,
-    middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer),
-      abort(), timeout(), hooks({ onHookError: report }),
-      connect({ transport: channel.transport }), ping()]
-  }, channel)
-  await endpoint.ready
-  return { endpoint: endpoint as unknown as IRpcEndpoint, oneWay: endpoint, stream: endpoint.stream }
-}`
-
-/** Advanced adapter examples use the same public Node-compatible discovery and stdio reader. */
-const loaderCode = `const runtime = { load: async () => ({ processRuntimeIO: {
-  discover: () => {
-    const marker = process.env[PROCESS_RUNTIME_API_ENV]
-    if (marker !== undefined) delete process.env[PROCESS_RUNTIME_API_ENV]
-    return { marker, runtime: 'node' }
-  },
-  open: () => openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: 5000 })
-} }) }`
-
-/** Self-spawn runs one real child and keeps advanced endpoint construction on its owning side. */
-const spawnOptionsCode = (
-  adapter: boolean
-): string => `import { createProcessPeer, ${adapter ? 'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, ' : ''}isProcessChild, type IRuntimeProcessPeerOptions } from '@migaia/rpc-process'
-import { createRuntimeApiEndpoint, codec, framer, abort, timeout, hooks, connect, ping, type IRpcEndpoint } from '@migaia/rpc-core'
-${adapter ? "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n" : ''}
-type IServiceApi = { service: { math: { double(value: number): number } } }
-const report = (error: unknown) => { console.error(error) }
-${adapter ? loaderCode : ''}
-if (isProcessChild()) {
-  await createProcessPeer({
-    provide: { service: { math: { double: (value: number) => value * 2 } } }, report,
-    contract: { schemaVersion: 1, plugin: 'service', features: {
-      math: { methods: { double: { mode: 'request', idempotent: true } } }
-    } }
-  })
-} else {
-  ${endpointFactoryCode}
-  let keys = 0
-  let retries = 0
-  const child = await ${adapter ? 'createAdapterProcessPeer' : 'createProcessPeer'}<IServiceApi>({
-    spawn: true, self: { name: 'desktop', instanceId: crypto.randomUUID() },
-    defaultTimeoutMs: 2000, endpointFactory, report,
-    keyFactory: () => { keys++; return crypto.randomUUID() },
-    retryPort: { dispatch: (input) => {
-      retries++
-      return input.sendOnce({ expectedGeneration: input.generation, key: input.key })
-    } }
-  }${adapter ? ', runtime' : ''})
-  try {
-    console.log(await child.request('service.math.double', 21), child.self.name)
-    console.log(keys, retries)
-  } finally { await child.close() }
-}`
-
-/** HMAC protects real frames; the random key remains in this local deployment's two endpoints. */
-const namedOptionsCode = (
-  adapter: boolean
-): string => `import { createHmac, timingSafeEqual } from 'node:crypto'
-import { createProcessPeer${adapter ? ', createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV' : ''} } from '@migaia/rpc-process'
-import { defineProbe } from '@migaia/rpc-core/probe'
-${adapter ? "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n" : ''}
-${adapter ? loaderCode : ''}
-const name = 'reports-' + crypto.randomUUID()
-const token = crypto.randomUUID()
-const key = crypto.randomUUID()
-const signature = (value: unknown) => createHmac('sha256', key).update(JSON.stringify(value)).digest()
-const authentication = {
-  encodedType: 'string' as const,
-  sign: (value: unknown) => JSON.stringify({ value, signature: signature(value).toString('hex') }),
-  verify: (input: unknown) => {
-    const frame = JSON.parse(String(input)) as { value: unknown; signature: string }
-    const actual = Buffer.from(frame.signature, 'hex')
-    const expected = signature(frame.value)
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new TypeError('invalid signature')
-    return frame.value
-  }
-}
-let observed = 0
-const probe = defineProbe({ stages: ['peer'], emit: () => { observed++ } })
-const report = (error: unknown) => { console.error(error) }
-const contract = { schemaVersion: 1 as const, plugin: 'math', features: {
-  math: { methods: { double: { mode: 'request' as const, idempotent: true } } }
-} }
-const server = await ${adapter ? 'createAdapterProcessPeer' : 'createProcessPeer'}({
-  listen: name, token, verify: (auth) => {
-    if (auth !== token) throw new TypeError('invalid credential')
-    return 'desktop-account'
-  },
-  self: { name: 'math', instanceId: crypto.randomUUID() },
-  provide: { math: { double: (value: number) => value * 2 } }, contract,
-  providerLimits: { maxGlobal: 4, maxPerPeer: 2 }, authentication, probe, report
-}${adapter ? ', runtime' : ''})
-try {
-  const client = await ${adapter ? 'createAdapterProcessPeer' : 'createProcessPeer'}<{ math: { double(value: number): number } }>({
-    connect: name, token, connectTimeoutMs: 2000, authentication, probe, report,
-    defaultTimeoutMs: 2000
-  }${adapter ? ', runtime' : ''})
-  try { console.log(await client.request('math.double', 21), observed > 0) }
-  finally { await client.close() }
-} finally { await server.close() }`
-
-/** Runtime options are shared by the public factory and its explicit runtime-loader variant. */
-export const processPeerOptionCases = (adapter = false): readonly IOptionCaseDoc[] => [
-  {
-    title: t('Own a child with an application endpoint', '用应用端点持有子进程'),
-    problem: t(
-      'A desktop owns a helper and needs its existing endpoint composition. Supply the acquired channel pipeline to the factory and close the Peer after the request.',
-      '桌面应用持有辅助进程，需要沿用自己的端点组装。工厂使用已取得通道的管线，请求结束后关闭连接。'
-    ),
-    example: spawnOptionsCode(adapter),
-    result: t(
-      'The request returns `42` and the local name is `desktop`. This managed spawn consumes keyFactory and retryPort for its declared idempotent request. Function sources use direct Core assembly instead. Native process capability warnings may still be reported.',
-      '请求返回 `42`，本端名称为 `desktop`。此受管理启动为声明为幂等的请求使用 keyFactory 与 retryPort；函数来源则走直接核心组装。原生进程能力警告仍可能被上报。'
-    ),
-    covers: [
-      'spawn',
-      'self',
-      'defaultTimeoutMs',
-      'endpointFactory',
-      'report',
-      'keyFactory',
-      'retryPort'
-    ]
-  },
-  {
-    title: t('Authenticate a named service and protect its frames', '认证命名服务并保护通信帧'),
-    problem: t(
-      'A same-user local service needs an application credential and signed traffic. Keep one generated secret on both ends, publish an explicit method contract and bound provider concurrency.',
-      '同用户本地服务还需要应用凭据与签名通信。双方持有本次生成的密钥，发布明确的方法契约，并限制提供方并发。'
-    ),
-    example: namedOptionsCode(adapter),
-    result: t(
-      'Output is `42 true`: the verified connection executes a declared method and the probe observes traffic. The credential and signing key are never printed; the client closes its session before the server closes its listener.',
-      '输出为 `42 true`：通过校验的连接执行声明方法，探针观察到通信。凭据与签名密钥不输出；客户端先关闭会话，服务端再关闭监听。'
-    ),
-    covers: [
-      'listen',
-      'connect',
-      'token',
-      'verify',
-      'connectTimeoutMs',
-      'provide',
-      'contract',
-      'providerLimits',
-      'authentication',
-      'probe',
-      'self',
-      'defaultTimeoutMs',
-      'report'
-    ]
-  }
-]
-
-/** Native stdio owns real stderr subscriptions and leaves physical termination with the caller. */
-const stdioTransportCode = `import { spawn } from 'node:child_process'
-import { once } from 'node:events'
-import { fileURLToPath } from 'node:url'
-import { createProcessPeer, createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
-import { createAdapterChildStdio, openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
-import { systemScheduler } from '@migaia/utils/scheduler'
-const reports: unknown[] = []
-const report = (error: unknown) => { reports.push(error) }
-const token = 'public-stdio-example'
-if (process.argv.includes('--stdio-child')) {
-  await createProcessPeer({
-    provide: { double: (value: number) => { console.error('helper completed'); return value * 2 } },
-    connect: async ({ self, capabilities }) => {
-      const { channel } = await openProcessStdioChannel({ bootstrap: 'none', bootstrapTimeoutMs: 5000 })
-      return createProcessTransport(channel, {
-        role: 'responder', peerId: 'main',
-        offer: createNativeProcessOffer({ peer: { id: self.instanceId, runtime: 'node' }, capabilities }),
-        auth: { mode: 'required', verify: (auth) => {
-          if (auth !== token) throw new TypeError('invalid credential')
-          return 'stdio-owner'
-        } },
-        ipc: { connectionId: 'helper', sessionId: 'job', log: () => {} }, report
-      })
+/** Each option story covers one application decision; external I/O remains application-owned. */
+export const processReaderOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  createProcessPeer: [
+    {
+      title: {
+        en: 'Move pricing work into its own process',
+        zh: '把价格计算移到独立进程'
+      },
+      problem: {
+        en: 'Checkout must keep expensive price calculations off the main process. pricing-child.ts provides the prices method using child bootstrap discovery. Pass its entry URL to spawn so checkout owns the helper and closes it when the screen leaves.',
+        zh: '结算页需要把昂贵的价格计算移出主进程。pricing-child.ts 通过子进程引导发现提供 prices 方法；把其入口 URL 交给 spawn，由结算页持有辅助进程，并在离开时关闭。'
+      },
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IPricing = { prices(): number[] }\nconst prices = await createProcessPeer<IPricing>({\n  spawn: new URL('./pricing-child.ts', import.meta.url),\n  defaultTimeoutMs: 2000,\n  report: (error) => reportToMonitoring(error)\n})\ntry {\n  renderPrices(await prices.request('prices'))\n} finally {\n  await prices.close()\n}",
+      result: {
+        en: 'Checkout receives the helper’s prices and releases the owned process after use.',
+        zh: '结算页取得辅助进程的价格，并在用完后释放所持有的进程。'
+      },
+      covers: ['spawn', 'defaultTimeoutMs', 'report']
+    },
+    {
+      title: {
+        en: 'Connect checkout to the existing price daemon',
+        zh: '连接已有价格守护进程'
+      },
+      problem: {
+        en: 'The price daemon already runs and is shared by several screens. Connect by its application name and credential instead of launching another process. Bound connection setup so the screen can offer retry if the daemon is unavailable.',
+        zh: '价格守护进程已运行，供多个界面共用。使用其应用名称与凭据连接，避免另启进程；限制连接准备时间，使服务不可用时界面能够提示重试。'
+      },
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst prices = await createProcessPeer({\n  connect: pricingServiceName,\n  token: pricingToken,\n  connectTimeoutMs: 2000\n})\nonCheckoutClosed(() => prices.close())",
+      result: {
+        en: 'Checkout owns this local session; closing it leaves the external daemon under its original owner.',
+        zh: '结算页只持有本次本地会话；关闭会话后，外部守护进程仍由原所有者管理。'
+      },
+      covers: ['connect', 'token', 'connectTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Admit checkout clients before serving prices',
+        zh: '先接纳结算客户端再提供价格'
+      },
+      problem: {
+        en: 'A shared local price daemon must distinguish permitted clients of the same operating-system user. Verify their application credential and return the admitted account identity, then limit concurrent lookups.',
+        zh: '本地价格守护进程需要区分同一系统用户下哪些客户端获准访问。校验应用凭据并返回获准账户身份，再限制并发价格查询。'
+      },
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst service = await createProcessPeer({\n  listen: pricingServiceName,\n  token: pricingToken,\n  verify: (credential) => verifyCheckoutCredential(credential),\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})\nonServiceClosed(() => service.close())",
+      result: {
+        en: 'Only admitted sessions can call prices, and provider work has an explicit concurrency budget.',
+        zh: '只有获准会话能调用价格方法，处理任务也有明确并发预算。'
+      },
+      covers: ['listen', 'token', 'verify', 'provide', 'providerLimits']
     }
-  })
-} else {
-  const child = spawn(process.execPath, [...process.execArgv, fileURLToPath(import.meta.url), '--stdio-child'], {
-    stdio: ['pipe', 'pipe', 'pipe']
-  })
-  const exited = once(child, 'close')
-  const observedStderr = Promise.withResolvers<void>()
-  const original = new Error('diagnostic sink unavailable')
-  const names: string[] = []
-  let failed = false
-  const caller = new AbortController()
-  try {
-    const peer = await createProcessPeer<{ double(value: number): number }>({
-      connect: async ({ self, capabilities }) => createProcessTransport(createAdapterChildStdio(child), {
-        role: 'initiator', peerId: 'helper',
-        offer: createNativeProcessOffer({ peer: { id: self.instanceId, runtime: 'node' }, auth: token, capabilities }),
-        signal: caller.signal, handshakeTimeoutMs: 2000, scheduler: systemScheduler, report,
-        ipc: {
-          connectionId: 'helper-connection', sessionId: 'job', processId: String(child.pid),
-          maxPendingData: 16, maxPendingControl: 4,
-          log: (record) => {
-            names.push(record.name)
-            if (record.name === 'ipc.stderr' && !failed) { failed = true; throw original }
-          },
-          stderr: (listener) => {
-            const onData = (chunk: Buffer) => { listener(chunk); observedStderr.resolve() }
-            child.stderr.on('data', onData)
-            return () => { child.stderr.off('data', onData) }
-          }
-        }
-      }), report
-    })
-    try {
-      console.log(await peer.request('double', 21))
-      await observedStderr.promise
-      console.log(names.includes('ipc.stderr'), reports.includes(original))
-    } finally { await peer.close() }
-  } finally { child.kill(); await exited }
-}`
-
-/** Crossed Web Streams are genuine ordered carriers, without a mock handshake or fake agreement. */
-const trustedByteCode = `import { createAdapterWebByteIO, createNativeProcessOffer, createProcessPeer, createProcessTransport } from '@migaia/rpc-process'
-import { systemScheduler } from '@migaia/utils/scheduler'
-const forward = new TransformStream<Uint8Array>()
-const backward = new TransformStream<Uint8Array>()
-const clientBytes = createAdapterWebByteIO(backward.readable, forward.writable)
-const serverBytes = createAdapterWebByteIO(forward.readable, backward.writable)
-const report = (error: unknown) => { console.error(error) }
-const opening = createProcessPeer<{ echo(value: string): string }>({
-  connect: async ({ self, capabilities }) => createProcessTransport(clientBytes, {
-    role: 'initiator', peerId: 'helper', scheduler: systemScheduler,
-    offer: createNativeProcessOffer({ peer: { id: self.instanceId, runtime: 'web' }, capabilities }),
-    ipc: { connectionId: 'local-client', sessionId: 'local', log: () => {} }, report
-  }), report
-})
-const serving = createProcessPeer({
-  provide: { echo: (value: string) => value },
-  connect: async ({ self, capabilities }) => createProcessTransport(serverBytes, {
-    role: 'responder', peerId: 'client', scheduler: systemScheduler,
-    offer: createNativeProcessOffer({ peer: { id: self.instanceId, runtime: 'web' }, capabilities }),
-    auth: { mode: 'none' },
-    ipc: { connectionId: 'local-server', sessionId: 'local', log: () => {} }, report
-  }), report
-})
-const [client, server] = await Promise.all([opening, serving])
-try { console.log(await client.request('echo', 'local-only')) }
-finally { await client.close(); await server.close() }`
-
-/** Native MessagePorts preserve whole messages and require matching identity profiles. */
-const messageTransportCode = `import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { createProcessPeer, createProcessTransport, type IProcessMessageChannel } from '@migaia/rpc-process'
-const { port1, port2 } = new MessageChannel()
-function channel(port: MessagePort): IProcessMessageChannel {
-  return {
-    kind: 'message', send: (value) => port.postMessage(value),
-    onMessage: (listener) => { port.on('message', listener); return () => { port.off('message', listener) } },
-    onClose: (listener) => { port.on('close', listener); return () => { port.off('close', listener) } },
-    close: () => { port.close() }
-  }
+  ],
+  createProcessPlugin: [
+    {
+      title: {
+        en: 'Install the existing price service in a host',
+        zh: '把已有价格服务安装到宿主'
+      },
+      problem: {
+        en: 'Several features need the same existing price daemon. Install one named process plugin in the application host so its process outlet and session cleanup share that host’s lifetime.',
+        zh: '多个功能需要共用已有价格守护进程。在应用宿主安装一个具名进程插件，让进程出口与会话清理共用宿主的生命周期。'
+      },
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\ntype IPricing = { prices(): number[] }\nconst pricing = createProcessPlugin<IPricing>({\n  name: 'pricing',\n  connect: pricingServiceName,\n  defaultTimeoutMs: 2000\n})\nawait applicationHost.use(pricing)\nonApplicationClosed(() => applicationHost.dispose())",
+      result: {
+        en: 'The host owns the installed pricing session and releases it at application shutdown.',
+        zh: '宿主持有安装后的价格会话，并在应用退出时释放。'
+      },
+      covers: ['name', 'connect', 'defaultTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Offer checkout callbacks to the price daemon',
+        zh: '向价格服务提供结算回调'
+      },
+      problem: {
+        en: 'The price daemon needs the current checkout currency while preparing a quote. Provide only that callback API and its matching contract, with bounded concurrent work.',
+        zh: '价格服务准备报价时需要读取当前结算币种。只提供该回调接口及匹配契约，并限制处理任务并发。'
+      },
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  self: { name: 'checkout', instanceId: checkoutInstanceId },\n  provide: { checkout: { api: { currency: () => selectedCurrency() } } },\n  contract: checkoutContract,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})",
+      result: {
+        en: 'The remote daemon can call the declared currency callback without opening other local methods.',
+        zh: '远端守护进程可调用声明的币种回调，不会因此公开其他本地方法。'
+      },
+      covers: ['self', 'provide', 'contract', 'providerLimits']
+    },
+    {
+      title: {
+        en: 'Expose only approved host administration',
+        zh: '只公开获准的宿主管理'
+      },
+      problem: {
+        en: 'An administrator must install only plugins in the application’s declared catalog. Expose host controls explicitly and use the same host that owns this process plugin; resolve only catalog-admitted names.',
+        zh: '管理员只能安装应用目录中声明的插件。显式公开宿主控制，并使用安装当前进程插件的同一宿主；只解析目录接纳的名称。'
+      },
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst administration = createProcessPlugin({\n  ...pricingPluginOptions,\n  expose: ['host'],\n  host: applicationHost,\n  catalog: approvedCatalog,\n  resolvePlugin: (name, config) => resolveApprovedPlugin(name, config)\n})",
+      result: {
+        en: 'The remote administration path is limited to the declared catalog on this host.',
+        zh: '远端管理路径的范围限于该宿主声明的目录。'
+      },
+      covers: ['expose', 'host', 'catalog', 'resolvePlugin']
+    }
+  ],
+  createAdapterProcessPeer: [
+    {
+      title: {
+        en: 'Move pricing work into its own process',
+        zh: '把价格计算移到独立进程'
+      },
+      problem: {
+        en: 'Checkout must keep expensive price calculations off the main process. pricing-child.ts provides the prices method using child bootstrap discovery. Pass its entry URL to spawn so checkout owns the helper and closes it when the screen leaves.',
+        zh: '结算页需要把昂贵的价格计算移出主进程。pricing-child.ts 通过子进程引导发现提供 prices 方法；把其入口 URL 交给 spawn，由结算页持有辅助进程，并在离开时关闭。'
+      },
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\ntype IPricing = { prices(): number[] }\nconst prices = await createAdapterProcessPeer<IPricing>({\n  spawn: new URL('./pricing-child.ts', import.meta.url),\n  defaultTimeoutMs: 2000,\n  report: (error) => reportToMonitoring(error)\n}, runtimeLoader)\ntry {\n  renderPrices(await prices.request('prices'))\n} finally {\n  await prices.close()\n}",
+      result: {
+        en: 'Checkout receives the helper’s prices and releases the owned process after use.',
+        zh: '结算页取得辅助进程的价格，并在用完后释放所持有的进程。'
+      },
+      covers: ['spawn', 'defaultTimeoutMs', 'report']
+    },
+    {
+      title: {
+        en: 'Connect checkout to the existing price daemon',
+        zh: '连接已有价格守护进程'
+      },
+      problem: {
+        en: 'The price daemon already runs and is shared by several screens. Connect by its application name and credential instead of launching another process. Bound connection setup so the screen can offer retry if the daemon is unavailable.',
+        zh: '价格守护进程已运行，供多个界面共用。使用其应用名称与凭据连接，避免另启进程；限制连接准备时间，使服务不可用时界面能够提示重试。'
+      },
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\nconst prices = await createAdapterProcessPeer({\n  connect: pricingServiceName,\n  token: pricingToken,\n  connectTimeoutMs: 2000\n}, runtimeLoader)\nonCheckoutClosed(() => prices.close())",
+      result: {
+        en: 'Checkout owns this local session; closing it leaves the external daemon under its original owner.',
+        zh: '结算页只持有本次本地会话；关闭会话后，外部守护进程仍由原所有者管理。'
+      },
+      covers: ['connect', 'token', 'connectTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Admit checkout clients before serving prices',
+        zh: '先接纳结算客户端再提供价格'
+      },
+      problem: {
+        en: 'A shared local price daemon must distinguish permitted clients of the same operating-system user. Verify their application credential and return the admitted account identity, then limit concurrent lookups.',
+        zh: '本地价格守护进程需要区分同一系统用户下哪些客户端获准访问。校验应用凭据并返回获准账户身份，再限制并发价格查询。'
+      },
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\nconst service = await createAdapterProcessPeer({\n  listen: pricingServiceName,\n  token: pricingToken,\n  verify: (credential) => verifyCheckoutCredential(credential),\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, runtimeLoader)\nonServiceClosed(() => service.close())",
+      result: {
+        en: 'Only admitted sessions can call prices, and provider work has an explicit concurrency budget.',
+        zh: '只有获准会话能调用价格方法，处理任务也有明确并发预算。'
+      },
+      covers: ['listen', 'token', 'verify', 'provide', 'providerLimits']
+    }
+  ],
+  createAdapterProcessPlugin: [
+    {
+      title: {
+        en: 'Install the existing price service in a host',
+        zh: '把已有价格服务安装到宿主'
+      },
+      problem: {
+        en: 'Several features need the same existing price daemon. Install one named process plugin in the application host so its process outlet and session cleanup share that host’s lifetime.',
+        zh: '多个功能需要共用已有价格守护进程。在应用宿主安装一个具名进程插件，让进程出口与会话清理共用宿主的生命周期。'
+      },
+      example:
+        "import { createAdapterProcessPlugin } from '@migaia/rpc-process'\n\ntype IPricing = { prices(): number[] }\nconst pricing = createAdapterProcessPlugin<IPricing>({\n  name: 'pricing',\n  connect: pricingServiceName,\n  defaultTimeoutMs: 2000\n}, runtimeLoader)\nawait applicationHost.use(pricing)\nonApplicationClosed(() => applicationHost.dispose())",
+      result: {
+        en: 'The host owns the installed pricing session and releases it at application shutdown.',
+        zh: '宿主持有安装后的价格会话，并在应用退出时释放。'
+      },
+      covers: ['name', 'connect', 'defaultTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Offer checkout callbacks to the price daemon',
+        zh: '向价格服务提供结算回调'
+      },
+      problem: {
+        en: 'The price daemon needs the current checkout currency while preparing a quote. Provide only that callback API and its matching contract, with bounded concurrent work.',
+        zh: '价格服务准备报价时需要读取当前结算币种。只提供该回调接口及匹配契约，并限制处理任务并发。'
+      },
+      example:
+        "import { createAdapterProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  self: { name: 'checkout', instanceId: checkoutInstanceId },\n  provide: { checkout: { api: { currency: () => selectedCurrency() } } },\n  contract: checkoutContract,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, runtimeLoader)",
+      result: {
+        en: 'The remote daemon can call the declared currency callback without opening other local methods.',
+        zh: '远端守护进程可调用声明的币种回调，不会因此公开其他本地方法。'
+      },
+      covers: ['self', 'provide', 'contract', 'providerLimits']
+    },
+    {
+      title: {
+        en: 'Expose only approved host administration',
+        zh: '只公开获准的宿主管理'
+      },
+      problem: {
+        en: 'An administrator must install only plugins in the application’s declared catalog. Expose host controls explicitly and use the same host that owns this process plugin; resolve only catalog-admitted names.',
+        zh: '管理员只能安装应用目录中声明的插件。显式公开宿主控制，并使用安装当前进程插件的同一宿主；只解析目录接纳的名称。'
+      },
+      example:
+        "import { createAdapterProcessPlugin } from '@migaia/rpc-process'\n\nconst administration = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  expose: ['host'],\n  host: applicationHost,\n  catalog: approvedCatalog,\n  resolvePlugin: (name, config) => resolveApprovedPlugin(name, config)\n}, runtimeLoader)",
+      result: {
+        en: 'The remote administration path is limited to the declared catalog on this host.',
+        zh: '远端管理路径的范围限于该宿主声明的目录。'
+      },
+      covers: ['expose', 'host', 'catalog', 'resolvePlugin']
+    }
+  ],
+  fullProcessPlugin: [
+    {
+      title: {
+        en: 'Keep one owner for the advanced pricing deployment',
+        zh: '为高级价格部署保留单一所有者'
+      },
+      problem: {
+        en: 'The application already owns a full deployment, endpoint factory and host-control port. Register the proxy under the same pricing name as its contract and local host registration so cleanup targets the installed plugin.',
+        zh: '应用已持有完整部署、端点工厂与宿主控制接口。代理名称须与契约和本地宿主登记中的 pricing 一致，清理才会指向实际安装的插件。'
+      },
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      result: {
+        en: 'The advanced proxy keeps deployment ownership and cleanup attached to its actual local registration.',
+        zh: '高级代理把部署所有权与清理责任留在真实本地登记上。'
+      },
+      covers: [
+        'name',
+        'contract',
+        'registrationOwner',
+        'registrationOwner.name',
+        'registrationOwner.host',
+        'deployment'
+      ]
+    },
+    {
+      title: {
+        en: 'Reuse one logical result when an order call retries',
+        zh: '订单重试时复用同一逻辑结果'
+      },
+      problem: {
+        en: 'A declared idempotent remote order method can be retried after reconnecting. Give the advanced proxy a logical-key generator and the application’s retry port, while sharing its process governor.',
+        zh: '声明为幂等的远端订单方法可能在重连后重试。给高级代理提供逻辑键生成器与应用重试端口，同时共用进程治理对象。'
+      },
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  resilience: processGovernor,\n  keyFactory: () => crypto.randomUUID(),\n  retryPort: orderRetryPolicy\n})",
+      result: {
+        en: 'Managed process dispatch uses these logical-key and retry policies for declared idempotent methods.',
+        zh: '托管进程派发为声明为幂等的方法使用这些逻辑键与重试策略。'
+      },
+      covers: ['resilience', 'keyFactory', 'retryPort']
+    }
+  ],
+  createProcessTransport: [
+    {
+      title: {
+        en: 'Authenticate an application-owned byte connection',
+        zh: '认证应用持有的字节连接'
+      },
+      problem: {
+        en: 'The application already opened a raw pipe or socket for pricing. Initiate its native handshake with the local offer and credential; Process negotiates the channel while the application keeps native process ownership.',
+        zh: '应用已为价格服务打开原始管道或套接字。使用本地提议与凭据发起原生握手；Process 协商通道，原生进程的所有权仍留在应用。'
+      },
+      example:
+        "import { createNativeProcessOffer, createProcessTransport } from '@migaia/rpc-process'\n\nconst channel = await createProcessTransport(rawByteChannel, {\n  role: 'initiator',\n  peerId: 'pricing-service',\n  offer: createNativeProcessOffer({\n    peer: { id: 'checkout', runtime: 'bun' }, auth: pricingToken\n  }),\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  ipc: sessionDiagnostics\n})",
+      result: {
+        en: 'The application gets a negotiated pricing channel without transferring ownership of its process.',
+        zh: '应用取得已协商的价格通道，同时保留进程所有权。'
+      },
+      covers: ['role', 'peerId', 'offer', 'scheduler', 'report', 'ipc']
+    },
+    {
+      title: {
+        en: 'Verify clients on an incoming byte connection',
+        zh: '验证入站字节连接的客户端'
+      },
+      problem: {
+        en: 'A service already accepted a raw connection and must admit the caller before business traffic starts. Required authentication runs the application credential verifier during the responder handshake.',
+        zh: '服务已接入原始连接，需要在业务通信前接纳调用方。响应方握手中的必需认证会调用应用凭据校验函数。'
+      },
+      example:
+        "import { createProcessTransport } from '@migaia/rpc-process'\n\nconst channel = await createProcessTransport(acceptedByteChannel, {\n  ...responderOptions,\n  role: 'responder',\n  auth: {\n    mode: 'required',\n    verify: (credential) => verifyCheckoutCredential(credential)\n  }\n})",
+      result: {
+        en: 'The service receives a negotiated channel only after its credential policy accepts the caller.',
+        zh: '服务只有在凭据策略接纳调用方后，才取得已协商通道。'
+      },
+      covers: ['auth', 'auth.mode', 'auth.verify']
+    },
+    {
+      title: {
+        en: 'Preserve native message boundaries',
+        zh: '保留原生消息边界'
+      },
+      problem: {
+        en: 'A native MessagePort carrier already delivers complete values. Both owners agree the same identity codec and capability order so Process can keep these values as messages instead of byte-encoding them.',
+        zh: '原生 MessagePort 载体已交付完整值。两端约定同一 identity 编解码器及能力顺序，使 Process 将值保留为消息，而非转换为字节编码。'
+      },
+      example:
+        "import { createProcessTransport } from '@migaia/rpc-process'\n\nconst profile = { codec: 'identity' as const, capabilities: agreedCapabilities }\nconst channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: profile, peer: profile }\n})",
+      result: {
+        en: 'The native message path uses the agreed static profile; actual acceptance remains with Core.',
+        zh: '原生消息路径使用约定的静态配置，实际接纳仍由 Core 负责。'
+      },
+      covers: [
+        'staticAgreement',
+        'staticAgreement.local',
+        'staticAgreement.peer',
+        'staticAgreement.local.codec',
+        'staticAgreement.peer.codec'
+      ]
+    }
+  ],
+  createNativeProcessOffer: [
+    {
+      title: {
+        en: 'Advertise a live price feed',
+        zh: '声明实时价格流'
+      },
+      problem: {
+        en: 'A pricing helper provides an iterable live feed. Advertise stream explicitly along with its runtime extension; the later handshake still selects the bilateral agreement.',
+        zh: '价格辅助进程提供可迭代的实时数据流。显式声明流及其运行时扩展；双方最终约定仍由后续握手选择。'
+      },
+      example:
+        "import { createNativeProcessOffer } from '@migaia/rpc-process'\n\nconst offer = createNativeProcessOffer({\n  peer: { id: 'price-feed', runtime: 'node' },\n  auth: pricingToken,\n  stream: true,\n  capabilities: ['runtime-api@1']\n})",
+      result: {
+        en: 'The proposal includes live-feed support while keeping the credential out of diagnostics.',
+        zh: '提议包含实时流支持，凭据不进入诊断标签。'
+      },
+      covers: ['peer', 'auth', 'stream', 'capabilities']
+    },
+    {
+      title: {
+        en: 'Keep a lookup-only helper scalar',
+        zh: '让只查询的辅助进程保持标量'
+      },
+      problem: {
+        en: 'A legacy helper only returns complete lookup results. Disable streams and use an explicit empty extension list so runtime completion does not widen this proposal.',
+        zh: '旧辅助进程只返回完整查询结果。禁用流并显式传入空扩展列表，避免运行时补全扩大此提议。'
+      },
+      example:
+        "import { createNativeProcessOffer } from '@migaia/rpc-process'\n\nconst offer = createNativeProcessOffer({\n  peer: { id: 'price-lookup', runtime: 'node' },\n  stream: false,\n  capabilities: []\n})",
+      result: {
+        en: 'The proposal stays limited to its base controls and scalar use.',
+        zh: '提议保持基础控制与标量用途。'
+      },
+      covers: ['peer', 'stream', 'capabilities']
+    }
+  ],
+  createProcessJsonRpcChannel: [
+    {
+      title: {
+        en: 'Call the foreign pricing plugin',
+        zh: '调用外部语言的价格插件'
+      },
+      problem: {
+        en: 'An existing foreign-language price service implements Migaia’s hello, describe, invoke and cancel extensions. Select its declared plugin contract so only those methods become callable; this is not a generic JSON-RPC client.',
+        zh: '已有外部语言价格服务实现 Migaia 的 hello、describe、invoke 和 cancel 扩展。选择声明的插件契约，只公开其中的方法；这不是通用 JSON-RPC 客户端。'
+      },
+      example:
+        "import { createProcessJsonRpcChannel } from '@migaia/rpc-process'\n\nconst channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  byte: pricingByteChannel,\n  peerId: 'foreign-pricing',\n  target: { kind: 'plugin', contract: pricingContract },\n  offer: jsonRpcOffer\n})\nonServiceClosed(() => channel.close())",
+      result: {
+        en: 'The returned channel addresses only the pricing plugin’s declared methods.',
+        zh: '返回通道只使用价格插件声明的方法。'
+      },
+      covers: ['byte', 'peerId', 'target', 'target.kind', 'target.contract', 'offer']
+    },
+    {
+      title: {
+        en: 'Bridge the approved plugin catalog',
+        zh: '桥接获准的插件目录'
+      },
+      problem: {
+        en: 'An existing foreign-language service implements Migaia’s hello, describe, invoke and cancel extensions. Its host target is restricted to the approved catalog; a general JSON-RPC server cannot satisfy this protocol.',
+        zh: '已有外部语言服务实现 Migaia 的 hello、describe、invoke 和 cancel 扩展。宿主目标的范围限于获准目录；通用 JSON-RPC 服务无法满足这份协议。'
+      },
+      example:
+        "import { createProcessJsonRpcChannel } from '@migaia/rpc-process'\n\nconst channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  byte: pricingByteChannel,\n  peerId: 'foreign-pricing',\n  target: { kind: 'host', catalog: approvedCatalog },\n  offer: jsonRpcOffer\n})\nonServiceClosed(() => channel.close())",
+      result: {
+        en: 'The returned channel addresses only the declared catalog.',
+        zh: '返回通道的范围限于声明的目录。'
+      },
+      covers: ['byte', 'peerId', 'target', 'target.kind', 'target.catalog', 'offer']
+    }
+  ],
+  openProcessObjectChannel: [
+    {
+      title: {
+        en: 'Add process diagnostics to an existing connection',
+        zh: '给已有连接附加进程诊断'
+      },
+      problem: {
+        en: 'The application’s platform integration already owns a genuine negotiated Core object connection. Open that same connection with process session diagnostics; this API does not create negotiation authority from a plain object.',
+        zh: '应用的平台集成已持有真实协商完成的 Core 对象连接。给同一连接加上进程会话诊断再打开；此 API 不能让普通对象获得协商权限。'
+      },
+      example:
+        "import { openProcessObjectChannel } from '@migaia/rpc-process'\n\nconst channel = openProcessObjectChannel(negotiatedConnection, {\n  peerId: 'pricing-service',\n  ipc: sessionDiagnostics,\n  report: (error) => reportToMonitoring(error)\n})",
+      result: {
+        en: 'The opened channel retains the original connection and attaches the selected process diagnostics.',
+        zh: '打开后的通道保留原连接，并附加所选进程诊断。'
+      },
+      covers: ['peerId', 'ipc', 'report']
+    },
+    {
+      title: {
+        en: 'Bound setup of the held connection',
+        zh: '限制所持有连接的准备时间'
+      },
+      problem: {
+        en: 'A view can leave while its held connection is opening. Pass the view signal and a handshake budget so that setup observes its owner’s cancellation and waiting policy.',
+        zh: '视图可能在所持有连接准备期间离开。传入视图信号与握手预算，让准备过程遵守所有者的取消与等待策略。'
+      },
+      example:
+        "import { openProcessObjectChannel } from '@migaia/rpc-process'\n\nconst channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  scheduler: applicationScheduler,\n  signal: viewController.signal,\n  handshakeTimeoutMs: 3000\n})",
+      result: {
+        en: 'Connection opening uses the view’s signal and the selected setup budget.',
+        zh: '连接准备使用视图信号及所选预算。'
+      },
+      covers: ['scheduler', 'signal', 'handshakeTimeoutMs']
+    }
+  ],
+  createProcessResilience: [
+    {
+      title: {
+        en: 'Bound a shared pricing daemon’s load',
+        zh: '限制共享价格守护进程的负载'
+      },
+      problem: {
+        en: 'A shared price daemon needs explicit admission budgets so many checkout sessions cannot exhaust it with concurrent or oversized requests. Keep its quotas with one process governor.',
+        zh: '共享价格守护进程需要明确的准入预算，避免大量结算会话通过并发或过大请求耗尽资源。用一个进程治理对象持有这些配额。'
+      },
+      example:
+        "import { createProcessResilience } from '@migaia/rpc-process'\n\nconst governor = createProcessResilience({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  maxConnections: 32,\n  maxConcurrentCallsPerConnection: 8,\n  maxCallsPerMinute: 120,\n  maxPayloadBytes: 256 * 1024\n})\nonApplicationClosed(() => governor.close())",
+      result: {
+        en: 'The shared governor supplies connection, concurrency, request-rate and payload admission limits.',
+        zh: '共享治理对象提供连接、并发、请求速率和载荷的准入限制。'
+      },
+      covers: [
+        'scheduler',
+        'report',
+        'maxConnections',
+        'maxConcurrentCallsPerConnection',
+        'maxCallsPerMinute',
+        'maxPayloadBytes'
+      ]
+    },
+    {
+      title: {
+        en: 'Retire unhealthy sessions without losing retry results',
+        zh: '结束异常会话并保留重试结果'
+      },
+      problem: {
+        en: 'A pricing session that stays idle or repeatedly times out should release resources. Reuse the application outcome store across reconnects, and give accepted work a short drain window when closing.',
+        zh: '价格会话长期空闲或反复超时时应释放资源。重连时复用应用结果存储，并在关闭时留出短暂排空窗口，供已接受的任务完成。'
+      },
+      example:
+        "import { createProcessResilience } from '@migaia/rpc-process'\n\nconst governor = createProcessResilience({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  idempotencyStore: orderOutcomes,\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  drainMs: 2000\n})",
+      result: {
+        en: 'Expired sessions can retire while keyed retries keep using the selected outcome store.',
+        zh: '过期会话可以结束，携带幂等键的重试继续使用所选结果存储。'
+      },
+      covers: ['idempotencyStore', 'maxConsecutiveTimeouts', 'idleTimeoutMs', 'drainMs']
+    },
+    {
+      title: {
+        en: 'Suspend dependent features after terminal pricing failure',
+        zh: '价格服务终态失败后挂起依赖功能'
+      },
+      problem: {
+        en: 'If pricing reaches a terminal state, checkout features that depend on it should stop receiving work while operators investigate. Keep dependants installed but suspended, and schedule escalating terminal reports.',
+        zh: '价格服务进入终态后，依赖它的结算功能应停止接收任务，等待排查。保留依赖功能的安装状态并将其挂起，同时安排逐步升级的终态上报。'
+      },
+      example:
+        "import { createProcessResilience } from '@migaia/rpc-process'\n\nconst governor = createProcessResilience({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  reportAtMs: [0, 10000, 60000],\n  unhandledLimit: 2,\n  liquidation: { cascade: false }\n})",
+      result: {
+        en: 'Unhandled terminal reports follow the selected schedule; liquidation suspends dependants.',
+        zh: '未处理终态报告按所选时序上报，清算时挂起依赖功能。'
+      },
+      covers: ['reportAtMs', 'unhandledLimit', 'liquidation', 'liquidation.cascade']
+    }
+  ],
+  createNodeProcessLauncher: [
+    {
+      title: {
+        en: 'Carry an advanced launch’s child identity',
+        zh: '携带高级启动的子端身份'
+      },
+      problem: {
+        en: 'A custom runtime launcher already has the parent Peer identity and the supervisor-issued generation for this launch. Forward those values when preparing runtime bootstrap; ordinary short sources do this automatically.',
+        zh: '自定义运行时启动器已持有父 Peer 身份与监督器为本次启动签发的代次。准备运行时引导时转交这些值；普通简写来源会自动处理。'
+      },
+      example:
+        "import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\n\nconst launcher = createNodeProcessLauncher({\n  runtimeApiBootstrap: {\n    name: 'pricing',\n    parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration\n  }\n})",
+      result: {
+        en: 'The launcher carries the application’s existing runtime identity into this child bootstrap.',
+        zh: '启动器把应用已有的运行时身份带入本次子端引导。'
+      },
+      covers: [
+        'runtimeApiBootstrap',
+        'runtimeApiBootstrap.name',
+        'runtimeApiBootstrap.parentInstanceId',
+        'runtimeApiBootstrap.generation'
+      ]
+    },
+    {
+      title: {
+        en: 'Use the runtime’s ordinary launch context',
+        zh: '使用运行时原有启动上下文'
+      },
+      problem: {
+        en: 'A standard runtime source already supplies the native launcher’s held Core context. Keep the default constructor instead of rebuilding identities or inventing a generation counter in application code.',
+        zh: '标准运行时来源已向原生启动器提供其持有的 Core 上下文。使用默认构造，不在应用代码中重建身份或自造代次计数。'
+      },
+      example:
+        "import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\n\nconst launcher = createNodeProcessLauncher()",
+      result: {
+        en: 'The original runtime source supplies bootstrap identity when it performs the launch.',
+        zh: '执行启动时，由原运行时来源提供引导身份。'
+      },
+      covers: []
+    }
+  ],
+  createBunProcessLauncher: [
+    {
+      title: {
+        en: 'Carry an advanced launch’s child identity',
+        zh: '携带高级启动的子端身份'
+      },
+      problem: {
+        en: 'A custom runtime launcher already has the parent Peer identity and the supervisor-issued generation for this launch. Forward those values when preparing runtime bootstrap; ordinary short sources do this automatically.',
+        zh: '自定义运行时启动器已持有父 Peer 身份与监督器为本次启动签发的代次。准备运行时引导时转交这些值；普通简写来源会自动处理。'
+      },
+      example:
+        "import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'\n\nconst launcher = createBunProcessLauncher({\n  runtimeApiBootstrap: {\n    name: 'pricing',\n    parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration\n  }\n})",
+      result: {
+        en: 'The launcher carries the application’s existing runtime identity into this child bootstrap.',
+        zh: '启动器把应用已有的运行时身份带入本次子端引导。'
+      },
+      covers: [
+        'runtimeApiBootstrap',
+        'runtimeApiBootstrap.name',
+        'runtimeApiBootstrap.parentInstanceId',
+        'runtimeApiBootstrap.generation'
+      ]
+    },
+    {
+      title: {
+        en: 'Use the runtime’s ordinary launch context',
+        zh: '使用运行时原有启动上下文'
+      },
+      problem: {
+        en: 'A standard runtime source already supplies the native launcher’s held Core context. Keep the default constructor instead of rebuilding identities or inventing a generation counter in application code.',
+        zh: '标准运行时来源已向原生启动器提供其持有的 Core 上下文。使用默认构造，不在应用代码中重建身份或自造代次计数。'
+      },
+      example:
+        "import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'\n\nconst launcher = createBunProcessLauncher()",
+      result: {
+        en: 'The original runtime source supplies bootstrap identity when it performs the launch.',
+        zh: '执行启动时，由原运行时来源提供引导身份。'
+      },
+      covers: []
+    }
+  ],
+  createDenoProcessLauncher: [
+    {
+      title: {
+        en: 'Carry an advanced launch’s child identity',
+        zh: '携带高级启动的子端身份'
+      },
+      problem: {
+        en: 'A custom runtime launcher already has the parent Peer identity and the supervisor-issued generation for this launch. Forward those values when preparing runtime bootstrap; ordinary short sources do this automatically.',
+        zh: '自定义运行时启动器已持有父 Peer 身份与监督器为本次启动签发的代次。准备运行时引导时转交这些值；普通简写来源会自动处理。'
+      },
+      example:
+        "import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'\n\nconst launcher = createDenoProcessLauncher({\n  runtimeApiBootstrap: {\n    name: 'pricing',\n    parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration\n  }\n})",
+      result: {
+        en: 'The launcher carries the application’s existing runtime identity into this child bootstrap.',
+        zh: '启动器把应用已有的运行时身份带入本次子端引导。'
+      },
+      covers: [
+        'runtimeApiBootstrap',
+        'runtimeApiBootstrap.name',
+        'runtimeApiBootstrap.parentInstanceId',
+        'runtimeApiBootstrap.generation'
+      ]
+    },
+    {
+      title: {
+        en: 'Use the runtime’s ordinary launch context',
+        zh: '使用运行时原有启动上下文'
+      },
+      problem: {
+        en: 'A standard runtime source already supplies the native launcher’s held Core context. Keep the default constructor instead of rebuilding identities or inventing a generation counter in application code.',
+        zh: '标准运行时来源已向原生启动器提供其持有的 Core 上下文。使用默认构造，不在应用代码中重建身份或自造代次计数。'
+      },
+      example:
+        "import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'\n\nconst launcher = createDenoProcessLauncher()",
+      result: {
+        en: 'The original runtime source supplies bootstrap identity when it performs the launch.',
+        zh: '执行启动时，由原运行时来源提供引导身份。'
+      },
+      covers: []
+    }
+  ],
+  createAdapterNodeProcessLaunch: [
+    {
+      title: {
+        en: 'Prepare bootstrap before opening native pipes',
+        zh: '打开原生管道前准备引导'
+      },
+      problem: {
+        en: 'A custom launcher owns native spawning but needs Process to prepare its runtime bootstrap once. Pass the real spec and launch context with the application’s existing parent identity, then check cancellation before acquiring native resources.',
+        zh: '自定义启动器负责原生进程创建，但需要 Process 只准备一次运行时引导。传入真实规格、启动上下文和应用已有的父端身份，再在取得原生资源前检查取消状态。'
+      },
+      example:
+        "import { createAdapterNodeProcessLaunch } from '@migaia/rpc-process/adapters/node-child-process'\n\nconst launch = createAdapterNodeProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: {\n    name: 'pricing',\n    parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration\n  }\n})\nlaunch.assertActive()\nstartNativeProcess(processSpec, launch)",
+      result: {
+        en: 'Bootstrap preparation is ready for the caller’s native spawn; the helper does not spawn a process.',
+        zh: '引导准备可供调用方原生启动使用；该辅助函数自身不创建进程。'
+      },
+      covers: [
+        'runtimeApiBootstrap',
+        'runtimeApiBootstrap.name',
+        'runtimeApiBootstrap.parentInstanceId',
+        'runtimeApiBootstrap.generation'
+      ]
+    },
+    {
+      title: {
+        en: 'Keep token-only preparation for a legacy child',
+        zh: '为旧子进程保留仅令牌引导'
+      },
+      problem: {
+        en: 'A custom launch outside a held Core context serves a legacy child that only needs the spec’s token bootstrap. Leave runtimeApiBootstrap absent and retain the caller’s original native spawn path.',
+        zh: '未持有 Core 上下文的自定义启动路径服务于只需规格令牌引导的旧子进程。省略 runtimeApiBootstrap，并保留调用方原有的原生启动路径。'
+      },
+      example:
+        "import { createAdapterNodeProcessLaunch } from '@migaia/rpc-process/adapters/node-child-process'\n\nconst launch = createAdapterNodeProcessLaunch(processSpec, launchContext)\nlaunch.assertActive()\nstartNativeProcess(processSpec, launch)",
+      result: {
+        en: 'The helper retains the spec’s ordinary token-only bootstrap and native spawning stays with the caller.',
+        zh: '辅助函数保留规格原有的仅令牌引导，原生启动仍由调用方负责。'
+      },
+      covers: []
+    }
+  ],
+  createAdapterProcessLaunch: [
+    {
+      title: {
+        en: 'Prepare bootstrap before opening native pipes',
+        zh: '打开原生管道前准备引导'
+      },
+      problem: {
+        en: 'A custom launcher owns native spawning but needs Process to prepare its runtime bootstrap once. Pass the real spec and launch context with the application’s existing parent identity, then check cancellation before acquiring native resources.',
+        zh: '自定义启动器负责原生进程创建，但需要 Process 只准备一次运行时引导。传入真实规格、启动上下文和应用已有的父端身份，再在取得原生资源前检查取消状态。'
+      },
+      example:
+        "import { createAdapterProcessLaunch } from '@migaia/rpc-process'\n\nconst launch = createAdapterProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: {\n    name: 'pricing',\n    parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration\n  }\n})\nlaunch.assertActive()\nstartNativeProcess(processSpec, launch)",
+      result: {
+        en: 'Bootstrap preparation is ready for the caller’s native spawn; the helper does not spawn a process.',
+        zh: '引导准备可供调用方原生启动使用；该辅助函数自身不创建进程。'
+      },
+      covers: [
+        'runtimeApiBootstrap',
+        'runtimeApiBootstrap.name',
+        'runtimeApiBootstrap.parentInstanceId',
+        'runtimeApiBootstrap.generation'
+      ]
+    },
+    {
+      title: {
+        en: 'Keep token-only preparation for a legacy child',
+        zh: '为旧子进程保留仅令牌引导'
+      },
+      problem: {
+        en: 'A custom launch outside a held Core context serves a legacy child that only needs the spec’s token bootstrap. Leave runtimeApiBootstrap absent and retain the caller’s original native spawn path.',
+        zh: '未持有 Core 上下文的自定义启动路径服务于只需规格令牌引导的旧子进程。省略 runtimeApiBootstrap，并保留调用方原有的原生启动路径。'
+      },
+      example:
+        "import { createAdapterProcessLaunch } from '@migaia/rpc-process'\n\nconst launch = createAdapterProcessLaunch(processSpec, launchContext)\nlaunch.assertActive()\nstartNativeProcess(processSpec, launch)",
+      result: {
+        en: 'The helper retains the spec’s ordinary token-only bootstrap and native spawning stays with the caller.',
+        zh: '辅助函数保留规格原有的仅令牌引导，原生启动仍由调用方负责。'
+      },
+      covers: []
+    }
+  ],
+  'adapters/node-child-process:openProcessStdioChannel': [
+    {
+      title: {
+        en: 'Read the launcher’s prefix before serving RPC',
+        zh: '服务 RPC 前读取启动器前缀'
+      },
+      problem: {
+        en: 'The child’s stdin begins with the launcher’s bootstrap frame. Read it before handing the held byte channel to the native handshake; bound that initial wait so a misconfigured launch does not wait forever.',
+        zh: '子端标准输入以启动器的引导帧开头。先读取该帧，再将所持有字节通道交给原生握手；限制首次等待，避免错误启动配置无限等待。'
+      },
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n\nconst opened = await openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: 5000 })\nstartChildProtocol(opened.channel, opened.bootstrap)",
+      result: {
+        en: 'The result separates bootstrap bytes from the channel used for later RPC frames.',
+        zh: '返回值将引导字节与供后续 RPC 帧使用的通道分开。'
+      },
+      covers: ['bootstrap', 'bootstrapTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Open a pipe without a bootstrap prefix',
+        zh: '打开没有引导前缀的管道'
+      },
+      problem: {
+        en: 'An already trusted deployment starts its protocol directly on stdin. Select none so the stdio opener does not consume the first protocol frame as bootstrap.',
+        zh: '已有受信任部署直接从标准输入开始协议。选择 none，避免标准流打开器把首个协议帧误当作引导帧消费。'
+      },
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n\nconst opened = await openProcessStdioChannel({ bootstrap: 'none' })\nstartChildProtocol(opened.channel, opened.bootstrap)",
+      result: {
+        en: 'The original byte channel is ready without consuming a prefix.',
+        zh: '原字节通道可直接使用，不消费前缀。'
+      },
+      covers: ['bootstrap']
+    },
+    {
+      title: {
+        en: 'Report an unsupported descriptor deployment',
+        zh: '报告不支持的文件描述符部署'
+      },
+      problem: {
+        en: 'A deployment descriptor requests fd bootstrap, but these stdio adapters support stdin and none only. Surface a configuration error so the launcher can be corrected to the supported stdin path.',
+        zh: '部署描述请求 fd 引导，但这些标准流适配器只支持 stdin 与 none。把配置错误交给界面，便于将启动器改为受支持的标准输入路径。'
+      },
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n\ntry {\n  await openProcessStdioChannel({ bootstrap: 'fd', fd: 3 })\n} catch (error) {\n  showLaunchConfigurationError(error)\n}",
+      result: {
+        en: 'The application can report the unsupported configuration instead of waiting for an unread descriptor.',
+        zh: '应用可报告不支持的配置，不会一直等待无法读取的描述符。'
+      },
+      covers: ['bootstrap', 'fd']
+    }
+  ],
+  'adapters/deno-command:openProcessStdioChannel': [
+    {
+      title: {
+        en: 'Read the launcher’s prefix before serving RPC',
+        zh: '服务 RPC 前读取启动器前缀'
+      },
+      problem: {
+        en: 'The child’s stdin begins with the launcher’s bootstrap frame. Read it before handing the held byte channel to the native handshake; bound that initial wait so a misconfigured launch does not wait forever.',
+        zh: '子端标准输入以启动器的引导帧开头。先读取该帧，再将所持有字节通道交给原生握手；限制首次等待，避免错误启动配置无限等待。'
+      },
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/deno-command'\n\nconst opened = await openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: 5000 })\nstartChildProtocol(opened.channel, opened.bootstrap)",
+      result: {
+        en: 'The result separates bootstrap bytes from the channel used for later RPC frames.',
+        zh: '返回值将引导字节与供后续 RPC 帧使用的通道分开。'
+      },
+      covers: ['bootstrap', 'bootstrapTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Open a pipe without a bootstrap prefix',
+        zh: '打开没有引导前缀的管道'
+      },
+      problem: {
+        en: 'An already trusted deployment starts its protocol directly on stdin. Select none so the stdio opener does not consume the first protocol frame as bootstrap.',
+        zh: '已有受信任部署直接从标准输入开始协议。选择 none，避免标准流打开器把首个协议帧误当作引导帧消费。'
+      },
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/deno-command'\n\nconst opened = await openProcessStdioChannel({ bootstrap: 'none' })\nstartChildProtocol(opened.channel, opened.bootstrap)",
+      result: {
+        en: 'The original byte channel is ready without consuming a prefix.',
+        zh: '原字节通道可直接使用，不消费前缀。'
+      },
+      covers: ['bootstrap']
+    },
+    {
+      title: {
+        en: 'Report an unsupported descriptor deployment',
+        zh: '报告不支持的文件描述符部署'
+      },
+      problem: {
+        en: 'A deployment descriptor requests fd bootstrap, but these stdio adapters support stdin and none only. Surface a configuration error so the launcher can be corrected to the supported stdin path.',
+        zh: '部署描述请求 fd 引导，但这些标准流适配器只支持 stdin 与 none。把配置错误交给界面，便于将启动器改为受支持的标准输入路径。'
+      },
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/deno-command'\n\ntry {\n  await openProcessStdioChannel({ bootstrap: 'fd', fd: 3 })\n} catch (error) {\n  showLaunchConfigurationError(error)\n}",
+      result: {
+        en: 'The application can report the unsupported configuration instead of waiting for an unread descriptor.',
+        zh: '应用可报告不支持的配置，不会一直等待无法读取的描述符。'
+      },
+      covers: ['bootstrap', 'fd']
+    }
+  ],
+  receiveAdapterBootstrap: [
+    {
+      title: {
+        en: 'Read the first bootstrap frame',
+        zh: '读取首个引导帧'
+      },
+      problem: {
+        en: 'The custom launcher already gave the child its real byte channel. Read the bootstrap prefix with a five-second budget before the native handshake starts.',
+        zh: '自定义启动器已把真实字节通道交给子端。在原生握手前，用五秒预算读取引导前缀。'
+      },
+      example:
+        "import { receiveAdapterBootstrap } from '@migaia/rpc-process'\n\nconst opened = await receiveAdapterBootstrap(childByteChannel, 'stdin', {\n  bootstrapTimeoutMs: 5000,\n  scheduler: applicationScheduler\n})\nstartChildProtocol(opened.channel, opened.bootstrap)",
+      result: {
+        en: 'The application receives the held channel plus its separated bootstrap bytes.',
+        zh: '应用取得所持有通道及单独的引导字节。'
+      },
+      covers: ['bootstrapTimeoutMs', 'scheduler']
+    },
+    {
+      title: {
+        en: 'Preserve a protocol that starts immediately',
+        zh: '保留立即开始的协议'
+      },
+      problem: {
+        en: 'An existing channel carries protocol frames immediately and has no bootstrap prefix. Select none to preserve its first bytes instead of interpreting them as a bootstrap frame.',
+        zh: '已有通道立即传递协议帧，没有引导前缀。选择 none，保留其首批字节，不将它们解释为引导帧。'
+      },
+      example:
+        "import { receiveAdapterBootstrap } from '@migaia/rpc-process'\n\nconst opened = await receiveAdapterBootstrap(childByteChannel, 'none', {\n  bootstrapTimeoutMs: 5000,\n  scheduler: applicationScheduler\n})\nstartChildProtocol(opened.channel, opened.bootstrap)",
+      result: {
+        en: 'The application keeps the held channel without consuming a bootstrap frame.',
+        zh: '应用保留所持有通道，不消费引导帧。'
+      },
+      covers: ['bootstrapTimeoutMs', 'scheduler']
+    }
+  ],
+  'adapters/node-socket:dialProcessByteChannel': [
+    {
+      title: {
+        en: 'Dial the existing local price service',
+        zh: '拨号到已有本地价格服务'
+      },
+      problem: {
+        en: 'The application already knows its approved local service address. Dial the raw byte channel under the checkout view’s cancellation signal, then pass it to Process for the authenticated handshake.',
+        zh: '应用已知道获准本地服务的地址。使用结算视图的取消信号拨号取得原始字节通道，再交给 Process 进行认证握手。'
+      },
+      example:
+        "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst byte = await dialProcessByteChannel({\n  address: pricingServiceAddress,\n  signal: viewController.signal\n})\nawait connectPricingProtocol(byte)",
+      result: {
+        en: 'Checkout gets one raw local connection whose setup observes view cancellation.',
+        zh: '结算页取得一条原始本地连接，其准备过程响应视图取消。'
+      },
+      covers: ['address', 'signal']
+    },
+    {
+      title: {
+        en: 'Let an import choose its own service address',
+        zh: '为导入选择自己的服务地址'
+      },
+      problem: {
+        en: 'An import job targets an approved local service endpoint selected by the application. Keep that address explicit instead of reusing an unrelated screen’s connection.',
+        zh: '导入任务访问应用选择的获准本地服务端点。显式提供该地址，避免复用其他界面的连接。'
+      },
+      example:
+        "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst byte = await dialProcessByteChannel({ address: importServiceAddress })\nawait connectImportProtocol(byte)",
+      result: {
+        en: 'The import owns its own raw connection to the selected local endpoint.',
+        zh: '导入任务持有通往所选本地端点的独立原始连接。'
+      },
+      covers: ['address']
+    }
+  ],
+  'adapters/deno-socket:dialProcessByteChannel': [
+    {
+      title: {
+        en: 'Dial the existing local price service',
+        zh: '拨号到已有本地价格服务'
+      },
+      problem: {
+        en: 'The application already knows its approved local service address. Dial the raw byte channel under the checkout view’s cancellation signal, then pass it to Process for the authenticated handshake.',
+        zh: '应用已知道获准本地服务的地址。使用结算视图的取消信号拨号取得原始字节通道，再交给 Process 进行认证握手。'
+      },
+      example:
+        "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/deno-socket'\n\nconst byte = await dialProcessByteChannel({\n  address: pricingServiceAddress,\n  signal: viewController.signal\n})\nawait connectPricingProtocol(byte)",
+      result: {
+        en: 'Checkout gets one raw local connection whose setup observes view cancellation.',
+        zh: '结算页取得一条原始本地连接，其准备过程响应视图取消。'
+      },
+      covers: ['address', 'signal']
+    },
+    {
+      title: {
+        en: 'Let an import choose its own service address',
+        zh: '为导入选择自己的服务地址'
+      },
+      problem: {
+        en: 'An import job targets an approved local service endpoint selected by the application. Keep that address explicit instead of reusing an unrelated screen’s connection.',
+        zh: '导入任务访问应用选择的获准本地服务端点。显式提供该地址，避免复用其他界面的连接。'
+      },
+      example:
+        "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/deno-socket'\n\nconst byte = await dialProcessByteChannel({ address: importServiceAddress })\nawait connectImportProtocol(byte)",
+      result: {
+        en: 'The import owns its own raw connection to the selected local endpoint.',
+        zh: '导入任务持有通往所选本地端点的独立原始连接。'
+      },
+      covers: ['address']
+    }
+  ]
 }
-const report = (error: unknown) => { console.error(error) }
-const profile = { codec: 'identity' as const, capabilities: ['runtime-api@1', 'close@1', 'batch@1', 'abort@1', 'wire-error@1'] }
-const staticAgreement = { local: profile, peer: profile }
-const [client, server] = await Promise.all([
-  createProcessPeer<{ double(value: number): number }>({
-    self: { name: 'client', instanceId: 'client' },
-    connect: async () => createProcessTransport(channel(port1), {
-      peerId: 'server', staticAgreement,
-      ipc: { connectionId: 'messages-client', sessionId: 'messages', log: () => {} }, report
-    }), report
-  }),
-  createProcessPeer({
-    self: { name: 'server', instanceId: 'server' },
-    provide: { double: (value: number) => value * 2 },
-    connect: async () => createProcessTransport(channel(port2), {
-      peerId: 'client', staticAgreement: { local: profile, peer: profile },
-      ipc: { connectionId: 'messages-server', sessionId: 'messages', log: () => {} }, report
-    }), report
-  })
-])
-try { console.log(await client.request('double', 21)) }
-finally { await client.close(); await server.close() }`
 
-/** The three channel configurations have distinct wire and authentication ownership. */
-export const processTransportOptionCases: readonly IOptionCaseDoc[] = [
-  {
-    title: t(
-      'Authenticate manual stdio and record bounded diagnostics',
-      '认证手动标准流并记录有界诊断'
-    ),
-    problem: t(
-      'A caller already launches a helper and must keep ownership of its native process. Explicit byte roles authenticate the inherited pipe; IPC labels and a stderr subscription feed structured diagnostics.',
-      '调用方已经启动辅助进程，需要继续持有原生进程。显式字节角色认证继承管道，通信标签与标准错误订阅用于生成结构化诊断。'
-    ),
-    example: stdioTransportCode,
-    result: t(
-      'Output is `42`, then `true true`: stderr produces a redacted IPC record and a throwing log sink reaches report with the original Error. The signal and 2000 ms budget apply to setup; the caller terminates and joins the child.',
-      '输出为 `42`、`true true`：标准错误生成脱敏通信记录，日志接收端抛错时 report 收到原始错误。信号与 2000 毫秒预算作用于建立连接；调用方终止并等待子进程。'
-    ),
-    covers: [
-      'role',
-      'offer',
-      'auth',
-      'auth.mode',
-      'auth.verify',
-      'peerId',
-      'signal',
-      'handshakeTimeoutMs',
-      'scheduler',
-      'report',
-      'ipc',
-      'ipc.connectionId',
-      'ipc.sessionId',
-      'ipc.processId',
-      'ipc.maxPendingData',
-      'ipc.maxPendingControl',
-      'ipc.log',
-      'ipc.stderr'
-    ]
-  },
-  {
-    title: t(
-      'Use no-auth only on an already private local carrier',
-      '仅在已私有的本地载体上选择无认证'
-    ),
-    problem: t(
-      'Two in-process Web Stream owners already control both ends. Select none explicitly rather than implying that a routing label authenticates the remote side.',
-      '进程内两个网页流拥有者已经控制两端。显式选择无认证，避免把路由标签误当成对端认证。'
-    ),
-    example: trustedByteCode,
-    result: t(
-      'The real byte handshake completes and the request returns `local-only`. This configuration intentionally does not verify credentials and is unsuitable for a public listener.',
-      '真实字节握手完成，请求返回 `local-only`。此配置有意不验证凭据，不适用于公开监听端。'
-    ),
-    covers: ['role', 'offer', 'auth', 'auth.mode', 'scheduler', 'peerId', 'ipc', 'report']
-  },
-  {
-    title: t(
-      'Keep a native message carrier in identity format',
-      '让原生消息载体保持 identity 格式'
-    ),
-    problem: t(
-      'A process bridge exposes complete native messages. Both owners declare identity and the same capability order before activation; a byte codec would not match this carrier.',
-      '进程桥接已经提供完整原生消息。两端在激活前声明 identity 以及同序能力；字节编解码器无法匹配此载体。'
-    ),
-    example: messageTransportCode,
-    result: t(
-      'The MessagePort request returns `42`. Matching static profiles configure the message path; Core still owns the actual control acknowledgement and accepted directory.',
-      '消息端口请求返回 `42`。一致的静态配置设定消息路径；实际控制确认与已接纳目录仍由核心拥有。'
-    ),
-    covers: [
-      'staticAgreement',
-      'staticAgreement.local',
-      'staticAgreement.peer',
-      'staticAgreement.local.codec',
-      'staticAgreement.peer.codec',
-      'staticAgreement.local.capabilities',
-      'staticAgreement.peer.capabilities',
-      'peerId',
-      'ipc',
-      'report'
-    ]
-  }
-]
-
-/** Offers are configuration proposals, never proof of bilateral negotiation. */
-export const processOfferOptionCases: readonly IOptionCaseDoc[] = [
-  {
-    title: t('Advertise a streaming helper contract', '声明辅助进程的流契约'),
-    problem: t(
-      'A helper serves an iterable method. Explicitly advertise stream and the runtime extension, and let the later handshake select common capabilities.',
-      '辅助进程提供可迭代方法。显式声明流与运行时扩展，再由后续握手选择共同能力。'
-    ),
-    example: `import { createNativeProcessOffer } from '@migaia/rpc-process'
-const offer = createNativeProcessOffer({
-  peer: { id: 'feed-helper', runtime: 'node' }, auth: crypto.randomUUID(),
-  stream: true, capabilities: ['runtime-api@1', 'stream@1']
-})
-console.log(offer.capabilities.includes('stream@1'))
-console.log(offer.capabilities.filter(value => value === 'stream@1').length)`,
-    result: t(
-      'Output is `true` and `1`: stream is present once after deduplication. The secret remains unprinted; the offer alone has not authenticated another process.',
-      '输出为 `true`、`1`：去重后流能力只出现一次。密钥不输出，单凭提议尚未认证其他进程。'
-    ),
-    covers: ['peer', 'auth', 'stream', 'capabilities']
-  },
-  {
-    title: t('Keep a scalar-only proposal narrow', '保持仅标量调用的窄提议'),
-    problem: t(
-      'A small local helper exposes no streams or automatic extensions. Disable stream and supply an explicit empty extension list.',
-      '小型本地辅助进程不提供流或自动扩展。禁用流，并显式传入空扩展列表。'
-    ),
-    example: `import { createNativeProcessOffer } from '@migaia/rpc-process'
-const offer = createNativeProcessOffer({ peer: { id: 'scalar-helper', runtime: 'node' }, stream: false, capabilities: [] })
-console.log(offer.capabilities.join(','), Object.isFrozen(offer))`,
-    result: t(
-      'Output is `ping@1,close@1,batch@1 true`: only the base controls remain. Omission of capabilities has a different meaning: it allows runtime-default completion.',
-      '输出为 `ping@1,close@1,batch@1 true`，只保留基础控制能力。省略 capabilities 则不同，仍允许运行时补全默认扩展。'
-    ),
-    covers: ['peer', 'stream', 'capabilities']
-  }
-]
-
-/** A native launch wrapper reads the original Core proposal, including its issued generation. */
-const launcherOptionsCode = (
-  module: string,
-  factory: string
-): string => `import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
-import { ${factory}, type ${module === 'deno-command' ? 'IDenoProcessHandle' : module === 'bun-spawn' ? 'IBunProcessHandle' : 'INodeProcessHandle'} } from '@migaia/rpc-process/adapters/${module}'
-import { holdAdapterLaunch } from '@migaia/rpc-core/adapter/internal-advanced'
-import type { IProcessLauncher } from '@migaia/supervision/process'
-type IHandle = ${module === 'deno-command' ? 'IDenoProcessHandle' : module === 'bun-spawn' ? 'IBunProcessHandle' : 'INodeProcessHandle'}
-${module === 'deno-command' ? "if (!Reflect.has(globalThis, 'Deno')) { console.log('Deno.Command required') } else " : ''}if (isProcessChild()) {
-  await createProcessPeer({ provide: { answer: () => 42 } })
-} else {
-  const native = ${factory}()
-  const launcher: IProcessLauncher<IHandle> = {
-    capabilities: native.capabilities,
-    launch: (spec, context) => {
-      const proposal = holdAdapterLaunch(context).proposal
-      if (!proposal) throw new TypeError('Core launch context required')
-      const runtimeApiBootstrap = {
-        name: proposal.childName ?? proposal.self.name,
-        parentInstanceId: proposal.self.instanceId,
-        generation: proposal.generation
+/** Focused field examples preserve the existing field contracts. */
+export const processReaderOptionFields: Readonly<
+  Record<string, Readonly<Record<string, { example: string; whenToUse: IText }>>>
+> = {
+  createProcessPeer: {
+    endpointFactory: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})',
+      whenToUse: {
+        en: 'Keep an existing endpoint composition for the acquired process channel; use its actual codec, framer and flow-control features.',
+        zh: '需要让已有端点组装使用取得的进程通道时设置，沿用该通道真实的编解码器、分帧器与流控特性。'
       }
-      console.log(runtimeApiBootstrap.name, runtimeApiBootstrap.generation?.kind)
-      return ${factory}({ runtimeApiBootstrap }).launch(spec, context)
+    },
+    self: {
+      example:
+        "const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  self: { name: 'checkout', instanceId: checkoutInstanceId }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    provide: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  provide: { prices: () => fetchPrices() }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    providerLimits: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    authentication: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  authentication: orderProtection\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    probe: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  probe: connectionProbe\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    defaultTimeoutMs: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  defaultTimeoutMs: 2000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    contract: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...declaredPricingPeerOptions,\n  contract: pricingContract\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    report: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Route native process and background diagnostics to the application sink without printing credentials.',
+        zh: '需要把原生进程与后台诊断交给应用接收端时设置，避免输出凭据。'
+      }
+    },
+    keyFactory: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  keyFactory: () => crypto.randomUUID()\n})',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    retryPort: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  retryPort: orderRetryPolicy\n})',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    spawn: {
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IPricing = { prices(): number[] }\nconst prices = await createProcessPeer<IPricing>({\n  spawn: new URL('./pricing-child.ts', import.meta.url),\n  defaultTimeoutMs: 2000,\n  report: (error) => reportToMonitoring(error)\n})\ntry {\n  renderPrices(await prices.request('prices'))\n} finally {\n  await prices.close()\n}",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    connect: {
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst prices = await createProcessPeer({\n  connect: pricingServiceName,\n  token: pricingToken,\n  connectTimeoutMs: 2000\n})\nonCheckoutClosed(() => prices.close())",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    listen: {
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst service = await createProcessPeer({\n  listen: pricingServiceName,\n  token: pricingToken,\n  verify: (credential) => verifyCheckoutCredential(credential),\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})\nonServiceClosed(() => service.close())",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    token: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  token: pricingToken\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    verify: {
+      example:
+        "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst service = await createProcessPeer({\n  listen: pricingServiceName,\n  token: pricingToken,\n  verify: (credential) => verifyCheckoutCredential(credential),\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})\nonServiceClosed(() => service.close())",
+      whenToUse: {
+        en: 'Require an application principal for a listener rather than relying only on same-user socket permissions.',
+        zh: '监听端需要应用主体身份，而不能仅依赖同用户套接字权限时设置。'
+      }
+    },
+    connectTimeoutMs: {
+      example:
+        'const pricing = await createProcessPeer({\n  ...pricingPeerOptions,\n  connectTimeoutMs: 2000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createProcessPlugin: {
+    name: {
+      example:
+        "const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  name: 'pricing'\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    contract: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...declaredPricingPluginOptions,\n  contract: pricingContract\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    registrationOwner: {
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    resilience: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  resilience: processGovernor\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    host: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...administrationPluginOptions,\n  host: applicationHost\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    endpointFactory: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})',
+      whenToUse: {
+        en: 'Build the explicit full-deployment endpoint from this acquired channel; retain its pipeline and flow-control features.',
+        zh: '需要为完整部署按当前取得通道显式构造端点时设置，保留原管线与流控特性。'
+      }
+    },
+    report: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Route native process and background diagnostics to the application sink without printing credentials.',
+        zh: '需要把原生进程与后台诊断交给应用接收端时设置，避免输出凭据。'
+      }
+    },
+    keyFactory: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  keyFactory: () => crypto.randomUUID()\n})',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    retryPort: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  retryPort: orderRetryPolicy\n})',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    deployment: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  deployment: pricingDeployment\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    self: {
+      example:
+        "const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  self: { name: 'checkout', instanceId: checkoutInstanceId }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    provide: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  provide: { prices: () => fetchPrices() }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    providerLimits: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    authentication: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  authentication: orderProtection\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    probe: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  probe: connectionProbe\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    defaultTimeoutMs: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  defaultTimeoutMs: 2000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    spawn: {
+      example:
+        "const pricing = createProcessPlugin({\n  ...sourceIndependentPluginOptions,\n  spawn: new URL('./pricing-child.ts', import.meta.url)\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    connect: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...sourceIndependentPluginOptions,\n  connect: pricingServiceName\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    listen: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...sourceIndependentPluginOptions,\n  listen: pricingServiceName\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    token: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  token: pricingToken\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    verify: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  verify: (credential) => verifyCheckoutCredential(credential)\n})',
+      whenToUse: {
+        en: 'Require an application principal for a listener rather than relying only on same-user socket permissions.',
+        zh: '监听端需要应用主体身份，而不能仅依赖同用户套接字权限时设置。'
+      }
+    },
+    connectTimeoutMs: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...pricingPluginOptions,\n  connectTimeoutMs: 2000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    expose: {
+      example:
+        "const pricing = createProcessPlugin({\n  ...administrationPluginOptions,\n  expose: ['host']\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    catalog: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...administrationPluginOptions,\n  catalog: approvedCatalog\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    resolvePlugin: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...administrationPluginOptions,\n  resolvePlugin: (name, config) => resolveApprovedPlugin(name, config)\n})',
+      whenToUse: {
+        en: 'Resolve only catalog-admitted names to local definitions when host is explicitly exposed.',
+        zh: '显式暴露宿主控制时，仅把通过目录接纳的名称解析为本地定义。'
+      }
+    },
+    'registrationOwner.name': {
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'registrationOwner.host': {
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createProcessResilience: {
+    scheduler: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  scheduler: applicationScheduler\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    report: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Send secondary failures to the application diagnostic sink while preserving the original error identity.',
+        zh: '需要把次级故障交给应用诊断接收端，并保留原始错误身份时设置。'
+      }
+    },
+    idempotencyStore: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  idempotencyStore: orderOutcomes\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    maxConnections: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  maxConnections: 32\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    maxConcurrentCallsPerConnection: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  maxConcurrentCallsPerConnection: 8\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    maxCallsPerMinute: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  maxCallsPerMinute: 120\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    maxPayloadBytes: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  maxPayloadBytes: 262144\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    maxConsecutiveTimeouts: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  maxConsecutiveTimeouts: 3\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    idleTimeoutMs: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  idleTimeoutMs: 30000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    drainMs: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  drainMs: 2000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    reportAtMs: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  reportAtMs: [0, 10000, 60000]\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    unhandledLimit: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  unhandledLimit: 2\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    liquidation: {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  liquidation: { cascade: false }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'liquidation.cascade': {
+      example:
+        'const governor = createProcessResilience({\n  ...governorOptions,\n  liquidation: { cascade: false }\n})',
+      whenToUse: {
+        en: 'Keep false when dependent resources should remain suspended; choose true when terminal liquidation should release their real Host dependency closure.',
+        zh: '依赖方资源应保持挂起时保留 false；终态清算需要释放真实宿主依赖闭包时选择 true。'
+      }
+    }
+  },
+  createProcessTransport: {
+    peerId: {
+      example:
+        "const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  peerId: 'pricing-service'\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    signal: {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  signal: viewController.signal\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    handshakeTimeoutMs: {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  handshakeTimeoutMs: 3000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    scheduler: {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  scheduler: applicationScheduler\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    report: {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Send secondary failures to the application diagnostic sink while preserving the original error identity.',
+        zh: '需要把次级故障交给应用诊断接收端，并保留原始错误身份时设置。'
+      }
+    },
+    ipc: {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: sessionDiagnostics\n})',
+      whenToUse: {
+        en: 'Correlate connection records and configure queue capacity without treating diagnostic labels as credentials.',
+        zh: '需要关联连接记录并配置队列容量时设置，诊断标签不能作为凭据。'
+      }
+    },
+    role: {
+      example:
+        "const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  role: 'initiator'\n})",
+      whenToUse: {
+        en: 'Use initiator on the dialing or launching side and responder on the byte receiver; both sides supply an offer.',
+        zh: '拨号或启动端使用发起方，字节接收端使用响应方，双方均提供握手提议。'
+      }
+    },
+    offer: {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  offer: pricingOffer\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    auth: {
+      example:
+        "const channel = await createProcessTransport(acceptedByteChannel, {\n  ...responderOptions,\n  auth: { mode: 'required', verify: verifyCheckoutCredential }\n})",
+      whenToUse: {
+        en: 'Require verification on externally reachable byte channels; select none only when the carrier is already private and owned.',
+        zh: '可从外部访问的字节通道需要校验；仅在载体已经私有且由自己持有时选择无认证。'
+      }
+    },
+    staticAgreement: {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.connectionId': {
+      example:
+        "const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, connectionId: 'checkout-pricing' }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.sessionId': {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, sessionId: currentSessionId }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.processId': {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, processId: supervisedProcessId }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.maxPendingData': {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, maxPendingData: 64 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.maxPendingControl': {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, maxPendingControl: 16 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.log': {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, log: (record) => recordConnectionEvent(record) }\n})',
+      whenToUse: {
+        en: 'Collect structured connection records; keep secret bytes out of the sink and let report observe sink failures.',
+        zh: '需要收集结构化连接记录时设置，不向接收端写入敏感字节，接收端故障交给 report。'
+      }
+    },
+    'ipc.stderr': {
+      example:
+        'const channel = await createProcessTransport(rawByteChannel, {\n  ...byteTransportOptions,\n  ipc: { ...sessionDiagnostics, stderr: (listener) => subscribePricingStderr(listener) }\n})',
+      whenToUse: {
+        en: 'Borrow the existing child stderr subscription for bounded redacted diagnostics and unsubscribe during channel cleanup.',
+        zh: '需要借用既有子进程标准错误订阅生成有界脱敏诊断，并在通道清理时取消订阅时设置。'
+      }
+    },
+    'auth.mode': {
+      example:
+        "const channel = await createProcessTransport(acceptedByteChannel, {\n  ...responderOptions,\n  auth: { mode: 'required', verify: (credential) => verifyCheckoutCredential(credential) }\n})",
+      whenToUse: {
+        en: 'Choose required for credential verification; none explicitly omits verification on an already private carrier.',
+        zh: '需要校验凭据时选择 required；已私有载体上的 none 显式省略校验。'
+      }
+    },
+    'auth.verify': {
+      example:
+        "const channel = await createProcessTransport(acceptedByteChannel, {\n  ...responderOptions,\n  auth: { mode: 'required', verify: (credential) => verifyCheckoutCredential(credential) }\n})",
+      whenToUse: {
+        en: 'Require verification on externally reachable byte channels; select none only when the carrier is already private and owned.',
+        zh: '可从外部访问的字节通道需要校验；仅在载体已经私有且由自己持有时选择无认证。'
+      }
+    },
+    'staticAgreement.local': {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'staticAgreement.peer': {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'staticAgreement.local.codec': {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use identity on both profiles when the native carrier already preserves complete messages.',
+        zh: '原生载体已经保持完整消息边界时，两端配置均使用 identity。'
+      }
+    },
+    'staticAgreement.local.capabilities': {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'staticAgreement.peer.codec': {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use identity on both profiles when the native carrier already preserves complete messages.',
+        zh: '原生载体已经保持完整消息边界时，两端配置均使用 identity。'
+      }
+    },
+    'staticAgreement.peer.capabilities': {
+      example:
+        'const channel = await createProcessTransport(messageChannel, {\n  ...messageTransportOptions,\n  staticAgreement: { local: messageProfile, peer: messageProfile }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createNativeProcessOffer: {
+    peer: {
+      example:
+        "const offer = createNativeProcessOffer({\n  ...nativeOfferOptions,\n  peer: { id: 'checkout', runtime: 'bun' }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    auth: {
+      example:
+        'const offer = createNativeProcessOffer({\n  ...nativeOfferOptions,\n  auth: pricingToken\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    stream: {
+      example:
+        'const offer = createNativeProcessOffer({\n  ...nativeOfferOptions,\n  stream: true\n})',
+      whenToUse: {
+        en: 'Set true for an iterable service; set false when stream must stay disabled even if runtime defaults are completed.',
+        zh: '可迭代服务使用 true；即使补全运行时默认值也必须禁用流时使用 false。'
+      }
+    },
+    capabilities: {
+      example:
+        'const offer = createNativeProcessOffer({\n  ...nativeOfferOptions,\n  capabilities: agreedCapabilities\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createProcessJsonRpcChannel: {
+    peerId: {
+      example:
+        "const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  peerId: 'pricing-service'\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    signal: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  signal: viewController.signal\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    handshakeTimeoutMs: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  handshakeTimeoutMs: 3000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    scheduler: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  scheduler: applicationScheduler\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    report: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Send secondary failures to the application diagnostic sink while preserving the original error identity.',
+        zh: '需要把次级故障交给应用诊断接收端，并保留原始错误身份时设置。'
+      }
+    },
+    ipc: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: sessionDiagnostics\n})',
+      whenToUse: {
+        en: 'Correlate connection records and configure queue capacity without treating diagnostic labels as credentials.',
+        zh: '需要关联连接记录并配置队列容量时设置，诊断标签不能作为凭据。'
+      }
+    },
+    byte: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  byte: pricingByteChannel\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    target: {
+      example:
+        "const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  target: { kind: 'plugin', contract: pricingContract }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    offer: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  offer: jsonRpcOffer\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    token: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  token: pricingToken\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    wallClock: {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  wallClock: applicationWallClock\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.connectionId': {
+      example:
+        "const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, connectionId: 'checkout-pricing' }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.sessionId': {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, sessionId: currentSessionId }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.processId': {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, processId: supervisedProcessId }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.maxPendingData': {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, maxPendingData: 64 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.maxPendingControl': {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, maxPendingControl: 16 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.log': {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, log: (record) => recordConnectionEvent(record) }\n})',
+      whenToUse: {
+        en: 'Collect structured connection records; keep secret bytes out of the sink and let report observe sink failures.',
+        zh: '需要收集结构化连接记录时设置，不向接收端写入敏感字节，接收端故障交给 report。'
+      }
+    },
+    'ipc.stderr': {
+      example:
+        'const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  ipc: { ...sessionDiagnostics, stderr: (listener) => subscribePricingStderr(listener) }\n})',
+      whenToUse: {
+        en: 'Borrow the existing child stderr subscription for bounded redacted diagnostics and unsubscribe during channel cleanup.',
+        zh: '需要借用既有子进程标准错误订阅生成有界脱敏诊断，并在通道清理时取消订阅时设置。'
+      }
+    },
+    'target.kind': {
+      example:
+        "const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  target: { kind: 'plugin', contract: pricingContract }\n})",
+      whenToUse: {
+        en: 'Select plugin with one contract, or host with a catalog; neither target supports stream declarations over this bridge.',
+        zh: '单个契约选择 plugin，目录选择 host；此桥接的两个目标都不支持流声明。'
+      }
+    },
+    'target.contract': {
+      example:
+        "const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  target: { kind: 'plugin', contract: pricingContract }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'target.catalog': {
+      example:
+        "const channel = await createProcessJsonRpcChannel({\n  ...foreignServiceOptions,\n  target: { kind: 'host', catalog: approvedCatalog }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  openProcessObjectChannel: {
+    peerId: {
+      example:
+        "const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  peerId: 'pricing-service'\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    signal: {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  signal: viewController.signal\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    handshakeTimeoutMs: {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  handshakeTimeoutMs: 3000\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    scheduler: {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  scheduler: applicationScheduler\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    report: {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Send secondary failures to the application diagnostic sink while preserving the original error identity.',
+        zh: '需要把次级故障交给应用诊断接收端，并保留原始错误身份时设置。'
+      }
+    },
+    ipc: {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: sessionDiagnostics\n})',
+      whenToUse: {
+        en: 'Correlate connection records and configure queue capacity without treating diagnostic labels as credentials.',
+        zh: '需要关联连接记录并配置队列容量时设置，诊断标签不能作为凭据。'
+      }
+    },
+    'ipc.connectionId': {
+      example:
+        "const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, connectionId: 'checkout-pricing' }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.sessionId': {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, sessionId: currentSessionId }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.processId': {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, processId: supervisedProcessId }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.maxPendingData': {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, maxPendingData: 64 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.maxPendingControl': {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, maxPendingControl: 16 }\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'ipc.log': {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, log: (record) => recordConnectionEvent(record) }\n})',
+      whenToUse: {
+        en: 'Collect structured connection records; keep secret bytes out of the sink and let report observe sink failures.',
+        zh: '需要收集结构化连接记录时设置，不向接收端写入敏感字节，接收端故障交给 report。'
+      }
+    },
+    'ipc.stderr': {
+      example:
+        'const channel = openProcessObjectChannel(negotiatedConnection, {\n  ...objectConnectionOptions,\n  ipc: { ...sessionDiagnostics, stderr: (listener) => subscribePricingStderr(listener) }\n})',
+      whenToUse: {
+        en: 'Borrow the existing child stderr subscription for bounded redacted diagnostics and unsubscribe during channel cleanup.',
+        zh: '需要借用既有子进程标准错误订阅生成有界脱敏诊断，并在通道清理时取消订阅时设置。'
+      }
+    }
+  },
+  receiveAdapterBootstrap: {
+    bootstrapTimeoutMs: {
+      example:
+        "const opened = await receiveAdapterBootstrap(childByteChannel, 'stdin', {\n  ...bootstrapReaderOptions,\n  bootstrapTimeoutMs: 5000\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    scheduler: {
+      example:
+        "const opened = await receiveAdapterBootstrap(childByteChannel, 'stdin', {\n  ...bootstrapReaderOptions,\n  scheduler: applicationScheduler\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createAdapterProcessLaunch: {
+    runtimeApiBootstrap: {
+      example:
+        "const launch = createAdapterProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.name': {
+      example:
+        "const launch = createAdapterProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.parentInstanceId': {
+      example:
+        "const launch = createAdapterProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.generation': {
+      example:
+        "const launch = createAdapterProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createAdapterProcessPeer: {
+    endpointFactory: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Keep an existing endpoint composition for the acquired process channel; use its actual codec, framer and flow-control features.',
+        zh: '需要让已有端点组装使用取得的进程通道时设置，沿用该通道真实的编解码器、分帧器与流控特性。'
+      }
+    },
+    self: {
+      example:
+        "const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  self: { name: 'checkout', instanceId: checkoutInstanceId }\n}, runtimeLoader)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    provide: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  provide: { prices: () => fetchPrices() }\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    providerLimits: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    authentication: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  authentication: orderProtection\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    probe: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  probe: connectionProbe\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    defaultTimeoutMs: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  defaultTimeoutMs: 2000\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    contract: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...declaredPricingPeerOptions,\n  contract: pricingContract\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    report: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  report: (error) => reportToMonitoring(error)\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Route native process and background diagnostics to the application sink without printing credentials.',
+        zh: '需要把原生进程与后台诊断交给应用接收端时设置，避免输出凭据。'
+      }
+    },
+    keyFactory: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  keyFactory: () => crypto.randomUUID()\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    retryPort: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  retryPort: orderRetryPolicy\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    spawn: {
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\ntype IPricing = { prices(): number[] }\nconst prices = await createAdapterProcessPeer<IPricing>({\n  spawn: new URL('./pricing-child.ts', import.meta.url),\n  defaultTimeoutMs: 2000,\n  report: (error) => reportToMonitoring(error)\n}, runtimeLoader)\ntry {\n  renderPrices(await prices.request('prices'))\n} finally {\n  await prices.close()\n}",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    connect: {
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\nconst prices = await createAdapterProcessPeer({\n  connect: pricingServiceName,\n  token: pricingToken,\n  connectTimeoutMs: 2000\n}, runtimeLoader)\nonCheckoutClosed(() => prices.close())",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    listen: {
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\nconst service = await createAdapterProcessPeer({\n  listen: pricingServiceName,\n  token: pricingToken,\n  verify: (credential) => verifyCheckoutCredential(credential),\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, runtimeLoader)\nonServiceClosed(() => service.close())",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    token: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  token: pricingToken\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    verify: {
+      example:
+        "import { createAdapterProcessPeer } from '@migaia/rpc-process'\n\nconst service = await createAdapterProcessPeer({\n  listen: pricingServiceName,\n  token: pricingToken,\n  verify: (credential) => verifyCheckoutCredential(credential),\n  provide: { prices: () => fetchPrices() },\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, runtimeLoader)\nonServiceClosed(() => service.close())",
+      whenToUse: {
+        en: 'Require an application principal for a listener rather than relying only on same-user socket permissions.',
+        zh: '监听端需要应用主体身份，而不能仅依赖同用户套接字权限时设置。'
+      }
+    },
+    connectTimeoutMs: {
+      example:
+        'const pricing = await createAdapterProcessPeer({\n  ...pricingPeerOptions,\n  connectTimeoutMs: 2000\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createAdapterProcessPlugin: {
+    name: {
+      example:
+        "const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  name: 'pricing'\n}, runtimeLoader)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    contract: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...declaredPricingPluginOptions,\n  contract: pricingContract\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    registrationOwner: {
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    resilience: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...fullPricingPluginOptions,\n  resilience: processGovernor\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    host: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...administrationPluginOptions,\n  host: applicationHost\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    endpointFactory: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Build the explicit full-deployment endpoint from this acquired channel; retain its pipeline and flow-control features.',
+        zh: '需要为完整部署按当前取得通道显式构造端点时设置，保留原管线与流控特性。'
+      }
+    },
+    report: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  report: (error) => reportToMonitoring(error)\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Route native process and background diagnostics to the application sink without printing credentials.',
+        zh: '需要把原生进程与后台诊断交给应用接收端时设置，避免输出凭据。'
+      }
+    },
+    keyFactory: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  keyFactory: () => crypto.randomUUID()\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    retryPort: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  retryPort: orderRetryPolicy\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Managed process spawn/connect consumes this policy for declared idempotent requests. A function source uses direct Core assembly and does not consume this proxy policy.',
+        zh: '托管进程 spawn/connect 为声明为幂等的请求使用此策略；函数来源使用直接 Core 组装，不使用这项代理策略。'
+      }
+    },
+    deployment: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...fullPricingPluginOptions,\n  deployment: pricingDeployment\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    self: {
+      example:
+        "const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  self: { name: 'checkout', instanceId: checkoutInstanceId }\n}, runtimeLoader)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    provide: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  provide: { prices: () => fetchPrices() }\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    providerLimits: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  providerLimits: { maxGlobal: 8, maxPerPeer: 2 }\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    authentication: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  authentication: orderProtection\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    probe: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  probe: connectionProbe\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    defaultTimeoutMs: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  defaultTimeoutMs: 2000\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    spawn: {
+      example:
+        "const pricing = createAdapterProcessPlugin({\n  ...sourceIndependentPluginOptions,\n  spawn: new URL('./pricing-child.ts', import.meta.url)\n}, runtimeLoader)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    connect: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...sourceIndependentPluginOptions,\n  connect: pricingServiceName\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    listen: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...sourceIndependentPluginOptions,\n  listen: pricingServiceName\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    token: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  token: pricingToken\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    verify: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  verify: (credential) => verifyCheckoutCredential(credential)\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Require an application principal for a listener rather than relying only on same-user socket permissions.',
+        zh: '监听端需要应用主体身份，而不能仅依赖同用户套接字权限时设置。'
+      }
+    },
+    connectTimeoutMs: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...pricingPluginOptions,\n  connectTimeoutMs: 2000\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    expose: {
+      example:
+        "const pricing = createAdapterProcessPlugin({\n  ...administrationPluginOptions,\n  expose: ['host']\n}, runtimeLoader)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    catalog: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...administrationPluginOptions,\n  catalog: approvedCatalog\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    resolvePlugin: {
+      example:
+        'const pricing = createAdapterProcessPlugin({\n  ...administrationPluginOptions,\n  resolvePlugin: (name, config) => resolveApprovedPlugin(name, config)\n}, runtimeLoader)',
+      whenToUse: {
+        en: 'Resolve only catalog-admitted names to local definitions when host is explicitly exposed.',
+        zh: '显式暴露宿主控制时，仅把通过目录接纳的名称解析为本地定义。'
+      }
+    },
+    'registrationOwner.name': {
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'registrationOwner.host': {
+      example:
+        "import { createProcessPlugin } from '@migaia/rpc-process'\n\nconst pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing',\n  contract: pricingContract,\n  registrationOwner: { name: 'pricing', host: applicationHost },\n  deployment: pricingDeployment\n})\nawait applicationHost.use(pricing)",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createNodeProcessLauncher: {
+    runtimeApiBootstrap: {
+      example:
+        "const launcher = createNodeProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.name': {
+      example:
+        "const launcher = createNodeProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.parentInstanceId': {
+      example:
+        "const launcher = createNodeProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.generation': {
+      example:
+        "const launcher = createNodeProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createBunProcessLauncher: {
+    runtimeApiBootstrap: {
+      example:
+        "const launcher = createBunProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.name': {
+      example:
+        "const launcher = createBunProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.parentInstanceId': {
+      example:
+        "const launcher = createBunProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.generation': {
+      example:
+        "const launcher = createBunProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createDenoProcessLauncher: {
+    runtimeApiBootstrap: {
+      example:
+        "const launcher = createDenoProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.name': {
+      example:
+        "const launcher = createDenoProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.parentInstanceId': {
+      example:
+        "const launcher = createDenoProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.generation': {
+      example:
+        "const launcher = createDenoProcessLauncher({\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  'adapters/node-child-process:openProcessStdioChannel': {
+    bootstrap: {
+      example: "const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })",
+      whenToUse: {
+        en: 'Use stdin when the parent writes a framed prefix and none when protocol starts immediately. fd is declared but rejected by both current openers.',
+        zh: '父进程写入分帧前缀时用 stdin，直接开始协议时用 none。fd 虽已声明，但当前两个读取函数都会拒绝。'
+      }
+    },
+    fd: {
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n\ntry {\n  await openProcessStdioChannel({ bootstrap: 'fd', fd: 3 })\n} catch (error) {\n  showLaunchConfigurationError(error)\n}",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    bootstrapTimeoutMs: {
+      example:
+        "const opened = await openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: 5000 })",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  'adapters/deno-command:openProcessStdioChannel': {
+    bootstrap: {
+      example: "const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })",
+      whenToUse: {
+        en: 'Use stdin when the parent writes a framed prefix and none when protocol starts immediately. fd is declared but rejected by both current openers.',
+        zh: '父进程写入分帧前缀时用 stdin，直接开始协议时用 none。fd 虽已声明，但当前两个读取函数都会拒绝。'
+      }
+    },
+    fd: {
+      example:
+        "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/deno-command'\n\ntry {\n  await openProcessStdioChannel({ bootstrap: 'fd', fd: 3 })\n} catch (error) {\n  showLaunchConfigurationError(error)\n}",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    bootstrapTimeoutMs: {
+      example:
+        "const opened = await openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: 5000 })",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  'adapters/node-socket:dialProcessByteChannel': {
+    address: {
+      example:
+        'const byte = await dialProcessByteChannel({\n  ...dialOptions,\n  address: pricingServiceAddress\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    signal: {
+      example:
+        'const byte = await dialProcessByteChannel({\n  ...dialOptions,\n  signal: viewController.signal\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  'adapters/deno-socket:dialProcessByteChannel': {
+    address: {
+      example:
+        'const byte = await dialProcessByteChannel({\n  ...dialOptions,\n  address: pricingServiceAddress\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    signal: {
+      example:
+        'const byte = await dialProcessByteChannel({\n  ...dialOptions,\n  signal: viewController.signal\n})',
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  createAdapterNodeProcessLaunch: {
+    runtimeApiBootstrap: {
+      example:
+        "const launch = createAdapterNodeProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.name': {
+      example:
+        "const launch = createAdapterNodeProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.parentInstanceId': {
+      example:
+        "const launch = createAdapterNodeProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    },
+    'runtimeApiBootstrap.generation': {
+      example:
+        "const launch = createAdapterNodeProcessLaunch(processSpec, launchContext, {\n  runtimeApiBootstrap: { name: 'pricing', parentInstanceId: parentPeer.self.instanceId,\n    generation: launchGeneration }\n})",
+      whenToUse: {
+        en: 'Use the application-owned value shown here when configuring this connection. Omitted optional values keep their documented defaults.',
+        zh: '配置这条连接时使用应用持有的值；省略可选值时保留说明中的默认行为。'
+      }
+    }
+  },
+  fullProcessPlugin: {
+    name: {
+      example:
+        "const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  name: 'pricing'\n})",
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
+    },
+    contract: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  contract: pricingContract\n})',
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
+    },
+    registrationOwner: {
+      example:
+        "const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  registrationOwner: { name: 'pricing', host: applicationHost }\n})",
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
+    },
+    resilience: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  resilience: processGovernor\n})',
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
+    },
+    host: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  host: remoteHostControl\n})',
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
+    },
+    endpointFactory: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  endpointFactory: (channel, signal) => openPricingEndpoint(channel, signal)\n})',
+      whenToUse: {
+        en: 'Build the explicit full-deployment endpoint from this acquired channel; retain its pipeline and flow-control features.',
+        zh: '需要为完整部署按当前取得通道显式构造端点时设置，保留原管线与流控特性。'
+      }
+    },
+    report: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  report: (error) => reportToMonitoring(error)\n})',
+      whenToUse: {
+        en: 'Send secondary failures to the application diagnostic sink while preserving the original error identity.',
+        zh: '需要把次级故障交给应用诊断接收端，并保留原始错误身份时设置。'
+      }
+    },
+    keyFactory: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  keyFactory: () => crypto.randomUUID()\n})',
+      whenToUse: {
+        en: 'Issue an application key for a declared idempotent proxy call when the caller supplies no explicit key.',
+        zh: '代理方法已声明幂等，且调用方未显式提供键，需要签发应用键时设置。'
+      }
+    },
+    retryPort: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  retryPort: orderRetryPolicy\n})',
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
+    },
+    deployment: {
+      example:
+        'const pricing = createProcessPlugin({\n  ...fullPricingPluginOptions,\n  deployment: pricingDeployment\n})',
+      whenToUse: {
+        en: 'Configure this part of the advanced pricing deployment.',
+        zh: '配置高级价格部署的这一部分。'
+      }
     }
   }
-  const peer = await createProcessPeer<{ answer(): number }>({
-    self: { name: 'desktop', instanceId: crypto.randomUUID() },
-    spawn: { entry: new URL(import.meta.url), ${module === 'deno-command' ? "wrap: command => ({ ...command, args: [command.args[0]!, '--node-modules-dir=manual', ...command.args.slice(1)] }), " : ''}supervision: { id: 'helper', launcher } }
-  })
-  try { console.log(await peer.request('answer')) }
-  finally { await peer.close() }
-}`
-
-/** Bootstrap validation precedes native acquisition, including Deno-only acquisition. */
-const invalidBootstrapCode = (
-  module: string,
-  factory: string
-): string => `import { ${factory} } from '@migaia/rpc-process/adapters/${module}'
-const launcher = ${factory}({ runtimeApiBootstrap: {
-  name: 'helper', parentInstanceId: crypto.randomUUID()
-} })
-try {
-  await launcher.launch({
-    command: process.execPath, args: [], env: { inherit: [], set: {} },
-    stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }
-  }, { signal: new AbortController().signal, output: () => {} })
-} catch (error) {
-  const failure = error as Error & { code?: string }
-  if (failure.code !== 'INVALID_CONFIG') throw error
-  console.log(failure.code)
-}`
-
-/** Launcher construction stays lazy; only the full launch can supply an execution generation. */
-export const processLauncherOptionCases = (
-  module: string,
-  factory: string
-): readonly IOptionCaseDoc[] => [
-  {
-    title: t('Forward the owning runtime launch identity', '转发所属运行时的启动身份'),
-    problem: t(
-      'An application wraps a native launcher. Copy bootstrap fields from the exact Core launch request, including its real generation, rather than inventing a restart counter.',
-      '应用包装原生启动器时，应从同一个核心启动请求取得引导字段及真实代次，不能自建重启计数。'
-    ),
-    example: launcherOptionsCode(module, factory),
-    result: t(
-      module === 'deno-command'
-        ? 'Under Deno the wrapper prints `helper restart` and the request returns `42`. Bun prints `Deno.Command required` without pretending to spawn through Deno. The second scenario still exercises early validation under Bun.'
-        : 'The wrapper prints `helper restart` and the child request returns `42`. The held context supplies identity before the explicit override; capability diagnostics remain observable.',
-      module === 'deno-command'
-        ? '在 Deno 下，包装器输出 `helper restart`，请求返回 `42`。Bun 输出 `Deno.Command required`，不会声称已经通过 Deno 启动；第二个场景仍可在 Bun 下执行前置校验。'
-        : '包装器输出 `helper restart`，子进程请求返回 `42`。持有的上下文优先提供身份，显式覆盖不能替换它，能力诊断仍可被观察。'
-    ),
-    covers: [
-      'runtimeApiBootstrap',
-      'runtimeApiBootstrap.name',
-      'runtimeApiBootstrap.parentInstanceId',
-      'runtimeApiBootstrap.generation'
-    ]
-  },
-  {
-    title: t('Reject bootstrap without the required pipes', '缺少必需管道时拒绝引导配置'),
-    problem: t(
-      'A deployment accidentally ignores stdin and stdout while requesting runtime bootstrap. Reject before creating a process instead of silently losing the first secret frame.',
-      '部署请求运行时引导，却错误地忽略标准输入输出。应在创建进程前拒绝，不能静默丢失首个敏感帧。'
-    ),
-    example: invalidBootstrapCode(module, factory),
-    result: t(
-      'Output is `INVALID_CONFIG`; no native child is created. Explicit runtime bootstrap requires stdin bootstrap plus channel-mode stdin and stdout.',
-      '输出为 `INVALID_CONFIG`，不创建原生子进程。显式运行时引导需要标准输入引导，以及通道模式的标准输入输出。'
-    ),
-    covers: [
-      'runtimeApiBootstrap',
-      'runtimeApiBootstrap.name',
-      'runtimeApiBootstrap.parentInstanceId'
-    ]
-  }
-]
-
-/** The helper prepares an actual launch, while native Node owns spawning and pipe creation. */
-const launchPreparationCode = (web: boolean): string => `import { spawn } from 'node:child_process'
-import { Readable, Writable } from 'node:stream'
-import { createProcessPeer, isProcessChild, ${web ? 'createAdapterProcessLaunch, ' : ''}PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION, type IProcessByteChannel } from '@migaia/rpc-process'
-import { createNodeProcessLauncher${web ? '' : ', createAdapterNodeProcessLaunch'} } from '@migaia/rpc-process/adapters/node-child-process'
-import { holdAdapterLaunch } from '@migaia/rpc-core/adapter/internal-advanced'
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import type { IProcessHandle, IProcessLauncher } from '@migaia/supervision/process'
-type IHandle = IProcessHandle & { channel: IProcessByteChannel; runtimeApiIdentity: { name: string; instanceId: string } }
-if (isProcessChild()) {
-  await createProcessPeer({ provide: { answer: () => 42 } })
-} else {
-  const launcher: IProcessLauncher<IHandle> = {
-    capabilities: createNodeProcessLauncher().capabilities,
-    launch: async (spec, context) => {
-      const proposal = holdAdapterLaunch(context).proposal
-      if (!proposal) throw new TypeError('Core launch context required')
-      const operation = ${web ? 'createAdapterProcessLaunch' : 'createAdapterNodeProcessLaunch'}(spec, context, { runtimeApiBootstrap: {
-        name: proposal.childName ?? proposal.self.name, parentInstanceId: proposal.self.instanceId,
-        generation: proposal.generation
-      } })
-      operation.assertActive()
-      const bootstrap = operation.bootstrap!
-      const inherited = Object.fromEntries(spec.env.inherit.map(key => [key, process.env[key]]))
-      const child = spawn(spec.command, [...spec.args], {
-        env: { ...inherited, ...spec.env.set, [PROCESS_RUNTIME_API_ENV]: PROCESS_RUNTIME_API_ENV_VERSION },
-        stdio: ['pipe', 'pipe', 'pipe']
-      })
-      const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
-        child.once('error', reject)
-        child.once('close', (code, signal) => resolve({ code, signal }))
-      })
-      child.stderr.on('data', (chunk: Buffer) => context.output('stderr', chunk))
-      const onAbort = () => { child.kill('SIGKILL') }
-      context.signal.addEventListener('abort', onAbort, { once: true })
-      void exited.finally(() => context.signal.removeEventListener('abort', onAbort))
-      try {
-        await new Promise<void>((resolve, reject) => child.stdin.write(encodeRpcStreamFrame(bootstrap.payload), error => error ? reject(error) : resolve()))
-        operation.assertActive()
-        return {
-          identity: { fingerprint: bootstrap.self.instanceId, pid: child.pid },
-          runtimeApiIdentity: bootstrap.self, exited,
-          channel: ${web ? 'operation.createWebChannel(Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>, Writable.toWeb(child.stdin) as WritableStream<Uint8Array>)' : 'operation.createChildChannel(child)'},
-          terminate: (mode) => { child.kill(mode === 'force' ? 'SIGKILL' : 'SIGTERM') }
-        }
-      } catch (error) { child.kill('SIGKILL'); await exited; throw error }
-    }
-  }
-  const peer = await createProcessPeer<{ answer(): number }>({ spawn: {
-    entry: new URL(import.meta.url), supervision: { id: 'prepared-helper', launcher }
-  } })
-  try { console.log(await peer.request('answer')) }
-  finally { await peer.close() }
-}`
-
-/** Invalid preparation has no native side effects, unlike the successful custom-launch story. */
-const invalidPreparationCode = (
-  web: boolean
-): string => `import { ${web ? 'createAdapterProcessLaunch' : 'PROCESS_RUNTIME_API_ENV'} } from '@migaia/rpc-process'
-${web ? '' : "import { createAdapterNodeProcessLaunch } from '@migaia/rpc-process/adapters/node-child-process'"}
-try {
-  ${web ? 'createAdapterProcessLaunch' : 'createAdapterNodeProcessLaunch'}({
-    command: process.execPath, args: [], env: { inherit: [], set: {} },
-    stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }
-  }, { signal: new AbortController().signal, output: () => {} }, {
-    runtimeApiBootstrap: { name: 'helper', parentInstanceId: crypto.randomUUID() }
-  })
-} catch (error) {
-  const failure = error as Error & { code?: string }
-  if (failure.code !== 'INVALID_CONFIG') throw error
-  console.log(failure.code)
-}`
-
-/** Custom launchers use real pipe handles, without asking preparation to spawn a process. */
-export const processLaunchPreparationCases = (web = false): readonly IOptionCaseDoc[] => [
-  {
-    title: t(
-      'Prepare bootstrap once before a custom native launch',
-      '自定义原生启动前只准备一次引导'
-    ),
-    problem: t(
-      'A custom launcher owns spawning but needs the standard bootstrap identity and carrier construction. Use the original Core request and write exactly the prepared payload before protocol traffic.',
-      '自定义启动器负责创建进程，但需要标准引导身份与通道构造。使用原始核心请求，在协议通信前准确写入准备好的载荷。'
-    ),
-    example: launchPreparationCode(web),
-    result: t(
-      'The real helper answers `42`. The same prepared self identity becomes the handle fingerprint and runtime identity; the supervisor owns termination and waiting.',
-      '真实辅助进程返回 `42`。同一个准备好的自身身份成为句柄指纹与运行时身份，监督器拥有终止与等待。'
-    ),
-    covers: [
-      'runtimeApiBootstrap',
-      'runtimeApiBootstrap.name',
-      'runtimeApiBootstrap.parentInstanceId',
-      'runtimeApiBootstrap.generation'
-    ]
-  },
-  {
-    title: t('Validate the pipe contract before spawning', '创建进程前校验管道契约'),
-    problem: t(
-      'A custom launcher receives an incompatible stdio spec. Preparation should fail before the caller acquires any native child.',
-      '自定义启动器收到不兼容的标准流规格，应在调用方取得原生子进程前由准备阶段拒绝。'
-    ),
-    example: invalidPreparationCode(web),
-    result: t(
-      'Output is `INVALID_CONFIG`. Preparation itself has no spawned process to clean up.',
-      '输出为 `INVALID_CONFIG`；准备操作本身没有已启动进程需要清理。'
-    ),
-    covers: [
-      'runtimeApiBootstrap',
-      'runtimeApiBootstrap.name',
-      'runtimeApiBootstrap.parentInstanceId'
-    ]
-  }
-]
-
-/** The parent writes one real framed prefix; each child opens only its own standard streams. */
-const stdioBootstrapCode = (
-  module: string,
-  mode: 'stdin' | 'none',
-  reader = false
-): string => `import { spawn } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-${reader ? "import { receiveAdapterBootstrap } from '@migaia/rpc-process'\nimport { createAdapterProcessStdio } from '@migaia/rpc-process/adapters/node-child-process'" : `import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/${module}'`}
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { systemScheduler } from '@migaia/utils/scheduler'
-if (process.argv.includes('--bootstrap-child')) {
-  const result = await ${reader ? `receiveAdapterBootstrap(createAdapterProcessStdio(process), '${mode}', { bootstrapTimeoutMs: 2000, scheduler: systemScheduler })` : `openProcessStdioChannel({ bootstrap: '${mode}', bootstrapTimeoutMs: 2000 })`}
-  console.error(${mode === 'stdin' ? "new TextDecoder().decode(result.bootstrap) === 'configuration'" : 'result.bootstrap === undefined'})
-  await result.channel.close()
-} else {
-  const entry = fileURLToPath(import.meta.url)
-  const child = spawn(${module === 'deno-command' ? "'deno', ['run', '--allow-all', '--node-modules-dir=manual', entry, '--bootstrap-child']" : "process.execPath, [...process.execArgv, entry, '--bootstrap-child']"}, {
-    stdio: ['pipe', 'pipe', 'pipe']
-  })
-  let result = ''
-  child.stdout.resume()
-  child.stderr.on('data', (chunk: Buffer) => { result += chunk.toString() })
-  const exited = new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject); child.once('close', code => resolve(code))
-  })
-  ${mode === 'stdin' ? "child.stdin.end(encodeRpcStreamFrame(new TextEncoder().encode('configuration')))" : 'child.stdin.end()'}
-  console.log(await exited, result.trim())
-}`
-
-/** The fd branch rejects before touching either runtime's current stdio. */
-const fdBootstrapCode = (
-  module: string
-): string => `import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/${module}'
-try { await openProcessStdioChannel({ bootstrap: 'fd', fd: 3, bootstrapTimeoutMs: 1000 }) }
-catch (error) {
-  const failure = error as Error & { code?: string }
-  if (failure.code !== 'INVALID_CONFIG') throw error
-  console.log(failure.code)
-}`
-
-/** Child bootstrap selection is separate from later handshake and method-call deadlines. */
-export const processStdioOptionCases = (
-  module = 'node-child-process'
-): readonly IOptionCaseDoc[] => [
-  {
-    title: t('Consume the parent prefix before handing off the pipe', '交接管道前消费父进程前缀'),
-    problem: t(
-      'A manually launched helper expects one framed configuration before RPC. Give the first-frame read its own budget without claiming it limits later calls.',
-      '手动启动的辅助进程在远程调用前需要一个分帧配置。为首帧读取设置独立预算，不把它说成后续调用期限。'
-    ),
-    example: stdioBootstrapCode(module, 'stdin'),
-    result: t(
-      'Output is `0 true`: the real child receives the prefix and closes its channel. The parent writes exactly one length-prefixed frame; application logs use stderr.',
-      '输出为 `0 true`：真实子进程收到前缀并关闭通道。父进程只写入一个长度前缀帧，应用日志使用标准错误。'
-    ),
-    covers: ['bootstrap', 'bootstrapTimeoutMs']
-  },
-  {
-    title: t('Open a pipe with no bootstrap prefix', '打开没有引导前缀的管道'),
-    problem: t(
-      'The caller will begin the protocol directly and writes no bootstrap frame. Select none so setup does not wait for a nonexistent prefix.',
-      '调用方直接开始协议，不写入引导帧。选择 none，避免建立连接时等待不存在的前缀。'
-    ),
-    example: stdioBootstrapCode(module, 'none'),
-    result: t(
-      'Output is `0 true`; no bootstrap bytes are returned. The explicit budget does not cause none mode to read a frame.',
-      '输出为 `0 true`，不返回引导字节。显式预算不会让 none 模式读取一帧。'
-    ),
-    covers: ['bootstrap', 'bootstrapTimeoutMs']
-  },
-  {
-    title: t('Handle the declared but unsupported fd mode', '处理已声明但不支持的文件描述符模式'),
-    problem: t(
-      'A shared launcher configuration selects a dedicated fd. These public openers support stdin or none only, so fail visibly instead of reading another descriptor.',
-      '共用启动配置选择独立文件描述符，但这些公开读取函数仅支持标准输入或无前缀，应明确失败，不能读取其他描述符。'
-    ),
-    example: fdBootstrapCode(module),
-    result: t(
-      'Output is `INVALID_CONFIG` before stdio acquisition. Supplying fd does not make this declared mode supported.',
-      '取得标准流前输出 `INVALID_CONFIG`。提供 fd 字段不会让已声明的模式变成受支持功能。'
-    ),
-    covers: ['bootstrap', 'fd', 'bootstrapTimeoutMs']
-  }
-]
-
-/** The lower-level reader uses the same native pipes plus a caller-owned scheduler. */
-export const processBootstrapReaderCases: readonly IOptionCaseDoc[] = ['stdin', 'none'].map(
-  (mode) => ({
-    title:
-      mode === 'stdin'
-        ? t('Bound the first frame on an existing channel', '限制已有通道上的首帧等待')
-        : t('Retain an existing channel without a prefix read', '保留已有通道而不读取前缀'),
-    problem:
-      mode === 'stdin'
-        ? t(
-            'A custom stdio adapter already owns the byte channel. Borrow its scheduler for the first frame and retain the same channel for later protocol setup.',
-            '自定义标准流适配器已经持有字节通道。借用调度器等待首帧，后续协议建立仍使用原通道。'
-          )
-        : t(
-            'An existing channel starts directly with protocol bytes. Explicit none mode returns it without installing a bootstrap read.',
-            '已有通道直接从协议字节开始。显式无前缀模式返回原通道，不安装引导读取。'
-          ),
-    example: stdioBootstrapCode('node-child-process', mode as 'stdin' | 'none', true),
-    result: t(
-      'Output is `0 true`: the child selects the intended read policy and releases its own channel. The 2000 ms timeout only belongs to the optional first-frame read.',
-      '输出为 `0 true`：子进程选择预期读取策略并释放自身通道。2000 毫秒超时只属于可选的首帧读取。'
-    ),
-    covers: ['bootstrapTimeoutMs', 'scheduler']
-  })
-)
-
-/** Authentication uses an actual local socket selected by the operating system. */
-const socketDialCode = (module: string, cancel: boolean): string =>
-  cancel
-    ? `import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/${module}'
-const caller = new AbortController()
-const reason = new Error('view closed')
-caller.abort(reason)
-try { await dialProcessByteChannel({ address: 'tcp://127.0.0.1:0', signal: caller.signal }) }
-catch (error) { console.log(error === reason || (error as Error).cause === reason) }`
-    : `import { createProcessPeer, createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
-import { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/${module}'
-const token = crypto.randomUUID()
-const report = (error: unknown) => { console.error(error) }
-const accepted = Promise.withResolvers<Awaited<ReturnType<typeof createProcessPeer>>>()
-const listener = await listenProcessByteChannel({
-  address: 'tcp://127.0.0.1:0',
-  auth: { mode: 'required', verify: (auth) => {
-    if (auth !== token) throw new TypeError('invalid credential')
-    return 'desktop-account'
-  } }, report,
-  onConnection: async (pending) => {
-    try {
-      const peer = await createProcessPeer({
-        self: { name: 'server', instanceId: 'server' }, provide: { answer: () => 42 }, report,
-        connect: async ({ capabilities }) => (await pending.accept({
-          peerId: 'client', offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' }, capabilities }),
-          ipc: { connectionId: 'accepted', sessionId: 'local', log: () => {} }, report
-        })).channel
-      })
-      accepted.resolve(peer)
-    } catch (error) { accepted.reject(error); throw error }
-  }
-})
-try {
-  const caller = new AbortController()
-  const client = await createProcessPeer<{ answer(): number }>({
-    self: { name: 'client', instanceId: 'client' }, report,
-    connect: async ({ capabilities }) => createProcessTransport(await dialProcessByteChannel({ address: listener.address, signal: caller.signal }), {
-      role: 'initiator', peerId: 'server',
-      offer: createNativeProcessOffer({ peer: { id: 'client', runtime: 'node' }, auth: token, capabilities }),
-      ipc: { connectionId: 'dialed', sessionId: 'local', log: () => {} }, report
-    })
-  })
-  const server = await accepted.promise
-  try { console.log(await client.request('answer')) }
-  finally { await client.close(); await server.close() }
-} finally { await listener.close() }`
-
-/** Dial-only cancellation does not transfer ownership of an established remote process. */
-export const processDialOptionCases = (module: string): readonly IOptionCaseDoc[] => [
-  {
-    title: t('Dial an authenticated loopback listener', '连接已认证的回环监听端'),
-    problem: t(
-      'A running local service should accept a client without hard-coding an available port. Dial the listener’s actual address and keep the client abort signal scoped to dialing.',
-      '运行中的本地服务需要接纳客户端，不能硬编码可用端口。使用监听器真实地址拨号，把客户端中止信号限定在拨号阶段。'
-    ),
-    example: socketDialCode(module, false),
-    result: t(
-      'The authenticated request returns `42`. Closing the client and server sessions precedes closing the listener; no remote process is terminated by dialing.',
-      '通过认证的请求返回 `42`。先关闭客户端与服务端会话，再关闭监听器；拨号不会终止远端进程。'
-    ),
-    covers: ['address', 'signal']
-  },
-  {
-    title: t('Cancel a dial after its caller has already left', '调用方已离开时取消拨号'),
-    problem: t(
-      'A view is gone before a local connection starts. Pass its already-aborted signal so the adapter does not open a socket for obsolete work.',
-      '本地连接开始前页面已经关闭。传入已经中止的信号，避免适配器为过期任务打开套接字。'
-    ),
-    example: socketDialCode(module, true),
-    result: t(
-      'Output is `true`: cancellation preserves the original reason directly or as its cause. No listener or remote process is required.',
-      '输出为 `true`：取消保留原始原因，直接返回或置于 cause。此场景不需要监听器或远端进程。'
-    ),
-    covers: ['address', 'signal']
-  }
-]
-
-/** Real session projections expose the selected shared replay owner and concurrency policy. */
-const resilienceLimitsCode = `import { createProcessResilience } from '@migaia/rpc-process'
-import { createRpcIdempotencyStore } from '@migaia/rpc-core'
-import { systemScheduler } from '@migaia/utils/scheduler'
-const store = createRpcIdempotencyStore({ retentionMs: 30000, maxEntries: 128 })
-const reports: unknown[] = []
-const governor = createProcessResilience({
-  scheduler: systemScheduler, report: error => { reports.push(error) }, idempotencyStore: store,
-  maxConnections: 8, maxConcurrentCallsPerConnection: 4, maxCallsPerMinute: 120,
-  maxPayloadBytes: 65536, maxConsecutiveTimeouts: 2, idleTimeoutMs: 15000, drainMs: 1000,
-  reportAtMs: [0, 1000, 5000], unhandledLimit: 2, liquidation: { cascade: false }
-})
-try {
-  const first = governor.sessionOptions({ connectionId: 'one', sessionId: 'login-one', principalId: 'account-A' })
-  const next = governor.sessionOptions({ connectionId: 'two', sessionId: 'login-two', principalId: 'account-A' })
-  const context = { token: 'operation', senderId: 'client' }
-  console.log(first.idempotency.store === store, first.limits.maxGlobal, first.limits.maxPerPeer)
-  console.log(first.idempotency.scope!(context) === next.idempotency.scope!(context))
-} finally { await governor.close() }`
-
-/** Terminal policy acts on a real supervised exit and a real dependent Host registration. */
-const liquidationCode = (
-  cascade: boolean
-): string => `import { setImmediate } from 'node:timers/promises'
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
-import { createProcessResilience } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createUnitBudget } from '@migaia/supervision'
-import { createProcessSupervisor } from '@migaia/supervision/process'
-import { systemScheduler } from '@migaia/utils/scheduler'
-const removed = Promise.withResolvers<void>()
-let dependentDisposed = false
-const service = definePlugin({
-  name: 'service', features: { api: defineFeature(() => ({ read: () => 42 })) },
-  install: () => ({}), dispose: () => { removed.resolve() }
-})
-const dependent = definePlugin({
-  name: 'dependent', features: { api: defineFeature((_core, deps) => ({ read: () => deps.base.read() }), { base: service.getFeature('api') }) },
-  install: () => ({}), dispose: () => { dependentDisposed = true }
-})
-const host = defineHost<Record<string, never>, never, readonly [typeof service, typeof dependent]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-const reports: unknown[] = []
-const report = (error: unknown) => { reports.push(error) }
-const supervisor = createProcessSupervisor({
-  id: 'service', launcher: createNodeProcessLauncher(),
-  budget: createUnitBudget({ kind: 'process', maxUnits: 1 }), scheduler: systemScheduler,
-  report, isolation: 'best-effort', restart: { mode: 'never' },
-  spec: { command: process.execPath, args: ['-e', 'process.exit(1)'], env: { inherit: ['PATH'], set: {} },
-    stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' } }
-})
-const governor = createProcessResilience({
-  scheduler: systemScheduler, report, reportAtMs: [0, 1], unhandledLimit: 1,
-  liquidation: { cascade: ${cascade} }
-})
-try {
-  const [, handle] = await host.use(service, dependent)
-  governor.attachRegistration('service', {
-    ownership: 'spawn-owned', health: 'none', supervisor: {
-      restart: () => supervisor.restart(), inspect: () => supervisor.inspect(), dispose: () => supervisor.dispose(),
-      onTerminal: listener => supervisor.subscribe(event => { if (event.type === 'terminal') listener(event) })
-    }
-  }, { kind: 'proxy-plugin', name: 'service', host })
-  await supervisor.start()
-  await removed.promise
-  await setImmediate()
-  console.log(governor.inspect('service')?.liquidated, dependentDisposed)
-  try { handle.getFeature('api').read() }
-  catch (error) { console.log((error as Error & { code?: string }).code) }
-  console.log(reports.some(error => (error as { code?: string })?.code === 'PROCESS_TERMINAL_CALL'))
-} finally { await governor.close(); await supervisor.dispose(); await host.dispose() }`
-
-/** Session limits and terminal dependency policy remain separate application decisions. */
-export const processResilienceOptionCases: readonly IOptionCaseDoc[] = [
-  {
-    title: t('Share replay storage with a bounded session policy', '共享重放存储并限制会话策略'),
-    problem: t(
-      'A daemon needs a selected replay store and smaller connection, call and payload budgets. Build one governor and derive session options only after authenticating a stable principal.',
-      '守护进程需要指定重放存储，以及较小的连接、调用和载荷预算。创建一个治理对象，仅在认证稳定主体后派生会话配置。'
-    ),
-    example: resilienceLimitsCode,
-    result: t(
-      'Output is `true 4 4` and `true`: the governor borrows the selected store, projects concurrency four and keeps one principal’s scope across connections. The other configured admission and retirement limits are not triggered by this projection-only example.',
-      '输出为 `true 4 4`、`true`：治理对象借用指定存储，投影并发四，并在连接变化后保持同一主体的范围。此例仅派生配置，不触发其余接纳与退出限制。'
-    ),
-    covers: [
-      'scheduler',
-      'report',
-      'idempotencyStore',
-      'maxConnections',
-      'maxConcurrentCallsPerConnection',
-      'maxCallsPerMinute',
-      'maxPayloadBytes',
-      'maxConsecutiveTimeouts',
-      'idleTimeoutMs',
-      'drainMs',
-      'reportAtMs',
-      'unhandledLimit',
-      'liquidation',
-      'liquidation.cascade'
-    ]
-  },
-  ...[false, true].map((cascade) => ({
-    title: cascade
-      ? t('Remove dependent registrations after terminal liquidation', '终态清算时移除依赖登记')
-      : t('Retain and suspend dependants after terminal liquidation', '终态清算时保留并挂起依赖方'),
-    problem: cascade
-      ? t(
-          'An unrecoverable service and its dependent should release together. Use cascade with the actual installing Host, after bounded unhandled reports.',
-          '无法恢复的服务及其依赖方需要一并释放。使用实际安装宿主，在有限次未处理上报后执行级联清算。'
-        )
-      : t(
-          'An unrecoverable service should be removed while its dependent resources remain retained. Keep cascade false and let the original Host suspend the dependant.',
-          '无法恢复的服务应被移除，但依赖方资源仍需保留。保持 cascade 为假，让原宿主挂起依赖方。'
-        ),
-    example: liquidationCode(cascade),
-    result: cascade
-      ? t(
-          'Output includes `true true`, `PLUGIN_NOT_INSTALLED`, `false`: the real child exits, the second unhandled report liquidates, and the Host releases the dependent. Capability warnings remain diagnostics.',
-          '输出包含 `true true`、`PLUGIN_NOT_INSTALLED`、`false`：真实子进程退出，第二次未处理上报触发清算，宿主释放依赖方。能力警告仍属于诊断。'
-        )
-      : t(
-          'Output includes `true false`, `PLUGIN_SUSPENDED`, `true`: the second unhandled report liquidates the service while the dependent remains suspended until final Host cleanup.',
-          '输出包含 `true false`、`PLUGIN_SUSPENDED`、`true`：第二次未处理上报清算服务，依赖方仍被挂起，直到最后释放宿主。'
-        ),
-    covers: [
-      'scheduler',
-      'report',
-      'reportAtMs',
-      'unhandledLimit',
-      'liquidation',
-      'liquidation.cascade'
-    ]
-  }))
-]
-
-/** Managed PluginHost installation uses canonical endpoint admission for its shared process slot. */
-const pluginSpawnCode = (
-  adapter: boolean
-): string => `import { defineHost } from '@migaia/plugin-host'
-import { createProcessPeer, createProcessPlugin, ${adapter ? 'createAdapterProcessPlugin, PROCESS_RUNTIME_API_ENV, ' : ''}isProcessChild } from '@migaia/rpc-process'
-${adapter ? "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n" : ''}
-${adapter ? loaderCode : ''}
-if (isProcessChild()) {
-  await createProcessPeer({ provide: { answer: () => 42 } })
-} else {
-  const service = ${adapter ? 'createAdapterProcessPlugin' : 'createProcessPlugin'}<{ answer(): number }>({
-    name: 'service', spawn: true, defaultTimeoutMs: 2000,
-    self: { name: 'desktop', instanceId: crypto.randomUUID() },
-    provide: { parent: { label: () => 'desktop' } }, expose: [],
-    report: (error) => { console.error(error) }
-  }${adapter ? ', runtime' : ''})
-  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  })
-  try { await host.use(service); console.log(await host.process!.request('service', 'answer')) }
-  finally { await host.dispose() }
-}`
-
-/** The same shared frame-protection configuration is installed through actual runtime plugins. */
-const pluginNamedCode = (adapter: boolean): string =>
-  namedOptionsCode(adapter)
-    .replace(
-      'import { createProcessPeer',
-      'import { createProcessPlugin, type IRuntimeProcessPeerOptions, createProcessPeer'
-    )
-    .replace(
-      'import { defineProbe }',
-      "import { defineHost } from '@migaia/plugin-host'\nimport { defineProbe }"
-    )
-    .replace(
-      adapter ? ', createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV' : 'createProcessPeer }',
-      adapter ? ', createAdapterProcessPlugin, PROCESS_RUNTIME_API_ENV' : 'createProcessPeer }'
-    )
-    .replaceAll('}, runtime)', '})')
-    .replace(
-      'const name = ',
-      `async function open(options: IRuntimeProcessPeerOptions) {
-  const plugin = ${adapter ? 'createAdapterProcessPlugin' : 'createProcessPlugin'}<{ math: { double(value: number): number } }>({ name: 'bridge', ...options }${adapter ? ', runtime' : ''})
-  const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
-  await host.use(plugin)
-  return { request: (method: 'math.double', value: number) => host.process!.request('bridge', method, value), close: async () => { await host.dispose() } }
 }
-const name = `
-    )
-    .replaceAll(
-      adapter ? 'await createAdapterProcessPeer' : 'await createProcessPeer',
-      'await open'
-    )
-    .replace('await open<{ math: { double(value: number): number } }>', 'await open')
 
-/** Catalog admission and resolver execution use the same actual installing Host. */
-const hostControlOptionsCode = (
-  adapter: boolean
-): string => `import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { createProcessPeer, createProcessPlugin, createProcessTransport, ${adapter ? 'createAdapterProcessPlugin, PROCESS_RUNTIME_API_ENV, ' : ''}type IProcessMessageChannel } from '@migaia/rpc-process'
-import { RemoteMethodName, type IRemoteHostCatalog } from '@migaia/rpc-core/remote'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-${adapter ? "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'" : ''}
-${adapter ? loaderCode : ''}
-function carrier(port: MessagePort): IProcessMessageChannel {
-  return { kind: 'message', send: value => port.postMessage(value),
-    onMessage: listener => { port.on('message', listener); return () => { port.off('message', listener) } },
-    onClose: listener => { port.on('close', listener); return () => { port.off('close', listener) } },
-    close: () => { port.close() }
-  }
-}
-const report = (error: unknown) => { console.error(error) }
-const ports = new MessageChannel()
-const business = definePlugin({ name: 'math',
-  features: { api: defineFeature(() => ({ double: (value: number) => value * 2 })) }, install: () => ({})
-})
-const catalog: IRemoteHostCatalog = { math: { schemaVersion: 1, plugin: 'math', features: {
-  api: { methods: { double: { mode: 'request', idempotent: true } } }
-} } }
-const host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
-type IControlApi = { migaia: { remote: { host: {
-  inspect(args: []): { plugins: unknown[] }
-  use(args: [string]): { name: string; state: string }
-} } } }
-const caller = createProcessPeer<IControlApi>({ self: { name: 'controller', instanceId: 'controller' }, report,
-  connect: async ({ capabilities }) => createProcessTransport(carrier(ports.port2), {
-    peerId: 'host', staticAgreement: { local: { codec: 'identity', capabilities }, peer: { codec: 'identity', capabilities } },
-    ipc: { connectionId: 'controller', sessionId: 'control', log: () => {} }, report
-  })
-})
-void caller.catch(() => {})
-let resolutions = 0
-const link = ${adapter ? 'createAdapterProcessPlugin' : 'createProcessPlugin'}({
-  name: 'control-link', self: { name: 'host', instanceId: 'host' }, expose: ['host'], host, catalog,
-  resolvePlugin: name => {
-    if (name !== 'math') throw new TypeError('unknown catalog entry')
-    resolutions++; return business
-  },
-  connect: async ({ capabilities }) => createProcessTransport(carrier(ports.port1), {
-    peerId: 'controller', staticAgreement: { local: { codec: 'identity', capabilities }, peer: { codec: 'identity', capabilities } },
-    ipc: { connectionId: 'host', sessionId: 'control', log: () => {} }, report
-  }), report
-}${adapter ? ', runtime' : ''})
-try {
-  await host.use(link)
-  const remote = await caller
-  const before = await remote.request(RemoteMethodName.hostInspect, []) as { plugins: unknown[] }
-  console.log(before.plugins.length)
-  const installed = await remote.request(RemoteMethodName.hostUse, ['math']) as { name: string; state: string }
-  console.log(installed.state, installed.name)
-  const after = await remote.request(RemoteMethodName.hostInspect, []) as { plugins: unknown[] }
-  console.log(after.plugins.length, resolutions)
-} finally {
-  await host.dispose(); ports.port1.close(); ports.port2.close(); await (await caller).close()
-}`
+/** Existing reference assemblies share the rewritten cases across their actual overloads. */
+export const processPeerOptionCases = (adapter = false) =>
+  processReaderOptionCases[adapter ? 'createAdapterProcessPeer' : 'createProcessPeer']!
+export const processTransportOptionCases = processReaderOptionCases.createProcessTransport!
+export const processOfferOptionCases = processReaderOptionCases.createNativeProcessOffer!
+export const processLauncherOptionCases = (_module: string, factory: string) =>
+  processReaderOptionCases[factory]!
+export const processLaunchPreparationCases = (web = false) =>
+  processReaderOptionCases[web ? 'createAdapterProcessLaunch' : 'createAdapterNodeProcessLaunch']!
+export const processStdioOptionCases = (module = 'node-child-process') =>
+  processReaderOptionCases['adapters/' + module + ':openProcessStdioChannel']!
+export const processBootstrapReaderCases = processReaderOptionCases.receiveAdapterBootstrap!
+export const processDialOptionCases = (module: string) =>
+  processReaderOptionCases['adapters/' + module + ':dialProcessByteChannel']!
+export const processResilienceOptionCases = processReaderOptionCases.createProcessResilience!
+export const processRuntimePluginOptionCases = (adapter = false) =>
+  processReaderOptionCases[adapter ? 'createAdapterProcessPlugin' : 'createProcessPlugin']!
+export const processJsonRpcOptionCases = (objectMode = false) =>
+  processReaderOptionCases[objectMode ? 'openProcessObjectChannel' : 'createProcessJsonRpcChannel']!
+export const processFullPluginOptionCases = processReaderOptionCases.fullProcessPlugin!
 
-/** Runtime plugin cases cover actual source installation, while full deployment has its own owner. */
-export const processRuntimePluginOptionCases = (adapter = false): readonly IOptionCaseDoc[] => [
-  {
-    title: t(
-      'Install an owned child into the shared process outlet',
-      '把持有的子进程安装到共用进程出口'
-    ),
-    problem: t(
-      'An application wants Host disposal to release an auxiliary process. Register one named cold plugin, publish parent methods explicitly and keep host exposure empty.',
-      '应用希望由宿主释放辅助进程。登记一个有名称的冷插件，显式发布父端方法，并保持宿主暴露列表为空。'
-    ),
-    example: pluginSpawnCode(adapter),
-    result: t(
-      'The Host process request returns `42`; disposal owns this child. The local self identity is configured separately from credentials and provided methods.',
-      '宿主进程请求返回 `42`，释放宿主负责回收此子进程。本端身份配置与凭据、已提供方法彼此独立。'
-    ),
-    covers: ['name', 'spawn', 'defaultTimeoutMs', 'self', 'provide', 'expose', 'report']
-  },
-  {
-    ...processPeerOptionCases(adapter)[1]!,
-    title: t(
-      'Install authenticated named-service plugins on two Hosts',
-      '在两个宿主安装已认证的命名服务插件'
-    ),
-    example: pluginNamedCode(adapter),
-    covers: [
-      'name',
-      'listen',
-      'connect',
-      'token',
-      'verify',
-      'connectTimeoutMs',
-      'provide',
-      'contract',
-      'providerLimits',
-      'authentication',
-      'probe',
-      'self',
-      'defaultTimeoutMs',
-      'report'
-    ]
-  },
-  {
-    title: t('Expose only catalog-approved Host installation', '仅暴露目录批准的宿主安装'),
-    problem: t(
-      'A private controller may install a known local plugin through this process bridge. Explicitly expose host and give the same installing Host its catalog and local resolver.',
-      '私有控制端可以通过进程桥接安装已知本地插件。显式暴露宿主入口，并为实际安装宿主提供目录及本地解析器。'
-    ),
-    example: hostControlOptionsCode(adapter),
-    result: t(
-      'Output is `0`, `enabled math`, then `1 1`: the caller reads an empty catalog state, installs the approved local definition and invokes the resolver once. The MessagePorts are real private carriers; this example does not claim to spawn a process.',
-      '输出为 `0`、`enabled math`、`1 1`：调用方读取空安装状态，安装批准的本地定义，解析器执行一次。消息端口是真实私有载体，此例不声称启动进程。'
-    ),
-    covers: ['name', 'connect', 'self', 'expose', 'host', 'catalog', 'resolvePlugin', 'report']
-  }
-]
-
-/** Complete Node examples use real process owners and explicit cleanup. */
+/** Existing non-option cases retain their established behavior examples. */
 export const rpcProcessCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   createProcessPeer: [
     {
@@ -1241,144 +2743,3 @@ export const rpcProcessCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
     }
   ]
 }
-
-/** A complete local responder uses the published framing contract and the real bridge handshake. */
-const jsonRpcOptionsCode = (
-  objectMode: boolean,
-  hostMode: boolean
-): string => `import { createServer, type Socket } from 'node:net'
-import { once } from 'node:events'
-import { PassThrough } from 'node:stream'
-import { encodeJsonRpcFrame, createJsonRpcFrameDecoder } from '@migaia/rpc-contract/framing/jsonrpc'
-import { RpcProtocol } from '@migaia/rpc-contract'
-import { createProcessPeer, createProcessJsonRpcChannel, openProcessObjectChannel,
-  createProcessChannelClosedError, type IProcessJsonRpcChannelOptions } from '@migaia/rpc-process'
-import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { createAdapterJsonRpcChannel } from '@migaia/rpc-core/adapter/internal-advanced'
-import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
-
-const objectMode = ${objectMode}
-const hostMode = ${hostMode}
-const token = crypto.randomUUID()
-const sockets = new Set<Socket>()
-let authenticated = 0
-let invokes = 0
-const server = createServer((socket) => {
-  sockets.add(socket)
-  socket.once('close', () => sockets.delete(socket))
-  const decoder = createJsonRpcFrameDecoder()
-  socket.on('data', (chunk) => {
-    for (const value of decoder.push(chunk as Uint8Array)) {
-      const request = value as { id?: string | number; method: string; params: Record<string, unknown> }
-      let result: unknown
-      if (request.method === 'migaia.hello') {
-        const hello = JSON.parse(request.params.hello as string) as { auth: string; capabilities: string[] }
-        if (hello.auth !== token) { socket.destroy(new Error('invalid responder token')); return }
-        authenticated++
-        result = {
-          reply: JSON.stringify({ kind: 'handshake', step: 'accept', protocol: 'migaia.rpc',
-            major: RpcProtocol.major, minor: RpcProtocol.minor, codec: 'json',
-            capabilities: hello.capabilities, peer: { id: 'foreign-service', runtime: 'node' } }),
-          methods: ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel']
-        }
-      } else if (request.method === 'migaia.describe') {
-        result = { schemaVersion: 2, self: { name: 'foreign', instanceId: 'foreign-service' },
-          methods: [{ name: 'math.add', supportedModes: ['request', 'notify'], modeSource: 'declared' }] }
-      } else if (request.method === 'migaia.invoke') {
-        invokes++
-        result = (request.params.args as number[]).reduce((sum, value) => sum + value, 0)
-      } else if (request.method === 'migaia.cancel') continue
-      else throw new Error('unexpected responder method')
-      if (request.id !== undefined) socket.write(encodeJsonRpcFrame({ jsonrpc: '2.0', id: request.id, result }))
-    }
-  })
-})
-server.listen(0, '127.0.0.1')
-await once(server, 'listening')
-const address = server.address()
-if (!address || typeof address === 'string') throw new Error('missing loopback address')
-const reports: unknown[] = []
-const records: unknown[] = []
-const stderr = new PassThrough()
-const controller = new AbortController()
-const contract = { schemaVersion: 1 as const, plugin: 'foreign', features: {
-  math: { methods: { add: { mode: 'request' as const, idempotent: false } } }
-} }
-const peer = await createProcessPeer<{ math: { add(args: [number, number]): number } }>({
-  self: { name: 'main', instanceId: 'jsonrpc-main' },
-  connect: async ({ self }) => {
-    const options: IProcessJsonRpcChannelOptions = {
-      byte: await dialProcessByteChannel({ address: 'tcp://127.0.0.1:' + address.port }),
-      peerId: 'foreign-service',
-      target: hostMode ? { kind: 'host', catalog: { foreign: contract } } : { kind: 'plugin', contract },
-      offer: { peer: { id: self.instanceId, runtime: 'bun' },
-        versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }], capabilities: [] },
-      token: token, scheduler: systemScheduler, wallClock: systemWallClock,
-      signal: controller.signal, handshakeTimeoutMs: 2500,
-      ipc: { connectionId: 'jsonrpc-loopback', sessionId: 'jsonrpc-session', processId: 'external-responder',
-        maxPendingData: 8, maxPendingControl: 2, log: (record) => { records.push(record) },
-        stderr: (listener) => { stderr.on('data', listener); return () => { stderr.off('data', listener) } }
-      },
-      report: (error) => { reports.push(error) }
-    }
-    return objectMode ? createAdapterJsonRpcChannel(options, {
-      closedError: createProcessChannelClosedError,
-      openConnection: (connection, current) => openProcessObjectChannel(connection, current)
-    }) : createProcessJsonRpcChannel(options)
-  }
-})
-try {
-  stderr.write(new Uint8Array([65, 66]))
-  console.log(await peer.request('math.add', [20, 22]))
-  console.log(authenticated, invokes, records.length > 0, reports.length)
-} finally {
-  await peer.close()
-  stderr.end()
-  for (const socket of sockets) socket.destroy()
-  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
-}
-`
-
-/** Plugin and Host targets select different admitted contract grammars. */
-export const processJsonRpcOptionCases = (objectMode = false): readonly IOptionCaseDoc[] =>
-  [false, true].map((hostMode) => ({
-    title: hostMode
-      ? t('Bridge an approved Host catalog', '桥接已批准的宿主目录')
-      : t('Bridge one approved plugin contract', '桥接一个已批准的插件契约'),
-    problem: hostMode
-      ? t(
-          'A local JSON-RPC responder serves a declared set of plugins. Select host with catalog, retaining the actual byte channel and explicit clocks.',
-          '本地 JSON-RPC 响应端提供声明过的插件集合。选择带目录的宿主目标，保留真实字节通道并显式提供时钟。'
-        )
-      : t(
-          'A local responder implements the Migaia JSON-RPC extensions for one service. Select plugin with contract; an arbitrary JSON-RPC server cannot satisfy this handshake.',
-          '本地响应端为一个服务实现 Migaia JSON-RPC 扩展。选择带契约的插件目标，任意 JSON-RPC 服务不能满足此握手。'
-        ),
-    example: jsonRpcOptionsCode(objectMode, hostMode),
-    result: t(
-      'Output is `42` then `1 1 true 0`: the real loopback responder verifies the generated token, handles one invocation, and produces IPC records without reports. A borrowed application PassThrough supplies stderr bytes; it is not described as an OS stderr source. The object variant opens the actual Core-negotiated connection through Process diagnostics.',
-      '输出为 `42`、`1 1 true 0`：真实回环响应端校验生成的令牌，处理一次调用，生成通信记录且没有上报错误。借用的应用 PassThrough 提供标准错误字节，不声称它来自操作系统标准错误。对象变体通过进程诊断打开核心实际协商所得连接。'
-    ),
-    covers: [
-      'byte',
-      'peerId',
-      'target',
-      'target.kind',
-      hostMode ? 'target.catalog' : 'target.contract',
-      'offer',
-      'token',
-      'scheduler',
-      'wallClock',
-      'signal',
-      'handshakeTimeoutMs',
-      'report',
-      'ipc',
-      'ipc.connectionId',
-      'ipc.sessionId',
-      'ipc.processId',
-      'ipc.maxPendingData',
-      'ipc.maxPendingControl',
-      'ipc.log',
-      'ipc.stderr'
-    ]
-  }))
