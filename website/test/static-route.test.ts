@@ -1389,7 +1389,7 @@ test('shares one library sidebar between guides and API pages', () => {
   const apiHtml = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/api')), 'utf8')
 
   assert.match(html, /class="left-rail-content"/)
-  assert.match(html, /<span>指南<\/span>/)
+  assert.match(html, /<span>场景指南<\/span>/)
   assert.match(html, />API 参考<\/a>/)
   assert.equal(stableLeftRail(html), stableLeftRail(apiHtml))
   assert.match(html, /href="\/zh\/docs\/utils\/api\/function\/onceAsync"/)
@@ -2059,8 +2059,8 @@ test('keeps every module type declaration visible with its code', () => {
 
 test('gives primary tasks independent bilingual pages', () => {
   const expectations = [
-    ['/zh/docs/store-react', '把 Store 状态带进 React', '状态仍由原来的包持有'],
-    ['/en/docs/store-react', 'Bring Store state into React', 'State stays with its owning package'],
+    ['/zh/docs/store-react', '把响应式状态接入 React', '为什么选它'],
+    ['/en/docs/store-react', 'Connect reactive state to React', 'Why choose it'],
     ['/zh/docs/store-react/getting-started', '渲染一个计数按钮', 'Provider 与 Registry 的创建参数'],
     [
       '/en/docs/store-react/getting-started',
@@ -2137,12 +2137,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Isolate server requests and collect cleanup results',
       'Locate calls using the nine public error codes'
     ],
-    ['/zh/docs/store-worker', '把计算交给 Worker 并取回结果', '底层工具'],
-    [
-      '/en/docs/store-worker',
-      'Run computations in a Worker and receive results',
-      'Low-level tools'
-    ],
+    ['/zh/docs/store-worker', '把计算和编解码接到 Worker', '为什么选它'],
+    ['/en/docs/store-worker', 'Connect computation and codecs to a Worker', 'Why choose it'],
     [
       '/zh/docs/store-worker/getting-started',
       '在真实 Worker 中计算购物总价',
@@ -2229,8 +2225,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Workload choices and shutdown order',
       'Choose offloading from the work itself'
     ],
-    ['/zh/docs/store-wasm', '把数值状态保存在 WASM 内存中', '底层工具'],
-    ['/en/docs/store-wasm', 'Store numeric state in WASM memory', 'Low-level tools'],
+    ['/zh/docs/store-wasm', '让固定类型状态存入 WASM 内存', '为什么选它'],
+    ['/en/docs/store-wasm', 'Keep fixed-layout state in WASM memory', 'Why choose it'],
     ['/zh/docs/store-wasm/getting-started', '创建并释放温度字段', '继续选择字段'],
     [
       '/en/docs/store-wasm/getting-started',
@@ -2313,11 +2309,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'When ordinary store fields remain useful',
       'Choose from layout needs'
     ],
-    ['/zh/docs/store-shared', '在线程之间共享整数状态', '共享的是内存，不是 Runtime 对象'],
+    ['/zh/docs/store-shared', 'Store Shared：共享整数，各自同步', '为什么选它'],
     [
       '/en/docs/store-shared',
-      'Share integer state between threads',
-      'Share memory rather than Runtime objects'
+      'Store Shared: shared integers, independent readers',
+      'Why choose it'
     ],
     ['/zh/docs/store-shared/getting-started', '创建一个响应式库存视图', '观察者和共享内存分别管理'],
     [
@@ -2415,8 +2411,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'Recreate shared stock from a trusted snapshot',
       'Identify seven public codes and original host errors'
     ],
-    ['/zh/docs/store-devtools', '查看 Store 怎样变化', '底层工具'],
-    ['/en/docs/store-devtools', 'See how a Store changes', 'Low-level tools'],
+    ['/zh/docs/store-devtools', '查看 Store 的历史、动作与真实依赖关系', '为什么选它'],
+    [
+      '/en/docs/store-devtools',
+      'Inspect Store history, actions and real dependency paths',
+      'Why choose it'
+    ],
     ['/zh/docs/store-devtools/getting-started', '记录修改并恢复购物车数量', 'tools 的全部成员'],
     [
       '/en/docs/store-devtools/getting-started',
@@ -2489,12 +2489,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Diagnostic cost and disposal',
       'Dispose the session and handle failures'
     ],
-    ['/zh/docs/store-ssr', '为每次请求收集页面状态', '创建状态与传输状态'],
-    [
-      '/en/docs/store-ssr',
-      'Collect page state for each request',
-      'Create state and transport state'
-    ],
+    ['/zh/docs/store-ssr', '为每次请求收集页面状态', '为什么选它'],
+    ['/en/docs/store-ssr', 'Collect page state for each request', 'Why choose it'],
     ['/zh/docs/store-ssr/getting-started', '生成第一次请求的状态文本', '返回的作用域可做什么'],
     [
       '/en/docs/store-ssr/getting-started',
@@ -2577,8 +2573,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'Close the request scope after stream output completes',
       'Distinguish the twelve public error codes'
     ],
-    ['/zh/docs/store-persist', '自动保存用户设置与集合', '底层工具'],
-    ['/en/docs/store-persist', 'Automatically save settings and collections', 'Low-level tools'],
+    ['/zh/docs/store-persist', '恢复设置与集合，按顺序保存修改', '为什么选它'],
+    [
+      '/en/docs/store-persist',
+      'Restore settings and collections, then save changes in order',
+      'Why choose it'
+    ],
     ['/zh/docs/store-persist/getting-started', '保存并读回主题设置', '接入应用中的存储'],
     [
       '/en/docs/store-persist/getting-started',
@@ -2647,11 +2647,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Retry, errors, and shutdown',
       'Troubleshooting and adapter tools'
     ],
-    ['/zh/docs/store-middleware', '观察 Store 的操作与状态更新', '各包负责的部分'],
+    ['/zh/docs/store-middleware', '观察 Store 动作并明确写入与清理边界', '为什么选它'],
     [
       '/en/docs/store-middleware',
-      'Observe Store operations and state updates',
-      'Package responsibilities'
+      'Observe Store actions with explicit write and cleanup boundaries',
+      'Why choose it'
     ],
     ['/zh/docs/store-middleware/getting-started', '给计数 Store 接入日志', '绑定返回什么'],
     [
@@ -2725,11 +2725,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Close observation bindings before disposing the Store',
       'Inspect logical closure and physical cleanup'
     ],
-    ['/zh/docs/store-indexed', '按字段和条目观察集合', '按集合形状与读取方式继续'],
+    ['/zh/docs/store-indexed', '只观察视图读取的字段、下标与成员', '为什么选它'],
     [
       '/en/docs/store-indexed',
-      'Observe collection fields and entries',
-      'Continue by collection shape and read behavior'
+      'Observe the fields, positions, and members a view reads',
+      'Why choose it'
     ],
     ['/zh/docs/store-indexed/getting-started', '观察任务列表的第一项', '写入检查、调试名称与释放'],
     [
@@ -2793,11 +2793,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Close a selection list and preserve error sources',
       'Check five public codes and external errors'
     ],
-    ['/zh/docs/store-keyed', '在多个会话中复用状态定义', '从独立状态到列表与清理'],
+    ['/zh/docs/store-keyed', 'Store Keyed：一份状态定义，在每个作用域里各有一份值', '为什么选它'],
     [
       '/en/docs/store-keyed',
-      'Reuse state definitions across sessions',
-      'Continue from scoped values to lists and cleanup'
+      'Store Keyed: one state definition, a separate value in every scope',
+      'Why choose it'
     ],
     ['/zh/docs/store-keyed/getting-started', '订阅购物车小计', '继续查找 AtomStore 成员'],
     [
@@ -2865,11 +2865,15 @@ test('gives primary tasks independent bilingual pages', () => {
       'Release state and cached definitions after a conversation closes',
       'Inspect failures using public codes'
     ],
-    ['/zh/docs/store-light', '让表单和页面对象自动更新', '扩展与诊断工具'],
+    [
+      '/zh/docs/store-light',
+      'Store Light：用普通对象写状态，字段、派生值和方法自动响应',
+      '为什么选它'
+    ],
     [
       '/en/docs/store-light',
-      'Keep forms and page objects reactive',
-      'Extension and diagnostic tools'
+      'Store Light: write state as a plain object, and fields, derived values and methods react',
+      'Why choose it'
     ],
     [
       '/zh/docs/store-light/getting-started',
@@ -2929,8 +2933,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Resource versions and cleanup',
       'Await cleanup and preserve failures'
     ],
-    ['/zh/docs/wasm', 'Wasm：在一块字节内存里处理数据', '底层工具'],
-    ['/en/docs/wasm', 'Wasm: work with data in byte memory', 'Lower-level tools'],
+    ['/zh/docs/wasm', 'Wasm：对齐分配字节，独立读取转码结果', '为什么选它'],
+    ['/en/docs/wasm', 'Wasm: aligned bytes and independent conversion results', 'Why choose it'],
     ['/zh/docs/wasm/getting-started', '快速开始：写入并读取地图坐标', '继续分配时重新创建视图'],
     [
       '/en/docs/wasm/getting-started',
@@ -2987,8 +2991,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Troubleshooting: conversion has no output or a byte view stops working',
       'Investigate unexpected view or release results'
     ],
-    ['/zh/docs/tray', 'Tray：一起启动，也一起释放', '底层工具'],
-    ['/en/docs/tray', 'Tray: start and release an application together', 'Lower-level tools'],
+    ['/zh/docs/tray', 'Tray：就绪后使用，结束时释放', '为什么选它'],
+    ['/en/docs/tray', 'Tray: become ready, run, then release', 'Why choose it'],
     ['/zh/docs/tray/getting-started', '从一个配置值开始', '需要多个插件实例时'],
     [
       '/en/docs/tray/getting-started',
@@ -3121,8 +3125,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'String templates and number formatting',
       'Number formatting'
     ],
-    ['/zh/docs/rpc-core', '跨端点调用业务方法', '底层工具'],
-    ['/en/docs/rpc-core', 'Call application methods across endpoints', 'Lower-level tools'],
+    ['/zh/docs/rpc-core', 'RPC Core：把请求、答复和取消交给同一端点', '为什么选它'],
+    [
+      '/en/docs/rpc-core',
+      'RPC Core: keep requests, replies, and cancellation on one endpoint',
+      'Why choose it'
+    ],
     ['/zh/docs/rpc-core/getting-started', '安装并计算商品小计', '端点返回什么'],
     [
       '/en/docs/rpc-core/getting-started',
@@ -3193,11 +3201,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Reuse business keys and close owned connections',
       'Create a new connection after closure'
     ],
-    ['/zh/docs/storage-web', '保存页面偏好、草稿和离线记录', '底层与扩展工具'],
+    ['/zh/docs/storage-web', '按数据种类保存记录，并明确升级与释放', '为什么选它'],
     [
       '/en/docs/storage-web',
-      'Save preferences, drafts, and offline records',
-      'Lower-level and extension tools'
+      'Store record kinds with explicit upgrades and cleanup',
+      'Why choose it'
     ],
     ['/zh/docs/storage-web/getting-started', '安装并保存第一项设置', '命名空间编解码器'],
     ['/en/docs/storage-web/getting-started', 'Install and save a setting', 'Namespace codec'],
@@ -3257,8 +3265,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Cancellation, errors, and shutdown',
       'Close the accessor and keep persisted data'
     ],
-    ['/zh/docs/logger', 'Logger：按需组合能力的日志库', '内置插件'],
-    ['/en/docs/logger', 'Logger: a logging library you assemble from plugins', 'Built-in plugins'],
+    ['/zh/docs/logger', 'Logger：把结构化日志交给明确的输出端', '内置插件'],
+    ['/en/docs/logger', 'Logger: send structured entries to explicit outputs', 'Built-in plugins'],
     ['/zh/docs/logger/getting-started', '快速开始：第一个 Logger', '常用方法'],
     ['/en/docs/logger/getting-started', 'Quick start: your first Logger', 'Common methods'],
     ['/zh/docs/logger/entries-hooks-and-sinks', 'Entry、Hook 与 Sink', '输出端出错时'],
@@ -3291,11 +3299,11 @@ test('gives primary tasks independent bilingual pages', () => {
     ],
     ['/zh/docs/logger/troubleshooting', '排错与常见问题', '常见错误代码'],
     ['/en/docs/logger/troubleshooting', 'Troubleshooting and FAQ', 'Common error codes'],
-    ['/zh/docs/plugin-host', 'Plugin Host：让你的库可以被插件扩展', 'API 一览'],
+    ['/zh/docs/plugin-host', 'Plugin Host：把安装、依赖和清理交给宿主', '为什么选它'],
     [
       '/en/docs/plugin-host',
-      'Plugin Host: make your library extensible with plugins',
-      'API at a glance'
+      'Plugin Host: own installation, dependencies and cleanup',
+      'Why choose it'
     ],
     ['/zh/docs/plugin-host/getting-started', '快速开始：安装第一个插件', 'defineHost 的选项'],
     [
@@ -3327,11 +3335,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Remove, disable, and replace',
       'Disable: pause without releasing'
     ],
-    ['/zh/docs/capability', 'Capability：让可选功能按需打开和关闭', '底层工具'],
+    ['/zh/docs/capability', 'Capability：让功能启停有归属、依赖有顺序', '为什么选它'],
     [
       '/en/docs/capability',
-      'Capability: open and close optional features on demand',
-      'Lower-level tools'
+      'Capability: owned feature lifetimes and ordered dependencies',
+      'Why choose it'
     ],
     ['/zh/docs/capability/getting-started', '快速开始：打开通知功能，再关闭它', '启用结果与状态'],
     [
@@ -3379,13 +3387,13 @@ test('gives primary tasks independent bilingual pages', () => {
     ],
     [
       '/zh/docs/middleware-pipeline',
-      'Middleware Pipeline：把一次处理拆成按顺序执行的步骤',
-      '一个函数，三个成员'
+      'Middleware Pipeline：复用步骤，并保留各自的执行顺序',
+      '为什么选它'
     ],
     [
       '/en/docs/middleware-pipeline',
-      'Middleware Pipeline: split one operation into ordered stages',
-      'One function, three members'
+      'Middleware Pipeline: reusable steps with explicit execution order',
+      'Why choose it'
     ],
     [
       '/zh/docs/middleware-pipeline/getting-started',
@@ -3427,11 +3435,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Cancel a run and handle errors',
       'Two errors at once'
     ],
-    ['/zh/docs/resource', 'Resource：会随输入自动刷新、可取消的异步数据', 'API 一览'],
+    ['/zh/docs/resource', 'Resource：会随输入自动刷新、可取消的异步数据', '为什么选它'],
     [
       '/en/docs/resource',
       'Resource: async data that refreshes with its inputs and can be cancelled',
-      'API at a glance'
+      'Why choose it'
     ],
     ['/zh/docs/resource/getting-started', '快速开始：加载一个用户', '构造选项'],
     ['/en/docs/resource/getting-started', 'Quick start: load a user', 'Constructor options'],
@@ -3461,7 +3469,7 @@ test('gives primary tasks independent bilingual pages', () => {
     ['/en/docs/reactive/runtime', 'Runtime and scheduling', 'Give each context its own Runtime'],
     ['/zh/docs/reactive/troubleshooting', '排错与常见问题', '错误代码'],
     ['/en/docs/reactive/troubleshooting', 'Troubleshooting and FAQ', 'Error codes'],
-    ['/zh/docs/event-subscriber', 'Event Subscriber：通知所有关心这件事的模块', 'API 一览'],
+    ['/zh/docs/event-subscriber', 'Event Subscriber：订阅有归属，通知有顺序', '为什么选它'],
     [
       '/zh/docs/event-subscriber/getting-started',
       '快速开始：第一次订阅和发布',
@@ -3469,8 +3477,8 @@ test('gives primary tasks independent bilingual pages', () => {
     ],
     [
       '/en/docs/event-subscriber',
-      'Event Subscriber: notify every module that cares',
-      'API at a glance'
+      'Event Subscriber: owned subscriptions and predictable delivery',
+      'Why choose it'
     ],
     [
       '/en/docs/event-subscriber/getting-started',
@@ -3583,11 +3591,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Troubleshooting: unreleased resources or shutdown waits',
       'Error codes'
     ],
-    ['/zh/docs/serialize', 'Serialize：保存数据时，保留它的格式', '底层工具'],
+    ['/zh/docs/serialize', 'Serialize：选择格式，明确数据与分片边界', '为什么选它'],
     [
       '/en/docs/serialize',
-      'Serialize: keep the format with the data you save',
-      'Lower-level tools'
+      'Serialize: explicit formats, values and slice boundaries',
+      'Why choose it'
     ],
     [
       '/zh/docs/serialize/getting-started',
@@ -3793,11 +3801,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Stop accepting work and shut down after parent loss',
       'Keep shutdown and exit callbacks separate'
     ],
-    ['/zh/docs/storage-contract', '让业务接入不同存储', '后端实现者使用的工具'],
+    ['/zh/docs/storage-contract', '在存储边界固定输入与错误语义', '为什么选它'],
     [
       '/en/docs/storage-contract',
-      'Use different stores from application code',
-      'Tools for backend implementations'
+      'Capture inputs and failures at storage boundaries',
+      'Why choose it'
     ],
     ['/zh/docs/storage-contract/getting-started', '安装并保存第一项偏好', '字符串存储的完整方法'],
     [
@@ -3847,8 +3855,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'Codecs and troubleshooting',
       'Binary and diagnostic helpers'
     ],
-    ['/zh/docs/rpc-contract', '让两端按同一种格式交换数据', '底层工具'],
-    ['/en/docs/rpc-contract', 'Use the same data format on both sides', 'Lower-level tools'],
+    ['/zh/docs/rpc-contract', 'RPC Contract：确定线上数据与接收边界', '为什么选它'],
+    [
+      '/en/docs/rpc-contract',
+      'RPC Contract: define wire data and receiving boundaries',
+      'Why choose it'
+    ],
     ['/zh/docs/rpc-contract/getting-started', '安装并检查库存查询消息', '把检查后的值交给连接层'],
     [
       '/en/docs/rpc-contract/getting-started',
@@ -3941,12 +3953,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Preserve binary data and verify integrity',
       'Let the host inspect native wrappers before restore'
     ],
-    ['/zh/docs/rpc-process', '在子进程计算业务结果', '底层工具'],
-    [
-      '/en/docs/rpc-process',
-      'Calculate application results in a child process',
-      'Lower-level tools'
-    ],
+    ['/zh/docs/rpc-process', '调用另一个进程中的函数，并明确谁负责关闭它', '为什么选它'],
+    ['/en/docs/rpc-process', 'Call another process and keep its owner explicit', 'Why choose it'],
     ['/zh/docs/rpc-process/getting-started', '安装并启动价格服务', 'Peer 创建选项'],
     [
       '/en/docs/rpc-process/getting-started',
@@ -4015,8 +4023,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'Separate business failures from host diagnostics',
       'Check observable configuration differences first'
     ],
-    ['/zh/docs/rpc-threads', '在线程中计算业务结果', '底层工具'],
-    ['/en/docs/rpc-threads', 'Calculate application results in a Worker', 'Lower-level tools'],
+    ['/zh/docs/rpc-threads', '把计算移出主线程，并明确谁负责关闭 Worker', '为什么选它'],
+    [
+      '/en/docs/rpc-threads',
+      'Move work off the main thread and keep its Worker owner explicit',
+      'Why choose it'
+    ],
     ['/zh/docs/rpc-threads/getting-started', '安装并启动价格 Worker', 'Peer 创建选项'],
     [
       '/en/docs/rpc-threads/getting-started',
@@ -4075,8 +4087,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Separate business errors from Worker resource failures',
       'Check entry selection and cleanup by symptom'
     ],
-    ['/zh/docs/rpc-browser', '从页面调用 iframe 的业务方法', '底层工具'],
-    ['/en/docs/rpc-browser', 'Call iframe methods from a page', 'Lower-level tools'],
+    ['/zh/docs/rpc-browser', '把浏览器原生载体接成可调用连接', '为什么选它'],
+    ['/en/docs/rpc-browser', 'Connect browser carriers to callable peers', 'Why choose it'],
     ['/zh/docs/rpc-browser/getting-started', '安装并连接价格 iframe', 'Peer 创建选项'],
     [
       '/en/docs/rpc-browser/getting-started',
@@ -4135,8 +4147,8 @@ test('gives primary tasks independent bilingual pages', () => {
       'Separate business errors, decoding failures, and carrier closure',
       'Check source selection and cleanup responsibility'
     ],
-    ['/zh/docs/rpc-devtools', '查看真实 RPC 调用留下的事件', '底层工具'],
-    ['/en/docs/rpc-devtools', 'Inspect events from real RPC calls', 'Lower-level tools'],
+    ['/zh/docs/rpc-devtools', '把 RPC 观察变成可查询的诊断数据', '为什么选它'],
+    ['/en/docs/rpc-devtools', 'Turn RPC observations into queryable diagnostics', 'Why choose it'],
     ['/zh/docs/rpc-devtools/getting-started', '安装并查看价格 RPC', '创建采集器的全部选项'],
     [
       '/en/docs/rpc-devtools/getting-started',
@@ -4189,8 +4201,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'Distinguish uncaptured content from missing events',
       'Check retention and time baselines'
     ],
-    ['/zh/docs/rpc-pool', '把订单计算分配给 Worker', '池与 Peer 各自负责什么'],
-    ['/en/docs/rpc-pool', 'Assign order calculations to Workers', 'What the pool and Peers manage'],
+    ['/zh/docs/rpc-pool', '为线程与进程调用设置容量和等待上限', '为什么选它'],
+    [
+      '/en/docs/rpc-pool',
+      'Set capacity and waiting limits for Thread and Process calls',
+      'Why choose it'
+    ],
     ['/zh/docs/rpc-pool/getting-started', '启动处理订单的线程池', '公开类型对应到哪里'],
     [
       '/en/docs/rpc-pool/getting-started',
@@ -4586,8 +4602,8 @@ test('gives primary tasks independent bilingual pages', () => {
   for (const locale of ['zh', 'en']) {
     /** The rendered overview must expose both API groups and actual local reference links. */
     const home = readFileSync(join(buildRoot, artifactPath(`/${locale}/docs/lifecycle`)), 'utf8')
-    assert.ok(home.includes(locale === 'zh' ? '常用 API' : 'Everyday APIs'))
-    assert.ok(home.includes(locale === 'zh' ? '底层工具' : 'Lower-level tools'))
+    assert.ok(home.includes(locale === 'zh' ? '常用 API' : 'Essentials'))
+    assert.ok(home.includes(locale === 'zh' ? '全部 API' : 'All APIs'))
     assert.ok(
       home.includes(`href="/${locale}/docs/lifecycle/api/disposal/executeReleaseDescriptor"`)
     )
@@ -4822,7 +4838,7 @@ test('keeps guide topics, primary endpoints, and plugins in one rail', () => {
     const path = `/${locale}/docs/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     const rail = stableLeftRail(page)
-    assert.ok(rail.includes(locale === 'zh' ? '<span>指南</span>' : '<span>Guides</span>'))
+    assert.ok(rail.includes(locale === 'zh' ? '<span>场景指南</span>' : '<span>Guides</span>'))
     assert.ok(rail.includes(locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'))
     assert.ok(rail.includes(locale === 'zh' ? '中间件插件' : 'Middleware plugins'))
     assert.match(rail, />connect<\/a>/)
