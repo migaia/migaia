@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-pool",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "private": true,
   "description": "Thread and process pools composed from public RPC peers.",
   "license": "MIT",
