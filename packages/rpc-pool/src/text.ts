@@ -14,11 +14,15 @@ export const RpcPoolText = {
 
 /** Pool lifecycle describes client dispatch only, independently of native supervision state. */
 export const RpcPoolState = {
+  /** New calls and resizes may be admitted; member availability is tracked separately. */
   open: 'open',
+  /** New admission is fenced while accepted operations and member cleanup drain. */
   closing: 'closing',
+  /** Member cleanup has completed, including completion that rejects with retained failures. */
   closed: 'closed'
 } as const
 
+/** Public pool admission phases, independent of Thread/Process native lifecycle values. */
 export type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState]
 
 /** The bounded FIFO default counts waiting operations, excluding occupied member slots. */
