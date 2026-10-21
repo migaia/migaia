@@ -20033,32 +20033,32 @@
     },
     {
       "from": "/en/docs/micro-hub/api",
-      "to": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--resource-const",
       "type": "api-symbol"
     },
     {
-      "from": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "from": "/en/docs/micro-hub/api#micro-hub-index--resource-const",
       "to": "/en/docs/micro-hub/api",
       "type": "symbol-api"
     },
     {
-      "from": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "from": "/en/docs/micro-hub/api#micro-hub-index--resource-const",
       "to": "/en/docs/micro-hub/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/en/docs/micro-hub/getting-started",
-      "to": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--resource-const",
       "type": "guide-symbol"
     },
     {
-      "from": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "from": "/en/docs/micro-hub/api#micro-hub-index--resource-const",
       "to": "/en/docs/micro-hub",
       "type": "symbol-architecture"
     },
     {
       "from": "/en/docs/micro-hub",
-      "to": "/en/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/en/docs/micro-hub/api#micro-hub-index--resource-const",
       "type": "architecture-symbol"
     },
     {
@@ -21373,32 +21373,32 @@
     },
     {
       "from": "/zh/docs/micro-hub/api",
-      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource-const",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource-const",
       "to": "/zh/docs/micro-hub/api",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource-const",
       "to": "/zh/docs/micro-hub/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/docs/micro-hub/getting-started",
-      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource-const",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "from": "/zh/docs/micro-hub/api#micro-hub-index--resource-const",
       "to": "/zh/docs/micro-hub",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/docs/micro-hub",
-      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource",
+      "to": "/zh/docs/micro-hub/api#micro-hub-index--resource-const",
       "type": "architecture-symbol"
     },
     {

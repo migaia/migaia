@@ -3027,7 +3027,8 @@
               "descriptionZh": "参数：`runtime` 和 `length` 必填，本例长度 `2`；`options` 默认 `{}`，`initialValues` 可选、无默认，本例初始化为 `[10, 20]`。`get/set/update` 的 `index` 必填；`update` 的纯 updater 必填。`schedulerStrategy` 是 reactive 的运行时调度选项。"
             }
           ],
-          "fragment": "store-shared-index--sharedInt32Array-const"
+          "fragment": "store-shared-index--sharedInt32Array-const",
+          "routeSlug": "sharedInt32Array-const"
         },
         {
           "name": "SharedInt32Array",
@@ -3380,7 +3381,8 @@
               "descriptionZh": "参数：类构造的 `runtime` 和 `length` 必填，`options` 默认 `{}`；本例 `initialValues: [7]` 只在新内存生效。`update(index, updater)` 两参数均必填，回调输入为当前值，返回 int32；竞争时回调可重试，失败时保留原错。"
             }
           ],
-          "fragment": "store-shared-index--SharedInt32Array-class"
+          "fragment": "store-shared-index--SharedInt32Array-class",
+          "routeSlug": "SharedInt32Array-class"
         },
         {
           "name": "SharedInt32Signal",

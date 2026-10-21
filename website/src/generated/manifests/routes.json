@@ -2331,6 +2331,12 @@
       "library": "micro-hub"
     },
     {
+      "path": "/en/docs/micro-hub/api/resource-const",
+      "locale": "en",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
       "path": "/en/docs/micro-hub/api/resource/resources",
       "locale": "en",
       "domain": "docs",
@@ -18862,6 +18868,12 @@
     },
     {
       "path": "/zh/docs/micro-hub/api/resource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "micro-hub"
+    },
+    {
+      "path": "/zh/docs/micro-hub/api/resource-const",
       "locale": "zh",
       "domain": "docs",
       "library": "micro-hub"
