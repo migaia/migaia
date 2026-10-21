@@ -11,78 +11,130 @@ import { PersistState } from '../state-constants.js'
  * from `persistKeyed()` implement this contract. All use the same `persistUnit()` engine.
  */
 export type IPersistUnit<TState> = {
-  /** Reads the current persistable state synchronously. */
+  /** Reads current state synchronously, including once at attachment for the hydration baseline. */
   snapshot(): TState
-  /** Restores state synchronously during hydration. */
+  /** Restores reconciled state synchronously; the unit owns validation and any partial effects. */
   restore(state: TState): void
-  /** Registers change notifications and returns an unsubscribe function. */
+  /** Registers change notifications; the persistence handle owns the returned unsubscribe only. */
   subscribe(onChange: () => void): IDisposer
 }
 
+/** Combined lifecycle view: loading, ready, hydration/write error, or terminal disposal. */
 export type IPersistStatus =
   | typeof PersistState.loading
   | typeof PersistState.ready
   | typeof PersistState.error
   | typeof PersistState.disposed
+/** Latest hydration attempt's phase; disposal does not add a separate hydration phase. */
 export type IHydrationStatus =
   | typeof PersistState.loading
   | typeof PersistState.success
   | typeof PersistState.error
+/** Write/removal phase, independent of hydration; disposal takes precedence over late completion. */
 export type IWriteStatus =
   | typeof PersistState.idle
   | typeof PersistState.writing
   | typeof PersistState.error
   | typeof PersistState.disposed
 
+/** Read-only access to a Runtime signal without exposing its writable member in this contract. */
 export type IReadonlyPersistValue<T> = {
+  /** Current value; read inside a reactive observer to establish the underlying dependency. */
   readonly value: T
 }
 
+/**
+ * Controls one archive and exposes hydration and write outcomes separately. The handle owns its
+ * subscription, debounce timer and operation controllers, not the unit, storage or Runtime.
+ */
 export type IPersistHandle = {
+  /** Disposed first, then loading/error, otherwise ready; ready also permits an in-flight write. */
   status: IReactiveComputed<IPersistStatus>
+  /** Latest hydration/write error, combining both in an AggregateError when both are present. */
   error: IReactiveComputed<unknown>
+  /** Whether the latest hydration attempt succeeded; disposal does not reset this result. */
   hydrated: IReactiveComputed<boolean>
+  /** Loading/success/error for hydration; a retry starts a new loading phase. */
   hydrationStatus: IReadonlyPersistValue<IHydrationStatus>
+  /** Hydration failure retained until another attempt starts; undefined initially and on success. */
   hydrationError: IReadonlyPersistValue<unknown>
+  /** Idle/writing/error/disposed for serialized writes and removals. */
   writeStatus: IReadonlyPersistValue<IWriteStatus>
+  /** Latest write failure, cleared by successful active writes; final disposal writes may update it. */
   writeError: IReadonlyPersistValue<unknown>
-  /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */
+  /** Initial hydration attempt only; rejects on failure/cancellation and is not replaced by retry. */
   ready: Promise<void>
-  /** Resolves after hydration, whether it succeeds or fails. */
+  /** Always resolves after the initial ready attempt settles, including failure or cancellation. */
   settled: Promise<void>
-  /** Reads the archive again after failure. Only successful hydration reopens the write gate. */
+  /**
+   * Starts another read when hydration has failed, without starting duplicate recovery reads. Await
+   * the invocation that starts recovery before resuming explicit writes; concurrent calls need not
+   * share its wait. The original ready/settled promises retain their initial results.
+   */
   retryHydrate(): Promise<void>
   /**
-   * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with
-   * `AbortError`.
+   * Cancels debounce, waits for initial hydration and an observed in-flight write, then requests a
+   * current snapshot write. Hydration/write failures reject; disposal is AbortError cancellation.
+   * Completion depends on the adapter settling even when it ignores cancellation.
    */
   flush(): Promise<void>
-  /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */
+  /**
+   * Cancels debounce and queues archive removal after initial hydration and earlier writes. Does
+   * not reset memory or disable future writes; hydration/removal failures reject.
+   */
   clear(): Promise<void>
+  /** Terminal marker set synchronously by dispose, including while adapter work is still pending. */
   readonly disposed: boolean
+  /**
+   * Idempotently stops scheduling and aborts active operations without awaiting them. A pending
+   * debounce snapshots one final unawaited write; inspect writeError for failure. Unsubscribe
+   * failures can throw after the handle is already terminal; borrowed resources remain owned by
+   * their caller.
+   */
   dispose(): void
 }
 
+/**
+ * Configuration for one borrowed unit and archive; synchronous transform callbacks must not return
+ * thenables.
+ */
 export type IPersistUnitOptions<TState> = {
+  /** Required archive identity passed unchanged to storage; any string is accepted. */
   key: string
   /**
    * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep
    * them in one graph.
    */
   runtime: IRuntime
+  /** Borrowed text-capable adapter; binary routing additionally uses its byte capabilities/methods. */
   storage: IPersistStorage
   /**
    * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize
-   * on the state type.
+   * on the state type. Defaults to defaultJsonCodec; structured output is unsupported for writes.
    */
   codec?: ICodec
+  /** Archive schema version, default 0; must be a nonnegative safe integer. */
   version?: number
+  /**
+   * Synchronously transforms a different archived version; absence makes a version mismatch fail
+   * hydration.
+   */
   migrate?: (persisted: TState, fromVersion: number) => TState
+  /** Synchronously selects state for each write, default identity; does not change in-memory state. */
   partialize?: (state: TState) => Partial<TState>
+  /**
+   * Synchronously reconciles an archive with current state. Default plain-object merging preserves
+   * fields changed since the attachment snapshot; other shapes use archived replacement. Supply a
+   * shape-specific merge when storing only part of an array, Map, Set or custom state.
+   */
   merge?: (persisted: Partial<TState>, current: TState) => TState
-  /** Quiet interval before enqueueing a write; zero writes without debounce. */
+  /** Quiet interval before enqueueing a write, default 0; finite range 0 through 2147483647 ms. */
   debounceMs?: number
-  /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */
+  /**
+   * Optional maximum from a window's first post-hydration change; same finite range as debounceMs.
+   * Omitted means no maximum; zero schedules a zero-delay task when debounce is enabled. Does not
+   * bound queue or adapter latency, and has no timer effect when debounceMs is zero.
+   */
   maxWaitMs?: number
   /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */
   scheduler?: IScheduler
@@ -99,7 +151,9 @@ export type IPersistStorage = Pick<
   IKeyValueStore,
   'capabilities' | 'get' | 'set' | 'remove' | 'keys'
 > & {
+  /** Optional byte read paired with setBytes when capabilities.binary enables the binary route. */
   readonly getBytes?: IRecordStore['getBytes']
+  /** Optional byte write paired with getBytes; text-only storage need not implement either method. */
   readonly setBytes?: IRecordStore['setBytes']
 }
 

@@ -102,6 +102,13 @@ function mergePersistedPlainState<TState>(
  * `persist()`, `persistCollection()`, and `persistKeyed()` adapt their native APIs to
  * `IPersistUnit` and call this engine. Debouncing, disposal, and hydration races are implemented
  * here once.
+ *
+ * Returns a handle synchronously and starts the first read immediately; await ready before
+ * depending on restored state. A failed read/restore blocks scheduled writes until recovery.
+ * Writes/removals are serialized, while transform and unit callbacks remain synchronous and may
+ * fail through their owning boundary. Invalid configuration throws before subscription; later
+ * hydration/write failures are exposed by the handle's promises and error values. Storage, unit and
+ * Runtime are borrowed; dispose stops this attachment rather than disposing those resources.
  */
 export function persistUnit<TState>(
   unit: IPersistUnit<TState>,
@@ -473,7 +480,7 @@ export function persistUnit<TState>(
         try {
           const current = unit.snapshot()
           const reconciled =
-            options.merge === undefined
+            extracted.merge === undefined
               ? mergePersistedPlainState(state, current, hydrationStartSnapshot)
               : assertSynchronousCallbackResult(key, 'merge', merge(state, current))
           unit.restore(reconciled)

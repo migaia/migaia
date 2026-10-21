@@ -3,14 +3,21 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StorePersistErrorCode, type IStorePersistErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/**
+ * Source stamped on locally constructed errors; forwarded unit/codec/adapter failures keep their
+ * owner.
+ */
 export const STORE_PERSIST_SOURCE = '@migaia/store-persist'
 
 function tagStorePersistError<E extends Error>(error: E, code: IStorePersistErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_PERSIST_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Constructs a tagged native Error for an explicit code/message without rewriting its stack. A
+ * defined options.cause is retained by identity; this creates a new error rather than tagging an
+ * existing exception. Ordinary persistence users usually inspect handle outcomes instead.
+ */
 export function createStorePersistError(
   code: IStorePersistErrorCode,
   message: string,
@@ -23,7 +30,11 @@ export function createStorePersistError(
   return tagStorePersistError(error, code)
 }
 
-/** Builds a tagged native DOMException for cancellation after disposal. */
+/**
+ * Constructs a tagged native DOMException named AbortError for cancellation after disposal. A
+ * defined cause is attached by identity; the declared return type is Error, while runtime callers
+ * can still recognize DOMException and its native stack.
+ */
 export function createStorePersistAbortError(
   code: IStorePersistErrorCode,
   message: string,
@@ -35,7 +46,7 @@ export function createStorePersistAbortError(
   return tagStorePersistError(error, code)
 }
 
-/** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
+/** Constructs a tagged native TypeError, retaining a defined cause without rewriting either stack. */
 export function createStorePersistTypeError(
   code: IStorePersistErrorCode,
   message: string,
@@ -48,7 +59,11 @@ export function createStorePersistTypeError(
   return tagStorePersistError(error, code)
 }
 
-/** Builds a `(source, code)`-tagged `AggregateError`, preserving `errors[]` as a cause path. */
+/**
+ * Constructs a tagged native AggregateError retaining supplied failure order and identities in
+ * errors. Use for combined failures; no deduplication or replacement of the original errors
+ * occurs.
+ */
 export function createStorePersistAggregateError(
   code: IStorePersistErrorCode,
   errors: readonly unknown[],

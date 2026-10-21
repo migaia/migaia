@@ -33,7 +33,11 @@ function legacyReviver(_key: string, value: unknown): unknown {
 /**
  * Provides the default JSON codec with round-trip support for `Map` and `Set`. It delegates to
  * `storage-contract`'s `collectionsJsonCodec` and also reads legacy collection tags. The package
- * does not depend on concrete `@migaia/storage-web` values.
+ * does not depend on concrete `@migaia/storage-web` values. Encodes the whole supplied value rather
+ * than validating an envelope. Encoding failures reject with ENCODE_FAILED and cause; non-string or
+ * invalid decoding rejects with ENVELOPE_INVALID. Exact sole-marker legacy records occupy reserved
+ * shapes; lookalikes with extra fields remain application data. A legacy archive is decoded on its
+ * legacy path without reinterpreting its ordinary arrays as new collection tuples.
  */
 export const defaultJsonCodec: ICodec = Object.freeze({
   name: COLLECTIONS_JSON_CODEC_NAME,
@@ -93,6 +97,13 @@ function assertBinaryCapable(storage: IPersistStorage): asserts storage is IPers
   }
 }
 
+/**
+ * Encodes a supplied value and writes one key, forwarding the required context and optional signal.
+ * Structured output is rejected before encoding. Binary output with capabilities.binary uses
+ * getBytes/setBytes support and requires an intrinsic Uint8Array; other routes require a string for
+ * storage.set. No base64 conversion or envelope validation is added. Capability/output mismatches
+ * reject locally; codec and adapter failures otherwise propagate from their owners.
+ */
 export async function writeEnvelope(
   storage: IPersistStorage,
   key: string,
@@ -127,6 +138,14 @@ export async function writeEnvelope(
   await storage.set(key, encoded, ctx)
 }
 
+/**
+ * Reads and decodes one archive; a null storage miss skips decoding and returns undefined.
+ * Otherwise it returns the codec's decoded value unchanged. Binary output requires
+ * capabilities.binary and both byte methods; otherwise it rejects with a capability/output
+ * mismatch. Other outputs read the text route, including structured codecs whose writes this
+ * package rejects. Forwards context/signal unchanged; does not validate the decoded envelope or try
+ * a second channel when a key is absent. Owner failures propagate.
+ */
 export async function readEnvelope(
   storage: IPersistStorage,
   key: string,
@@ -150,6 +169,10 @@ export async function readEnvelope(
   return codec.decode(text, ctx)
 }
 
+/**
+ * Delegates removal of one key to borrowed storage with the supplied context/signal. Resolves after
+ * storage.remove settles, propagating its failure; does not change any in-memory unit.
+ */
 export async function removeEnvelope(
   storage: IPersistStorage,
   key: string,

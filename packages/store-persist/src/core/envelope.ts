@@ -5,11 +5,19 @@
  * maintain separate text and byte locations for one key or resolve channel conflicts by revision.
  */
 export type IEnvelope<TState> = {
+  /** Nonnegative safe schema version used to choose whether migration is necessary. */
   version: number
+  /**
+   * Decoded archive payload; assertEnvelope rejects null and undefined but accepts other falsy
+   * values.
+   */
   state: TState
 }
 
-/** Native validation error retaining inaccessible input-property failures through cause. */
+/**
+ * Tagged TypeError for invalid archive shape/version/state, retaining reflective failures through
+ * cause.
+ */
 export class PersistEnvelopeError extends TypeError {
   /** Preserves the invalid-envelope identity while keeping an original reflective failure reachable. */
   constructor(message: string, options?: { readonly cause?: unknown }) {
@@ -26,7 +34,13 @@ import { STORE_PERSIST_SOURCE } from '../errors.js'
 import { StorePersistErrorCode } from '../error-code.js'
 import { StorePersistErrorText } from '../error-text.js'
 
-/** Validates one captured version/state pair and contains unknown-input reflection failures. */
+/**
+ * Validates one decoded archive and returns a new version/state pair without cloning its state. Use
+ * before restoration: version must be a nonnegative safe integer and state must be present and
+ * non-nullish. Reads each accepted property once, including inherited properties; key only
+ * identifies diagnostics. Invalid shape or failed reflection throws PersistEnvelopeError with any
+ * underlying failure on cause. This is not application-state schema validation.
+ */
 export function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState> {
   try {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {

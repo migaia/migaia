@@ -11,26 +11,40 @@ import { snapshotPersistOptions } from '../core/options.js'
 
 /**
  * Supports the four `store-indexed` collections through snapshots and whole-state replacement.
- * `snapshot()` tracks a structural signal, so `runtime.effect()` observes structural changes.
- * `replace(state)` atomically replaces the complete state. `ObservableMap` and `ObservableSet` add
- * the same replacement capability already available on `ObservableObject` and `ObservableArray`.
+ * Reading `snapshot()` establishes the dependencies observed by the adapter's Runtime effect.
+ * Restoration delegates whole-state replacement to the collection; the collection owns its
+ * validation and mutation guarantees rather than this structural contract adding rollback.
  */
 export type IPersistableCollection<TState> = {
+  /** Borrowed graph owner for the subscription effect and persistence status values. */
   readonly runtime: IRuntime
+  /** Synchronously reads state and establishes the collection's reactive snapshot dependencies. */
   snapshot(): TState
+  /** Restores a reconciled archive using the collection's own replacement semantics. */
   replace(state: TState): void
 }
 
+/** Whole-collection attachment options with optional shape-specific write projection and merge. */
 export type IPersistCollectionOptions<TState> = Pick<
   IPersistUnitOptions<TState>,
   'debounceMs' | 'maxWaitMs' | 'scheduler'
 > & {
+  /** Required archive key passed unchanged to storage. */
   key: string
+  /** Borrowed text-capable storage with optional binary operations. */
   storage: IPersistStorage
+  /** Complete envelope codec, default defaultJsonCodec, including Map/Set round trips. */
   codec?: ICodec
+  /** Nonnegative safe archive version, default 0. */
   version?: number
+  /** Synchronously converts a mismatched archive version; absence rejects that hydration. */
   migrate?: (persisted: TState, fromVersion: number) => TState
+  /** Synchronous write projection, default identity; pair partial non-object shapes with merge. */
   partialize?: (state: TState) => Partial<TState>
+  /**
+   * Synchronous reconciliation, default attachment-baseline merge for plain objects and archive
+   * replacement for arrays, Maps, Sets and other shapes. Return a complete replacement state.
+   */
   merge?: (persisted: Partial<TState>, current: TState) => TState
 }
 
@@ -56,9 +70,14 @@ function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPer
   }
 }
 
-// Each collection provides its own `snapshot()` and `replace()` types and structurally satisfies `IPersistableCollection`.
-// TypeScript infers the state type from the collection instead of requiring overloads for each collection.
-// This avoids overload and implementation signature mismatches.
+/**
+ * Persists one collection through snapshot/replace, inferring its state type from that boundary.
+ * Copies options once and owns an effect that skips its initial dependency-tracking run, then
+ * requests writes on later changes. Returns the shared handle immediately; await ready for
+ * restoration and flush for completed writes. Invalid configuration throws; asynchronous failures
+ * remain on the handle. Disposal removes this effect without disposing collection, Runtime or
+ * storage.
+ */
 export function persistCollection<TState>(
   collection: IPersistableCollection<TState>,
   options: IPersistCollectionOptions<TState>
