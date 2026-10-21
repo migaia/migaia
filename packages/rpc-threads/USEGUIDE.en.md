@@ -396,7 +396,7 @@ Threads share a process and do not replace separate process permissions or fault
 
 Install both Core and Contract peer dependencies explicitly. The package does not enforce a hardcoded equality between their version numbers. lifecycle, supervision, and utils are runtime dependencies. The Electron-main entry additionally uses the optional peer `electron: ^44.0.0`. Install PluginHost or utils directly when an example imports them.
 
-Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol.
+Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol.
 
 ### Peer sources, typing, and calls
 
@@ -489,11 +489,12 @@ In a Peer connect callback, pass context.capabilities to the channel and start b
 
 A full IRuntimeThreadSpawn requires spec, launcher, budget, scheduler, channelFactory, and report; health, supervisor, keyFactory, and retryPort are optional. It does not inherit the short syntax's isolation override: omitting supervisor.isolation leaves supervision's required default. spec.entry is a Node absolute path / file URL or a Web absolute module URL; spec.name / data / limits are optional. heapBytes and callWallTimeMs are positive limits. The former maps to Node Worker's maxOldGenerationSizeMb, while the latter caps a call deadline; neither is a whole-process memory or CPU quota.
 
-| Platform                               | Launcher / channel factory   | Native capability                                                                                         |
-| -------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Node                                   | The two node-entry factories | termination, exit-observation, and heap-limit are enforced; only a real exit settles exited.              |
-| Bun, Deno, browsers, Electron renderer | The root Web factories       | All three are unsupported; a terminate request supplies no actual-exit receipt.                           |
-| Electron main                          | The electron-main factories  | Reuse worker_threads but explicitly retain all three as unsupported; Node evidence is not Electron proof. |
+| Platform                          | Launcher / channel factory   | Native capability                                                                                         |
+| --------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Node                              | The two node-entry factories | termination, exit-observation, and heap-limit are enforced; only a real exit settles exited.              |
+| Bun                               | The two node-entry factories | termination and exit-observation are enforced; heap-limit remains unsupported.                            |
+| Deno, browsers, Electron renderer | The root Web factories       | All three are unsupported; a terminate request supplies no actual-exit receipt.                           |
+| Electron main                     | The electron-main factories  | Reuse worker_threads but explicitly retain all three as unsupported; Node evidence is not Electron proof. |
 
 The Web launcher requires report and accepts a Worker constructor, defaulting to global Worker, plus optional runtimeApi. Its constructor receives entry and `{ type: 'module', name }`. Node launcher options default to an empty object and accept execArgv / runtimeApi; advanced createAdapterNodeThreadLauncher also takes a real runtime resource. Host capabilities are acquired only when a launch occurs. Node sampleUsage is a cold query for this isolate's available heap, CPU microseconds, and ELU. sharedPid is identity only; unavailable native methods leave fields absent, and an exited Worker returns an empty object rather than borrowing parent-process totals.
 
@@ -503,7 +504,7 @@ When construction or opening fails, launcher / supervision ownership releases ac
 
 AdapterNodeThreadParentChannel retains the real parentPort without adding listeners until open selects the fixed profile. createAdapterNodeThreadPeer receives an already held parentPort and original workerData. A runtime resource loads the real Worker module; its pid identifies the shared process. receiveThreadData consumes the matching initial bootstrap, removes its listener, awaits prepare(data, peerId), sends ready, and returns portable business data. readThreadBootstrap validates and extracts peerId / data. These helpers do not authorize arbitrary external Workers.
 
-New adapters reuse defineMessageAdapter from the [Core adapter SDK](../rpc-core/USEGUIDE.en.md); complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. This delivery's runnable examples establish Node Worker / MessagePort behavior only; they do not establish browser, Bun, Deno, or Electron permissions and exit behavior.
+New adapters reuse defineMessageAdapter from the [Core adapter SDK](../rpc-core/USEGUIDE.en.md); complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities.
 
 ### Carrier observation
 

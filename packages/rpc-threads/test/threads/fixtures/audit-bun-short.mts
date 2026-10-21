@@ -1,4 +1,5 @@
-import { createThreadPeer, createWebThreadChannelFactory, isThreadChild } from '@migaia/rpc-threads'
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
@@ -11,15 +12,18 @@ if (await isThreadChild()) {
   const requested = Object.values(RpcCapability).filter(
     (capability) => capability !== RpcCapability.stream
   )
-  /** The canonical Web channel factory receives the actual launcher-created handle. */
-  const factory = createWebThreadChannelFactory({
+  /** The canonical native channel factory receives the actual launcher-created handle. */
+  const factory = createNodeThreadChannelFactory({
     scheduler: systemScheduler,
     capabilities: requested
   })
   /** Record only the public result of real bilateral ACK negotiation. */
   let observed: readonly string[] | undefined
+  /** Preserve every cleanup diagnostic so successful business output cannot hide a reap failure. */
+  const diagnostics: unknown[] = []
   /** The ordinary public URL form supplies neither a fake health policy nor a private source. */
   const peer = await createThreadPeer<{ echo(value: string): string }>({
+    report: (error) => diagnostics.push(error),
     spawn: policy
       ? {
           entry: new URL(import.meta.url),
@@ -36,21 +40,29 @@ if (await isThreadChild()) {
         }
       : new URL(import.meta.url)
   })
+  /** Keep the business result until the owned execution has actually closed. */
+  let value: string
   try {
-    console.log(
-      JSON.stringify({
-        value: await peer.request('echo', 'actual-bun-worker'),
-        ...(policy
-          ? {
-              requestedStream: requested.includes(
-                RpcCapability.stream as (typeof requested)[number]
-              ),
-              observedStream: observed?.includes(RpcCapability.stream)
-            }
-          : {})
-      })
-    )
+    value = await peer.request('echo', 'actual-bun-worker')
   } finally {
     await peer.close()
   }
+  console.log(
+    JSON.stringify({
+      value,
+      ...(policy
+        ? {
+            requestedStream: requested.includes(RpcCapability.stream as (typeof requested)[number]),
+            observedStream: observed?.includes(RpcCapability.stream)
+          }
+        : {}),
+      diagnostics: diagnostics.map((error: any) => ({
+        source: error?.source,
+        code: error?.code,
+        name: error?.name,
+        detail: error?.detail,
+        message: String(error?.message ?? error)
+      }))
+    })
+  )
 }
