@@ -4,7 +4,7 @@
  * each pending Promise by its own settlement. Trusted state retains live references. Document
  * readers require an injected host. Resource snapshots use the canonical version-2 relative ages.
  */
-import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { reactiveReference } from './reactive.js'
 import { storeSsrCases } from './store-ssr-cases.ts'
 
@@ -77,6 +77,167 @@ scope.register('fixture', createStore({ title: 'Fixed' }, { runtime: scope.runti
 const text = serializeTrustedSSRState(scope.dehydrateTrusted())
 console.log(text)
 await scope.disposeAsync()`
+/** Existing runtimes let request adapters and state share one graph. */
+const scopeRuntimeExample = `import { createSSRRequestScope } from '@migaia/store-ssr'
+import { createRuntime } from '@migaia/reactive'
+
+const runtime = createRuntime()
+const scope = createSSRRequestScope({ runtime })
+console.log(scope.runtime === runtime)
+await scope.disposeAsync()`
+/** Request-owned runtimes accept the same scheduler options as createRuntime. */
+const scopeRuntimeOptionsExample = `import { createSSRRequestScope } from '@migaia/store-ssr'
+
+const queue: (() => void)[] = []
+const scope = createSSRRequestScope({
+  runtimeOptions: {
+    adapter: { now: () => 0, timestamp: () => 0 },
+    maxFlushPasses: 10,
+    schedulerStrategy: (flush) => { queue.push(flush) }
+  }
+})
+const count = scope.runtime.signal(0)
+const seen: number[] = []
+const effect = scope.runtime.effect(() => { seen.push(count.value) })
+count.value = 1
+console.log(seen)
+queue.splice(0).forEach((flush) => flush())
+console.log(seen)
+effect.dispose()
+count.dispose()
+await scope.disposeAsync()`
+/** Explicit carriers use one codec and element ID at both ends of the transfer. */
+const carrierOptionsExample = `import { createSerializeRegistry } from '@migaia/serialize'
+import { jsonPlugin } from '@migaia/serialize/plugins'
+import { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr'
+
+const codecs = createSerializeRegistry([jsonPlugin()])
+const controller = new AbortController()
+const state = { version: 1 as const, stores: { app: { count: 2 } } }
+try {
+  const html = await createSSRStateScriptWith(state, {
+    codecs, elementId: 'checkout-state', signal: controller.signal
+  })
+  const document = {
+    getElementById: (id: string) => id === 'checkout-state' ? {
+      textContent: JSON.stringify(state),
+      getAttribute: (name: string) => name === 'data-codec' ? 'json' : 'text'
+    } : null
+  }
+  const restored = await readSSRStateFromDocumentWith({
+    codecs, elementId: 'checkout-state', document, signal: controller.signal
+  })
+  console.log(html.includes('id="checkout-state"'), restored?.stores.app?.count)
+} finally { await codecs.dispose() }`
+/** Both codec operations honor the caller's cancellation signal. */
+const carrierCancellationExample = `import { createSerializeRegistry } from '@migaia/serialize'
+import { jsonPlugin } from '@migaia/serialize/plugins'
+import { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr'
+
+const codecs = createSerializeRegistry([jsonPlugin()])
+const controller = new AbortController()
+controller.abort()
+const state = { version: 1 as const, stores: { app: { count: 2 } } }
+const document = {
+  getElementById: (_id: string) => ({
+    textContent: JSON.stringify(state),
+    getAttribute: (name: string) => name === 'data-codec' ? 'json' : 'text'
+  })
+}
+try {
+  try { await createSSRStateScriptWith(state, { codecs, signal: controller.signal }) }
+  catch (error) { console.log((error as Error).name) }
+  try { await readSSRStateFromDocumentWith({ codecs, document, signal: controller.signal }) }
+  catch (error) { console.log((error as Error).name) }
+} finally { await codecs.dispose() }`
+/** Scope configuration separates supplied runtimes from runtime construction options. */
+const scopeOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Share the request’s existing runtime', '复用请求已有的运行时'),
+    problem: t(
+      'A request already has a reactive runtime for its stores and resources. Without runtime the scope creates another graph, so those objects cannot be registered with it. Supply the same request-owned runtime and omit runtimeOptions.',
+      '请求已经为状态和资源创建了响应式运行时。省略 runtime 会创建另一张图，已有对象无法登记到该作用域。应传入同一个请求运行时，并省略 runtimeOptions。'
+    ),
+    example: scopeRuntimeExample,
+    result: t('The identity check prints true.', '身份比较输出 true。'),
+    covers: ['runtime']
+  },
+  {
+    title: t('Choose when request effects flush', '指定请求副作用的冲刷时机'),
+    problem: t(
+      'A rendering host needs an explicit flush point instead of the default microtask. runtimeOptions creates the scope runtime with that scheduler. The adapter fixes diagnostic clocks; maxFlushPasses limits repeated effect execution within one flush.',
+      '渲染宿主需要明确的冲刷时点，不能使用默认微任务。runtimeOptions 按指定调度器创建运行时。adapter 固定诊断时钟，maxFlushPasses 限制一次冲刷中副作用的重复执行次数。'
+    ),
+    example: scopeRuntimeOptionsExample,
+    result: t(
+      'The effect records [0], then [0, 1] when the host drains its queue.',
+      '副作用先记录 [0]，宿主执行队列后变为 [0, 1]。'
+    ),
+    covers: ['runtimeOptions']
+  }
+]
+/** Carrier options are shared; the reader additionally needs its document host. */
+const scriptOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Use a page-specific state element', '使用页面专属的状态元素'),
+    problem: t(
+      'A checkout page uses a state element other than the default __STORE_STATE__. Pass the same elementId and codecs to the writer and reader; otherwise the reader looks up the wrong element or lacks its codec. The supplied signal lets the request cancel either codec operation.',
+      '结账页使用的状态元素不是默认 __STORE_STATE__。写入方和读取方应传入相同的 elementId 和 codecs，否则会查错元素或缺少编解码器。传入 signal 后，请求可以取消任一编解码操作。'
+    ),
+    example: carrierOptionsExample,
+    result: t(
+      'The script has id checkout-state and the reader restores count 2.',
+      '脚本的 id 为 checkout-state，读取方恢复 count 2。'
+    ),
+    covers: ['codecs', 'elementId', 'signal']
+  },
+  {
+    title: t('Stop codec work after request cancellation', '请求取消后停止编解码'),
+    problem: t(
+      'A request can end before state encoding or decoding starts. Without signal the registry has no caller cancellation to observe. Forward the request signal to reject work after cancellation; the scope does not own or abort it.',
+      '请求可能在状态编解码开始前结束。省略 signal 时注册表没有调用方取消信号可观察。传入请求信号后，取消之后的工作会拒绝；作用域不拥有也不取消这个信号。'
+    ),
+    example: carrierCancellationExample,
+    result: t(
+      'Both operations reject with SerializeCodecError.',
+      '两个操作都以 SerializeCodecError 拒绝。'
+    ),
+    covers: ['codecs', 'signal']
+  }
+]
+/** Error causes preserve the original decoding or entry failures. */
+const errorCauseOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t('Retain the original decode failure', '保留原始解码失败'),
+    problem: t(
+      'An application adds SSR context to a decoder failure. A message alone loses the original error object. cause keeps that object reachable without changing its identity.',
+      '应用需要为解码失败添加 SSR 上下文。仅有消息会丢失原始错误对象。cause 保留该对象的可达路径，身份不变。'
+    ),
+    example: `import { createStoreSsrError, StoreSsrErrorCode } from '@migaia/store-ssr'
+
+const cause = new SyntaxError('invalid payload')
+const error = createStoreSsrError(StoreSsrErrorCode.invalidSnapshot, 'Could not read page state', { cause })
+console.log(error.cause === cause)`,
+    result: t('The cause identity check prints true.', '原因身份比较输出 true。'),
+    covers: ['cause']
+  },
+  {
+    title: t('Retain a group of hydration failures', '保留一组恢复失败'),
+    problem: t(
+      'Several store entries failed and the application adds an outer error. Keeping the AggregateError as cause preserves every original entry error; omission attaches no cause.',
+      '多个状态条目恢复失败，应用还需要外层错误。把 AggregateError 作为 cause 可保留每个原始条目错误；省略时不会附加原因。'
+    ),
+    example: `import { createStoreSsrError, StoreSsrErrorCode } from '@migaia/store-ssr'
+
+const entry = new Error('cart hydration failed')
+const cause = new AggregateError([entry], 'hydration failed')
+const error = createStoreSsrError(StoreSsrErrorCode.hydrateFailed, 'Could not restore page state', { cause })
+console.log(error.cause === cause, cause.errors[0] === entry)`,
+    result: t('Both identity checks print true.', '两个身份比较都输出 true。'),
+    covers: ['cause']
+  }
+]
+
 /** Stable keys select separate store/resource namespaces. */
 const key = t(
   'Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.',
@@ -110,7 +271,8 @@ const runtimeMembers: Readonly<Record<string, IMemberDoc>> = {
     default: t(
       'Reactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.',
       '默认使用响应包微任务冲刷、默认宿主适配器及每轮一百次执行上限。'
-    )
+    ),
+    example: scopeRuntimeOptionsExample
   },
   ...Object.fromEntries(
     Object.entries(reactiveReference.types!.IRuntimeOptions.members!).map(([name, doc]) => [
@@ -397,6 +559,7 @@ const errorDoc = (native: string, aggregate = false) => ({
   },
   ...(native === 'Error'
     ? {
+        optionCases: errorCauseOptionCases,
         optionDocs: {
           cause: {
             summary: t(
@@ -712,6 +875,7 @@ console.log(SsrWireType.json, SsrWireType.text, SsrWireType.bytes)`
       members: scopeMembers
     },
     ISSRRequestScopeOptions: {
+      optionCases: scopeOptionCases,
       summary: t('Mutually exclusive Runtime construction choices.', '互斥的运行时构造选择。'),
       members: runtimeMembers,
       example: scopeExample
@@ -945,6 +1109,7 @@ if (cached) profile.hydrate(cached)`
       }
     },
     ISSRScriptOptions: {
+      optionCases: scriptOptionCases,
       summary: t(
         'Required registry and optional script encoding controls.',
         '必需注册表与可选脚本编码控制。'
@@ -953,6 +1118,10 @@ if (cached) profile.hydrate(cached)`
       example: codecExample
     },
     ISSRReadOptions: {
+      optionCases: scriptOptionCases.map((item) => ({
+        ...item,
+        covers: [...item.covers, 'document']
+      })),
       summary: t(
         'Required registry and explicitly injected document host.',
         '必需注册表与显式文档宿主。'
