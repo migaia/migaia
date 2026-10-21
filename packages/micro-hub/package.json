@@ -1,6 +1,6 @@
 {
   "name": "@migaia/micro-hub",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Singleton micro-frontend hub: contract-first shared state, owner-scoped events and requests, plugin-based persistence for Module Federation and Web Components.",
   "license": "MIT",
