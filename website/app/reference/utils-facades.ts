@@ -805,8 +805,8 @@ const configOwnerStatics: Readonly<Record<string, IMemberDoc>> = {
   },
   fromAsync: {
     summary: t(
-      'Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.',
-      '从异步来源构建配置实例：Promise、普通值，或接收中止信号的工厂函数；字符串按 JSON 解析。来源拒绝或工厂抛错变为 `CONFIG_SOURCE_FAILED`，`signal` 与 `timeoutMs` 以标准的中止和超时错误拒绝。把它放进 `@migaia/resource` 的 `createResource` 返回的加载函数里，就得到响应式的配置资源。'
+      'Builds an owner from an async source: a Promise, a value, or a factory that receives an abort signal; strings are parsed as JSON. Source rejections and factory throws become `CONFIG_SOURCE_FAILED`, retaining the original source failure on `cause`; `signal` and `timeoutMs` reject with the standard abort and timeout errors. Pair it with `createResource` from `@migaia/resource` to get a reactive config resource.',
+      '从异步来源构建配置实例：Promise、普通值，或接收中止信号的工厂函数；字符串按 JSON 解析。来源拒绝或工厂抛错变为 `CONFIG_SOURCE_FAILED`，原始来源失败保存在 `cause` 上；`signal` 与 `timeoutMs` 以标准的中止和超时错误拒绝。把它放进 `@migaia/resource` 的 `createResource` 返回的加载函数里，就得到响应式的配置资源。'
     ),
     params: {
       source: t(

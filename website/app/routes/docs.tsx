@@ -297,9 +297,19 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   const hasAuthoredSymbol = Boolean(
     selectedSymbol && symbolDocFor(reference, selectedModule, selectedSymbol.name)
   )
+  /** Runtime signatures render without source JSDoc; hydration needs only those declaration tokens. */
+  const renderedApis = selectedSymbol
+    ? content.apis.map((api) => ({
+        ...api,
+        symbols: api.symbols.map((symbol) => ({
+          ...symbol,
+          signature: withoutDocComments(symbol.signature)
+        }))
+      }))
+    : content.apis
   return {
     ...content,
-    apis: packApis(content.apis),
+    apis: packApis(renderedApis),
     apiLinks: packLinks(apiLinks),
     typeEntryLinks: packLinks(typeEntryLinks),
     guide: hasAuthoredSymbol ? undefined : guide,
