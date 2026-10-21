@@ -3,7 +3,12 @@ import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'
 import type { IAdapter, IAdapterContext } from './typing.js'
 
-/** Snapshots adapter invocation once and assimilates foreign thenables safely. */
+/**
+ * Captures the adapt method once and returns a frozen reusable contract. Each invocation converts
+ * once and assimilates foreign thenables without taking artifact, Host or scope ownership. Invalid
+ * shapes throw ADAPTER_CONTRACT_INVALID; conversion failures reach the caller, or are classified by
+ * loadIntoHost when used in its transaction.
+ */
 export function defineAdapter<
   TArtifact,
   THost extends import('../host/typing.js').ITrayHostSource,

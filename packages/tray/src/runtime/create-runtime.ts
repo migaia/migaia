@@ -92,7 +92,13 @@ function createSelfMutationCapability(
   })
 }
 
-/** Creates an exact-generation Runtime that never owns or disposes the managed Host. */
+/**
+ * Borrows a managed Host for exact-generation callback execution. options defaults to an empty
+ * object, shutdown.mode to strict-drain, and report to no observer. A foreign Host rejects with
+ * RUNTIME_CONTRACT_INVALID. run() retains its lease until real callback settlement; cancellation
+ * only aborts the context signal. Disposing this Runtime closes its admission without disposing
+ * Host.
+ */
 export function createRuntime<
   THost extends ITrayHostTypeInfo & Pick<ITrayHost<any, any, any>, 'on'>
 >(
@@ -159,6 +165,7 @@ export function createRuntime<
       try {
         leased = bridge.acquire(name)
       } catch (error) {
+        timeoutTask?.cancel()
         report(error)
         runOptions.signal?.removeEventListener('abort', onAbort)
         return Promise.reject(attachTrayError(error, TrayErrorCode.runtimeAborted) as Error)

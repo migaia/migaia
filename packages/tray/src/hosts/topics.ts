@@ -4,6 +4,7 @@ import { createTrayError } from '../errors.js'
 
 /** Authenticated publisher identity is separate from arbitrary business payloads. */
 export type ITrayTopicMeta = Readonly<{
+  /** Parent-authenticated publisher, supplied separately from application-controlled payload data. */
   from: Readonly<{ id: string; host: string; generation: number }> | Readonly<{ parent: true }>
 }>
 /** Local user callbacks may return a Promise; EventSubscriber observes its rejection. */

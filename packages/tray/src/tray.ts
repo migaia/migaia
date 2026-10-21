@@ -29,7 +29,13 @@ type IAdmittedEntry = {
   readonly start: ITrayEntryDefinition<unknown>['start']
 }
 
-/** Creates one immutable static composition root over one Capability Graph. */
+/**
+ * Creates a fixed same-realm composition without starting entries. Captures keys, dependencies and
+ * callbacks, rejecting invalid or duplicate entries synchronously. Call ready() before get(); a
+ * blocked gate permits an explicit retry, while final gate and Graph failures remain cached.
+ * Capability Graph owns startup rollback, primary/auxiliary release and disposal; its errors retain
+ * their originating identity. Tray adds no timeout or forced termination policy.
+ */
 export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph {
   if (!Array.isArray(entries)) throw createTrayError(TrayErrorCode.invalidEntry)
   const admitted: IAdmittedEntry[] = []

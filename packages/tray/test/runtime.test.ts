@@ -1,5 +1,5 @@
 /* oxlint-disable unicorn/no-thenable -- this suite intentionally models foreign thenables. */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -35,6 +35,29 @@ const installPlugin = async (host: any) =>
   })
 
 describe('@migaia/tray/runtime', () => {
+  it('cancels the deadline when the target cannot grant a generation lease', async () => {
+    /** A real managed Host has no admitted target, so its public lease boundary rejects. */
+    const host = await createManagedHost()
+    /** The empty plugin tuple deliberately exercises an unavailable dynamic target. */
+    const runtime = createRuntime(host)
+    /** Rejected admission must never reach application work. */
+    const execute = vi.fn()
+    vi.useFakeTimers()
+    try {
+      await expect(runtime.run('missing', { timeoutMs: 60_000 }, execute)).rejects.toMatchObject({
+        source: '@migaia/capability/graph',
+        code: 'GRAPH_PROVIDER_UNAVAILABLE'
+      })
+      expect(execute).not.toHaveBeenCalled()
+      expect(runtime.activeRuns).toBe(0)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+      await runtime.dispose()
+      await host.dispose()
+    }
+  })
+
   it('publishes the exact extension snapshot and fences removal until callback settlement', async () => {
     const host = (await createManagedHost()) as any
     await installPlugin(host)

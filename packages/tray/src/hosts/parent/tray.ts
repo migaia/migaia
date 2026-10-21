@@ -45,12 +45,23 @@ export type ICreateTrayOptions<
   THosts extends readonly IAnyTrayHost[],
   TRouting extends readonly ITrayRoutingPolicy[] = readonly []
 > = Readonly<{
+  /** Trusted host definitions with unique names; no instance is spawned during construction. */
   hosts: THosts
+  /** Optional custom policies, combined with host-declared tuples; built-ins are always present. */
   routing?: TRouting
+  /** Optional borrowed probe handle(s) forwarded to the original RPC runtime factories. */
   probe?: IRpcProbe | readonly IRpcProbe[]
+  /** Contains native/lifecycle diagnostics; defaults to Core's defaultRpcReporter. */
   report?(error: unknown): void
 }>
-/** The public registry exposes only frozen management and observation capabilities. */
+/**
+ * Creates a frozen parent registry for trusted host definitions, without spawning instances. The
+ * registry owns admission metadata and its parent PluginHost; native connections and generations
+ * remain RPC/supervision-owned. Invalid definitions/policies reject synchronously. spawn() awaits
+ * generation initialization; remotes never replay failed business calls. dispose() closes admission
+ * and shares one cleanup Promise. report defaults to defaultRpcReporter; routing/probe are
+ * omitted.
+ */
 export function createTray<
   const THosts extends readonly IAnyTrayHost[],
   const TRouting extends readonly ITrayRoutingPolicy[] = readonly []

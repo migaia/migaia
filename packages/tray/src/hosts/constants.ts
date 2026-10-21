@@ -9,8 +9,11 @@ export type TrayManagementMode = keyof typeof TrayManagementMode
 
 /** Runtime families accepted by the host DSL and selected by the runtime adapter. */
 export const TrayRuntime = {
+  /** Same-realm cooperative task managed by the canonical coroutine RPC plugin. */
   coroutine: 'coroutine',
+  /** Node Worker entry managed by the canonical thread RPC plugin. */
   thread: 'thread',
+  /** Child-process entry managed by the canonical process RPC plugin. */
   process: 'process'
 } as const
 /** Value union shares the canonical runtime domain's namespace. */
@@ -18,10 +21,15 @@ export type TrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime]
 
 /** Registry states derive from init completion and the rpc unit lifecycle. */
 export const TrayInstanceState = {
+  /** Initial admission is installing its RPC unit and running generation init. */
   starting: 'starting',
+  /** The current generation has completed business plugin initialization. */
   ready: 'ready',
+  /** Native replacement or recovery is waiting for a new generation's initialization. */
   restarting: 'restarting',
+  /** Startup/init or terminal native recovery failed. */
   failed: 'failed',
+  /** The admitted native unit is stopped, while its registry record remains discoverable. */
   stopped: 'stopped'
 } as const
 /** Value union shares the canonical state domain's namespace. */
@@ -29,11 +37,17 @@ export type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInst
 
 /** Read-only lifecycle topics are emitted only by registry state transitions. */
 export const TrayInstanceEvent = {
+  /** A new id admission was recorded, before generation readiness. */
   spawned: 'spawned',
+  /** A current generation completed initialization. */
   ready: 'ready',
+  /** An admitted unit entered replacement or supervised recovery. */
   restarting: 'restarting',
+  /** The current admission entered failed state. */
   failed: 'failed',
+  /** The record remains admitted but its native unit stopped. */
   stopped: 'stopped',
+  /** The admission was revoked and its removal cleanup was attempted. */
   removed: 'removed'
 } as const
 /** Value union shares the canonical event domain's namespace. */

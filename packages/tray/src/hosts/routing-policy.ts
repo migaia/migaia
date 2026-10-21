@@ -6,11 +6,18 @@ import type { ITrayInstance } from './typing.js'
 declare const trayRoutingPolicyBrand: unique symbol
 /** Read-only policy identity; the synchronous pick callback stays module-private. */
 export type ITrayRoutingPolicy<TName extends string = string> = Readonly<{
+  /** Portable registration name; the synchronous picker itself stays in the parent realm. */
   name: TName
+  /** Type-only marker; structural copies have no runtime policy authority. */
   [trayRoutingPolicyBrand]: true
 }>
 /** Parent-owned selection context; sequence counts earlier picks for one host/policy pair. */
-export type ITrayRoutingContext = Readonly<{ host: string; sequence: number }>
+export type ITrayRoutingContext = Readonly<{
+  /** Definition name whose current ready admissions form the candidate set. */
+  host: string
+  /** Zero-based attempted-pick sequence for this registry's host/policy pair. */
+  sequence: number
+}>
 /** Pure selection callback consumes only ready candidate snapshots and returns one id. */
 export type ITrayRoutingPick = (
   candidates: readonly ITrayInstance[],
@@ -43,7 +50,13 @@ const reservedNames = new Set([
   'toLocaleString'
 ])
 
-/** Defines a named policy without invoking pick; invalid names or callbacks reject synchronously. */
+/**
+ * Defines a frozen trusted policy without running pick. name must start with a lowercase letter,
+ * contain only letters/digits afterwards, and avoid built-in/function member names. Invalid input
+ * throws TRAY_ROUTING_INVALID synchronously. Register the identity on the parent and declare it in
+ * child host routing tuples. At dispatch pick receives frozen ready candidates in spawn order and
+ * must synchronously return one candidate id; failure never retries the call on another instance.
+ */
 export function defineRoutingPolicy<const TName extends string>(
   name: TName,
   pick: ITrayRoutingPick
@@ -69,12 +82,18 @@ function authorPolicy<const TName extends string>(
   return policy
 }
 
-/** Always-available cyclic selection uses the registry's shared host/policy sequence. */
+/**
+ * Built-in cyclic policy; callable/member routing forms share its host-local sequence without
+ * registration.
+ */
 export const roundRobin = authorPolicy(
   TrayRoutingBuiltinName.roundRobin,
   (candidates, context) => candidates[context.sequence % candidates.length]!.id
 )
-/** Stable ties retain spawn order; counters belong to current record admissions. */
+/**
+ * Built-in policy selecting the least pending business sends; ties retain spawn order, not CPU
+ * load.
+ */
 export const leastInFlight = authorPolicy(
   TrayRoutingBuiltinName.leastInFlight,
   (candidates) =>

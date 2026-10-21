@@ -46,7 +46,7 @@ export const TrayErrorCode = {
   runtimeDisposed: 'RUNTIME_DISPOSED',
   /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */
   runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED',
-  /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */
+  /** Runtime could not acquire the target lease; inspect the retained admission failure or cause. */
   runtimeAborted: 'RUNTIME_ABORTED',
   /**
    * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged.
@@ -60,7 +60,7 @@ export const TrayErrorCode = {
   invalidEntry: 'TRAY_INVALID_ENTRY',
   /** Duplicate key during factory admission; caller must provide unique keys. */
   duplicateEntry: 'TRAY_DUPLICATE_ENTRY',
-  /** Unknown lookup or dependency key; caller must use an admitted key. */
+  /** Unknown get()/entryState() key; caller must use an admitted key. */
   unknownEntry: 'TRAY_UNKNOWN_ENTRY',
   /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */
   unavailable: 'TRAY_UNAVAILABLE',
@@ -70,4 +70,8 @@ export const TrayErrorCode = {
   hostMutationBypass: 'HOST_MUTATION_BYPASS'
 } as const
 
+/**
+ * Tray-owned failure domain; complete identities from other packages remain owned by those
+ * packages.
+ */
 export type ITrayErrorCode = (typeof TrayErrorCode)[keyof typeof TrayErrorCode]

@@ -252,28 +252,47 @@ export type IPluginWithSynchronousShared<TPlugin> = TPlugin & {
 
 /** Public lifecycle states for a managed Host. */
 export const TrayHostState = {
+  /** Accepts managed mutations and Runtime leases. */
   active: 'active',
+  /** Disposal has closed mutation admission while cleanup runs. */
   closing: 'closing',
+  /** Logical disposal completed; the result may still expose physicalCompletion. */
   terminal: 'terminal',
+  /** Disposal itself failed; inspect the facade error and returned cleanup observation. */
   failed: 'failed'
 } as const
+/** Managed Host lifecycle domain, separate from individual plugin readiness. */
 export type ITrayHostState = (typeof TrayHostState)[keyof typeof TrayHostState]
 
 /** Event payloads published after settled managed mutations. */
 export type ITrayHostEventMap = {
+  /** Successful definition registration, including a definition left blocked. */
   readonly use: Readonly<Record<string, unknown>>
+  /** Successful committed definition removal. */
   readonly unUse: Readonly<Record<string, unknown>>
+  /** Successful same-name definition replacement. */
   readonly replace: Readonly<Record<string, unknown>>
   /** Settled lifecycle aliases describe the logical operation without exposing Graph authority. */
   readonly registered: Readonly<Record<string, unknown>>
+  /** Alias of the successful unUse observation. */
   readonly removed: Readonly<Record<string, unknown>>
+  /** Alias of the successful replace observation. */
   readonly replaced: Readonly<Record<string, unknown>>
+  /**
+   * Graph-stage mutation failure; earlier descriptor/admission rejection does not publish this
+   * event.
+   */
   readonly mutationFailed: Readonly<{
+    /** Managed operation whose failure observation was produced. */
     readonly operation: 'use' | 'unUse' | 'replace'
+    /** Target plugin name, retained even when the candidate was not committed. */
     readonly name: string
+    /** Same primary error exposed by the failure result. */
     readonly error: Error
   }>
+  /** Published after the shared disposal Promise exists, allowing safe reentrant observation. */
   readonly disposing: Readonly<{ readonly state: 'closing' }>
+  /** Logical disposal observation; cleanupComplete does not imply that cleanup had no errors. */
   readonly disposed: Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean }>
 }
 
@@ -282,15 +301,26 @@ export type IUnsubscribe = () => void
 
 /** Cleanup observation returned by managed mutations. */
 export type ITrayPluginPhysicalCleanupResult = ICleanupResult
+/** Settled mutation view plus current cleanup errors and any later physical-completion increment. */
 export type ITrayPluginMutationObservation<TView> = ICleanupResult &
   Readonly<{
+    /** Definition registration or same-name replacement. */
     readonly operation: 'use' | 'replace'
+    /** Target definition name. */
     readonly name: string
+    /** Names reported by Graph reconciliation for this operation. */
     readonly affected: readonly string[]
+    /** Whether successful reconciliation changed the Graph topology. */
     readonly topologyChanged: boolean
+    /** Continue through this view to retain the resulting ready-plugin type information. */
     readonly view: TView
+    /** Whether physical cleanup has settled; false requires observing physicalCompletion. */
     readonly cleanupComplete: boolean
   }>
+/**
+ * Ok reports success; committed independently records whether the candidate became the current
+ * binding.
+ */
 export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFailureView> =
   | (ITrayPluginMutationObservation<TSuccessView> &
       Readonly<{ readonly ok: true; readonly committed: true }>)
@@ -316,13 +346,19 @@ export type ITrayHostMutationResult<
     : ITrayHostDynamic<THost>
 >
 
+/** Removal view plus current cleanup errors and any later physical-completion increment. */
 export type ITrayPluginRemovalObservation<TView> = ICleanupResult &
   Readonly<{
+    /** Requested definition name, including an unknown-name no-op. */
     readonly name: string
+    /** Names reconciled by the removal; empty when no definition existed. */
     readonly affected: readonly string[]
+    /** Managed view after the removal or retained after failure. */
     readonly view: TView
+    /** Whether physical cleanup has settled; inspect cleanupErrors separately. */
     readonly cleanupComplete: boolean
   }>
+/** Unknown names succeed without commit/removal; failures retain whether removal already committed. */
 export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> =
   | (ITrayPluginRemovalObservation<TPreviousView> &
       Readonly<{ readonly ok: true; readonly committed: false; readonly removed: false }>)
@@ -358,23 +394,40 @@ export type ITrayHost<
     readonly definitions: TDefinitions
     readonly ready: TReady
   }>
+  /** Frozen current definition names, including blocked definitions. */
   readonly plugins: readonly string[]
+  /** Frozen names whose current Graph nodes are ready. */
   readonly readyPlugins: readonly string[]
+  /** Managed facade lifecycle, independent of per-plugin readiness. */
   readonly state: ITrayHostState
+  /** Whether the facade is currently active. */
   readonly isActive: boolean
+  /** Retained disposal failure; ordinary mutation failures are returned in their own observations. */
   readonly error: unknown | undefined
+  /** Current Host extension snapshot, including constructor baseline and ready managed plugins. */
   readonly extensions: Readonly<
     IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>
   >
+  /** Config access delegates to the canonical PluginHost snapshot and update owner. */
   readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>
+  /**
+   * Reads Graph node state, using blocked for an unknown name; publication/bypass checks still
+   * apply.
+   */
   pluginState(name: string): string
+  /** Subscribes to managed observations and returns a synchronous unsubscribe receipt. */
   on<TKey extends keyof ITrayHostEventMap>(
     type: TKey,
     listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>
   ): IUnsubscribe
+  /**
+   * Admits a definition, then reconciles its required-provider closure. Invalid admission rejects
+   * before mutation; Graph-stage failures return an observation whose committed flag owns custody.
+   */
   use<const TPlugin extends ITrayPluginConstraint<THost>>(
     plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]
   ): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>
+  /** Removes a definition and blocks dependent consumers; an unknown name is a successful no-op. */
   unUse<const TName extends string>(
     name: TName
   ): Promise<
@@ -390,10 +443,13 @@ export type ITrayHost<
           ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>
         >
   >
+  /** Replaces the exact same-name binding; inspect committed separately from ok after failure. */
   replace<const TPlugin extends ITrayPluginConstraint<THost>>(
     plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]
   ): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>
+  /** Shares one logical shutdown Promise; bounded mode can expose continuing physical cleanup. */
   dispose(): Promise<ITrayHostDisposalResult>
+  /** Awaits disposal while discarding the structured observation result. */
   [asyncDisposeKey](): Promise<void>
 }>
 
@@ -422,11 +478,14 @@ export type ICreateHostOptions<
 > = Readonly<{
   /** Constructs the one PluginHost instance owned by the resulting Tray host. */
   readonly create: () => THost
-  /** Initial plugin definitions admitted and installed in tuple order. */
+  /**
+   * Initial definitions; present Feature providers install before consumers, missing required
+   * providers block.
+   */
   readonly plugins: TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>
-  /** Maximum wait for a serialized graph mutation to enter execution. */
+  /** Required finite nonnegative wait budget for serialized graph mutation admission; no default. */
   readonly mutationAdmissionMs: number
-  /** Maximum bounded-shutdown wait for physical plugin quiescence. */
+  /** Required finite nonnegative physical-wait budget used by bounded cleanup; no default. */
   readonly quiescenceMs: number
   /** Selects bounded shutdown or a strict drain that waits for physical completion. */
   readonly shutdown: Readonly<{
@@ -437,6 +496,10 @@ export type ICreateHostOptions<
   readonly report?: (error: unknown) => void
 }>
 
+/**
+ * Exact ready closure for literal finite definitions within the inference budget, otherwise a
+ * dynamic view.
+ */
 export type ITrayResolvedHost<
   THost extends ITrayHostSource,
   TDefinitions extends readonly ITrayPluginConstraint<THost>[]
@@ -445,19 +508,31 @@ export type ITrayResolvedHost<
     ? ITrayHost<THost, TDefinitions>
     : ITrayHostDynamic<THost>
 
+/** Terminal logical observation; physicalCompletion, when present, carries later cleanup increments. */
 export type ITrayHostDisposalResult = ICleanupResult &
   Readonly<{
+    /** Logical result state, including a facade whose own state became failed during cleanup. */
     readonly state: 'terminal'
+    /** Whether disposal followed managed publication or detected escaped concrete-Host mutation. */
     readonly termination: 'managed' | 'external-host'
+    /** Physical settlement flag; inspect cleanupErrors independently for failures. */
     readonly cleanupComplete: boolean
+    /** Primary disposal error when the structured failure path caught an Error. */
     readonly error?: Error
   }>
 
+/**
+ * Cleanup observation attached to a failed createHost call after rolling back its own acquired
+ * claim.
+ */
 export type ITrayHostCreationFailureDetail = ICleanupResult &
   Readonly<{
+    /** Creation-stage vocabulary; current creation rollback reports factory or setup. */
     readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit'
+    /** Whether rollback settled without retained cleanup errors or pending physical completion. */
     readonly cleanupComplete: boolean
   }>
+/** Primary creation failure with rollback detail; original errors remain on identity or cause paths. */
 export type ITrayHostCreationError = Error &
   Readonly<{ readonly detail: ITrayHostCreationFailureDetail }>
 
