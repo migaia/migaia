@@ -1,4 +1,5 @@
 import {
+  EventDelivery,
   EventDispatchPolicy,
   createEventChannel,
   invokeTask,
@@ -179,7 +180,7 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
         events[name] = Object.freeze({
           on: (listener: (payload: unknown) => void) => {
             app.assertConnected()
-            return app.track(channel.subscribe((event) => listener(event.value)))
+            return app.track(channel.subscribe(listener, { delivery: EventDelivery.value }))
           }
         })
       }
@@ -230,7 +231,7 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
         events[name] = Object.freeze({
           on: (listener: (payload: unknown) => void) => {
             owner.assertConnected()
-            return owner.track(channel.subscribe((event) => listener(event.value)))
+            return owner.track(channel.subscribe(listener, { delivery: EventDelivery.value }))
           },
           emit: (payload: unknown) => {
             owner.assertConnected()
@@ -261,7 +262,8 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
             )
           }
           /** Task subscription answering this request. */
-          const stop = slot.requests.subscribe((event) => handler(event.value), {
+          const stop = slot.requests.subscribe(handler, {
+            delivery: EventDelivery.value,
             taskId: member
           })
           slot.handled.add(member)
