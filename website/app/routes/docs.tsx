@@ -41,6 +41,7 @@ import { commentExample, type IExampleCommentaryContext } from '../example-comme
 import type {
   ILocalizedEnhancerDoc,
   ILocalizedMemberDoc,
+  ILocalizedOptionCase,
   ILocalizedReference,
   ILocalizedSymbolDoc,
   ILocalizedTypeDoc,
@@ -1265,6 +1266,7 @@ function typeReferenceSections(
   ])
   return [
     ...(guide && (guide.scenarios.length > 0 || guide.example) ? ['usage'] : []),
+    ...(guide && guide.optionCases.length > 0 ? ['option-cases'] : []),
     'signature',
     ...(surface.members.length > 0 ? ['members'] : [])
   ]
@@ -1425,6 +1427,18 @@ function ModuleOverview({
                 locale={locale}
               />
             ) : null}
+          </section>
+        ) : null}
+        {selectedGuide && selectedGuide.optionCases.length > 0 ? (
+          <section className="section-block compact" id={`${selectedType.fragment}--option-cases`}>
+            <h2>{referenceSectionLabel(locale, 'option-cases', true)}</h2>
+            <OptionCaseList
+              caseId={(index) => `${selectedType.fragment}--option-case-${index + 1}`}
+              cases={selectedGuide.optionCases}
+              label={selectedType.name}
+              library={api.library}
+              locale={locale}
+            />
           </section>
         ) : null}
         <section className="api-signature" id={`${selectedType.fragment}--signature`}>
@@ -2227,6 +2241,53 @@ function NestedFieldDocs({
  * metadata supplies types when available; reference-only paths keep their exact prose without
  * fabricating a signature or a parameter type for an unresolved composed surface.
  */
+/**
+ * Renders option cases: each sets several fields of one options bag in a realistic situation, with
+ * the problem before the code and the observed result after it. `fieldHref` links each covered
+ * field to its table row; without it the field names render as plain code.
+ */
+function OptionCaseList({
+  caseId,
+  cases,
+  fieldHref,
+  label,
+  library,
+  locale
+}: {
+  readonly caseId: (index: number) => string
+  readonly cases: readonly ILocalizedOptionCase[]
+  readonly fieldHref?: (name: string) => string
+  readonly label: string
+  readonly library: string
+  readonly locale: ILocale
+}) {
+  return cases.map((item, index) => (
+    <div className="reference-case option-case" id={caseId(index)} key={item.title}>
+      <h3>
+        <InlineText library={library} locale={locale} text={item.title} />
+      </h3>
+      <ReferenceParagraphs library={library} locale={locale} text={item.problem} />
+      <CodeBlock code={item.example} label={label} locale={locale} />
+      <ReferenceParagraphs library={library} locale={locale} text={item.result} />
+      <p className="option-case-covers">
+        {locale === 'zh' ? '用到的选项：' : 'Options used: '}
+        {item.covers.map((name, position) => (
+          <Fragment key={name}>
+            {position > 0 ? ' ' : null}
+            {fieldHref ? (
+              <a href={fieldHref(name)}>
+                <code>{name}</code>
+              </a>
+            ) : (
+              <code>{name}</code>
+            )}
+          </Fragment>
+        ))}
+      </p>
+    </div>
+  ))
+}
+
 function ReferenceMemberDetails({
   api,
   doc,
@@ -2954,6 +3015,24 @@ function SingleApiReference({
     const fields = Object.keys(typeDoc?.members ?? {}).filter((name) => !name.includes('.'))
     return fields.length > 0 && fields.every((name) => optionNames.has(name)) ? undefined : typeDoc
   }
+  /** Option cases of this API, falling back to the cases of its options type. */
+  const optionCases =
+    symbolDoc && symbolDoc.optionCases.length > 0
+      ? symbolDoc.optionCases
+      : symbolDoc?.optionsType
+        ? (instanceGuideFor(reference, api.module, symbolDoc.optionsType)?.optionCases ?? [])
+        : []
+  /** Anchor of one option case, linked from the fields it covers. */
+  const optionCaseId = (index: number) => `${symbol.fragment}--option-case-${index + 1}`
+  /** First case that sets a field (or its top-level parent), for fields without their own example. */
+  const coveringCase = (name: string) => {
+    const index = optionCases.findIndex(
+      (item) =>
+        item.covers.includes(fieldIdentity(name)) ||
+        item.covers.includes(fieldIdentity(name).split('.')[0]!)
+    )
+    return index < 0 ? undefined : { index, title: optionCases[index]!.title }
+  }
   const unlistedOptions = Object.entries(symbolDoc?.options ?? {}).filter(
     ([name]) => !options.some((field) => fieldIdentity(field.name) === fieldIdentity(name))
   )
@@ -3201,6 +3280,14 @@ function SingleApiReference({
           id={`${symbol.fragment}--configuration`}
         >
           <h2>{locale === 'zh' ? '选项' : 'Options'}</h2>
+          <OptionCaseList
+            caseId={optionCaseId}
+            cases={optionCases}
+            fieldHref={(name) => `#${symbol.fragment}--option-${optionAnchor(name)}`}
+            label={symbol.name}
+            library={library.slug}
+            locale={locale}
+          />
           {options.length > 0 ? (
             <div className="table-scroll">
               <table className="option-reference">
@@ -3294,6 +3381,18 @@ function SingleApiReference({
                         ) : null}
                         {!field.referenceDoc && field.example ? (
                           <CodeBlock code={field.example} label={field.name} locale={locale} />
+                        ) : null}
+                        {!field.example && coveringCase(field.name) ? (
+                          <p className="option-case-link">
+                            {locale === 'zh' ? '示例：' : 'Example: '}
+                            <a href={`#${optionCaseId(coveringCase(field.name)!.index)}`}>
+                              <InlineText
+                                library={library.slug}
+                                locale={locale}
+                                text={coveringCase(field.name)!.title}
+                              />
+                            </a>
+                          </p>
                         ) : null}
                       </td>
                     </tr>
@@ -5326,6 +5425,7 @@ function referenceSectionLabel(locale: ILocale, section: string, type = false): 
     'related-apis': ['Related APIs', '相关 API'],
     members: type ? ['Members', '成员'] : ['Instance API', '实例 API'],
     usage: ['Usage', '用法'],
+    'option-cases': ['Configuration examples', '配置示例'],
     installed: ['After installation', '安装后能力'],
     contract: ['Parameters and result', '参数与返回'],
     scenarios: ['When to use', '适用场景'],

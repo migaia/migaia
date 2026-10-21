@@ -179,8 +179,9 @@ function isCodeField(group: keyof ILibraryReference, path: readonly string[]): b
     )
   if (path.length !== 3 || path[2] !== 'example') return false
   return (
-    (group === 'symbols' && (path[0] === 'optionDocs' || path[0] === 'cases')) ||
-    (group === 'types' && path[0] === 'members') ||
+    (group === 'symbols' &&
+      (path[0] === 'optionDocs' || path[0] === 'cases' || path[0] === 'optionCases')) ||
+    (group === 'types' && (path[0] === 'members' || path[0] === 'optionCases')) ||
     (group === 'enhancers' && path[0] === 'grants')
   )
 }

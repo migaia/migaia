@@ -8,6 +8,7 @@ import type {
   IEnhancerDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   IText,
   ITypeDoc,
   SymbolRole
@@ -34,6 +35,15 @@ export type ILocalizedMemberDoc = Readonly<{
   example?: string
 }>
 
+/** Option case projected into the page locale; `covers` keeps the declared field names. */
+export type ILocalizedOptionCase = Readonly<{
+  title: string
+  problem: string
+  example: string
+  result: string
+  covers: readonly string[]
+}>
+
 /** Type doc projected into the page locale. */
 export type ILocalizedTypeDoc = Readonly<{
   surface?: string
@@ -41,6 +51,7 @@ export type ILocalizedTypeDoc = Readonly<{
   scenarios: readonly string[]
   example?: string
   members: Readonly<Record<string, ILocalizedMemberDoc>>
+  optionCases: readonly ILocalizedOptionCase[]
 }>
 
 /** Runtime symbol doc projected into the page locale. */
@@ -53,6 +64,8 @@ export type ILocalizedSymbolDoc = Readonly<{
   options: Readonly<Record<string, ILocalizedMemberDoc>>
   /** Named options type whose member docs (resolved through nested types) document the table. */
   optionsType?: string
+  /** The API's own option cases; empty means the options type's cases apply. */
+  optionCases: readonly ILocalizedOptionCase[]
   example?: string
   exampleIntro?: string
   exampleResult?: string
@@ -133,6 +146,20 @@ function member(
   }
 }
 
+/** Projects option cases into one locale. */
+function optionCases(
+  cases: readonly IOptionCaseDoc[] | undefined,
+  locale: IReferenceLocale
+): readonly ILocalizedOptionCase[] {
+  return (cases ?? []).map((item) => ({
+    title: text(item.title, locale),
+    problem: text(item.problem, locale),
+    example: code(item.example, locale) ?? '',
+    result: text(item.result, locale),
+    covers: item.covers
+  }))
+}
+
 /** Projects one type doc. */
 function typeDoc(
   doc: ITypeDoc,
@@ -146,7 +173,8 @@ function typeDoc(
     example: code(doc.example, locale),
     members: Object.fromEntries(
       Object.entries(doc.members).map(([name, value]) => [name, member(value, reference, locale)])
-    )
+    ),
+    optionCases: optionCases(doc.optionCases, locale)
   }
 }
 
@@ -203,6 +231,7 @@ export function localizeReference(
               ])
             ),
             optionsType: doc.options,
+            optionCases: optionCases(doc.optionCases, locale),
             example: code(doc.example, locale),
             exampleIntro: doc.exampleIntro && text(doc.exampleIntro, locale),
             exampleResult: doc.exampleResult && text(doc.exampleResult, locale),
@@ -339,6 +368,7 @@ export function pageReference(
                     purpose: doc.purpose,
                     params: {},
                     options: {},
+                    optionCases: [],
                     cases: [],
                     scenarios: [],
                     avoid: []
@@ -353,7 +383,7 @@ export function pageReference(
         reached.has(bare(key))
           ? [[key, doc]]
           : listed.has(bare(key))
-            ? [[key, { summary: doc.summary, scenarios: [], members: {} }]]
+            ? [[key, { summary: doc.summary, scenarios: [], members: {}, optionCases: [] }]]
             : []
       )
     ),

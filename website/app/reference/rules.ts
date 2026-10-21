@@ -9,6 +9,7 @@ import type {
   IEnumDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   ISymbolDoc,
   IText,
   ITypeDoc
@@ -172,6 +173,80 @@ function checkMember(
   return findings
 }
 
+/**
+ * `REF-OPTION-CODE`: every options field is shown in code, by its own example or by an option case
+ * that lists it and spells its name. Literal-union, enum and function fields need their own example
+ * and `whenToUse`, because their effect depends on the value the reader picks.
+ */
+function checkOptionCode(
+  symbol: IApiSymbol,
+  fieldDocs: ReadonlyMap<string, IMemberDoc | undefined>,
+  cases: readonly IOptionCaseDoc[],
+  where: string,
+  symbols: readonly IApiSymbol[]
+): IFinding[] {
+  const findings: IFinding[] = []
+  cases.forEach((item, index) => {
+    const at = `${where}.optionCases[${index}]`
+    findings.push(
+      ...checkText(item.title, `${at}.title`, MIN_ZH_DETAIL),
+      ...checkText(item.problem, `${at}.problem`, MIN_ZH_DETAIL),
+      ...checkText(item.result, `${at}.result`, MIN_ZH_DETAIL),
+      ...checkCode(item.example, `${at}.example`, true)
+    )
+    /** Every code variant must spell each covered field, so the claim is visible in the code. */
+    const variants =
+      typeof item.example === 'string' ? [item.example] : [item.example.en, item.example.zh]
+    for (const name of item.covers) {
+      const leaf = name.split('.').at(-1) ?? name
+      if (!symbol.configuration.some((field) => field.name === name))
+        findings.push({
+          rule: 'REF-OPTION-CODE',
+          where: at,
+          message: `covers unknown field ${name}`
+        })
+      else if (!variants.every((code) => new RegExp(`\\b${leaf}\\b`).test(code)))
+        findings.push({ rule: 'REF-OPTION-CODE', where: at, message: `example never sets ${name}` })
+    }
+  })
+  /** Field names some case covers. */
+  const covered = new Set(cases.flatMap((item) => item.covers))
+  for (const field of symbol.configuration) {
+    const doc = fieldDocs.get(field.name)
+    if (!doc) continue
+    const at = `${where}{${field.name}}`
+    const top = field.name.split('.')[0]!
+    const needsOwn =
+      Boolean(fieldLiteralValues(field.type, symbols)) ||
+      Boolean(doc.values) ||
+      /=>/.test(field.type)
+    if (needsOwn) {
+      if (!doc.example)
+        findings.push({
+          rule: 'REF-OPTION-CODE',
+          where: at,
+          message: 'value-dependent field has no own example'
+        })
+      if (!doc.whenToUse)
+        findings.push({
+          rule: 'REF-OPTION-CODE',
+          where: at,
+          message: 'value-dependent field has no whenToUse'
+        })
+      else findings.push(...checkText(doc.whenToUse, `${at}.whenToUse`, MIN_ZH_DETAIL))
+      continue
+    }
+    const parentExample = top !== field.name && fieldDocs.get(top)?.example
+    if (!doc.example && !parentExample && !covered.has(field.name) && !covered.has(top))
+      findings.push({
+        rule: 'REF-OPTION-CODE',
+        where: at,
+        message: 'field is not shown in any example or option case'
+      })
+  }
+  return findings
+}
+
 /** `REF-OPTION`: checks one options field. */
 function checkOption(
   field: IApiSymbol['configuration'][number],
@@ -277,6 +352,8 @@ function checkSymbol(
     if (!/^(?:void|Promise<void>)$/.test(shape.returns.trim()))
       findings.push(...checkText(doc.returns, `${where}.returns`, MIN_ZH_DETAIL))
   }
+  /** Field docs by field name, read once for the per-field and the code-coverage checks. */
+  const fieldDocs = new Map<string, IMemberDoc | undefined>()
   for (const field of symbol.configuration) {
     const fieldDoc =
       doc.optionDocs?.[field.name] ??
@@ -288,9 +365,18 @@ function checkSymbol(
             api.symbols
           )
         : undefined)
+    fieldDocs.set(field.name, fieldDoc)
     findings.push(
       ...checkOption(field, fieldDoc, `${where}{${field.name}}`, api.symbols, reference)
     )
+  }
+  if (symbol.configuration.length > 0) {
+    /** The API's own cases win; otherwise the options type supplies them. */
+    const cases =
+      doc.optionCases ??
+      (doc.options ? keyed(reference.types, api.module, doc.options)?.optionCases : undefined) ??
+      []
+    findings.push(...checkOptionCode(symbol, fieldDocs, cases, where, api.symbols))
   }
   if (constantMembers(symbol).length > 0) {
     const enumDoc: IEnumDoc | undefined = reference.enums[symbol.name]
