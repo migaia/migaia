@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { setTimeout as delay } from 'node:timers/promises'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import {
   createBrowserPeer,
@@ -293,17 +294,17 @@ describe('browser Runtime Peer', () => {
     expect(fixture.listeners.get('message')?.size ?? 0).toBe(0)
   })
 
-  it('ignores hostile origin and sibling source before the real capability ACK is accepted', async () => {
-    /** Initial/ready frames continue normally while both actual capability ACKs are held. */
+  it('ignores hostile origin and sibling source before the real identity proposal is accepted', async () => {
+    /** Ready frames continue normally while both actual identity proposals are held. */
     const pair = windowPair()
-    /** Each held ACK comes from its own live Core resource's ordinary physical send operation. */
-    let leftAck: unknown
-    /** The opposite offer must be independent from the first resource's outbound ACK. */
-    let rightAck: unknown
-    /** The second ACK's synchronous send releases the test before cold receive can activate. */
+    /** Each held initial comes from its live Core resource's ordinary physical send operation. */
+    let leftInitial: unknown
+    /** The opposite proposal remains independent from the first resource's initial. */
+    let rightInitial: unknown
+    /** The second proposal's send releases the test before either identity exchange completes. */
     let release!: () => void
     /**
-     * ACK readiness is a test-local physical-delivery barrier, not another handshake
+     * Proposal readiness is a test-local physical-delivery barrier, not another handshake
      * implementation.
      */
     const captured = new Promise<void>((resolve) => {
@@ -311,9 +312,9 @@ describe('browser Runtime Peer', () => {
     })
     pair.left.setSend((message, origin) => {
       if (origin !== 'https://left.test') return
-      if (rpcMessageCapabilityControl.isAcknowledgement(message)) {
-        leftAck = message
-        if (rightAck !== undefined) release()
+      if (rpcMessageCapabilityControl.isInitial(message)) {
+        leftInitial = message
+        if (rightInitial !== undefined) release()
         return
       }
       queueMicrotask(() =>
@@ -322,15 +323,17 @@ describe('browser Runtime Peer', () => {
     })
     pair.right.setSend((message, origin) => {
       if (origin !== 'https://right.test') return
-      if (rpcMessageCapabilityControl.isAcknowledgement(message)) {
-        rightAck = message
-        if (leftAck !== undefined) release()
+      if (rpcMessageCapabilityControl.isInitial(message)) {
+        rightInitial = message
+        if (leftInitial !== undefined) release()
         return
       }
       queueMicrotask(() =>
         pair.right.emit('message', structuredClone(message), pair.left.target, 'https://left.test')
       )
     })
+    /** No startup or cleanup diagnostic may be hidden by the source/origin admission fixture. */
+    const reports: unknown[] = []
     /** Both factories supply independent local offers through their original Core capture owners. */
     const opening = [
       createBrowserPeer<{ echo(value: string): string }>({
@@ -339,7 +342,7 @@ describe('browser Runtime Peer', () => {
           origin: 'https://right.test',
           receiver: pair.left.target
         },
-        report: () => undefined
+        report: (error) => reports.push(error)
       }),
       createBrowserPeer({
         connect: {
@@ -348,26 +351,41 @@ describe('browser Runtime Peer', () => {
           receiver: pair.right.target
         },
         provide: { echo: (value: string) => value },
-        report: () => undefined
+        report: (error) => reports.push(error)
       })
     ] as const
-    /** Observe opening failures immediately while the test holds only real ACK frame delivery. */
+    /** Observe opening failures immediately while the test holds real initial-frame delivery. */
     const opened = Promise.all(opening)
     void opened.catch(() => undefined)
+    /** Observe only the attacked endpoint, so its still-blocked counterpart cannot hide admission. */
+    let leftSettled = false
+    void opening[0].then(
+      () => {
+        leftSettled = true
+      },
+      () => {
+        leftSettled = true
+      }
+    )
     await captured
-    expect(rpcMessageCapabilityControl.isAcknowledgement(leftAck)).toBe(true)
-    expect(rpcMessageCapabilityControl.isAcknowledgement(rightAck)).toBe(true)
-    pair.left.emit('message', leftAck, pair.right.target, 'https://wrong.test')
-    pair.left.emit('message', leftAck, {}, 'https://right.test')
-    pair.left.emit('message', leftAck, pair.right.target, 'https://right.test')
-    pair.right.emit('message', rightAck, pair.left.target, 'https://left.test')
-    /** Wrongly admitted hostile ACKs would make the genuine ACK duplicate and fail construction. */
+    expect(rpcMessageCapabilityControl.isInitial(leftInitial)).toBe(true)
+    expect(rpcMessageCapabilityControl.isInitial(rightInitial)).toBe(true)
+    pair.left.emit('message', leftInitial, pair.right.target, 'https://wrong.test')
+    await delay(0)
+    expect(leftSettled).toBe(false)
+    pair.left.emit('message', leftInitial, {}, 'https://right.test')
+    await delay(0)
+    expect(leftSettled).toBe(false)
+    pair.left.emit('message', leftInitial, pair.right.target, 'https://right.test')
+    pair.right.emit('message', rightInitial, pair.left.target, 'https://left.test')
+    /** Only genuine source/origin metadata may complete either original identity exchange. */
     const peers = await opened
     try {
-      expect(await peers[0].request('echo', 'after-real-ack')).toBe('after-real-ack')
+      expect(await peers[0].request('echo', 'after-real-initial')).toBe('after-real-initial')
     } finally {
       await Promise.all(peers.map((peer) => peer.close()))
     }
+    expect(reports).toEqual([])
   })
 
   it.each([

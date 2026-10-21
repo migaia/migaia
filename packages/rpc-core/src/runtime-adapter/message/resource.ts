@@ -505,7 +505,8 @@ class AdapterMessageResource implements IAdapterMessageResource {
     /** A captured inbound initial message is the same independent peer offer used by the old child. */
     const initial = bootstrap?.direction === 'inbound' ? raw : this.#rawBootstrap
     const received = initial === undefined ? undefined : this.#admitInitial(initial)
-    if (!outbound)
+    /** Symmetric initial records already exchange both offers; a late duplicate ACK is raw data. */
+    if (!outbound && this.#identityAnnouncement === undefined)
       this.#port.postMessage(rpcMessageCapabilityControl.acknowledgement(local.value), undefined)
     /** Actual early control settles readiness synchronously before Promise delivery as originally. */
     const peer = received?.capabilities ?? this.#peerOffer
