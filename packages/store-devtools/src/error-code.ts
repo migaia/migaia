@@ -1,8 +1,7 @@
 /**
- * Owns the error-code declarations for `@migaia/store-devtools`. Under
- * `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is
- * always `'@migaia/store-devtools'`. Throw sites reference these constants instead of inline
- * literals. Code values are public API. Renaming a code is a breaking change.
+ * Public semantic codes owned by Store Devtools. Package-created errors use the source
+ * '@migaia/store-devtools'; complete foreign callback identities retain their original owner. Code
+ * values are public API and distinguish configuration, session state and cleanup failures.
  */
 export const StoreDevtoolsErrorCode = {
   /**
@@ -41,5 +40,6 @@ export const StoreDevtoolsErrorCode = {
   callbackFailed: 'CALLBACK_FAILED'
 } as const
 
+/** Values from the package's canonical code table, suitable for source/code error handling. */
 export type IStoreDevtoolsErrorCode =
   (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode]

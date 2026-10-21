@@ -11,7 +11,11 @@ function tagStoreDevtoolsError<E extends Error>(error: E, code: IStoreDevtoolsEr
   return attachErrorIdentity(error, { source: STORE_DEVTOOLS_SOURCE, code })
 }
 
-/** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
+/**
+ * Create a fresh native Error with this package's source and a caller-selected registered code and
+ * message. Optional cause retains the supplied original value; absent or undefined cause adds no
+ * cause property. This constructs an error without throwing or classifying an existing one.
+ */
 export function createStoreDevtoolsError(
   code: IStoreDevtoolsErrorCode,
   message: string,
@@ -24,7 +28,11 @@ export function createStoreDevtoolsError(
   return tagStoreDevtoolsError(error, code)
 }
 
-/** Builds a tagged AggregateError while retaining every subscription failure. */
+/**
+ * Create a native AggregateError with this package's identity and the supplied message/errors.
+ * Original failures remain reachable through errors in their supplied order; this factory does not
+ * throw, deduplicate them or add a separate cause property.
+ */
 export function createStoreDevtoolsAggregateError(
   code: IStoreDevtoolsErrorCode,
   errors: readonly unknown[],
@@ -34,8 +42,10 @@ export function createStoreDevtoolsAggregateError(
 }
 
 /**
- * Builds a `(source, code)`-tagged `RangeError`. The error type matters to callers that branch on
- * `instanceof RangeError`, so this preserves it instead of producing a plain `Error`.
+ * Create a native RangeError with this package's source, a registered code and the supplied
+ * message. Use it when a caller must branch on native range failure, as with depth or
+ * missing-history ids. Construction does not throw, attach a cause or replace an existing error's
+ * stack.
  */
 export function createStoreDevtoolsRangeError(
   code: IStoreDevtoolsErrorCode,

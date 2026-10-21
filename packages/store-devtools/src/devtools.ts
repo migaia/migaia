@@ -30,18 +30,29 @@ function assertDepth(value: number, name: string): void {
   }
 }
 
+/** A newly allocated diagnostic tree node; its object and children array remain mutable. */
 export type IDependencyTreeNode = {
+  /** Traversal role: dependency roots are observers and reverse-tree roots are observables. */
   kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]
+  /** DebugName, then constructor.name, then AnonymousReactiveNode; not a stable node identifier. */
   label: string
+  /** Current version on observable-role nodes; observer-role nodes omit this field. */
   version?: number
+  /** Edges in the graph's current iteration order, truncated at maxDepth or a path cycle. */
   children: IDependencyTreeNode[]
+  /** Present as true only when this node repeats on the current path, not for a shared diamond leaf. */
   circular?: boolean
 }
 
+/** One published history snapshot; the runtime freezes the entry and state only at the top level. */
 export type IStoreHistoryEntry = {
+  /** Session-local increasing identifier, starting at 1 and not reset by clear. */
   id: number
+  /** Value returned by the configured clock when this entry was prepared. */
   timestamp: number
+  /** 'initial', default 'state change', or the caller's manual record label. */
   label: string
+  /** Clone of store.$plain(); unsupported subtrees may remain aliased under the diagnostic policy. */
   state: Record<string, unknown>
 }
 
@@ -53,30 +64,82 @@ function reportDevtoolsFailure(
   runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener })
 }
 
+/** A retained action record; payload/error and nested values are not cloned or deep-frozen. */
 export type IActionTrace = {
+  /** Configured now() value taken when this action is appended, not the trace event's timestamp. */
   timestamp: number
+  /** Runtime action name or a caller-selected manual name. */
   name: string
+  /** Optional manual diagnostic payload; automatic action capture does not add one. */
   payload?: unknown
+  /** Optional duration supplied by the Runtime trace or manual caller. */
   durationMs?: number
+  /** Optional original failure reference, populated automatically for action error events. */
   error?: unknown
 }
 
+/** Session-local capture policy; invalid limits/callbacks reject synchronously before subscribing. */
 export type IStoreDevToolsOptions = {
+  /**
+   * Positive safe-integer history capacity, default 100; oldest snapshots are evicted
+   * independently.
+   */
   maxHistory?: number
+  /** Positive safe-integer capacity for each independent actions/trace queue, default 1000. */
   maxTrace?: number
+  /**
+   * Enabled unless exactly false; captures the entire borrowed Runtime, not only this Store's
+   * actions.
+   */
   captureRuntimeTrace?: boolean
+  /**
+   * Optional timestamp source, default Date.now; its result is retained without clock
+   * normalization.
+   */
   now?: () => number
+  /**
+   * Optional snapshot/replay clone, default ClonePolicy.diagnostic; it does not redact sensitive
+   * fields.
+   */
   clone?: (state: Record<string, unknown>) => Record<string, unknown>
 }
 
+/** In-memory diagnostics that borrow the Store/Runtime and require explicit synchronous disposal. */
 export type IStoreDevTools = {
+  /** A fresh frozen chronological array of retained shallow-frozen history entries. */
   readonly history: readonly IStoreHistoryEntry[]
+  /** A fresh frozen array; action records and their payload/error references remain mutable. */
   readonly actions: readonly IActionTrace[]
+  /** A fresh frozen array of original Runtime event references, with independent maxTrace capacity. */
   readonly trace: readonly IRuntimeTraceEvent[]
+  /**
+   * Prepare and append a snapshot, default label 'state change'; failure leaves queues/id
+   * unchanged.
+   */
   record(label?: string): IStoreHistoryEntry
+  /**
+   * Append a shallow action copy with now(); manual capture remains available when runtime trace is
+   * disabled.
+   */
   recordAction(trace: Omit<IActionTrace, 'timestamp'>): void
+  /**
+   * Clone a retained snapshot into Store.$hydrate, suppressing synchronous replay history only.
+   * Missing/evicted ids throw UNKNOWN_HISTORY_ENTRY RangeError; this is not external-effect
+   * rollback. Unclassified clone failures receive CALLBACK_FAILED; hydrate errors retain their
+   * upstream identity. Replay suppression is restored even when either step throws.
+   */
   jumpTo(id: number): void
+  /**
+   * Prepare the current snapshot first, then reset all queues to one new initial entry without
+   * resetting ids.
+   */
   clear(): void
+  /**
+   * Mark terminal and attempt both subscriptions once, without disposing the Store/Runtime or
+   * clearing retained queues. One cleanup failure is rethrown; multiple failures become
+   * CLEANUP_FAILED. Later dispose calls return, while record/recordAction/jumpTo/clear reject
+   * SESSION_DISPOSED.
+   */
   dispose(): void
 }
 
@@ -87,7 +150,12 @@ const nodeLabel = (node: object): string =>
 
 // Detects cycles on the current path rather than through a global visited set. Shared diamond nodes expand once per path.
 // Only revisiting a node still on that path is a cycle. Push on entry and remove on return.
-/** Traverses dependencies of runtime-created public handles or extension graph observers. */
+/**
+ * Inspect the current dependencies of a real Effect/Computed handle or extension observer without
+ * changing graph subscriptions. maxDepth defaults to 20, accepts nonnegative safe integers, and
+ * zero keeps only the root. The mutable result expands shared nodes once per path, marks only a
+ * current-path repeat circular, and stops there. Invalid depth throws INVALID_OPTION RangeError.
+ */
 export function getDependencyTree(
   root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,
   maxDepth = 20
@@ -129,7 +197,12 @@ export function getDependencyTree(
   }
 }
 
-/** Traverses subscribers of runtime-created public handles or extension graph observables. */
+/**
+ * Inspect the current subscribers of a real Signal/Computed handle or extension observable. The
+ * root has observable role/version; descendants have observer role. maxDepth defaults to 20, zero
+ * returns a childless root, and invalid depths throw INVALID_OPTION RangeError. The newly allocated
+ * mutable tree is a point-in-time view, not a subscription or a live graph index.
+ */
 export function getObserverTree(
   root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,
   maxDepth = 20
@@ -225,6 +298,15 @@ class BoundedQueue<T> {
   }
 }
 
+/**
+ * Attach bounded in-memory history and optional Runtime/action capture to an existing reactive
+ * Store. Options default to {}; construction records id 1/label 'initial' synchronously before
+ * subscribing. History watches this Store, while trace capture observes its whole borrowed Runtime.
+ * Configuration or initial preparation failure throws before returning; later automatic snapshot
+ * failures go to Runtime.reportError without interrupting the business write. The caller must
+ * dispose the session separately from its Store/Runtime, and time travel does not undo external
+ * I/O.
+ */
 export function createStoreDevTools<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
   options: IStoreDevToolsOptions = {}
@@ -407,7 +489,14 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
         )
       replayDepth++
       try {
-        store.$hydrate(clone(entry.state))
+        /** Replay cloning uses the same diagnostic error boundary as snapshot recording. */
+        let state: Record<string, unknown>
+        try {
+          state = clone(entry.state)
+        } catch (error) {
+          throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
+        }
+        store.$hydrate(state)
       } finally {
         replayDepth--
       }
