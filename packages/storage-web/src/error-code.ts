@@ -1,9 +1,8 @@
 /**
  * Defines the error codes owned by `@migaia/storage-web` in one place.
  *
- * The `(source, code)` pair uniquely identifies an error under `docs/contracts/error-codes.md`.
- * `source` is always `@migaia/storage-web`. Throw sites reference these constants rather than
- * inline literals.
+ * The `(source, code)` pair uniquely identifies one public semantic failure. `source` is always
+ * `@migaia/storage-web`. Throw sites reference these constants rather than inline literals.
  *
  * Code values are public API, so renaming one is a breaking change. Five contract codes move to
  * `@migaia/storage-contract`: `UNSUPPORTED_CAPABILITY`, `ABORTED`, `STORE_DISPOSED`,
@@ -147,9 +146,8 @@ export const StorageErrorCode = Object.freeze({
   invalidConfig: 'INVALID_CONFIG',
 
   /**
-   * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2
-   * orphan-reporting rule; callers should repair or rebuild the index rather than treating the
-   * skipped row as a successful query result.
+   * IndexedDB sidecar contains an index row whose authoritative record is absent. Callers should
+   * repair or rebuild the index rather than treating the skipped row as a successful query result.
    */
   indexOrphan: 'INDEX_ORPHAN',
 
@@ -168,9 +166,9 @@ export const StorageErrorCode = Object.freeze({
   indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED',
 
   /**
-   * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2
-   * Disposal cannot revive subscriptions or owned reactive state; callers must create a new live
-   * query instead of reusing the disposed handle.
+   * A live-query consumer attempted to refresh after terminal disposal. Disposal cannot revive
+   * subscriptions or owned reactive state; callers must create a new live query instead of reusing
+   * the disposed handle.
    */
   liveQueryDisposed: 'LIVE_QUERY_DISPOSED',
 
@@ -285,4 +283,5 @@ export const StorageErrorCode = Object.freeze({
   backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'
 } as const)
 
+/** Semantic failure code owned by storage-web; shared contract failures keep their own source. */
 export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode]

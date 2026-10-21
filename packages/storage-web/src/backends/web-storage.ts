@@ -30,6 +30,10 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   opaqueEntries: false
 })
 
+/**
+ * Namespace configuration shared by local and session storage; changing the codec changes the
+ * persistent key format.
+ */
 export type IWebStorageOptions = {
   /** Prefixes keys to isolate instances and applications. Defaults to `default`. */
   readonly namespace?: string

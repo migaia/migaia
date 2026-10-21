@@ -4,8 +4,9 @@ import type { ICodec } from './types.js'
 import { StorageCodecOutput } from '../constants.js'
 
 /**
- * Stores caller-supplied bytes through `setBytes`. Text-only backends use a base64 fallback with
- * about 33% larger output.
+ * Frozen Uint8Array codec retaining the original valid view on encode/decode; invalid values reject
+ * SERIALIZE_FAILED or DESERIALIZE_FAILED. Backend writes own their byte snapshot. selectCodec adds
+ * base64 wrapping on text-only backends, whose encoded length is four times ceil(byteLength / 3).
  */
 export const binaryCodec: ICodec<Uint8Array, Uint8Array> = Object.freeze({
   name: 'binary',

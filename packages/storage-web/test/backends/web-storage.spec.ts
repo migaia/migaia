@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createWebStorageBackend } from '../../src/backends/web-storage'
 import { localStorageHost } from '../../src/backends/local-storage'
 import { sessionStorageHost } from '../../src/backends/session-storage'
@@ -18,6 +18,43 @@ const unavailableStorage: Storage = {
 }
 
 describe('createWebStorageBackend', () => {
+  it.each([
+    { storageName: 'localStorage' as const, backend: 'local', factory: localStorageHost },
+    { storageName: 'sessionStorage' as const, backend: 'session', factory: sessionStorageHost }
+  ])(
+    '$storageName access denied by the host keeps the original cause',
+    async ({ storageName, backend, factory }) => {
+      /** Browsers may deny access before a Storage object can be obtained for probing. */
+      const original = new DOMException('Storage access is disabled', 'SecurityError')
+      /** Exercise the real public factory's default host lookup, rather than its injected option. */
+      const getter = vi.spyOn(globalThis, storageName, 'get').mockImplementation(() => {
+        throw original
+      })
+      try {
+        /** Capture the public failure once so cause identity is asserted, not just deep equality. */
+        let failure: unknown
+        try {
+          factory()
+        } catch (error) {
+          failure = error
+        }
+        expect(failure).toMatchObject({
+          source: '@migaia/storage-web',
+          code: 'BACKEND_UNAVAILABLE',
+          backend
+        })
+        expect((failure as Error).cause).toBe(original)
+        /** An explicit usable port must continue to bypass a denied ambient host getter. */
+        const store = factory({ storage: fakeWebStorage() })
+        store.sync.set('theme', 'dark')
+        expect(store.sync.get('theme')).toBe('dark')
+        await store.dispose()
+      } finally {
+        getter.mockRestore()
+      }
+    }
+  )
+
   it('构造期拒绝 null、数组和 primitive options', () => {
     for (const options of [null, [], 'options', 1])
       expect(() =>

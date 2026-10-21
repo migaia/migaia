@@ -7,6 +7,7 @@ import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../type
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageBackend } from '../constants.js'
 
+/** Namespace and optional borrowed Storage port for a session-storage backend. */
 export type ISessionStorageOptions = IWebStorageOptions & {
   /**
    * Injects storage for tests and non-browser environments. Defaults to
@@ -15,10 +16,18 @@ export type ISessionStorageOptions = IWebStorageOptions & {
   readonly storage?: IWebStorageLike
 }
 
+/**
+ * Creates a namespaced text store over the supplied port or the host's sessionStorage. The default
+ * namespace is `default`, encoded by lengthPrefixedNamespaceCodec. Host access or probe failure
+ * throws BACKEND_UNAVAILABLE with the original cause; invalid options remain INVALID_CONFIG.
+ * Dispose releases this store's listeners without clearing the borrowed Storage data.
+ */
 export const sessionStorageHost = (
   options: ISessionStorageOptions = {}
 ): ISyncCapableStore<IKeyValueStore> => {
+  /** Capture namespace configuration before admitting either an injected or ambient port. */
   const optionsSnapshot = snapshotWebStorageOptions(options, StorageBackend.session)
+  /** Keep option-getter failure distinct from the host refusing access to its default port. */
   let storage: IWebStorageLike | undefined
   try {
     storage = options.storage
@@ -28,9 +37,17 @@ export const sessionStorageHost = (
       cause
     })
   }
+  try {
+    storage ??= globalThis.sessionStorage
+  } catch (cause) {
+    throw new StorageError(StorageErrorCode.unavailable, {
+      backend: StorageBackend.session,
+      cause
+    })
+  }
   return createWebStorageBackend(
     StorageBackend.session,
-    storage ?? globalThis.sessionStorage,
+    storage,
     optionsSnapshot
   ) as ISyncCapableStore<IKeyValueStore>
 }

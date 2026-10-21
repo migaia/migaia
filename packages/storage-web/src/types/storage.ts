@@ -16,10 +16,19 @@ export { isKeyValueStore, asRecordStore, isRecordStore } from '@migaia/storage-c
  * `@migaia/storage-contract`.
  */
 export type IWebStorageLike = {
+  /** Current native physical entry count, including other namespaces. */
   readonly length: number
+  /** Read one physical text key, returning null when absent. */
   getItem(key: string): string | null
+  /** Write one physical text value; native quota/access errors may throw. */
   setItem(key: string, value: string): void
+  /** Remove one physical key without touching other entries. */
   removeItem(key: string): void
+  /**
+   * Clear the physical storage; storage-web namespace clearing enumerates only its own keys
+   * instead.
+   */
   clear(): void
+  /** Read the physical key at a native enumeration index, or null when absent. */
   key(index: number): string | null
 }

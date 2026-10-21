@@ -7,13 +7,24 @@ export { StorageErrorCode, type IStorageErrorCode }
 /** `source` value stamped onto every error this package throws. */
 export const STORAGE_WEB_SOURCE = '@migaia/storage-web'
 
+/**
+ * Optional diagnostic context for a frozen StorageError; nested values and cause retain their
+ * original identity.
+ */
 export type IStorageErrorDetails = {
+  /** Backend whose operation failed, when known. */
   readonly backend?: IBackendKind
+  /** Logical key associated with this failure. */
   readonly key?: string | IStorageKey
+  /** Channel already occupying a conflicting logical key. */
   readonly existingChannel?: IStorageChannel
+  /** Channel the rejected mutation attempted to use. */
   readonly attemptedChannel?: IStorageChannel
+  /** Schema, codec, migration, comparator or diagnostic extension that failed. */
   readonly extensionStage?: IExtensionStage
+  /** Operation name attached by the owning boundary. */
   readonly operation?: string
+  /** Original failure retained for bounded cause-chain inspection. */
   readonly cause?: unknown
 }
 
@@ -123,25 +134,37 @@ export const createStorageTypeError = (
   )
 }
 
+/** Value, bytes or structured-record channel sharing one logical key conflict domain. */
 export type IStorageChannel = 'value' | 'bytes' | 'record'
+/** Extension phase used to locate a schema, codec, migration, comparator or diagnostic failure. */
 export type IExtensionStage = 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
 
 /**
- * Normalizes backend exceptions into one error form. Retains the original exception as `cause`
- * without changing its message.
+ * Frozen storage diagnostic retaining the original failure on cause. The top-level message defaults
+ * to the package/code label; nested details are not deep-frozen and original stacks remain on
+ * cause.
  */
 export class StorageError extends Error {
+  /** Canonical storage-web diagnostic source. */
   readonly source: string
+  /** Semantic failure scenario; branch on this rather than message text. */
   readonly code: IStorageErrorCode
+  /** Backend associated with this operation. */
   readonly backend?: IBackendKind
+  /** Logical key associated with this operation. */
   readonly key?: string | IStorageKey
+  /** Channel already occupying the conflicting key. */
   readonly existingChannel?: IStorageChannel
+  /** Channel the rejected write attempted to use. */
   readonly attemptedChannel?: IStorageChannel
+  /** Extension phase responsible for this failure. */
   readonly extensionStage?: IExtensionStage
+  /** Operation name attached by its owning boundary. */
   readonly operation?: string
   /** Internal repository stage used to apply invalid-record policy. */
   readonly stage?: 'decode' | 'migrate' | 'validate'
 
+  /** Capture diagnostic details once and freeze this error without replacing its original cause. */
   constructor(
     code: IStorageErrorCode,
     details: IStorageErrorDetails = {},

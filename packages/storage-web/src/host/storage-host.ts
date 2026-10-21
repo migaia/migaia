@@ -278,7 +278,11 @@ export class StorageHostFacade<
     })
   }
 
-  /** Materializes one immutable plugin tuple through the canonical PluginHost batch. */
+  /**
+   * Install one atomic native plugin batch; publication happens only after complete success. A
+   * concurrent mutation throws STORAGE_HOST_BUSY synchronously, while setup/timeout failures reject
+   * and roll back newly owned Stores.
+   */
   use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(
     ...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>
   ): Promise<
@@ -806,7 +810,11 @@ export class StorageHostFacade<
   }
 }
 
-/** Creates an async facade shell; constructor sync work never reads platform globals. */
+/**
+ * Create a Host and atomically install the optional initial plugin tuple. Defaults to no backends
+ * and a 30000 ms install budget. Browser storage is acquired only by selected backend plugins;
+ * failed initial installation disposes its newly created facade before rejecting.
+ */
 export const createStorageHost = async <
   const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
 >(

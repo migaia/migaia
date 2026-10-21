@@ -55,10 +55,11 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
 })
 
 /**
- * Provides an in-memory backend for tests, server-side SSR, and explicit fallback when other
- * backends are unavailable. Each instance owns isolated storage and needs no namespace. Supplies
- * all L0 and L1 operations, with structured cloning for records. The v1 backend does not supply
- * native secondary indexes.
+ * Create an isolated in-memory Store for tests, SSR or an explicitly selected fallback. Text, byte
+ * and record channels share conflict checks; replacement must be explicit. Bytes are copied and
+ * records use structuredClone. Record transactions validate revisions before commit and roll back
+ * on failure; committed mutations publish changes. Dispose seals new work, drains admitted
+ * mutations and clears this instance. Native secondary indexes are unavailable.
  */
 export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>> &
   IChangeFeedStore => {
@@ -175,7 +176,7 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
     remove: (key) => {
       assertLive()
       assertStringStorageKey(key, StorageBackend.memory)
-      // SWV2- ties an event to a successful mutation: removing an absent key changed
+      // Events describe successful mutations: removing an absent key changed
       // nothing, so it must not publish.
       if (kv.delete(key)) publishChange({ channel: 'value', kind: 'remove', keys: [key] })
     },

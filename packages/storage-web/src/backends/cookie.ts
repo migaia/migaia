@@ -49,14 +49,27 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   opaqueEntries: true
 })
 
-export type ICookieDocument = { cookie: string }
+/**
+ * Minimal document surface borrowed by cookiesHost; reads and assignments must keep native cookie
+ * semantics.
+ */
+export type ICookieDocument = {
+  /** Native visible-cookie getter/assignment surface; the document remains borrowed. */ cookie: string
+}
 
+/**
+ * Cookie namespace, fixed scope and borrowed document input; invalid attributes reject
+ * construction.
+ */
 export type ICookiesOptions = {
   /** Prefixes keys to isolate instances and applications. Defaults to `default`. */
   readonly namespace?: string
   /** Customizes physical key encoding. Changing the codec changes the cookie persistence format. */
   readonly namespaceCodec?: INamespaceCodec
-  /** Fixes the cookie scope. Writes and deletions always use the same scope. */
+  /**
+   * Optional fixed scope; omission emits no scope attributes. Writes and deletions reuse the
+   * captured scope.
+   */
   readonly scope?: ICookieScope
   /** Injects a document for testing. Defaults to `globalThis.document`. */
   readonly document?: ICookieDocument
@@ -166,8 +179,11 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
 }
 
 /**
- * Stores cookies through `document.cookie`. Does not handle server-side cookies. For SSR, the
- * caller parses `req.headers.cookie` on the server and supplies the data to `memoryStorageHost`.
+ * Create a visible-cookie Store over the borrowed document.cookie surface. Namespace defaults to
+ * default and the fixed scope applies to writes and removal; there is no server cookie integration.
+ * Values are strings and the complete assignment is bounded to 4096 bytes. Browser rejection can
+ * fail a write, while hidden HttpOnly or differently scoped cookies remain outside read/removal
+ * guarantees. Dispose retires this Store without clearing the caller-owned document.
  */
 export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))

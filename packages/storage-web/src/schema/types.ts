@@ -8,6 +8,7 @@ import type { IOperationContext } from '../types/context.js'
  * `decode`, then `validate` when read validation is enabled.
  */
 export type ISchemaAdapter<TDomain, TStored = TDomain> = {
+  /** Stable adapter label used to identify the schema conversion boundary. */
   readonly name: string
   /**
    * Supports asynchronous refinement and remote validation. Wrappers for synchronous schema

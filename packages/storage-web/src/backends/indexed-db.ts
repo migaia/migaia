@@ -147,16 +147,27 @@ const indexedDbSignalFailure = (
   }
 }
 
+/**
+ * IndexedDB physical layout and optional native factory inputs, captured before lazy database
+ * acquisition.
+ */
 export type IIndexedDbOptions = {
+  /** Database name; defaults to storage-web. */
   readonly dbName?: string
+  /** Text-value object store; defaults to kv. */
   readonly kvStoreName?: string
+  /** Byte-value object store; defaults to bytes. */
   readonly bytesStoreName?: string
+  /** Authoritative record object store; defaults to records. */
   readonly recordsStoreName?: string
-  /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */
+  /**
+   * Defaults to false; explicit release-time opt-in deletes the legacy documents object store after
+   * migration.
+   */
   readonly cleanupLegacyRecords?: boolean
   /**
-   * Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide
-   * IndexedDB.
+   * Optional IndexedDB factory for tests/non-browser hosts; defaults to the captured realm
+   * indexedDB. No fallback Store is selected when the factory is unavailable.
    */
   readonly factory?: IDBFactory
   /**
@@ -438,10 +449,11 @@ const toIdbRecordIndexRange = (
 }
 
 /**
- * Provides the IndexedDB backend, the browser storage backend that stores bytes directly and
- * supports indexes and transactions. Carries forward the previously verified connection management,
- * commit-based write completion, and `onblocked`/`onversionchange` handling from the earlier
- * implementation without changing their core logic. See the comments at each handling site.
+ * Create a lazily opened IndexedDB Store with text, byte and structured-record channels, atomic
+ * transactions and entity secondary indexes. Writes settle after transaction commit. Configuration
+ * rejects invalid factories/layouts before use; transaction, quota and version failures keep their
+ * original causes. Dispose seals admission, waits owned mutation work and closes connection/
+ * coordination resources; it does not delete the database.
  */
 export const indexedDbHost = <TValue = unknown>(
   options: IIndexedDbOptions = {}

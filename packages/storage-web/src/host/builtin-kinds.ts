@@ -6,7 +6,9 @@ import type { sessionStorageHost } from '../backends/session-storage.js'
 import type { indexedDbHost } from '../backends/indexed-db.js'
 
 /** Built-in plugin IDs stay caller-selectable while their kind tokens remain package-private. */
-export type IBuiltInPluginId<TId extends string> = { readonly id?: TId }
+export type IBuiltInPluginId<TId extends string> = {
+  /** Optional bounded backend id; each built-in factory supplies its documented default. */ readonly id?: TId
+}
 
 /** Canonical store types retained by built-in kind tokens and plugin declarations. */
 export type IMemoryBackendStore = ReturnType<typeof memoryStorageHost>
@@ -15,7 +17,7 @@ export type ISessionStorageBackendStore = ReturnType<typeof sessionStorageHost>
 export type ICookieBackendStore = ReturnType<typeof cookiesHost>
 export type IIndexedDbBackendStore = ReturnType<typeof indexedDbHost>
 
-/** Sole owner of the four built-in kind identities; this module imports no backend code. */
+/** Sole owner of the five built-in kind identities; this module imports no backend code. */
 export const memoryBackendKind = defineBuiltInBackendKind<IMemoryBackendStore>()('memory')
 export const localStorageBackendKind =
   defineBuiltInBackendKind<ILocalStorageBackendStore>()('local-storage')

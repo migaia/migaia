@@ -7,7 +7,11 @@ import {
 } from '../host/builtin-kinds.js'
 import type { IStorageBackendPlugin } from '../host/types.js'
 
-/** Creates a local-storage plugin while preserving canonical factory options. */
+/**
+ * Define a localStorage backend plugin with default id local. Store acquisition waits for Host
+ * install, which owns rollback and final disposal; this ordinary plugin adds no reactive adapter.
+ * Backend options retain their factory defaults.
+ */
 export const localStorageBackendPlugin = <const TId extends string = 'local'>(
   options: ILocalStorageOptions & IBuiltInPluginId<TId> = {}
 ): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId> =>

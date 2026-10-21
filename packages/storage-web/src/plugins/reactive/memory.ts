@@ -14,7 +14,11 @@ const memoryReactiveFeature = defineNativeReactiveFeature(
   memoryBackendKind
 )
 
-/** Creates the canonical memory reactive fast-path plugin with exact store identity. */
+/**
+ * Define a memory backend plus its exact reactive adapter; default id memory. Consistency is
+ * push/instance, without polling. Host installation owns Store/source rollback and disposal;
+ * eventual observation does not make cross-context writes transactional.
+ */
 export const memoryReactive = {
   memoryReactive: <const TId extends string = 'memory'>(
     options: IBuiltInPluginId<TId> = {}

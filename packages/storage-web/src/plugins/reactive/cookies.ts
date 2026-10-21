@@ -17,7 +17,11 @@ const cookiesReactiveFeature = defineNativeReactiveFeature(
   cookieBackendKind
 )
 
-/** Creates the canonical cookiesHost reactive fast-path plugin. */
+/**
+ * Define a cookie backend plus its exact reactive adapter; default id cookies. Consistency is
+ * hybrid/origin-js-visible-eventual, polling every 1000 ms. Host installation owns Store/source
+ * rollback and disposal; eventual observation does not make cross-context writes transactional.
+ */
 export const cookiesReactive = {
   cookiesReactive: <const TId extends string = 'cookies'>(
     options: ICookiesOptions & IBuiltInPluginId<TId> = {}

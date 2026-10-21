@@ -22,7 +22,11 @@ export const prepareIndexedDbStore = async (store: IKeyValueStore): Promise<void
   await privateStore.prepare()
 }
 
-/** Creates IndexedDB store synchronously, then lets Host register its disposer before preparation. */
+/**
+ * Define a IndexedDB backend plugin with default id indexed-db. Store acquisition waits for Host
+ * install, which owns rollback and final disposal; this ordinary plugin adds no reactive adapter.
+ * Backend options retain their factory defaults.
+ */
 export const indexedDbBackendPlugin = <const TId extends string = 'indexed-db'>(
   options: IIndexedDbOptions & IBuiltInPluginId<TId> = {}
 ): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId> =>
