@@ -270,7 +270,8 @@ const prices = new Resource(({ signal }) => fetchPrices(signal), runtime, {
 
 runtime.effect(() => {
   const state = prices.state
-  if (state.status === ResourceStatus.success) renderTable(state.data, { updating: state.refreshing })
+  if (state.status === ResourceStatus.success)
+    renderTable(state.data, { updating: state.refreshing })
 })
 // after 60 s the next read returns { status: 'success', data: oldPrices, refreshing: true },
 // then { status: 'success', data: newPrices }`,
@@ -284,7 +285,8 @@ const prices = new Resource(({ signal }) => fetchPrices(signal), runtime, {
 
 runtime.effect(() => {
   const state = prices.state
-  if (state.status === ResourceStatus.success) renderTable(state.data, { updating: state.refreshing })
+  if (state.status === ResourceStatus.success)
+    renderTable(state.data, { updating: state.refreshing })
 })
 // 60 秒后，下一次读取得到 { status: 'success', data: 旧价格, refreshing: true }，
 // 刷新完成后变为 { status: 'success', data: 新价格 }`

@@ -27,6 +27,11 @@
  *   either carries its own `example` or is listed in `covers` of an option case (`optionCases`)
  *   whose example spells the field name. A nested field (`restart.mode`) is also covered by its
  *   top-level field's own example.
+ * - `REF-OPTION-SCOPE` an option case sets at most 6 fields; a larger options bag gets several cases,
+ *   one per situation.
+ * - `REF-OPTION-READABLE` options examples are reader code: lines of at most 100 characters
+ *   (`CODE-WIDTH`), public entry points only (`CODE-INTERNAL`), and no logging of counts, sizes,
+ *   comparisons or predicates that only prove a check passed (`CODE-EVIDENCE`).
  * - `REF-ENUM` every enum-like constant (object of literal values) has an `enums` entry that explains
  *   each key: when to choose it and what happens.
  * - `REF-TYPE` every exported type/interface/class has a `types` entry with a summary and a doc for

@@ -173,6 +173,66 @@ function checkMember(
   return findings
 }
 
+/** Most option fields one case may set; more than this reads as a field inventory, not a scenario. */
+const MAX_CASE_COVERS = 6
+
+/** Widest code line shown in an options example, so the block reads without horizontal scrolling. */
+const MAX_CODE_WIDTH = 100
+
+/** Package subpaths that are not public reader entry points (`/internal`, `/internal-advanced`). */
+const INTERNAL_IMPORT = /(?:from\s+|import\s*\(\s*)['"]@migaia\/[^'"]*\binternal[^'"]*['"]/
+
+/**
+ * Logged expressions that only prove a check passed (counts, sizes, comparisons, predicates). A
+ * reader example shows a value the reader cares about; verification output belongs in the script
+ * that ran it outside the repository.
+ */
+const EVIDENCE_LOG =
+  /\.length\b|\.size\b|[!=]==|\.every\(|\.some\(|\binstanceof\b|\btypeof\b|\.has\(|\.includes\(/
+
+/**
+ * `REF-OPTION-READABLE`: an options example is reader code, not a verification script. Checks line
+ * width (`CODE-WIDTH`), internal entry points (`CODE-INTERNAL`) and proof-style logging
+ * (`CODE-EVIDENCE`) in every locale variant.
+ */
+function checkReaderCode(code: ICode | undefined, where: string): IFinding[] {
+  if (!code) return []
+  const findings: IFinding[] = []
+  /** Locale variants are checked separately; a shared string is one variant. */
+  const variants =
+    typeof code === 'string'
+      ? [['', code]]
+      : [
+          ['en', code.en],
+          ['zh', code.zh]
+        ]
+  for (const [locale, text] of variants) {
+    const at = locale ? `${where}.${locale}` : where
+    text.split('\n').forEach((line, index) => {
+      if ([...line].length > MAX_CODE_WIDTH)
+        findings.push({
+          rule: 'CODE-WIDTH',
+          where: at,
+          message: `line ${index + 1} is ${[...line].length} characters (max ${MAX_CODE_WIDTH})`
+        })
+    })
+    if (INTERNAL_IMPORT.test(text))
+      findings.push({
+        rule: 'CODE-INTERNAL',
+        where: at,
+        message: 'imports an internal entry point; use the public package entry'
+      })
+    for (const match of text.matchAll(/console\.(?:log|info|debug)\(([^\n]*)\)/g))
+      if (EVIDENCE_LOG.test(match[1]!))
+        findings.push({
+          rule: 'CODE-EVIDENCE',
+          where: at,
+          message: `logs a check instead of a value: ${match[0].slice(0, 60)}`
+        })
+  }
+  return findings
+}
+
 /**
  * `REF-OPTION-CODE`: every options field is shown in code, by its own example or by an option case
  * that lists it and spells its name. Literal-union, enum and function fields need their own example
@@ -192,8 +252,15 @@ function checkOptionCode(
       ...checkText(item.title, `${at}.title`, MIN_ZH_DETAIL),
       ...checkText(item.problem, `${at}.problem`, MIN_ZH_DETAIL),
       ...checkText(item.result, `${at}.result`, MIN_ZH_DETAIL),
-      ...checkCode(item.example, `${at}.example`, true)
+      ...checkCode(item.example, `${at}.example`, true),
+      ...checkReaderCode(item.example, `${at}.example`)
     )
+    if (item.covers.length > MAX_CASE_COVERS)
+      findings.push({
+        rule: 'REF-OPTION-SCOPE',
+        where: at,
+        message: `covers ${item.covers.length} fields (max ${MAX_CASE_COVERS}); split it by scenario`
+      })
     /** Every code variant must spell each covered field, so the claim is visible in the code. */
     const variants =
       typeof item.example === 'string' ? [item.example] : [item.example.en, item.example.zh]
@@ -215,6 +282,7 @@ function checkOptionCode(
     const doc = fieldDocs.get(field.name)
     if (!doc) continue
     const at = `${where}{${field.name}}`
+    findings.push(...checkReaderCode(doc.example, `${at}.example`))
     const top = field.name.split('.')[0]!
     const needsOwn =
       Boolean(fieldLiteralValues(field.type, symbols)) ||
