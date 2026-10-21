@@ -1,9 +1,8 @@
 /**
  * Declares the public error codes for `@migaia/store-ssr` in one place.
  *
- * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/store-ssr'`. Throw sites use these constants instead of inline
- * literals.
+ * Package-owned failures use `(source, code)` with source `'@migaia/store-ssr'`. Throw sites use
+ * these constants instead of inline literals; complete upstream identities retain their owner.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */
@@ -102,4 +101,5 @@ export const StoreSsrErrorCode = {
   resourceTimeout: 'RESOURCE_TIMEOUT'
 } as const
 
+/** Stable semantic values minted by SSR validation, registration and cleanup boundaries. */
 export type IStoreSsrErrorCode = (typeof StoreSsrErrorCode)[keyof typeof StoreSsrErrorCode]
