@@ -2534,7 +2534,7 @@
           "name": "assertSSRState",
           "kind": "function",
           "signature": "export declare function assertSSRState(value: unknown): asserts value is ISSRState;",
-          "declarationLine": 174,
+          "declarationLine": 312,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Validates version-1 envelope and recursive plain JSON data without cloning/freezing.",
           "core": "value: Unknown parsed/request value to narrow to ISSRState.\nVoid with type assertion. Validation errors retain their semantic identity. Unclassified extensible native getter failures receive INVALID_SNAPSHOT in place with class, stack and identity preserved; frozen/non-Error failures remain on cause, while complete foreign source/code identities remain unchanged.",
@@ -2612,10 +2612,10 @@
           "name": "createSSRRequestScope",
           "kind": "function",
           "signature": "export declare function createSSRRequestScope(options?: ISSRRequestScopeOptions): SSRRequestScope;",
-          "declarationLine": 127,
+          "declarationLine": 222,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Constructs a request scope with a new Runtime by default. Retain it through rendering, register objects created with scope.runtime, and await disposeAsync afterward. Install @migaia/store-light and @migaia/resource directly for the examples that import them.",
-          "core": "options: Optional ISSRRequestScopeOptions, defaults to {}. runtime reuses an existing Runtime; runtimeOptions constructs a new one, and the two fields cannot be combined. Supplying a shared Runtime does not isolate requests.\nSSRRequestScope with separate store/resource key spaces. register/registerResource default to owned: true and require the exact scope Runtime; detach transfers cleanup to the caller. Dehydrate copies/freezes supported JSON data. The Resource example overrides its default ttl of Infinity with 60000 ms to keep its completed cache eligible; ttl is a Resource option, not a scope option.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
+          "core": "options: Optional ISSRRequestScopeOptions, defaults to {}. runtime reuses an existing Runtime; runtimeOptions constructs a new one, and the two fields cannot be combined. Supplying a shared Runtime does not isolate requests.\nSSRRequestScope with separate store/resource key spaces. register/registerResource default to owned: true and require the exact scope Runtime; detach transfers cleanup to the caller. Dehydrate copies/freezes supported JSON data. The Resource example overrides its default ttl of Infinity with 60000 ms to keep its completed cache eligible; ttl is a Resource option, not a scope option.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
           "advanced": "",
           "parameters": ["options: ISSRRequestScopeOptions (optional)"],
           "parameterDetails": [
@@ -2675,7 +2675,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "options: Optional ISSRRequestScopeOptions, defaults to {}. runtime reuses an existing Runtime; runtimeOptions constructs a new one, and the two fields cannot be combined. Supplying a shared Runtime does not isolate requests.\nSSRRequestScope with separate store/resource key spaces. register/registerResource default to owned: true and require the exact scope Runtime; detach transfers cleanup to the caller. Dehydrate copies/freezes supported JSON data. The Resource example overrides its default ttl of Infinity with 60000 ms to keep its completed cache eligible; ttl is a Resource option, not a scope option.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
+              "content": "options: Optional ISSRRequestScopeOptions, defaults to {}. runtime reuses an existing Runtime; runtimeOptions constructs a new one, and the two fields cannot be combined. Supplying a shared Runtime does not isolate requests.\nSSRRequestScope with separate store/resource key spaces. register/registerResource default to owned: true and require the exact scope Runtime; detach transfers cleanup to the caller. Dehydrate copies/freezes supported JSON data. The Resource example overrides its default ttl of Infinity with 60000 ms to keep its completed cache eligible; ttl is a Resource option, not a scope option.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
             },
             {
               "id": "advanced-usage",
@@ -2688,7 +2688,7 @@
               "name": "runtime",
               "type": "IRuntime",
               "optional": true,
-              "description": ""
+              "description": "Optional existing Runtime; sharing it does not create request isolation."
             },
             {
               "name": "runtimeOptions",
@@ -2742,7 +2742,7 @@
               "type": "IRuntime",
               "optional": true,
               "description": "`createSSRRequestScope` 默认创建新运行时，各真实 `store-light` 容器使用自身的 `scope.runtime`，`register()` 接纳前检查精确运行时身份。",
-              "descriptionEn": "",
+              "descriptionEn": "Optional existing Runtime; sharing it does not create request isolation.",
               "descriptionZh": "`createSSRRequestScope` 默认创建新运行时，各真实 `store-light` 容器使用自身的 `scope.runtime`，`register()` 接纳前检查精确运行时身份。"
             },
             {
@@ -2808,7 +2808,7 @@
           "name": "createSSRStateScript",
           "kind": "function",
           "signature": "export declare function createSSRStateScript(state: ISSRState, elementId?: string): string;",
-          "declarationLine": 137,
+          "declarationLine": 247,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Builds a complete application/json script element with a validated ID and escaped JSON. It returns HTML text; it neither inserts nodes nor hydrates stores. To read the element later, supply the same ID and an explicit document to readSSRStateFromDocument.",
           "core": "state: Required version-1 ISSRState with a plain stores record and optional version-2 resource snapshots; it uses serializeSSRState validation and HTML escaping.\nelementId: Optional ID from caller configuration, defaults to `__STORE_STATE__`; must match /^[A-Za-z_][A-Za-z0-9_:.-]*$/. Empty IDs, whitespace, quotes and a leading digit reject with INVALID_STATE_SCRIPT.\nComplete script HTML; invalid ID throws INVALID_STATE_SCRIPT.",
@@ -2899,7 +2899,7 @@
           "name": "createSSRStateScriptWith",
           "kind": "function",
           "signature": "export declare function createSSRStateScriptWith(state: ISSRState, options: ISSRScriptOptions): Promise<string>;",
-          "declarationLine": 161,
+          "declarationLine": 287,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Encodes via registry.primaryType. JSON text uses JSON-safe HTML escapes; other text/bytes become base64 in text/plain. Value chunks reject CODEC_CONTRACT.",
           "core": "state: Valid ISSRState, checked before encoding.\nPromise of complete script with codec/wire metadata; codec/abort failures follow serialize.\ncodecs: Required ISerializeRegistry from @migaia/serialize createSerializeRegistry; writer uses primaryType, reader uses data-codec and checks has.\nelementId: Script identifier from caller configuration; writers enforce /^[A-Za-z_][A-Za-z0-9_:.-]*$/ or fail INVALID_STATE_SCRIPT.\nUses the stable `__STORE_STATE__` element identifier.\nsignal: External IAbortSignal forwarded to registry encode/decode; SSR neither owns nor aborts it.\nOmitted: no caller cancellation signal.",
@@ -2981,13 +2981,13 @@
               "name": "codecs",
               "type": "ISerializeRegistry",
               "optional": false,
-              "description": ""
+              "description": "Required registry; primaryType selects the format recorded in data-codec."
             },
             {
               "name": "elementId",
               "type": "string",
               "optional": true,
-              "description": ""
+              "description": "Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding."
             },
             {
               "name": "signal",
@@ -3004,16 +3004,16 @@
               "name": "codecs",
               "type": "ISerializeRegistry",
               "optional": false,
-              "description": "Required registry; the recorded data-codec selects its decoder.",
-              "descriptionEn": "Required registry; the recorded data-codec selects its decoder.",
+              "description": "Required registry; primaryType selects the format recorded in data-codec.",
+              "descriptionEn": "Required registry; primaryType selects the format recorded in data-codec.",
               "descriptionZh": ""
             },
             {
               "name": "elementId",
               "type": "string",
               "optional": true,
-              "description": "Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion.",
-              "descriptionEn": "Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion.",
+              "description": "Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding.",
+              "descriptionEn": "Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding.",
               "descriptionZh": ""
             },
             {
@@ -3031,7 +3031,7 @@
           "name": "createStoreSsrAggregateError",
           "kind": "function",
           "signature": "export declare function createStoreSsrAggregateError(code: IStoreSsrErrorCode, errors: unknown[], message: string): AggregateError;",
-          "declarationLine": 14,
+          "declarationLine": 18,
           "source": "packages/store-ssr/dist/errors.d.ts",
           "purpose": "Builds native AggregateError tagged source @migaia/store-ssr and selected code, preserving stack and native class.",
           "core": "code: Actual failure value from StoreSsrErrorCode.\nerrors: Original failures retained in AggregateError.errors.\nmessage: Caller-facing diagnostic message.\nTagged AggregateError; helper returns rather than throws it.",
@@ -3179,8 +3179,8 @@
         {
           "name": "createStoreSsrError",
           "kind": "function",
-          "signature": "export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
-          "declarationLine": 6,
+          "signature": "export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */ readonly cause?: unknown; }): Error;",
+          "declarationLine": 9,
           "source": "packages/store-ssr/dist/errors.d.ts",
           "purpose": "Builds native Error tagged source @migaia/store-ssr and selected code, preserving stack and native class.",
           "core": "code: Actual failure value from StoreSsrErrorCode.\nmessage: Caller-facing diagnostic message.\nTagged Error; helper returns rather than throws it.\ncause: Non-undefined original failure retained as cause.\nOmitted; no cause attached.",
@@ -3188,7 +3188,7 @@
           "parameters": [
             "code: IStoreSsrErrorCode",
             "message: string",
-            "options: { readonly cause?: unknown; } (optional)"
+            "options: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */ readonly cause?: unknown; } (optional)"
           ],
           "parameterDetails": [
             {
@@ -3203,7 +3203,7 @@
             },
             {
               "name": "options",
-              "type": "{ readonly cause?: unknown; }",
+              "type": "{ /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */ readonly cause?: unknown; }",
               "optional": true
             }
           ],
@@ -3215,7 +3215,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
+            "export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */ readonly cause?: unknown; }): Error;"
           ],
           "overloadParameterDetails": [
             [
@@ -3231,7 +3231,7 @@
               },
               {
                 "name": "options",
-                "type": "{ readonly cause?: unknown; }",
+                "type": "{ /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */ readonly cause?: unknown; }",
                 "optional": true
               }
             ]
@@ -3276,10 +3276,10 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "Identity for package-owned failures; complete foreign identities retain their existing source. */ export const STORE_SSR_SOURCE = '@migaia/store-ssr' /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */ const tagStoreSsrError = <E extends Error>(error: E, code: IStoreSsrErrorCode): E => attachErrorIdentity(error, { source: STORE_SSR_SOURCE, code }) /** Create an SSR-owned Error for the supplied stable code and display text. An optional nonundefined cause remains reachable by identity; the native stack is generated normally and never rewritten. / export function createStoreSsrError( code: IStoreSsrErrorCode, message: string, options?: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field."
+              "description": "Optional original failure; omitted/undefined leaves the Error without an own cause field."
             }
           ],
-          "identity": "packages/store-ssr/dist/errors.d.ts:createStoreSsrError:export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "identity": "packages/store-ssr/dist/errors.d.ts:createStoreSsrError:export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field. */ readonly cause?: unknown; }): Error;",
           "guidance": [
             {
               "id": "错误身份与工厂",
@@ -3338,8 +3338,8 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "Identity for package-owned failures; complete foreign identities retain their existing source. */ export const STORE_SSR_SOURCE = '@migaia/store-ssr' /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */ const tagStoreSsrError = <E extends Error>(error: E, code: IStoreSsrErrorCode): E => attachErrorIdentity(error, { source: STORE_SSR_SOURCE, code }) /** Create an SSR-owned Error for the supplied stable code and display text. An optional nonundefined cause remains reachable by identity; the native stack is generated normally and never rewritten. / export function createStoreSsrError( code: IStoreSsrErrorCode, message: string, options?: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field.",
-              "descriptionEn": "Identity for package-owned failures; complete foreign identities retain their existing source. */ export const STORE_SSR_SOURCE = '@migaia/store-ssr' /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */ const tagStoreSsrError = <E extends Error>(error: E, code: IStoreSsrErrorCode): E => attachErrorIdentity(error, { source: STORE_SSR_SOURCE, code }) /** Create an SSR-owned Error for the supplied stable code and display text. An optional nonundefined cause remains reachable by identity; the native stack is generated normally and never rewritten. / export function createStoreSsrError( code: IStoreSsrErrorCode, message: string, options?: { /** Optional original failure; omitted/undefined leaves the Error without an own cause field.",
+              "description": "Optional original failure; omitted/undefined leaves the Error without an own cause field.",
+              "descriptionEn": "Optional original failure; omitted/undefined leaves the Error without an own cause field.",
               "descriptionZh": ""
             }
           ],
@@ -3349,7 +3349,7 @@
           "name": "createStoreSsrRangeError",
           "kind": "function",
           "signature": "export declare function createStoreSsrRangeError(code: IStoreSsrErrorCode, message: string): RangeError;",
-          "declarationLine": 10,
+          "declarationLine": 14,
           "source": "packages/store-ssr/dist/errors.d.ts",
           "purpose": "Builds native RangeError tagged source @migaia/store-ssr and selected code, preserving stack and native class.",
           "core": "code: Actual failure value from StoreSsrErrorCode.\nmessage: Caller-facing diagnostic message.\nTagged RangeError; helper returns rather than throws it.",
@@ -3488,7 +3488,7 @@
           "name": "createStoreSsrTypeError",
           "kind": "function",
           "signature": "export declare function createStoreSsrTypeError(code: IStoreSsrErrorCode, message: string): TypeError;",
-          "declarationLine": 12,
+          "declarationLine": 16,
           "source": "packages/store-ssr/dist/errors.d.ts",
           "purpose": "Builds native TypeError tagged source @migaia/store-ssr and selected code, preserving stack and native class.",
           "core": "code: Actual failure value from StoreSsrErrorCode.\nmessage: Caller-facing diagnostic message.\nTagged TypeError; helper returns rather than throws it.",
@@ -3627,7 +3627,7 @@
           "name": "deserializeSSRState",
           "kind": "function",
           "signature": "export declare function deserializeSSRState(serialized: string): ISSRState;",
-          "declarationLine": 136,
+          "declarationLine": 241,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "JSON-parses then validates the envelope; parsed state is not frozen.",
           "core": "serialized: Serialized JSON or script textContent, never a complete script tag.\nISSRState; invalid JSON keeps its native SyntaxError class, stack and identity with INVALID_STATE_SCRIPT attached in place. Invalid payloads retain their validation identity; complete foreign identities remain unchanged.",
@@ -3706,8 +3706,8 @@
         {
           "name": "IAwaitResourcesOptions",
           "kind": "type",
-          "signature": "export type IAwaitResourcesOptions = { readonly timeoutMs?: number; };",
-          "declarationLine": 59,
+          "signature": "export type IAwaitResourcesOptions = { /** Defaults to no deadline; finite 0..2147483647 ms is accepted, with zero expiring pending work. */ readonly timeoutMs?: number; };",
+          "declarationLine": 88,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Resource waterfall wait budget.",
           "core": "timeoutMs: Total milliseconds, finite from 0 through 2147483647. Zero waits only for already-settled Promise reactions, never for in-flight work. Invalid input returns a rejected Promise with RangeError INVALID_OPTION. At the deadline only unsettled resources receive RESOURCE_TIMEOUT; fulfilled work is omitted and rejected work keeps its original reason. Resources are not cancelled.\nOmitted: no deadline; waits until convergence or scope disposal.",
@@ -3724,7 +3724,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly timeoutMs?: number;",
-              "description": null,
+              "description": "Defaults to no deadline; finite 0..2147483647 ms is accepted, with zero expiring pending work.",
               "parameterDetails": [],
               "returns": "number"
             }
@@ -3732,7 +3732,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IAwaitResourcesOptions = { readonly timeoutMs?: number; };"
+            "export type IAwaitResourcesOptions = { /** Defaults to no deadline; finite 0..2147483647 ms is accepted, with zero expiring pending work. */ readonly timeoutMs?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3771,7 +3771,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:IAwaitResourcesOptions:export type IAwaitResourcesOptions = { readonly timeoutMs?: number; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:IAwaitResourcesOptions:export type IAwaitResourcesOptions = { /** Defaults to no deadline; finite 0..2147483647 ms is accepted, with zero expiring pending work. */ readonly timeoutMs?: number; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3780,8 +3780,8 @@
         {
           "name": "IDehydrateAsyncOptions",
           "kind": "type",
-          "signature": "export type IDehydrateAsyncOptions = { /** Overrides the default resource failure reporting through `Runtime.onError`. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. */ readonly timeoutMs?: number; };",
-          "declarationLine": 50,
+          "signature": "export type IDehydrateAsyncOptions = { /** Optional hook replacing default Runtime reporting; its own failure does not stop dehydration. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. Omission sets no deadline; zero expires pending work immediately. * Finite 0..2147483647 millisecond values are accepted, including fractions. */ readonly timeoutMs?: number; };",
+          "declarationLine": 77,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Prefetch wait and diagnostic callback options.",
           "core": "timeoutMs: Total milliseconds, finite from 0 through 2147483647. Zero waits only for already-settled Promise reactions, never for in-flight work. Invalid input returns a rejected Promise with RangeError INVALID_OPTION. At the deadline only unsettled resources receive RESOURCE_TIMEOUT; fulfilled work is omitted and rejected work keeps its original reason. Resources are not cancelled.\nOmitted: no deadline; waits until convergence or scope disposal.\nonResourceError: Synchronous callback for each {key,error} failure in collected order; return void. Throws and rejected returned thenables are reported best-effort to Runtime phase ssr-resource; returned thenables are not awaited.\nRuntime.reportError(failure.error, {phase: ssr-resource}).",
@@ -3798,7 +3798,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly onResourceError?: (failure: ISSRResourceFailure) => void;",
-              "description": "Overrides the default resource failure reporting through `Runtime.onError`.",
+              "description": "Optional hook replacing default Runtime reporting; its own failure does not stop dehydration.",
               "parameterDetails": [],
               "returns": "(failure: ISSRResourceFailure) => void"
             },
@@ -3807,7 +3807,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly timeoutMs?: number;",
-              "description": "Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking rendering indefinitely.",
+              "description": "Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking rendering indefinitely. Omission sets no deadline; zero expires pending work immediately. Finite 0..2147483647 millisecond values are accepted, including fractions.",
               "parameterDetails": [],
               "returns": "number"
             }
@@ -3815,7 +3815,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDehydrateAsyncOptions = { /** Overrides the default resource failure reporting through `Runtime.onError`. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. */ readonly timeoutMs?: number; };"
+            "export type IDehydrateAsyncOptions = { /** Optional hook replacing default Runtime reporting; its own failure does not stop dehydration. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. Omission sets no deadline; zero expires pending work immediately. * Finite 0..2147483647 millisecond values are accepted, including fractions. */ readonly timeoutMs?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3854,7 +3854,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:IDehydrateAsyncOptions:export type IDehydrateAsyncOptions = { /** Overrides the default resource failure reporting through `Runtime.onError`. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. */ readonly timeoutMs?: number; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:IDehydrateAsyncOptions:export type IDehydrateAsyncOptions = { /** Optional hook replacing default Runtime reporting; its own failure does not stop dehydration. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. Omission sets no deadline; zero expires pending work immediately. * Finite 0..2147483647 millisecond values are accepted, including fractions. */ readonly timeoutMs?: number; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3864,7 +3864,7 @@
           "name": "IJSONPrimitive",
           "kind": "type",
           "signature": "export type IJSONPrimitive = string | number | boolean | null;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "String, number, boolean or null; runtime validation rejects non-finite numbers despite the broad number type.",
           "core": "String, number, boolean or null; runtime validation rejects non-finite numbers despite the broad number type.",
@@ -3926,7 +3926,7 @@
           "name": "IJSONValue",
           "kind": "type",
           "signature": "export type IJSONValue = IJSONPrimitive | readonly IJSONValue[] | { readonly [key: string]: IJSONValue; };",
-          "declarationLine": 6,
+          "declarationLine": 8,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Recursive primitives, readonly arrays or string-keyed records. Runtime requires plain objects, no cycles and bounded depth/nodes; bigint, undefined, functions and class instances are unsupported.",
           "core": "Recursive primitives, readonly arrays or string-keyed records. Runtime requires plain objects, no cycles and bounded depth/nodes; bigint, undefined, functions and class instances are unsupported.",
@@ -3989,8 +3989,8 @@
         {
           "name": "ISSRDocument",
           "kind": "type",
-          "signature": "export type ISSRDocument = { getElementById(elementId: string): { readonly textContent: string | null; getAttribute(name: string): string | null; } | null; };",
-          "declarationLine": 139,
+          "signature": "export type ISSRDocument = { /** Read an existing state element; no global document is accessed implicitly. */ getElementById(elementId: string): { /** Encoded payload without its surrounding script tag; null means no text. */ readonly textContent: string | null; /** Read recorded codec/wire attributes; null selects decoder defaults. */ getAttribute(name: string): string | null; } | null; };",
+          "declarationLine": 249,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Minimal injected document protocol without browser dependency.",
           "core": "getElementById: Synchronous host callback; host errors propagate with their existing identity. Element textContent is string/null; getAttribute(name) synchronously returns metadata string/null.\ngetElementById.elementId: Element identifier received from caller configuration and passed unchanged by the reader.\nElement-like {textContent,getAttribute(name)} or null; basic reader reads text only, codec reader also reads data-codec/data-wire.",
@@ -4006,8 +4006,8 @@
               "name": "getElementById",
               "kind": "method",
               "optional": false,
-              "signature": "getElementById(elementId: string): { readonly textContent: string | null; getAttribute(name: string): string | null; } | null;",
-              "description": null,
+              "signature": "getElementById(elementId: string): { /** Encoded payload without its surrounding script tag; null means no text. */ readonly textContent: string | null; /** Read recorded codec/wire attributes; null selects decoder defaults. */ getAttribute(name: string): string | null; } | null;",
+              "description": "Read an existing state element; no global document is accessed implicitly.",
               "parameterDetails": [
                 {
                   "name": "elementId",
@@ -4015,13 +4015,13 @@
                   "optional": false
                 }
               ],
-              "returns": "{ readonly textContent: string | null; getAttribute(name: string): string | null; } | null"
+              "returns": "{ /** Encoded payload without its surrounding script tag; null means no text. */ readonly textContent: string | null; /** Read recorded codec/wire attributes; null selects decoder defaults. */ getAttribute(name: string): string | null; } | null"
             }
           ],
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRDocument = { getElementById(elementId: string): { readonly textContent: string | null; getAttribute(name: string): string | null; } | null; };"
+            "export type ISSRDocument = { /** Read an existing state element; no global document is accessed implicitly. */ getElementById(elementId: string): { /** Encoded payload without its surrounding script tag; null means no text. */ readonly textContent: string | null; /** Read recorded codec/wire attributes; null selects decoder defaults. */ getAttribute(name: string): string | null; } | null; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4060,7 +4060,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRDocument:export type ISSRDocument = { getElementById(elementId: string): { readonly textContent: string | null; getAttribute(name: string): string | null; } | null; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRDocument:export type ISSRDocument = { /** Read an existing state element; no global document is accessed implicitly. */ getElementById(elementId: string): { /** Encoded payload without its surrounding script tag; null means no text. */ readonly textContent: string | null; /** Read recorded codec/wire attributes; null selects decoder defaults. */ getAttribute(name: string): string | null; } | null; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4069,8 +4069,8 @@
         {
           "name": "ISSRReadOptions",
           "kind": "type",
-          "signature": "export type ISSRReadOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly document?: ISSRDocument; readonly signal?: IAbortSignal; };",
-          "declarationLine": 162,
+          "signature": "export type ISSRReadOptions = { /** Required registry; the recorded data-codec selects its decoder. */ readonly codecs: ISerializeRegistry; /** Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion. */ readonly elementId?: string; /** Optional supplied host; omission returns undefined without a global lookup. */ readonly document?: ISSRDocument; /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */ readonly signal?: IAbortSignal; };",
+          "declarationLine": 289,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Required registry and explicitly injected document host.",
           "core": "codecs: Required ISerializeRegistry from @migaia/serialize createSerializeRegistry; writer uses primaryType, reader uses data-codec and checks has.\nelementId: Script identifier from caller configuration; writers enforce /^[A-Za-z_][A-Za-z0-9_:.-]*$/ or fail INVALID_STATE_SCRIPT.\nUses the stable `__STORE_STATE__` element identifier.\nsignal: External IAbortSignal forwarded to registry encode/decode; SSR neither owns nor aborts it.\nOmitted: no caller cancellation signal.\ndocument: Application ISSRDocument; browser document is structurally compatible. No global fallback.\nOmitted: returns undefined without decoding.",
@@ -4087,7 +4087,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly codecs: ISerializeRegistry;",
-              "description": null,
+              "description": "Required registry; the recorded data-codec selects its decoder.",
               "parameterDetails": [],
               "returns": "ISerializeRegistry"
             },
@@ -4096,7 +4096,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly elementId?: string;",
-              "description": null,
+              "description": "Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4105,7 +4105,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly document?: ISSRDocument;",
-              "description": null,
+              "description": "Optional supplied host; omission returns undefined without a global lookup.",
               "parameterDetails": [],
               "returns": "ISSRDocument"
             },
@@ -4114,7 +4114,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly signal?: IAbortSignal;",
-              "description": null,
+              "description": "Optional registry-operation signal; omission adds no SSR-owned cancellation.",
               "parameterDetails": [],
               "returns": "IAbortSignal"
             }
@@ -4122,7 +4122,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRReadOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly document?: ISSRDocument; readonly signal?: IAbortSignal; };"
+            "export type ISSRReadOptions = { /** Required registry; the recorded data-codec selects its decoder. */ readonly codecs: ISerializeRegistry; /** Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion. */ readonly elementId?: string; /** Optional supplied host; omission returns undefined without a global lookup. */ readonly document?: ISSRDocument; /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */ readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4161,7 +4161,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRReadOptions:export type ISSRReadOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly document?: ISSRDocument; readonly signal?: IAbortSignal; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRReadOptions:export type ISSRReadOptions = { /** Required registry; the recorded data-codec selects its decoder. */ readonly codecs: ISerializeRegistry; /** Defaults to **STORE_STATE**; this is a lookup key rather than a DOM insertion. */ readonly elementId?: string; /** Optional supplied host; omission returns undefined without a global lookup. */ readonly document?: ISSRDocument; /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */ readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4170,8 +4170,8 @@
         {
           "name": "ISSRRegistrationOptions",
           "kind": "type",
-          "signature": "export type ISSRRegistrationOptions = { /** Request scopes own registered stores by default. */ readonly owned?: boolean; };",
-          "declarationLine": 38,
+          "signature": "export type ISSRRegistrationOptions = { /** Defaults to true for Stores/resources; false leaves cleanup with the caller. */ readonly owned?: boolean; };",
+          "declarationLine": 58,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Ownership policy fixed at registration.",
           "core": "owned: Boolean true gives scope cleanup responsibility, false keeps it with caller.\nTrue.",
@@ -4188,7 +4188,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly owned?: boolean;",
-              "description": "Request scopes own registered stores by default.",
+              "description": "Defaults to true for Stores/resources; false leaves cleanup with the caller.",
               "parameterDetails": [],
               "returns": "boolean"
             }
@@ -4196,7 +4196,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRRegistrationOptions = { /** Request scopes own registered stores by default. */ readonly owned?: boolean; };"
+            "export type ISSRRegistrationOptions = { /** Defaults to true for Stores/resources; false leaves cleanup with the caller. */ readonly owned?: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4235,7 +4235,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRRegistrationOptions:export type ISSRRegistrationOptions = { /** Request scopes own registered stores by default. */ readonly owned?: boolean; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRRegistrationOptions:export type ISSRRegistrationOptions = { /** Defaults to true for Stores/resources; false leaves cleanup with the caller. */ readonly owned?: boolean; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4244,11 +4244,11 @@
         {
           "name": "ISSRRequestScopeOptions",
           "kind": "type",
-          "signature": "export type ISSRRequestScopeOptions = { readonly runtime?: IRuntime; readonly runtimeOptions?: IRuntimeOptions; };",
-          "declarationLine": 42,
+          "signature": "export type ISSRRequestScopeOptions = { /** Optional existing Runtime; sharing it does not create request isolation. */ readonly runtime?: IRuntime; /** Optional new-Runtime configuration; supplying both this and runtime fails. */ readonly runtimeOptions?: IRuntimeOptions; };",
+          "declarationLine": 63,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Mutually exclusive Runtime construction choices.",
-          "core": "runtime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
+          "core": "runtime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -4262,7 +4262,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly runtime?: IRuntime;",
-              "description": null,
+              "description": "Optional existing Runtime; sharing it does not create request isolation.",
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -4271,7 +4271,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly runtimeOptions?: IRuntimeOptions;",
-              "description": null,
+              "description": "Optional new-Runtime configuration; supplying both this and runtime fails.",
               "parameterDetails": [],
               "returns": "IRuntimeOptions"
             }
@@ -4279,7 +4279,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRRequestScopeOptions = { readonly runtime?: IRuntime; readonly runtimeOptions?: IRuntimeOptions; };"
+            "export type ISSRRequestScopeOptions = { /** Optional existing Runtime; sharing it does not create request isolation. */ readonly runtime?: IRuntime; /** Optional new-Runtime configuration; supplying both this and runtime fails. */ readonly runtimeOptions?: IRuntimeOptions; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4309,7 +4309,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "runtime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
+              "content": "runtime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
             },
             {
               "id": "advanced-usage",
@@ -4318,7 +4318,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRRequestScopeOptions:export type ISSRRequestScopeOptions = { readonly runtime?: IRuntime; readonly runtimeOptions?: IRuntimeOptions; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRRequestScopeOptions:export type ISSRRequestScopeOptions = { /** Optional existing Runtime; sharing it does not create request isolation. */ readonly runtime?: IRuntime; /** Optional new-Runtime configuration; supplying both this and runtime fails. */ readonly runtimeOptions?: IRuntimeOptions; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4327,8 +4327,8 @@
         {
           "name": "ISSRResource",
           "kind": "type",
-          "signature": "export type ISSRResource = { readonly runtime: IRuntime; readonly disposed: boolean; readonly promise: Promise<unknown>; dehydrate(): IResourceCacheSnapshot<unknown> | undefined; hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; dispose(): void; };",
-          "declarationLine": 30,
+          "signature": "export type ISSRResource = { /** Exact Runtime identity required to match the receiving scope. */ readonly runtime: IRuntime; /** Whether resource-owned work was already released. */ readonly disposed: boolean; /** Current work identity; replacement Promises participate in later wait rounds. */ readonly promise: Promise<unknown>; /** Return includable cache state, or undefined to omit this resource from the payload. */ dehydrate(): IResourceCacheSnapshot<unknown> | undefined; /** Apply cache state under Resource-owned validation and lifetime policy. */ hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; /** Release work synchronously; SSR does not await a returned value. */ dispose(): void; };",
+          "declarationLine": 43,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "The methods needed to manage loaded data within one server request: wait for loading, save or restore cached data, and release the resource. [Resource](/en/docs/resource/api/Resource) provides these methods. Construct it with scope.runtime, the request scope’s execution context, and pass it to scope.registerResource. The scope can then wait for it, ask it for cached data, and clean it up by default. Without registration, the scope does not manage it. A resource using a different runtime makes registration throw CROSS_RUNTIME. Resource itself defines whether cached data is available to save.",
           "core": "runtime: Exact Runtime owner, identical to scope.runtime.\ndisposed: Terminal flag checked by dehydration and cleanup.\npromise: Current prefetch Promise, reread each round and deduplicated by identity per key; continuous getter failure is captured once.\ndehydrate: Synchronous optional resource cache snapshot producer.\nIResourceCacheSnapshot or undefined to omit; errors propagate.\nhydrate: Synchronously applies external resource snapshot.\nhydrate.snapshot: Version-2 IResourceCacheSnapshot with relative ageMs/remainingTtlMs from validated SSR state.\nVoid; failures remain reachable through scope hydration.\ndispose: Synchronous resource cleanup; this protocol does not accept async disposal.\nVoid; scope disposal retains failures, unregisterResource propagates them.",
@@ -4345,7 +4345,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly runtime: IRuntime;",
-              "description": null,
+              "description": "Exact Runtime identity required to match the receiving scope.",
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -4354,7 +4354,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly disposed: boolean;",
-              "description": null,
+              "description": "Whether resource-owned work was already released.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -4363,7 +4363,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly promise: Promise<unknown>;",
-              "description": null,
+              "description": "Current work identity; replacement Promises participate in later wait rounds.",
               "parameterDetails": [],
               "returns": "Promise<unknown>"
             },
@@ -4372,7 +4372,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dehydrate(): IResourceCacheSnapshot<unknown> | undefined;",
-              "description": null,
+              "description": "Return includable cache state, or undefined to omit this resource from the payload.",
               "parameterDetails": [],
               "returns": "IResourceCacheSnapshot<unknown> | undefined"
             },
@@ -4381,7 +4381,7 @@
               "kind": "method",
               "optional": false,
               "signature": "hydrate(snapshot: IResourceCacheSnapshot<unknown>): void;",
-              "description": null,
+              "description": "Apply cache state under Resource-owned validation and lifetime policy.",
               "parameterDetails": [
                 {
                   "name": "snapshot",
@@ -4396,7 +4396,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dispose(): void;",
-              "description": null,
+              "description": "Release work synchronously; SSR does not await a returned value.",
               "parameterDetails": [],
               "returns": "void"
             }
@@ -4404,7 +4404,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRResource = { readonly runtime: IRuntime; readonly disposed: boolean; readonly promise: Promise<unknown>; dehydrate(): IResourceCacheSnapshot<unknown> | undefined; hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; dispose(): void; };"
+            "export type ISSRResource = { /** Exact Runtime identity required to match the receiving scope. */ readonly runtime: IRuntime; /** Whether resource-owned work was already released. */ readonly disposed: boolean; /** Current work identity; replacement Promises participate in later wait rounds. */ readonly promise: Promise<unknown>; /** Return includable cache state, or undefined to omit this resource from the payload. */ dehydrate(): IResourceCacheSnapshot<unknown> | undefined; /** Apply cache state under Resource-owned validation and lifetime policy. */ hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; /** Release work synchronously; SSR does not await a returned value. */ dispose(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4443,7 +4443,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRResource:export type ISSRResource = { readonly runtime: IRuntime; readonly disposed: boolean; readonly promise: Promise<unknown>; dehydrate(): IResourceCacheSnapshot<unknown> | undefined; hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; dispose(): void; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRResource:export type ISSRResource = { /** Exact Runtime identity required to match the receiving scope. */ readonly runtime: IRuntime; /** Whether resource-owned work was already released. */ readonly disposed: boolean; /** Current work identity; replacement Promises participate in later wait rounds. */ readonly promise: Promise<unknown>; /** Return includable cache state, or undefined to omit this resource from the payload. */ dehydrate(): IResourceCacheSnapshot<unknown> | undefined; /** Apply cache state under Resource-owned validation and lifetime policy. */ hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; /** Release work synchronously; SSR does not await a returned value. */ dispose(): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4452,8 +4452,8 @@
         {
           "name": "ISSRResourceFailure",
           "kind": "type",
-          "signature": "export type ISSRResourceFailure = { readonly key: string; readonly error: unknown; };",
-          "declarationLine": 46,
+          "signature": "export type ISSRResourceFailure = { /** Registration whose work failed, could not be read, or exceeded its deadline. */ readonly key: string; /** Original rejection/read failure, or a module-owned RESOURCE_TIMEOUT error. */ readonly error: unknown; };",
+          "declarationLine": 70,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Resource wait diagnostic preserving original rejection/getter failure or tagged timeout.",
           "core": "key: Failed pending round entry registration key.\nerror: Unknown original failure or RESOURCE_TIMEOUT Error; do not assume every value is an Error.",
@@ -4472,7 +4472,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly key: string;",
-              "description": null,
+              "description": "Registration whose work failed, could not be read, or exceeded its deadline.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4481,7 +4481,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: unknown;",
-              "description": null,
+              "description": "Original rejection/read failure, or a package-owned RESOURCE_TIMEOUT error.",
               "parameterDetails": [],
               "returns": "unknown"
             }
@@ -4489,7 +4489,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRResourceFailure = { readonly key: string; readonly error: unknown; };"
+            "export type ISSRResourceFailure = { /** Registration whose work failed, could not be read, or exceeded its deadline. */ readonly key: string; /** Original rejection/read failure, or a module-owned RESOURCE_TIMEOUT error. */ readonly error: unknown; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4528,7 +4528,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRResourceFailure:export type ISSRResourceFailure = { readonly key: string; readonly error: unknown; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRResourceFailure:export type ISSRResourceFailure = { /** Registration whose work failed, could not be read, or exceeded its deadline. */ readonly key: string; /** Original rejection/read failure, or a package-owned RESOURCE_TIMEOUT error. */ readonly error: unknown; };",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -4537,8 +4537,8 @@
         {
           "name": "ISSRScriptOptions",
           "kind": "type",
-          "signature": "export type ISSRScriptOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly signal?: IAbortSignal; };",
-          "declarationLine": 147,
+          "signature": "export type ISSRScriptOptions = { /** Required registry; primaryType selects the format recorded in data-codec. */ readonly codecs: ISerializeRegistry; /** Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding. */ readonly elementId?: string; /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */ readonly signal?: IAbortSignal; };",
+          "declarationLine": 265,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Required registry and optional script encoding controls.",
           "core": "codecs: Required ISerializeRegistry from @migaia/serialize createSerializeRegistry; writer uses primaryType, reader uses data-codec and checks has.\nelementId: Script identifier from caller configuration; writers enforce /^[A-Za-z_][A-Za-z0-9_:.-]*$/ or fail INVALID_STATE_SCRIPT.\nUses the stable `__STORE_STATE__` element identifier.\nsignal: External IAbortSignal forwarded to registry encode/decode; SSR neither owns nor aborts it.\nOmitted: no caller cancellation signal.",
@@ -4555,7 +4555,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly codecs: ISerializeRegistry;",
-              "description": null,
+              "description": "Required registry; primaryType selects the format recorded in data-codec.",
               "parameterDetails": [],
               "returns": "ISerializeRegistry"
             },
@@ -4564,7 +4564,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly elementId?: string;",
-              "description": null,
+              "description": "Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -4573,7 +4573,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly signal?: IAbortSignal;",
-              "description": null,
+              "description": "Optional registry-operation signal; omission adds no SSR-owned cancellation.",
               "parameterDetails": [],
               "returns": "IAbortSignal"
             }
@@ -4581,7 +4581,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRScriptOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly signal?: IAbortSignal; };"
+            "export type ISSRScriptOptions = { /** Required registry; primaryType selects the format recorded in data-codec. */ readonly codecs: ISerializeRegistry; /** Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding. */ readonly elementId?: string; /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */ readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4620,7 +4620,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRScriptOptions:export type ISSRScriptOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly signal?: IAbortSignal; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRScriptOptions:export type ISSRScriptOptions = { /** Required registry; primaryType selects the format recorded in data-codec. */ readonly codecs: ISerializeRegistry; /** Defaults to **STORE_STATE**; invalid HTML id tokens fail before encoding. */ readonly elementId?: string; /** Optional registry-operation signal; omission adds no SSR-owned cancellation. */ readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4629,8 +4629,8 @@
         {
           "name": "ISSRState",
           "kind": "type",
-          "signature": "export type ISSRState = { readonly version: 1; readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };",
-          "declarationLine": 9,
+          "signature": "export type ISSRState = { /** Supported outer SSR version, independent of resource cache versions. */ readonly version: 1; /** Store snapshots indexed by nonempty registration keys other than **proto**. */ readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; /** Optional cache map; omission is accepted, while dehydration emits an empty map. */ readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };",
+          "declarationLine": 12,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Versioned JSON-compatible envelope; readonly typing alone does not freeze all producers.",
           "core": "version: Literal 1, the only accepted SSR envelope version.\nCurrent SSR state format.\nstores: Plain record of registration keys to plain IJSONValue field records; scope dehydration sorts keys and omits disposed stores.\nresources: Optional @migaia/resource IResourceCacheSnapshot record: version 2, finite nonnegative ageMs, finite nonnegative remainingTtlMs or null, and JSON data. Relative ages retain their canonical Resource meaning during hydration.\nAbsent means no resource hydration; scope dehydration still emits an empty record when none exist.",
@@ -4647,7 +4647,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly version: 1;",
-              "description": null,
+              "description": "Supported outer SSR version, independent of resource cache versions.",
               "parameterDetails": [],
               "returns": "1"
             },
@@ -4656,7 +4656,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>;",
-              "description": null,
+              "description": "Store snapshots indexed by nonempty registration keys other than **proto**.",
               "parameterDetails": [],
               "returns": "Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>"
             },
@@ -4665,7 +4665,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>;",
-              "description": null,
+              "description": "Optional cache map; omission is accepted, while dehydration emits an empty map.",
               "parameterDetails": [],
               "returns": "Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>"
             }
@@ -4673,7 +4673,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRState = { readonly version: 1; readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };"
+            "export type ISSRState = { /** Supported outer SSR version, independent of resource cache versions. */ readonly version: 1; /** Store snapshots indexed by nonempty registration keys other than **proto**. */ readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; /** Optional cache map; omission is accepted, while dehydration emits an empty map. */ readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4712,7 +4712,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRState:export type ISSRState = { readonly version: 1; readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRState:export type ISSRState = { /** Supported outer SSR version, independent of resource cache versions. */ readonly version: 1; /** Store snapshots indexed by nonempty registration keys other than **proto**. */ readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; /** Optional cache map; omission is accepted, while dehydration emits an empty map. */ readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -4721,8 +4721,8 @@
         {
           "name": "ISSRStore",
           "kind": "type",
-          "signature": "export type ISSRStore = { readonly $runtime: IRuntime; readonly $disposed: boolean; $plain(): Record<string, unknown>; $hydrate(state: Record<string, unknown>): void; $dispose(): void | PromiseLike<void>; };",
-          "declarationLine": 23,
+          "signature": "export type ISSRStore = { /** Exact Runtime identity required to match the receiving scope. */ readonly $runtime: IRuntime; /** Whether Store cleanup already ran inside or outside this scope. */ readonly $disposed: boolean; /** Return current plain state; dehydrate copies it while the trusted path retains it. */ $plain(): Record<string, unknown>; /** Apply state under Store policy; thrown failures remain observable. */ $hydrate(state: Record<string, unknown>): void; /** Release owned work; async completion is observed by scope.disposeAsync(). */ $dispose(): void | PromiseLike<void>; };",
+          "declarationLine": 30,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "A request scope groups the stores used by one server request. This type lists the methods it needs to save state, restore it, and release a store. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible object. Create the store with runtime: scope.runtime, sharing the scope’s execution context, then pass it to scope.register. The scope can then collect its state for a request snapshot and owns cleanup by default. Without registration, the scope does not collect or clean up that store. Using a different runtime makes registration throw CROSS_RUNTIME.",
           "core": "$runtime: Exact owner Runtime, identical to scope.runtime.\n$disposed: Terminal flag checked for dehydration/cleanup omission.\n$plain: Synchronous plain data callback, never a Promise.\nRecord<string, unknown>; validated/copied by dehydrate or retained live by trusted path. Throws propagate.\n$hydrate: Synchronous data application callback without transactional rollback.\n$hydrate.state: Store field record from validated state.\nVoid; original failures are retained by hydration or propagate from registration.\n$dispose: Releases owned store resources, possibly asynchronously.\nVoid or PromiseLike<void>; scope observes rejection and disposeAsync awaits completion.",
@@ -4739,7 +4739,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly $runtime: IRuntime;",
-              "description": null,
+              "description": "Exact Runtime identity required to match the receiving scope.",
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -4748,7 +4748,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly $disposed: boolean;",
-              "description": null,
+              "description": "Whether Store cleanup already ran inside or outside this scope.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -4757,7 +4757,7 @@
               "kind": "method",
               "optional": false,
               "signature": "$plain(): Record<string, unknown>;",
-              "description": null,
+              "description": "Return current plain state; dehydrate copies it while the trusted path retains it.",
               "parameterDetails": [],
               "returns": "Record<string, unknown>"
             },
@@ -4766,7 +4766,7 @@
               "kind": "method",
               "optional": false,
               "signature": "$hydrate(state: Record<string, unknown>): void;",
-              "description": null,
+              "description": "Apply state under Store policy; thrown failures remain observable.",
               "parameterDetails": [
                 {
                   "name": "state",
@@ -4781,7 +4781,7 @@
               "kind": "method",
               "optional": false,
               "signature": "$dispose(): void | PromiseLike<void>;",
-              "description": null,
+              "description": "Release owned work; async completion is observed by scope.disposeAsync().",
               "parameterDetails": [],
               "returns": "void | PromiseLike<void>"
             }
@@ -4789,7 +4789,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISSRStore = { readonly $runtime: IRuntime; readonly $disposed: boolean; $plain(): Record<string, unknown>; $hydrate(state: Record<string, unknown>): void; $dispose(): void | PromiseLike<void>; };"
+            "export type ISSRStore = { /** Exact Runtime identity required to match the receiving scope. */ readonly $runtime: IRuntime; /** Whether Store cleanup already ran inside or outside this scope. */ readonly $disposed: boolean; /** Return current plain state; dehydrate copies it while the trusted path retains it. */ $plain(): Record<string, unknown>; /** Apply state under Store policy; thrown failures remain observable. */ $hydrate(state: Record<string, unknown>): void; /** Release owned work; async completion is observed by scope.disposeAsync(). */ $dispose(): void | PromiseLike<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4828,7 +4828,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRStore:export type ISSRStore = { readonly $runtime: IRuntime; readonly $disposed: boolean; $plain(): Record<string, unknown>; $hydrate(state: Record<string, unknown>): void; $dispose(): void | PromiseLike<void>; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:ISSRStore:export type ISSRStore = { /** Exact Runtime identity required to match the receiving scope. */ readonly $runtime: IRuntime; /** Whether Store cleanup already ran inside or outside this scope. */ readonly $disposed: boolean; /** Return current plain state; dehydrate copies it while the trusted path retains it. */ $plain(): Record<string, unknown>; /** Apply state under Store policy; thrown failures remain observable. */ $hydrate(state: Record<string, unknown>): void; /** Release owned work; async completion is observed by scope.disposeAsync(). */ $dispose(): void | PromiseLike<void>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4838,7 +4838,7 @@
           "name": "ISsrWireType",
           "kind": "type",
           "signature": "export type ISsrWireType = (typeof SsrWireType)[keyof typeof SsrWireType];",
-          "declarationLine": 13,
+          "declarationLine": 17,
           "source": "packages/store-ssr/dist/ssr-constants.d.ts",
           "purpose": "Union json, text or bytes from SsrWireType; b64 is HTML metadata outside this union.",
           "core": "Union json, text or bytes from SsrWireType; b64 is HTML metadata outside this union.",
@@ -4968,7 +4968,7 @@
           "name": "ITrustedSSRState",
           "kind": "type",
           "signature": "export type ITrustedSSRState = ISSRState & { readonly [trustedSSRBrand]: true; };",
-          "declarationLine": 20,
+          "declarationLine": 26,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "ISSRState intersected with inaccessible unique-symbol brand, produced by dehydrateTrusted. Nested references remain live; do not fabricate via cast.",
           "core": "version: Literal 1, the only accepted SSR envelope version.\nCurrent SSR state format.\nstores: Plain record of registration keys to plain IJSONValue field records; scope dehydration sorts keys and omits disposed stores.\nresources: Optional @migaia/resource IResourceCacheSnapshot record: version 2, finite nonnegative ageMs, finite nonnegative remainingTtlMs or null, and JSON data. Relative ages retain their canonical Resource meaning during hydration.\nAbsent means no resource hydration; scope dehydration still emits an empty record when none exist.",
@@ -5032,7 +5032,7 @@
           "name": "readSSRStateFromDocument",
           "kind": "function",
           "signature": "export declare function readSSRStateFromDocument(elementId?: string, documentValue?: ISSRDocument): ISSRState | undefined;",
-          "declarationLine": 146,
+          "declarationLine": 263,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Reads text from an explicitly injected host; never reads global document or checks script metadata.",
           "core": "elementId: Optional matching ID from caller configuration, default `__STORE_STATE__`.\ndocumentValue: Optional ISSRDocument, e.g. browser document or caller adapter; absent means no element.\nISSRState or undefined when text/element absent or empty. Whitespace is parsed and may throw.",
@@ -5120,7 +5120,7 @@
           "name": "readSSRStateFromDocumentWith",
           "kind": "function",
           "signature": "export declare function readSSRStateFromDocumentWith(options: ISSRReadOptions): Promise<ISSRState | undefined>;",
-          "declarationLine": 169,
+          "declarationLine": 305,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Decodes data-codec (default json) and data-wire (default text). b64 becomes bytes; other wire values become text. Validates decoded state.",
           "core": "Promise<ISSRState | undefined>; missing/empty text yields undefined, unregistered codec rejects CODEC_CONTRACT, host/codec failures propagate.\ncodecs: Required ISerializeRegistry from @migaia/serialize createSerializeRegistry; writer uses primaryType, reader uses data-codec and checks has.\nelementId: Script identifier from caller configuration; writers enforce /^[A-Za-z_][A-Za-z0-9_:.-]*$/ or fail INVALID_STATE_SCRIPT.\nUses the stable `__STORE_STATE__` element identifier.\nsignal: External IAbortSignal forwarded to registry encode/decode; SSR neither owns nor aborts it.\nOmitted: no caller cancellation signal.\ndocument: Application ISSRDocument; browser document is structurally compatible. No global fallback.\nOmitted: returns undefined without decoding.",
@@ -5256,7 +5256,7 @@
           "name": "serializeSSRState",
           "kind": "function",
           "signature": "export declare function serializeSSRState(state: ISSRState): string;",
-          "declarationLine": 129,
+          "declarationLine": 228,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Validates then JSON-stringifies, escaping &, <, > and Unicode line separators as \\u0026, \\u003c, \\u003e, \\u2028 and \\u2029 for non-executable HTML embedding.",
           "core": "state: Required ISSRState: version must be 1; stores is a plain record of store keys to plain JSON field records. resources is optional and contains version-2 Resource snapshots. JSON values support null, booleans, strings, finite numbers, arrays and plain objects; no cycles, unsupported objects, depth above 256, or traversal above one million nodes.\nHTML-escaped JSON string; validation/native JSON failures propagate.",
@@ -5336,7 +5336,7 @@
           "name": "serializeTrustedSSRState",
           "kind": "function",
           "signature": "export declare function serializeTrustedSSRState(state: ITrustedSSRState): string;",
-          "declarationLine": 135,
+          "declarationLine": 235,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Serializes branded live data without validation; pair with dehydrateTrusted immediately before any await/mutation.",
           "core": "state: Exact branded ITrustedSSRState produced by scope; a type cast provides no runtime guarantee.\nHTML-escaped JSON; native stringify failures propagate.",
@@ -5413,11 +5413,11 @@
         {
           "name": "SSRRequestScope",
           "kind": "class",
-          "signature": "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() * result; the failure list does not independently filter payload keys. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting * instead. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
-          "declarationLine": 73,
+          "signature": "export declare class SSRRequestScope { #private; /** Runtime retained for equality checks and reporting; never disposed by this scope. */ readonly runtime: IRuntime; /** * Create a request registry with a fresh Runtime by default, or retain the supplied Runtime. * Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION. Create separate * scopes and Runtimes for request isolation; construction creates no Stores or resources. */ constructor(options?: ISSRRequestScopeOptions); /** True as soon as teardown starts, before any owned cleanup callback runs. */ get disposed(): boolean; /** * Register a same-Runtime Store under a unique nonempty key other than **proto**. Ownership * defaults to true. Pending hydration runs before commit; a hydration throw while the scope stays * active leaves the key free and state retained. Reentrant scope closure rejects admission * without taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes * and cross-Runtime Stores fail with their corresponding SSR code. */ register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; /** * Remove a Store, returning false when absent. disposeOwned defaults to true and starts cleanup * only for owned entries; async cleanup is tracked for disposeAsync(). Removal precedes cleanup, * so a thrown Store failure does not restore registration. Closed scopes throw SCOPE_DISPOSED. */ unregister(key: string, disposeOwned?: boolean): boolean; /** * Remove a Store without cleanup and return its exact reference, or undefined when absent. The * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED. */ detach(key: string): ISSRStore | undefined; /** * Register a same-Runtime resource with ownership defaulting to true. Store/resource keys use * separate registries. Pending hydration runs before commit; a throw while the scope stays active * leaves the key free and state retained. Reentrant scope closure rejects admission without * taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes and * cross-Runtime resources fail with their corresponding SSR code. */ registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; /** * Remove a resource, returning false when absent. disposeOwned defaults to true; owned cleanup * runs before deletion, so a thrown cleanup leaves this registration present. Nonowned resources * are only unregistered. Closed scopes throw SCOPE_DISPOSED. */ unregisterResource(key: string, disposeOwned?: boolean): boolean; /** * Remove a resource without cleanup and return its exact reference, or undefined when absent. The * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED. */ detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. Each call * replaces pending tables for unregistered keys. One hydration callback failure is rethrown by * identity; several become HYDRATE_FAILED with ordered errors. */ hydrate(state: ISSRState): void; /** * Copy/freeze JSON Store state and includable resource data, sorting keys and omitting disposed * or valueless entries. Getters may execute. Unsupported values, cycles or depth/node limits fail * with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or waiting * occurs. */ dehydrate(): ISSRState; /** * Returns live business references without copying, deep-freezing or validation. Outer state and * registration maps are shallow-frozen; later mutations to retained business values can change * the payload before serialization, including across an await; this is not a snapshot. Use only * for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this unchecked path only when skipping validation and copying is justified. The * TypeScript brand is not runtime validation; closed scopes throw SCOPE_DISPOSED. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. The timeout is one total budget, * with no deadline by default; waiting observes late rejection but never aborts resource work. * Nonconverging waterfalls reject RESOURCE_ROUND_LIMIT, invalid budgets reject INVALID_OPTION, * and an already-closed scope rejects SCOPE_DISPOSED. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() * result; the failure list does not independently filter payload keys. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead. * Resource failures do not independently remove payload keys: each resource decides inclusion. * Disposal during waiting can make the final dehydrate() reject SCOPE_DISPOSED. Timeout options * use awaitResources() semantics; returned state has not yet been HTML-encoded. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; /** * Close admission, interrupt waits, clear state and start owned cleanup once: resources in * reverse registration order, then Stores in reverse order. Disposed/nonowned entries are skipped * and the Runtime stays caller-owned. All cleanup is attempted before a sole sync failure is * rethrown or several become SCOPE_DISPOSAL_FAILED. Async Store jobs are observed by * disposeAsync(); repeated dispose() is a no-op. */ dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
+          "declarationLine": 103,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Creates one fixed-Runtime request registry, equivalent to createSSRRequestScope.",
-          "core": "New request-owned SSRRequestScope with empty registries and fixed Runtime; finish with disposeAsync. Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION before a usable scope is returned.\nruntime: Runtime fixed at construction, identical to the owner of every registered object. Cleanup releases registered owned objects; the scope does not dispose the Runtime itself.\ndisposed: Terminal flag set before cleanup; later active operations fail SCOPE_DISPOSED.\nregister: Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw leaves the key free and retains pending data while the scope remains active; disposal clears pending data and rejects SCOPE_DISPOSED. Neither failure transfers candidate ownership. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.\nregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregister.store: ISSRStore, normally @migaia/store-light createStore with scope.runtime.\nregister.options: Optional ISSRRegistrationOptions; default owned true.\nVoid; retains the exact store by key.\nunregister: Removes store registration, then starts requested owned cleanup. Synchronous failure leaves the key removed; asynchronous errors are retained for disposeAsync.\nunregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregister.disposeOwned: Default true; false leaves removed store alive.\nWhether key existed; synchronous cleanup errors propagate.\ndetach: Removes store registration without cleanup and transfers ownership to caller.\ndetach.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRStore or undefined.\nregisterResource: Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and retains pending data only while the scope stays active. Disposal clears pending data and rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.\nregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregisterResource.resource: ISSRResource, normally @migaia/resource Resource constructed with scope.runtime.\nregisterResource.options: Optional registration policy, default owned true.\nVoid; retains resource until removal or disposal.\nunregisterResource: Disposes requested owned resource before deleting its registration; synchronous disposal failure leaves registration present.\nunregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregisterResource.disposeOwned: Default true; false skips cleanup.\nWhether registration was removed; original cleanup errors propagate.\ndetachResource: Removes resource without disposing it; caller takes cleanup ownership.\ndetachResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRResource or undefined.\nhydrate: Validates, then applies entries best-effort. Missing registrations become pending hydration; each call replaces pending maps. Successful changes remain applied if another entry fails. One failure is rethrown unchanged; several become HYDRATE_FAILED AggregateError.\nhydrate.state: Version-1 ISSRState from deserializeSSRState or validated application data.\nVoid; no rollback protocol is provided.\ndehydrate: Reads live registrations in key order. Store fields and resource data are validated, deeply copied and frozen; metadata is shallow copied. Disposed entries and resource snapshots returning undefined are omitted.\nFrozen ISSRState; unsupported data fails SERIALIZE_UNSUPPORTED, entry access failures can become INVALID_SNAPSHOT with cause.\ndehydrateTrusted: Skips nested validation, copying and freezing. Only outer records are frozen; entry data remains live. Pair with serializeTrustedSSRState immediately for known immutable JSON fixtures.\nBranded ITrustedSSRState, not an immutable snapshot.\nawaitResources: Waits in waterfall rounds, deduplicating last Promise identity per key. New retries/refetches participate. Getter failures and rejections become diagnostics. Continued new work after 64 rounds rejects RESOURCE_ROUND_LIMIT. Disposal returns already collected failures.\nawaitResources.options: Optional IAwaitResourcesOptions, default empty with no deadline.\nPromise of readonly ISSRResourceFailure entries. At timeout only still-pending Promises receive RESOURCE_TIMEOUT; fulfilled entries are omitted and rejected entries retain their original reason. A zero budget recognizes already-settled work without awaiting in-flight resources. Invalid options reject the Promise rather than throwing synchronously.\ndehydrateAsync: Waits, reports each failure, then calls dehydrate. It does not independently remove failed keys; inclusion follows resource.dehydrate. Disposal during waiting makes final dehydration reject SCOPE_DISPOSED.\ndehydrateAsync.options: Optional IDehydrateAsyncOptions, defaults to no deadline and Runtime reporting.\nPromise<ISSRState>; diagnostic throws/rejections are reported best-effort and do not stop other reports. Returned reporter thenables are observed without awaiting.\ndispose: Marks terminal, wakes waits and clears registrations/pending state, then starts all owned cleanup: resources before stores, reverse registration order per group. Idempotent; one failure does not prevent other cleanup.\nVoid without awaiting store cleanup. One synchronous failure is rethrown unchanged; several become SCOPE_DISPOSAL_FAILED AggregateError. Await disposeAsync for completion.\ndisposeAsync: Starts disposal if needed and awaits every tracked owned cleanup. Completion is published before synchronous cleanup callbacks, so reentrant calls from dispose or disposeAsync share the same Promise. It waits for the full cleanup set admitted by the synchronous start pass and replays failures; the Runtime itself is retained.\nStable Promise<void>; exact single retained failure or SCOPE_DISPOSAL_FAILED AggregateError for multiple failures.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
+          "core": "New request-owned SSRRequestScope with empty registries and fixed Runtime; finish with disposeAsync. Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION before a usable scope is returned.\nruntime: Runtime fixed at construction, identical to the owner of every registered object. Cleanup releases registered owned objects; the scope does not dispose the Runtime itself.\ndisposed: Terminal flag set before cleanup; later active operations fail SCOPE_DISPOSED.\nregister: Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw leaves the key free and retains pending data while the scope remains active; disposal clears pending data and rejects SCOPE_DISPOSED. Neither failure transfers candidate ownership. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.\nregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregister.store: ISSRStore, normally @migaia/store-light createStore with scope.runtime.\nregister.options: Optional ISSRRegistrationOptions; default owned true.\nVoid; retains the exact store by key.\nunregister: Removes store registration, then starts requested owned cleanup. Synchronous failure leaves the key removed; asynchronous errors are retained for disposeAsync.\nunregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregister.disposeOwned: Default true; false leaves removed store alive.\nWhether key existed; synchronous cleanup errors propagate.\ndetach: Removes store registration without cleanup and transfers ownership to caller.\ndetach.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRStore or undefined.\nregisterResource: Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and retains pending data only while the scope stays active. Disposal clears pending data and rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.\nregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregisterResource.resource: ISSRResource, normally @migaia/resource Resource constructed with scope.runtime.\nregisterResource.options: Optional registration policy, default owned true.\nVoid; retains resource until removal or disposal.\nunregisterResource: Disposes requested owned resource before deleting its registration; synchronous disposal failure leaves registration present.\nunregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregisterResource.disposeOwned: Default true; false skips cleanup.\nWhether registration was removed; original cleanup errors propagate.\ndetachResource: Removes resource without disposing it; caller takes cleanup ownership.\ndetachResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRResource or undefined.\nhydrate: Validates, then applies entries best-effort. Missing registrations become pending hydration; each call replaces pending maps. Successful changes remain applied if another entry fails. One failure is rethrown unchanged; several become HYDRATE_FAILED AggregateError.\nhydrate.state: Version-1 ISSRState from deserializeSSRState or validated application data.\nVoid; no rollback protocol is provided.\ndehydrate: Reads live registrations in key order. Store fields and resource data are validated, deeply copied and frozen; metadata is shallow copied. Disposed entries and resource snapshots returning undefined are omitted.\nFrozen ISSRState; unsupported data fails SERIALIZE_UNSUPPORTED, entry access failures can become INVALID_SNAPSHOT with cause.\ndehydrateTrusted: Skips nested validation, copying and freezing. Only outer records are frozen; entry data remains live. Pair with serializeTrustedSSRState immediately for known immutable JSON fixtures.\nBranded ITrustedSSRState, not an immutable snapshot.\nawaitResources: Waits in waterfall rounds, deduplicating last Promise identity per key. New retries/refetches participate. Getter failures and rejections become diagnostics. Continued new work after 64 rounds rejects RESOURCE_ROUND_LIMIT. Disposal returns already collected failures.\nawaitResources.options: Optional IAwaitResourcesOptions, default empty with no deadline.\nPromise of readonly ISSRResourceFailure entries. At timeout only still-pending Promises receive RESOURCE_TIMEOUT; fulfilled entries are omitted and rejected entries retain their original reason. A zero budget recognizes already-settled work without awaiting in-flight resources. Invalid options reject the Promise rather than throwing synchronously.\ndehydrateAsync: Waits, reports each failure, then calls dehydrate. It does not independently remove failed keys; inclusion follows resource.dehydrate. Disposal during waiting makes final dehydration reject SCOPE_DISPOSED.\ndehydrateAsync.options: Optional IDehydrateAsyncOptions, defaults to no deadline and Runtime reporting.\nPromise<ISSRState>; diagnostic throws/rejections are reported best-effort and do not stop other reports. Returned reporter thenables are observed without awaiting.\ndispose: Marks terminal, wakes waits and clears registrations/pending state, then starts all owned cleanup: resources before stores, reverse registration order per group. Idempotent; one failure does not prevent other cleanup.\nVoid without awaiting store cleanup. One synchronous failure is rethrown unchanged; several become SCOPE_DISPOSAL_FAILED AggregateError. Await disposeAsync for completion.\ndisposeAsync: Starts disposal if needed and awaits every tracked owned cleanup. Completion is published before synchronous cleanup callbacks, so reentrant calls from dispose or disposeAsync share the same Promise. It waits for the full cleanup set admitted by the synchronous start pass and replays failures; the Runtime itself is retained.\nStable Promise<void>; exact single retained failure or SCOPE_DISPOSAL_FAILED AggregateError for multiple failures.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush.",
           "advanced": "Own stores/resources through rendering, snapshot, then await cleanup.",
           "parameters": ["options: ISSRRequestScopeOptions (optional)"],
           "parameterDetails": [
@@ -5437,7 +5437,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly runtime: IRuntime;",
-              "description": null,
+              "description": "Runtime retained for equality checks and reporting; never disposed by this scope.",
               "parameterDetails": [],
               "returns": "IRuntime"
             },
@@ -5446,7 +5446,7 @@
               "kind": "get",
               "optional": false,
               "signature": "get disposed(): boolean;",
-              "description": null,
+              "description": "True as soon as teardown starts, before any owned cleanup callback runs.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -5455,7 +5455,7 @@
               "kind": "method",
               "optional": false,
               "signature": "register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void;",
-              "description": null,
+              "description": "Register a same-Runtime Store under a unique nonempty key other than **proto**. Ownership defaults to true. Pending hydration runs before commit; a hydration throw while the scope stays active leaves the key free and state retained. Reentrant scope closure rejects admission without taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes and cross-Runtime Stores fail with their corresponding SSR code.",
               "parameterDetails": [
                 {
                   "name": "key",
@@ -5480,7 +5480,7 @@
               "kind": "method",
               "optional": false,
               "signature": "unregister(key: string, disposeOwned?: boolean): boolean;",
-              "description": null,
+              "description": "Remove a Store, returning false when absent. disposeOwned defaults to true and starts cleanup only for owned entries; async cleanup is tracked for disposeAsync(). Removal precedes cleanup, so a thrown Store failure does not restore registration. Closed scopes throw SCOPE_DISPOSED.",
               "parameterDetails": [
                 {
                   "name": "key",
@@ -5500,7 +5500,7 @@
               "kind": "method",
               "optional": false,
               "signature": "detach(key: string): ISSRStore | undefined;",
-              "description": "Remove a registration without disposing it; ownership transfers to the caller.",
+              "description": "Remove a Store without cleanup and return its exact reference, or undefined when absent. The caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED.",
               "parameterDetails": [
                 {
                   "name": "key",
@@ -5515,7 +5515,7 @@
               "kind": "method",
               "optional": false,
               "signature": "registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void;",
-              "description": null,
+              "description": "Register a same-Runtime resource with ownership defaulting to true. Store/resource keys use separate registries. Pending hydration runs before commit; a throw while the scope stays active leaves the key free and state retained. Reentrant scope closure rejects admission without taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes and cross-Runtime resources fail with their corresponding SSR code.",
               "parameterDetails": [
                 {
                   "name": "key",
@@ -5540,7 +5540,7 @@
               "kind": "method",
               "optional": false,
               "signature": "unregisterResource(key: string, disposeOwned?: boolean): boolean;",
-              "description": null,
+              "description": "Remove a resource, returning false when absent. disposeOwned defaults to true; owned cleanup runs before deletion, so a thrown cleanup leaves this registration present. Nonowned resources are only unregistered. Closed scopes throw SCOPE_DISPOSED.",
               "parameterDetails": [
                 {
                   "name": "key",
@@ -5560,7 +5560,7 @@
               "kind": "method",
               "optional": false,
               "signature": "detachResource(key: string): ISSRResource | undefined;",
-              "description": null,
+              "description": "Remove a resource without cleanup and return its exact reference, or undefined when absent. The caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED.",
               "parameterDetails": [
                 {
                   "name": "key",
@@ -5575,7 +5575,7 @@
               "kind": "method",
               "optional": false,
               "signature": "hydrate(state: ISSRState): void;",
-              "description": "Applies validated JSON state best-effort rather than atomically. A store or resource can reject its own hydration; every other entry is still attempted and failures are collected. The contracts provide no stage/commit/rollback protocol, so successful changes remain applied. Pending hydration records always reflect the entries actually consumed, including when a later entry fails. Callers must handle partial application rather than assume rollback.",
+              "description": "Applies validated JSON state best-effort rather than atomically. A store or resource can reject its own hydration; every other entry is still attempted and failures are collected. The contracts provide no stage/commit/rollback protocol, so successful changes remain applied. Pending hydration records always reflect the entries actually consumed, including when a later entry fails. Callers must handle partial application rather than assume rollback. Each call replaces pending tables for unregistered keys. One hydration callback failure is rethrown by identity; several become HYDRATE_FAILED with ordered errors.",
               "parameterDetails": [
                 {
                   "name": "state",
@@ -5590,7 +5590,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dehydrate(): ISSRState;",
-              "description": null,
+              "description": "Copy/freeze JSON Store state and includable resource data, sorting keys and omitting disposed or valueless entries. Getters may execute. Unsupported values, cycles or depth/node limits fail with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or waiting occurs.",
               "parameterDetails": [],
               "returns": "ISSRState"
             },
@@ -5599,7 +5599,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dehydrateTrusted(): ITrustedSSRState;",
-              "description": "Returns live dehydration references without copying, freezing or validation. Later mutations can change the payload before serialization, including across an await; this is not a snapshot. Use only for known-safe JSON data that stays immutable through serialization, such as owned documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() instead. Select this fast path only when skipping validation and copying is justified.",
+              "description": "Returns live business references without copying, deep-freezing or validation. Outer state and registration maps are shallow-frozen; later mutations to retained business values can change the payload before serialization, including across an await; this is not a snapshot. Use only for known-safe JSON data that stays immutable through serialization, such as owned documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() instead. Select this unchecked path only when skipping validation and copying is justified. The TypeScript brand is not runtime validation; closed scopes throw SCOPE_DISPOSED.",
               "parameterDetails": [],
               "returns": "ITrustedSSRState"
             },
@@ -5608,7 +5608,7 @@
               "kind": "method",
               "optional": false,
               "signature": "awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>;",
-              "description": "Waits for registered asynchronous resources in rounds and returns their failures. Callers can fail the page or refetch on the client. New waterfall registrations participate in later rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same key is awaited. One resource failure does not block other prefetches. Thrown promise getters and timeouts are included in the failure list. Disposal during the wait returns results already collected without marking remaining resources as failures.",
+              "description": "Waits for registered asynchronous resources in rounds and returns their failures. Callers can fail the page or refetch on the client. New waterfall registrations participate in later rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same key is awaited. One resource failure does not block other prefetches. Thrown promise getters and timeouts are included in the failure list. Disposal during the wait returns results already collected without marking remaining resources as failures. The timeout is one total budget, with no deadline by default; waiting observes late rejection but never aborts resource work. Nonconverging waterfalls reject RESOURCE_ROUND_LIMIT, invalid budgets reject INVALID_OPTION, and an already-closed scope rejects SCOPE_DISPOSED.",
               "parameterDetails": [
                 {
                   "name": "options",
@@ -5623,7 +5623,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>;",
-              "description": "Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() result; the failure list does not independently filter payload keys. Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead.",
+              "description": "Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() result; the failure list does not independently filter payload keys. Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead. Resource failures do not independently remove payload keys: each resource decides inclusion. Disposal during waiting can make the final dehydrate() reject SCOPE_DISPOSED. Timeout options use awaitResources() semantics; returned state has not yet been HTML-encoded.",
               "parameterDetails": [
                 {
                   "name": "options",
@@ -5638,7 +5638,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dispose(): void;",
-              "description": null,
+              "description": "Close admission, interrupt waits, clear state and start owned cleanup once: resources in reverse registration order, then Stores in reverse order. Disposed/nonowned entries are skipped and the Runtime stays caller-owned. All cleanup is attempted before a sole sync failure is rethrown or several become SCOPE_DISPOSAL_FAILED. Async Store jobs are observed by disposeAsync(); repeated dispose() is a no-op.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -5655,7 +5655,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() * result; the failure list does not independently filter payload keys. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting * instead. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }"
+            "export declare class SSRRequestScope { #private; /** Runtime retained for equality checks and reporting; never disposed by this scope. */ readonly runtime: IRuntime; /** * Create a request registry with a fresh Runtime by default, or retain the supplied Runtime. * Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION. Create separate * scopes and Runtimes for request isolation; construction creates no Stores or resources. */ constructor(options?: ISSRRequestScopeOptions); /** True as soon as teardown starts, before any owned cleanup callback runs. */ get disposed(): boolean; /** * Register a same-Runtime Store under a unique nonempty key other than **proto**. Ownership * defaults to true. Pending hydration runs before commit; a hydration throw while the scope stays * active leaves the key free and state retained. Reentrant scope closure rejects admission * without taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes * and cross-Runtime Stores fail with their corresponding SSR code. */ register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; /** * Remove a Store, returning false when absent. disposeOwned defaults to true and starts cleanup * only for owned entries; async cleanup is tracked for disposeAsync(). Removal precedes cleanup, * so a thrown Store failure does not restore registration. Closed scopes throw SCOPE_DISPOSED. */ unregister(key: string, disposeOwned?: boolean): boolean; /** * Remove a Store without cleanup and return its exact reference, or undefined when absent. The * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED. */ detach(key: string): ISSRStore | undefined; /** * Register a same-Runtime resource with ownership defaulting to true. Store/resource keys use * separate registries. Pending hydration runs before commit; a throw while the scope stays active * leaves the key free and state retained. Reentrant scope closure rejects admission without * taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes and * cross-Runtime resources fail with their corresponding SSR code. */ registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; /** * Remove a resource, returning false when absent. disposeOwned defaults to true; owned cleanup * runs before deletion, so a thrown cleanup leaves this registration present. Nonowned resources * are only unregistered. Closed scopes throw SCOPE_DISPOSED. */ unregisterResource(key: string, disposeOwned?: boolean): boolean; /** * Remove a resource without cleanup and return its exact reference, or undefined when absent. The * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED. */ detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. Each call * replaces pending tables for unregistered keys. One hydration callback failure is rethrown by * identity; several become HYDRATE_FAILED with ordered errors. */ hydrate(state: ISSRState): void; /** * Copy/freeze JSON Store state and includable resource data, sorting keys and omitting disposed * or valueless entries. Getters may execute. Unsupported values, cycles or depth/node limits fail * with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or waiting * occurs. */ dehydrate(): ISSRState; /** * Returns live business references without copying, deep-freezing or validation. Outer state and * registration maps are shallow-frozen; later mutations to retained business values can change * the payload before serialization, including across an await; this is not a snapshot. Use only * for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this unchecked path only when skipping validation and copying is justified. The * TypeScript brand is not runtime validation; closed scopes throw SCOPE_DISPOSED. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. The timeout is one total budget, * with no deadline by default; waiting observes late rejection but never aborts resource work. * Nonconverging waterfalls reject RESOURCE_ROUND_LIMIT, invalid budgets reject INVALID_OPTION, * and an already-closed scope rejects SCOPE_DISPOSED. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() * result; the failure list does not independently filter payload keys. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead. * Resource failures do not independently remove payload keys: each resource decides inclusion. * Disposal during waiting can make the final dehydrate() reject SCOPE_DISPOSED. Timeout options * use awaitResources() semantics; returned state has not yet been HTML-encoded. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; /** * Close admission, interrupt waits, clear state and start owned cleanup once: resources in * reverse registration order, then Stores in reverse order. Disposed/nonowned entries are skipped * and the Runtime stays caller-owned. All cleanup is attempted before a sole sync failure is * rethrown or several become SCOPE_DISPOSAL_FAILED. Async Store jobs are observed by * disposeAsync(); repeated dispose() is a no-op. */ dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -5693,7 +5693,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "New request-owned SSRRequestScope with empty registries and fixed Runtime; finish with disposeAsync. Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION before a usable scope is returned.\nruntime: Runtime fixed at construction, identical to the owner of every registered object. Cleanup releases registered owned objects; the scope does not dispose the Runtime itself.\ndisposed: Terminal flag set before cleanup; later active operations fail SCOPE_DISPOSED.\nregister: Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw leaves the key free and retains pending data while the scope remains active; disposal clears pending data and rejects SCOPE_DISPOSED. Neither failure transfers candidate ownership. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.\nregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregister.store: ISSRStore, normally @migaia/store-light createStore with scope.runtime.\nregister.options: Optional ISSRRegistrationOptions; default owned true.\nVoid; retains the exact store by key.\nunregister: Removes store registration, then starts requested owned cleanup. Synchronous failure leaves the key removed; asynchronous errors are retained for disposeAsync.\nunregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregister.disposeOwned: Default true; false leaves removed store alive.\nWhether key existed; synchronous cleanup errors propagate.\ndetach: Removes store registration without cleanup and transfers ownership to caller.\ndetach.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRStore or undefined.\nregisterResource: Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and retains pending data only while the scope stays active. Disposal clears pending data and rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.\nregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregisterResource.resource: ISSRResource, normally @migaia/resource Resource constructed with scope.runtime.\nregisterResource.options: Optional registration policy, default owned true.\nVoid; retains resource until removal or disposal.\nunregisterResource: Disposes requested owned resource before deleting its registration; synchronous disposal failure leaves registration present.\nunregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregisterResource.disposeOwned: Default true; false skips cleanup.\nWhether registration was removed; original cleanup errors propagate.\ndetachResource: Removes resource without disposing it; caller takes cleanup ownership.\ndetachResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRResource or undefined.\nhydrate: Validates, then applies entries best-effort. Missing registrations become pending hydration; each call replaces pending maps. Successful changes remain applied if another entry fails. One failure is rethrown unchanged; several become HYDRATE_FAILED AggregateError.\nhydrate.state: Version-1 ISSRState from deserializeSSRState or validated application data.\nVoid; no rollback protocol is provided.\ndehydrate: Reads live registrations in key order. Store fields and resource data are validated, deeply copied and frozen; metadata is shallow copied. Disposed entries and resource snapshots returning undefined are omitted.\nFrozen ISSRState; unsupported data fails SERIALIZE_UNSUPPORTED, entry access failures can become INVALID_SNAPSHOT with cause.\ndehydrateTrusted: Skips nested validation, copying and freezing. Only outer records are frozen; entry data remains live. Pair with serializeTrustedSSRState immediately for known immutable JSON fixtures.\nBranded ITrustedSSRState, not an immutable snapshot.\nawaitResources: Waits in waterfall rounds, deduplicating last Promise identity per key. New retries/refetches participate. Getter failures and rejections become diagnostics. Continued new work after 64 rounds rejects RESOURCE_ROUND_LIMIT. Disposal returns already collected failures.\nawaitResources.options: Optional IAwaitResourcesOptions, default empty with no deadline.\nPromise of readonly ISSRResourceFailure entries. At timeout only still-pending Promises receive RESOURCE_TIMEOUT; fulfilled entries are omitted and rejected entries retain their original reason. A zero budget recognizes already-settled work without awaiting in-flight resources. Invalid options reject the Promise rather than throwing synchronously.\ndehydrateAsync: Waits, reports each failure, then calls dehydrate. It does not independently remove failed keys; inclusion follows resource.dehydrate. Disposal during waiting makes final dehydration reject SCOPE_DISPOSED.\ndehydrateAsync.options: Optional IDehydrateAsyncOptions, defaults to no deadline and Runtime reporting.\nPromise<ISSRState>; diagnostic throws/rejections are reported best-effort and do not stop other reports. Returned reporter thenables are observed without awaiting.\ndispose: Marks terminal, wakes waits and clears registrations/pending state, then starts all owned cleanup: resources before stores, reverse registration order per group. Idempotent; one failure does not prevent other cleanup.\nVoid without awaiting store cleanup. One synchronous failure is rethrown unchanged; several become SCOPE_DISPOSAL_FAILED AggregateError. Await disposeAsync for completion.\ndisposeAsync: Starts disposal if needed and awaits every tracked owned cleanup. Completion is published before synchronous cleanup callbacks, so reentrant calls from dispose or disposeAsync share the same Promise. It waits for the full cleanup set admitted by the synchronous start pass and replays failures; the Runtime itself is retained.\nStable Promise<void>; exact single retained failure or SCOPE_DISPOSAL_FAILED AggregateError for multiple failures.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
+              "content": "New request-owned SSRRequestScope with empty registries and fixed Runtime; finish with disposeAsync. Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION before a usable scope is returned.\nruntime: Runtime fixed at construction, identical to the owner of every registered object. Cleanup releases registered owned objects; the scope does not dispose the Runtime itself.\ndisposed: Terminal flag set before cleanup; later active operations fail SCOPE_DISPOSED.\nregister: Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw leaves the key free and retains pending data while the scope remains active; disposal clears pending data and rejects SCOPE_DISPOSED. Neither failure transfers candidate ownership. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.\nregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregister.store: ISSRStore, normally @migaia/store-light createStore with scope.runtime.\nregister.options: Optional ISSRRegistrationOptions; default owned true.\nVoid; retains the exact store by key.\nunregister: Removes store registration, then starts requested owned cleanup. Synchronous failure leaves the key removed; asynchronous errors are retained for disposeAsync.\nunregister.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregister.disposeOwned: Default true; false leaves removed store alive.\nWhether key existed; synchronous cleanup errors propagate.\ndetach: Removes store registration without cleanup and transfers ownership to caller.\ndetach.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRStore or undefined.\nregisterResource: Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and retains pending data only while the scope stays active. Disposal clears pending data and rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.\nregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nregisterResource.resource: ISSRResource, normally @migaia/resource Resource constructed with scope.runtime.\nregisterResource.options: Optional registration policy, default owned true.\nVoid; retains resource until removal or disposal.\nunregisterResource: Disposes requested owned resource before deleting its registration; synchronous disposal failure leaves registration present.\nunregisterResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nunregisterResource.disposeOwned: Default true; false skips cleanup.\nWhether registration was removed; original cleanup errors propagate.\ndetachResource: Removes resource without disposing it; caller takes cleanup ownership.\ndetachResource.key: Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.\nExact ISSRResource or undefined.\nhydrate: Validates, then applies entries best-effort. Missing registrations become pending hydration; each call replaces pending maps. Successful changes remain applied if another entry fails. One failure is rethrown unchanged; several become HYDRATE_FAILED AggregateError.\nhydrate.state: Version-1 ISSRState from deserializeSSRState or validated application data.\nVoid; no rollback protocol is provided.\ndehydrate: Reads live registrations in key order. Store fields and resource data are validated, deeply copied and frozen; metadata is shallow copied. Disposed entries and resource snapshots returning undefined are omitted.\nFrozen ISSRState; unsupported data fails SERIALIZE_UNSUPPORTED, entry access failures can become INVALID_SNAPSHOT with cause.\ndehydrateTrusted: Skips nested validation, copying and freezing. Only outer records are frozen; entry data remains live. Pair with serializeTrustedSSRState immediately for known immutable JSON fixtures.\nBranded ITrustedSSRState, not an immutable snapshot.\nawaitResources: Waits in waterfall rounds, deduplicating last Promise identity per key. New retries/refetches participate. Getter failures and rejections become diagnostics. Continued new work after 64 rounds rejects RESOURCE_ROUND_LIMIT. Disposal returns already collected failures.\nawaitResources.options: Optional IAwaitResourcesOptions, default empty with no deadline.\nPromise of readonly ISSRResourceFailure entries. At timeout only still-pending Promises receive RESOURCE_TIMEOUT; fulfilled entries are omitted and rejected entries retain their original reason. A zero budget recognizes already-settled work without awaiting in-flight resources. Invalid options reject the Promise rather than throwing synchronously.\ndehydrateAsync: Waits, reports each failure, then calls dehydrate. It does not independently remove failed keys; inclusion follows resource.dehydrate. Disposal during waiting makes final dehydration reject SCOPE_DISPOSED.\ndehydrateAsync.options: Optional IDehydrateAsyncOptions, defaults to no deadline and Runtime reporting.\nPromise<ISSRState>; diagnostic throws/rejections are reported best-effort and do not stop other reports. Returned reporter thenables are observed without awaiting.\ndispose: Marks terminal, wakes waits and clears registrations/pending state, then starts all owned cleanup: resources before stores, reverse registration order per group. Idempotent; one failure does not prevent other cleanup.\nVoid without awaiting store cleanup. One synchronous failure is rethrown unchanged; several become SCOPE_DISPOSAL_FAILED AggregateError. Await disposeAsync for completion.\ndisposeAsync: Starts disposal if needed and awaits every tracked owned cleanup. Completion is published before synchronous cleanup callbacks, so reentrant calls from dispose or disposeAsync share the same Promise. It waits for the full cleanup set admitted by the synchronous start pass and replays failures; the Runtime itself is retained.\nStable Promise<void>; exact single retained failure or SCOPE_DISPOSAL_FAILED AggregateError for multiple failures.\nruntime: Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.\nCreates an isolated Runtime.\nruntimeOptions: IRuntimeOptions forwarded to reactive createRuntime when runtime is absent; callback, adapter and scheduler contracts remain defined by reactive.\nReactive defaults: microtask flushing, default host adapter and 100 maxFlushPasses.\nruntimeOptions.adapter: Host capabilities: `scheduleMicrotask`, `now` (monotonic time), `timestamp` (epoch time) and `reportError`. Each missing entry falls back to the default.\n`queueMicrotask`, `performance.now()`, `Date.now()` and a reporter that does nothing.\nruntimeOptions.onError: Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.\nNot set: errors go to `adapter.reportError`.\nSet it in every long-lived runtime. An automatic flush runs in a microtask, so a failing effect has no caller to throw to; without `onError` the default adapter drops the error and the page just stops updating. Read `context.phase` and `context.observer?.debugName` to see which effect failed.\nruntimeOptions.onTrace: Receives every trace event from creation on, same as calling `subscribeTrace` immediately.\nNot set: no trace events are produced unless `subscribeTrace` is used.\nUse it while diagnosing why an effect reruns too often, or to feed a devtools panel from the first node on. `subscribeTrace` called later misses the events of nodes created before it; `onTrace` sees them all. Each event names nodes by `debugName`, so give the nodes you care about a name.\nruntimeOptions.maxFlushPasses: Maximum runs of one effect within one flush. Exceeding it is treated as a self-triggering loop: the queue is cleared and `FLUSH_LOOP` is thrown with the dropped node names. Must be a positive integer.\n`100` runs per effect per flush.\nruntimeOptions.scheduleIdle: Schedules cleanup work, such as suspending computed values nobody observes. Use it to align cleanup with animation frames or idle callbacks.\nUses `adapter.scheduleMicrotask`.\nUse it when many computed values lose their last observer at once, for example when a large list unmounts, and the cleanup should not compete with the next interaction. Passing `requestIdleCallback` moves that cleanup to idle time; reading the computed again before then simply keeps it alive.\nruntimeOptions.schedulerStrategy: Decides when pending effects flush: receives a `flush` function and calls it when appropriate (for example in `requestAnimationFrame`). It must call synchronously or schedule; returning a thenable falls back to the safe default and reports `INVALID_OPTION`.\nMerge all writes of the current task into one microtask flush."
             },
             {
               "id": "advanced-usage",
@@ -5706,7 +5706,7 @@
               "name": "runtime",
               "type": "IRuntime",
               "optional": true,
-              "description": ""
+              "description": "Optional existing Runtime; sharing it does not create request isolation."
             },
             {
               "name": "runtimeOptions",
@@ -5751,7 +5751,7 @@
               "description": "Selects flush timing at creation; the runtime does not expose strategy replacement."
             }
           ],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:SSRRequestScope:export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() * result; the failure list does not independently filter payload keys. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting * instead. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:SSRRequestScope:export declare class SSRRequestScope { #private; /** Runtime retained for equality checks and reporting; never disposed by this scope. */ readonly runtime: IRuntime; /** * Create a request registry with a fresh Runtime by default, or retain the supplied Runtime. * Invalid options or simultaneous runtime/runtimeOptions throw INVALID_OPTION. Create separate * scopes and Runtimes for request isolation; construction creates no Stores or resources. */ constructor(options?: ISSRRequestScopeOptions); /** True as soon as teardown starts, before any owned cleanup callback runs. */ get disposed(): boolean; /** * Register a same-Runtime Store under a unique nonempty key other than **proto**. Ownership * defaults to true. Pending hydration runs before commit; a hydration throw while the scope stays * active leaves the key free and state retained. Reentrant scope closure rejects admission * without taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes * and cross-Runtime Stores fail with their corresponding SSR code. */ register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; /** * Remove a Store, returning false when absent. disposeOwned defaults to true and starts cleanup * only for owned entries; async cleanup is tracked for disposeAsync(). Removal precedes cleanup, * so a thrown Store failure does not restore registration. Closed scopes throw SCOPE_DISPOSED. */ unregister(key: string, disposeOwned?: boolean): boolean; /** * Remove a Store without cleanup and return its exact reference, or undefined when absent. The * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED. */ detach(key: string): ISSRStore | undefined; /** * Register a same-Runtime resource with ownership defaulting to true. Store/resource keys use * separate registries. Pending hydration runs before commit; a throw while the scope stays active * leaves the key free and state retained. Reentrant scope closure rejects admission without * taking candidate ownership. Invalid/duplicate keys, invalid ownership, closed scopes and * cross-Runtime resources fail with their corresponding SSR code. */ registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; /** * Remove a resource, returning false when absent. disposeOwned defaults to true; owned cleanup * runs before deletion, so a thrown cleanup leaves this registration present. Nonowned resources * are only unregistered. Closed scopes throw SCOPE_DISPOSED. */ unregisterResource(key: string, disposeOwned?: boolean): boolean; /** * Remove a resource without cleanup and return its exact reference, or undefined when absent. The * caller assumes later cleanup responsibility; closed scopes throw SCOPE_DISPOSED. */ detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. Each call * replaces pending tables for unregistered keys. One hydration callback failure is rethrown by * identity; several become HYDRATE_FAILED with ordered errors. */ hydrate(state: ISSRState): void; /** * Copy/freeze JSON Store state and includable resource data, sorting keys and omitting disposed * or valueless entries. Getters may execute. Unsupported values, cycles or depth/node limits fail * with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or waiting * occurs. */ dehydrate(): ISSRState; /** * Returns live business references without copying, deep-freezing or validation. Outer state and * registration maps are shallow-frozen; later mutations to retained business values can change * the payload before serialization, including across an await; this is not a snapshot. Use only * for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this unchecked path only when skipping validation and copying is justified. The * TypeScript brand is not runtime validation; closed scopes throw SCOPE_DISPOSED. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. The timeout is one total budget, * with no deadline by default; waiting observes late rejection but never aborts resource work. * Nonconverging waterfalls reject RESOURCE_ROUND_LIMIT, invalid budgets reject INVALID_OPTION, * and an already-closed scope rejects SCOPE_DISPOSED. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate() * result; the failure list does not independently filter payload keys. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead. * Resource failures do not independently remove payload keys: each resource decides inclusion. * Disposal during waiting can make the final dehydrate() reject SCOPE_DISPOSED. Timeout options * use awaitResources() semantics; returned state has not yet been HTML-encoded. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; /** * Close admission, interrupt waits, clear state and start owned cleanup once: resources in * reverse registration order, then Stores in reverse order. Disposed/nonowned entries are skipped * and the Runtime stays caller-owned. All cleanup is attempted before a sole sync failure is * rethrown or several become SCOPE_DISPOSAL_FAILED. Async Store jobs are observed by * disposeAsync(); repeated dispose() is a no-op. */ dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
           "guidance": [],
           "usageScore": 12,
           "configuration": [
@@ -5760,7 +5760,7 @@
               "type": "IRuntime",
               "optional": true,
               "description": "`createSSRRequestScope` 默认创建新运行时，各真实 `store-light` 容器使用自身的 `scope.runtime`，`register()` 接纳前检查精确运行时身份。",
-              "descriptionEn": "",
+              "descriptionEn": "Optional existing Runtime; sharing it does not create request isolation.",
               "descriptionZh": "`createSSRRequestScope` 默认创建新运行时，各真实 `store-light` 容器使用自身的 `scope.runtime`，`register()` 接纳前检查精确运行时身份。"
             },
             {
@@ -5825,7 +5825,7 @@
         {
           "name": "SsrWireType",
           "kind": "const",
-          "signature": "export declare const SsrWireType: { readonly json: 'json'; readonly text: 'text'; readonly bytes: 'bytes'; };",
+          "signature": "export declare const SsrWireType: { /** Registry type eligible for direct JSON-safe text embedding. */ readonly json: 'json'; /** Text chunk category; non-JSON formats are base64-wrapped without rewriting their syntax. */ readonly text: 'text'; /** Byte chunk category, always base64-wrapped for script content. */ readonly bytes: 'bytes'; };",
           "declarationLine": 8,
           "source": "packages/store-ssr/dist/ssr-constants.d.ts",
           "purpose": "JSON codec identifier and text/bytes chunk-kind labels used by SSR.",
@@ -5843,7 +5843,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly json: 'json';",
-              "description": null,
+              "description": "Registry type eligible for direct JSON-safe text embedding.",
               "parameterDetails": [],
               "returns": "'json'"
             },
@@ -5852,7 +5852,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly text: 'text';",
-              "description": null,
+              "description": "Text chunk category; non-JSON formats are base64-wrapped without rewriting their syntax.",
               "parameterDetails": [],
               "returns": "'text'"
             },
@@ -5861,7 +5861,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly bytes: 'bytes';",
-              "description": null,
+              "description": "Byte chunk category, always base64-wrapped for script content.",
               "parameterDetails": [],
               "returns": "'bytes'"
             }
@@ -5870,7 +5870,7 @@
           "aliasOf": "SsrWireType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SsrWireType: { readonly json: 'json'; readonly text: 'text'; readonly bytes: 'bytes'; };"
+            "export declare const SsrWireType: { /** Registry type eligible for direct JSON-safe text embedding. */ readonly json: 'json'; /** Text chunk category; non-JSON formats are base64-wrapped without rewriting their syntax. */ readonly text: 'text'; /** Byte chunk category, always base64-wrapped for script content. */ readonly bytes: 'bytes'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5909,7 +5909,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr-constants.d.ts:SsrWireType:export declare const SsrWireType: { readonly json: 'json'; readonly text: 'text'; readonly bytes: 'bytes'; };",
+          "identity": "packages/store-ssr/dist/ssr-constants.d.ts:SsrWireType:export declare const SsrWireType: { /** Registry type eligible for direct JSON-safe text embedding. */ readonly json: 'json'; /** Text chunk category; non-JSON formats are base64-wrapped without rewriting their syntax. */ readonly text: 'text'; /** Byte chunk category, always base64-wrapped for script content. */ readonly bytes: 'bytes'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -6032,7 +6032,7 @@
           "name": "StoreSsrErrorCode",
           "kind": "const",
           "signature": "export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: 'SCOPE_DISPOSED'; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: 'HYDRATE_FAILED'; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: 'INVALID_STATE_SCRIPT'; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: 'INVALID_STORE_KEY'; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: 'SERIALIZE_UNSUPPORTED'; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: 'CODEC_CONTRACT'; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: 'RESOURCE_ROUND_LIMIT'; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: 'RESOURCE_TIMEOUT'; };",
-          "declarationLine": 10,
+          "declarationLine": 9,
           "source": "packages/store-ssr/dist/error-code.d.ts",
           "purpose": "Stable public error codes, interpreted together with source and cause/errors chains.",
           "core": "scopeDisposed: Active operation after disposal; create a fresh request scope.\nscopeDisposalFailed: Several cleanup failures; inspect AggregateError.errors.\nhydrateFailed: Several hydration failures; successful entries remain applied.\ninvalidSnapshot: Malformed stores/resources or resource metadata, or property-access failures. Unclassified extensible native errors receive INVALID_SNAPSHOT in place with identity/class/stack preserved; frozen/non-Error failures remain on cause and complete foreign identities keep their owner.\ninvalidStateScript: Unsupported envelope version, invalid script ID, or invalid JSON syntax in deserializeSSRState.\ninvalidStoreKey: Empty, non-string or `__proto__` registration/snapshot key.\nserializeUnsupported: Non-JSON value, cycle, non-finite number, non-plain object, depth over 256 or traversal over one million nodes.\ninvalidOption: Invalid options, ownership, timeout, duplicate key, or simultaneous runtime/runtimeOptions.\ncrossRuntime: Registered object belongs to another Runtime.\ncodecContract: Writer codec returns value chunk or reader lacks named codec.\nresourceRoundLimit: Waterfall resources continue changing beyond the round limit.\nresourceTimeout: One resource Promise is still unsettled at the total deadline; completed siblings do not receive this code. Choose fallback or client refetch.",

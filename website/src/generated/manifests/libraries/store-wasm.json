@@ -2456,7 +2456,7 @@
           "name": "array",
           "kind": "function",
           "signature": "export declare function array(length: number, granularity?: number): IFieldBuilder<IWasmArrayField>;",
-          "declarationLine": 11,
+          "declarationLine": 30,
           "source": "packages/store-wasm/dist/array.d.ts",
           "purpose": "Describes fixed zero-filled f64 elements with shared tracking buckets. Call array(length, granularity?); there is no item builder parameter or compatibility overload for the old argument order.",
           "core": "length: Caller-selected safe integer from 0 through 536870911; immutable element count, invalid values fail RangeError INVALID_OPTION.\ngranularity: Caller positive safe integer indices per bucket, default 64; one tracks each index independently, larger buckets can invalidate peers.\nReturns Store Light IFieldBuilder with FIELD_BUILDER true, mode StoreFieldMode.sync from @migaia/store-light and synchronous create(context). A sync-only annotation is typeof StoreFieldMode.sync, not the full IStoreFieldMode union that also permits async. After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED. An aborted context preserves an unclassified native reason in place with INIT_ABORTED, a complete foreign identity unchanged, or an untaggable reason on cause. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal. Field exposes readonly length/disposed, idempotent dispose(): void, at(index): number, setAt(index,value): void, setRange(lo,hi,values): void, view(): Float64Array. Indices are safe integers in [0,length); reads track buckets. Writes require number, including NaN/infinities. Range is half-open [lo,hi); all ArrayLike length and element reads finish before writes, so a getter failure leaves memory unchanged. Unclassified native input errors receive INVALID_OPTION in place, foreign identities remain unchanged, and frozen/non-Error failures remain on cause. Changed buckets commit once each in a batch; each commit refreshes the current memory view after owner-triggered memory growth, with attempted memory rollback on failure. view returns an independent copy without tracking, never writeback. After disposal data operations fail FIELD_DISPOSED; sources release before allocation.",
@@ -2640,7 +2640,7 @@
           "name": "boolean",
           "kind": "function",
           "signature": "export declare function boolean(): IFieldBuilder<IWasmBooleanField>;",
-          "declarationLine": 7,
+          "declarationLine": 15,
           "source": "packages/store-wasm/dist/boolean.d.ts",
           "purpose": "Describes a one-byte boolean field initially false; accepts actual booleans without truthy coercion, owned by Store Light.",
           "core": "Returns Store Light IFieldBuilder with FIELD_BUILDER true, mode StoreFieldMode.sync from @migaia/store-light and synchronous create(context). A sync-only annotation is typeof StoreFieldMode.sync, not the full IStoreFieldMode union that also permits async. After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED. An aborted context preserves an unclassified native reason in place with INIT_ABORTED, a complete foreign identity unchanged, or an untaggable reason on cause. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal. Field exposes value getter/setter, readonly observed/disposed and idempotent dispose(): void. Reading tracks its source; Object.is-equal writes do nothing. Memory growth refreshes backing views. Disposed value access fails FIELD_DISPOSED. Disposal marks terminal, removes reactive sources then frees allocation. Value is boolean; true encodes as one and false as zero. Other types throw TypeError INVALID_OPTION.",
@@ -2705,7 +2705,7 @@
           "name": "createStoreWasmAggregateError",
           "kind": "function",
           "signature": "export declare function createStoreWasmAggregateError(code: IStoreWasmErrorCode, errors: readonly unknown[], message: string): AggregateError;",
-          "declarationLine": 17,
+          "declarationLine": 26,
           "source": "packages/store-wasm/dist/errors.d.ts",
           "purpose": "Builds native AggregateError tagged with package source and selected stable code, preserving its stack and native runtime class.",
           "core": "code: Value from StoreWasmErrorCode for the actual failure branch.\nerrors: Caller-collected failures retained by identity and order in AggregateError.errors.\nmessage: Caller-provided readable diagnostic message.\nTagged AggregateError; helper returns this object without throwing it.",
@@ -2900,7 +2900,7 @@
           "name": "createStoreWasmError",
           "kind": "function",
           "signature": "export declare function createStoreWasmError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
-          "declarationLine": 7,
+          "declarationLine": 10,
           "source": "packages/store-wasm/dist/errors.d.ts",
           "purpose": "Builds native Error tagged with package source and selected stable code, preserving its stack and native runtime class.",
           "core": "code: Value from StoreWasmErrorCode for the actual failure branch.\nmessage: Caller-provided readable diagnostic message.\nTagged Error; helper returns this object without throwing it.\ncause: Original non-undefined failure retained as cause.\nOmitted: no cause attached.",
@@ -3111,7 +3111,7 @@
           "name": "createStoreWasmRangeError",
           "kind": "function",
           "signature": "export declare function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;",
-          "declarationLine": 11,
+          "declarationLine": 17,
           "source": "packages/store-wasm/dist/errors.d.ts",
           "purpose": "Builds native RangeError tagged with package source and selected stable code, preserving its stack and native runtime class.",
           "core": "code: Value from StoreWasmErrorCode for the actual failure branch.\nmessage: Caller-provided readable diagnostic message.\nTagged RangeError; helper returns this object without throwing it.",
@@ -3292,7 +3292,7 @@
           "name": "createStoreWasmTypeError",
           "kind": "function",
           "signature": "export declare function createStoreWasmTypeError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
-          "declarationLine": 13,
+          "declarationLine": 22,
           "source": "packages/store-wasm/dist/errors.d.ts",
           "purpose": "Builds native TypeError tagged with package source and selected stable code, preserving its stack and native runtime class.",
           "core": "code: Value from StoreWasmErrorCode for the actual failure branch.\nmessage: Caller-provided readable diagnostic message.\nTagged TypeError; helper returns this object without throwing it.\ncause: Original non-undefined failure retained as cause.\nOmitted: no cause attached.",
@@ -3503,7 +3503,7 @@
           "name": "ensureWasm",
           "kind": "function",
           "signature": "export declare function ensureWasm(): Promise<WebAssembly.Memory>;",
-          "declarationLine": 1,
+          "declarationLine": 8,
           "source": "packages/store-wasm/dist/arena.d.ts",
           "purpose": "Initializes @migaia/wasm once; pending and successful calls preserve one Promise identity. Failed initialization clears the attempt cache so another call can retry.",
           "core": "Promise<WebAssembly.Memory> for shared memory, never caller-owned. Native WebAssembly.CompileError, LinkError and RuntimeError cross unchanged without source/code as the registered native pass-through exception. The original arena trap is rethrown unchanged; only later INSTANCE_POISONED failures carry the first trap on cause. This readiness Promise remains resolved after a later trap.",
@@ -3668,7 +3668,7 @@
           "name": "IStoreWasmErrorCode",
           "kind": "type",
           "signature": "export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];",
-          "declarationLine": 55,
+          "declarationLine": 54,
           "source": "packages/store-wasm/dist/error-code.d.ts",
           "purpose": "Value union of the StoreWasmErrorCode runtime table, preserving package failure branches.",
           "core": "Value union of the StoreWasmErrorCode runtime table, preserving package failure branches.",
@@ -3825,7 +3825,7 @@
           "name": "IWasmReservedKey",
           "kind": "type",
           "signature": "export type IWasmReservedKey = (typeof WasmReservedKey)[keyof typeof WasmReservedKey];",
-          "declarationLine": 6,
+          "declarationLine": 9,
           "source": "packages/store-wasm/dist/field-constants.d.ts",
           "purpose": "Union dispose or disposed, the record keys reserved for field lifetime.",
           "core": "Union dispose or disposed, the record keys reserved for field lifetime.",
@@ -3890,7 +3890,7 @@
           "name": "number",
           "kind": "function",
           "signature": "export declare function number(): IFieldBuilder<IWasmNumberField>;",
-          "declarationLine": 7,
+          "declarationLine": 16,
           "source": "packages/store-wasm/dist/number.d.ts",
           "purpose": "Describes an eight-byte little-endian f64 field, initially zero, with independent reactive tracking and Store Light ownership.",
           "core": "Returns Store Light IFieldBuilder with FIELD_BUILDER true, mode StoreFieldMode.sync from @migaia/store-light and synchronous create(context). A sync-only annotation is typeof StoreFieldMode.sync, not the full IStoreFieldMode union that also permits async. After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED. An aborted context preserves an unclassified native reason in place with INIT_ABORTED, a complete foreign identity unchanged, or an untaggable reason on cause. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal. Field exposes value getter/setter, readonly observed/disposed and idempotent dispose(): void. Reading tracks its source; Object.is-equal writes do nothing. Memory growth refreshes backing views. Disposed value access fails FIELD_DISPOSED. Disposal marks terminal, removes reactive sources then frees allocation. Value is number; typeof checking allows NaN/infinities. Object.is distinguishes signed zero. Non-number writes throw TypeError INVALID_OPTION.",
@@ -3959,7 +3959,7 @@
           "name": "record",
           "kind": "function",
           "signature": "export declare function record<Shape extends IRecordShape>(shape: Shape): IFieldBuilder<IWasmRecordField<Shape>>;",
-          "declarationLine": 8,
+          "declarationLine": 18,
           "source": "packages/store-wasm/dist/record.d.ts",
           "purpose": "Describes fixed named f64 properties with tracking per key, not a dynamic dictionary. Keys are captured when the builder is constructed.",
           "core": "shape: Caller non-array object mapping keys to number() builders. Runtime checks FIELD_BUILDER branding only; other builders are unsupported. dispose/disposed reject RESERVED_FIELD_NAME when the field is created.\nReturns Store Light IFieldBuilder with FIELD_BUILDER true, mode StoreFieldMode.sync from @migaia/store-light and synchronous create(context). A sync-only annotation is typeof StoreFieldMode.sync, not the full IStoreFieldMode union that also permits async. After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED. An aborted context preserves an unclassified native reason in place with INIT_ABORTED, a complete foreign identity unchanged, or an untaggable reason on cause. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal. Field maps captured keys to direct number getter/setters (not .value), initially zero. Each read tracks its own source; Object.is-equal writes skip commit. Non-number throws TypeError INVALID_OPTION. Non-enumerable disposed and idempotent dispose(): void retain lifecycle ownership. Later property access fails FIELD_DISPOSED; cleanup releases sources before allocation. Nested records/arrays and dynamic keys are unsupported.",
@@ -4290,8 +4290,8 @@
         {
           "name": "StoreWasmErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };",
-          "declarationLine": 7,
+          "signature": "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects scalar/record value access and array data operations after field disposal. Create a new * field instead of reusing it; metadata such as disposed and fixed array length remains * readable. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports no usable allocation id/pointer, failed array alignment, or corrupt stored string * length. Check allocation availability and memory integrity. Invalid requested sizes are * INVALID_OPTION rather than this allocation/memory failure. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an arena export used by this module on the shared instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };",
+          "declarationLine": 5,
           "source": "packages/store-wasm/dist/error-code.d.ts",
           "purpose": "Stable public construction, lifetime, memory and cleanup failure codes interpreted with source.",
           "core": "notInitialized: Field creation ran before ensureWasm completed; await readiness first.\nfieldDisposed: Disposed field is read or written; create another instance.\ninitAborted: Field context signal was already aborted. Native reason identity, class and stack remain; unclassified extensible errors receive this code in place, complete foreign identities keep their owner, and frozen/non-Error reasons remain on cause.\nreservedFieldName: Record would shadow dispose/disposed lifecycle keys; rename the field.\nallocationFailed: Allocation/pointer handshake, alignment or stored string length is invalid.\ninvalidOption: Invalid size, granularity, write type, string capacity, index or range.\ncleanupFailed: Several cleanup failures or rollback requires an aggregate to retain its primary.\ninstancePoisoned: Earlier WebAssembly.RuntimeError poisoned the shared arena; cause is the first trap. Reload/restart; allocation retries cannot repair it.",
@@ -4317,7 +4317,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly fieldDisposed: 'FIELD_DISPOSED';",
-              "description": "Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation.",
+              "description": "Rejects scalar/record value access and array data operations after field disposal. Create a new * field instead of reusing it; metadata such as disposed and fixed array length remains * readable.",
               "parameterDetails": [],
               "returns": "'FIELD_DISPOSED'"
             },
@@ -4344,7 +4344,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly allocationFailed: 'ALLOCATION_FAILED';",
-              "description": "Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error.",
+              "description": "Reports no usable allocation id/pointer, failed array alignment, or corrupt stored string * length. Check allocation availability and memory integrity. Invalid requested sizes are * INVALID_OPTION rather than this allocation/memory failure.",
               "parameterDetails": [],
               "returns": "'ALLOCATION_FAILED'"
             },
@@ -4371,7 +4371,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly instancePoisoned: 'INSTANCE_POISONED';",
-              "description": "Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed.",
+              "description": "Rejects allocation after an arena export used by this package on the shared instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed.",
               "parameterDetails": [],
               "returns": "'INSTANCE_POISONED'"
             }
@@ -4380,7 +4380,7 @@
           "aliasOf": "StoreWasmErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };"
+            "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects scalar/record value access and array data operations after field disposal. Create a new * field instead of reusing it; metadata such as disposed and fixed array length remains * readable. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports no usable allocation id/pointer, failed array alignment, or corrupt stored string * length. Check allocation availability and memory integrity. Invalid requested sizes are * INVALID_OPTION rather than this allocation/memory failure. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an arena export used by this module on the shared instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4419,7 +4419,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-wasm/dist/error-code.d.ts:StoreWasmErrorCode:export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };",
+          "identity": "packages/store-wasm/dist/error-code.d.ts:StoreWasmErrorCode:export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects scalar/record value access and array data operations after field disposal. Create a new * field instead of reusing it; metadata such as disposed and fixed array length remains * readable. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports no usable allocation id/pointer, failed array alignment, or corrupt stored string * length. Check allocation availability and memory integrity. Invalid requested sizes are * INVALID_OPTION rather than this allocation/memory failure. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an arena export used by this package on the shared instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };",
           "guidance": [
             {
               "id": "错误码-构造工厂与稳定诊断",
@@ -4521,7 +4521,7 @@
           "name": "string",
           "kind": "function",
           "signature": "export declare function string(maxBytes?: number): IFieldBuilder<IWasmStringField>;",
-          "declarationLine": 7,
+          "declarationLine": 17,
           "source": "packages/store-wasm/dist/string.d.ts",
           "purpose": "Describes initially empty UTF-8 bytes with fixed capacity plus four-byte length header; capacity never reallocates and oversized writes never truncate.",
           "core": "maxBytes: Caller UTF-8 byte capacity, default 256; safe integer from 0 through 4294967291. Invalid size throws RangeError INVALID_OPTION at builder construction.\nReturns Store Light IFieldBuilder with FIELD_BUILDER true, mode StoreFieldMode.sync from @migaia/store-light and synchronous create(context). A sync-only annotation is typeof StoreFieldMode.sync, not the full IStoreFieldMode union that also permits async. After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED. An aborted context preserves an unclassified native reason in place with INIT_ABORTED, a complete foreign identity unchanged, or an untaggable reason on cause. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal. Field exposes value getter/setter, readonly observed/disposed and idempotent dispose(): void. Reading tracks its source; Object.is-equal writes do nothing. Memory growth refreshes backing views. Disposed value access fails FIELD_DISPOSED. Disposal marks terminal, removes reactive sources then frees allocation. Value is string; TextEncoder byte count determines capacity, not character count. Non-string throws TypeError INVALID_OPTION; overflow throws Error INVALID_OPTION before commit. Reads decode current bytes; corrupt length fails ALLOCATION_FAILED.",
@@ -4693,7 +4693,7 @@
         {
           "name": "WasmReservedKey",
           "kind": "const",
-          "signature": "export declare const WasmReservedKey: { readonly dispose: 'dispose'; readonly disposed: 'disposed'; };",
+          "signature": "export declare const WasmReservedKey: { /** Owned record cleanup method; a user field cannot shadow it. */ readonly dispose: 'dispose'; /** Terminal record-state getter; a user field cannot shadow it. */ readonly disposed: 'disposed'; };",
           "declarationLine": 2,
           "source": "packages/store-wasm/dist/field-constants.d.ts",
           "purpose": "Record property names reserved for cleanup and terminal state; caller fields must not shadow them.",
@@ -4711,7 +4711,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly dispose: 'dispose';",
-              "description": null,
+              "description": "Owned record cleanup method; a user field cannot shadow it.",
               "parameterDetails": [],
               "returns": "'dispose'"
             },
@@ -4720,7 +4720,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly disposed: 'disposed';",
-              "description": null,
+              "description": "Terminal record-state getter; a user field cannot shadow it.",
               "parameterDetails": [],
               "returns": "'disposed'"
             }
@@ -4729,7 +4729,7 @@
           "aliasOf": "WasmReservedKey",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const WasmReservedKey: { readonly dispose: 'dispose'; readonly disposed: 'disposed'; };"
+            "export declare const WasmReservedKey: { /** Owned record cleanup method; a user field cannot shadow it. */ readonly dispose: 'dispose'; /** Terminal record-state getter; a user field cannot shadow it. */ readonly disposed: 'disposed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4768,7 +4768,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-wasm/dist/field-constants.d.ts:WasmReservedKey:export declare const WasmReservedKey: { readonly dispose: 'dispose'; readonly disposed: 'disposed'; };",
+          "identity": "packages/store-wasm/dist/field-constants.d.ts:WasmReservedKey:export declare const WasmReservedKey: { /** Owned record cleanup method; a user field cannot shadow it. */ readonly dispose: 'dispose'; /** Terminal record-state getter; a user field cannot shadow it. */ readonly disposed: 'disposed'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
