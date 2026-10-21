@@ -1,6 +1,455 @@
 # `@migaia/utils` 使用指南
 
-本指南逐个模块覆盖公开运行时 API、直接配置所需的关键类型、语义与用法示例。所有公开名称（包括 type-only helper）的用途与入口列在文末索引；精确类型以发布的 `.d.ts` 为准；包的定位与安装方式见 [README](./README.md)。
+[English](./USEGUIDE.en.md)
+
+包的定位、亮点和心智模型见 [README](./README.md)。本指南先按场景给出可以直接运行的示例（Node 24），再逐个模块列出公开运行时 API 的签名、选项、边界行为与错误码；所有公开名称的用途与入口列在文末的[公开入口索引](#公开入口索引)，精确类型以发布的 `.d.ts` 为准。
+
+## 按场景查找
+
+| 你遇到的问题 | 看这一节 |
+| --- | --- |
+| 超时后请求还在后台跑 | [给慢请求加超时，并让请求真的停下](#给慢请求加超时并让请求真的停下) |
+| 不看 `signal` 的操作在超时之后才失败 | [超时之后才到的失败去了哪里](#超时之后才到的失败去了哪里) |
+| 404 也在重试，重试没有总时限 | [只重试值得重试的错误](#只重试值得重试的错误) |
+| 一次发出太多请求；离开页面后排队的请求还在跑 | [批量任务限制并发，离开时取消排队任务](#批量任务限制并发离开时取消排队任务) |
+| 同时初始化，建了多个连接 | [并发初始化只执行一次](#并发初始化只执行一次) |
+| 手写展开更新改到了原对象 | [不可变地修改深层字段](#不可变地修改深层字段) |
+| 调用方事后改了传进来的配置 | [防止配置在传入之后被改掉](#防止配置在传入之后被改掉) |
+| 错误包装后只能比对 message 文本 | [错误被包装后，仍能认出底层原因](#错误被包装后仍能认出底层原因) |
+
+## 给慢请求加超时，并让请求真的停下
+
+给慢请求加了超时，调用方按时拿到了错误，但请求本身还在后台跑，下游还在为一个没人要的结果干活。
+
+只用 `setTimeout` 加 `Promise.race` 做超时，只是让调用方先返回；连接、计时器和内存都没有释放，因为没有人通知操作停下。
+
+`withTimeout` 会把一个 `signal` 交给你的操作；到点时先取消这个 `signal`，再以 `DEADLINE_EXCEEDED` 拒绝。把 `signal` 原样传给 `fetch`，或在自己的代码里检查它，工作就会真正停下。
+
+```ts doc-test=run
+import { withTimeout } from '@migaia/utils/promise'
+import { isUtilsTimeoutError } from '@migaia/utils/error'
+
+// 模拟一个 2 秒才返回的查询；真实代码里通常是 fetch(url, { signal })。
+function slowQuery(signal: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve('查询结果'), 2_000)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer) // 收到取消，立即停下
+      console.log('查询已停止，原因:', signal.reason.code)
+      reject(signal.reason)
+    })
+  })
+}
+
+try {
+  await withTimeout(({ signal }) => slowQuery(signal), { timeoutMs: 100 })
+} catch (error) {
+  if (isUtilsTimeoutError(error)) console.log('超时:', error.code, error.timeoutMs)
+}
+```
+
+输出：
+
+```text
+查询已停止，原因: DEADLINE_EXCEEDED
+超时: DEADLINE_EXCEEDED 100
+```
+
+先输出 `查询已停止，原因: DEADLINE_EXCEEDED`，再输出 `超时: DEADLINE_EXCEEDED 100`。
+
+操作先收到取消并清掉了自己的计时器，调用方随后收到超时错误；`signal.reason` 就是这个超时错误。操作用 `signal.reason` 拒绝只是在确认取消，不会再被当成超时之后的新失败上报。
+
+## 超时之后才到的失败去了哪里
+
+有些操作不看 `signal`，超时后仍会继续执行，过一会儿才失败。这个失败去了哪里？
+
+手写的 `Promise.race` 要么让这个迟到的失败悄悄消失，要么让它变成“未处理的 Promise 拒绝”，两种情况都没人知道写入其实失败了。
+
+`withTimeout` 已经以超时结束，不会再改变调用方拿到的结果；迟到的失败交给 `report` 回调。不传 `report` 时，它会作为未捕获异常交给宿主，Node 默认会因此退出进程。所以操作不看 `signal` 时，一定要传 `report`。
+
+```ts doc-test=run
+import { withTimeout } from '@migaia/utils/promise'
+
+const saving = withTimeout(
+  // 这个写入不看 signal，超时之后才失败
+  () => new Promise((_, reject) => setTimeout(() => reject(new Error('写入失败')), 50)),
+  {
+    timeoutMs: 10,
+    report: (error, context) =>
+      console.log('超时后才到的失败:', (error as Error).message, context.phase)
+  }
+)
+await saving.catch((error) => console.log('调用方收到:', error.code))
+await new Promise((resolve) => setTimeout(resolve, 100))
+```
+
+输出：
+
+```text
+调用方收到: DEADLINE_EXCEEDED
+超时后才到的失败: 写入失败 late-rejection
+```
+
+先输出 `调用方收到: DEADLINE_EXCEEDED`，大约 40 毫秒后输出 `超时后才到的失败: 写入失败 late-rejection`。
+
+调用方只看到超时；写入失败没有丢，带着 `phase: 'late-rejection'` 进入了 `report`。
+
+## 只重试值得重试的错误
+
+下游偶尔返回 503，重试一次就好；但重试代码把本来就过载的服务打得更狠，用户还要等半分钟才看到失败。
+
+手写的重试循环常有三个坑：404 这类重试也不会成功的错误照样重试；失败后立刻重试；没有总时限。
+
+`retry` 用 `shouldRetry` 判断哪些错误值得重试，用 `delay` 控制两次尝试之间的等待（传函数可以按次数递增），用 `totalTimeoutMs` 限制包括等待在内的总时间。
+
+```ts doc-test=run
+import { retry } from '@migaia/utils/promise'
+
+// 模拟一个不稳定的库存接口：前两次返回 503，第三次成功。
+let calls = 0
+async function readStock(signal: AbortSignal): Promise<number> {
+  calls += 1
+  if (signal.aborted) throw signal.reason
+  if (calls < 3) throw Object.assign(new Error('服务暂时不可用'), { status: 503 })
+  return 42
+}
+
+const stock = await retry(({ attempt, signal }) => {
+  console.log(`第 ${attempt} 次尝试`)
+  return readStock(signal)
+}, {
+  maxAttempts: 5,
+  // 只重试 5xx；参数错误（4xx）重试也没用，直接抛出。
+  shouldRetry: (error) => (error as { status?: number }).status! >= 500,
+  delay: (_error, { attempt }) => 100 * 2 ** (attempt - 1), // 100ms、200ms……
+  totalTimeoutMs: 2_000 // 包括等待在内，整体最多 2 秒
+})
+console.log('库存:', stock)
+```
+
+输出：
+
+```text
+第 1 次尝试
+第 2 次尝试
+第 3 次尝试
+库存: 42
+```
+
+依次输出 `第 1 次尝试`、`第 2 次尝试`、`第 3 次尝试` 和 `库存: 42`。
+
+两次 503 之后分别等待 100 毫秒和 200 毫秒，第三次成功。总时限到达时，正在进行的那次尝试的 `signal` 会被取消。
+
+订单号不存在，接口返回 404；重试五次也不会成功，只会让用户多等。
+
+常见的重试循环对所有错误一视同仁，耗尽次数后再抛一个新的包装错误，调用方读不到原来的 `status`。
+
+`shouldRetry` 返回 `false` 时，`retry` 不再等待，直接把这个原始错误抛给调用方。错误不会被包装，message 也不变，调用方仍能读到自己的 `status` 字段。
+
+```ts doc-test=run
+import { retry } from '@migaia/utils/promise'
+
+let calls = 0
+try {
+  await retry(() => {
+    calls += 1
+    throw Object.assign(new Error('订单号不存在'), { status: 404 })
+  }, {
+    maxAttempts: 5,
+    shouldRetry: (error) => (error as { status?: number }).status! >= 500
+  })
+} catch (error) {
+  console.log('调用次数:', calls, '错误:', (error as Error).message)
+}
+```
+
+输出：
+
+```text
+调用次数: 1 错误: 订单号不存在
+```
+
+输出 `调用次数: 1 错误: 订单号不存在`。
+
+404 没有被重试，`maxAttempts: 5` 只是上限；调用方拿到的仍是自己抛出的那个错误。
+
+## 批量任务限制并发，离开时取消排队任务
+
+一次下载几百个文件，下游开始限流甚至报错，连接也排起长队。
+
+`Promise.all(ids.map(download))` 会同时发出全部请求，没有任何东西限制同一时刻在跑的数量。
+
+`createConcurrencyLimiter` 让同时运行的任务不超过 `concurrency` 个，其余任务按提交顺序排队，前面的完成一个，后面的才开始一个。
+
+```ts doc-test=run
+import { createConcurrencyLimiter } from '@migaia/utils/promise'
+
+const limiter = createConcurrencyLimiter({ concurrency: 2 })
+const download = (id: number) =>
+  limiter.run(async () => {
+    console.log(`开始下载 ${id}，同时进行 ${limiter.activeCount} 个，排队 ${limiter.pendingCount} 个`)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    return `文件 ${id}`
+  })
+
+// 一次提交 5 个任务，但同时最多只有 2 个在跑
+const files = await Promise.all([1, 2, 3, 4, 5].map(download))
+console.log(files.join('、'))
+```
+
+输出：
+
+```text
+开始下载 1，同时进行 2 个，排队 3 个
+开始下载 2，同时进行 2 个，排队 3 个
+开始下载 3，同时进行 2 个，排队 2 个
+开始下载 4，同时进行 2 个，排队 1 个
+开始下载 5，同时进行 2 个，排队 0 个
+文件 1、文件 2、文件 3、文件 4、文件 5
+```
+
+`activeCount` 一直是 2，`pendingCount` 从 3 降到 0；最后一行按提交顺序列出 `文件 1` 到 `文件 5`。
+
+`Promise.all` 的结果顺序与提交顺序一致，和任务完成的先后无关。
+
+用户关掉页面后，排队中的下载任务照样执行，是在为没人看的页面下载数据。
+
+手写的队列通常只管“排队”，不管“撤销”：任务一旦进了队列，就只能等它跑完。
+
+给 `run` 传一个 `signal`：任务还在排队时被取消，会直接以取消原因拒绝，不会再开始；已经开始的任务会在 `context.signal` 上收到取消，由任务自己决定是否停下。
+
+```ts doc-test=run
+import { createConcurrencyLimiter } from '@migaia/utils/promise'
+
+const limiter = createConcurrencyLimiter({ concurrency: 1 })
+const page = new AbortController() // 用户离开页面时取消
+
+const thumbnails = [1, 2, 3].map((id) =>
+  limiter
+    .run(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      return `缩略图 ${id} 完成`
+    }, { signal: page.signal })
+    .catch((reason) => `缩略图 ${id} 已取消：${reason}`)
+)
+
+page.abort('用户离开了页面') // 1 号已经在跑，2、3 号还在排队
+for (const line of await Promise.all(thumbnails)) console.log(line)
+```
+
+输出：
+
+```text
+缩略图 1 完成
+缩略图 2 已取消：用户离开了页面
+缩略图 3 已取消：用户离开了页面
+```
+
+输出 `缩略图 1 完成`，2、3 号输出 `已取消：用户离开了页面`。
+
+1 号在取消前已经开始，所以照常完成；2、3 号还在排队，被直接取消，从没开始执行。
+
+## 并发初始化只执行一次
+
+三个模块同时初始化，结果建了三个数据库连接。
+
+用 `let db` 加 `if (!db)` 做懒加载，在异步代码里会出错：三个调用同时发生时，`db` 对它们来说都还是空的。
+
+`onceAsync` 在第一次调用时就保存这个 Promise，之后的调用（包括同时发生的调用）拿到的都是同一个 Promise。
+
+```ts doc-test=run
+import { onceAsync } from '@migaia/utils/function'
+
+let connects = 0
+// 三个模块启动时都会调用 getDb()，但连接只应建立一次。
+const getDb = onceAsync(async () => {
+  connects += 1
+  console.log('正在连接数据库……')
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  return { query: (sql: string) => `执行 ${sql}` }
+})
+
+const [users, orders, reports] = await Promise.all([getDb(), getDb(), getDb()])
+console.log('连接次数:', connects, '是同一个连接:', users === orders && orders === reports)
+console.log(users.query('select 1'))
+```
+
+输出：
+
+```text
+正在连接数据库……
+连接次数: 1 是同一个连接: true
+执行 select 1
+```
+
+`正在连接数据库……` 只输出一次，随后输出 `连接次数: 1 是同一个连接: true`。
+
+三个调用方拿到的是同一个对象：初始化只发生了一次。
+
+配置服务第一次初始化失败了，之后的调用会怎样？
+
+如果以为 `onceAsync` 失败后会自动再试，就会在服务恢复后仍然一直拿到旧的失败而感到奇怪。
+
+`onceAsync` 记住的是第一次调用的 Promise，不管它成功还是失败；之后每次调用都拿到同一个失败，函数不会再执行。需要失败重试时，把 `retry` 写进传给 `onceAsync` 的函数里，让初始化本身重试；或者失败后换一个新的 `onceAsync`。
+
+```ts doc-test=run
+import { onceAsync } from '@migaia/utils/function'
+
+let attempts = 0
+const loadConfig = onceAsync(async () => {
+  attempts += 1
+  throw new Error('配置服务不可达')
+})
+
+for (let index = 0; index < 3; index += 1)
+  await loadConfig().catch((error) => console.log(`第 ${index + 1} 次调用:`, error.message))
+console.log('实际执行次数:', attempts)
+```
+
+输出：
+
+```text
+第 1 次调用: 配置服务不可达
+第 2 次调用: 配置服务不可达
+第 3 次调用: 配置服务不可达
+实际执行次数: 1
+```
+
+三次调用都输出 `配置服务不可达`，最后一行是 `实际执行次数: 1`。
+
+失败也只发生一次并被记住；要不要重试，由传进去的函数自己决定。
+
+## 不可变地修改深层字段
+
+修改用户地址里的城市，依赖引用比较的界面却没有刷新，原来的状态对象也被改掉了。
+
+手写不可变更新要逐层展开：`{ ...state, user: { ...state.user, address: { ...state.user.address, city } } }`。层数一多就容易漏掉一层，结果改到了原对象。
+
+`set` 按路径复制经过的每一层，其余分支原样复用，原对象保持不变。`get` 按路径读取，中间缺了一层时返回 `undefined`，不会抛错。
+
+```ts doc-test=run
+import { get, set } from '@migaia/utils/object'
+
+type IState = {
+  user: { name: string; address: { city: string }; phone?: { mobile: string } }
+  cart: { items: string[] }
+}
+
+const state: IState = {
+  user: { name: 'Ada', address: { city: '上海' } },
+  cart: { items: ['键盘'] }
+}
+
+const next = set(state, 'user.address.city', '杭州')
+
+console.log(get(next, 'user.address.city')) // 新值
+console.log(state.user.address.city) // 原对象没有被改
+console.log('cart 仍是同一个对象:', next.cart === state.cart) // 没改的分支直接复用
+console.log('user 是新对象:', next.user !== state.user)
+console.log(get(next, 'user.phone.mobile')) // 可选的 phone 不存在，返回 undefined，不抛错
+```
+
+输出：
+
+```text
+杭州
+上海
+cart 仍是同一个对象: true
+user 是新对象: true
+undefined
+```
+
+输出 `杭州` 和 `上海`：新对象改了，原对象没变。
+
+`cart 仍是同一个对象: true` 和 `user 是新对象: true` 说明只有路径上的对象被复制；最后的 `undefined` 来自不存在的路径。
+
+## 防止配置在传入之后被改掉
+
+库的重试次数莫名其妙变了，查到最后发现是调用方在传入配置之后又改了自己的对象。
+
+库直接保存调用方传来的配置对象时，调用方事后的修改会影响库的行为；插件拿到配置后随手改一个字段，也会影响其他所有人。
+
+`ownConfig` 在接收时复制一份归库所有；`readonlyConfig` 生成只读视图交给插件；`patchConfig` 生成新配置而不改旧配置，`CONFIG_DELETE` 用来删除字段。
+
+```ts doc-test=run
+import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'
+
+const userOptions = { endpoint: 'https://api.example.com', retry: { attempts: 3 }, debug: true }
+const config = ownConfig(userOptions) // 复制一份，从此与调用方的对象无关
+userOptions.retry.attempts = 100 // 调用方事后改了自己的对象
+console.log('库内看到的重试次数:', config.retry.attempts)
+
+const view = readonlyConfig(config) // 交给插件的只读视图
+try {
+  view.retry.attempts = 0
+} catch (error) {
+  console.log('只读视图拒绝修改:', (error as Error).name, (error as { code?: string }).code)
+}
+
+// 生成新配置：改 endpoint，删掉 debug；没改的 retry 直接复用
+const next = patchConfig(config, { endpoint: 'https://staging.example.com', debug: CONFIG_DELETE })
+console.log(next.endpoint, '| debug 还在吗:', 'debug' in next, '| retry 复用:', next.retry === config.retry)
+```
+
+输出：
+
+```text
+库内看到的重试次数: 3
+只读视图拒绝修改: TypeError CONFIG_READONLY
+https://staging.example.com | debug 还在吗: false | retry 复用: true
+```
+
+`库内看到的重试次数: 3`：调用方的修改没有影响到库。
+
+往只读视图里写会抛出 `TypeError`，代码是 `CONFIG_READONLY`。新配置的 `endpoint` 已更新、`debug` 已删除，没改动的 `retry` 与旧配置共用同一个对象。
+
+## 错误被包装后，仍能认出底层原因
+
+底层的断线错误被一层层包装成“加载订单失败”，上层想知道是不是断线，只能比较 message 文本。
+
+比较 message 很脆弱：文案一改，判断就失效；替换错误对象又会丢掉原来的类型和堆栈。
+
+`attachErrorIdentity` 把稳定的 `source` 和 `code` 直接写到原错误上，不替换错误对象，`instanceof` 和堆栈都不变；`walkErrorCauses` 沿着 `cause` 和 `AggregateError.errors` 把它找出来。
+
+```ts doc-test=run
+import { attachErrorIdentity, walkErrorCauses } from '@migaia/utils/error'
+
+// 底层驱动抛出的原生错误，带上稳定的 source 和 code
+function readRow(): never {
+  throw attachErrorIdentity(new Error('connection reset'), {
+    source: 'order-db',
+    code: 'CONNECTION_LOST'
+  })
+}
+
+try {
+  try {
+    readRow()
+  } catch (cause) {
+    // 上层包装成业务错误，但把原始错误放在 cause 上
+    throw new Error('加载订单失败', { cause })
+  }
+} catch (error) {
+  const lost = walkErrorCauses(error).some(
+    (item) => (item as { code?: string } | undefined)?.code === 'CONNECTION_LOST'
+  )
+  console.log((error as Error).message, '| 底层是断线吗:', lost)
+  console.log('原始错误仍是 Error 实例:', walkErrorCauses(error)[1] instanceof Error)
+}
+```
+
+输出：
+
+```text
+加载订单失败 | 底层是断线吗: true
+原始错误仍是 Error 实例: true
+```
+
+输出 `加载订单失败 | 底层是断线吗: true`：外层 message 是业务文案，判断依据的是 code。
+
+`原始错误仍是 Error 实例: true`：附加身份没有改变原错误的类型。
+
+---
 
 ## 目录
 
@@ -49,7 +498,7 @@ type IWallClock = { timestamp(): number };
 - `IManualScheduler`：额外提供 `advance(ms)`（手动推进虚拟时间，触发到期回调）与 `pendingCount`（未触发且未取消的任务数），用于确定性单测。
 - `IWallClock`：只产生诊断时间戳（epoch 毫秒安全整数），不得参与截止时间、过期或重放窗口比较。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 export const systemScheduler: IScheduler;
 export const systemWallClock: IWallClock;
 ```
@@ -58,7 +507,7 @@ export const systemWallClock: IWallClock;
 
 `systemWallClock.timestamp()` 返回 `Date.now()`。需要 epoch 时间戳时使用它；实现接受 `IScheduler` 的超时、重试或调度逻辑时，必须配对使用 `scheduler.now()` 和 `scheduler.schedule()`，不要把墙钟值与 `now()` 相减或比较。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function createManualScheduler(): IManualScheduler;
 ```
 
@@ -66,7 +515,7 @@ function createManualScheduler(): IManualScheduler;
 
 创建一个 FIFO 虚拟时钟调度器：`schedule()` 按 `到期时间 → 注册顺序` 排队；调用 `advance(ms)` 会一次性执行所有到期回调（回调内部再 `schedule` 的新任务，只要到期时间 `<= 目标时刻` 也会在同一次 `advance` 内继续触发）。`advance` 单次循环超过 10000 次会抛 `RangeError`/`SCHEDULER_RUNAWAY`（防止回调间互相递归调度导致死循环）。`delayMs`/`ms` 必须是有限的非负数（非 number 抛 `TypeError`，否则抛 `RangeError`），到期时刻或目标时刻溢出为非有限值时同样抛 `RangeError`，均带 `INVALID_ARGUMENT` 且不改变时钟与队列；回调内再次调用 `advance()` 抛 `TypeError`/`REENTRANT_CALL`，外层 `advance` 照常完成。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const scheduler = createManualScheduler();
 const task = scheduler.schedule(() => console.log('fired'), 100);
 scheduler.advance(50); // 未触发
@@ -75,7 +524,7 @@ scheduler.advance(50); // 触发，打印 'fired'
 
 ### `deferred`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IDeferred<T> = {
   readonly promise: Promise<T>;
   readonly resolve: (value: T | PromiseLike<T>) => void;
@@ -88,14 +537,14 @@ function deferred<T>(): IDeferred<T>;
 
 新代码应先选择平台原生的 `Promise.withResolvers()`。`deferred()` 主要服务于尚未支持该 API 的旧运行时，或必须统一依赖 `IDeferred<T>` 的项目边界：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const { promise, resolve, reject } = Promise.withResolvers<number>();
 resolve(42);
 ```
 
 兼容旧运行时：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const { promise, resolve } = deferred<number>();
 setTimeout(() => resolve(42), 0);
 await promise; // 42
@@ -103,13 +552,13 @@ await promise; // 42
 
 ### `toPromise`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function toPromise<T>(run: () => T): Promise<Awaited<T>>;
 ```
 
 同步且恰好调用 `run` 一次，并用原生 Promise 规则同化返回值。若 `run` 同步抛出，调用点不会同步抛错，而是返回以 exact reason reject 的 Promise。它只负责同步计算到 Promise 的规范化，不创建 timer、scheduler、retry 或 cancellation 状态。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const found = await toPromise(() => cache.get('key'));
 const pending = toPromise(() => {
   throw new Error('read failed');
@@ -127,13 +576,13 @@ await pending; // 异步观察 rejection
 
 ### `sleep`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;
 ```
 
 在调度器延迟后 resolve；若传入的 `signal`/`signals` 在等待期间中止，则以 `UtilsAbortError` reject。`delayMs` 必须是有限非负数。会正确清理已注册的定时器与 abort 监听器，即使清理过程本身抛错也会通过 `hostRethrowReporter`（sleep 不接受自定义 reporter）上报，而不是吞掉。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IAsyncControls = {
   readonly signal?: IAbortSignal;
   readonly signals?: readonly IAbortSignal[];
@@ -144,7 +593,7 @@ type IAsyncControls = {
 
 `signal` 与 `signals` **互斥**——同时提供两者会 reject 一个 `TypeError`。`unref: true` 会尝试调用底层定时器句柄的 `unref()`（Node 环境下避免阻塞进程退出）。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const controller = new AbortController();
 const p = sleep(1000, { signal: controller.signal as any });
 controller.abort('cancelled');
@@ -153,7 +602,7 @@ await p; // 抛 UtilsAbortError，cause 为 'cancelled'
 
 ### `createAbortTimeoutSignal`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IAbortTimeoutSignalOptions = {
   readonly signal?: IAbortSignal;
   readonly timeoutMs?: number;
@@ -170,7 +619,7 @@ function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortT
 
 创建一个可交给多个底层请求共享的 operation signal，但不创建、race 或结算业务 Promise。外部 signal 先中止时保留原始 reason；deadline 先到时使用 `timeoutReason()` 的返回值。reason factory 抛出的原始错误会成为 signal reason，不会从 timer callback 逃逸。无 `timeoutMs` 时透传外部 signal identity；`dispose()` 幂等并负责取消 timer、移除 listener，cleanup 失败通过 `report` 的 `operation: 'abort-timeout-signal'` 上报。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const merged = createAbortTimeoutSignal({
   signal: controller.signal as any,
   timeoutMs: 500,
@@ -187,7 +636,7 @@ try {
 
 ### `withTimeout`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>;
 type IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;
 
@@ -211,7 +660,7 @@ function withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTime
 
 - `timeoutMs`：必须是有限非负数；`timeoutMs === 0` 时默认立即以 `UtilsTimeoutError('operation', 0)` reject（除非 `zeroTimeoutBehavior: 'start'`，此时立刻启动操作，并保留零延时 deadline；操作若未在 deadline 回调前结算，仍会超时）。
 - `cooperativeCancellation`（默认 `true`）：为 `false` 时不分配内部 `AbortController`，操作函数只会拿到一个惰性的、恒不中止的结构化信号（类型是 `IAbortSignal`，不能传给 `fetch`）——用于纯粹的"限时等待结果，但不需要通知操作提前退出"的场景。
-- `report`：操作结算后，迟到成功值直接丢弃；只有迟到 rejection 交给 `report`（默认 `hostRethrowReporter`）。清理失败通过返回 Promise 的 rejection/aggregate 暴露，不交给这个 reporter。
+- `report`：操作结算后，迟到成功值直接丢弃；只有迟到 rejection 交给 `report`（默认 `hostRethrowReporter`）。操作用它收到的 `signal.reason` 本身拒绝时（例如 `fetch(url, { signal })` 被取消后），只是在确认取消，不交给 `report`。清理失败通过返回 Promise 的 rejection/aggregate 暴露，不交给这个 reporter。
 - 清理阶段（取消定时器、移除监听器）失败时，会把清理错误与原始错误一起包装成 `AggregateError` 一并 reject。
 
 ```ts
@@ -231,7 +680,7 @@ await withTimeout(
 
 ### `raceWithAbort`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IAbortOperation<T> = ITimeoutOperation<T>;
 
 function raceWithAbort<T>(
@@ -245,7 +694,7 @@ function raceWithAbort<T>(
 
 与 `withTimeout` 语义相同，但**不设置截止时间定时器**，只在外部 `signal(s)` 中止时让操作提前失败。`cleanupPolicy: 'report'`（默认 `'reject'`）让监听器清理失败时改为上报诊断而不是让最终 Promise reject。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const controller = new AbortController();
 const result = raceWithAbort(({ signal }) => fetchSomething({ signal }), {
   signal: controller.signal as any
@@ -254,7 +703,7 @@ const result = raceWithAbort(({ signal }) => fetchSomething({ signal }), {
 
 ### `retry`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IRetryContext = {
   readonly attempt: number;
   readonly signal: INativeAbortSignal;
@@ -292,7 +741,7 @@ function retry<T>(
 - `delay`：固定毫秒数或 `(error, context) => 毫秒数` 的退避函数，作用于两次尝试之间的等待（通过内部 `sleep`，同样遵守 `signal`/`signals`）。
 - 外部信号在重试过程中的任意时刻中止，都会以 `UtilsAbortError` 结束整个重试，不再进入下一次尝试。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 await retry(
   async ({ attempt }) => {
     if (attempt < 3) throw new Error('boom');
@@ -304,7 +753,7 @@ await retry(
 
 ### `hostRethrowReporter` 与 `IUtilsReporter`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IUtilsReporter = (
   error: unknown,
   context: {
@@ -316,11 +765,11 @@ type IUtilsReporter = (
 const hostRethrowReporter: IUtilsReporter;
 ```
 
-`hostRethrowReporter` 是默认诊断上报器：把错误通过 `queueMicrotask` 重新抛出（在不支持 `queueMicrotask` 的环境下同步抛出），使其成为未捕获异常，交由宿主（进程/浏览器）的全局错误处理机制记录，而不是被静默吞掉。自定义 `report` 选项可以替换为日志上报、埋点等。
+`hostRethrowReporter` 是默认诊断上报器：把错误通过 `queueMicrotask` 重新抛出（在不支持 `queueMicrotask` 的环境下同步抛出），使其成为未捕获异常，交由宿主（进程/浏览器）的全局错误处理机制记录，而不是被静默吞掉。自定义 `report` 选项可以替换为日志上报、埋点等。在 Node 中，未捕获异常默认会让进程退出；所以操作不看 `signal`、可能在超时之后才失败时，请传入自己的 `report`。操作用收到的 `signal.reason` 拒绝属于确认取消，`withTimeout`、`raceWithAbort` 和 `retry` 都不会上报它。
 
 ### `createConcurrencyLimiter`
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConcurrencyLimiter = {
   run<T>(
     task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,
@@ -348,7 +797,7 @@ function createConcurrencyLimiter(options: {
 
 `concurrency` 必须是正安全整数，否则构造时抛 `RangeError`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 const limiter = createConcurrencyLimiter({ concurrency: 2 });
 const results = await Promise.all([1, 2, 3, 4].map((n) => limiter.run(() => fetchPage(n))));
 await limiter.dispose(); // 等待剩余任务完成后关闭
@@ -362,7 +811,7 @@ await limiter.dispose(); // 等待剩余任务完成后关闭
 
 统一的错误身份、包装与因果链遍历工具。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IPropertyRead<T> =
   | { readonly threw: false; readonly value: T }
   | { readonly threw: true; readonly error: unknown };
@@ -373,7 +822,7 @@ function tryReadProperty<T extends object, K extends keyof T>(target: T, key: K)
 
 外部 abort signal 的 reason 也通过同一入口读取：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const read = tryReadProperty(signal, 'reason');
 if (read.threw) report(read.error);
 else handleAbort(read.value);
@@ -381,7 +830,7 @@ else handleAbort(read.value);
 
 失败后是重抛、包装、上报还是把原错误当作 reason，取决于调用方原有契约；此原语只返回读取结果。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 abstract class UtilsError extends Error {
   readonly source = '@migaia/utils';
   readonly code: IUtilsErrorCode;
@@ -400,7 +849,7 @@ class UtilsTimeoutError extends UtilsError {
 
 `UtilsError` 是抽象基类，所有本包抛出的语义化错误都携带 `source: '@migaia/utils'` 与稳定的 `code`。`UtilsAbortError` 通过 `cause` 保留原始中止原因；`UtilsTimeoutError` 额外携带 `scope`（超时发生在单次操作 / 单次尝试 / 总截止时间的哪一层）与 `timeoutMs`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function attachErrorIdentity<T extends object>(
   error: T,
   identity: {
@@ -420,28 +869,28 @@ function attachErrorIdentity<T extends object>(
 
 就地给一个已存在的错误对象追加不可写的身份字段（`source`/`code`/`phase`/`detail`），**不会**替换或包装该错误。如果同一字段已存在且值不同，会抛出 `TypeError`（避免悄悄覆盖其他代码写入的身份信息）；值相同则视为幂等，直接返回。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const error = new Error('boom');
 attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' });
 (error as Error & { readonly code?: string }).code; // 'FETCH_FAILED'（返回类型仍是 T，不扩展 code 字段）
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function toError(value: unknown, options?: { readonly message?: string }): Error;
 ```
 
 把任意抛出值规整为可诊断错误：原生 `Error` 或具有字符串 name/message/stack 的跨 realm/结构化错误形状原样返回；后者不保证 instanceof 本地 Error。其余值包装成携带 `cause: value` 的内部错误类型，消息优先取 `options.message`，其次（当抛出值本身是字符串时）取该字符串，否则用固定的兜底文案。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function walkErrorCauses(
   error: unknown,
   options?: { readonly maxDepth?: number }
 ): readonly unknown[];
 ```
 
-按 `cause` 链与 `AggregateError.errors` 展开遍历，返回访问到的全部节点（含起始 `error` 自身），用 `Set` 做同一值去重防止环路。`maxDepth`（默认 32）限制最大深度，超出后停止继续下探那一支。
+按 `cause` 链与 `AggregateError.errors` 展开遍历，返回访问到的全部节点（含起始 `error` 自身），用 `Set` 做同一值去重防止环路。`maxDepth`（默认 32）限制最大深度，超出后停止继续下探那一支。用 `cause: undefined` 创建的错误会在结果里留下一个 `undefined` 项，读取字段时请用可选链（`item?.code`）。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 try {
   throw new Error('outer', { cause: new Error('inner') });
 } catch (error) {
@@ -449,13 +898,13 @@ try {
 }
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;
 ```
 
 把 0 个、1 个或多个错误合并：0 个返回 `undefined`；1 个原样返回（经 `toError` 规整）；多个包装成 `AggregateError(errors, message)`。如果遍历 `errors` 这个 `Iterable` 本身抛错，会把已收集的错误连同该次遍历失败一起打包进 `AggregateError` 再抛出。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function isUtilsError(value: unknown): value is UtilsError;
 function isUtilsAbortError(value: unknown): value is UtilsAbortError;
 function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;
@@ -532,7 +981,7 @@ const UtilsErrorCode = {
 - `new Uint8Array(buffer, byteOffset, length)` 创建共享底层内存的窗口，不复制数据；视图写入会反映到原 buffer。`subarray()` 继续共享内存，`slice()` 才创建独立副本。
 - 普通 `ArrayBuffer` 跨 Worker 转移后可能 detached；`SharedArrayBuffer` 是并发共享内存，具有不同的所有权和同步要求，所以 `isArrayBuffer()` 明确拒绝它。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function isUint8Array(value: unknown): value is Uint8Array;
 function isArrayBuffer(value: unknown): value is ArrayBuffer;
 ```
@@ -541,50 +990,50 @@ function isArrayBuffer(value: unknown): value is ArrayBuffer;
 
 detached `Uint8Array` / `ArrayBuffer` 仍返回 `true`：detachment 不改变对象品牌，但会影响读取能力；需要消费字节的调用方仍须独立处理 detached 状态。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function bytesToBase64(value: Uint8Array): string;
 ```
 
 按 RFC 4648 规范字母表编码为标准（非 URL-safe）、带 `=` 补齐的 Base64 字符串。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 function base64ToBytes(value: string, target?: Uint8Array): Uint8Array; // target 长度须等于解码字节数，复用而不分配
 ```
 
 **只接受规范形式**：标准字母表、必须 4 的倍数长度、正确的 `=` 补齐。非规范输入（URL-safe 变体、无补齐、多余空白等）一律拒绝，抛出携带 `code: 'INVALID_ENCODING'` 的 `TypeError`。解码时直接检查 padding 未使用位必须为零，不进行反向编码，拒绝数值不对齐的输入。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'
 base64ToBytes('AQID'); // Uint8Array [1, 2, 3]
 base64ToBytes('AQID-_'); // 抛 TypeError（URL-safe 字符不被接受）
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function* streamBase64Chunks(value: Uint8Array, maxChunkBytes?: number): Iterable<string>;
 ```
 
 把大字节数组切分成多个**各自独立合法**的 Base64 片段（每片段都在 3 字节边界上切分，因此每片段自身都能正确解码，不需要拼接后才合法）。`maxChunkBytes` 默认 `32763`，必须是 `>= 3` 的安全整数；实际切分宽度会向下取整到 3 的倍数。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function utf8ByteLength(value: string): number;
 ```
 
 计算字符串编码为 UTF-8 后的字节数，不分配缓冲区（正确处理代理对/非法代理，用 U+FFFD 的宽度 3 计入非法代理）。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function encodeUtf8(value: string): Uint8Array;
 function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean }): string;
 ```
 
 `encodeUtf8` 编码为新分配的 UTF-8 字节数组。`decodeUtf8` 解码：`fatal: false`（默认）遇到非法字节序列时用 U+FFFD 替换并跳过 1 字节继续；`fatal: true` 时直接抛出携带偏移量的编码错误。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function splitUtf8(value: string, maxBytes: number): readonly string[];
 ```
 
 把字符串按码点边界切分成若干子串，保证每个子串编码后的字节数不超过 `maxBytes`（绝不会在一个码点中间切断）。`maxBytes` 必须是 `>= 4` 的安全整数（4 是单个码点的最大 UTF-8 宽度）。空字符串返回 `['']`。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']
 ```
 
@@ -598,13 +1047,13 @@ splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']
 
 ### 快照与探测
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;
 ```
 
 非数组对象的原型为 null，或其原型的父原型为 null 时返回 true。因此也接受 Object.create(Object.create(null))，并非只检查当前 realm 的 Object.prototype 等值；通常的 class 实例与 Date/Map 等内置对象返回 false。读取原型链失败（代理陷阱抛错）时同样返回 `false`，不会向上抛错。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IProbePropertyResult<T> =
   | { readonly kind: 'missing' }
   | { readonly kind: 'value'; readonly value: T }
@@ -614,7 +1063,7 @@ function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult
 
 读取单个属性且只读取一次（避免 getter 被调用两次产生副作用）：属性不存在返回 `missing`；读取（包括触发 getter）抛错返回 `failed` 并携带原始错误；否则返回 `value`。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const profileUnavailable = new Error('profile unavailable');
 let profileReads = 0;
 const user = {
@@ -646,7 +1095,7 @@ profileReads; // 1：getter 只被读取一次
 
 第一个参数可以是普通对象、class 实例或其他可读取属性的对象；第二参数接受字符串、数字或 Symbol key。它把缺失字段与读取失败拆成不同分支，避免 `try/catch` 后错误地使用默认值；返回 `failed` 时不会重建错误，`error` 就是 getter 原样抛出的实例。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function immutableSnapshot<T>(value: T): T;
 ```
 
@@ -654,7 +1103,7 @@ function immutableSnapshot<T>(value: T): T;
 
 结构化克隆不会保留自定义 class 的原型方法、getter/setter 与属性描述符；函数、WeakMap 等不支持的成员会让整个克隆失败。“immutable”表示快照不再共享源对象引用，不表示返回值经过 `Object.freeze()`；需要运行时冻结或递归只读时由调用方另行处理。宿主不提供 `structuredClone` 时抛出 `code: 'ENV_UNSUPPORTED'` 的 `TypeError`；值本身不可结构化克隆时抛出 `code: 'CLONE_UNSUPPORTED'` 的 `TypeError`。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const shared = { count: 1 };
 const source = {
   primary: shared,
@@ -670,7 +1119,7 @@ copy.createdAt instanceof Date; // true
 Object.isFrozen(copy); // false
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type ISnapshotDiagnostic = {
   readonly path: readonly PropertyKey[];
   readonly reason: 'accessor' | 'read-failed' | 'unsupported';
@@ -690,7 +1139,7 @@ function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
 
 `structuredDiagnosticSnapshot` 是两种策略的组合：优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能完整克隆就完整克隆，否则仍返回可观测降级结果”的遥测边界优先使用它。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function identitySnapshot<T>(value: T): T;
 ```
 
@@ -705,13 +1154,13 @@ function identitySnapshot<T>(value: T): T;
 
 两种形式共享同一套安全限制：单段最长 512 字符、路径最多 256 段、字符串路径总长不超过 4096 字符；`__proto__`/`prototype`/`constructor` 一律被拒绝（防止原型污染）。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple;
 ```
 
 把字符串路径解析成规范化的 `readonly` 段元组（数字下标解析成 `number`），或校验并冻结一个已给定的元组路径。任何越界/危险段都会抛出携带 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IPathValueProbe<T, P extends IObjectPathInput<T>> = {
   readonly kind: 'value';
   readonly originKey: P;
@@ -765,7 +1214,7 @@ function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
 
 `probeObjectPathSegments` 接受已经由调用方校验/缓存的段元组，跳过再次解析；结果语义与 `probeObjectPath` 完全相同。只有能保证 segments 已通过同一安全约束的高频内部路径才应使用它，外部字符串输入继续交给 `probeObjectPath`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function get<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P
@@ -774,14 +1223,14 @@ function get<T, P extends IObjectPathInput<T>>(
 
 基于 `probeObjectPath` 的简化读取：`missing`/`blocked` 统一返回 `undefined`；`failed`（读取本身抛错）会**原样重新抛出**该错误，不会被静默吞掉——这一点区别于"路径不存在"，调用方需要分别处理。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const data = { user: { name: 'Ada' } };
 get(data, 'user.name'); // 'Ada'
 get(data, 'user.missing'); // undefined（missing）
 get(data, 'user.name.x'); // undefined（blocked：'Ada' 是字符串，无法继续深入 .x）
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function set<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P,
@@ -791,7 +1240,7 @@ function set<T, P extends IObjectPathInput<T>>(
 
 不可变路径写入：每次值真正变化的 `set()` 都返回一个新根对象，传入对象保持不变。只有路径上的节点被浅拷贝（结构共享，未涉及的兄弟节点保持同一引用）。这里的 immutable 描述更新方式，不表示返回对象经过深拷贝或 `Object.freeze()`；返回值本身仍可修改。路径中间缺失的容器会按下一段键的类型自动创建（数字键 → `[]`，其他 → `{}`）。若路径中途遇到非空的原始值（字符串、数字等，无法继续深入）会抛出 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。若新值与旧值经 `Object.is` 相等，则没有发生更新，直接复用原对象，不做任何拷贝。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const before = { user: { name: 'Ada', tags: ['a'] } };
 const after = set(before, 'user.name', 'Grace');
 after.user.name; // 'Grace'
@@ -802,7 +1251,7 @@ before.user.name; // 'Ada'（原对象未被修改）
 Object.isFrozen(after); // false（immutable update 不等于冻结）
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
   readonly originKey: P;
   readonly segments: IObjectPathTuple;
@@ -838,7 +1287,7 @@ function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IP
 
 `onGet`/`onSet` 在每次成功读/写时被调用，事件对象字段：`originKey`（原始传入路径）、`segments`（解析后的段元组）、`probe`（本次读/写命中的 `IPathValueProbe`，即成功探测结果）、`value`（本次实际读到/将要写入的值）、`replace(value)`（调用后就地改写本次读取/写入的实际返回值/写入值，例如做统一的默认值填充或写入前校验/转换）。`IPathGetEvent`/`IPathSetEvent` 唯一的区别是 `value`/`replace` 的类型：读事件用 `IObjectPathValue`（读到的原值类型），写事件用 `IObjectPathWriteValue`（字面量放宽后的可写类型）。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const accessor = createPathAccessor(
   { count: 0 },
   { onSet: (event) => console.log('write', event.originKey, event.value) }
@@ -879,7 +1328,7 @@ type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKe
 - 类型参数 `T extends Record<F, PropertyKey>`：目标联合类型本身；约束要求 `T` 每个成员上 `F` 对应的字段值都必须是 `PropertyKey`——如果某个分支的该字段是对象等非 `PropertyKey` 类型，`T` 就不满足 `Record<F, PropertyKey>` 约束，直接编译报错（不是运行时报错，是这个类型工具压根用不起来）。
 - 结果：一个以 `T[F]` 的每个字面量值为 key、value 是 `Extract<T, Record<F, K>>`（该判别值对应的联合分支，若多个分支共享同一判别值则保留为它们的联合）的映射类型。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 /** 按一个 string 或 tuple 对象路径对联合类型分组，路径解析规则与 /object 模块的 IObjectPath 完全一致。 */
 type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
   [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;
@@ -893,7 +1342,7 @@ type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
 
 **用法示例**（摘自包自带测试 `test/typing.test.ts`，行为已用 `expectTypeOf` 验证）：
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IEvent =
   | {
       readonly type: 'created';
@@ -923,7 +1372,7 @@ type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category
 
 **类型边界示例**：全部路径不存在时会违反路径约束；部分分支缺路径或非 PropertyKey 的路径值可能只产生空映射。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // @ts-expect-error 所有分支均不存在此路径，违反 IObjectPathInput 约束
 type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>;
 
@@ -947,13 +1396,13 @@ type IConfigProfile = 'data' | 'richRuntime';
 
 `data`（默认）：只接受可移植的纯数据——普通对象、数组、`Date`/`RegExp`/`Map`/`Set` 等内置类型；**拒绝函数**。`richRuntime`：额外接受函数/可构造类（连同其自身属性与 `prototype` 一起深拷贝），用于确实需要在配置里携带回调或工厂的场景。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const CONFIG_DELETE: unique symbol;
 ```
 
 在 `patchConfig`/`combineConfig` 的补丁对象中，把某个键的值设为这个符号，表示"删除该键"（而不是设为 `undefined`）。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function ownConfig<T extends IConfigRecord>(
   value: T,
   options?: { readonly profile?: IConfigProfile; readonly limits?: Partial<IConfigLimits> }
@@ -971,7 +1420,7 @@ function ownConfig<T extends IConfigRecord>(
 
 调用方拿到结果后有三种明确路径：内部继续把它作为稳定配置根；通过 `readonlyConfig()` 暴露可读但不可写的递归 Proxy；通过 `patchConfig()` 或 `combineConfig()` 派生下一份已拥有配置。不要直接把原始外部对象交给这些 API，也不要把“已拥有”误解为冻结——所有权保证来自独立图与内部登记，运行时写保护由 `readonlyConfig()` 单独提供。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConfigLimits = {
   readonly maxDepth: number; // 默认 256
   readonly maxNodes: number; // 默认 100_000
@@ -983,13 +1432,13 @@ type IConfigLimits = {
 
 `limits` 不得超过包级默认上限。`patchConfig` 相对输入基准只能收紧，放宽会抛 CONFIG_CONFLICT；`combineConfig` 取所有输入与请求上限的逐项最小值，放宽请求被自动收紧，不因此抛 CONFIG_CONFLICT。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;
 ```
 
 返回一个**带缓存的只读对象**，内部通过 `Proxy` 拦截修改；同一输入对象重复调用会返回同一个只读对象。读取时仍然访问原配置，没有再复制一份数据。任何写操作（`set`/`defineProperty`/`deleteProperty`/`setPrototypeOf`/`preventExtensions`，以及 `Map`/`Set`/`Date` 上的变更方法如 `.set()`/`.add()`/`.setFullYear()`）都会抛出 `code: 'CONFIG_READONLY'` 的 `TypeError`。嵌套对象、`Map`、`Set` 和函数字段也会受到同样的写入保护。`value` 必须是 `ownConfig` 的产物，否则抛 `code: 'CONFIG_UNSUPPORTED'`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function patchConfig<T extends IConfigRecord>(
   base: IOwnedConfig<T>,
   patch: IConfigPatch<T>,
@@ -1003,14 +1452,14 @@ function patchConfig<T extends IConfigRecord>(
 
 对**根**做写时复制式覆盖：`patch` 中每个键要么设为新值（会被递归深拷贝并纳入所有权），要么设为 `CONFIG_DELETE` 表示删除。只有被改动路径上的节点被复制，未涉及的子树按引用共享。`patch` 为空对象且 `reuseUnchangedRoot`（默认 `true`）时直接返回 `base` 本身，不做任何拷贝。`patch` 必须是普通对象、键不能是 `symbol`、不能是访问器属性，否则抛 `code: 'CONFIG_UNSUPPORTED'`；键名撞上 `__proto__`/`prototype`/`constructor` 抛 `code: 'CONFIG_PATH_INVALID'`。**注意**：`patchConfig` 只在根一层应用补丁——要修改嵌套字段，先用 `get`/`set`（`/object` 模块）在应用层算出新的嵌套子树，再作为整体值放进 `patch`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true });
 const next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE });
 next.retries; // 3
 'debug' in next; // false
 ```
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function parseConfigPath(
   path: string,
   limits?: Pick<IConfigLimits, 'maxPathLength' | 'maxSegmentLength'>
@@ -1019,7 +1468,7 @@ function parseConfigPath(
 
 在 `/object` 模块的 `parseObjectPath` 基础上叠加 config 专属限制（长度上限可自定义，默认取包级默认值）并强制所有段都是字符串（不支持数字下标简写形式在 config 路径里独立出现，统一按字符串段处理）。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConfigReadResult =
   { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown };
 function readConfigPath(
@@ -1030,7 +1479,7 @@ function readConfigPath(
 
 读取配置内某条路径，区分"键不存在"（`missing`）与"值就是 `undefined`"（`value: undefined`）。返回的对象/函数类型的值会自动包一层只读 Proxy（与 `readonlyConfig` 相同的包装逻辑），保证读到的嵌套值也不可被外部修改。`config` 必须是 `ownConfig` 的产物。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function combineConfig(
   sources: readonly IOwnedConfig<IConfigRecord>[],
   options?: {
@@ -1045,7 +1494,7 @@ function combineConfig(
 
 按 `sources` 数组的顺序（后者覆盖前者）合并多个已拥有的配置根。只有一个来源且未提供任何合并选项时，直接返回该来源，保留根 identity；其他情形产出新的 owned 配置。全部来源必须共享同一个 `profile`，否则抛 `code: 'CONFIG_CONFLICT'`。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConfigMergeStrategies = {
   readonly record: 'merge' | 'replace'; // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖
   readonly array: 'replace' | 'concat' | 'mergeByIndex'; // 默认 'replace'
@@ -1075,7 +1524,7 @@ type IConfigConflictDecision =
 
 当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须**同步**返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const defaults = ownConfig({
   retries: 1,
   tags: ['default'],
@@ -1113,19 +1562,19 @@ const diff = {
 
 ## `/function` 模块
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 const noop: () => undefined;
 ```
 
 恒返回 `undefined` 的空函数，用作默认回调占位符。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function once<T extends (...args: never[]) => unknown>(functionValue: T): T;
 ```
 
 记忆化一个**同步**函数：只在首次调用时真正执行，之后的调用直接返回首次的结果（或重新抛出首次的异常——包括异常也被缓存，不会在第二次调用时重新执行函数体）。若在首次调用**尚未完成**时发生重入（函数体内部再次调用了被包装后的自身），会抛出 `code: 'REENTRANT_CALL'` 的 `TypeError`，防止意外的递归自调用绕过缓存语义。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // runtime.ts：整个模块只创建并导出这一份包装函数。
 export const getRuntime = once(() => {
   const registry = buildCommandRegistry();
@@ -1143,13 +1592,13 @@ first === second; // true
 
 `Proxy` 适合把首次属性访问变成惰性初始化，或限制访问方式；它本身不提供唯一性。是否是单例仍由 Proxy 后面的实例存储位置和 owner 数量决定，因此无需为了“真实单例”给 `once` 结果额外套 Proxy。
 
-```ts
+```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>;
 ```
 
 记忆化一次**异步**调用：首次调用时启动 `functionValue()`，包装函数会保留并返回同一个 Promise；后续调用无论发生在 pending、fulfilled 还是 rejected 阶段，都直接拿到这个 Promise。`functionValue()` 可以返回原生 `Promise` 或合法 PromiseLike；其他值会让共享 Promise 以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。
 export const loadAppConfig = onceAsync(async () => {
   const response = await fetch('/config');
@@ -1177,7 +1626,7 @@ const [routerConfig, telemetryConfig] = await Promise.all([
 
 Collector 是包根入口提供的、数组专用的惰性查询流水线：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // 内部组合类型，不是公开导出；使用者导入 ICollector 或 IFieldCollector。
 type ICollectorActions<T, Self> = {
   readonly result: readonly T[];
@@ -1205,7 +1654,7 @@ interface IFieldCollector<T, P extends IObjectPathInput<T>>
 function collect<T>(dataSource: readonly T[]): ICollector<T>;
 ```
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const collector = collect(users)
   .fieldBy('profile.name-zh', 'profile.name-en')
   .like(' World ')
@@ -1269,6 +1718,63 @@ await request.catch(() => undefined);
 
 `createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并登记入参；`readonlyConfig` 返回带缓存、只能读取不能修改的对象；`patchConfig` 返回一份新的受管理配置，`CONFIG_DELETE` 只在根一层的补丁里生效。
 
+### 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败
+
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
+import { createConcurrencyLimiter, retry } from '@migaia/utils/promise';
+import { combineErrors } from '@migaia/utils/error';
+
+const limiter = createConcurrencyLimiter({ concurrency: 4 });
+const outcomes = await Promise.allSettled(
+  urls.map((url) =>
+    limiter.run(() =>
+      retry(({ signal }) => fetch(url, { signal }).then((r) => r.json()), {
+        maxAttempts: 3,
+        shouldRetry: () => true
+      })
+    )
+  )
+);
+await limiter.dispose();
+
+const failed = combineErrors(
+  outcomes.filter((o) => o.status === 'rejected').map((o) => (o as PromiseRejectedResult).reason),
+  'some URLs failed'
+);
+if (failed) throw failed;
+```
+
+`combineErrors` 在没有失败时返回 `undefined`，只有一个失败时返回它本身，多个失败时合并成 `AggregateError`。
+
+### 对象路径 + 配置：把修改后的嵌套结构整体写回配置根
+
+```ts
+import { get, set } from '@migaia/utils/object';
+import { ownConfig, patchConfig } from '@migaia/utils/config';
+
+const config = ownConfig({ server: { host: 'localhost', port: 8080 } });
+// patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁
+const nextServer = set(get(config, 'server')!, 'port', 9090);
+const next = patchConfig(config, { server: nextServer });
+```
+
+### 一次性初始化 + 错误身份：让初始化失败带上可识别的 code
+
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
+import { once } from '@migaia/utils/function';
+import { attachErrorIdentity } from '@migaia/utils/error';
+
+const initOnce = once(() => {
+  try {
+    return dangerousInit();
+  } catch (error) {
+    throw attachErrorIdentity(error as Error, { source: 'my-package', code: 'INIT_FAILED' });
+  }
+});
+```
+
+`once` 会记住第一次抛出的错误，之后的调用都会抛出同一个错误对象，不会重新初始化。
+
 ---
 
 ## `/value`、`/string`、`/number` 高频工具
@@ -1277,7 +1783,7 @@ await request.catch(() => undefined);
 
 `tryString(value)` 从 `/string` 导出，string 原样通过，其他值只执行一次原生 `String(value)`。它返回 `{ threw: false, value: string }` 或 `{ threw: true, error: unknown }`；失败保留精确原抛出值，不提供 fallback、不调用 reporter、不生成新错误。调用方根据自己的边界选择报告、fallback 或重抛：
 
-```ts
+```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { tryString } from '@migaia/utils/string';
 
 const converted = tryString(value);
@@ -1290,6 +1796,18 @@ const text = converted.value;
 `format(source, values, options?)` 使用线性扫描替换 `{path}`，嵌套路径只读取 own property；缺失值默认保留占位符。`options.placeholder` 可配置 `{ open, close }`，`missing` 可选 `preserve | empty | throw`，`nullish` 可选 `empty | stringify`。双写边界字符用于输出字面量边界。
 
 `formatNumber`、`formatCurrency`、`formatPercent`、`formatInteger`、`formatCompactNumber` 共享一个 64 项有界 `Intl.NumberFormat` 缓存。高频表格、行情或库存循环使用 `createNumberFormatter(options)`，避免每项重复解析配置。所有 locale、币种、精度和舍入规则由调用方显式拥有。
+
+```ts
+import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';
+
+isEmptyValue('  '); // true；0、false、0n 均为 false
+isPrimitive(Symbol('id')); // true
+format('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });
+formatCurrency(1234.5, 'CNY', {
+  locales: 'zh-CN',
+  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+});
+```
 
 ---
 
@@ -1319,180 +1837,194 @@ const failure: unknown = new TypeError('invalid input')
 if (isNativeErrorValue(failure)) console.log(failure.stack)
 ```
 
-### `deferTask` and optional deferred capability
+### `deferTask` 与调度器可选的 `defer`
 
-The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery. Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle.
+`IScheduler` 可以额外提供 `defer(callback): void`，用来安排“当前调用结束后再执行”的任务，它和可取消的定时任务是两回事。`deferTask(clock, callback)` 优先使用调度器的 `defer`；调度器没有提供时，退回 `schedule(callback, 0)`。根入口和 `/scheduler` 子路径导出的是同一个函数。`systemScheduler` 的 `defer` 使用原生微任务，保持微任务的先后顺序；自定义调度器自己决定何时执行。回调返回的 Promise 由调用方负责；登记失败时抛出的错误保持原样。这个 API 不创建新的队列，也不返回取消句柄。
 
-Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery. Resource retry/Suspense yields continue using the ordinary timer API.
+回调或方法不是函数时，抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的原生 `TypeError`；读取 `defer` 方法本身失败时，原错误放在 `cause` 上。使用默认的 `systemScheduler` 而宿主缺少 `queueMicrotask` 时抛 `ENV_UNSUPPORTED`；显式传入的手动时钟或宿主时钟不依赖这个全局函数。用展开语法复制 `systemScheduler` 时也会复制它的 `defer`：如果要改变延后任务的执行方式，记得同时覆盖 `defer`。
+
+```ts
+import { deferTask } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
+
+const clock = createManualScheduler();
+let delivered = false;
+deferTask(clock, () => {
+  delivered = true;
+});
+console.log(delivered); // false
+clock.advance(0);
+console.log(delivered); // true
+```
 
 UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 UTF-8 与字节偏移；Base64 失败仍标明 Base64。
 
 ## 公开入口索引
 
-下表逐名覆盖公开表面。具体参数、错误与生命周期约束见前述模块说明；类型 helper 同样列出用途。URL helper 只提供结构读取，不做 URL 合法性或安全性校验。
+下表逐个列出公开名称。具体参数、错误与生命周期约束见前面各模块的说明；类型工具也列出了用途。URL 工具只读取结构，不校验 URL 是否合法或安全。
 
 | 名称 | 规范入口 | 用途与约束 |
 | --- | --- | --- |
-| `CONFIG_DELETE` | `@migaia/utils/config` | 根级 patch 或合并冲突决策中的删除哨兵；不会递归应用到嵌套 patch。 |
-| `ConfigProfile` | `@migaia/utils/config` | data 与 richRuntime 两种配置输入域常量。 |
-| `IAbortOperation` | `@migaia/utils/promise` | 接收本包生成的 signal，可返回值或 PromiseLike 的惰性操作。 |
-| `IAbortSignal` | `@migaia/utils/promise` | 无 DOM/Node 依赖的结构 signal：aborted、reason 与 abort 监听方法。 |
-| `IAbortSignalAdmission` | `@migaia/utils/promise` | Result of one structural signal admission read; callers retain all error and abort policy. |
-| `IAbortSignalRejection` | `@migaia/utils/promise` | Stable reasons for rejecting an untrusted abort-signal-shaped value without throwing. |
-| `IAbortTimeoutSignal` | `@migaia/utils/promise` | 合并信号与幂等 dispose 句柄；没有输入信号和预算时 signal 可为 undefined。 |
-| `IAbortTimeoutSignalOptions` | `@migaia/utils/promise` | 外部 signal、timeoutMs、scheduler、timeoutReason、report 的输入配置。 |
-| `IAsyncControls` | `@migaia/utils/promise` | 异步等待共享的 signal/signals、scheduler 与 unref 选项；signal 与 signals 互斥。 |
-| `ICollector` | `@migaia/utils` | Collector state before a field scope enables field-dependent predicates. |
-| `IConcurrencyLimiter` | `@migaia/utils/promise` | FIFO 并发 owner：run、close、whenIdle、dispose 与活动/排队数量。 |
-| `IConfigCombineOptions` | `@migaia/utils/config` | 按 profile、limits、合并策略、路径规则与冲突回调组合 owned 配置。 |
-| `IConfigConflictContext` | `@migaia/utils/config` | 冲突的当前路径、左右值、探测结果与输入 owner 上下文。 |
-| `IConfigConflictDecision` | `@migaia/utils/config` | 选择 left/right、delete 或一个替换 value；同步回调不得返回 thenable。 |
-| `IConfigLimits` | `@migaia/utils/config` | 配置图深度、节点、键与路径/分段长度上限；只允许收紧包级上限。 |
-| `IConfigMergeStrategies` | `@migaia/utils/config` | record/array/map/set 与 undefined 的合并策略。 |
-| `IConfigPatch` | `@migaia/utils/config` | 根字段的部分补丁；CONFIG_DELETE 表示删除该根字段。 |
-| `IConfigPatchOptions` | `@migaia/utils/config` | ownConfig 的 profile/limits 与 reuseUnchanged 结构共享控制。 |
+| `CONFIG_DELETE` | `@migaia/utils/config` | 根级补丁或合并冲突决策里的删除标记；不会递归作用到嵌套补丁。 |
+| `ConfigProfile` | `@migaia/utils/config` | `data` 与 `richRuntime` 两种配置输入范围的常量。 |
+| `IAbortOperation` | `@migaia/utils/promise` | 接收本包生成的 signal、返回值或 PromiseLike 的惰性操作。 |
+| `IAbortSignal` | `@migaia/utils/promise` | 不依赖 DOM 或 Node 的结构化 signal：`aborted`、`reason` 和 abort 监听方法。 |
+| `IAbortSignalAdmission` | `@migaia/utils/promise` | `admitAbortSignal` 读取一次 signal 形状的结果；错误和中止的处理策略由调用方决定。 |
+| `IAbortSignalRejection` | `@migaia/utils/promise` | 拒绝一个不可信的、形似 abort signal 的值时给出的稳定原因，不抛错。 |
+| `IAbortTimeoutSignal` | `@migaia/utils/promise` | 合并后的 signal 与幂等的 `dispose`；既没有外部 signal 也没有时限时，`signal` 可能是 `undefined`。 |
+| `IAbortTimeoutSignalOptions` | `@migaia/utils/promise` | 外部 `signal`、`timeoutMs`、`scheduler`、`timeoutReason`、`report` 的输入选项。 |
+| `IAsyncControls` | `@migaia/utils/promise` | 异步等待共用的 `signal` / `signals`、`scheduler` 与 `unref` 选项；`signal` 和 `signals` 互斥。 |
+| `ICollector` | `@migaia/utils` | 还没调用 `fieldBy` 的 Collector；按字段筛选的方法要在 `fieldBy` 之后才可用。 |
+| `IConcurrencyLimiter` | `@migaia/utils/promise` | 先进先出的并发限制器：`run`、`close`、`whenIdle`、`dispose` 以及运行中和排队中的数量。 |
+| `IConfigCombineOptions` | `@migaia/utils/config` | 按 profile、limits、合并策略、路径规则和冲突回调组合已拥有的配置。 |
+| `IConfigConflictContext` | `@migaia/utils/config` | 冲突发生的路径以及左右两侧的值。 |
+| `IConfigConflictDecision` | `@migaia/utils/config` | 选择 `left`、`right`、`delete` 或一个替换值；回调必须同步返回，不能返回 thenable。 |
+| `IConfigLimits` | `@migaia/utils/config` | 配置图的深度、节点数、键数以及路径和分段长度上限；只能比包级上限更严。 |
+| `IConfigMergeStrategies` | `@migaia/utils/config` | `record`、`array`、`map`、`set` 与 `undefined` 的合并策略。 |
+| `IConfigPatch` | `@migaia/utils/config` | 根字段的部分补丁；`CONFIG_DELETE` 表示删除该根字段。 |
+| `IConfigPatchOptions` | `@migaia/utils/config` | `ownConfig` 的 profile / limits，加上控制空补丁是否复用原根对象的 `reuseUnchangedRoot`。 |
 | `IConfigPathRule` | `@migaia/utils/config` | 按路径前缀选择局部合并策略。 |
-| `IConfigProfile` | `@migaia/utils/config` | data 或 richRuntime 输入域；后者允许受控 callable。 |
-| `IConfigReadResult` | `@migaia/utils/config` | 区分 missing 与 value（值可为 undefined）的路径读取结果。 |
-| `IConfigRecord` | `@migaia/utils/config` | 具有字符串键的只读配置根结构。 |
-| `IDeadlineOnlyOperation` | `@migaia/utils/promise` | Deadline-only operation used when `cooperativeCancellation` may be `false`: the operation then receives a stable never-aborting structural signal, not a host `AbortSignal`. |
-| `IDeferred` | `@migaia/utils/promise` | 原生 promise 与对应 resolve/reject 能力；由调用方拥有结算。 |
-| `IDiagnosticSnapshot` | `@migaia/utils/object` | 隔离的 value 与逐路径 diagnostics；不能假设所有 unsupported 叶已复制。 |
-| `IDiscriminatedByField` | `@migaia/utils/typing` | Groups a discriminated union by one top-level property-key field. |
-| `IDiscriminatedByPath` | `@migaia/utils/typing` | Groups a discriminated union by a typed string or tuple object path. |
-| `IErrorChainData` | `@migaia/utils/error` | Plain, finite JSON data accepted by the generic error boundary and structured clone. |
-| `IErrorChainStrategy` | `@migaia/utils/error` | Small policy surface for fields, privacy, budgets, portable data, and native restoration. |
-| `IErrorIdentity` | `@migaia/utils/error` | source/code 二元组，可附 phase/detail；语义归属由包边界决定。 |
-| `IErrorIdentityHooks` | `@migaia/utils/error` | 身份冲突与属性写入失败时的可选恢复策略，必须保留原始错误可达。 |
-| `IFieldCollector` | `@migaia/utils` | Collector state whose values are inferred from the latest `fieldBy`. |
-| `IFormatOptions` | `@migaia/utils/string` | String-template policies; defaults preserve missing placeholders and blank nullish values. |
-| `IFormatPlaceholder` | `@migaia/utils/string` | Placeholder delimiters used by the linear template scanner. |
-| `IManualScheduler` | `@migaia/utils/testing` | 测试用虚拟时钟，提供 advance 与 pendingCount；仅从 /testing 导入。 |
-| `INativeAbortSignal` | `@migaia/utils/promise` | The signal type for values this module creates with a real `AbortController` and hands to an operation, so callers can pass it to host APIs such as `fetch` without an assertion. |
-| `INumberFormatOptions` | `@migaia/utils/number` | Locale and Intl policy used by all numeric format helpers. |
-| `INumberFormatter` | `@migaia/utils/number` | Reusable formatter for hot loops such as inventory tables and market data. |
-| `INumericValue` | `@migaia/utils/number` | Public numeric values accepted without lossy coercion from strings. |
-| `IObjectPath` | `@migaia/utils/object` | Typed dot/bracket paths, capped at eight levels to bound compiler work. |
-| `IObjectPathInput` | `@migaia/utils/object` | All statically valid string and tuple paths for one root type. |
-| `IObjectPathSegment` | `@migaia/utils/object` | 路径元组中的字符串、数字或 symbol 键。 |
-| `IObjectPathTuple` | `@migaia/utils/object` | 由字符串、数字或 symbol 构成的只读路径分段数组。 |
-| `IObjectPathTupleFor` | `@migaia/utils/object` | Typed readonly tuple paths, including number indexes and symbol object keys. |
-| `IObjectPathValue` | `@migaia/utils/object` | Resolves a string or tuple path to its value type. |
-| `IObjectPathWriteValue` | `@migaia/utils/object` | Resolves the accepted replacement type for a string or tuple path. |
-| `IOwnConfigOptions` | `@migaia/utils/config` | 选择 data/richRuntime profile 并收紧配置资源预算。 |
-| `IOwnDescriptorsSnapshot` | `@migaia/utils/object` | Result of one non-throwing own-descriptor capture at an object boundary. |
-| `IOwnedConfig` | `@migaia/utils/config` | 由 ownConfig 接纳并登记所有权的配置类型；品牌不授予伪造对象运行时权限。 |
-| `IPathAccessor` | `@migaia/utils/object` | 维护当前 immutable 根，提供 get/set、probeValue 与 parsePath。 |
-| `IPathAccessorOptions` | `@migaia/utils/object` | 缺失、阻塞、读取失败与 get/set 转换回调。 |
-| `IPathBlockedProbe` | `@migaia/utils/object` | 路径被非对象中间值阻塞，记录失败分段与 parent。 |
-| `IPathFailedProbe` | `@migaia/utils/object` | 成员反射失败，保留原始 error 与失败路径位置。 |
-| `IPathGetEvent` | `@migaia/utils/object` | 携带原路径、已解析分段、读取 probe 与 replace 的读取转换事件。 |
-| `IPathMissingProbe` | `@migaia/utils/object` | 路径成员缺失，记录失败分段与已解析前缀。 |
-| `IPathProbe` | `@migaia/utils/object` | 路径探测的 value/missing/blocked/failed 判别联合。 |
-| `IPathSetEvent` | `@migaia/utils/object` | 携带待写新值、synthetic probe 与 replace 的写转换事件。 |
-| `IPathValueProbe` | `@migaia/utils/object` | 成功读取的路径、分段与按路径推导的值。 |
-| `IPrimitive` | `@migaia/utils/value` | string、number、boolean、bigint、symbol、null 或 undefined。 |
-| `IProbePropertyResult` | `@migaia/utils/object` | 属性 missing/value/failed 判别结果；has/get trap 失败均作为数据返回。 |
-| `IPropertyRead` | `@migaia/utils/error` | Result of one property read; failures retain the exact value thrown by the getter. |
-| `IRetryContext` | `@migaia/utils/promise` | 当前 attempt、该次尝试的原生 signal 与可选 remainingMs。 |
-| `IRetryFailureContext` | `@migaia/utils/promise` | 失败策略上下文，增加 maxAttempts；不保证提供 remainingMs。 |
-| `IScheduledTask` | `@migaia/utils/scheduler` | Handle of one scheduled callback. |
-| `IScheduler` | `@migaia/utils/scheduler` | The only scheduler contract. |
-| `ISerializedErrorChain` | `@migaia/utils/error` | Frozen error tree; extension fields are admitted only by the caller's strategy whitelist. |
-| `ISnapshotDiagnostic` | `@migaia/utils/object` | 快照中 accessor/read-failed/unsupported 的路径、原因和原始 cause。 |
-| `IStringConversion` | `@migaia/utils/string` | Outcome of one conversion; failures retain the exact value thrown by user coercion. |
-| `IThenableInspection` | `@migaia/utils/function` | 单次 then getter 的捕获结果；普通值返回空对象，读取失败保留 error。 |
-| `IThenableProbe` | `@migaia/utils/function` | Result of a single, failure-contained thenable inspection. |
-| `ITimeoutOperation` | `@migaia/utils/promise` | 接收本包生成的原生 signal，返回值或 PromiseLike 的限时操作。 |
-| `IUrlLike` | `@migaia/utils/typing` | A URL given either as text or as any object with an `href`, such as a WHATWG `URL`. |
-| `IUtilsErrorCode` | `@migaia/utils/error` | UtilsErrorCode 常量对象的值联合；不是任意字符串。 |
-| `IUtilsReporter` | `@migaia/utils/promise` | 异步控制的 late-rejection/cleanup/reporter 诊断回调；operation 指明来源。 |
-| `IWallClock` | `@migaia/utils/scheduler` | Wall clock for diagnostic timestamps only. |
-| `MAX_NATIVE_RECURSION_DEPTH` | `@migaia/utils/function` | Maximum synchronous reentrancy before consumers spill work from the native stack. |
-| `ThenableProbeKind` | `@migaia/utils/function` | Stable outcomes for one `.then` admission read. |
-| `UtilsAbortError` | `@migaia/utils/promise` | Error representing cooperative cancellation. |
-| `UtilsError` | `@migaia/utils/error` | Base error retaining the utils source and stable semantic code. |
-| `UtilsErrorCode` | `@migaia/utils/error` | Stable semantic codes emitted by the utils package boundary. |
-| `UtilsTimeoutError` | `@migaia/utils/error` | Error representing an operation, attempt, or total deadline. |
-| `admitAbortSignal` | `@migaia/utils/promise` | Admits an abort signal shape through one `aborted` read without probing `reason` or subscribing. |
-| `assimilateCapturedThen` | `@migaia/utils/function` | Invokes an already-captured then method once with its original thenable receiver. |
-| `attachErrorIdentity` | `@migaia/utils/error` | Attaches stable identity without replacing the original object. |
-| `attachSecondaryErrors` | `@migaia/utils/error` | Appends secondary failures to a primary without changing primary identity. |
-| `base64ToBytes` | `@migaia/utils/bytes` | Decode canonical RFC 4648 Base64. |
-| `bytesToBase64` | `@migaia/utils/bytes` | Encodes bytes using the canonical RFC 4648 alphabet. |
-| `collect` | `@migaia/utils` | Creates a lazy collector over a borrowed readonly array. |
-| `combineConfig` | `@migaia/utils/config` | Combines owned roots in source order using explicit record conflict policy. |
-| `combineErrors` | `@migaia/utils/error` | Combines zero, one, or many errors while preserving iteration failures. |
-| `createAbortTimeoutSignal` | `@migaia/utils/promise` | Creates the canonical merged signal used by adapters that need timeout plus external abort. |
-| `createConcurrencyLimiter` | `@migaia/utils/promise` | Limits active tasks with FIFO admission and cooperative queued cancellation. |
-| `createManualScheduler` | `@migaia/utils/testing` | Creates a deterministic scheduler over a virtual clock that starts at `0`. |
-| `createNumberFormatter` | `@migaia/utils/number` | Creates a reusable formatter so hot loops pay option parsing and cache lookup only once. |
-| `createPathAccessor` | `@migaia/utils/object` | Creates a reusable accessor whose immutable root advances after each successful set. |
-| `createSafeRecord` | `@migaia/utils/object` | Creates a new null-prototype dictionary whose untrusted keys cannot invoke prototype setters. |
-| `decodeUtf8` | `@migaia/utils/bytes` | Decodes UTF-8 bytes using replacement or fatal mode. |
-| `deferTask` | `@migaia/utils/scheduler` | Register one deferred job through its scheduler receiver. |
-| `deferred` | `@migaia/utils/promise` | Creates a native Promise deferred without exposing mutable settlement state. |
-| `deserializeErrorChain` | `@migaia/utils/error` | Rebuild a native error graph after validating the entire untrusted tree. |
-| `diagnosticSnapshot` | `@migaia/utils/object` | Produces a best-effort value snapshot plus explicit diagnostics. |
-| `encodeUtf8` | `@migaia/utils/bytes` | Encodes into a new byte array using the native encoder, or an equivalent loop when absent. |
-| `format` | `@migaia/utils/string` | Replaces placeholder paths in one linear scan. |
-| `formatCompactNumber` | `@migaia/utils/number` | Formats large quantitative values with compact notation and caller-owned precision. |
-| `formatCurrency` | `@migaia/utils/number` | Formats money while requiring the caller to own currency and rounding policy. |
-| `formatInteger` | `@migaia/utils/number` | Formats inventory-style whole numbers; callers may override fraction policy explicitly. |
-| `formatNumber` | `@migaia/utils/number` | Formats one number or bigint with explicit Intl policy and cached formatter reuse. |
-| `formatPercent` | `@migaia/utils/number` | Formats a ratio as a percentage while leaving precision policy configurable. |
-| `get` | `@migaia/utils/object` | Reads one path; missing/blocked paths yield undefined while getter failures remain observable. |
-| `hostRethrowReporter` | `@migaia/utils/promise` | Reports a diagnostic to the host without creating an unhandled rejected Promise. |
-| `identitySnapshot` | `@migaia/utils/object` | Returns the original value while making identity preservation explicit. |
-| `immutableSnapshot` | `@migaia/utils/object` | Produces an independent immutable data snapshot for supported plain values. |
-| `inspectThenable` | `@migaia/utils/function` | Reads a callback result's then property once for synchronous-contract enforcement. |
-| `isArrayBuffer` | `@migaia/utils/bytes` | Recognizes ArrayBuffer internal slots across realms, including detached buffers, without accepting SharedArrayBuffer, proxies, or objects that imitate the public constructor shape. |
-| `isBlankString` | `@migaia/utils/value` | Detects empty or whitespace-only strings without coercing non-string values. |
-| `isEmptyValue` | `@migaia/utils/value` | Detects common business-form emptiness while preserving `0`, `0n`, and `false` as real values. |
-| `isNativeErrorValue` | `@migaia/utils/error` | Recognizes Error-family prototype chains across realms for native identity preservation. |
-| `isNullish` | `@migaia/utils/value` | Narrows null and undefined without treating other falsy business values as absent. |
-| `isPlainObject` | `@migaia/utils/object` | Accepts only ordinary record objects or null-prototype records, never arrays. |
-| `isPrimitive` | `@migaia/utils/value` | Narrows all JavaScript primitives without allocating a runtime type tag. |
-| `isSafeIntegerValue` | `@migaia/utils/value` | Narrows finite safe integers without converting strings, boxed numbers, or other values. |
-| `isUint8Array` | `@migaia/utils/bytes` | Recognizes Uint8Array internal slots across realms and subclasses without trusting mutable prototypes, constructor names, or Symbol.toStringTag properties supplied by the value. |
-| `isUrlObject` | `@migaia/utils` | True for the object form of `IUrlLike`: a non-null object whose `href` is a string. |
-| `isUtilsAbortError` | `@migaia/utils/error` | 先验证 utils 错误形状与身份，再检查 ABORTED。 |
-| `isUtilsError` | `@migaia/utils/error` | Recognizes diagnostic error shapes only when both utils identity fields are valid. |
-| `isUtilsTimeoutError` | `@migaia/utils/error` | 先验证 utils 错误形状与身份，再检查 DEADLINE_EXCEEDED。 |
-| `noop` | `@migaia/utils/function` | Returns a function that always returns the same stable value. |
-| `normalizeSerializedErrorChain` | `@migaia/utils/error` | Validate and freeze a fresh wire error tree before any receiver uses its fields. |
-| `observeThenableRejection` | `@migaia/utils/function` | Observes a captured thenable rejection while containing reporter failures at the boundary. |
-| `once` | `@migaia/utils/function` | Memoizes a synchronous function, including its first thrown result. |
-| `onceAsync` | `@migaia/utils/function` | Memoizes one asynchronous invocation and preserves exact Promise identity. |
-| `ownConfig` | `@migaia/utils/config` | Creates a validated isolated graph with a runtime ownership brand. |
-| `parseConfigPath` | `@migaia/utils/config` | Applies config limits and string-key policy over the canonical object-path parser. |
-| `parseObjectPath` | `@migaia/utils/object` | Parses strict `a.b.[0].c` syntax or snapshots a tuple path. |
-| `patchConfig` | `@migaia/utils/config` | Applies a root-level copy-on-write overlay. |
-| `probeObjectPath` | `@migaia/utils/object` | Parses and probes one path in a single operation. |
-| `probeObjectPathSegments` | `@migaia/utils/object` | Probes an already parsed tuple without reparsing it during delivery. |
-| `probeProperty` | `@migaia/utils/object` | Reads one property exactly once and exposes getter failures explicitly. |
-| `probeThenable` | `@migaia/utils/function` | Reads `value.then` once and returns an explicit discriminant. |
-| `raceWithAbort` | `@migaia/utils/promise` | Races a lazy operation against one or more external abort signals without creating a timer. |
-| `reachErrorChain` | `@migaia/utils/error` | 按 identity 去重遍历 cause 与 aggregate children，受策略的对象预算约束。 |
-| `readConfigPath` | `@migaia/utils/config` | Reads a config path and distinguishes missing from an undefined value. |
-| `readUrlHref` | `@migaia/utils` | Returns the text form of a URL-like value: the string itself, or the object's `href`. |
-| `readonlyConfig` | `@migaia/utils/config` | Creates a cached readonly facade that rejects structural mutation. |
-| `retry` | `@migaia/utils/promise` | Enforces the retry task's outer deadline, including policy and backoff admission work. |
-| `safeErrorReason` | `@migaia/utils/error` | Reads an arbitrary failure's diagnostic reason once, returning a caller-owned safe fallback. |
-| `sanitizeErrorText` | `@migaia/utils/error` | Replace lone surrogates and retain the longest allowed UTF-8 scalar prefix. |
-| `serializeErrorChain` | `@migaia/utils/error` | Projects any thrown value into a bounded, frozen, language-neutral error tree. |
-| `set` | `@migaia/utils/object` | Performs an immutable path update with structural sharing and missing-container creation. |
-| `sleep` | `@migaia/utils/promise` | Resolves after a scheduler delay or rejects on cooperative abort. |
-| `snapshotOwnDescriptors` | `@migaia/utils/object` | Captures own descriptors at most once and contains revoked-proxy or descriptor-trap failures. |
-| `splitUtf8` | `@migaia/utils/bytes` | Splits normalized UTF-8 text within maxBytes without splitting a Unicode scalar value. |
-| `streamBase64Chunks` | `@migaia/utils/bytes` | 按 maxChunkBytes 产生规范 Base64 块；块宽为不超过预算的 3 字节倍数。 |
-| `structuredDiagnosticSnapshot` | `@migaia/utils/object` | Produces one structuredClone-first diagnostic projection for tolerant consumers. |
-| `systemScheduler` | `@migaia/utils/scheduler` | Default scheduler: `performance.now()` as the monotonic clock and host `setTimeout` / `clearTimeout` for timers. |
-| `systemWallClock` | `@migaia/utils/scheduler` | Default wall clock: `Date.now()` epoch milliseconds, for diagnostic timestamps only. |
-| `toError` | `@migaia/utils/error` | Converts arbitrary thrown values while preserving the original as cause. |
-| `toPromise` | `@migaia/utils/promise` | Runs one synchronous computation immediately while normalizing its value or thrown reason to a native Promise settlement. |
-| `tryReadProperty` | `@migaia/utils/error` | Reads one property with the original receiver and returns a throwing getter's value as data. |
-| `tryString` | `@migaia/utils/string` | Converts a value once with native String semantics, keeping strings unchanged. |
-| `utf8ByteLength` | `@migaia/utils/bytes` | Counts UTF-8 bytes without allocating a buffer or iterator. |
-| `walkErrorCauses` | `@migaia/utils/error` | Walks cause and AggregateError chains with bounded identity deduplication. |
-| `withTimeout` | `@migaia/utils/promise` | Races a lazy operation against an abort-aware deadline. |
+| `IConfigProfile` | `@migaia/utils/config` | `data` 或 `richRuntime` 输入范围；后者允许配置里带函数。 |
+| `IConfigReadResult` | `@migaia/utils/config` | 区分 `missing`（键不存在）与 `value`（值可以是 `undefined`）的路径读取结果。 |
+| `IConfigRecord` | `@migaia/utils/config` | 以字符串为键的配置根对象类型。 |
+| `IDeadlineOnlyOperation` | `@migaia/utils/promise` | `cooperativeCancellation` 可能为 `false` 时 `withTimeout` 接受的操作；它收到的是永不中止的结构化 signal，而不是宿主 `AbortSignal`。 |
+| `IDeferred` | `@migaia/utils/promise` | 原生 Promise 加上对应的 `resolve` / `reject`；由调用方决定何时结算。 |
+| `IDiagnosticSnapshot` | `@migaia/utils/object` | 隔离后的 `value` 加逐路径的 `diagnostics`；不能假设所有不支持的叶子都已复制。 |
+| `IDiscriminatedByField` | `@migaia/utils/typing` | 按一个顶层、值为属性键的判别字段，把联合类型分组。 |
+| `IDiscriminatedByPath` | `@migaia/utils/typing` | 按一条有类型的字符串或元组对象路径，把联合类型分组。 |
+| `IErrorChainData` | `@migaia/utils/error` | 错误链边界和结构化克隆都接受的、有限的普通 JSON 数据。 |
+| `IErrorChainStrategy` | `@migaia/utils/error` | 错误链序列化的策略：字段、隐私、预算、可移植数据和原生错误还原。 |
+| `IErrorIdentity` | `@migaia/utils/error` | `source` / `code` 两个字段，可附带 `phase` 和 `detail`；含义由各包自己定义。 |
+| `IErrorIdentityHooks` | `@migaia/utils/error` | 身份字段冲突或写入失败时的可选恢复策略，必须让原错误仍然可以找到。 |
+| `IFieldCollector` | `@migaia/utils` | 调用 `fieldBy` 之后的 Collector；值的类型由最近一次 `fieldBy` 推导。 |
+| `IFormatOptions` | `@migaia/utils/string` | 模板格式化策略；默认保留缺失的占位符，把 `null` / `undefined` 输出为空。 |
+| `IFormatPlaceholder` | `@migaia/utils/string` | 线性模板扫描使用的占位符边界字符。 |
+| `IManualScheduler` | `@migaia/utils/testing` | 测试用的虚拟时钟，提供 `advance` 和 `pendingCount`；只能从 `/testing` 导入。 |
+| `INativeAbortSignal` | `@migaia/utils/promise` | 本包用真实 `AbortController` 创建并交给操作的 signal 类型；有宿主类型时就是 `AbortSignal`，可以直接传给 `fetch`。 |
+| `INumberFormatOptions` | `@migaia/utils/number` | 所有数字格式化工具共用的 locale 与 `Intl` 选项。 |
+| `INumberFormatter` | `@migaia/utils/number` | 可复用的格式化函数，适合库存表、行情等高频循环。 |
+| `INumericValue` | `@migaia/utils/number` | 格式化函数接受的数值：`number` 或 `bigint`，不接受字符串。 |
+| `IObjectPath` | `@migaia/utils/object` | 有类型的点号 / 方括号字符串路径，最深 8 层，以限制编译器的工作量。 |
+| `IObjectPathInput` | `@migaia/utils/object` | 某个根类型所有静态合法的字符串路径和元组路径。 |
+| `IObjectPathSegment` | `@migaia/utils/object` | 路径元组里的字符串、数字或 symbol 键。 |
+| `IObjectPathTuple` | `@migaia/utils/object` | 由字符串、数字或 symbol 组成的只读路径分段数组。 |
+| `IObjectPathTupleFor` | `@migaia/utils/object` | 有类型的只读元组路径，支持数字下标和 symbol 键。 |
+| `IObjectPathValue` | `@migaia/utils/object` | 字符串或元组路径指向的值类型。 |
+| `IObjectPathWriteValue` | `@migaia/utils/object` | 向该路径写入时接受的类型；字面量类型会放宽为基础类型。 |
+| `IOwnConfigOptions` | `@migaia/utils/config` | 选择 `data` / `richRuntime` profile，并收紧配置资源上限。 |
+| `IOwnDescriptorsSnapshot` | `@migaia/utils/object` | 在对象边界上一次性、不抛错地捕获自有属性描述符的结果。 |
+| `IOwnedConfig` | `@migaia/utils/config` | 经 `ownConfig` 接收并登记所有权的配置类型；仅有这个类型标记的伪造对象不会被接受。 |
+| `IPathAccessor` | `@migaia/utils/object` | 持有当前不可变根对象，提供 `get` / `set`、`probeValue` 与 `parsePath`。 |
+| `IPathAccessorOptions` | `@migaia/utils/object` | 路径缺失、被阻塞、读取失败时的回调，以及读写时的转换回调。 |
+| `IPathBlockedProbe` | `@migaia/utils/object` | 路径被非对象的中间值挡住；记录失败的分段和 `parent`。 |
+| `IPathFailedProbe` | `@migaia/utils/object` | 读取成员时抛错；保留原始 `error` 和失败位置。 |
+| `IPathGetEvent` | `@migaia/utils/object` | 读取转换事件：原路径、解析后的分段、读取结果和 `replace`。 |
+| `IPathMissingProbe` | `@migaia/utils/object` | 路径上的成员不存在；记录失败的分段和已解析的前缀。 |
+| `IPathProbe` | `@migaia/utils/object` | 路径探测结果：`value` / `missing` / `blocked` / `failed`。 |
+| `IPathSetEvent` | `@migaia/utils/object` | 写入转换事件：待写入的新值、探测结果和 `replace`。 |
+| `IPathValueProbe` | `@migaia/utils/object` | 读取成功：路径、分段和按路径推导出的值。 |
+| `IPrimitive` | `@migaia/utils/value` | `string`、`number`、`boolean`、`bigint`、`symbol`、`null` 或 `undefined`。 |
+| `IProbePropertyResult` | `@migaia/utils/object` | 属性 `missing` / `value` / `failed` 的结果；`has` / `get` 陷阱抛错也作为数据返回。 |
+| `IPropertyRead` | `@migaia/utils/error` | 一次属性读取的结果；读取抛错时保留 getter 抛出的原值。 |
+| `IRetryContext` | `@migaia/utils/promise` | 当前尝试次数 `attempt`、这次尝试的原生 `signal`，以及可选的剩余时间 `remainingMs`。 |
+| `IRetryFailureContext` | `@migaia/utils/promise` | `shouldRetry` / `delay` 收到的上下文，多了 `maxAttempts`；不保证有 `remainingMs`。 |
+| `IScheduledTask` | `@migaia/utils/scheduler` | 一个已安排回调的句柄：`cancel()`，以及可选的 `unref()`。 |
+| `IScheduler` | `@migaia/utils/scheduler` | 唯一的调度器契约：单调时钟 `now()`、`schedule()` 和可选的 `defer()`。 |
+| `ISerializedErrorChain` | `@migaia/utils/error` | 冻结的错误树；扩展字段只有在调用方策略的白名单里才会保留。 |
+| `ISnapshotDiagnostic` | `@migaia/utils/object` | 快照中访问器、读取失败或不支持成员的路径、原因与原始 `cause`。 |
+| `IStringConversion` | `@migaia/utils/string` | 一次字符串转换的结果；失败时保留用户转换函数抛出的原值。 |
+| `IThenableInspection` | `@migaia/utils/function` | 读取一次 `then` 的捕获结果；普通值返回空对象，读取失败保留 `error`。 |
+| `IThenableProbe` | `@migaia/utils/function` | 一次 thenable 检查的结果，读取失败不会抛出。 |
+| `ITimeoutOperation` | `@migaia/utils/promise` | 接收本包生成的原生 signal、返回值或 PromiseLike 的限时操作。 |
+| `IUrlLike` | `@migaia/utils/typing` | 字符串形式的 URL，或带 `href` 的对象（例如 WHATWG `URL`）。 |
+| `IUtilsErrorCode` | `@migaia/utils/error` | `UtilsErrorCode` 常量对象的取值联合，不是任意字符串。 |
+| `IUtilsReporter` | `@migaia/utils/promise` | 迟到失败、清理失败和 reporter 自身失败的诊断回调；`operation` 说明来源。 |
+| `IWallClock` | `@migaia/utils/scheduler` | 只用于诊断时间戳的墙钟。 |
+| `MAX_NATIVE_RECURSION_DEPTH` | `@migaia/utils/function` | 同步重入的最大深度；超过后调用方应把工作移出原生调用栈。 |
+| `ThenableProbeKind` | `@migaia/utils/function` | 一次 `.then` 读取的稳定结果种类。 |
+| `UtilsAbortError` | `@migaia/utils/promise` | 表示协作式取消的错误，代码 `ABORTED`，原始取消原因在 `cause` 上。 |
+| `UtilsError` | `@migaia/utils/error` | 本包语义错误的基类，带 `source: '@migaia/utils'` 和稳定的 `code`。 |
+| `UtilsErrorCode` | `@migaia/utils/error` | 本包对外抛出的稳定错误码。 |
+| `UtilsTimeoutError` | `@migaia/utils/error` | 表示操作、单次尝试或总时限超时的错误，代码 `DEADLINE_EXCEEDED`。 |
+| `admitAbortSignal` | `@migaia/utils/promise` | 只读取一次 `aborted` 来接纳 signal 形状，不读取 `reason`，也不订阅。 |
+| `assimilateCapturedThen` | `@migaia/utils/function` | 用原 thenable 作为接收者，调用一次已经读取到的 `then` 方法。 |
+| `attachErrorIdentity` | `@migaia/utils/error` | 给原错误附加稳定身份字段，不替换错误对象。 |
+| `attachSecondaryErrors` | `@migaia/utils/error` | 把次要失败追加到主错误上，不改变主错误的身份。 |
+| `base64ToBytes` | `@migaia/utils/bytes` | 解码规范的 RFC 4648 Base64；非规范输入抛 `INVALID_ENCODING`。 |
+| `bytesToBase64` | `@migaia/utils/bytes` | 用标准 RFC 4648 字母表把字节编码为带补齐的 Base64。 |
+| `collect` | `@migaia/utils` | 在借用的只读数组上创建惰性 Collector。 |
+| `combineConfig` | `@migaia/utils/config` | 按来源顺序合并已拥有的配置，冲突按显式策略处理。 |
+| `combineErrors` | `@migaia/utils/error` | 合并 0 个、1 个或多个错误；遍历本身失败时也一并保留。 |
+| `createAbortTimeoutSignal` | `@migaia/utils/promise` | 把外部取消与时限合并成一个 signal，不接管任何 Promise 的结算。 |
+| `createConcurrencyLimiter` | `@migaia/utils/promise` | 限制同时运行的任务数，先进先出排队，排队中的任务可以取消。 |
+| `createManualScheduler` | `@migaia/utils/testing` | 创建从 `0` 开始的虚拟时钟调度器，用于确定性测试。 |
+| `createNumberFormatter` | `@migaia/utils/number` | 创建可复用的格式化函数，高频循环只解析一次选项。 |
+| `createPathAccessor` | `@migaia/utils/object` | 创建路径访问器；每次成功 `set` 后，当前根对象前进到新根。 |
+| `createSafeRecord` | `@migaia/utils/object` | 创建原型为 `null` 的新字典，不可信的键名不会触发原型上的 setter。 |
+| `decodeUtf8` | `@migaia/utils/bytes` | 解码 UTF-8；默认用 U+FFFD 替换非法字节，`fatal: true` 时抛错。 |
+| `deferTask` | `@migaia/utils/scheduler` | 通过调度器安排一个在当前调用结束后执行的任务。 |
+| `deferred` | `@migaia/utils/promise` | 创建可以从外部结算的原生 Promise；新代码优先用 `Promise.withResolvers()`。 |
+| `deserializeErrorChain` | `@migaia/utils/error` | 先完整校验不可信的错误树，再重建原生错误图。 |
+| `diagnosticSnapshot` | `@migaia/utils/object` | 尽力复制一个值，并给出明确的诊断列表。 |
+| `encodeUtf8` | `@migaia/utils/bytes` | 把字符串编码为新的 UTF-8 字节数组。 |
+| `format` | `@migaia/utils/string` | 一次线性扫描替换模板中的占位符路径。 |
+| `formatCompactNumber` | `@migaia/utils/number` | 用紧凑记法格式化大数值，精度由调用方决定。 |
+| `formatCurrency` | `@migaia/utils/number` | 格式化金额；币种和舍入规则由调用方指定。 |
+| `formatInteger` | `@migaia/utils/number` | 格式化整数（例如库存数量）；可以显式覆盖小数策略。 |
+| `formatNumber` | `@migaia/utils/number` | 用显式的 `Intl` 选项格式化 `number` 或 `bigint`，复用缓存的格式化器。 |
+| `formatPercent` | `@migaia/utils/number` | 把比例格式化为百分比，精度可配置。 |
+| `get` | `@migaia/utils/object` | 按路径读取；路径缺失或被阻塞时返回 `undefined`，getter 抛错时照常抛出。 |
+| `hostRethrowReporter` | `@migaia/utils/promise` | 默认 reporter：在微任务里把错误重新抛给宿主，不制造未处理的 Promise 拒绝。 |
+| `identitySnapshot` | `@migaia/utils/object` | 原样返回输入，用来明确表示接受共享引用。 |
+| `immutableSnapshot` | `@migaia/utils/object` | 用 `structuredClone` 生成与源对象不共享引用的数据快照。 |
+| `inspectThenable` | `@migaia/utils/function` | 读取一次回调结果的 `then`，用于检查同步契约。 |
+| `isArrayBuffer` | `@migaia/utils/bytes` | 跨 realm 识别真正的 `ArrayBuffer`（包括已 detached 的），拒绝 `SharedArrayBuffer`、Proxy 和伪造对象。 |
+| `isBlankString` | `@migaia/utils/value` | 判断空字符串或只有空白的字符串，不转换其他类型。 |
+| `isEmptyValue` | `@migaia/utils/value` | 判断表单意义上的“空”：`null`、`undefined`、空白字符串和 `NaN`；`0`、`0n`、`false` 不算空。 |
+| `isNativeErrorValue` | `@migaia/utils/error` | 跨 realm 识别原生 Error 家族的原型链，用于保留原错误；只做诊断，不做认证。 |
+| `isNullish` | `@migaia/utils/value` | 只识别 `null` 和 `undefined`，不把其他假值当作缺失。 |
+| `isPlainObject` | `@migaia/utils/object` | 只接受普通对象或原型为 `null` 的对象，不接受数组。 |
+| `isPrimitive` | `@migaia/utils/value` | 识别 JavaScript 的全部原始类型。 |
+| `isSafeIntegerValue` | `@migaia/utils/value` | 只接受有限的安全整数 `number`，不转换字符串或包装对象。 |
+| `isUint8Array` | `@migaia/utils/bytes` | 跨 realm 识别真正的 `Uint8Array` 及其子类，不信任可篡改的原型、构造函数名或 `Symbol.toStringTag`。 |
+| `isUrlObject` | `@migaia/utils` | 判断 `IUrlLike` 的对象形式：非空对象且 `href` 是字符串。 |
+| `isUtilsAbortError` | `@migaia/utils/error` | 先确认是本包的错误形状和身份，再检查代码是否为 `ABORTED`。 |
+| `isUtilsError` | `@migaia/utils/error` | 只有两个身份字段都有效时，才认定为本包的错误形状。 |
+| `isUtilsTimeoutError` | `@migaia/utils/error` | 先确认是本包的错误形状和身份，再检查代码是否为 `DEADLINE_EXCEEDED`。 |
+| `noop` | `@migaia/utils/function` | 恒返回 `undefined` 的空函数，用作默认回调。 |
+| `normalizeSerializedErrorChain` | `@migaia/utils/error` | 接收方使用之前，先校验并冻结一份新的线上错误树。 |
+| `observeThenableRejection` | `@migaia/utils/function` | 观察已捕获 thenable 的拒绝，并在边界上隔离 reporter 自身的失败。 |
+| `once` | `@migaia/utils/function` | 记住同步函数的第一次结果，包括第一次抛出的错误。 |
+| `onceAsync` | `@migaia/utils/function` | 记住第一次异步调用的 Promise，之后的调用拿到同一个 Promise。 |
+| `ownConfig` | `@migaia/utils/config` | 校验并复制配置，得到一份登记了所有权的独立配置。 |
+| `parseConfigPath` | `@migaia/utils/config` | 在对象路径解析之上加配置的长度限制，并要求所有分段都是字符串。 |
+| `parseObjectPath` | `@migaia/utils/object` | 解析严格的 `a.b.[0].c` 写法，或复制并冻结一个元组路径。 |
+| `patchConfig` | `@migaia/utils/config` | 对根层做写时复制的覆盖，生成新配置。 |
+| `probeObjectPath` | `@migaia/utils/object` | 解析并探测一条路径，一步完成。 |
+| `probeObjectPathSegments` | `@migaia/utils/object` | 探测已经解析好的元组路径，不再重新解析。 |
+| `probeProperty` | `@migaia/utils/object` | 只读取一次属性，并把 getter 失败作为明确的结果返回。 |
+| `probeThenable` | `@migaia/utils/function` | 只读取一次 `value.then`，并返回明确的结果种类。 |
+| `raceWithAbort` | `@migaia/utils/promise` | 让惰性操作与一个或多个外部取消信号赛跑，不创建计时器。 |
+| `reachErrorChain` | `@migaia/utils/error` | 按身份去重，遍历 `cause` 与 `AggregateError` 的子错误，受策略的对象预算限制。 |
+| `readConfigPath` | `@migaia/utils/config` | 读取配置路径，区分键不存在和值为 `undefined`。 |
+| `readUrlHref` | `@migaia/utils` | 返回 URL 值的文本形式：字符串本身，或对象的 `href`。 |
+| `readonlyConfig` | `@migaia/utils/config` | 返回带缓存的只读视图，任何写入都会抛 `CONFIG_READONLY`。 |
+| `retry` | `@migaia/utils/promise` | 按 `shouldRetry` 串行重试，支持退避、单次限时和总时限。 |
+| `safeErrorReason` | `@migaia/utils/error` | 读取一次任意失败的诊断原因；读取失败时返回调用方给的安全默认文本。 |
+| `sanitizeErrorText` | `@migaia/utils/error` | 替换孤立代理项，并截取不超过字节上限的最长 UTF-8 前缀。 |
+| `serializeErrorChain` | `@migaia/utils/error` | 把任意抛出值转换成有界、冻结、与语言无关的错误树。 |
+| `set` | `@migaia/utils/object` | 不可变地写入路径：只复制路径上的对象，其余分支复用，缺失的容器自动创建。 |
+| `sleep` | `@migaia/utils/promise` | 等待一段时间后完成；signal 中止时以 `UtilsAbortError` 拒绝。 |
+| `snapshotOwnDescriptors` | `@migaia/utils/object` | 最多读取一次自有属性描述符，隔离已撤销 Proxy 或描述符陷阱的失败。 |
+| `splitUtf8` | `@migaia/utils/bytes` | 按字节上限切分 UTF-8 文本，不切断任何码点。 |
+| `streamBase64Chunks` | `@migaia/utils/bytes` | 按 `maxChunkBytes` 产生各自独立合法的 Base64 片段；片段宽度是不超过上限的 3 的倍数。 |
+| `structuredDiagnosticSnapshot` | `@migaia/utils/object` | 先尝试 `structuredClone`，失败时退回尽力快照并给出诊断。 |
+| `systemScheduler` | `@migaia/utils/scheduler` | 默认调度器：`performance.now()` 作为单调时钟，宿主 `setTimeout` / `clearTimeout` 作为计时器。 |
+| `systemWallClock` | `@migaia/utils/scheduler` | 默认墙钟：`Date.now()` 的毫秒时间戳，只用于诊断。 |
+| `toError` | `@migaia/utils/error` | 把任意抛出值转换为 `Error`，原值放在 `cause` 上。 |
+| `toPromise` | `@migaia/utils/promise` | 立即执行一次同步计算，把返回值或同步异常统一成 Promise。 |
+| `tryReadProperty` | `@migaia/utils/error` | 用原接收者读取一次属性；getter 抛错时把抛出值作为数据返回。 |
+| `tryString` | `@migaia/utils/string` | 按原生 `String` 规则转换一次，字符串原样返回。 |
+| `utf8ByteLength` | `@migaia/utils/bytes` | 计算 UTF-8 字节数，不分配缓冲区或迭代器。 |
+| `walkErrorCauses` | `@migaia/utils/error` | 沿 `cause` 和 `AggregateError.errors` 展开错误链，按身份去重并限制深度。 |
+| `withTimeout` | `@migaia/utils/promise` | 给惰性操作加截止时间；到点先取消操作收到的 signal，再以超时错误拒绝。 |
