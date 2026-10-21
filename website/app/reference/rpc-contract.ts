@@ -9,7 +9,8 @@ import type {
   ISymbolDoc,
   IText,
   ITypeDoc,
-  IEnumDoc
+  IEnumDoc,
+  IOptionCaseDoc
 } from './contract.js'
 import { rpcContractCases } from './rpc-contract-cases.ts'
 
@@ -4644,6 +4645,579 @@ symbols.createStringFramer = {
     '创建有序有界的字符串分帧器，`frame(value, context)` 返回整字符串或有序 `rpc.frame.v1` 分片；`context.source` 为调用方拥有的来源命名空间，`context.messageId` 为发送方关联标识，两者均不认证对端。\n\n`accept(frame, context)` 返回 `pending`、携带重组字符串的 `complete`，或携带带码错误的 `rejected`，按两个上下文字段共同隔离；`close()` 清理保留组装与计时器，并使之后的接收拒绝，不会发送网络消息。'
   )
 }
+/** Public option examples are executed against built package entries. */
+const rpcOptionExamples = {
+  warningKeys: `import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'
+
+const warnings: string[] = []
+const warner = createRpcUnknownFieldWarner({
+  maxKeysPerConnection: 1,
+  warn: (_connection, fieldKey) => { warnings.push(fieldKey) }
+})
+warner.note('a', 'request', '/items/0', 'extra')
+warner.note('a', 'request', '/items/1', 'extra')
+warner.note('a', 'request', '/items/1', 'later')
+console.log(warnings.length, warnings[1])
+warner.clear()`,
+  warningConnections: `import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'
+
+const warnings: string[] = []
+const warner = createRpcUnknownFieldWarner({
+  maxConnections: 1,
+  warn: (connection) => { warnings.push(connection) }
+})
+warner.note('a', 'request', '', 'extra')
+warner.note('b', 'request', '', 'extra')
+warner.note('a', 'request', '', 'extra')
+console.log(warnings)
+warner.clear()`,
+  wireIgnore: `import { serializeRpcError, normalizeRpcSerializedError, deserializeRpcError } from '@migaia/rpc-contract/errors'
+
+const wire = { ...serializeRpcError(new Error('offline'), { report: console.error }), extra: 1 }
+const fields: string[] = []
+const options = {
+  unknownFields: 'ignore' as const,
+  onUnknownField: (_pointer: string, field: string) => { fields.push(field) }
+}
+const normalized = normalizeRpcSerializedError(wire, options)
+const error = deserializeRpcError(normalized, options)
+console.log('extra' in normalized, error.message, fields)`,
+  wireReject: `import { serializeRpcError, normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'
+
+const wire = { ...serializeRpcError(new Error('offline'), { report: console.error }), extra: 1 }
+try { normalizeRpcSerializedError(wire, { unknownFields: 'reject' }) }
+catch (error) { console.log((error as { code: string }).code) }`,
+  errorReport: `import { serializeRpcError } from '@migaia/rpc-contract/errors'
+
+const original = new Error('request failed')
+Object.defineProperty(original, 'cause', { get() { throw new Error('cause unavailable') } })
+const fields: string[] = []
+const wire = serializeRpcError(original, { report: ({ field }) => { fields.push(field) } })
+console.log(wire.message, fields)`,
+  errorReach: `import { reachRpcError } from '@migaia/rpc-contract/errors'
+
+const child = new Error('child')
+Object.defineProperty(child, 'cause', { get() { throw new Error('cause unavailable') } })
+const original = new AggregateError([child], 'request failed')
+const fields: string[] = []
+const reached = [...reachRpcError(original, { report: ({ field }) => { fields.push(field) } })]
+console.log(reached.includes(original), reached.includes(child), fields)`,
+  framerBounds: `import { createStringFramer } from '@migaia/rpc-contract/framing'
+
+const framer = createStringFramer({
+  chunkBytes: 2, maxMessageBytes: 8, maxChunks: 4,
+  maxBufferedBytes: 16, maxConcurrentMessages: 2, assemblyTimeoutMs: 1000
+})
+const context = { source: 'page', messageId: 'one' }
+const frames = framer.frame('abcdef', context)
+for (const frame of frames) {
+  const result = framer.accept(frame, context)
+  if (result.status === 'complete') console.log(frames.length, result.value)
+}
+framer.close()`,
+  framerTimers: `import { createBinaryFramer } from '@migaia/rpc-contract/framing'
+
+const tasks = new Map<number, () => void>()
+let nextId = 0
+let clockReads = 0
+let cancelled = 0
+const framer = createBinaryFramer({
+  chunkBytes: 2, assemblyTimeoutMs: 50,
+  now: () => { clockReads += 1; return 0 },
+  schedule: (task, _delayMs) => { const id = ++nextId; tasks.set(id, task); return id },
+  cancel: (handle) => { tasks.delete(handle as number); cancelled += 1 }
+})
+const context = { source: 'page', messageId: 'one' }
+const frames = framer.frame(new Uint8Array([1, 2, 3, 4]), context)
+console.log(framer.accept(frames[0]!, context).status)
+console.log(framer.accept(frames[1]!, context).status, cancelled, clockReads)
+framer.close()`,
+  decoderFrames: `import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
+
+const payloads: number[][] = []
+const decoder = createRpcStreamFrameDecoder({
+  onFrame: (frame) => { payloads.push([...frame]) },
+  onError: (error) => { console.error(error) }
+})
+const frame = encodeRpcStreamFrame(new Uint8Array([7, 8]))
+decoder.push(frame.subarray(0, 3))
+decoder.push(frame.subarray(3))
+decoder.finish()
+console.log(payloads)
+decoder.close()`,
+  decoderError: `import { createRpcStreamFrameDecoderWithLimit, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
+
+const failures: Error[] = []
+const decoder = createRpcStreamFrameDecoderWithLimit({
+  onFrame: (_frame) => {},
+  onError: (error) => { failures.push(error) }
+}, () => 16)
+decoder.push(encodeRpcStreamFrame(new Uint8Array([7, 8])).subarray(0, 5))
+decoder.finish()
+console.log(failures.length, (failures[0] as Error & { code: string }).code)
+decoder.close()`,
+  handshakeInitiator: `import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'
+import { createRpcHello, acceptRpcHandshake } from '@migaia/rpc-contract/handshake'
+
+const offer = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
+const accepted = acceptRpcHandshake(offer, createRpcHello(offer))
+if (!accepted.ok) throw accepted.error
+const receiver = createRpcHandshakeFrameReceiver({ role: 'initiator' })
+receiver.accept(new TextEncoder().encode(accepted.reply))
+console.log(JSON.parse(await receiver.readHandshakeFrame()).step)
+console.log(receiver.accept(new TextEncoder().encode('business')), receiver.ready)
+receiver.activate()
+receiver.close('done')`,
+  handshakeResponder: `import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'
+import { createRpcHello } from '@migaia/rpc-contract/handshake'
+
+const offer = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
+const receiver = createRpcHandshakeFrameReceiver({ role: 'responder' })
+receiver.accept(new TextEncoder().encode(createRpcHello(offer)))
+console.log(JSON.parse(await receiver.readHandshakeFrame()).step)
+receiver.beginAccept()
+receiver.activate()
+console.log(receiver.accept(new TextEncoder().encode('business')), receiver.ready)
+receiver.close('done')`,
+  handshakeUnknown: `import { createRpcHello, acceptRpcHandshake, completeRpcHandshake, normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'
+
+const offer = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
+const hello = JSON.stringify({ ...JSON.parse(createRpcHello(offer)), extra: 1 })
+const fields: string[] = []
+const options = { onUnknownField: (_pointer: string, field: string) => { fields.push(field) } }
+normalizeRpcHandshake(hello, options)
+const accepted = acceptRpcHandshake(offer, hello, options)
+if (!accepted.ok) throw accepted.error
+completeRpcHandshake(offer, JSON.stringify({ ...JSON.parse(accepted.reply), extra: 2 }), options)
+console.log(fields)`,
+  envelopeUnknown: `import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'
+import { RpcRouteProfile } from '@migaia/rpc-contract'
+
+const fields: string[] = []
+const envelope = normalizeRpcEnvelope({
+  kind: 'request', id: 'one', method: 'ping', extra: true,
+  data: { route: { profile: RpcRouteProfile, type: 'request', applicationVersion: '1', senderId: 'a', targetId: 'b', sentAt: 0 } }
+}, { onUnknownField: (_pointer, field) => { fields.push(field) } })
+console.log(envelope.kind, fields)`,
+  runtimeOrder: `import { runtimeOperationCapabilities } from '@migaia/rpc-contract/runtime'
+
+const required = runtimeOperationCapabilities('request', {
+  orderKey: 'cart-42', timeoutMs: 2000, idempotencyKey: 'save-42'
+})
+console.log(required)`,
+  runtimeCancel: `import { runtimeOperationCapabilities, RpcRuntimeCancel } from '@migaia/rpc-contract/runtime'
+
+const required = runtimeOperationCapabilities('stream', { cancel: RpcRuntimeCancel, timeoutMs: 2000 }, true)
+console.log(required)`,
+  streamFinish: `import { checkRpcRuntimeStreamFinish, checkRpcRuntimeStreamIntent, checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'
+import { RpcRuntimeCancel, RpcRuntimeFinish } from '@migaia/rpc-contract/runtime'
+
+const options = { cancel: RpcRuntimeCancel } as const
+console.log(checkRpcRuntimeStreamFinish(options))
+console.log(checkRpcRuntimeStreamIntent({ finish: true }, options))
+console.log(checkRpcRuntimeStreamTransition({ event: RpcRuntimeFinish }, options))`,
+  streamFinishDenied: `import { checkRpcRuntimeStreamFinish, checkRpcRuntimeStreamIntent, checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'
+import { RpcRuntimeFinish } from '@migaia/rpc-contract/runtime'
+
+const options = { cancel: undefined }
+const errors = [
+  checkRpcRuntimeStreamFinish(options),
+  checkRpcRuntimeStreamIntent({ finish: true }, options),
+  checkRpcRuntimeStreamTransition({ event: RpcRuntimeFinish }, options)
+]
+console.log(errors.map((error) => (error as Error & { code: string }).code))`
+}
+/** Each configuration case keeps one caller problem and its observable result together. */
+const rpcOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  unknownWarner: [
+    {
+      title: t('Bound warning keys on a busy connection', '限制繁忙连接的警告键数量'),
+      problem: t(
+        'A peer adds the same field to many array entries. Numeric indexes share one warning identity. maxKeysPerConnection limits remembered identities, then emits one wildcard warning instead of retaining more keys. Without it, the limit is 256.',
+        '对端在许多数组项增加同一字段。数字索引共享一个警告身份。maxKeysPerConnection 限制保留的身份数，达到后只发一次通配警告，不继续保存键；省略时上限为 256。'
+      ),
+      example: rpcOptionExamples.warningKeys,
+      result: t('Two warnings are recorded; the second is *.', '记录两条警告，第二条为 *。'),
+      covers: ['maxKeysPerConnection', 'warn']
+    },
+    {
+      title: t('Bound diagnostic memory across connections', '限制跨连接的诊断内存'),
+      problem: t(
+        'A long-lived endpoint sees many connections. maxConnections evicts the least recently observed one; a later note on that connection warns again. Without it, the cache remembers 1024 connections.',
+        '长期运行的端点会接触很多连接。maxConnections 移除最久未观察到的连接，该连接之后出现时会再次警告；省略时记住 1024 个连接。'
+      ),
+      example: rpcOptionExamples.warningConnections,
+      result: t('The sink records ["a", "b", "a"].', '接收方记录 ["a", "b", "a"]。'),
+      covers: ['maxConnections', 'warn']
+    }
+  ],
+  wireError: [
+    {
+      title: t('Admit a newer peer’s additive error field', '接纳新版本对端增加的错误字段'),
+      problem: t(
+        'Unknown error fields reject by default. Choose ignore when additive fields may be discarded, and use onUnknownField to see what was omitted. The callback observes fields; it does not change policy.',
+        '未知错误字段默认被拒绝。可以丢弃新增字段时选择 ignore，并用 onUnknownField 观察省略项。回调只观察字段，不改变策略。'
+      ),
+      example: rpcOptionExamples.wireIgnore,
+      result: t(
+        'extra is absent, the message is offline, and the observer records extra.',
+        'extra 被省略，消息为 offline，观察者记录 extra。'
+      ),
+      covers: ['unknownFields', 'onUnknownField']
+    },
+    {
+      title: t('Keep a strict received-error boundary', '严格检查收到的错误'),
+      problem: t(
+        'A received error must match the known schema. reject refuses an extra field; omission selects this same policy. Use ignore only when dropping additive fields is acceptable.',
+        '收到的错误必须符合已知结构。reject 拒绝额外字段，省略时也使用该策略。只有允许丢弃新增字段时才用 ignore。'
+      ),
+      example: rpcOptionExamples.wireReject,
+      result: t('Normalization reports INVALID_WIRE_ERROR.', '规范化报 INVALID_WIRE_ERROR。'),
+      covers: ['unknownFields']
+    }
+  ],
+  serializeError: [
+    {
+      title: t('Observe an unreadable error property', '观察无法读取的错误属性'),
+      problem: t(
+        'An error may have a cause getter that throws. The serializer can omit unreadable information but needs a report sink to preserve the local diagnostic. The required callback has no default.',
+        '错误的 cause 读取器可能抛错。序列化器可以省略无法读取的信息，但需要 report 接收本地诊断。该回调必填，没有默认值。'
+      ),
+      example: rpcOptionExamples.errorReport,
+      result: t(
+        'The message remains request failed and the sink records cause.',
+        '消息仍为 request failed，接收方记录 cause。'
+      ),
+      covers: ['report']
+    },
+    {
+      title: t('Keep traversal failures visible', '让遍历失败保持可见'),
+      problem: t(
+        'A diagnostic walk encounters an unreadable cause on an aggregate child. report observes the read failure while reachRpcError still yields the reachable original values. No callback is supplied automatically.',
+        '诊断遍历在聚合子错误上遇到无法读取的 cause。report 接收读取失败，reachRpcError 仍产出可达的原始值；库不会自动提供回调。'
+      ),
+      example: rpcOptionExamples.errorReach,
+      result: t(
+        'The original and child are both reached, and cause is reported.',
+        '原错误和子错误均可达，并上报 cause。'
+      ),
+      covers: ['report']
+    }
+  ],
+  framer: [
+    {
+      title: t('Fit fragments within a small carrier budget', '让分片符合小型载体预算'),
+      problem: t(
+        'A custom carrier accepts only small fragments. chunkBytes controls splitting; message, chunk, buffer and concurrent-message limits bound retained assembly state. assemblyTimeoutMs releases an incomplete assembly after its deadline. Omitted values use the documented larger defaults.',
+        '自定义载体只接受小分片。chunkBytes 控制切分，消息、片数、缓冲量和并发消息上限约束保留的组装状态。assemblyTimeoutMs 到期后释放未完成组装。省略时使用表中较大的默认值。'
+      ),
+      example: rpcOptionExamples.framerBounds,
+      result: t('Three fragments reconstruct abcdef.', '三个分片重组为 abcdef。'),
+      covers: [
+        'chunkBytes',
+        'maxMessageBytes',
+        'maxChunks',
+        'maxBufferedBytes',
+        'maxConcurrentMessages',
+        'assemblyTimeoutMs'
+      ]
+    },
+    {
+      title: t('Use a carrier-owned timer queue', '使用载体自己的计时队列'),
+      problem: t(
+        'A host supplies its own timers. schedule returns a handle and cancel receives that same handle once assembly completes. now is retained for configuration compatibility but is not invoked by current expiry logic. Omission uses host setTimeout and clearTimeout.',
+        '宿主提供自己的计时器。schedule 返回句柄，组装完成时 cancel 接收同一句柄。now 会被保存，但当前到期逻辑不会调用它。省略时使用宿主 setTimeout 和 clearTimeout。'
+      ),
+      example: rpcOptionExamples.framerTimers,
+      result: t(
+        'The statuses are pending and complete; one timer is cancelled and the clock is never read.',
+        '状态依次为 pending、complete；取消一次计时器，时钟读取次数为零。'
+      ),
+      covers: ['chunkBytes', 'assemblyTimeoutMs', 'now', 'schedule', 'cancel']
+    }
+  ],
+  decoder: [
+    {
+      title: t('Consume complete payloads after arbitrary reads', '任意读取切分后消费完整载荷'),
+      problem: t(
+        'A byte carrier can split the length prefix and body anywhere. Required onFrame receives each complete payload synchronously. Required onError handles framing failure; neither callback has a default.',
+        '字节载体可以在长度前缀和主体的任意位置切分。必填 onFrame 同步接收完整载荷，必填 onError 处理分帧失败；两者都没有默认实现。'
+      ),
+      example: rpcOptionExamples.decoderFrames,
+      result: t('One payload [7, 8] is delivered.', '交付一份载荷 [7, 8]。'),
+      covers: ['onFrame', 'onError']
+    },
+    {
+      title: t('Report a truncated final payload', '上报最终未完成的载荷'),
+      problem: t(
+        'A connection ends after only one body byte arrives. finish() reports the partial tail through onError and makes the decoder terminal. Without the required callback, construction does not provide an error sink.',
+        '连接只收到一个主体字节就结束。finish() 通过 onError 报告未完成部分，并使解码器进入终态；必填回调没有库内默认接收方。'
+      ),
+      example: rpcOptionExamples.decoderError,
+      result: t('One INVALID_FRAME failure is recorded.', '记录一次 INVALID_FRAME 失败。'),
+      covers: ['onFrame', 'onError']
+    }
+  ],
+  handshakeReceiver: [
+    {
+      title: t('Receive the responder’s selection', '接收响应方的协商选择'),
+      problem: t(
+        'An initiating carrier can receive business text after the accept frame but before its own activation. role initiator enables that branch. responder and omission do not enable this shortcut.',
+        '发起载体可能在收到 accept 后、自身激活前接到业务文本。role 为 initiator 时允许该分支；responder 或省略时不启用此捷径。'
+      ),
+      example: rpcOptionExamples.handshakeInitiator,
+      result: t(
+        'The handshake step is accept; business is returned while ready remains false.',
+        '握手阶段为 accept；ready 仍为 false 时即可返回 business。'
+      ),
+      covers: ['role']
+    },
+    {
+      title: t('Activate after sending acceptance', '发送接受后进入业务阶段'),
+      problem: t(
+        'A responding carrier reads hello, records acceptance and activates before delivering business messages. Choose responder for this role; omission uses responder-like first-frame handling.',
+        '响应载体读取 hello、记录接受并激活，然后交付业务消息。此角色选择 responder；省略时按响应方的首帧规则处理。'
+      ),
+      example: rpcOptionExamples.handshakeResponder,
+      result: t(
+        'The handshake step is hello, then business is returned with ready true.',
+        '握手阶段为 hello，之后返回 business，ready 为 true。'
+      ),
+      covers: ['role']
+    }
+  ],
+  envelope: [
+    {
+      title: t('Observe additive handshake fields', '观察新增握手字段'),
+      problem: t(
+        'Peers can add fields without changing the negotiated core. onUnknownField records those fields during normalization, acceptance and completion. Omission silently ignores allowed additive fields.',
+        '对端可以增加字段而不改变协商核心。onUnknownField 在规范化、接受和完成时记录这些字段；省略时静默忽略允许新增的字段。'
+      ),
+      example: rpcOptionExamples.handshakeUnknown,
+      result: t('The observer records extra three times.', '观察者记录三次 extra。'),
+      covers: ['onUnknownField']
+    },
+    {
+      title: t('Observe a newer request field', '观察新版本请求字段'),
+      problem: t(
+        'A newer sender adds a request field. The callback records its name while known request data remains normalized; throwing from the callback would fail normalization. Omission adds no observer.',
+        '新版发送方增加一个请求字段。回调记录名称，已知请求数据仍完成规范化；回调抛错会使规范化失败。省略时不增加观察者。'
+      ),
+      example: rpcOptionExamples.envelopeUnknown,
+      result: t(
+        'The result remains a request and the observer records extra.',
+        '结果仍是 request，观察者记录 extra。'
+      ),
+      covers: ['onUnknownField']
+    }
+  ],
+  runtime: [
+    {
+      title: t('Declare ordered and retry-correlated calls', '声明有序且可关联重试的调用'),
+      problem: t(
+        'An adapter computes capability requirements before enabling ordered calls. orderKey adds ordering, timeoutMs adds deadlines, and idempotencyKey adds outcome lookup requirements. Omission adds only the mode baseline; this helper grants no execution rights.',
+        '适配器在启用有序调用前计算能力需求。orderKey 增加顺序能力，timeoutMs 增加截止时间能力，idempotencyKey 增加结果查询能力。省略时只加入当前模式的基线；此函数不授予执行权限。'
+      ),
+      example: rpcOptionExamples.runtimeOrder,
+      result: t(
+        'The list includes order@1, deadline@1 and outcome@1.',
+        '列表包含 order@1、deadline@1 和 outcome@1。'
+      ),
+      covers: ['orderKey', 'timeoutMs', 'idempotencyKey']
+    },
+    {
+      title: t(
+        'Request final-provider cancellation before start',
+        '请求最终提供方在启动前裁定取消'
+      ),
+      problem: t(
+        'Set cancel to before-start when the final provider owns pre-execution cancellation. This adds cancel-before-start capability; timeout and signal do not add ordinary deadline/abort requirements in that mode. Omission keeps ordinary cancellation with its existing owner.',
+        '最终提供方负责执行前取消时，把 cancel 设为 before-start。它增加启动前取消能力；该模式下，超时和信号不增加普通 deadline/abort 需求。省略时普通取消仍归已有所有者。'
+      ),
+      example: rpcOptionExamples.runtimeCancel,
+      result: t(
+        'The stream requirements include stream@1 and cancel-before-start@1, without deadline@1 or abort@1.',
+        '流需求包含 stream@1 和 cancel-before-start@1，不包含 deadline@1 或 abort@1。'
+      ),
+      covers: ['cancel', 'timeoutMs']
+    }
+  ],
+  streamCancel: [
+    {
+      title: t(
+        'Admit finish-without-items for a before-start task',
+        '为启动前取消任务接纳停止取项控制'
+      ),
+      problem: t(
+        'A protocol owner validates a finish-without-items control against the task’s original cancel option. before-start admits this form; omission does not. These checks return errors rather than changing the producer.',
+        '协议所有者按任务原始 cancel 选项检查 finish-without-items 控制。before-start 允许此形式，省略时不允许。这些检查返回错误，不修改生产方。'
+      ),
+      example: rpcOptionExamples.streamFinish,
+      result: t('All three checks return undefined.', '三个检查均返回 undefined。'),
+      covers: ['cancel']
+    },
+    {
+      title: t('Reject finish for ordinary cancellation', '拒绝普通取消任务的停止取项控制'),
+      problem: t(
+        'An ordinary task never opted into before-start cancellation. Passing no cancel option must reject finish-without-items instead of treating it as a valid producer operation.',
+        '普通任务没有选择启动前取消。未传 cancel 时必须拒绝 finish-without-items，不能把它当作有效生产方操作。'
+      ),
+      example: rpcOptionExamples.streamFinishDenied,
+      result: t(
+        'All three checks return INVALID_STREAM errors.',
+        '三个检查均返回 INVALID_STREAM 错误。'
+      ),
+      covers: ['cancel']
+    }
+  ]
+}
+envelopeOptions.onUnknownField = {
+  ...envelopeOptions.onUnknownField,
+  whenToUse: t(
+    'Observe allowed additive fields during a version rollout. The callback receives pointer and field and must return void; a throw aborts normalization. Omit it to ignore those fields silently.',
+    '版本升级期间需要观察允许新增的字段时设置。回调接收 pointer 和 field，返回空值；抛错会终止规范化。省略时静默忽略这些字段。'
+  ),
+  example: rpcOptionExamples.handshakeUnknown
+}
+wireErrorOptions.unknownFields = {
+  ...wireErrorOptions.unknownFields,
+  whenToUse: t(
+    'Use reject for strict received-error schemas; it is the default. Use ignore only when additive fields may be dropped. The observer does not choose or change that policy.',
+    '需要严格接收错误结构时用 reject，它也是默认值。仅允许丢弃新增字段时用 ignore。观察回调不选择或改变策略。'
+  ),
+  example: rpcOptionExamples.wireIgnore
+}
+wireErrorOptions.onUnknownField = {
+  ...wireErrorOptions.onUnknownField,
+  whenToUse: t(
+    'Use it with unknownFields ignore to record fields dropped from a newer peer’s error. Omit it for no observer; the default reject policy still rejects unknown fields.',
+    '使用 unknownFields ignore 接收新版本对端错误时，用它记录丢弃字段。省略时没有观察者；默认 reject 策略仍拒绝未知字段。'
+  ),
+  example: rpcOptionExamples.wireIgnore
+}
+framerOptions.now = {
+  ...framerOptions.now,
+  whenToUse: t(
+    'Supply only when sharing a framer configuration shape that already includes a clock. Current assembly expiry retains this callback but never invokes it; omission has the same expiry behavior. Use schedule to control expiry.',
+    '只在复用已经包含时钟的分片配置形状时提供。当前组装到期逻辑保存但从不调用此回调；省略时到期行为相同。控制到期应使用 schedule。'
+  ),
+  example: rpcOptionExamples.framerTimers
+}
+framerOptions.schedule = {
+  ...framerOptions.schedule,
+  whenToUse: t(
+    'Set it when the carrier owns a timer queue. Return one handle for the expiry callback; cancel receives that handle. Omission uses host setTimeout when available, otherwise no timer is armed.',
+    '载体持有计时队列时设置。为到期回调返回句柄，由 cancel 接收该句柄。省略时使用可用宿主 setTimeout，宿主没有计时器时不安排。'
+  ),
+  example: rpcOptionExamples.framerTimers
+}
+framerOptions.cancel = {
+  ...framerOptions.cancel,
+  whenToUse: t(
+    'Set it when using a custom schedule so completed or closed assemblies release their pending timer. It receives the original opaque handle. Omission uses host clearTimeout when available.',
+    '使用自定义 schedule 时设置此函数，使已完成或关闭的组装释放待执行计时器。它接收原始不透明句柄。省略时使用可用宿主 clearTimeout。'
+  ),
+  example: rpcOptionExamples.framerTimers
+}
+frameDecoderOptions.onFrame = {
+  ...frameDecoderOptions.onFrame,
+  whenToUse: t(
+    'Always supply the complete-payload consumer. It runs synchronously after assembly state is released, and a throw propagates to push(). There is no default consumer.',
+    '必须提供完整载荷消费者。它在组装状态释放后同步运行，抛错向 push() 传播。没有默认消费者。'
+  ),
+  example: rpcOptionExamples.decoderFrames
+}
+frameDecoderOptions.onError = {
+  ...frameDecoderOptions.onError,
+  whenToUse: t(
+    'Always supply a framing failure sink. The first malformed or truncated frame makes the decoder terminal, then invokes it once. There is no default sink, and callback throws propagate to the caller.',
+    '必须提供分帧失败接收方。首个异常或未完成帧使解码器进入终态，然后调用一次。没有默认接收方，回调抛错向调用者传播。'
+  ),
+  example: rpcOptionExamples.decoderError
+}
+runtimeOptions.cancel = {
+  ...runtimeOptions.cancel,
+  whenToUse: t(
+    'Choose before-start only when the final provider must decide cancellation before actual execution starts. Omission leaves ordinary cancellation with its existing owner. In capability calculation this mode adds cancel-before-start and excludes ordinary timeout/signal requirements.',
+    '仅当最终提供方必须在实际执行开始前裁定取消时选 before-start。省略时普通取消仍归已有所有者。计算能力时，此模式增加 cancel-before-start，排除普通超时及信号能力需求。'
+  ),
+  example: rpcOptionExamples.runtimeCancel
+}
+symbols.createRpcUnknownFieldWarner = {
+  ...symbols.createRpcUnknownFieldWarner,
+  optionCases: rpcOptionCases.unknownWarner,
+  optionDocs: {
+    ...symbols.createRpcUnknownFieldWarner.optionDocs,
+    warn: {
+      ...symbols.createRpcUnknownFieldWarner.optionDocs!.warn!,
+      whenToUse: t(
+        'Always supply the synchronous warning sink. It receives a connection identity and bounded field key, including * on key overflow. There is no default; a thrown callback failure propagates.',
+        '必须提供同步警告接收方。它接收连接身份和有界字段键，键溢出时包含 *。没有默认实现，回调抛错会传播。'
+      ),
+      example: rpcOptionExamples.warningKeys
+    }
+  }
+}
+types.IRpcSerializeErrorOptions = {
+  ...types.IRpcSerializeErrorOptions,
+  optionCases: rpcOptionCases.serializeError,
+  members: {
+    ...types.IRpcSerializeErrorOptions.members,
+    report: {
+      ...types.IRpcSerializeErrorOptions.members.report!,
+      whenToUse: t(
+        'Always supply a local diagnostic sink for failed reads or portable projections omitted from the wire error. The callback receives pointer, field and the original failure. There is no default reporter.',
+        '必须为线上错误省略的读取或可移植投影失败提供本地诊断接收方。回调接收 pointer、field 和原始失败。没有默认报告方。'
+      ),
+      example: rpcOptionExamples.errorReport
+    }
+  }
+}
+types.IRpcHandshakeFrameReceiverOptions = {
+  ...types.IRpcHandshakeFrameReceiverOptions,
+  optionCases: rpcOptionCases.handshakeReceiver,
+  members: {
+    ...types.IRpcHandshakeFrameReceiverOptions.members,
+    role: {
+      ...types.IRpcHandshakeFrameReceiverOptions.members.role!,
+      whenToUse: t(
+        'Use initiator for the side receiving accept; it permits post-accept business text before activation. Use responder for the side receiving hello. Omission uses responder-like first-frame handling without that initiator shortcut.',
+        '接收 accept 的一端使用 initiator，它允许激活前接收 accept 之后的业务文本。接收 hello 的一端使用 responder。省略时按响应方首帧规则处理，不启用发起方捷径。'
+      ),
+      example: rpcOptionExamples.handshakeInitiator
+    }
+  }
+}
+types.IRpcEnvelopeOptions = { ...types.IRpcEnvelopeOptions, optionCases: rpcOptionCases.envelope }
+types.IRpcWireErrorOptions = {
+  ...types.IRpcWireErrorOptions,
+  optionCases: rpcOptionCases.wireError
+}
+types.IRpcFramerOptions = { ...types.IRpcFramerOptions, optionCases: rpcOptionCases.framer }
+types.IRpcStreamFrameDecoderOptions = {
+  ...types.IRpcStreamFrameDecoderOptions,
+  optionCases: rpcOptionCases.decoder
+}
+types.IRpcRuntimeOptions = { ...types.IRpcRuntimeOptions, optionCases: rpcOptionCases.runtime }
+for (const name of [
+  'checkRpcRuntimeStreamFinish',
+  'checkRpcRuntimeStreamIntent',
+  'checkRpcRuntimeStreamTransition'
+])
+  symbols[name] = {
+    ...symbols[name],
+    optionCases: rpcOptionCases.streamCancel,
+    optionDocs: {
+      cancel: {
+        ...runtimeOptions.cancel!,
+        example: rpcOptionExamples.streamFinish,
+        whenToUse: t(
+          'Pass the original task cancel option when validating finish-without-items. before-start admits that control; omission rejects it. These helpers only return the validation error and never cancel or drain a producer.',
+          '检查 finish-without-items 时传入任务原始 cancel 选项。before-start 允许此控制，省略时拒绝。这些辅助函数只返回校验错误，不取消或排空生产方。'
+        )
+      }
+    }
+  }
 /** Module orientation uses canonical entry points even when other entries are aliases. */
 const modules: ILibraryReference['modules'] = {
   index: {
