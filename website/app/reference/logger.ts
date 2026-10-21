@@ -10,6 +10,7 @@ import type {
   IGrantDoc,
   ILibraryReference,
   IMemberDoc,
+  IOptionCaseDoc,
   IText,
   ITypeDoc
 } from './contract.js'
@@ -757,6 +758,584 @@ const nested = (
   fields: Readonly<Record<string, IMemberDoc>>,
   keys: readonly string[]
 ) => Object.fromEntries(keys.map((key) => [`${prefix}.${key}`, fields[key] as IMemberDoc]))
+
+/** Source-backed plugin configuration cases, verified against built public entries. */
+const loggerPluginOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  ILevelPluginConfig: [
+    {
+      title: {
+        en: 'Keep production warnings and business events',
+        zh: '保留生产警告和业务事件'
+      },
+      problem: {
+        en: 'A busy service produces debug messages and health checks. The default debug threshold keeps them all. Use warn to hide lower standard levels and a filter to remove health checks, including those with custom tags.',
+        zh: '繁忙服务会产生调试消息和健康检查日志。默认 debug 门槛会保留它们。使用 warn 隐藏较低标准级别，再用过滤器移除健康检查，包括自定义标签的条目。'
+      },
+      example: `import { Logger } from '@migaia/logger'
+import { level } from '@migaia/logger/plugins'
+
+const seen: string[] = []
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [level({ level: 'warn', filters: [(entry) => !entry.context.includes('health')] })]
+})
+log.useSink((entry) => { seen.push(entry.message) })
+log.debug('connection opened')
+log.warn('retrying')
+log.dispatchRaw({ tag: 'audit', message: 'health check', context: ['health'] })
+log.log('audit', 'order saved')
+await log.flush()
+console.log(seen)
+await log.shutdown('manual')`,
+      result: {
+        en: 'The list contains retrying and order saved. Custom tags bypass the severity threshold but still pass through the filter.',
+        zh: '列表包含 retrying 和 order saved。自定义标签不受级别门槛限制，但仍经过过滤器。'
+      },
+      covers: ['level', 'filters']
+    },
+    {
+      title: {
+        en: 'Defer output from a hot callback',
+        zh: '把高频回调的输出延后'
+      },
+      problem: {
+        en: 'An input callback should finish before its sinks run. Level methods normally dispatch immediately. asyncOutput delegates dispatch to the runtime manager; this queue makes the scheduling point visible.',
+        zh: '输入回调需要先结束，再运行输出端。级别方法通常立即分发。asyncOutput 把分发交给宿主管理器；这里用队列展示调度时点。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { level } from '@migaia/logger/plugins'
+
+const tasks: (() => void)[] = []
+const seen: string[] = []
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: { ...getLoggerRuntimeManager(), defer: (task) => { tasks.push(task) } },
+  plugins: [level({ asyncOutput: true })]
+})
+log.useSink((entry) => { seen.push(entry.message) })
+log.info('typed')
+console.log(seen.length)
+tasks.splice(0).forEach((task) => task())
+await log.flush()
+console.log(seen)
+await log.shutdown('manual')`,
+      result: {
+        en: 'The first output is 0. After the queue runs, the list contains typed.',
+        zh: '第一次输出 0。执行队列后，列表包含 typed。'
+      },
+      covers: ['asyncOutput']
+    }
+  ],
+  IColorPluginConfig: [
+    {
+      title: {
+        en: 'Produce JSON for a log collector',
+        zh: '为日志采集器输出 JSON'
+      },
+      problem: {
+        en: 'A collector expects one JSON object per line, while automatic format selection can choose pretty output in a terminal or CI. Select json explicitly. never avoids ANSI colors if this configuration is later used with pretty output.',
+        zh: '采集器需要每行一个 JSON 对象，但自动选择可能在终端或持续集成环境使用可读文本。显式选择 json。若以后改用可读格式，never 会关闭内置 ANSI 颜色。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { color } from '@migaia/logger/plugins'
+
+const lines: string[] = []
+const runtimeManager = {
+  ...getLoggerRuntimeManager(),
+  console: {
+    log: (...values: unknown[]) => { lines.push(values.map(String).join(' ')) },
+    warn: (...values: unknown[]) => { lines.push(values.map(String).join(' ')) },
+    error: (...values: unknown[]) => { lines.push(values.map(String).join(' ')) }
+  }
+}
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager,
+  plugins: [color({ format: 'json', color: 'never' })]
+})
+log.log('info', 'order saved')
+await log.flush()
+const entry = JSON.parse(lines[0]!)
+console.log(entry.tag, entry.message)
+await log.shutdown('manual')`,
+      result: {
+        en: 'The parsed line contains info and order saved; the console receives JSON rather than a pretty prefix.',
+        zh: '解析后得到 info 和 order saved；控制台收到 JSON，而不是可读文本前缀。'
+      },
+      covers: ['format', 'color']
+    },
+    {
+      title: {
+        en: 'Highlight a custom audit tag',
+        zh: '突出自定义审计标签'
+      },
+      problem: {
+        en: 'A local console needs compact audit lines without timestamps. Built-in colors cover standard levels only. A colorMap function paints the custom tag and colorMessage applies the same function to the message head.',
+        zh: '本地控制台需要不带时间戳的紧凑审计日志。内置颜色只覆盖标准级别。colorMap 函数处理自定义标签，colorMessage 把同一函数用于消息开头。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { color } from '@migaia/logger/plugins'
+
+const lines: string[] = []
+const runtimeManager = {
+  ...getLoggerRuntimeManager(),
+  console: {
+    log: (...values: unknown[]) => { lines.push(values.map(String).join(' ')) },
+    warn: (...values: unknown[]) => { lines.push(values.map(String).join(' ')) },
+    error: (...values: unknown[]) => { lines.push(values.map(String).join(' ')) }
+  }
+}
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager,
+  plugins: [color({
+    format: 'pretty', color: 'never', timestamp: false, colorMessage: 'head',
+    colorMap: { audit: (text) => '<' + text + '>' }
+  })]
+})
+log.log('audit', 'order saved')
+await log.flush()
+console.log(lines[0])
+await log.shutdown('manual')`,
+      result: {
+        en: 'The line is <[AUDIT]> <order saved>. The custom paint function remains under application control.',
+        zh: '这一行是 <[AUDIT]> <order saved>。自定义染色函数的行为由应用控制。'
+      },
+      covers: ['timestamp', 'colorMessage', 'colorMap']
+    }
+  ],
+  IBatchPluginConfig: [
+    {
+      title: {
+        en: 'Send small batches before a long wait',
+        zh: '及时发送小批次'
+      },
+      problem: {
+        en: 'A low-volume audit stream cannot wait for the default 20 entries or two seconds. A smaller maxSize sends two items together; maxWaitMs also bounds how long a partial batch waits. The public batch feature creates the queue.',
+        zh: '低流量审计记录不能等待默认的 20 条或两秒。较小的 maxSize 让两条记录成组交付，maxWaitMs 同时限制未满批次的等待时间。公开批处理能力负责创建队列。'
+      },
+      example: `import { Logger } from '@migaia/logger'
+import { batch, type IBatchShared } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+})
+const [handle] = await log.use(batch({ maxSize: 2, maxWaitMs: 100 }))
+const { createBatcher } = handle!.getFeature('batch') as IBatchShared
+const sizes: number[] = []
+const queue = createBatcher<number>({}, (items) => { sizes.push(items.length) })
+queue.push(1)
+queue.push(2)
+await queue.flush()
+console.log(sizes)
+await log.shutdown('manual')`,
+      result: {
+        en: 'One batch of size 2 is delivered; flush waits for its completion.',
+        zh: '交付一个含 2 个元素的批次，flush 等待它完成。'
+      },
+      covers: ['maxSize', 'maxWaitMs']
+    },
+    {
+      title: {
+        en: 'Bound concurrent delivery and queued work',
+        zh: '限制并发交付和排队数量'
+      },
+      problem: {
+        en: 'An async sink can send two batches concurrently, but an unlimited backlog would consume memory. maxConcurrentBatches and maxPendingBatches bound those two parts. asyncOutput false starts a full batch during push; flushTimeoutMs limits the drain wait without cancelling the sink.',
+        zh: '异步输出端可以同时发送两个批次，但无限积压会消耗内存。maxConcurrentBatches 和 maxPendingBatches 分别限制这两部分。asyncOutput 为 false 时，push 会启动已满批次；flushTimeoutMs 限制排空等待，不会取消输出端。'
+      },
+      example: `import { Logger } from '@migaia/logger'
+import { batch, type IBatchShared } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+})
+const [handle] = await log.use(batch({
+  maxSize: 1, maxConcurrentBatches: 2, maxPendingBatches: 8,
+  flushTimeoutMs: 1000, asyncOutput: false
+}))
+const { createBatcher } = handle!.getFeature('batch') as IBatchShared
+let active = 0
+let peak = 0
+const queue = createBatcher<number>({}, async () => {
+  active += 1
+  peak = Math.max(peak, active)
+  await Promise.resolve()
+  active -= 1
+})
+queue.push(1)
+queue.push(2)
+await queue.flush()
+console.log(peak)
+await log.shutdown('manual')`,
+      result: {
+        en: 'Peak concurrency is 2, within the configured limit.',
+        zh: '最高并发数是 2，没有超过配置上限。'
+      },
+      covers: ['maxConcurrentBatches', 'maxPendingBatches', 'flushTimeoutMs', 'asyncOutput']
+    }
+  ],
+  IHttpPluginConfig: [
+    {
+      title: {
+        en: 'Upload authenticated batches',
+        zh: '批量上传带认证的日志'
+      },
+      problem: {
+        en: 'A collector needs a bearer token and an application header, and one request per entry adds overhead. Install batch and set the upload queue bounds. This injected fetch records requests locally so the example sends no network traffic.',
+        zh: '采集器需要 Bearer 令牌和应用请求头，而逐条请求会增加开销。安装 batch 并设置上传队列上限。示例注入的 fetch 在本地记录请求，不发送网络流量。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { batch, http } from '@migaia/logger/plugins'
+
+const requests: { url: string; headers: Record<string, string>; body: string }[] = []
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: {
+    ...getLoggerRuntimeManager(),
+    fetch: async (url, init) => {
+      requests.push({ url, headers: init.headers, body: init.body })
+      return { ok: true, status: 204, headers: { get: () => null } }
+    }
+  },
+  plugins: [batch(), http({
+    url: 'https://logs.example/entries', authToken: 'demo-token', headers: { 'X-App': 'checkout' },
+    batch: { maxSize: 2, maxWaitMs: 100, maxConcurrentBatches: 1, maxPendingBatches: 8, asyncOutput: false }
+  })]
+})
+log.log('audit', 'opened')
+log.log('audit', 'saved')
+await log.flush()
+console.log(requests.length, JSON.parse(requests[0]!.body).entries.length)
+console.log(requests[0]!.headers.Authorization)
+await log.shutdown('manual')`,
+      result: {
+        en: 'One request contains two entries and the Authorization header is Bearer demo-token.',
+        zh: '一个请求包含两条日志，Authorization 请求头为 Bearer demo-token。'
+      },
+      covers: [
+        'url',
+        'authToken',
+        'headers',
+        'batch',
+        'batch.maxSize',
+        'batch.maxWaitMs',
+        'batch.maxConcurrentBatches',
+        'batch.maxPendingBatches',
+        'batch.asyncOutput'
+      ]
+    },
+    {
+      title: {
+        en: 'Limit retry waits for a throttled collector',
+        zh: '限制采集器限流后的重试等待'
+      },
+      problem: {
+        en: 'A collector can return 429 with Retry-After. retries limits extra attempts and maxRetryAfterMs caps that server-provided wait. requestTimeoutMs asks fetch to abort a slow attempt; it relies on fetch honoring the signal. The local fetch below rejects the first response and accepts the second.',
+        zh: '采集器可能返回带 Retry-After 的 429。retries 限制额外尝试次数，maxRetryAfterMs 限制服务端指定的等待。requestTimeoutMs 要求 fetch 中止缓慢请求，前提是 fetch 响应信号。下面的本地 fetch 第一次返回失败响应，第二次返回成功。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { batch, http } from '@migaia/logger/plugins'
+
+let attempts = 0
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: {
+    ...getLoggerRuntimeManager(),
+    fetch: async () => {
+      attempts += 1
+      return { ok: attempts > 1, status: attempts > 1 ? 204 : 429,
+        headers: { get: () => attempts === 1 ? '1' : null } }
+    }
+  },
+  plugins: [http({
+    url: 'https://logs.example/entries', retries: 1, requestTimeoutMs: 1000, maxRetryAfterMs: 1
+  })]
+})
+log.log('audit', 'saved')
+await log.flush()
+console.log(attempts)
+await log.shutdown('manual')`,
+      result: {
+        en: 'The entry succeeds on attempt 2. No batch provider means direct per-entry delivery.',
+        zh: '第 2 次尝试成功。未安装批处理提供者时，日志逐条直送。'
+      },
+      covers: ['retries', 'requestTimeoutMs', 'maxRetryAfterMs']
+    }
+  ],
+  IProcessPluginConfig: [
+    {
+      title: {
+        en: 'Own process listeners for a service lifetime',
+        zh: '在服务存续期间持有进程监听'
+      },
+      problem: {
+        en: 'A service needs crash reporting and a longer drain budget than the default three seconds. captureCrashes records fatal entries for crashes; the process plugin also owns signal listeners. Manual logger shutdown releases its registrations.',
+        zh: '服务需要崩溃报告，并希望排空预算长于默认三秒。captureCrashes 为崩溃记录致命日志，进程插件还持有信号监听。手动关闭日志器会释放这些登记。'
+      },
+      example: `import nodeProcess from 'node:process'
+import { Logger } from '@migaia/logger'
+import { process } from '@migaia/logger/plugins'
+
+const before = nodeProcess.listenerCount('uncaughtException')
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [process({ captureCrashes: true, shutdownTimeoutMs: 5000 })]
+})
+console.log(nodeProcess.listenerCount('uncaughtException') - before)
+await log.shutdown('manual')
+console.log(nodeProcess.listenerCount('uncaughtException') - before)`,
+      result: {
+        en: 'The listener count rises by 1, then returns to its original value after shutdown.',
+        zh: '监听数增加 1，关闭后恢复原值。'
+      },
+      covers: ['captureCrashes', 'shutdownTimeoutMs']
+    },
+    {
+      title: {
+        en: 'Drain queued output before an explicit exit',
+        zh: '显式退出前排空日志'
+      },
+      problem: {
+        en: 'A CLI calls process.exit while an async sink still has a final entry. By default exit is immediate. interceptProcessExit makes that call asynchronous so the logger can drain first. captureCrashes false disables fatal crash logging, but crash events still trigger shutdown.',
+        zh: '命令行程序调用 process.exit 时，异步输出端可能还持有最后一条日志。默认退出会立即发生。interceptProcessExit 让退出调用变为异步，使日志器先排空。captureCrashes 为 false 只关闭崩溃的致命日志记录，崩溃事件仍触发关闭。'
+      },
+      example: `import nodeProcess from 'node:process'
+import { Logger } from '@migaia/logger'
+import { process } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [process({ captureCrashes: false, interceptProcessExit: true, shutdownTimeoutMs: 1000 })]
+})
+log.useSink(async (entry) => { await Promise.resolve(); console.log(entry.message) })
+log.log('info', 'final entry')
+nodeProcess.exit(0)
+console.log('exit requested')`,
+      result: {
+        en: 'It prints exit requested, then final entry, and exits with code 0. The call no longer terminates synchronously.',
+        zh: '先输出 exit requested，再输出 final entry，最后以 0 退出。该调用不再同步终止进程。'
+      },
+      covers: ['interceptProcessExit']
+    }
+  ],
+  IReasoningPluginConfig: [
+    {
+      title: {
+        en: 'Name the two streaming sections',
+        zh: '为两个流式段落命名'
+      },
+      problem: {
+        en: 'A terminal UI needs headings for both thinking and response. The default response has no heading. labels supplies both names; finishing each phase also dispatches its accumulated text to the normal sinks.',
+        zh: '终端界面需要为思考和回答都显示标题。默认回答没有标题。labels 指定两个名称；每个阶段结束时，还会把累计文本分发给普通输出端。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { reasoning } from '@migaia/logger/plugins'
+
+const output: string[] = []
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: { ...getLoggerRuntimeManager(), write: (text) => { output.push(text) } },
+  plugins: [reasoning({ labels: { thinking: 'Planning', response: 'Answer' } })]
+})
+log.thinking('checking')
+log.endThinking()
+log.response('ready')
+log.endResponse()
+console.log(output.join('').includes('Planning'), output.join('').includes('Answer'))
+await log.shutdown('manual')`,
+      result: {
+        en: 'Both checks are true: the captured stream contains both headings.',
+        zh: '两个检查都为 true：捕获的流包含两个标题。'
+      },
+      covers: ['labels', 'labels.thinking', 'labels.response']
+    },
+    {
+      title: {
+        en: 'Schedule streaming writes after the callback',
+        zh: '把流式写入安排在回调结束后'
+      },
+      problem: {
+        en: 'A UI callback should not write output inline. asyncOutput defers chunks and completed entries through the manager. Without it, raw streaming output happens during the method call. Finish the phase before shutdown to publish its complete text.',
+        zh: '界面回调不应在调用中直接写输出。asyncOutput 通过宿主管理器延后片段和完整条目。省略时，原始流式输出在方法调用中发生。关闭前应结束当前阶段，以分发完整文本。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { reasoning } from '@migaia/logger/plugins'
+
+const output: string[] = []
+const tasks: (() => void)[] = []
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: { ...getLoggerRuntimeManager(),
+    write: (text) => { output.push(text) }, defer: (task) => { tasks.push(task) } },
+  plugins: [reasoning({ asyncOutput: true })]
+})
+log.response('ready')
+log.endResponse()
+console.log(output.length)
+tasks.splice(0).forEach((task) => task())
+await log.flush()
+console.log(output.join('').trim())
+await log.shutdown('manual')`,
+      result: {
+        en: 'The first output is 0. After scheduled work runs, the stream contains ready.',
+        zh: '第一次输出 0。执行排队工作后，流中包含 ready。'
+      },
+      covers: ['asyncOutput']
+    }
+  ],
+  IUuidPluginConfig: [
+    {
+      title: {
+        en: 'Show an entry id to the operator',
+        zh: '向操作人员显示条目编号'
+      },
+      problem: {
+        en: 'An operator needs an id to search for the same entry in another sink. display true includes the generated UUID in color output. The UUID comes from the logger runtime manager.',
+        zh: '操作人员需要通过编号在另一个输出端查找同一条日志。display 为 true 时，颜色插件的输出会包含生成的 UUID。UUID 由日志宿主管理器提供。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { color, uuid } from '@migaia/logger/plugins'
+
+const lines: string[] = []
+const capture = (...values: unknown[]) => { lines.push(values.map(String).join(' ')) }
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: { ...getLoggerRuntimeManager(), console: { log: capture, warn: capture, error: capture } },
+  plugins: [uuid({ display: true }), color({ format: 'json' })]
+})
+log.log('info', 'saved')
+await log.flush()
+const entry = JSON.parse(lines[0]!)
+console.log(entry.uuid !== undefined, typeof entry.data.uuid)
+await log.shutdown('manual')`,
+      result: {
+        en: 'It prints true string: the id is both displayed and stored in data.',
+        zh: '输出 true string：编号既用于显示，也保存在 data 中。'
+      },
+      covers: ['display']
+    },
+    {
+      title: {
+        en: 'Keep ids for downstream correlation',
+        zh: '为下游关联保留编号'
+      },
+      problem: {
+        en: 'A collector needs entry ids but the terminal should stay compact. display false, also the default, hides the rendered UUID while retaining data.uuid for downstream sinks.',
+        zh: '采集器需要条目编号，但终端应保持紧凑。display 为 false 时隐藏显示用 UUID，同时为下游输出端保留 data.uuid；省略时也采用此设置。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { color, uuid } from '@migaia/logger/plugins'
+
+const lines: string[] = []
+const capture = (...values: unknown[]) => { lines.push(values.map(String).join(' ')) }
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager: { ...getLoggerRuntimeManager(), console: { log: capture, warn: capture, error: capture } },
+  plugins: [uuid({ display: false }), color({ format: 'json' })]
+})
+log.log('info', 'saved')
+await log.flush()
+const entry = JSON.parse(lines[0]!)
+console.log(entry.uuid !== undefined, typeof entry.data.uuid)
+await log.shutdown('manual')`,
+      result: {
+        en: 'It prints false string: the top-level display id is absent, while data keeps its UUID.',
+        zh: '输出 false string：顶层显示编号缺失，data 中仍保留 UUID。'
+      },
+      covers: ['display']
+    }
+  ],
+  IFilePluginConfig: [
+    {
+      title: {
+        en: 'Bound a local file writer queue',
+        zh: '限制本地文件写入队列'
+      },
+      problem: {
+        en: 'A local audit writer needs small batches and a bounded backlog. path is the application-selected destination; batch configures that writer queue even without a shared batch plugin. The injected fs here records append calls instead of writing a real file.',
+        zh: '本地审计写入器需要小批次和有界积压。path 是应用选择的目标，batch 即使没有共享批处理插件，也会配置该写入队列。这里注入的 fs 记录追加调用，不写真实文件。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { file } from '@migaia/logger/plugins/file'
+
+const writes: string[] = []
+const runtimeManager = {
+  ...getLoggerRuntimeManager(),
+  fs: {
+    append: async (path: string, _text: string) => { writes.push(path) },
+    rotate: async (path: string) => { writes.push('rotate ' + path) }
+  }
+}
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager,
+  plugins: [file({ path: 'audit.jsonl', batch: {
+    maxSize: 2, maxWaitMs: 100, maxConcurrentBatches: 1,
+    maxPendingBatches: 8, flushTimeoutMs: 1000, asyncOutput: false
+  } })]
+})
+log.log('audit', 'opened')
+log.log('audit', 'saved')
+await log.flush()
+console.log(writes)
+await log.shutdown('manual')`,
+      result: {
+        en: 'One append call targets audit.jsonl. The logger drains the writer before shutdown completes.',
+        zh: '一次追加调用的目标是 audit.jsonl。关闭完成前，日志器会排空写入器。'
+      },
+      covers: [
+        'path',
+        'batch',
+        'batch.maxSize',
+        'batch.maxWaitMs',
+        'batch.maxConcurrentBatches',
+        'batch.maxPendingBatches',
+        'batch.flushTimeoutMs',
+        'batch.asyncOutput'
+      ]
+    },
+    {
+      title: {
+        en: 'Rotate after a batch reaches its limit',
+        zh: '批次达到上限后轮转'
+      },
+      problem: {
+        en: 'A host can rotate its destination after a sufficiently large batch. rotate compares the current batch bytes or entry count, not cumulative file size. Supply fs.rotate because the default Node append capability does not provide rotation.',
+        zh: '宿主可以在批次达到大小后轮转目标。rotate 比较当前批次的字节数或条目数，不累计文件大小。需要提供 fs.rotate，因为默认 Node 追加接口不提供轮转。'
+      },
+      example: `import { Logger, getLoggerRuntimeManager } from '@migaia/logger'
+import { file } from '@migaia/logger/plugins/file'
+
+const writes: string[] = []
+const runtimeManager = {
+  ...getLoggerRuntimeManager(),
+  fs: {
+    append: async (path: string, _text: string) => { writes.push(path) },
+    rotate: async (path: string) => { writes.push('rotate ' + path) }
+  }
+}
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtimeManager,
+  plugins: [file({
+    path: 'audit.jsonl', batch: { maxSize: 2 },
+    rotate: { maxBytes: 1_000_000, maxEntries: 2 }
+  })]
+})
+log.log('audit', 'opened')
+log.log('audit', 'saved')
+await log.flush()
+console.log(writes)
+await log.shutdown('manual')`,
+      result: {
+        en: 'The calls are audit.jsonl, then rotate audit.jsonl: appending the two-entry batch triggers rotation.',
+        zh: '调用依次为 audit.jsonl、rotate audit.jsonl：追加两条记录的批次后触发轮转。'
+      },
+      covers: ['rotate', 'rotate.maxBytes', 'rotate.maxEntries']
+    }
+  ]
+}
 
 /** Reference of `@migaia/logger`. */
 export const loggerReference: ILibraryReference = {
@@ -1717,6 +2296,7 @@ console.log(storedRetries ?? 2)`
       '`batch()` 通过 Feature 提供的 `createBatcher(config, onBatch)` 工厂函数的类型。'
     ),
     ILevelPluginConfig: {
+      optionCases: loggerPluginOptionCases.ILevelPluginConfig!,
       summary: t(
         'Options of `level()`: minimum level, filters and output scheduling.',
         '`level()` 插件的选项：最低级别、过滤器与输出方式。'
@@ -1730,6 +2310,11 @@ console.log(storedRetries ?? 2)`
       example: `level({ level: 'warn', filters: [(entry) => !entry.context.includes('health')] })`,
       members: {
         level: {
+          whenToUse: t(
+            'Use warn for a production service and debug while diagnosing it. The ordered thresholds are debug, info, warn, error and fatal; each keeps that level and higher standard levels. Omission selects debug. Custom tags still pass through filters.',
+            '生产服务可选 warn，排查问题时选 debug。门槛从低到高为 debug、info、warn、error、fatal；每个值保留本级及更高标准级别。省略时采用 debug，自定义标签仍经过过滤器。'
+          ),
+          example: loggerPluginOptionCases.ILevelPluginConfig![0]!.example,
           summary: t(
             'Minimum standard level; lower standard levels are dropped. Other tags bypass only the threshold and still pass through every filter. Captured at installation; change behavior with setLevel, not config.update alone.',
             '最低标准级别，更低标准级别会被丢弃；其他标签仅跳过门槛，仍经过所有过滤函数。安装时捕获此值，改变行为使用 `setLevel`，不能只提交 `config.update`。'
@@ -1780,6 +2365,7 @@ remove()`,
       members: membersOf(levelMembers)
     },
     IColorPluginConfig: {
+      optionCases: loggerPluginOptionCases.IColorPluginConfig!,
       summary: t(
         'Options of `color()`: colors, format, timestamp and highlighted parts.',
         '`color()` 插件的选项：颜色、格式、时间戳与染色范围。'
@@ -1793,11 +2379,21 @@ remove()`,
       example: `color({ color: 'auto', format: 'auto', timestamp: false, colorMessage: 'head' })`,
       members: {
         color: {
+          whenToUse: t(
+            'Use never when the output consumer cannot display ANSI sequences, or always when it can but lacks terminal detection. auto, the default, checks NO_COLOR, FORCE_COLOR, terminal status and CI. Custom colorMap functions still control their own output.',
+            '输出端不能显示 ANSI 序列时选 never；能显示但不能检测终端时选 always。默认 auto 依次检查 NO_COLOR、FORCE_COLOR、终端状态和持续集成环境。自定义 colorMap 函数仍控制自己的输出。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![0]!.example,
           summary: t('Whether ANSI colors are used.', '控制台输出是否使用 ANSI 颜色。'),
           default: t('`auto`.', '`auto`：根据环境自动决定。'),
           values: { enum: 'LoggerColorMode' }
         },
         format: {
+          whenToUse: t(
+            'Use json for a collector and pretty for a person reading the console. Default auto uses LOG_FORMAT when it is pretty or json; otherwise it chooses pretty in a terminal or CI and json elsewhere.',
+            '日志采集器选 json，人工查看控制台选 pretty。默认 auto 会采用值为 pretty 或 json 的 LOG_FORMAT；否则在终端或持续集成环境选 pretty，其余环境选 json。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![0]!.example,
           summary: t('Output format of each entry.', '每条日志在控制台中的输出格式。'),
           default: t('`auto`.', '`auto`：根据环境自动选择。'),
           values: {
@@ -1820,6 +2416,11 @@ remove()`,
           default: t('`true`.', '`true`：显示时间戳。')
         },
         colorMessage: {
+          whenToUse: t(
+            'Choose head to paint the message, tail for the last argument or an argument-free message, head-tail for both, or all for the message and primitive arguments. none, the default, paints only the tag. Objects and errors keep their native values.',
+            'head 为消息上色；tail 为最后一个参数上色，没有参数时处理消息；head-tail 同时处理两者；all 处理消息和原始类型参数。默认 none 只处理标签。对象和错误保留原生值。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![1]!.example,
           summary: t(
             'Which part of the message and arguments is colored like the tag.',
             '消息与参数中哪一部分按标签颜色上色。'
@@ -1843,6 +2444,11 @@ remove()`,
           }
         },
         colorMap: {
+          whenToUse: t(
+            'Supply a tag-to-function map when custom audit or domain tags need distinctive output. Each function receives text and returns its painted form. Omission retains built-in colors for five standard levels; unmapped custom tags remain unchanged.',
+            '自定义审计或业务标签需要不同显示方式时，提供从标签到函数的映射。每个函数接收文本，返回处理后的文本。省略时只保留五个标准级别的内置颜色，未映射的自定义标签保持原样。'
+          ),
+          example: loggerPluginOptionCases.IColorPluginConfig![1]!.example,
           summary: t(
             'Paint function per tag, for custom tags such as `audit`; unknown tags stay uncolored.',
             '按标签指定染色函数，用于 `audit` 等自定义标签；未映射的标签不上色。'
@@ -1852,6 +2458,7 @@ remove()`,
       }
     },
     IBatchPluginConfig: {
+      optionCases: loggerPluginOptionCases.IBatchPluginConfig!,
       summary: t(
         'Options of `batch()` and of the `batch` field of `http()` and `file()`.',
         '`batch()` 以及 `http()`、`file()` 中 `batch` 字段的攒批选项。'
@@ -1945,6 +2552,7 @@ await batcher.flush()`,
       }
     },
     IHttpPluginConfig: {
+      optionCases: loggerPluginOptionCases.IHttpPluginConfig!,
       summary: t(
         'Options of `http()`: endpoint, auth, retries, timeout and batching.',
         '`http()` 插件的选项：目标地址、认证、重试、超时与攒批。'
@@ -1996,7 +2604,10 @@ await batcher.flush()`,
             'Upload queue settings. An earlier or same-batch Feature provider supplies shared batching regardless of input order. Without a provider, this option still creates a bounded local queue forced to maxSize:1 and asyncOutput:false; other queue bounds apply.',
             '本次上传队列设置；已安装或同批的功能提供者按依赖绑定，不受输入顺序限制。没有提供者时此选项仍创建本地有界队列，强制单条大小及同步输出，其余队列边界仍适用。'
           ),
-          default: t('Not set: the `batch()` defaults.', '不设置：使用 `batch()` 的默认设置。')
+          default: t(
+            'With a shared batch provider: its defaults. Without one: direct per-entry delivery.',
+            '有共享批处理提供者时使用其默认设置；没有时逐条直送。'
+          )
         },
         ...nested('batch', batchFields, [
           'maxSize',
@@ -2015,6 +2626,7 @@ await batcher.flush()`,
       }
     },
     IProcessPluginConfig: {
+      optionCases: loggerPluginOptionCases.IProcessPluginConfig!,
       summary: t(
         'Options of `process()`: crash capture, shutdown timeout and exit interception.',
         '`process()` 插件的选项：崩溃捕获、关闭超时与退出拦截。'
@@ -2051,6 +2663,7 @@ await batcher.flush()`,
       }
     },
     IReasoningPluginConfig: {
+      optionCases: loggerPluginOptionCases.IReasoningPluginConfig!,
       summary: t('Options of `reasoning()`.', '`reasoning()` 插件的选项：段落标签与输出方式。'),
       scenarios: [
         t(
@@ -2103,6 +2716,7 @@ log.endResponse()`,
       members: membersOf(reasoningMembers)
     },
     IUuidPluginConfig: {
+      optionCases: loggerPluginOptionCases.IUuidPluginConfig!,
       summary: t(
         'Options of `uuid()`: whether the UUID is shown in output.',
         '`uuid()` 插件的选项：是否在输出中显示 UUID。'
@@ -2125,6 +2739,7 @@ log.endResponse()`,
       }
     },
     IFilePluginConfig: {
+      optionCases: loggerPluginOptionCases.IFilePluginConfig!,
       summary: t(
         'Options of `file()`: file path, batching and rotation.',
         '`file()` 插件的选项：文件路径、攒批与轮转。'
