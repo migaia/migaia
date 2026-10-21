@@ -1359,8 +1359,8 @@ test('explain capability, pain, and design on every README page', () => {
   }
 
   const lifecycle = readFileSync(join(buildRoot, artifactPath('/zh/docs/lifecycle/readme')), 'utf8')
-  assert.match(lifecycle, /一组资源必须随同一 owner 关闭/)
-  assert.match(lifecycle, /scope、generation、terminal controller 与 dispose transaction/)
+  assert.match(lifecycle, /按登记的相反顺序释放，一项失败不影响其余资源/)
+  assert.match(lifecycle, /新请求开始时旧请求自动失效/)
   assert.match(lifecycle, /不负责事件分发、业务排队或依赖图/)
 
   const tray = readFileSync(join(buildRoot, artifactPath('/zh/docs/tray/readme')), 'utf8')
@@ -3054,8 +3054,12 @@ test('gives primary tasks independent bilingual pages', () => {
       'Publish topics and observe instance events',
       'Observe events and finish waiting'
     ],
-    ['/zh/docs/utils', 'Utils：库代码常用的基础工具', '按子路径查找'],
-    ['/en/docs/utils', 'Utils: everyday building blocks for library code', 'Find tools by subpath'],
+    ['/zh/docs/utils', 'Utils：把超时、重试、并发和错误追踪写对', '按问题找 API'],
+    [
+      '/en/docs/utils',
+      'Utils: get timeouts, retries, concurrency and error tracing right',
+      'Find the API for your problem'
+    ],
     ['/zh/docs/utils/getting-started', '快速开始：给一个不稳定的请求加上重试', 'retry 的选项'],
     [
       '/en/docs/utils/getting-started',
@@ -3432,11 +3436,11 @@ test('gives primary tasks independent bilingual pages', () => {
     ['/en/docs/resource/cancellation-and-retry', 'Cancellation and retry', 'Retry after failure'],
     ['/zh/docs/resource/troubleshooting', '排错与常见问题', '错误代码'],
     ['/en/docs/resource/troubleshooting', 'Troubleshooting and FAQ', 'Error codes'],
-    ['/zh/docs/reactive', 'Reactive：值变了，依赖它的计算和副作用自动更新', 'API 一览'],
+    ['/zh/docs/reactive', 'Reactive：值变了，依赖它的计算和副作用自动更新', '按问题找 API'],
     [
       '/en/docs/reactive',
       'Reactive: when a value changes, dependent computations and effects update',
-      'API at a glance'
+      'Find the API for your problem'
     ],
     ['/zh/docs/reactive/getting-started', '快速开始：第一张依赖图', '释放'],
     ['/en/docs/reactive/getting-started', 'Quick start: your first dependency graph', 'Disposal'],
@@ -3474,8 +3478,22 @@ test('gives primary tasks independent bilingual pages', () => {
       'Waiting for listener results',
       'Choosing among six functions'
     ],
-    ['/zh/docs/lifecycle', 'Lifecycle：离开页面时，一起释放资源', '底层工具'],
-    ['/en/docs/lifecycle', 'Lifecycle: release page resources together', 'Lower-level tools'],
+    ['/zh/docs/lifecycle', 'Lifecycle：让关闭、取消和替换在并发下也不出错', '按问题找 API'],
+    [
+      '/en/docs/lifecycle',
+      'Lifecycle: shutdown, cancellation and replacement that stay correct under concurrency',
+      'Find the API for your problem'
+    ],
+    [
+      '/zh/docs/lifecycle/graceful-shutdown',
+      '服务优雅停机：等进行中的请求，但不被它们挂住',
+      '资源关不掉时，先优雅、再强制'
+    ],
+    [
+      '/en/docs/lifecycle/graceful-shutdown',
+      'Graceful service shutdown: wait for requests in flight without hanging on them',
+      'When a resource will not close: gracefully first, then by force'
+    ],
     ['/zh/docs/lifecycle/getting-started', '快速开始：一起结束页面里的连接和订阅', '构造选项'],
     [
       '/en/docs/lifecycle/getting-started',
@@ -3626,11 +3644,11 @@ test('gives primary tasks independent bilingual pages', () => {
       'Shutdown and troubleshooting: saving fails or exit never finishes',
       'Keep native error types in a custom parser'
     ],
-    ['/zh/docs/supervision', 'Supervision：让后台任务可以启动、替换和结束', '底层工具'],
+    ['/zh/docs/supervision', 'Supervision：让崩溃、卡死和关不掉的任务都有人管', '按问题找 API'],
     [
       '/en/docs/supervision',
-      'Supervision: start, replace, and stop background work',
-      'Lower-level tools'
+      'Supervision: someone to watch crashing, hanging and stubborn tasks',
+      'Find the API for your problem'
     ],
     ['/zh/docs/supervision/getting-started', '快速开始：启动一个草稿格式化任务', '其余构造选项'],
     [
