@@ -18,6 +18,7 @@ import { inspectThenable, observeThenableRejection } from '@migaia/utils/functio
 import { admitCapabilities } from './admission.js'
 import {
   ExitReason,
+  EXIT_OBSERVATION_CAPABILITY,
   IsolationMode,
   TerminalPolicyMode,
   UnitStopMode,
@@ -72,7 +73,6 @@ type IManagedSlot<
     | typeof ExitReason.launchFailed
     | typeof ExitReason.unhealthy
     | typeof ExitReason.resourceViolation
-  failureError?: unknown
   exitEmitted: boolean
   retired: boolean
   /** Actual native exit projection is captured before classification or teardown publication. */
@@ -470,6 +470,7 @@ export function createSupervisor<
       drainTimeoutMs: options.stop?.drainTimeoutMs ?? 5_000,
       exitTimeoutMs: options.stop?.exitTimeoutMs ?? 5_000,
       reapTimeoutMs,
+      exitObservation: options.launcher.capabilities[EXIT_OBSERVATION_CAPABILITY],
       beforeTerminate: options.stop?.beforeTerminate,
       onAbandon: (error: Error) => {
         abandoned++

@@ -1,8 +1,45 @@
 import { describe, expect, it, vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { assembled, chainHas, fixture, lines, marker, until } from './helper.js'
 
 describe('Tray lifecycle management', () => {
+  /** This direct consumer must prove cleanup against Deno's actual unsupported exit capability. */
+  const denoAvailable = spawnSync('deno', ['--version']).status === 0
+  it.skipIf(!denoAvailable)(
+    'disposes a Deno Thread without a PluginHost step timeout',
+    () => {
+      /** Existing package test entry launches one real Deno parent and its owned Thread child. */
+      const entry = fileURLToPath(new URL('./fixtures/deno-owned-exit.mts', import.meta.url))
+      /** Fixture output preserves admission notices independently from disposal diagnostics. */
+      const output = execFileSync('deno', ['run', '-A', entry], {
+        encoding: 'utf8',
+        timeout: 20_000
+      })
+      /** A code-only assertion would hide a duplicate report or a simultaneous disposal timeout. */
+      const receipt = JSON.parse(output.trim().split('\n').at(-1)!)
+      expect(receipt.value).toBe('actual-deno-tray-worker')
+      expect(receipt.admissionDiagnostics).toEqual([
+        expect.objectContaining({ source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' })
+      ])
+      expect(receipt.closeDiagnostics, JSON.stringify(receipt)).toEqual([
+        expect.objectContaining({
+          source: '@migaia/supervision',
+          code: 'EXIT_UNOBSERVABLE',
+          name: 'Error',
+          detail: { kind: 'thread', generation: 1, phase: 'exit', capability: 'exit-observation' },
+          message: expect.any(String)
+        })
+      ])
+      expect(JSON.stringify(receipt.closeDiagnostics)).not.toMatch(
+        /"code":"(?:REAP_TIMEOUT|DISPOSE_STEP_TIMEOUT)"/
+      )
+      expect(receipt.elapsedMs, JSON.stringify(receipt)).toBeLessThan(receipt.reapTimeoutMs / 2)
+    },
+    25_000
+  )
+
   it.each([0, 1, 2])(
     'runtime %i drops a stale background ready receipt queued behind a newer replace',
     async (index) => {

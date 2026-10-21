@@ -6,7 +6,13 @@ import {
   type IReleaseContext
 } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { TerminationMode, UnitStopMode, TeardownPhase } from './constants.js'
+import {
+  CapabilityLevel,
+  EXIT_OBSERVATION_CAPABILITY,
+  TerminationMode,
+  UnitStopMode,
+  TeardownPhase
+} from './constants.js'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
 import { createSupervisionError } from './errors.js'
@@ -27,6 +33,10 @@ export type IUnitSlot<
   drainTimeoutMs: number
   readonly exitTimeoutMs: number
   readonly reapTimeoutMs: number
+  /** Captured launcher declaration; an absent capability does not imply unsupported recovery. */
+  readonly exitObservation: CapabilityLevel | undefined
+  /** Primary retirement failure retained when a known recovery boundary becomes the public error. */
+  failureError?: unknown
   readonly beforeTerminate?: (
     handle: THandle,
     signal: IAbortController['signal'],
@@ -69,24 +79,38 @@ function safeTerminate<
   }
 }
 
-/** Marks an unresponsive unit abandoned exactly once while retaining its lease. */
+/** Marks an unconfirmed recovery abandoned exactly once while retaining its lease. */
 function abandon<TSpec, THandle extends IUnitHandle<TExit>, TExit, TContext extends ILaunchContext>(
   slot: IUnitSlot<TSpec, THandle, TExit, TContext>,
   phase: TeardownPhase
 ): void {
   if (slot.abandoned) return
   slot.abandoned = true
+  /** A declared observation boundary is known immediately; launch waits still use their deadline. */
+  const unobservable =
+    phase === TeardownPhase.exit && slot.exitObservation === CapabilityLevel.unsupported
   const error = createSupervisionError(
     Error,
-    SupervisionErrorCode.reapTimeout,
-    SupervisionErrorText.reapTimeout,
-    { detail: { kind: slot.kind, generation: slot.generation, phase } }
+    unobservable ? SupervisionErrorCode.exitUnobservable : SupervisionErrorCode.reapTimeout,
+    unobservable ? SupervisionErrorText.exitUnobservable : SupervisionErrorText.reapTimeout,
+    {
+      ...(unobservable ? { cause: slot.failureError } : {}),
+      detail: {
+        kind: slot.kind,
+        generation: slot.generation,
+        phase,
+        ...(unobservable ? { capability: EXIT_OBSERVATION_CAPABILITY } : {})
+      }
+    }
   )
   slot.onAbandon(error)
   slot.report(error)
 }
 
-/** Forces the unit and waits only until its finite recovery deadline. */
+/**
+ * Forces the unit, abandons a declared observation boundary, or awaits its finite recovery
+ * deadline.
+ */
 export function forceAndReap<
   TSpec,
   THandle extends IUnitHandle<TExit>,
@@ -98,6 +122,10 @@ export function forceAndReap<
     if (slot.disappeared) return
     slot.forceIssued = true
     safeTerminate(slot, handle, TerminationMode.force)
+    if (slot.exitObservation === CapabilityLevel.unsupported) {
+      abandon(slot, TeardownPhase.exit)
+      return
+    }
     if (
       !(await boundedWait(handle.exited, slot.scheduler.now() + slot.reapTimeoutMs, {
         scheduler: slot.scheduler

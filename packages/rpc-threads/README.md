@@ -234,7 +234,7 @@ buffer 在消息真正提交到原生端口时失效，byteLength 变为 0，共
 
 Web launcher 必填 report，可选 Worker 构造器（默认全局 Worker）和 runtimeApi；构造器接收 entry 与 `{ type: 'module', name }`。Node launcher options 默认空对象，可显式 execArgv / runtimeApi；高级 createAdapterNodeThreadLauncher 另接真实 runtime resource。工厂只在实际启动时获取宿主能力。Node 的 sampleUsage 为冷查询：可用时报告该 isolate 的 heap、CPU 微秒和 ELU，sharedPid 只是共享进程身份；缺少原生方法时字段缺席，退出后返回空对象，不拿整个父进程用量冒充线程用量。
 
-handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 原生 exited 只由真实 exit 结算；Web 的 exited 保持 pending，因此超时后可能报告 REAP_TIMEOUT 并保留 abandoned budget lease，不能提前把槽位当空闲。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。
+handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 由原生 exit、Bun 由原生 Worker close 结算 exited；Deno、浏览器和 Electron renderer 的退出观察为 unsupported，强制回收立即报告 supervision EXIT_UNOBSERVABLE 并保留 abandoned budget lease，不等待 reapTimeoutMs，也不能提前把槽位当空闲。可观察退出超时仍报告 REAP_TIMEOUT；best-effort 准入诊断 CAPABILITY_UNSUPPORTED 不变。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。
 
 构造或打开失败时，launcher / 监督 owner 释放已取得监听和候选 Worker；主错误保持原对象或在 cause 链中，清理错误保留在 errors。Node Endpoint 构造失败会回收真实 Worker 和预算；Web 请求 terminate 仍不能补出退出证明。高级调用方若直接 launch，须负责逻辑 channel 关闭、terminate 请求和等待真实 exited 的边界，不能在缺少原生回执的 Web 路径无限 await exited。
 
@@ -255,6 +255,7 @@ probe 失败经 onListenerError 报 Core TRANSPORT，原异常保留在 cause，
 | source / code                                    | 含义与处理                                                                      |
 | ------------------------------------------------ | ------------------------------------------------------------------------------- |
 | @migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED | 线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。 |
+| @migaia/supervision / EXIT_UNOBSERVABLE          | 退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。                  |
 | @migaia/rpc/core / INVALID_CONFIG                | 入口、来源、bootstrap、能力 ACK、portable data 或配置不合法；检查字段与 cause。 |
 | @migaia/rpc/core / TRANSPORT                     | 原生消息 I/O / 启动资源边界失败，保留原生错误类型和原因。                       |
 | @migaia/rpc/core / DEADLINE_EXCEEDED             | TimeoutError；Worker 可能已执行，先对账。                                       |

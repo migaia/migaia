@@ -277,9 +277,11 @@ If the new unit fails to start, `replace()` returns `{ kind: 'failed', error }` 
 
 1. **Application drain.** If you passed `stop.beforeTerminate`, it finishes in-flight work first (`drainTimeoutMs`).
 2. **Normal exit.** The unit is asked to exit and the supervisor waits for the actual exit (`exitTimeoutMs`).
-3. **Forced reap.** After a forced stop, the supervisor waits once more (`reapTimeoutMs`). If the unit still has not exited, it reports `REAP_TIMEOUT` and stops waiting.
+3. **Forced reap.** After a forced stop, the supervisor waits for actual exit (`reapTimeoutMs`) and reports `REAP_TIMEOUT` on expiry. If the launcher explicitly declares `exit-observation: 'unsupported'`, it immediately reports `EXIT_UNOBSERVABLE` and abandons that generation without waiting for this window. Details contain kind, generation and capability: `'exit-observation'`. Repeated disposal does not repeat the report.
 
 `stop()` always returns within these deadlines. If the unit has not really exited, though, its slot stays occupied until it does, so new work never runs next to a unit that has not finished stopping.
+
+`EXIT_UNOBSERVABLE` identifies a capability boundary, not a stuck thread or confirmed exit. Branch on source/code to distinguish it from `REAP_TIMEOUT`; choose another launcher when actual-exit guarantees are required. Best-effort admission's `CAPABILITY_UNSUPPORTED`, required-mode admission rejection and launch-phase timeouts remain unchanged.
 
 ```ts doc-test=run
 import { createUnitBudget } from '@migaia/supervision'
@@ -570,8 +572,9 @@ truthfully. `heapBytes` is accepted only when `heap-limit` is enforced; `callWal
 passed unchanged to the launcher for its caller-facing operations. A launcher without enforced
 exit observation requires a `health` check so a silent exit or stalled thread can be stopped.
 The supervisor performs no heap sampling and has no separate graceful thread phase: it drains
-the optional `beforeTerminate` hook, requests `terminate()` once, then waits up to the core
-reap deadline for actual exit. An unconfirmed exit keeps its budget lease occupied.
+the optional `beforeTerminate` hook and requests `terminate()` once. Observable exit waits up to
+the core reap deadline; explicitly unsupported exit observation reports `EXIT_UNOBSERVABLE`
+immediately instead. Either abandoned outcome keeps its budget lease occupied until actual exit.
 
 Use `@migaia/supervision/process` when you need crash isolation, a CPU limit, durable orphan
 recovery, or output draining. Thread code shares the host process and cannot provide those

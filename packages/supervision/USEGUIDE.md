@@ -277,9 +277,11 @@ v2 停止消费
 
 1. **应用收尾**：如果提供了 `stop.beforeTerminate`，先让它完成手头的工作（`drainTimeoutMs`）。
 2. **正常退出**：请求单元退出，等待它真正退出（`exitTimeoutMs`）。
-3. **强制回收**：强制结束后再等一段时间（`reapTimeoutMs`）。仍然没有退出，就报告 `REAP_TIMEOUT` 并放弃等待。
+3. **强制回收**：强制结束后等待实际退出（`reapTimeoutMs`），超时报告 `REAP_TIMEOUT`。如果启动器已明确声明 `exit-observation: 'unsupported'`，则立即报告 `EXIT_UNOBSERVABLE` 并按 abandoned 处理，不等待该回收窗口；诊断详情为 kind、generation 和 capability: `'exit-observation'`。重复释放不会重复报告。
 
 `stop()` 一定会在这些时限内返回。但如果单元还没有真正退出，它占用的名额会一直保留，直到它真正退出为止。这样新任务就不会和一个没停干净的旧任务同时运行。
+
+`EXIT_UNOBSERVABLE` 是能力边界，不表示线程卡死，也不表示退出已获确认。调用方应按 source/code 区分它与 `REAP_TIMEOUT`；需要真实退出保证时更换启动器。best-effort 准入时的 `CAPABILITY_UNSUPPORTED`、required 模式的准入拒绝以及 launch 阶段超时均不改变。
 
 ```ts doc-test=run
 import { createUnitBudget } from '@migaia/supervision'
@@ -535,7 +537,7 @@ if (outcome.state === 'ready') {
 await supervisor.dispose()
 ```
 
-启动器必须如实声明 `termination: 'enforced' | 'monitored' | 'unsupported'` 和 `fault-isolation: 'unsupported'`。在 `required` 隔离要求下，`enforced` 或 `monitored` 的结束能力可以通过，`unsupported` 会被拒绝；`monitored` 不代表运行时会强制执行。启动器还要如实声明 `heap-limit: 'enforced' | 'unsupported'` 和 `exit-observation: 'enforced' | 'unsupported'`。只有 `heap-limit` 为 `enforced` 时才接受 `heapBytes`；`callWallTimeMs` 原样交给启动器，用于它面向调用方的操作。不能可靠观察退出的启动器必须配置 `health` 检查，这样无声退出或停滞的线程才能被发现并结束。监督器不采样堆内存，线程也没有单独的“正常退出”阶段：先执行可选的 `beforeTerminate`，然后调用一次 `terminate()`，再在回收时限内等待线程真正退出。没有确认退出时，预算名额保持占用。
+启动器必须如实声明 `termination: 'enforced' | 'monitored' | 'unsupported'` 和 `fault-isolation: 'unsupported'`。在 `required` 隔离要求下，`enforced` 或 `monitored` 的结束能力可以通过，`unsupported` 会被拒绝；`monitored` 不代表运行时会强制执行。启动器还要如实声明 `heap-limit: 'enforced' | 'unsupported'` 和 `exit-observation: 'enforced' | 'unsupported'`。只有 `heap-limit` 为 `enforced` 时才接受 `heapBytes`；`callWallTimeMs` 原样交给启动器，用于它面向调用方的操作。不能可靠观察退出的启动器必须配置 `health` 检查，这样无声退出或停滞的线程才能被发现并结束。监督器不采样堆内存，线程也没有单独的“正常退出”阶段：先执行可选的 `beforeTerminate`，然后调用一次 `terminate()`；退出可观察时在回收时限内等待，明确不支持退出观察时立即报告 `EXIT_UNOBSERVABLE`。这两种 abandoned 结果都不会释放尚未确认实际退出的预算名额。
 
 需要隔离崩溃、限制 CPU、持久回收遗留单元或读取输出时，选择 `@migaia/supervision/process`。线程代码和宿主共用同一个进程，无法提供这些保证。各平台的适配器及其验证属于对应的适配包；本包的内存测试不代表 Bun、Deno、浏览器或 Electron 的线程结束行为已经被验证。
 

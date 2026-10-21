@@ -166,6 +166,8 @@ pnpm add @migaia/supervision
 
 监督器产生的错误带有 `source: '@migaia/supervision'` 和一个 `SupervisionErrorCode`；被包装的原始错误保留在 `cause` 上，清理失败可以通过 `errors` 找到。交给 `report` 的被动观察失败和迟到的检查失败保持原对象。状态和预算结果是返回值，不会作为错误抛出。
 
+启动器明确声明 `exit-observation: 'unsupported'` 时，强制终止后立即报告 `EXIT_UNOBSERVABLE` 并将该代记为 abandoned，不等待 `reapTimeoutMs`。诊断详情包含 kind、generation 和 capability。名额仍保留到真实退出，不能把无法观察当作已经退出；可观察退出但超时的路径仍报告 `REAP_TIMEOUT`，启动阶段的回收超时也保持原行为。
+
 `./process` 提供不经过 shell 的进程规格、能力检查、资源用量监控、有上限的输出尾部、持久的进程记录与回收、父进程断开保护，以及可选的有上限预热池。它只定义启动器接口，自己不创建操作系统进程。
 
 `./threads` 用同样的预算、重启、健康检查、替换和限时释放策略监督由启动器创建的线程。启动器把 `heap-limit` 和 `exit-observation` 声明为 `enforced` 或 `unsupported`；不能可靠观察退出的启动器必须配置健康检查。线程既不能隔离崩溃，也不能限制 CPU；需要这两项保证时选择进程。

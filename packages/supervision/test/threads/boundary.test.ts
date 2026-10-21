@@ -64,7 +64,8 @@ describe('thread boundary', () => {
       for (const statement of program.body) {
         const name = moduleSpecifier(statement)
         if (name === undefined) continue
-        if (name.startsWith('../')) expect(['../index.js', '../errors.js'], path).toContain(name)
+        if (name.startsWith('../'))
+          expect(['../index.js', '../errors.js', '../constants.js'], path).toContain(name)
         else if (name.startsWith('./')) expect(name, path).toMatch(/^\.\/[^/]+\.js$/)
         else {
           expect(name, path).toBe('@migaia/lifecycle')

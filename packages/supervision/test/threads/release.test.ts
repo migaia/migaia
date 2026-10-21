@@ -242,24 +242,43 @@ describe('thread resource release', () => {
       'exit-observation': 'unsupported'
     })
     const budget = createUnitBudget({ kind: ThreadUnitKind.thread, maxUnits: 1, scheduler })
+    /** The health callback's original exception must remain reachable after recovery abandonment. */
+    const healthFailure = new Error('health failed')
+    /** Both the recovery boundary and restart-policy diagnostic keep the primary failure. */
+    const reported: unknown[] = []
     const supervisor = createThreadSupervisor({
       id: 'health-release',
       spec: threadSpec(),
       launcher,
       budget,
       scheduler,
-      report: () => undefined,
+      report: (error) => {
+        reported.push(error)
+      },
       restart: { mode: 'never' },
       health: {
         intervalMs: 5_000,
         failureThreshold: 1,
-        check: () => Promise.reject(new Error('health failed'))
+        check: () => Promise.reject(healthFailure)
       }
     })
     await supervisor.start()
     scheduler.advance(5_000)
     await settle()
-    expect(supervisor.inspect().lastExit?.reason).toBe('unhealthy')
+    expect(supervisor.inspect().lastExit?.reason).toBe('abandoned')
+    /** Abandonment reports the observation boundary without losing the original health exception. */
+    const recoveryError = supervisor.inspect().lastExit?.error as Error & { code: string }
+    expect(recoveryError.code).toBe(SupervisionErrorCode.exitUnobservable)
+    expect(reported).toContain(recoveryError)
+    /** The coded health error remains the same primary used by the restart policy. */
+    const healthError = recoveryError.cause as Error & { code: string }
+    expect(healthError.code).toBe(SupervisionErrorCode.unhealthy)
+    expect(healthError.cause).toBe(healthFailure)
+    expect(supervisor.state).toBe('terminal')
+    expect(supervisor.inspect().terminalError).toMatchObject({
+      code: SupervisionErrorCode.supervisionExhausted,
+      cause: healthError
+    })
     await supervisor.dispose()
     expect(launcher.handles.every((handle) => !handle.alive)).toBe(true)
     expect(budget.inUse).toBe(0)
