@@ -4,7 +4,7 @@
  * implementations and cache retention have separate owners; source controls behavior where existing
  * package prose remains stale.
  */
-import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { storeKeyedCases } from './store-keyed-cases.js'
 
 /** Creates one bilingual sentence pair. */
@@ -72,6 +72,105 @@ console.log(values.forget('chat-1'))
 values.clear()
 totals.clear()
 store.dispose()`
+
+/** Family options control definition retention and labels, independently of store values. */
+const familyOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t(
+      'Keep only a small set of recent drafts strongly cached',
+      '只强保留少量最近访问的草稿定义'
+    ),
+    problem: t(
+      'An embedded editor visits many rooms but needs only two recent definitions kept strongly in its family cache. The default keeps up to 4096. Set `maxSize: 2`; older live definitions remain reusable through weak references, so retaining a token still preserves its identity.',
+      '嵌入式编辑器会访问许多房间，但定义族只需强保留最近两个定义。默认上限为 4096。设置 `maxSize: 2` 后，更早的存活定义仍可通过弱引用复用，持有令牌的代码不会失去原来的身份。'
+    ),
+    example: `import { familyDef } from '@migaia/store-keyed'
+
+const drafts = familyDef((room: string) => ({ room, text: '' }), { maxSize: 2 })
+const first = drafts('room-a')
+drafts('room-b')
+drafts('room-c')
+console.log(drafts.size, drafts('room-a') === first)
+drafts.clear()`,
+    result: t(
+      'The output is `2 true`: the strong cache stays bounded, and the retained first token is reused.',
+      '输出 `2 true`：强缓存保持在上限以内，先前持有的令牌仍被复用。'
+    ),
+    covers: ['maxSize']
+  },
+  {
+    title: t(
+      'Distinguish source and derived room values in diagnostics',
+      '在诊断信息里区分房间源值与派生值'
+    ),
+    problem: t(
+      'Several room families appear in the same diagnostics. Without custom labels, source tokens all use `family` and derived tokens use `derived-family`. Give each family a clear `debugLabel`; the key is appended in brackets, while values and dependencies keep their normal behavior.',
+      '同一份诊断信息里出现多个房间定义族。不设置标签时，所有源令牌都用 `family` 前缀，派生令牌都用 `derived-family`。为每个族设置清楚的 `debugLabel`，键会追加在方括号里；值和依赖关系仍按原有方式运行。'
+    ),
+    example: `import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, familyDef, derivedFamilyDef } from '@migaia/store-keyed'
+
+const unread = familyDef((room: string) => room.length, { debugLabel: 'unread-source' })
+const labels = derivedFamilyDef((room: string) => (get) => get(unread(room)), {
+  debugLabel: 'unread-label'
+})
+const store = createAtomStore(createRuntime())
+console.log(unread('ab').debugLabel, labels('ab').debugLabel)
+console.log(store.get(labels('ab')))
+store.set(unread('ab'), 5)
+console.log(store.get(labels('ab')))
+store.dispose()
+unread.clear()
+labels.clear()`,
+    result: t(
+      'The labels print `unread-source[ab] unread-label[ab]`. The derived value prints `2`, then `5` after the source changes.',
+      '标签输出 `unread-source[ab] unread-label[ab]`。派生值先输出 `2`，源值变化后输出 `5`。'
+    ),
+    covers: ['debugLabel']
+  }
+]
+
+/** Native error helpers retain both Error objects and structured application reasons. */
+const errorOptionCases = (name: string, native: string): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Keep a failed definition initializer', '保留定义初始化器的原始失败'),
+    problem: t(
+      'An adapter adds context to a failed initializer. A new error message alone loses the failure and its original stack. Set `cause` to keep that error available without changing its identity.',
+      '适配器需要为初始化器失败补充上下文。只创建新错误消息会丢失原始失败及其堆栈。把原始错误传给 `cause`，便能按原身份保留它。'
+    ),
+    example: `import { ${name}, StoreKeyedErrorCode } from '@migaia/store-keyed'
+
+const original = new Error('draft data could not be read')
+const error = ${name}(StoreKeyedErrorCode.invalidOption, 'draft initialization failed', {
+  cause: original
+})
+console.log(error instanceof ${native}, error.cause === original)`,
+    result: t(
+      'Both comparisons print `true`: the helper keeps its native error class and the exact original cause.',
+      '两个比较都输出 `true`：辅助函数保留原生错误类型，以及同一个原始原因。'
+    ),
+    covers: ['cause']
+  },
+  {
+    title: t('Keep the rejected input record', '保留被拒绝的输入记录'),
+    problem: t(
+      'A settings loader describes invalid family capacity with a record rather than an Error. Without `cause`, turning it into a message loses its fields. Pass the record directly so the caller can inspect it later.',
+      '设置加载器用记录对象说明族容量无效，而不是提供 Error。只把记录转成消息会丢失其中的字段。直接把记录传给 `cause`，调用方之后仍能检查它。'
+    ),
+    example: `import { ${name}, StoreKeyedErrorCode } from '@migaia/store-keyed'
+
+const reason = { field: 'maxSize', value: 0 }
+const error = ${name}(StoreKeyedErrorCode.invalidOption, 'family settings rejected', {
+  cause: reason
+})
+console.log(error.cause === reason)`,
+    result: t(
+      'The comparison prints `true`; the original input record remains on `error.cause`.',
+      '比较输出 `true`；原始输入记录保留在 `error.cause` 上。'
+    ),
+    covers: ['cause']
+  }
+]
 
 /** The public cache has no resource lifecycle; callers choose any eviction cleanup. */
 const cacheExample = `import { KeyedSplitCache } from '@migaia/store-keyed/optics'
@@ -1206,6 +1305,7 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
             )
           },
           optionDocs: causeOptions,
+          optionCases: errorOptionCases(name!, native!),
           returns: t(
             `A tagged native ${native}; the caller chooses whether to throw it.`,
             `返回已标记原生 \`${native}\`，由调用者决定是否抛出。`
@@ -1502,6 +1602,7 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
         '两种定义族工厂的构造设置，仅配置有界强保留及诊断命名。'
       ),
       example: familyExample,
+      optionCases: familyOptionCases,
       members: {
         maxSize: f(
           'Positive safe integer maximum number of strongly retained recent tokens; live weak canonical tokens can still be reused after LRU eviction.',
