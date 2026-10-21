@@ -7,6 +7,7 @@
 import {
   supervisionCases,
   supervisionOptionCases,
+  supervisionOptionFieldExamples as fieldExamples,
   supervisionOptionExamples as optionExamples
 } from './supervision-cases.js'
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
@@ -1204,32 +1205,18 @@ domains.SupervisionErrorText = {
   ),
   values: errors
 }
-/** Common policy examples use a complete cooperative service, shared by every profile. */
+/** Each common field has a short example at its own configuration boundary. */
 for (const [field, doc] of Object.entries(base)) {
-  const group = field.split('.')[0]
-  Object.assign(doc, {
-    example:
-      group === 'restart'
-        ? optionExamples.restart
-        : group === 'terminalPolicy'
-          ? optionExamples.terminal
-          : group === 'stop' || field === 'report'
-            ? optionExamples.stop
-            : group === 'health'
-              ? optionExamples.health
-              : field === 'isolation' || field === 'requires'
-                ? optionExamples.isolation
-                : optionExamples.ready
-  })
+  Object.assign(doc, { example: fieldExamples['base.' + field] })
 }
 Object.assign(report, {
   whenToUse: t(
-    'Supply a synchronous nonthrowing sink for contained failures. Here a failed drain is reported while retirement continues. Reporting does not retry work or complete shutdown; this callback is required.',
-    '提供同步、不抛错的失败接收器。本例排空失败会上报，退役仍继续。上报不会重试工作，也不会代替完成关闭；此回调为必填项。'
+    'Supply a synchronous nonthrowing sink for contained failures. A failed drain is reported while retirement continues. Reporting does not retry work or complete shutdown; this callback is required.',
+    '提供同步、不抛错的失败接收器。排空失败会上报，退役仍继续。上报不会重试工作，也不会代替完成关闭；此回调为必填项。'
   ),
   example: optionExamples.stop
 })
-Object.assign(scheduler, { example: optionExamples.ready })
+Object.assign(scheduler, { example: fieldExamples['base.scheduler'] })
 Object.assign(base.ready!, {
   whenToUse: t(
     'Set ready when creating a handle does not yet make its service usable. Resolve after the handshake; rejection fails startup and follows restart policy. Omit it to accept launch completion as readiness.',
@@ -1238,14 +1225,14 @@ Object.assign(base.ready!, {
 })
 Object.assign(base['restart.mode']!, {
   whenToUse: t(
-    'Use on-failure to retry crashes but stop after normal completion. never disables automatic retries; always also restarts normal exits. Omission selects on-failure. The example fails once, backs off, then becomes ready on the second launch.',
-    '崩溃后需要重试、正常结束后应停止时使用 on-failure。never 关闭自动重试，always 也会重启正常退出。省略时使用 on-failure。示例失败一次，退避后第二次启动就绪。'
+    'Use on-failure to retry crashes but stop after normal completion. never disables automatic retries; always also restarts normal exits. Omission selects on-failure. The task follows the configured backoff when a startup attempt fails.',
+    '崩溃后需要重试、正常结束后应停止时使用 on-failure。never 关闭自动重试，always 也会重启正常退出。省略时使用 on-failure。启动尝试失败后，任务按所配置的退避策略处理。'
   )
 })
 Object.assign(base['terminalPolicy.mode']!, {
   whenToUse: t(
-    'Choose stay when an operator must intervene after restart exhaustion. cooldown reopens admission after afterMs; the example compares both outcomes. Omitting terminalPolicy keeps the stay behavior. Disposal permanently closes either policy.',
-    '重启耗尽后需要人工介入时选择 stay；cooldown 在 afterMs 后重新准入，示例比较两种结果。省略 terminalPolicy 时保持等待。释放则永久关闭任一种策略。'
+    'Choose stay when an operator must intervene after restart exhaustion. cooldown reopens admission after afterMs. Omitting terminalPolicy keeps the stay behavior. Disposal permanently closes either policy.',
+    '重启耗尽后需要人工介入时选择 stay；cooldown 在 afterMs 后重新准入。省略 terminalPolicy 时保持等待。释放则永久关闭任一种策略。'
   )
 })
 for (const field of ['stop', 'stop.beforeTerminate'])
@@ -1258,8 +1245,8 @@ for (const field of ['stop', 'stop.beforeTerminate'])
 for (const field of ['health', 'health.check'])
   Object.assign(base[field]!, {
     whenToUse: t(
-      'Set health for a service that can become unresponsive without exiting. check resolves on success; rejection or timeout counts toward failureThreshold. The example stops after two failures. Omit health for no periodic checks; coroutine heartbeat cannot coexist with it.',
-      '服务可能不退出却失去响应时设置 health。check 成功时兑现，拒绝或超时累计到 failureThreshold。示例连续两次失败后停止。省略时不执行周期检查，协程心跳不能与它同时配置。'
+      'Set health for a service that can become unresponsive without exiting. check resolves on success; rejection or timeout counts toward failureThreshold. Reaching that threshold invalidates readiness. Omit health for no periodic checks; coroutine heartbeat cannot coexist with it.',
+      '服务可能不退出却失去响应时设置 health。check 成功时兑现，拒绝或超时累计到 failureThreshold。达到阈值后使就绪状态失效。省略时不执行周期检查，协程心跳不能与它同时配置。'
     )
   })
 Object.assign(base.isolation!, {
@@ -1270,42 +1257,35 @@ Object.assign(base.isolation!, {
 })
 for (const [field, doc] of Object.entries(launchFields))
   Object.assign(doc, {
-    example: field === 'launcher' ? optionExamples.processOutput : optionExamples.ready
+    example: fieldExamples['launch.' + field]
   })
 for (const [field, doc] of Object.entries(processFields)) {
   if (field === 'launcher' || field === 'spec' || field === 'budget') continue
   Object.assign(doc, {
-    example: field.startsWith('output')
-      ? optionExamples.processOutput
-      : field.startsWith('usage')
-        ? optionExamples.processUsage
-        : optionExamples.prewarm
+    example: fieldExamples['process.' + field]
   })
 }
 for (const field of ['output', 'output.onChunk'])
   Object.assign(processFields[field]!, {
     whenToUse: t(
-      'Set output to keep smaller diagnostic tails, and onChunk to observe drained bytes as they arrive. The synchronous observer returns void; a throw is reported without stopping the drain. Omission keeps 65536 bytes per stream and installs no observer. This example keeps def while observing the full abcdef chunk.',
-      '需要更小的诊断尾部时设置 output，需要随到随看排空字节时设置 onChunk。同步观察者返回空值，抛错会上报而不停止排空。省略时每条流保留 65536 字节，不安装观察者。本例保留 def，同时观察完整 abcdef 字节块。'
+      'Set output to keep smaller diagnostic tails, and onChunk to observe drained bytes as they arrive. The synchronous observer returns void; a throw is reported without stopping the drain. Omission keeps 65536 bytes per stream and installs no observer. The observer sees arriving bytes while the retained tail is bounded.',
+      '需要更小的诊断尾部时设置 output，需要随到随看排空字节时设置 onChunk。同步观察者返回空值，抛错会上报而不停止排空。省略时每条流保留 65536 字节，不安装观察者。观察者收到到达的字节，留存尾部仍受大小限制。'
     )
   })
 for (const [field, doc] of Object.entries(budgetOptions))
   Object.assign(doc, {
-    example:
-      field.startsWith('launchRate') || field === 'overflow'
-        ? optionExamples.budgetRate
-        : optionExamples.budgetQueue
+    example: fieldExamples['budget.' + field]
   })
 Object.assign(budgetOptions.overflow!, {
   whenToUse: t(
-    'Use reject for immediate overload feedback: full capacity returns full. queue waits in FIFO order until a slot or queueTimeoutMs; omission currently queues too. The rate example rejects overload, while the parent-budget example demonstrates a queued timeout.',
-    '需要立即反馈过载时使用 reject，容量满返回 full。queue 按先进先出等待名额或 queueTimeoutMs，当前省略也会排队。速率示例拒绝过载，父预算示例展示排队超时。'
+    'Use reject for immediate overload feedback: full capacity returns full. queue waits in FIFO order until a slot or queueTimeoutMs; omission currently queues too. The parent-budget example queues for at most five seconds; the rate example rejects overload immediately.',
+    '需要立即反馈过载时使用 reject，容量满返回 full。queue 按先进先出等待名额或 queueTimeoutMs，当前省略也会排队。父预算示例最多排队五秒，速率示例立即拒绝过载。'
   )
 })
 Object.assign(budgetOptions.launchRate!, {
   whenToUse: t(
-    'Configure max and windowMs to limit rapid starts even after prior slots are released. false disables that sliding grant window but retains maxUnits. Omission allows eight grants in 1000 ms. The example compares an unlimited rate with one grant per window.',
-    '前次名额已释放后仍需限制快速启动时，配置 max 与 windowMs。false 关闭滑动授予窗口，仍保留 maxUnits 并发限制。省略时 1000 毫秒允许八次授予。示例比较不限速与窗口内单次授予。'
+    'Configure max and windowMs to limit rapid starts even after prior slots are released. false disables that sliding grant window but retains maxUnits. Omission allows eight grants in 1000 ms. The example permits four grants per second.',
+    '前次名额已释放后仍需限制快速启动时，配置 max 与 windowMs。false 关闭滑动授予窗口，仍保留 maxUnits 并发限制。省略时 1000 毫秒允许八次授予。示例每秒允许四次授予。'
   )
 })
 
@@ -1579,7 +1559,7 @@ export const reference: ILibraryReference = {
           )
         },
         hooks: {
-          example: optionExamples.custom,
+          example: optionExamples.customHooks,
           ...p(
             'Optional `ISupervisionHooks` supplied by the outer adapter for adoption, attachment and diagnostics.',
             '外层适配器提供的可选 `ISupervisionHooks`，用于接管、附加和诊断。',
@@ -2394,8 +2374,8 @@ export const reference: ILibraryReference = {
           '未使用预热句柄退役前的最大空闲保留时长，须有限且非负；零表示立即到期。',
           t('`60000` milliseconds of idle retention.', '默认空闲最多保留 `60000` 毫秒。')
         ),
-        exitTimeoutMs: base['stop.exitTimeoutMs'],
-        reapTimeoutMs: base['stop.reapTimeoutMs']
+        exitTimeoutMs: { ...base['stop.exitTimeoutMs'], example: optionExamples.prewarmPolicy },
+        reapTimeoutMs: { ...base['stop.reapTimeoutMs'], example: optionExamples.prewarmPolicy }
       }
     },
     IPrewarmPool: {
