@@ -94,17 +94,23 @@ export const SerializeErrorText = {
  * and `instanceof` behavior.
  */
 export type ISerializeTaggedError<TError extends Error> = TError & {
+  /** Package identity retained alongside the native error type. */
   readonly source: string
+  /** Public serialize semantic failure code. */
   readonly code: ISerializeErrorCode
+  /** Optional caller diagnostic label, absent when none was supplied. */
   readonly context?: string
 }
+/** Native TypeError carrying serialize classification without losing instanceof behavior. */
 export type ISerializeTypeError = ISerializeTaggedError<TypeError>
+/** Native RangeError carrying serialize classification without losing instanceof behavior. */
 export type ISerializeRangeError = ISerializeTaggedError<RangeError>
 /**
  * Tagged native error for construction and lifecycle failures. Inherits `cause` from `Error` and
  * can carry `errors`.
  */
 export type ISerializeLifecycleError = ISerializeTaggedError<Error> & {
+  /** Optional frozen secondary-error snapshot from the factory; cause stays independent. */
   readonly errors?: readonly unknown[]
 }
 
@@ -175,8 +181,11 @@ export function createSerializeError(
   code: ISerializeErrorCode,
   message: string,
   options?: {
+    /** Original non-undefined failure retained through Error.cause. */
     readonly cause?: unknown
+    /** Optional operation label attached without changing error text. */
     readonly context?: string
+    /** Secondary failures copied into a frozen array; an empty array omits the property. */
     readonly errors?: readonly unknown[]
   }
 ): ISerializeLifecycleError {
@@ -196,7 +205,7 @@ export function createSerializeError(
 
 /**
  * Creates a native `TypeError` with the supplied code, for example `INVALID_OPTION` for an invalid
- * scheduler.
+ * scheduler. Optional context and non-undefined cause are retained; no input error is rewritten.
  */
 export function createSerializeTypeError(
   code: ISerializeErrorCode,
@@ -212,7 +221,7 @@ export function createSerializeTypeError(
 
 /**
  * Creates a native `RangeError` tagged for invalid input, such as an empty plugin list, duplicate
- * type, or illegal type.
+ * type, or illegal type. Optional context and non-undefined cause are retained by reference.
  */
 export function createSerializeRangeError(
   code: ISerializeErrorCode,

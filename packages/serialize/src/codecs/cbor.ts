@@ -58,9 +58,18 @@ function projectDecodedSafeIntegers(value: unknown, active = new Set<object>()):
 }
 
 /** Options for the deterministic CBOR codec factory. */
-export type ICborCodecOptions<TVersion extends number> = Readonly<{ version: TVersion }>
+export type ICborCodecOptions<TVersion extends number> = Readonly<{
+  /** Required positive safe integer codec revision; no default is supplied. */
+  version: TVersion
+}>
 
-/** Create an RFC-compatible CBOR codec for portable values. */
+/**
+ * Creates a frozen synchronous cbor codec through the optional peer imported by this subpath.
+ * Version must be a positive safe integer. Portable projection avoids records and host-specific
+ * encoder extensions; decoded bigint integers become numbers only when safely representable.
+ * Decoding then validates the portable profile without reviving inline bytes tags. Classified
+ * portable failures keep their code; other format failures retain a coded cause chain.
+ */
 export function defineCBORCodec<const TVersion extends number>(
   options: ICborCodecOptions<TVersion>
 ): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> {

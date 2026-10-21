@@ -143,7 +143,11 @@ function flow(value: IOutputValue, format: ISerializeTextFormat): string {
 
 /**
  * Emit one complete portable projection; invalid inputs never produce partial output or evaluate
- * getters.
+ * getters or toJSON hooks. Format defaults to json; yaml emits flow collections, and toml requires
+ * a record root and rejects null at any depth. Accepts finite scalar data, dense arrays, and
+ * ordinary/null-prototype own-data records; unsupported values, cycles, or accessors throw a coded
+ * TypeError INVALID_OPTION. This synchronous text emitter does not register a parser or persist
+ * data.
  */
 export function emitOutput(
   value: unknown,

@@ -6,10 +6,15 @@ import type { ICodecValue } from './codec.js'
 
 /** Factory tools keep binary detection and canonical base64url in the codec owner. */
 type IPortableWalkerContext = Readonly<{
+  /** Rejects through the strategy's violation policy while preserving the supplied cause. */
   reject: (reason: string, cause?: unknown) => never
+  /** Checks only the current invocation's ancestor path, not previously completed sibling values. */
   isAncestor: (value: object) => boolean
+  /** Canonical byte-brand check available to the caller's binary admission. */
   isUint8Array: typeof isUint8Array
+  /** Produces an unpadded base64url spelling for a strategy choosing inline bytes. */
   bytesToBase64url: typeof bytesToBase64url
+  /** Tests the full canonical unpadded spelling, including unused tail bits. */
   isCanonicalBase64url: typeof isCanonicalBase64url
   /** Invocation-owned rejection guard, absent when native binary needs no extra admission. */
   beforeNativeBinary?: () => never
@@ -52,28 +57,51 @@ type IPortableOwnedVisit = (
  * coded native error and retains the supplied original failure on cause.
  */
 export type IPortableWalkerStrategy = Readonly<{
+  /** Maximum root-zero traversal depth; defaults to Infinity, otherwise a nonnegative safe integer. */
   maxDepth?: number
+  /**
+   * Projects primitives or returns a value with a deferred violation; called before container
+   * admission.
+   */
   scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar | IPortablePrimitive
+  /**
+   * Supplies record entries and optional output/tag policy; undefined selects the array hook. An
+   * omitted record output validates in place, while a supplied output receives projected fields.
+   */
   record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined
+  /** Optional per-field admission before visiting a record child; defaults to accepting every key. */
   key?: (key: string, context: IPortableWalkerContext) => void
-  /** Output writes belong to the strategy's selected prototype and property semantics. */
+  /** Output field writer; defaults to defining a writable own enumerable data property. */
   write?: (output: Record<string, unknown>, key: string, child: unknown) => void
-  /** Native presence differs from inline bytes tags and never requires another child scan. */
+  /**
+   * Optional final projection, default identity; the boolean proves native rather than inline
+   * binary descendants.
+   */
   finish?: (value: unknown, hasNativeBinary: boolean) => unknown
+  /** Required error owner; must throw the caller's failure and retain an explicitly supplied cause. */
   violation: (reason: string, cause?: unknown) => never
 }> &
   (
     | Readonly<{
+        /**
+         * Optional array projector, default map; use visit for children instead of recursing in the
+         * strategy.
+         */
         array?: (
           value: unknown[],
           visit: (child: unknown) => unknown,
           context: IPortableWalkerContext
         ) => unknown[] | Readonly<{ value: unknown[]; length?: number; violation?: string }>
+        /** Mutually exclusive with the ordinary array hook. */
         arrayValue?: never
       }>
     | Readonly<{
+        /** Mutually exclusive with the raw arrayValue hook. */
         array?: never
-        /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */
+        /**
+         * Raw array projection with explicit visitor ownership; it replaces the ordinary array
+         * hook.
+         */
         arrayValue: (
           value: unknown[],
           visit: IPortableOwnedVisit,
@@ -87,10 +115,19 @@ export type IPortableWalkerStrategy = Readonly<{
   ) &
   (
     | Readonly<{
+        /**
+         * Returns inline base64url text for binary input, or undefined to continue container
+         * admission.
+         */
         binary: (value: object, context: IPortableWalkerContext) => string | undefined
+        /** Native storage cannot be returned without its intrinsic length reader. */
         nativeByteLength?: never
       }>
     | Readonly<{
+        /**
+         * Returns inline text or borrowed native storage, retaining native identity; undefined
+         * selects containers.
+         */
         binary: (
           value: object,
           context: IPortableWalkerContext
@@ -100,7 +137,12 @@ export type IPortableWalkerStrategy = Readonly<{
       }>
   )
 
-/** The ordinary function returns fused metadata; value uses the same traversal without boxing it. */
+/**
+ * Callable projection returning a frozen metadata record: value, conservative byteUpperBound, and
+ * hasBinary for inline or native bytes. Optional active ancestors are caller-owned, initialDepth
+ * defaults to zero, and a per-call native guard is exposed to strategy admission. The value method
+ * uses the same traversal without allocating metadata; payload freezing belongs to the strategy.
+ */
 type IPortableWalker = {
   (
     value: unknown,
@@ -173,6 +215,8 @@ function writePortableOwnField(output: Record<string, unknown>, key: string, chi
  * Create one specialized synchronous walker. Policy callbacks and context are bound once. Node
  * accounting stays in primitive invocation slots instead of allocating a result/context per node.
  * Nested calls save/restore the slots in finally; no caller graph survives a completed invocation.
+ * Returns both a metadata-producing callable and its value-only method. The strategy owns shape,
+ * prototype, binary, and error policies; this factory does not impose a single portable profile.
  */
 export function createPortableWalker(strategy: IPortableWalkerStrategy): IPortableWalker {
   /** Capture strategy choices once; recursive dispatch never reads a consumer profile. */
@@ -677,18 +721,32 @@ const validatePortable = /* @__PURE__ */ createPortableWalker(assertionStrategy)
 /** Format codecs share the single fused default instance. */
 const normalizeCodecPortable = /* @__PURE__ */ createPortableWalker(codecStrategy)
 
-/** Assert the legacy decoded portable profile without replacing or freezing caller data. */
+/**
+ * Validates the decoded portable profile in place without cloning or freezing. Finite primitives,
+ * arrays, ordinary/null-prototype records, and legacy bytes tags are accepted; unsupported values
+ * or cycles throw INVALID_OPTION. Getters are observed, and access failures may pass through for an
+ * enclosing codec to normalize. Optional active supplies an existing ancestor set, initially
+ * empty.
+ */
 export function assertPortableValue(value: unknown, active = new Set<object>()): void {
   validatePortable.value(value, active)
 }
 
-/** Validate and narrow a decoded format value while preserving its original identity. */
+/**
+ * Validates using assertPortableValue and returns the exact original value as ICodecValue; byte
+ * tags remain records.
+ */
 export function asCodecValue(value: unknown): ICodecValue {
   assertPortableValue(value)
   return value as ICodecValue
 }
 
-/** Preserve the legacy intermediate projection with a thin default walker instance. */
+/**
+ * Builds the legacy mutable projection: record keys are visited in sorted order and Uint8Array
+ * becomes a bytes-tag record. Getters run, repeated sibling references are copied separately, and
+ * cycles or unsupported binary containers reject. This intermediate projection may still contain
+ * values outside ICodecValue; use asCodecValue or a format codec for final portable validation.
+ */
 export function toPortableValue(value: unknown, active = new Set<object>()): unknown {
   return projectPortable.value(value, active)
 }

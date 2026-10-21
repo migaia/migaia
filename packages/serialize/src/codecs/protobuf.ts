@@ -6,7 +6,12 @@ import { assertCodecVersion, createCodecError } from '../internal/codec.js'
 
 /** Stable public schema identity remains independent from codec and binding versions. */
 export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{
+  /**
+   * Required stable schema name matching a lowercase letter followed by lowercase letters, digits,
+   * dots, or hyphens.
+   */
   id: TId
+  /** Required positive safe integer schema revision, distinct from the codec revision. */
   version: TVersion
 }>
 
@@ -17,12 +22,24 @@ export type IProtobufCodecOptions<
   TSchemaVersion extends number,
   TBinding extends DescMessage
 > = Readonly<{
+  /** Required positive safe integer codec revision; no default is inserted. */
   version: TVersion
+  /** Required schema identity copied into a frozen descriptor when the codec is created. */
   schema: IProtobufSchema<TSchemaId, TSchemaVersion>
+  /**
+   * Generated Buf message descriptor used by toBinary/fromBinary; not arbitrary encode/decode
+   * callbacks.
+   */
   binding: TBinding
 }>
 
-/** Create a protobuf codec that keeps codec and schema identities independent. */
+/**
+ * Creates a frozen synchronous protobuf codec from a generated Buf message descriptor and explicit
+ * codec/schema revisions. The optional Protobuf peer is imported only by this subpath. Invalid
+ * versions, schema identity, or binding admission throws INVALID_OPTION; binary encode/decode
+ * failures retain the original cause under the format error code. Schema fields are snapshotted,
+ * while the executable descriptor and message semantics remain owned by the generated binding.
+ */
 export function defineProtobufCodec<
   const TVersion extends number,
   const TSchemaId extends string,

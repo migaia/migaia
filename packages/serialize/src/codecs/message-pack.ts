@@ -11,9 +11,18 @@ import {
 import { assertCodecVersion } from '../internal/codec.js'
 
 /** Options for the MessagePack codec factory. */
-export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{ version: TVersion }>
+export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{
+  /** Required positive safe integer revision, independent of the peer library version. */
+  version: TVersion
+}>
 
-/** Create an extension-free MessagePack codec for portable values. */
+/**
+ * Creates a frozen synchronous message-pack codec using the optional MessagePack peer imported by
+ * this subpath. Version is required and must be a positive safe integer. Encoding normalizes
+ * portable values and sorts keys without format extensions; decoding validates the result and
+ * leaves inline bytes tags as records. Classified portable errors retain their code; other
+ * encode/decode failures are coded with the original cause.
+ */
 export function defineMessagePackCodec<const TVersion extends number>(
   options: IMessagePackCodecOptions<TVersion>
 ): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> {

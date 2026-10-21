@@ -9,12 +9,13 @@ import {
 } from '../errors.js'
 import { SerializeChunkKind, SerializePluginType } from '../format-constants.js'
 
+/** Native JSON callback and text-decoding options, captured when a parser is created. */
 export type IJsonPluginOptions = {
-  /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */
+  /** Optional JSON.stringify replacer, default undefined; owns any application-specific projection. */
   readonly replacer?: (key: string, value: unknown) => unknown
-  /** Passed to `JSON.parse` to restore rich values such as dates. */
+  /** Optional JSON.parse reviver, default undefined; restoration policy belongs to this callback. */
   readonly reviver?: (key: string, value: unknown) => unknown
-  /** Debug indentation. Omit in production to avoid increasing payload size. */
+  /** Optional JSON.stringify indentation, default undefined; native JSON spacing rules apply. */
   readonly space?: number
   /**
    * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding
@@ -29,9 +30,11 @@ const hostTextDecoder = (): ITextDecoder | undefined => {
 }
 
 /**
- * Default JSON parser using V8's optimized native JSON implementation. Earlier measurements
- * identify JSON as the fastest tested path when consumers require a main-thread object graph. Use
- * another parser for byte passthrough or a format that JSON cannot represent.
+ * Creates a synchronous parser delegating to host JSON.stringify/JSON.parse, with options
+ * defaulting to an empty record. Encoding returns one text chunk and follows native JSON projection
+ * rules, without portable-codec validation. Decode passes value chunks through unchanged, parses
+ * text, or uses an injected/host decoder for bytes. Missing byte-decoding capability throws
+ * ENV_UNSUPPORTED; encode/parse failures retain coded native errors and original causes.
  */
 export function jsonParser(options: IJsonPluginOptions = {}): ISerializeParser {
   const { replacer, reviver, space, decoder } = options
@@ -89,6 +92,10 @@ export function jsonParser(options: IJsonPluginOptions = {}): ISerializeParser {
   }
 }
 
+/**
+ * Creates a fresh json routing plugin and parser; options default to the native JSON parser
+ * defaults.
+ */
 export const jsonPlugin = (options: IJsonPluginOptions = {}): ISerializePlugin => ({
   type: SerializePluginType.json,
   parser: jsonParser(options)

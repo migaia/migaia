@@ -352,7 +352,9 @@ async function collectChunks(
 
 /**
  * Converts text or byte chunks to text using the required `decoder`. Value chunks reject because
- * they have no text form.
+ * they have no text form. Text returns unchanged; byte decoding delegates to the supplied receiver.
+ * Decoder failures retain coded native identity where possible, and value rejection is
+ * INVALID_CHUNK.
  */
 export function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): string {
   if (chunk[0] === SerializeChunkKind.text) return chunk[1]
@@ -375,7 +377,8 @@ export function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): stri
 
 /**
  * Converts text or byte chunks to bytes using the required `encoder`, for transfer, IndexedDB, or
- * Wasm. Value chunks reject.
+ * Wasm. Existing bytes are copied to a new Uint8Array; text delegates to the supplied encoder.
+ * Encoder failures retain coded native identity where possible; value chunks reject INVALID_CHUNK.
  */
 export function chunkToBytes(chunk: ISerializeChunk, encoder: ITextEncoder): Uint8Array {
   if (chunk[0] === SerializeChunkKind.bytes) return new Uint8Array(chunk[1])
@@ -858,6 +861,14 @@ const snapshotPlugin = (
   }
 }
 
+/**
+ * Creates a multi-format parser owner from a nonempty plugin list. First type is the default for
+ * writes and reads; persist a separate type token when data outlives a default-format change.
+ * Construction captures options and parser methods before acquiring ownership, rejects duplicate or
+ * malformed plugins, and requires injected or host Encoding API capabilities. Operations assemble
+ * chunks and race cancellation while retaining underlying work for drain. Call close to stop
+ * admission, then await the shared dispose Promise to drain and release unique parser owners.
+ */
 export function createSerializeRegistry(
   plugins: readonly ISerializePlugin[],
   options?: ISerializeRegistryOptions
