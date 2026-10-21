@@ -6,7 +6,11 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { pluginHostReference } from './plugin-host.js'
-import { storeMiddlewareCases } from './store-middleware-cases.js'
+import {
+  storeMiddlewareCases,
+  storeMiddlewareOptionCases,
+  storeMiddlewareOptionExamples
+} from './store-middleware-cases.js'
 
 /** Builds localized prose without a fallback language. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -834,6 +838,40 @@ export const storeMiddlewareReference: ILibraryReference = {
     },
     createStoreMiddlewareError: {
       role: 'operation',
+      optionCases: [
+        {
+          title: t('Keep an earlier exception', '保留先前异常'),
+          problem: t(
+            'A more specific middleware error should retain the failure that triggered it. Pass cause; omission leaves no original cause.',
+            '更具体的中间件错误需要保留触发它的失败。传入 cause；省略时不附原始原因。'
+          ),
+          example: `import { createStoreMiddlewareError, StoreMiddlewareErrorCode } from '@migaia/store-middleware'
+const cause = new TypeError('snapshot invalid')
+const error = createStoreMiddlewareError(StoreMiddlewareErrorCode.callbackFailed, 'capture failed', { cause })
+console.log(error.cause === cause)`,
+          result: t(
+            'Prints true; the original exception remains reachable.',
+            '输出 true；仍可找到原始异常。'
+          ),
+          covers: ['cause']
+        },
+        {
+          title: t('Keep structured failure details', '保留结构化失败详情'),
+          problem: t(
+            'An application can report a structured failure value instead of Error. cause retains that value without converting it to message text.',
+            '应用可能返回结构化失败值，而非 Error。cause 保留该值，无需转为消息文本。'
+          ),
+          example: `import { createStoreMiddlewareError, StoreMiddlewareErrorCode } from '@migaia/store-middleware'
+const cause = { field: 'quantity', value: -1 }
+const error = createStoreMiddlewareError(StoreMiddlewareErrorCode.invalidOption, 'invalid quantity', { cause })
+console.log(error.cause === cause)`,
+          result: t(
+            'Prints true; the details retain their identity.',
+            '输出 true；详情保留原有身份。'
+          ),
+          covers: ['cause']
+        }
+      ],
       purpose: t(
         'Constructs a native Error tagged with STORE_MIDDLEWARE_SOURCE and the chosen code, retaining stack and optional original cause without replacing native error behavior.',
         '构造带规范中间件来源及所选码的原生错误，保留堆栈与可选原始原因，不替换原生错误行为。'
@@ -1056,11 +1094,25 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         '外包插件宿主选项加存储状态能力，执行预算仍必填，选项快照期间流水线强制同步。'
       ),
       example: hostExample,
+      optionCases: storeMiddlewareOptionCases.host,
       members: {
         ...pluginHostReference.types.IPluginHostOptions!.members,
+        onDiagnosticFailure: {
+          ...pluginHostReference.types.IPluginHostOptions!.members.onDiagnosticFailure!,
+          whenToUse: t(
+            'Set it to observe a diagnostic callback that throws or rejects. Without it, the failure goes to globalThis.reportError when available; host operations keep their own result.',
+            '需要观察诊断回调的抛错或拒绝时设置。不设时交给可用的 globalThis.reportError；宿主操作保留自身结果。'
+          ),
+          example: storeMiddlewareOptionExamples.diagnostic
+        },
         runtime: domainMembers.runtime!,
         getState: {
           ...domainMembers.getState!,
+          whenToUse: t(
+            'Supply this required reader for an application-owned state source. It runs when a plugin or adapter requests state; it does not clone automatically.',
+            '接入应用持有的状态来源时提供这个必填读取器。插件或适配器请求状态时调用，不会自动克隆。'
+          ),
+          example: storeMiddlewareOptionExamples.state,
           summary: t(
             'Required synchronous zero-argument getter invoked when plugins or adapters need state. Return S; throws propagate through the invoking API.',
             '插件或适配器需要状态时调用的必填同步无参数读取器，返回状态，抛错经调用接口传播。'
@@ -1068,6 +1120,11 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         },
         applyState: {
           ...domainMembers.applyState!,
+          whenToUse: t(
+            'Supply a synchronous writer when DevTools may replace state. Omitting it rejects state replacement commands with DEVTOOLS_CAPABILITY.',
+            '允许 DevTools 替换状态时提供同步写入器。省略时，状态替换命令以 DEVTOOLS_CAPABILITY 拒绝。'
+          ),
+          example: storeMiddlewareOptionExamples.state,
           summary: t(
             'Optional synchronous callback receiving a replacement state from jump/reset. Return nothing; callback throws propagate through command delivery.',
             '可选同步回调，接收跳转或重置替代状态，无需返回值，抛错经命令交付传播。'
@@ -1095,6 +1152,11 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
           )
         },
         'pipeline.mode': {
+          whenToUse: t(
+            'Store hosts always force sync. Setting async, generator, or async-generator does not change their mode; omitting pipeline still installs a sync pipeline. Use synchronous usePipeline stages.',
+            '存储宿主始终强制 sync。设置 async、generator 或 async-generator 也不会改变模式；省略 pipeline 仍安装同步流水线。步骤使用同步 usePipeline。'
+          ),
+          example: storeMiddlewareOptionExamples.state,
           summary: t(
             'Always overwritten with sync by the Store host constructor.',
             '始终被存储宿主构造函数覆盖为同步。'
@@ -1118,6 +1180,7 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         '存储绑定的必填外包执行预算及可选策略共享、动作前缀筛选及快照复制。'
       ),
       example: bindingExample,
+      optionCases: storeMiddlewareOptionCases.binding,
       members: {
         execution: pluginHostReference.types.IPluginHostOptions!.members.execution!,
         'execution.mutationTimeoutMs':
@@ -1140,6 +1203,10 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
           '`undefined`：不筛选前缀，转发全部动作追踪。'
         ),
         clone: {
+          whenToUse: t(
+            'Set a synchronous clone to redact or choose snapshot copying. It runs at binding, reads, and state changes. Without it, diagnostic cloning may retain unsupported values by reference and does not redact.',
+            '需要脱敏或选择快照复制方式时设置同步 clone。绑定、读取和状态变化时都会调用。不设时尽力克隆诊断数据，可能共享不支持的值，也不会脱敏。'
+          ),
           summary: t(
             'Synchronous callback receiving the Store plain record on initial capture, reads and state changes. Return a snapshot record; throw aborts that capture and no async result is awaited.',
             '同步接收初始捕获、读取及状态变更时的存储普通记录，返回快照记录，抛错终止该次捕获，不等待异步结果。'
@@ -1158,7 +1225,7 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
             '`state => ClonePolicy.diagnostic(state)`, retaining unsupported subtree references when necessary.',
             '`state => ClonePolicy.diagnostic(state)`：必要时保留不支持子树引用。'
           ),
-          example: bindingExample
+          example: storeMiddlewareOptionExamples.capture
         }
       }
     },

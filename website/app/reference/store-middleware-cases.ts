@@ -1,7 +1,218 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
 
 /** Keeps each localized explanation beside one complete public-entry example. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Complete option examples exercise the Store host rather than a generic PluginHost. */
+export const storeMiddlewareOptionExamples = {
+  state: `import { createRuntime } from '@migaia/reactive'
+import { createStoreMiddlewareHost, createMutationPolicy, createReduxDevToolsAdapter, type IReduxDevToolsMessage } from '@migaia/store-middleware'
+let state = { count: 0 }
+const runtime = createRuntime()
+const mutationPolicy = createMutationPolicy('actions-only')
+const host = createStoreMiddlewareHost({
+  identity: { name: 'cart' },
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'sync' },
+  runtime, mutationPolicy,
+  getState: () => state,
+  applyState: (next) => { state = next }
+})
+let receive: (message: IReduxDevToolsMessage) => void = () => {}
+await host.connectDevTools(createReduxDevToolsAdapter({
+  init: (_state: typeof state) => {},
+  send: (_action: unknown, _state: typeof state) => {},
+  subscribe: (listener) => { receive = listener; return () => {} }
+}, runtime))
+receive({ type: 'DISPATCH', payload: { type: 'JUMP_TO_STATE' }, state: '{"count":3}' })
+console.log(host.identity.name, host.pipelineMode, state.count)
+await host.dispose()`,
+  queue: `import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/testing'
+import { createStoreMiddlewareHost } from '@migaia/store-middleware'
+const scheduler = createManualScheduler()
+const host = createStoreMiddlewareHost({
+  runtime: createRuntime(), getState: () => ({ count: 0 }),
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  queueAdmissionTimeoutMs: 20, scheduler
+})
+await host.use({ name: 'cart', install: () => ({ ready: true }) })
+console.log(host.identity.name, host.pipelineMode)
+await host.dispose()`,
+  diagnostic: `import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/testing'
+import { createStoreMiddlewareHost } from '@migaia/store-middleware'
+const scheduler = createManualScheduler()
+const failures: string[] = []
+const host = createStoreMiddlewareHost({
+  runtime: createRuntime(), getState: () => ({ count: 0 }),
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  queueAdmissionDiagnosticMs: 10, scheduler,
+  diagnostic: () => { throw new Error('diagnostic unavailable') },
+  onDiagnosticFailure: (error) => { failures.push((error as Error).message) }
+})
+let late = () => {}
+host.usePipeline((event, next) => { late = () => { next(event) } })
+host.recordState('cart/update', { count: 0 }, { count: 1 })
+late()
+console.log(failures)
+await host.dispose()`,
+  cleanup: `import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/testing'
+import { createStoreMiddlewareHost } from '@migaia/store-middleware'
+const scheduler = createManualScheduler()
+const started = Promise.withResolvers<void>()
+const release = Promise.withResolvers<void>()
+const host = createStoreMiddlewareHost({
+  runtime: createRuntime(), getState: () => ({ count: 0 }),
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  disposeStepTimeoutMs: 10, scheduler
+})
+await host.use({ name: 'slow', install: () => ({}), dispose: () => {
+  started.resolve(); return release.promise
+} })
+const closing = host.dispose()
+await started.promise
+scheduler.advance(11)
+const result = await closing
+console.log(result.cleanupComplete)
+release.resolve()
+await result.physicalCompletion`,
+  binding: `import { createStore } from '@migaia/store-light'
+import { bindStoreMiddleware, createMutationPolicy } from '@migaia/store-middleware'
+const mutationPolicy = createMutationPolicy('actions-only')
+const store = createStore({ count: 0 }, { mutationPolicy })
+const host = bindStoreMiddleware(store, {
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  mutationPolicy
+})
+host.runAction('cart/set', () => { store.count = 2 })
+console.log(store.count)
+await host.dispose()
+store.$dispose()`,
+  capture: `import { createStore } from '@migaia/store-light'
+import { bindStoreMiddleware, loggerMiddleware } from '@migaia/store-middleware'
+const store = createStore({ count: 0, email: 'ada@example.com' })
+const host = bindStoreMiddleware(store, {
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  actionPrefix: 'cart/',
+  clone: (state) => ({ ...structuredClone(state), email: '[redacted]' })
+})
+const names: string[] = []
+let captured: unknown
+await host.use(loggerMiddleware((event, state) => {
+  captured = state
+  if (event.type === 'action' && event.phase === 'end') names.push(event.name)
+}))
+store.$runtime.runTracedAction('other/save', () => {})
+store.$runtime.runTracedAction('cart/save', () => {})
+console.log(names, (captured as { email: unknown }).email, store.email)
+await host.dispose()
+store.$dispose()`
+}
+
+/** Related option fields stay together in small, observable Store workflows. */
+export const storeMiddlewareOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  host: [
+    {
+      title: t('Connect application state', '接入应用状态'),
+      problem: t(
+        'A custom state source needs a host for reads and DevTools replacements. runtime and getState are required; applyState enables replacements. Give diagnostics a name and share the mutation policy with guarded consumers. Store pipelines always run synchronously.',
+        '自定义状态来源需要宿主提供读取和 DevTools 状态替换。runtime 与 getState 必填；applyState 启用替换。为诊断命名，并与受保护的使用者共享写入策略。存储流水线始终同步运行。'
+      ),
+      example: storeMiddlewareOptionExamples.state,
+      result: t(
+        'Prints cart sync 3; the replacement reaches the application state.',
+        '输出 cart sync 3；替换值已写入应用状态。'
+      ),
+      covers: [
+        'runtime',
+        'getState',
+        'applyState',
+        'mutationPolicy',
+        'identity',
+        'identity.name',
+        'execution',
+        'execution.mutationTimeoutMs',
+        'execution.pipelineDrainTimeoutMs',
+        'pipeline',
+        'pipeline.mode'
+      ]
+    },
+    {
+      title: t('Set an admission budget for interactive changes', '为交互式变更设置接纳预算'),
+      problem: t(
+        'An interactive host should reject a queued change that waits longer than 20 ms. Without queueAdmissionTimeoutMs, waiting is unlimited. This configures that budget and installs one immediately available plugin; it does not interrupt an install that already started.',
+        '交互式宿主需要拒绝排队超过 20 毫秒的变更。不设置 queueAdmissionTimeoutMs 时，等待没有上限。这里配置预算并安装一个可以立即开始的插件；预算不会中断已经开始的安装。'
+      ),
+      example: storeMiddlewareOptionExamples.queue,
+      result: t(
+        'Prints DEFAULT sync; the immediately admitted plugin installs successfully. No queue timeout occurs in this run.',
+        '输出 DEFAULT sync；立即接纳的插件安装成功。本次运行没有发生排队超时。'
+      ),
+      covers: ['queueAdmissionTimeoutMs', 'scheduler']
+    },
+    {
+      title: t('Keep a failing diagnostic sink observable', '观察诊断接收方自身的失败'),
+      problem: t(
+        'The diagnostic channel receives late next() calls and long queue waits. queueAdmissionDiagnosticMs changes the wait-warning threshold from 1000 ms to 10 ms without rejecting queued work. onDiagnosticFailure receives a failing diagnostic callback. This example triggers that same channel with a late next() call.',
+        '诊断通道接收迟到的 next() 调用和长时间排队提示。queueAdmissionDiagnosticMs 把等待提示阈值从 1000 毫秒改为 10 毫秒，不拒绝排队工作。onDiagnosticFailure 接收诊断回调自身的失败。这里用迟到的 next() 调用触发同一通道。'
+      ),
+      example: storeMiddlewareOptionExamples.diagnostic,
+      result: t(
+        "Prints ['diagnostic unavailable']; failure of the diagnostic callback reaches the configured receiver.",
+        "输出 ['diagnostic unavailable']；诊断回调的失败交给配置的接收方。"
+      ),
+      covers: ['queueAdmissionDiagnosticMs', 'diagnostic', 'onDiagnosticFailure', 'scheduler']
+    },
+    {
+      title: t('Bound one slow cleanup step', '限制单个慢速清理步骤'),
+      problem: t(
+        'A plugin disposer may keep waiting after its screen closes. disposeStepTimeoutMs limits the ordinary cleanup wait; the default is 5000 ms and false removes the limit. The underlying Promise remains owned until it settles.',
+        '页面关闭后，插件释放函数可能仍在等待。disposeStepTimeoutMs 限制普通清理等待；默认为 5000 毫秒，false 关闭限制。底层 Promise 仍被持有，直到它结算。'
+      ),
+      example: storeMiddlewareOptionExamples.cleanup,
+      result: t(
+        'Prints false while physical cleanup is pending; resolving release finishes physicalCompletion.',
+        '物理清理未完成时输出 false；放行后 physicalCompletion 完成。'
+      ),
+      covers: ['disposeStepTimeoutMs', 'scheduler']
+    }
+  ],
+  binding: [
+    {
+      title: t('Share a strict Store policy', '共享严格的 Store 策略'),
+      problem: t(
+        'A Store guarded by actions-only must use the exact same mutation policy as its binding. Otherwise host.runAction does not grant that Store permission. Required execution budgets bound plugin changes and draining.',
+        '采用 actions-only 守卫的 Store 必须与绑定使用同一个写入策略对象。否则 host.runAction 不会授予该 Store 写入许可。必填执行预算限制插件变更和排空。'
+      ),
+      example: storeMiddlewareOptionExamples.binding,
+      result: t(
+        'Prints 2; the shared policy permits this action.',
+        '输出 2；共享策略允许这次动作。'
+      ),
+      covers: [
+        'execution',
+        'execution.mutationTimeoutMs',
+        'execution.pipelineDrainTimeoutMs',
+        'mutationPolicy'
+      ]
+    },
+    {
+      title: t('Filter actions and redact snapshots', '筛选动作并脱敏快照'),
+      problem: t(
+        'A support panel needs cart actions and snapshots without email addresses. Without actionPrefix, all runtime actions are forwarded; default cloning does not redact. clone changes diagnostic snapshots, while actionPrefix filters action names only.',
+        '支持面板需要购物车动作和隐藏邮箱的快照。不设 actionPrefix 时转发全部运行时动作；默认克隆不会脱敏。clone 修改诊断快照，actionPrefix 只筛选动作名。'
+      ),
+      example: storeMiddlewareOptionExamples.capture,
+      result: t(
+        "Prints ['cart/save'], [redacted], and the live ada@example.com address.",
+        "输出 ['cart/save']、[redacted] 和存活存储中的 ada@example.com。"
+      ),
+      covers: ['actionPrefix', 'clone']
+    }
+  ]
+}
 
 /** Store-domain middleware tasks with explicit ownership and deterministic output. */
 export const storeMiddlewareCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
