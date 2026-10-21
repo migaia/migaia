@@ -49,6 +49,14 @@ export const ResourceErrorText = {
   retryDelayInvalid: 'resource retry delay must be a non-negative finite number',
   /** Explains that a boolean constructor option received a non-boolean value. */
   booleanOptionInvalid: 'resource boolean option must be boolean',
+  /** Explains that `createResource()` needs a setup callback that returns a fetcher function. */
+  setupInvalid: 'resource setup must be a function that returns a fetcher function',
+  /** Explains that setup cleanups can only be registered while setup runs. */
+  setupClosed: 'resource setup context is closed; register onDispose during setup',
+  /** Explains that `subscribe()` received a non-function listener. */
+  listenerInvalid: 'resource subscribe listener must be a function',
+  /** Explains that `select()` received a non-function selector. */
+  selectorInvalid: 'resource select selector must be a function',
   /** Explains that the debug name constructor option received a non-string value. */
   debugNameInvalid: 'resource debugName must be a string'
 } as const

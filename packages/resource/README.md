@@ -128,6 +128,18 @@ export function disposeUserPanel(): void {
 
 依赖收集只覆盖 fetcher 返回 Promise 之前的同步阶段。上例先把 `userId.value` 读进 `id`，再调用异步 API；如果等到 `await` 之后才读取 `userId.value`，JavaScript 的同步追踪上下文已经结束，这次读取不会建立自动刷新关系。`disposeUserPanel()` 则按消费方向反向释放：先停止渲染 Effect，再终止 Resource，最后释放输入 Signal。
 
+### 函数式构建
+
+不想手写 `new Resource(fetcher, runtime)` 时，用 `createResource(setup, options)`：`setup` 拿到 `runtime`、`signal` 和 `onDispose`，返回 fetcher；`runtime` 省略时使用默认 Runtime。返回的实例还提供 `mutate()`（本地写入数据）、`subscribe()`（图外订阅状态）、`select()`（派生值）和 `using` 支持。详见 USEGUIDE。
+
+```ts
+const user = createResource(({ onDispose }) => {
+  const socket = connect()
+  onDispose(() => socket.close())
+  return ({ signal }) => fetchUser(userId.value, { signal })
+})
+```
+
 ## 5. 核心概念一览
 
 | 概念                   | 是什么                                                                                                                                                                |

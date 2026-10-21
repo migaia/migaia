@@ -162,6 +162,37 @@ dispose(): void;
 
 <a id="配置项"></a>
 
+## `createResource(setup, options)`
+
+函数式构建 `Resource`。`setup` 只同步执行一次，拿到 `{ runtime, scheduler, signal, debugName, onDispose }`，返回 fetcher；数据类型从 fetcher 推导。`options` 就是 `IResourceOptions` 加上可选的 `runtime`（默认 `@migaia/reactive` 的 `defaultRuntime`）。
+
+```ts
+import { createResource } from '@migaia/resource'
+
+const user = createResource(({ onDispose }) => {
+  const socket = connect()
+  onDispose(() => socket.close())
+  return ({ signal }) => fetchUser(userId.value, { signal })
+}, { ttl: 30_000 })
+```
+
+- `onDispose` 注册的清理在 `dispose()` 时按注册的逆序执行，`signal` 同时中止。
+- `setup` 抛错、返回值不是函数（`RESOURCE_SETUP_INVALID`）或选项非法时，先中止 `signal`、逆序执行已注册清理，再重抛原始错误；清理失败挂在 `errors` 上。
+- `setup` 返回后再调用 `onDispose` 会抛 `RESOURCE_SETUP_CLOSED`，避免泄漏。
+
+配合 `ConfigOwner.fromAsync` 得到配置资源：
+
+```ts
+const config = createResource(() => ({ signal }) => ConfigOwner.fromAsync(fetch(url, { signal }).then((r) => r.text())))
+```
+
+### `mutate()` / `subscribe()` / `select()` / `using`
+
+- `mutate(next | (previous) => next)`：本地写入成功数据（乐观更新、推送），取代进行中的请求，重新开始 TTL，返回 `this`。函数类型的数据需要包在 updater 里。
+- `subscribe(listener)`：在响应式图之外接收状态，立即回调一次，之后每次变化回调；监听器异常通过 `runtime.reportError` 报告。返回幂等的取消函数，`dispose()` 时自动取消。
+- `select(selector)`：基于成功数据的派生 computed，非成功状态时为 `undefined`，随资源一起释放。
+- `[Symbol.dispose]()`：支持 `using resource = createResource(...)`。
+
 ## 配置项 `IResourceOptions`
 
 ```ts

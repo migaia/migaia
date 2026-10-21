@@ -74,7 +74,21 @@ export const ResourceErrorCode = {
    * Already classified failures retain their originating package. Inspect the request failure
    * instead of treating it as cancellation or an invalid option.
    */
-  fetchFailed: 'FETCH_FAILED'
+  fetchFailed: 'FETCH_FAILED',
+
+  /**
+   * `createResource()` received a non-function setup, or setup returned something other than a
+   * fetcher function. Registered setup cleanups have already run. Pass a setup callback that
+   * returns `(ctx) => data | Promise<data>`.
+   */
+  setupInvalid: 'RESOURCE_SETUP_INVALID',
+
+  /**
+   * `onDispose()` was called on a setup context after setup returned (for example from an escaped
+   * context inside an async callback). The cleanup is rejected instead of leaking. Register every
+   * cleanup synchronously inside setup.
+   */
+  setupClosed: 'RESOURCE_SETUP_CLOSED'
 } as const
 
 export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode]

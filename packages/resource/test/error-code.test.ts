@@ -181,7 +181,7 @@ describe('the table is exhaustive and tagging is non-destructive', () => {
   it('code values are unique within this source, so (source, code) is unique by construction', () => {
     const declared = Object.values(ResourceErrorCode)
     expect(new Set(declared).size).toBe(declared.length)
-    expect(declared).toHaveLength(9) // FETCH_FAILED + 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED
+    expect(declared).toHaveLength(11) // FETCH_FAILED + 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED + RESOURCE_SETUP_INVALID/RESOURCE_SETUP_CLOSED
   })
 
   it('a tagged error carries source === "@migaia/resource" and a non-empty stack', () => {

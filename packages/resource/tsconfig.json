@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "lib": ["ES2024"],
+    "lib": ["ES2024", "ESNext.Disposable"],
     "types": []
   },
   "include": ["src", "../utils/types/host-globals.d.ts"]

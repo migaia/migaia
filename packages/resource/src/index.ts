@@ -11,5 +11,13 @@ export {
   type IResourceFetchContext,
   type IResourceOptions,
   type IResourceRetryPolicy,
-  type IResourceState
+  type IResourceState,
+  type IResourceUpdater
 } from './resource.class.js'
+
+export {
+  createResource,
+  type ICreateResourceOptions,
+  type IResourceSetup,
+  type IResourceSetupContext
+} from './create-resource.js'

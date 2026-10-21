@@ -1,6 +1,6 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IDisposable, IReactiveSignal, IRuntime } from '@migaia/reactive'
+import type { IDisposable, IReactiveComputed, IReactiveSignal, IRuntime } from '@migaia/reactive'
 import {
   ReactiveErrorPhase,
   internalRuntimeOf,
@@ -60,6 +60,15 @@ export type IResourceCacheSnapshot<T> = {
   /** Remaining lifetime resumes at hydration; `null` means no time-based expiration. */
   readonly remainingTtlMs: number | null
 }
+
+/**
+ * Updater accepted by `mutate()`. Declared through a method signature so its parameter stays
+ * bivariant and `Resource<T>` keeps its covariant assignability (`Resource<never>` to
+ * `Resource<number>`).
+ */
+export type IResourceUpdater<T> = {
+  bivarianceHack(previous: T | undefined): T
+}['bivarianceHack']
 
 export type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)
 
@@ -426,6 +435,12 @@ const appendDisposeCleanupErrors = (
  * after an await cannot be tracked by JavaScript's synchronous dependency context and should be
  * moved into a Computed read before awaiting.
  */
+/**
+ * Package-internal registrar for dispose-time cleanups. Assigned once by the `Resource` static
+ * block so `createResource()` can attach setup cleanups without a public mutation method.
+ */
+export let registerResourceCleanup: <T>(resource: Resource<T>, cleanup: () => void) => void
+
 export class Resource<T> implements IObserver, IDisposable {
   /** Bound graph capabilities operate only on this Resource observer. */
   readonly #tracking: ITrackedObserverBinding
@@ -454,6 +469,17 @@ export class Resource<T> implements IObserver, IDisposable {
   #settlementExpiry: IResourceExpiry | undefined
   #terminal = createTerminalController()
   #scheduler: IScheduler
+  /**
+   * Dispose-time cleanups (setup `onDispose` callbacks, `subscribe` effects, `select` computeds),
+   * run in reverse registration order by `dispose()`.
+   */
+  #cleanups: (() => void)[] = []
+
+  static {
+    registerResourceCleanup = (resource, cleanup) => {
+      resource.#cleanups.push(cleanup)
+    }
+  }
 
   constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options: IResourceOptions<T> = {}) {
     const admittedOptions = snapshotResourceOptions(options)
@@ -671,6 +697,117 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#currentPromise = Promise.resolve(data)
   }
 
+  /**
+   * Replaces the visible data locally (optimistic update, server push, cache write). Supersedes any
+   * in-flight request so its late result cannot overwrite this value, and starts a fresh TTL
+   * window. An updater receives the current success data (or `undefined`). Function-typed data must
+   * be passed through an updater. Returns `this` for chaining.
+   *
+   * @example
+   *   ;```ts
+   *   todos.mutate((list = []) => [...list, draft])
+   *   ```
+   */
+  mutate(next: T | IResourceUpdater<T>): this {
+    this.#assertUsable()
+    /** Current visible state, read without tracking. */
+    const current = this.#stateSignal.peek()
+    /** Success data passed to an updater. */
+    const previous = current.status === ResourceStatus.success ? current.data : undefined
+    /** New data; an updater runs before any state changes, so its throw leaves state intact. */
+    const data = typeof next === 'function' ? (next as IResourceUpdater<T>)(previous) : next
+    /** One clock sample for both timestamps; overflow throws before state changes. */
+    const now = this.#readSchedulerNow()
+    const expiresAt = calculateExpiresAt(now, this.#ttl)
+    this.#requests.supersede(abortError())
+    this.#requestPending = false
+    this.#paused = false
+    this.#refreshScheduled = false
+    this.#forceRefresh = false
+    this.#settlementExpiry = undefined
+    this.#updatedAt = now
+    this.#expiresAt = expiresAt
+    this.#stateSignal.value = { status: ResourceStatus.success, data }
+    this.#currentPromise = Promise.resolve(data)
+    return this
+  }
+
+  /**
+   * Calls `listener` with the current state now and after every state change, for consumers that do
+   * not run inside the reactive graph. Subscribing counts as observation (it can start and keep
+   * requests alive). Listener throws are reported through `runtime.reportError` and do not stop
+   * delivery. Returns an idempotent unsubscribe; `dispose()` unsubscribes automatically.
+   *
+   * @example
+   *   ;```ts
+   *   const stop = user.subscribe((state) => render(state))
+   *   ```
+   */
+  subscribe(listener: (state: IResourceState<T>) => void): () => void {
+    this.#assertUsable()
+    if (typeof listener !== 'function')
+      throw createResourceOptionTypeError(ResourceErrorText.listenerInvalid)
+    /** Effect that tracks `state` and delivers it outside the tracking window. */
+    const effect = this.runtime.effect(
+      () => {
+        if (this.#terminal.lifecycle !== LifecycleState.open) return
+        /** Tracked state read. */
+        const state = this.state
+        this.runtime.untracked(() => {
+          try {
+            listener(state)
+          } catch (error) {
+            this.runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
+          }
+        })
+      },
+      { debugName: this.debugName ? `${this.debugName}.subscribe` : undefined }
+    )
+    /** Whether this subscription has already been released. */
+    let released = false
+    /** Releases the effect once, from either unsubscribe or dispose. */
+    const release = (): void => {
+      if (released) return
+      released = true
+      effect.dispose()
+    }
+    this.#cleanups.push(release)
+    return release
+  }
+
+  /**
+   * Derived reactive value from the success data; `undefined` while not in success. The computed is
+   * disposed together with this resource.
+   *
+   * @example
+   *   ;```ts
+   *   const count = todos.select((list) => list.length)
+   *   count.value // number | undefined
+   *   ```
+   */
+  select<R>(selector: (data: T) => R): IReactiveComputed<R | undefined> {
+    this.#assertUsable()
+    if (typeof selector !== 'function')
+      throw createResourceOptionTypeError(ResourceErrorText.selectorInvalid)
+    /** Computed view over the tracked state. */
+    const computed = this.runtime.computed(
+      () => {
+        if (this.#terminal.lifecycle !== LifecycleState.open) return undefined
+        /** Tracked state read. */
+        const state = this.state
+        return state.status === ResourceStatus.success ? selector(state.data) : undefined
+      },
+      { debugName: this.debugName ? `${this.debugName}.select` : undefined }
+    )
+    this.#cleanups.push(() => computed.dispose())
+    return computed
+  }
+
+  /** Same as `dispose()`; enables `using resource = createResource(...)`. */
+  [Symbol.dispose](): void {
+    this.dispose()
+  }
+
   /** A reactive dependency changed. Coalesce diamond/batched invalidations. */
   markDirty(): void {
     this.#scheduleDependencyRefresh(false)
@@ -706,6 +843,10 @@ export class Resource<T> implements IObserver, IDisposable {
     }
 
     runCleanup(() => this.#requests.dispose(abortError()))
+    /** Registered cleanups, detached first so a reentrant registration cannot extend the run. */
+    const cleanups = this.#cleanups
+    this.#cleanups = []
+    for (let index = cleanups.length - 1; index >= 0; index -= 1) runCleanup(cleanups[index])
     this.#refreshScheduled = false
     this.#forceRefresh = false
     this.#requestPending = false
