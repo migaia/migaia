@@ -230,26 +230,26 @@ throw IdentifyError.from(error.native(), draft)`
   },
   combine: {
     summary: t(
-      'Creates a new instance with the same identity whose frozen `errors` is this error followed by the others, and whose `cause` is this error, so chain walkers reach every failure in order.',
-      '创建身份相同的新实例：其冻结的 `errors` 先是本错误，再是其他失败；`cause` 指向本错误，遍历链时能按顺序找到每个失败。'
+      'Instance `error.combine(...others)` creates a new `IdentifyError` with the same semantic identity and message, a frozen `errors` array ordered as `[error, ...others]`, and `cause: error`. The original native error remains reachable through that cause chain.\n\nStatic `IdentifyError.combine(errors, message)` delegates to `combineErrors()`: it returns `undefined` for no failures, the normalized error for one, or an `AggregateError` for several. If iteration throws, it throws an `AggregateError` containing the collected failures followed by the iteration failure.',
+      '实例方法 `error.combine(...others)` 创建语义身份与消息相同的新 `IdentifyError`，其冻结的 `errors` 数组按 `[error, ...others]` 排列，`cause` 指向 `error`，原生错误仍可沿原因链找到。\n\n静态方法 `IdentifyError.combine(errors, message)` 交给 `combineErrors()` 处理：没有失败时返回 `undefined`，只有一个时返回规范化后的错误，多个时返回 `AggregateError`。若遍历过程抛错，则抛出 `AggregateError`，其中先列出已收集的失败，再列出遍历失败。'
     ),
     params: {
       others: t(
-        'Instance form: further failures, kept by identity.',
-        '实例方法形式：其他失败，按原对象保存。'
+        'Instance form only: further failures appended in argument order, without conversion; each original value keeps its identity.',
+        '仅实例方法使用：按参数顺序追加的其他失败，不做转换，每个值保持原身份。'
       ),
       errors: t(
-        'Static form `IdentifyError.combine(errors, message)`: failures to combine; delegates to `combineErrors()`.',
-        '静态方法形式 `IdentifyError.combine(errors, message)`：要合并的失败列表，交给 `combineErrors()` 处理。'
+        'Static form only: iterable of failures normalized through `toError()`. Existing errors keep their native type and identity; other thrown values remain reachable as the wrapper’s cause.',
+        '仅静态方法使用：要合并的可迭代失败集合，经 `toError()` 规范化；已有错误保留原生类型和身份，其他抛出值保留为包装错误的原因。'
       ),
       message: t(
-        'Static form only: message of the `AggregateError` created for two or more failures.',
-        '仅静态方法形式：两个及以上失败时创建的 `AggregateError` 的信息。'
+        'Static form only: message of the `AggregateError` returned for several failures or thrown when iteration fails.',
+        '仅静态方法使用：多个失败时返回的 `AggregateError`，或遍历失败时抛出的 `AggregateError` 所用的消息。'
       )
     },
     returns: t(
-      'Instance form: a new `IdentifyError` with an `errors` array. Static form: `undefined`, the single error, or an `AggregateError`.',
-      '实例方法形式：带 `errors` 数组的新 `IdentifyError`。静态方法形式：`undefined`、唯一的那个错误，或一个 `AggregateError`。'
+      'Instance form: a new `IdentifyError` with an `errors` array. Static form: `undefined`, the single normalized error, or an `AggregateError`.',
+      '实例方法形式：带 `errors` 数组的新 `IdentifyError`。静态方法形式：`undefined`、唯一的规范化错误，或一个 `AggregateError`。'
     ),
     example: `throw error.combine(rollbackError, cleanupError)`
   },
@@ -1996,24 +1996,24 @@ export const utilsFacadeEnums: Readonly<Record<string, IEnumDoc>> = {
     ),
     values: {
       promise: t(
-        '`Promise.resolve().then()`: a promise microtask, after the current code and before timers or I/O. Available everywhere.',
-        '`Promise.resolve().then()`：Promise 微任务，在当前代码之后、定时器和 I/O 之前执行。所有宿主都可用。'
+        'Available in every host, `Promise.resolve().then()` queues a promise microtask after the current code and before timers or I/O.',
+        '所有宿主都支持 `Promise.resolve().then()`，它把任务放入 Promise 微任务队列，在当前代码之后、定时器和 I/O 之前执行。'
       ),
       microtask: t(
         '`queueMicrotask()`: the same microtask queue without allocating a Promise.',
         '`queueMicrotask()`：同一个微任务队列，但不创建 Promise。'
       ),
       nextTick: t(
-        '`process.nextTick()`: Node’s tick queue, which drains before promise microtasks when scheduled from a macrotask. Node and Bun.',
-        '`process.nextTick()`：Node 的 tick 队列；在宏任务中调度时，先于 Promise 微任务执行。适用于 Node 和 Bun。'
+        'In Node and Bun, `process.nextTick()` uses Node’s tick queue, which drains before promise microtasks when scheduled from a macrotask.',
+        '在 Node 和 Bun 中，`process.nextTick()` 把任务放入 Node 的 tick 队列；在宏任务中调度时，该队列先于 Promise 微任务执行。'
       ),
       timeout: t(
-        '`setTimeout()`: a timer macrotask with native delay; browsers clamp nested timers to 4 ms. Available everywhere.',
-        '`setTimeout()`：支持原生延迟的定时器宏任务；浏览器会把嵌套定时器钳制到 4 毫秒。所有宿主都可用。'
+        'Supported in every host, `setTimeout()` queues a timer macrotask with native delay; browsers clamp nested timers to 4 ms.',
+        '所有宿主都可用 `setTimeout()` 安排带原生延迟的定时器宏任务；浏览器中的嵌套定时器至少延迟 4 毫秒。'
       ),
       immediate: t(
-        '`setImmediate()`: Node’s check phase, right after I/O polling. Node and Bun.',
-        '`setImmediate()`：Node 的 check 阶段，紧跟在 I/O 轮询之后。适用于 Node 和 Bun。'
+        'Node and Bun provide `setImmediate()` for work in Node’s check phase, right after I/O polling.',
+        'Node 和 Bun 的 `setImmediate()` 把任务安排在 Node 的 check 阶段，紧跟 I/O 轮询执行。'
       ),
       messageChannel: t(
         '`MessageChannel`: a macrotask without the nested-timer clamp, the usual fast way to yield. Browsers, workers, Node, Deno and Bun.',
@@ -2028,24 +2028,24 @@ export const utilsFacadeEnums: Readonly<Record<string, IEnumDoc>> = {
         '`requestIdleCallback()`：在空闲期执行并提供 `timeRemaining()`；`idleTimeout` 可强制执行。Chromium、Firefox 和 Safari 18 及以上可用。'
       ),
       postTaskUserBlocking: t(
-        '`scheduler.postTask()` with `user-blocking` priority: work that blocks user input. Native delay. Chromium and Firefox.',
-        '`scheduler.postTask()` 的 `user-blocking` 优先级：会阻塞用户输入的工作。支持原生延迟。Chromium 和 Firefox 可用。'
+        'Chromium and Firefox support `scheduler.postTask()` with `user-blocking` priority and native delay for work that blocks user input.',
+        '在 Chromium 和 Firefox 中，可用 `scheduler.postTask()` 的 `user-blocking` 优先级安排会阻塞用户输入的工作，并设置原生延迟。'
       ),
       postTaskUserVisible: t(
-        '`scheduler.postTask()` with `user-visible` priority: work whose result the user sees soon. Native delay. Chromium and Firefox.',
-        '`scheduler.postTask()` 的 `user-visible` 优先级：用户很快会看到结果的工作。支持原生延迟。Chromium 和 Firefox 可用。'
+        'Chromium and Firefox support `scheduler.postTask()` with `user-visible` priority and native delay for work whose result the user sees soon.',
+        '在 Chromium 和 Firefox 中，可用 `scheduler.postTask()` 的 `user-visible` 优先级安排用户很快会看到结果的工作，并设置原生延迟。'
       ),
       postTaskBackground: t(
-        '`scheduler.postTask()` with `background` priority: logging, prefetching and other deferrable work. Native delay. Chromium and Firefox.',
-        '`scheduler.postTask()` 的 `background` 优先级：日志、预取等可推迟的工作。支持原生延迟。Chromium 和 Firefox 可用。'
+        'Chromium and Firefox support `scheduler.postTask()` with `background` priority and native delay for logging, prefetching and other deferrable work.',
+        '在 Chromium 和 Firefox 中，可用 `scheduler.postTask()` 的 `background` 优先级安排日志、预取等可推迟的工作，并设置原生延迟。'
       ),
       schedulerYield: t(
-        '`scheduler.yield()`: yields and resumes ahead of other tasks of the same priority, the recommended way to split long tasks. Chromium and Firefox.',
-        '`scheduler.yield()`：让出后优先于同优先级的其他任务恢复，是拆分长任务的推荐方式。Chromium 和 Firefox 可用。'
+        'In Chromium and Firefox, `scheduler.yield()` yields and resumes ahead of other tasks of the same priority, making it the recommended way to split long tasks.',
+        '在 Chromium 和 Firefox 中，`scheduler.yield()` 让出后优先于同优先级的其他任务恢复，是拆分长任务的推荐方式。'
       ),
       auto: t(
-        'First supported of `schedulerYield`, `postTaskUserVisible`, `messageChannel`, `immediate`, `timeout`. Available everywhere.',
-        '依次选用第一个可用的 `schedulerYield`、`postTaskUserVisible`、`messageChannel`、`immediate`、`timeout`。所有宿主都可用。'
+        'Available in every host, `auto` selects the first supported strategy in this order: `schedulerYield`, `postTaskUserVisible`, `messageChannel`, `immediate`, `timeout`.',
+        '`auto` 在所有宿主都可用，依次选用第一个可用的 `schedulerYield`、`postTaskUserVisible`、`messageChannel`、`immediate`、`timeout`。'
       )
     }
   }

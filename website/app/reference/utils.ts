@@ -3131,14 +3131,23 @@ console.log(menu.items)`
           default: t('`merge`.', '`merge`：逐键合并。'),
           values: {
             merge: t('Merge keys recursively.', '逐键递归合并。'),
-            replace: t('The later object replaces the earlier.', '后者整体替换前者。')
+            replace: t(
+              'The later object replaces the earlier object.',
+              '用后一个对象整体替换前一个对象。'
+            )
           }
         },
         'strategies.array': {
           summary: t('How two arrays at the same path merge.', '同一路径上的两个数组如何合并。'),
-          default: t('`replace`.', '`replace`：后者整体替换。'),
+          default: t(
+            '`replace`: arrays use the later array as a whole.',
+            '`replace`：数组默认采用后一个数组的完整内容。'
+          ),
           values: {
-            replace: t('The later array replaces the earlier.', '后者整体替换前者。'),
+            replace: t(
+              'The later array replaces the earlier array.',
+              '用后一个数组整体替换前一个数组。'
+            ),
             concat: t('Concatenate earlier then later.', '前者在前、后者在后拼接。'),
             mergeByIndex: t(
               'Merge element by element at the same index.',
@@ -3148,17 +3157,29 @@ console.log(menu.items)`
         },
         'strategies.map': {
           summary: t('How two `Map` values merge.', '两个 `Map` 如何合并。'),
-          default: t('`replace`.', '`replace`：后者整体替换。'),
+          default: t(
+            '`replace`: Map values use the later Map as a whole.',
+            '`replace`：Map 默认采用后一个 Map 的全部条目。'
+          ),
           values: {
-            replace: t('Later replaces earlier.', '后者整体替换前者。'),
+            replace: t(
+              'The later Map replaces the earlier Map.',
+              '用后一个 Map 整体替换前一个 Map。'
+            ),
             merge: t('Merge entries by key.', '按键合并条目。')
           }
         },
         'strategies.set': {
           summary: t('How two `Set` values merge.', '两个 `Set` 如何合并。'),
-          default: t('`replace`.', '`replace`：后者整体替换。'),
+          default: t(
+            '`replace`: Set values use the later Set as a whole.',
+            '`replace`：Set 默认采用后一个 Set 的全部元素。'
+          ),
           values: {
-            replace: t('Later replaces earlier.', '后者整体替换前者。'),
+            replace: t(
+              'The later Set replaces the earlier Set.',
+              '用后一个 Set 整体替换前一个 Set。'
+            ),
             union: t('Union of both sets.', '取两个集合的并集。')
           }
         },

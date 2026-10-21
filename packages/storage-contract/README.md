@@ -119,8 +119,8 @@ L0 指所有后端提供的字符串键值通道；L1 指额外提供字节、�
 | IKeyValueStore 成员     | 返回与语义                                                      |
 | ----------------------- | --------------------------------------------------------------- |
 | `get(key, ctx?)`        | `Promise<string \| null>`；不存在返回 null，不是 undefined。    |
-| `set(key, value, ctx?)` | value 为字符串，ctx 使用 IWriteOptions，返回 `Promise<void>`。  |
-| `remove(key, ctx?)`     | 返回 `Promise<void>`。                                          |
+| `set(key, value, ctx?)` | `set` 将字符串 value 写入指定 key，ctx 使用 IWriteOptions；返回用于等待这次写入的 `Promise<void>`。  |
+| `remove(key, ctx?)`     | `remove` 删除字符串值通道中的指定 key，返回用于等待这次删除的 `Promise<void>`。                                          |
 | `has(key, ctx?)`        | 返回 `Promise<boolean>`。                                       |
 | `keys(ctx?)`            | 返回 `Promise<string[]>`。                                      |
 | `clearValues(ctx?)`     | 只清字符串值通道，返回 `Promise<void>`。                        |
@@ -171,8 +171,8 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 | `records`          | 必填 boolean，是否有结构化记录通道。                                                                     |
 | `transactions`     | 必填 boolean，是否有事务能力。                                                                           |
 | `iteration`        | 必填 boolean，是否有迭代能力。                                                                           |
-| `secondaryIndexes` | 新描述符为 boolean；旧描述符可省略，快照规范化为 false。                                                 |
-| `changeFeed`       | 新描述符为 boolean；旧描述符可省略，快照规范化为 false。                                                 |
+| `secondaryIndexes` | secondaryIndexes 为 boolean，表示后端是否提供逻辑二级索引操作；旧描述符省略该字段时，快照把 secondaryIndexes 设为 false。                                                 |
+| `changeFeed`       | changeFeed 为 boolean，表示后端是否发送提交后的失效通知；旧描述符省略该字段时，快照把 changeFeed 设为 false。                                                 |
 | `maxValueBytes`    | 非负安全整数或 undefined，表示近似单值字节上限；undefined 表示没有这种单值限制声明，仍可能受总配额限制。 |
 | `opaqueEntries`    | 必填 boolean，是否可能存在脚本不可见的条目，例如 HttpOnly cookie。                                       |
 

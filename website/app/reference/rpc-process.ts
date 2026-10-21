@@ -3224,8 +3224,8 @@ console.log(event)`
     },
     IProcessResilience: {
       summary: t(
-        'Governance owner returned by `createProcessResilience()`. ' + resilienceExampleSetup.en,
-        '`createProcessResilience()` 返回的进程连接治理对象。' + resilienceExampleSetup.zh
+        'Governance owner returned by `createProcessResilience()`. The [terminal-child case](/en/docs/rpc-process/api/createProcessResilience#rpc-process-index--createProcessResilience--case-2) shows how to attach the original supervisor and release its resources separately; the factory example introduces the required dependencies and policies.',
+        '`createProcessResilience()` 返回的进程连接治理对象。[子进程终态案例](/zh/docs/rpc-process/api/createProcessResilience#rpc-process-index--createProcessResilience--case-2) 展示如何登记原监督器，并单独释放它的资源；所需依赖与策略在工厂示例前说明。'
       ),
       scenarios: [
         t(

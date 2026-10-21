@@ -24,7 +24,7 @@
 | `getMicroHub()` | Returns the hub; throws `HUB_NOT_CREATED` when none has been created. |
 | `hub.connect(name)` | Connects an app. The name must be non-empty and must not contain `.`; throws `APP_ALREADY_CONNECTED` while an app with the same name is still connected. |
 | `hub.apps` | Names of the connected apps, in connection order. |
-| `hub.dispose()` | Disconnects every app and releases the hub; `createMicroHub` can be called again afterwards. Repeated calls return the same Promise. |
+| `hub.dispose()` | `hub.dispose()` disconnects every app and returns `Promise<void>` for app unloading and hub cleanup; later disposal calls on that hub reuse its disposal Promise. `createMicroHub` can be called again afterwards. |
 
 `report(error)` receives errors that must not interrupt the current operation: exceptions from listeners and subscription callbacks, and cleanup failures. When omitted, the hub uses `globalThis.reportError`, or `console.error` when that is missing. If `report` itself throws, both errors go to the default reporter.
 
@@ -54,7 +54,7 @@ The shell and child apps receive exactly the same `IMicroApp`:
 | `name` / `connected` | The app name; `connected` becomes false after `disconnect()`. |
 | `use(contract)` | Returns the contract view. Repeated calls by the same app for the same contract return the same object. |
 | `own(contract, options?)` | Claims ownership and returns the view plus the owner-only members. Throws `CONTRACT_OWNED` when the contract already has an owner. |
-| `disconnect()` | Synchronously releases every subscription, handler and ownership, then unloads the app from plugin-host. Repeated calls return the same Promise. |
+| `disconnect()` | The app's `disconnect()` synchronously releases its subscriptions, handlers and ownership, then returns `Promise<void>` for unloading its plugin from plugin-host; later disconnection calls on that app reuse this unloading Promise. |
 
 After disconnecting, calling any member of the handle or a view throws `APP_DISCONNECTED`. Owner-only members:
 

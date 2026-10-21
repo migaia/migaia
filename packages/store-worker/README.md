@@ -156,7 +156,7 @@ IWorkerPort 是 Core IWebWorkerLikePort 的别名，要求 postMessage、addEven
 
 | 成员      | 生命周期                                                                                    |
 | --------- | ------------------------------------------------------------------------------------------- |
-| disposed  | close / dispose 后立即为 true。                                                             |
+| disposed  | `adapter.disposed` 在 `adapter.close()` 或 `adapter.dispose()` 开始时同步变为 `true`，表示该适配器已停止接纳请求。                                                             |
 | close()   | 无参数，同步幂等标记不可用；新 request 拒绝 ADAPTER_DISPOSED，不释放 Endpoint。             |
 | dispose() | 无参数，唯一异步释放入口；先 close，等初始化，再关闭 Endpoint，重复调用返回同一个 Promise。 |
 
@@ -176,7 +176,7 @@ Adapter.dispose 不 terminate 借用的 Worker / port。清理失败以 rejected
 | ---------------- | ---------------------------------------------------------------------------------- |
 | handler(message) | 接收已解析的原始消息值；关闭后 resolve 并忽略，不处理晚到队列残留。                |
 | pendingCount     | 已接纳、正在等待 Endpoint 初始化或交付消息的数量，不代表 provider compute 已完成。 |
-| disposed         | close / dispose 后立即为 true。                                                    |
+| disposed         | `handler.disposed` 在 `handler.close()` 或 `handler.dispose()` 开始时同步变为 `true`，表示该处理器不再接收消息。                                                    |
 | close()          | 同步幂等停止接纳，不执行 Endpoint 或用户清理。                                     |
 | dispose()        | 先 close，等待初始化，再执行 Endpoint 清理；同一个 Promise，失败保持拒绝。         |
 

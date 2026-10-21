@@ -3757,7 +3757,34 @@ const original = new Error('Application failure')
 const wire = serializeRpcError(original, { report: (error) => console.error(error) })
 const restored = deserializeRpcError(wire)
 console.log(restored.message)`
-symbols.serializeRpcError = { ...symbols.serializeRpcError, example: errorRoundtrip }
+/** Core owns the runtime functions; the contract package still owns the report-record type. */
+const coreErrorExample = (example: string): string =>
+  example
+    .replace(
+      "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-contract/errors'",
+      "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'"
+    )
+    .replace(
+      "import { serializeRpcError, type IRpcWireErrorFailure } from '@migaia/rpc-contract/errors'",
+      "import { serializeRpcError } from '@migaia/rpc-core'\nimport type { IRpcWireErrorFailure } from '@migaia/rpc-contract/errors'"
+    )
+/** The two supported error cases retain their problem, code, and observable result together. */
+const coreErrorCases = contractReference.symbols.serializeRpcError.cases!.map((entry) => ({
+  ...entry,
+  example:
+    typeof entry.example === 'string'
+      ? coreErrorExample(entry.example)
+      : t(coreErrorExample(entry.example.en), coreErrorExample(entry.example.zh))
+}))
+/** The minimal example is the first case, so the renderer presents that complete story once. */
+const firstCoreErrorCase = coreErrorCases[0]!
+symbols.serializeRpcError = {
+  ...symbols.serializeRpcError,
+  exampleIntro: firstCoreErrorCase.problem,
+  example: firstCoreErrorCase.example,
+  exampleResult: firstCoreErrorCase.result,
+  cases: coreErrorCases
+}
 symbols.deserializeRpcError = { ...symbols.deserializeRpcError, example: errorRoundtrip }
 /** Shared setup explains every endpoint parameter used by the runnable case pages. */
 const caseEndpointSetup = t(
@@ -3866,12 +3893,12 @@ for (const [name, optionCases] of Object.entries(rpcCoreOptionCases)) {
       members[field] = {
         ...members[field]!,
         summary: t(
-          'Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.',
-          '继承的直接来源回调。此托管工厂通过 binding.openChannel 取得通道，不调用该回调。'
+          `The inherited \`${field}\` callback is unused by this managed factory, which obtains its channel from binding.openChannel.`,
+          `此托管工厂不调用继承的 \`${field}\` 回调，而是通过 binding.openChannel 取得通道。`
         ),
         default: t(
-          'Omitted or supplied: the actual binding remains the channel acquisition owner.',
-          '无论省略或提供，实际绑定始终负责取得通道。'
+          `Omitting or supplying \`${field}\` leaves channel acquisition with the binding.`,
+          `无论省略或提供 \`${field}\`，通道都由绑定取得。`
         )
       }
     }

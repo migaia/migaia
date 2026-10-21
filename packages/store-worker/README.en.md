@@ -156,7 +156,7 @@ One adapter supports concurrent requests. Core correlates results and handles ea
 
 | Member    | Lifetime                                                                                                                                                      |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| disposed  | True immediately after close / dispose.                                                                                                                       |
+| disposed  | `adapter.disposed` becomes `true` synchronously when `adapter.close()` or `adapter.dispose()` starts, marking this adapter closed to new requests.                                                                                                                       |
 | close()   | No arguments; synchronous and idempotent retirement. New requests reject ADAPTER_DISPOSED, but it does not release the Endpoint.                              |
 | dispose() | No arguments; the sole async release operation. It closes admission, awaits initialization, then closes the Endpoint; repeated calls return the same Promise. |
 
@@ -176,7 +176,7 @@ The bridge converts input to portable data: plain records / arrays, finite primi
 | ---------------- | -------------------------------------------------------------------------------------------------------------- |
 | handler(message) | Accepts a parsed raw message value; after closure it resolves without processing late queue residue.           |
 | pendingCount     | Admitted messages awaiting initialization or delivery, not completed provider computations.                    |
-| disposed         | True immediately after close / dispose.                                                                        |
+| disposed         | `handler.disposed` becomes `true` synchronously when `handler.close()` or `handler.dispose()` starts, marking this handler closed to new messages.                                                                        |
 | close()          | Synchronously and idempotently retires admission without Endpoint or user cleanup.                             |
 | dispose()        | Closes admission, awaits initialization, and cleans up the Endpoint; reuses one Promise and retains rejection. |
 

@@ -24,7 +24,7 @@
 | `getMicroHub()` | 取得 hub；尚未创建时报 `HUB_NOT_CREATED`。 |
 | `hub.connect(name)` | 连接一个应用。名字非空且不含 `.`；同名应用仍在连接时报 `APP_ALREADY_CONNECTED`。 |
 | `hub.apps` | 已连接应用的名字，按连接顺序。 |
-| `hub.dispose()` | 断开所有应用并释放 hub；之后可以再次 `createMicroHub`。重复调用返回同一个 Promise。 |
+| `hub.dispose()` | `hub.dispose()` 断开所有应用并返回等待应用卸载及宿主清理完成的 `Promise<void>`；同一 hub 的后续释放调用复用这次释放的 Promise，之后可以再次 `createMicroHub`。 |
 
 `report(error)` 接收不应打断当前操作的错误：listener 和订阅回调的异常、清理失败。省略时使用 `globalThis.reportError`，没有则 `console.error`。`report` 自身抛错时，两个错误都交给默认 reporter。
 
@@ -54,7 +54,7 @@
 | `name` / `connected` | 名字；`disconnect()` 后 `connected` 为 false。 |
 | `use(contract)` | 返回契约视图。同一应用对同一契约重复调用返回同一个对象。 |
 | `own(contract, options?)` | 认领 owner，返回视图加 owner 专属成员。已有 owner 时报 `CONTRACT_OWNED`。 |
-| `disconnect()` | 同步释放所有订阅、handler、所有权，再从 plugin-host 卸载。重复调用返回同一个 Promise。 |
+| `disconnect()` | 应用的 `disconnect()` 先同步释放该应用的订阅、handler 和所有权，再从 plugin-host 卸载该应用；返回的 `Promise<void>` 用于等待这次卸载，同一句柄的后续断开调用复用它。 |
 
 断开后再调用句柄或视图上的成员报 `APP_DISCONNECTED`。owner 专属成员：
 

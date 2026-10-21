@@ -1543,6 +1543,10 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
         ...operationMembers,
         conflictPolicy: {
           ...conflictMember,
+          summary: t(
+            'The conflict policy captured in this snapshot, preserving the caller’s choice between rejecting an existing key and allowing replacement.',
+            '快照捕获的冲突策略，保留调用方选择的已有键处理方式：拒绝冲突，或允许替换。'
+          ),
           default: t(
             'Omitted: snapshot retains undefined; the writing backend applies its normal conflict default.',
             '省略时快照保留空值，由写入后端应用常规冲突默认值。'
