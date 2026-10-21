@@ -13,8 +13,28 @@
  * bootstrap/channel ownership; native spawning is still the custom launcher's responsibility.
  * Electron parentPort exposes the native payload through event.data.
  */
-import type { ICode, ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
-import { rpcProcessCases } from './rpc-process-cases.js'
+import type {
+  ICode,
+  ILibraryReference,
+  IMemberDoc,
+  IOptionCaseDoc,
+  ISymbolDoc,
+  IText
+} from './contract.js'
+import {
+  rpcProcessCases,
+  processPeerOptionCases,
+  processTransportOptionCases,
+  processOfferOptionCases,
+  processLauncherOptionCases,
+  processLaunchPreparationCases,
+  processStdioOptionCases,
+  processBootstrapReaderCases,
+  processDialOptionCases,
+  processResilienceOptionCases,
+  processRuntimePluginOptionCases,
+  processJsonRpcOptionCases
+} from './rpc-process-cases.js'
 import {
   runtimeOutletGrants,
   runtimePeerOptionMembers,
@@ -23,6 +43,16 @@ import {
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Shared stories retain only paths accepted by each actual overload. */
+const optionCasesFor = (
+  cases: readonly IOptionCaseDoc[],
+  docs: Readonly<Record<string, IMemberDoc>>
+): readonly IOptionCaseDoc[] =>
+  cases.map((entry) => ({
+    ...entry,
+    covers: entry.covers.filter((path) => Object.hasOwn(docs, path))
+  }))
 
 /** External public owners and their explicitly selected policies in the governance examples. */
 const resilienceExampleSetup: IText = {
@@ -1212,7 +1242,115 @@ const legacyReplaceExample: ICode = {
 }
 
 /** Doc of a `report(error)` callback member. */
+const fullProcessPluginOptionCases: readonly IOptionCaseDoc[] = [
+  {
+    title: t(
+      'Own a full remote-plugin deployment with explicit registration',
+      '用明确登记持有完整远程插件部署'
+    ),
+    problem: t(
+      'An application needs the advanced proxy API and its own replay dispatch. Supply the actual installing Host, endpoint factory and borrowed governor before acquiring the child.',
+      '应用需要高级代理接口及自己的重放派发。取得子进程前，提供实际安装宿主、端点工厂和借用的治理对象。'
+    ),
+    example: processExampleVariant(legacyReplaceExample, (code) =>
+      code
+        .replace('  createProcessPlugin,', '  createProcessPlugin,\n  createProcessResilience,')
+        .replaceAll('idempotent: false', 'idempotent: true')
+        .replace('hooks, ping }', 'hooks, ping, type IRpcEndpoint }')
+        .replace('endpoint: { endpoint },', 'endpoint: { endpoint: endpoint as IRpcEndpoint },')
+        .replace('return { endpoint }', 'return { endpoint: endpoint as IRpcEndpoint }')
+        .replaceAll('      ping()\n    ]', '      ping()\n    ] as const')
+        .replaceAll('          ping()\n        ]', '          ping()\n        ] as const')
+        .replace(
+          '  const plugin = createProcessPlugin<INodeProcessHandle>({',
+          `  const resilience = createProcessResilience({ scheduler: systemScheduler, report })
+  let keys = 0
+  let retries = 0
+  const plugin = createProcessPlugin<INodeProcessHandle>({`
+        )
+        .replace(
+          "    registrationOwner: { name: 'service', host },",
+          `    registrationOwner: { name: 'service', host }, resilience,
+    keyFactory: () => { keys++; return crypto.randomUUID() },
+    retryPort: { dispatch: input => { retries++; return input.sendOnce({ expectedGeneration: input.generation, key: input.key }) } },`
+        )
+        .replace(
+          "    const result = await plugin.replace({ strategy: 'stop-then-start' })\n    console.log(result.strategy)\n    if (result.strategy === 'stop-then-start') console.log(result.outcome.kind)",
+          '    console.log(keys, retries)'
+        )
+        .replace(
+          '  } finally {\n    await host.dispose()\n  }\n}',
+          '  } finally {\n    await host.dispose()\n    await resilience.close()\n  }\n}'
+        )
+    ),
+    result: t(
+      'Output is `42` and `1 1`: the explicit proxy invokes the key factory and dispatch port for the idempotent method. Host disposal releases its child, then the caller closes the borrowed governor. Unsupported native guarantees remain diagnostics.',
+      '输出为 `42`、`1 1`：显式代理为幂等方法调用键工厂和派发端口。宿主释放其子进程，随后由调用方关闭借用的治理对象。不支持的原生保证仍属于诊断。'
+    ),
+    covers: [
+      'name',
+      'contract',
+      'registrationOwner',
+      'registrationOwner.name',
+      'registrationOwner.host',
+      'resilience',
+      'host',
+      'endpointFactory',
+      'report',
+      'keyFactory',
+      'retryPort',
+      'deployment'
+    ]
+  },
+  {
+    title: t('Reject a registration owner naming another plugin', '拒绝指向其他插件的登记拥有者'),
+    problem: t(
+      'A copied deployment points cleanup at another registration. Reject the mismatch before dialing, constructing an endpoint or installing anything.',
+      '复制的部署把清理指向其他登记。应在拨号、构造端点或安装之前拒绝名称不匹配。'
+    ),
+    example: `import { defineHost } from '@migaia/plugin-host'
+import { createProcessPlugin } from '@migaia/rpc-process'
+const host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+let acquired = 0
+const unavailable = async (): Promise<never> => { acquired++; throw new Error('must not acquire') }
+try {
+  createProcessPlugin({
+    name: 'service', contract: { schemaVersion: 1, plugin: 'service', features: { api: { methods: { read: { mode: 'request', idempotent: true } } } } },
+    registrationOwner: { name: 'another', host },
+    host: { disable: (name, options) => host.plugin.disable(name, options), enable: name => host.plugin.enable(name) },
+    endpointFactory: unavailable, report: error => { console.error(error) },
+    deployment: { kind: 'connect', address: 'tcp://127.0.0.1:0', token: crypto.randomUUID(), dial: unavailable, establish: unavailable }
+  })
+} catch (error) {
+  const failure = error as Error & { code?: string }
+  if (failure.code !== 'PROCESS_PLUGIN_INVALID_OPTION') throw error
+  console.log(failure.code, acquired)
+} finally { await host.dispose() }`,
+    result: t(
+      'Output is `PROCESS_PLUGIN_INVALID_OPTION 0`: the actual Host remains unchanged and no acquisition callback runs.',
+      '输出为 `PROCESS_PLUGIN_INVALID_OPTION 0`：实际宿主保持原状，未执行取得资源的回调。'
+    ),
+    covers: [
+      'name',
+      'contract',
+      'registrationOwner',
+      'registrationOwner.name',
+      'registrationOwner.host',
+      'host',
+      'endpointFactory',
+      'report',
+      'deployment'
+    ]
+  }
+]
+
+/** Background diagnostics preserve original error identity at the application boundary. */
 const reportMember: IMemberDoc = {
+  whenToUse: t(
+    'Send secondary failures to the application diagnostic sink while preserving the original error identity.',
+    '需要把次级故障交给应用诊断接收端，并保留原始错误身份时设置。'
+  ),
+  example: processTransportOptionCases[0]!.example,
   summary: t(
     'Receives background errors that no call can reject with.',
     '接收无法通过调用 reject 的后台错误。'
@@ -1306,6 +1444,11 @@ const ipcOptionDocs: Readonly<Record<string, IMemberDoc>> = {
     default: t('8 pending control frames.', '默认允许排队 `8` 个控制帧。')
   },
   'ipc.log': {
+    whenToUse: t(
+      'Collect structured connection records; keep secret bytes out of the sink and let report observe sink failures.',
+      '需要收集结构化连接记录时设置，不向接收端写入敏感字节，接收端故障交给 report。'
+    ),
+    example: processTransportOptionCases[0]!.example,
     summary: t(
       'Callback receiving each Core IIpcLogRecord; synchronous throws and Promise rejections enter the original reporter boundary.',
       '回调接收核心提供的每条 `IIpcLogRecord`；同步抛错与异步拒绝进入原有报告边界。'
@@ -1322,6 +1465,11 @@ const ipcOptionDocs: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   'ipc.stderr': {
+    whenToUse: t(
+      'Borrow the existing child stderr subscription for bounded redacted diagnostics and unsubscribe during channel cleanup.',
+      '需要借用既有子进程标准错误订阅生成有界脱敏诊断，并在通道清理时取消订阅时设置。'
+    ),
+    example: processTransportOptionCases[0]!.example,
     summary: t(
       'Subscription callback for child stderr bytes. The diagnostic bridge records bounded redacted summaries rather than the raw text.',
       '子进程标准错误字节的订阅回调；诊断桥记录有界脱敏摘要，不保存原始文本。'
@@ -1377,6 +1525,11 @@ const commonOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   report: reportMember,
   ipc: {
+    whenToUse: t(
+      'Correlate connection records and configure queue capacity without treating diagnostic labels as credentials.',
+      '需要关联连接记录并配置队列容量时设置，诊断标签不能作为凭据。'
+    ),
+    example: processTransportOptionCases[0]!.example,
     summary: t(
       'Caller-authored connection and session labels plus the logging port; stderr and queue limits are optional.',
       '调用方编写的连接与会话标签及日志端口；标准错误订阅与队列限制可选。'
@@ -1477,6 +1630,11 @@ const stdioSymbol: ISymbolDoc = {
   role: 'operation',
   optionDocs: {
     bootstrap: {
+      whenToUse: t(
+        'Use stdin when the parent writes a framed prefix and none when protocol starts immediately. fd is declared but rejected by both current openers.',
+        '父进程写入分帧前缀时用 stdin，直接开始协议时用 none。fd 虽已声明，但当前两个读取函数都会拒绝。'
+      ),
+      example: processStdioOptionCases()[0]!.example,
       summary: t(
         'Required bootstrap source policy for this public child stdio opener. Both Node and Deno implement stdin or none and explicitly reject fd.',
         '此公开子进程标准流读取函数必填的启动来源策略。两种实现均支持标准输入或无启动帧，并显式拒绝文件描述符模式。'
@@ -1519,7 +1677,8 @@ const stdioSymbol: ISymbolDoc = {
     )
   },
   returns: t('`{ channel, bootstrap? }`.', '包含字节通道与启动数据的 `{ channel, bootstrap? }`。'),
-  example: processStdioExample('open')
+  example: processStdioExample('open'),
+  optionCases: processStdioOptionCases()
 }
 
 /** Symbols of launcher and socket adapters. */
@@ -1530,6 +1689,7 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
       {
         role: 'factory',
         optionDocs: bootstrapOptionDocs,
+        optionCases: processLauncherOptionCases(module, name),
         purpose: t(
           `Creates the launcher that starts child processes with ${en} for a full \`spawn\` source.`,
           `创建使用${zh}启动子进程的 launcher，配合 \`createProcessPeer\` 使用，用作完整 \`spawn\` 来源里监督配置中的 \`supervision.launcher\`。`
@@ -1578,6 +1738,14 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
   'adapters/node-child-process:openProcessStdioChannel': stdioSymbol,
   'adapters/deno-command:openProcessStdioChannel': {
     ...stdioSymbol,
+    optionCases: processStdioOptionCases('deno-command'),
+    optionDocs: {
+      ...stdioSymbol.optionDocs,
+      bootstrap: {
+        ...stdioSymbol.optionDocs!.bootstrap!,
+        example: processStdioOptionCases('deno-command')[0]!.example
+      }
+    },
     example: processStdioExample('open', 'Deno')
   },
   ...Object.fromEntries(
@@ -1588,6 +1756,7 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
           `adapters/${module}:dialProcessByteChannel`,
           {
             ...dialSymbol,
+            optionCases: processDialOptionCases(module),
             example: processSocketExample(module, module === 'deno-socket' ? 'Deno' : 'Node')
           }
         ],
@@ -1631,6 +1800,7 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
     example: stdioExample
   },
   createAdapterNodeProcessLaunch: {
+    optionCases: processLaunchPreparationCases(),
     role: 'operation',
     optionDocs: bootstrapOptionDocs,
     purpose: t(
@@ -1669,6 +1839,33 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
 /** Field docs shared by the public IRuntimeProcessPeerOptions surface and its operation options. */
 const processPeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   ...runtimePeerOptionMembers,
+  endpointFactory: {
+    ...runtimePeerOptionMembers.endpointFactory!,
+    whenToUse: t(
+      'Keep an existing endpoint composition for the acquired process channel; use its actual codec, framer and flow-control features.',
+      '需要让已有端点组装使用取得的进程通道时设置，沿用该通道真实的编解码器、分帧器与流控特性。'
+    ),
+    example: processPeerOptionCases()[0]!.example
+  },
+  keyFactory: {
+    ...runtimePeerOptionMembers.keyFactory!,
+    summary: t(
+      'Application key generator for automatically keyed idempotent requests on managed spawn/connect bindings. Function sources use direct Core Peer assembly and do not consume this proxy field.',
+      '受管理启动或连接绑定为幂等请求自动分配键时使用的应用工厂。函数来源走直接核心连接组装，不消费此代理字段。'
+    ),
+    whenToUse: t(
+      'Give managed child requests application-issued keys after declaring the remote method idempotent. Explicit call keys take precedence.',
+      '远程方法已声明为幂等，需要为受管理子进程请求签发应用键时设置；显式调用键优先。'
+    ),
+    example: processPeerOptionCases()[0]!.example
+  },
+  retryPort: {
+    ...runtimePeerOptionMembers.retryPort!,
+    summary: t(
+      'Whole-invocation dispatch port for managed spawn/connect bindings. Function sources use direct Core Peer assembly and do not consume this field.',
+      '受管理启动或连接绑定的整次调用派发端口。函数来源走直接核心连接组装，不消费此字段。'
+    )
+  },
   spawn: {
     summary: t(
       'Child to start and own: `URL`, path (relative to the main entry directory), `true` (current entry), a short object `{ entry | command, args?, wrap?, wire?, ... }`, or a full `ISpawnProcessPluginDeployment`.',
@@ -1692,6 +1889,11 @@ const processPeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   report: {
     ...reportMember,
+    whenToUse: t(
+      'Route native process and background diagnostics to the application sink without printing credentials.',
+      '需要把原生进程与后台诊断交给应用接收端时设置，避免输出凭据。'
+    ),
+    example: processPeerOptionCases()[0]!.example,
     default: t(
       '`defaultRpcReporter`, which reports through the default console path.',
       '`defaultRpcReporter`，使用默认控制台报告路径。'
@@ -1708,6 +1910,11 @@ const processPeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   verify: {
+    whenToUse: t(
+      'Require an application principal for a listener rather than relying only on same-user socket permissions.',
+      '监听端需要应用主体身份，而不能仅依赖同用户套接字权限时设置。'
+    ),
+    example: processPeerOptionCases()[1]!.example,
     summary: t(
       'Listener side: `(auth, peer) => principalId` validating the client credential; throw to reject.',
       '监听端：校验客户端凭据的 `(auth, peer) => principalId`；抛错表示拒绝。'
@@ -1768,10 +1975,20 @@ const processPluginOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     default: t(
       'Required in the full deployment overload; no endpoint factory is inferred.',
       '完整部署重载必填，不推导端点工厂。'
-    )
+    ),
+    whenToUse: t(
+      'Build the explicit full-deployment endpoint from this acquired channel; retain its pipeline and flow-control features.',
+      '需要为完整部署按当前取得通道显式构造端点时设置，保留原管线与流控特性。'
+    ),
+    example: fullProcessPluginOptionCases[0]!.example
   },
   report: reportMember,
   keyFactory: {
+    whenToUse: t(
+      'Issue an application key for a declared idempotent proxy call when the caller supplies no explicit key.',
+      '代理方法已声明幂等，且调用方未显式提供键，需要签发应用键时设置。'
+    ),
+    example: fullProcessPluginOptionCases[0]!.example,
     summary: t(
       'Synchronous callback returning an idempotency key when the full deployment remote proxy automatically keys an idempotent call.',
       '同步回调，在完整部署的远程代理为幂等调用自动分配键时返回幂等键。'
@@ -1801,6 +2018,11 @@ const processPluginOptionMembers: Readonly<Record<string, IMemberDoc>> = {
 const processByteOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   ...commonOptionMembers,
   role: {
+    whenToUse: t(
+      'Use initiator on the dialing or launching side and responder on the byte receiver; both sides supply an offer.',
+      '拨号或启动端使用发起方，字节接收端使用响应方，双方均提供握手提议。'
+    ),
+    example: processTransportOptionCases[0]!.example,
     summary: t(
       'Explicit local handshake role: initiator sends an offer, while responder supplies both an offer and an authentication decision.',
       '显式本端握手角色：发起方发送提议，响应方同时提供提议与认证决策。'
@@ -1823,6 +2045,11 @@ const processByteOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   auth: {
+    whenToUse: t(
+      'Require verification on externally reachable byte channels; select none only when the carrier is already private and owned.',
+      '可从外部访问的字节通道需要校验；仅在载体已经私有且由自己持有时选择无认证。'
+    ),
+    example: processTransportOptionCases[0]!.example,
     summary: t(
       'Responder-only authentication union: mode required invokes `verify(auth, peer)` with portable credentials and handshake peer metadata; return a principal string or void, synchronously or asynchronously. Throw/rejection refuses the handshake. Mode none explicitly skips authentication.',
       '仅响应方使用的认证联合：必需模式用可移植凭据与握手对端元数据调用 `verify(auth, peer)`，同步或异步返回主体字符串或空值；抛错或拒绝会拒绝握手。无认证模式显式跳过认证。'
@@ -1863,7 +2090,7 @@ const processResilienceOptionMembers: Readonly<Record<string, IMemberDoc>> = {
       '用于速率窗口、空闲与排空计时的时钟。'
     )
   },
-  report: reportMember,
+  report: { ...reportMember, example: processResilienceOptionCases[1]!.example },
   idempotencyStore: {
     summary: t(
       'Store of results for `idempotencyKey` calls.',
@@ -1965,6 +2192,11 @@ const processRuntimePluginMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   resolvePlugin: {
+    whenToUse: t(
+      'Resolve only catalog-admitted names to local definitions when host is explicitly exposed.',
+      '显式暴露宿主控制时，仅把通过目录接纳的名称解析为本地定义。'
+    ),
+    example: processRuntimePluginOptionCases()[2]!.example,
     summary: t(
       'Synchronous local resolver invoked by the canonical host-control owner after catalog admission; definitions remain local and are installed through the original Host.',
       '同步本地解析器，在目录接纳后由规范宿主控制拥有者调用；定义保留本地，通过原宿主安装。'
@@ -2006,7 +2238,7 @@ const processPluginDocs: Readonly<Record<string, IMemberDoc>> = {
     default: processRuntimePluginMembers.host!.default!
   },
   endpointFactory: {
-    ...runtimePeerOptionMembers.endpointFactory!,
+    ...processPluginOptionMembers.endpointFactory!,
     summary: t(
       'Endpoint factory called with the acquired channel and abort signal; mandatory for full deployments, while runtime sources can use canonical endpoint assembly.',
       '端点工厂接收取得的通道与中止信号；完整部署必填，运行时来源可使用规范端点组装。'
@@ -2015,15 +2247,15 @@ const processPluginDocs: Readonly<Record<string, IMemberDoc>> = {
   keyFactory: {
     ...processPluginOptionMembers.keyFactory!,
     summary: t(
-      'Full deployment proxy key callback for automatically keyed idempotent calls. Runtime form forwards this inherited field; direct Peer assembly does not read it.',
-      '完整部署代理为幂等调用自动分配键的回调；运行时形式转发此继承字段，直接连接组装本身不读取它。'
+      'Key callback for automatically keyed idempotent calls in full deployments and managed runtime spawn/connect bindings. Function sources use direct Core assembly and do not consume it.',
+      '完整部署及受管理运行时启动或连接绑定为幂等调用自动分配键的回调。函数来源走直接核心组装，不消费此字段。'
     )
   },
   retryPort: {
     ...processPluginOptionMembers.retryPort!,
     summary: t(
-      'Advanced full-deployment remote-proxy retry port. Runtime form forwards the inherited field, while direct Peer assembly keeps its own call path.',
-      '高级完整部署远程代理重试端口；运行时形式转发继承字段，直接连接组装保留自身调用路径。'
+      'Whole-invocation dispatch port for full deployments and managed runtime spawn/connect bindings. Function sources use the direct Core call path.',
+      '完整部署及受管理运行时启动或连接绑定的整次调用派发端口；函数来源使用直接核心调用路径。'
     )
   },
   'registrationOwner.name': {
@@ -2044,6 +2276,11 @@ const processPluginDocs: Readonly<Record<string, IMemberDoc>> = {
 const processResilienceDocs: Readonly<Record<string, IMemberDoc>> = {
   ...processResilienceOptionMembers,
   'liquidation.cascade': {
+    whenToUse: t(
+      'Keep false when dependent resources should remain suspended; choose true when terminal liquidation should release their real Host dependency closure.',
+      '依赖方资源应保持挂起时保留 false；终态清算需要释放真实宿主依赖闭包时选择 true。'
+    ),
+    example: processResilienceOptionCases[2]!.example,
     summary: t(
       'Whether terminal liquidation also removes dependent registrations through the existing Host dependency owner.',
       '终态清算是否通过现有宿主依赖拥有者同时移除依赖此登记的其他登记。'
@@ -2121,6 +2358,11 @@ const processJsonRpcDocs: Readonly<Record<string, IMemberDoc>> = {
   ...processJsonRpcMembers,
   ...ipcOptionDocs,
   'target.kind': {
+    whenToUse: t(
+      'Select plugin with one contract, or host with a catalog; neither target supports stream declarations over this bridge.',
+      '单个契约选择 plugin，目录选择 host；此桥接的两个目标都不支持流声明。'
+    ),
+    example: processJsonRpcOptionCases()[1]!.example,
     summary: t(
       'Required discriminant selecting the one target contract grammar.',
       '必填判别字段，选择唯一一种目标契约格式。'
@@ -2153,6 +2395,11 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
   ...processMessageOptionMembers,
   ...ipcOptionDocs,
   'auth.mode': {
+    whenToUse: t(
+      'Choose required for credential verification; none explicitly omits verification on an already private carrier.',
+      '需要校验凭据时选择 required；已私有载体上的 none 显式省略校验。'
+    ),
+    example: processTransportOptionCases[1]!.example,
     summary: t(
       'Explicit responder authentication policy; initiator options carry no auth decision object.',
       '显式响应方认证策略；发起方选项不携带认证决策对象。'
@@ -2192,6 +2439,11 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
       [
         `staticAgreement.${side}.codec`,
         {
+          whenToUse: t(
+            'Use identity on both profiles when the native carrier already preserves complete messages.',
+            '原生载体已经保持完整消息边界时，两端配置均使用 identity。'
+          ),
+          example: processTransportOptionCases[2]!.example,
           summary: t(
             side === 'local'
               ? 'This transport already delivers complete messages. Set the local codec to identity, which passes native message values through without converting them to bytes. A byte codec is rejected during configuration, before the transport is activated.'
@@ -2298,6 +2550,7 @@ export const rpcProcessReference: ILibraryReference = {
   },
   symbols: {
     createProcessPeer: {
+      optionCases: processPeerOptionCases(),
       role: 'factory',
       cases: rpcProcessCases.createProcessPeer,
       exampleIntro: {
@@ -2346,6 +2599,7 @@ export const rpcProcessReference: ILibraryReference = {
       ]
     },
     createProcessPlugin: {
+      optionCases: [...processRuntimePluginOptionCases(), ...fullProcessPluginOptionCases],
       role: 'enhancer',
       cases: rpcProcessCases.createProcessPlugin,
       exampleIntro: {
@@ -2376,6 +2630,7 @@ export const rpcProcessReference: ILibraryReference = {
       example: selfSpawnExample
     },
     createProcessResilience: {
+      optionCases: processResilienceOptionCases,
       role: 'factory',
       cases: rpcProcessCases.createProcessResilience,
       exampleIntro: resilienceExampleSetup,
@@ -2403,6 +2658,7 @@ export const rpcProcessReference: ILibraryReference = {
       ]
     },
     createProcessTransport: {
+      optionCases: processTransportOptionCases,
       role: 'operation',
       optionDocs: processTransportDocs,
       purpose: t(
@@ -2445,6 +2701,11 @@ export const rpcProcessReference: ILibraryReference = {
           )
         },
         stream: {
+          whenToUse: t(
+            'Set true for an iterable service; set false when stream must stay disabled even if runtime defaults are completed.',
+            '可迭代服务使用 true；即使补全运行时默认值也必须禁用流时使用 false。'
+          ),
+          example: processOfferOptionCases[0]!.example,
           summary: t(
             'Whether to advertise stream immediately. Explicit false also prevents stream from later runtime defaults; omitted may receive the installed Core default at runtime.',
             '是否立即宣告流能力。显式假值也阻止后续运行时默认补入流能力；省略时可在运行时取得已安装核心默认值。'
@@ -2479,6 +2740,7 @@ export const rpcProcessReference: ILibraryReference = {
         'Builds the native handshake offer: ping, close and batch, plus stream and extra capabilities when requested.',
         '构建原生握手提议：默认包含 ping、close 与 batch，按需加上 stream 与其它扩展能力。'
       ),
+      optionCases: processOfferOptionCases,
       params: {
         options: t(
           '`{ peer, auth?, stream?, capabilities? }`; `peer` is `{ id, runtime }` of this side.',
@@ -2489,6 +2751,7 @@ export const rpcProcessReference: ILibraryReference = {
       example: socketExample
     },
     createProcessJsonRpcChannel: {
+      optionCases: processJsonRpcOptionCases(),
       role: 'operation',
       optionDocs: processJsonRpcDocs,
       purpose: t(
@@ -2518,6 +2781,10 @@ export const rpcProcessReference: ILibraryReference = {
       example: processErrorExample
     },
     openProcessObjectChannel: {
+      optionCases: optionCasesFor(processJsonRpcOptionCases(true), {
+        ...commonOptionMembers,
+        ...ipcOptionDocs
+      }),
       role: 'operation',
       optionDocs: { ...commonOptionMembers, ...ipcOptionDocs },
       purpose: t(
@@ -2532,6 +2799,7 @@ export const rpcProcessReference: ILibraryReference = {
       example: objectChannelExample
     },
     receiveAdapterBootstrap: {
+      optionCases: processBootstrapReaderCases,
       role: 'operation',
       optionDocs: {
         bootstrapTimeoutMs: bootstrapTimeoutMember,
@@ -2597,6 +2865,7 @@ export const rpcProcessReference: ILibraryReference = {
       example: processStdioExample('web', 'Deno')
     },
     createAdapterProcessLaunch: {
+      optionCases: processLaunchPreparationCases(true),
       role: 'operation',
       optionDocs: bootstrapOptionDocs,
       purpose: t(
@@ -2621,6 +2890,7 @@ export const rpcProcessReference: ILibraryReference = {
       example: webLaunchExample
     },
     createAdapterProcessPeer: {
+      optionCases: processPeerOptionCases(true),
       role: 'factory',
       optionDocs: processPeerOptionMembers,
       purpose: t(
@@ -2645,6 +2915,7 @@ export const rpcProcessReference: ILibraryReference = {
       example: adapterPeerExample
     },
     createAdapterProcessPlugin: {
+      optionCases: [...processRuntimePluginOptionCases(true), ...fullProcessPluginOptionCases],
       role: 'factory',
       optionDocs: processPluginDocs,
       purpose: t(
@@ -2762,6 +3033,7 @@ console.log(event)`
     },
     ...runtimePairedTypes('process'),
     IRuntimeProcessPeerOptions: {
+      optionCases: processPeerOptionCases(),
       summary: t(
         'Options of `createProcessPeer()`: one source plus authentication and the Core Peer options.',
         '`createProcessPeer()` 的选项：一种来源，加上认证设置与 Core Peer 的通用选项。'
@@ -2770,6 +3042,7 @@ console.log(event)`
       members: processPeerOptionMembers
     },
     IRuntimeProcessPluginOptions: {
+      optionCases: processRuntimePluginOptionCases(),
       summary: t(
         'Options of `createProcessPlugin()` (simple form).',
         '`createProcessPlugin()` 简单形式所使用的选项。'
@@ -3040,6 +3313,7 @@ console.log(event)`
       }
     },
     IProcessResilienceOptions: {
+      optionCases: optionCasesFor(processResilienceOptionCases, processResilienceOptionMembers),
       summary: t(
         'Options of `createProcessResilience()`.',
         '`createProcessResilience()` 的选项：各项限制与诊断策略。'
@@ -3305,10 +3579,15 @@ console.log(event)`
       }
     },
     IProcessCommonOptions: {
+      optionCases: optionCasesFor(processTransportOptionCases, commonOptionMembers),
       summary: t('Options shared by handshake helpers.', '握手相关函数共用的选项。'),
       members: commonOptionMembers
     },
     IProcessByteOptions: {
+      optionCases: optionCasesFor(
+        processTransportOptionCases.slice(0, 2),
+        processByteOptionMembers
+      ),
       summary: t(
         'Options of `createProcessTransport()` on byte channels.',
         '`createProcessTransport()` 在字节通道上的握手选项。'
@@ -3316,6 +3595,10 @@ console.log(event)`
       members: processByteOptionMembers
     },
     IProcessMessageOptions: {
+      optionCases: optionCasesFor(
+        [processTransportOptionCases[0]!, processTransportOptionCases[2]!],
+        processMessageOptionMembers
+      ),
       summary: t(
         'Options of `createProcessTransport()` on message channels.',
         '`createProcessTransport()` 在消息通道上的握手选项。'
@@ -3323,6 +3606,7 @@ console.log(event)`
       members: processMessageOptionMembers
     },
     IProcessJsonRpcChannelOptions: {
+      optionCases: optionCasesFor(processJsonRpcOptionCases(), processJsonRpcMembers),
       summary: t(
         'Options of `createProcessJsonRpcChannel()`.',
         '`createProcessJsonRpcChannel()` 的选项：字节通道与诊断设置。'
@@ -3383,6 +3667,7 @@ console.log(event)`
       }
     },
     IProcessPluginOptions: {
+      optionCases: optionCasesFor(fullProcessPluginOptionCases, processPluginOptionMembers),
       summary: t(
         'Full options of the advanced `createProcessPlugin()` overload.',
         '高级 `createProcessPlugin()` 重载使用的完整选项。'
@@ -3398,6 +3683,9 @@ console.log(event)`
       members: {}
     },
     IAdapterProcessLaunchOptions: {
+      optionCases: optionCasesFor(processLaunchPreparationCases(), {
+        runtimeApiBootstrap: runtimeBootstrapMember
+      }),
       summary: t('Options of the adapter launch helpers.', '适配器启动辅助函数的选项。'),
       members: { runtimeApiBootstrap: runtimeBootstrapMember }
     },
