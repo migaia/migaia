@@ -7,36 +7,19 @@
  * consistent read per cell, not a transaction across all array elements.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import { storeSharedCases } from './store-shared-cases.ts'
 
 /** Builds one localized sentence pair. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Two independent Runtime cursors observe the same physical signal. */
-const signalExample = `import { createRuntime } from '@migaia/reactive'
-import { sharedInt32 } from '@migaia/store-shared'
-
-const writer = sharedInt32(createRuntime(), 0)
-const reader = sharedInt32(createRuntime(), 999, writer.buffer)
-const effect = reader.runtime.effect(() => console.log(reader.value))
-writer.value = 2
-console.log(reader.peek(), reader.isStale(), reader.sync(), reader.version)
-effect.dispose()
-reader.dispose()
-writer.dispose()`
+const signalExample = storeSharedCases.sharedInt32![0]!.example
 
 /** Array changes keep index dependencies separate and require explicit remote synchronization. */
-const arrayExample = `import { createRuntime } from '@migaia/reactive'
-import { sharedInt32Array } from '@migaia/store-shared'
+const arrayExample = storeSharedCases.sharedInt32Array![0]!.example
 
-const writer = sharedInt32Array(createRuntime(), 2, { initialValues: [1, 2] })
-const reader = sharedInt32Array(createRuntime(), 2, { buffer: writer.buffer })
-const effect = reader.runtime.effect(() => console.log(reader.get(0)))
-writer.set(0, 3)
-writer.update(1, (current) => current + 1)
-console.log(reader.sync(), reader.snapshot())
-effect.dispose()
-reader.dispose()
-writer.dispose()`
+/** Constructor examples show the same validated operations through the public class form. */
+const arrayConstructorExample = storeSharedCases.SharedInt32Array![0]!.example
 
 /** Watch is opt-in and its same stop handle can be called repeatedly. */
 const watchExample = `import { createRuntime } from '@migaia/reactive'
@@ -67,8 +50,8 @@ array.dispose()`
 
 /** Core range and ownership facts are shared by both public wrappers and constructors. */
 const runtimeParam = t(
-  'IRuntime from @migaia/reactive createRuntime; it owns dependency tracking and watch error reporting for this instance.',
-  '由响应包工厂返回的运行时，拥有当前实例依赖追踪及观察错误报告。'
+  'Required IRuntime from directly installed @migaia/reactive createRuntime. It owns tracking, effect scheduling and watch error reporting; this package does not change its scheduler. Some examples explicitly select reactive schedulerStrategy for synchronous presentation.',
+  '由直接安装的 `@migaia/reactive` 的 `createRuntime` 返回的必填 `IRuntime`，拥有追踪、效果调度及观察错误报告；本包不修改其调度器，部分示例显式选择响应包 `schedulerStrategy` 以同步展示。'
 )
 /** Callers select valid indices from the fixed instance length. */
 const indexParam = t(
@@ -127,8 +110,8 @@ const commonMembers: Readonly<Record<string, IMemberDoc>> = {
 const arrayOptions: Readonly<Record<string, IMemberDoc>> = {
   buffer: {
     summary: t(
-      'Existing buffer from another SharedInt32Array with identical length and current ABI header. Attaching never overwrites existing values.',
-      '另一个相同长度且使用当前共享布局的数组缓冲区，附着不会覆盖已有值。'
+      'Optional buffer from another SharedInt32Array with identical length and current ABI header. Attaching never overwrites existing values or consumes initialValues.',
+      '可选另一相同长度且使用当前布局的 `SharedInt32Array.buffer`，附着不覆盖已有值，也不消费 `initialValues`。'
     ),
     default: t(
       'Allocates a new SharedArrayBuffer for this fixed length, header and aligned 64-bit versions.',
@@ -141,8 +124,8 @@ const arrayOptions: Readonly<Record<string, IMemberDoc>> = {
       '调用者提供的三十二位整数迭代源，仅新缓冲区消费所需长度的前缀；长度零不拉取，到达前缀即经原生迭代结束协议关闭，不额外读取下一项；迭代失败成为保留原始原因的原生范围错误及 `INVALID_OPTION`。'
     ),
     default: t(
-      'Omitted; new cells contain zero. Ignored completely when attaching a buffer.',
-      '默认省略，新格为零，附着已有缓冲区时完全忽略。'
+      'Omitted; new cells contain zero. Not consumed when attaching a buffer.',
+      '默认省略，新格为零，附着已有缓冲区时不迭代。'
     )
   }
 }
@@ -216,7 +199,10 @@ export const storeSharedReference: ILibraryReference = {
         'SharedInt32Signal owned by the caller. Invalid shape/value/header uses INVALID_OPTION; short buffers use BUFFER_TOO_SMALL; contention uses CONTENTION_LIMIT. Dispose only this local wrapper.',
         '返回调用者拥有的共享信号，非法形状、值或布局头使用 `INVALID_OPTION`，过短使用 `BUFFER_TOO_SMALL`，争用使用 `CONTENTION_LIMIT`，销毁仅影响当前包装。'
       ),
-      example: signalExample
+      exampleIntro: storeSharedCases.sharedInt32![0]!.problem,
+      example: signalExample,
+      exampleResult: storeSharedCases.sharedInt32![0]!.result,
+      cases: storeSharedCases.sharedInt32
     },
     SharedInt32Signal: {
       role: 'factory',
@@ -226,10 +212,13 @@ export const storeSharedReference: ILibraryReference = {
       ),
       params: {
         runtime: runtimeParam,
-        initialValue: valueParam,
+        initialValue: t(
+          'Optional signed int32 initial value; defaults to 0 for a new buffer and is ignored when attaching an existing buffer.',
+          '可选有符号 `int32` 初值，新缓冲区默认 `0`，附着已有缓冲区时忽略。'
+        ),
         buffer: t(
-          'Optional buffer obtained from another current signal instance; omitted means allocate a new scalar layout.',
-          '可选另一当前信号实例提供的缓冲区，省略时分配新标量布局。'
+          'Optional buffer from another current signal instance; omitted means allocate a new 32-byte scalar layout. Kind and current ABI header must match.',
+          '可选另一当前信号实例提供的缓冲区，省略时分配新的 `32` 字节标量布局，种类及当前布局头必须匹配。'
         )
       },
       returns: t(
@@ -241,8 +230,8 @@ export const storeSharedReference: ILibraryReference = {
     sharedInt32Array: {
       role: 'factory',
       purpose: t(
-        'Creates or attaches fixed-length shared int32 cells with a shared 64-bit generation and per-cell 64-bit seqlocks. Each reader owns its own cursors; get tracks only the indices read by that Runtime.',
-        '创建或附着定长共享整数格，具有共享六十四位代次及每格六十四位序列锁，各读者拥有独立游标，读取仅追踪所属运行时读过的下标。'
+        'Creates or attaches fixed-length shared int32 cells with a shared 64-bit generation and per-cell seqlocks. Options default to {}; each reader owns its cursors, and get tracks only indices read in Runtime tracking.',
+        '创建或附着定长共享 `int32` 格，具有共享六十四位代次及逐格序列锁；`options` 默认 `{}`，各读者拥有独立游标，`get` 仅在运行时追踪内登记被读下标。'
       ),
       params: {
         runtime: runtimeParam,
@@ -256,13 +245,16 @@ export const storeSharedReference: ILibraryReference = {
         'SharedInt32Array owned by the caller. Range errors cover invalid options/index/value or short buffers; contention is explicit. Host memory allocation limits may also throw native failures.',
         '返回调用者拥有的共享数组，范围错误覆盖非法选项、下标、值或过短缓冲区，争用显式失败，宿主内存分配限制也可抛原生失败。'
       ),
-      example: arrayExample
+      exampleIntro: storeSharedCases.sharedInt32Array![0]!.problem,
+      example: arrayExample,
+      exampleResult: storeSharedCases.sharedInt32Array![0]!.result,
+      cases: storeSharedCases.sharedInt32Array
     },
     SharedInt32Array: {
       role: 'factory',
       purpose: t(
-        'Class constructor form of sharedInt32Array, taking Runtime, required fixed length and optional buffer/initialValues. Attaching validates ABI and length without reinitializing shared data.',
-        '共享数组工厂的类构造形式，接收运行时、必填固定长度及可选缓冲区和初值迭代源，附着校验布局及长度而不重新初始化共享数据。'
+        'Class constructor form of sharedInt32Array, taking Runtime, required fixed length and options defaulting to {} with optional buffer/initialValues. Attaching validates ABI and length without reinitializing shared data.',
+        '`sharedInt32Array` 的类构造形式，接收运行时、必填固定长度及默认 `{}` 的选项，其中 `buffer` 与 `initialValues` 均可省略；附着校验布局及长度而不重新初始化共享数据。'
       ),
       params: {
         runtime: runtimeParam,
@@ -276,7 +268,10 @@ export const storeSharedReference: ILibraryReference = {
         'New SharedInt32Array local wrapper with an independent observation cursor for each shared cell. Dispose it when this Runtime no longer reads it; invalid length, header or initialization rejects construction without publishing a usable wrapper.',
         '返回为每个共享格保留独立观察游标的本地数组包装，当前运行时不再读取时应销毁，无效长度、头或初始化在发布可用包装前使构造失败。'
       ),
-      example: arrayExample
+      exampleIntro: storeSharedCases.SharedInt32Array![0]!.problem,
+      example: arrayConstructorExample,
+      exampleResult: storeSharedCases.SharedInt32Array![0]!.result,
+      cases: storeSharedCases.SharedInt32Array
     },
     STORE_SHARED_SOURCE: {
       role: 'error',

@@ -4,6 +4,7 @@
  * parent leases release first. Coroutine heartbeat.intervalMs defaults to timeoutMs and its
  * failureThreshold defaults to one, distinct from health-check and process-sampling defaults.
  */
+import { supervisionCases } from './supervision-cases.js'
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 
 /** Keeps both locales on every reader-facing node. */
@@ -1255,6 +1256,7 @@ export const reference: ILibraryReference = {
     },
     createUnitBudget: {
       role: 'factory',
+      cases: supervisionCases.createUnitBudget,
       purpose: t(
         'Creates a shared runtime-neutral capacity and launch-rate budget. Pair with createSupervisor or profile constructors; retain leases until actual unit exit.',
         '创建运行时中立的共享容量与启动速率预算。搭配 `createCoroutineSupervisor` 等监督工厂使用；租约保持到单元实际退出。'
@@ -1281,6 +1283,7 @@ export const reference: ILibraryReference = {
     },
     createCoroutineSupervisor: {
       role: 'factory',
+      cases: supervisionCases.createCoroutineSupervisor,
       purpose: t(
         'Supervises a cooperative task or async iterator without native process isolation. Task cancellation is cooperative; an unending task keeps its budget lease after bounded recovery.',
         '监督协作任务或异步迭代器，不提供原生进程隔离；取消依赖任务主动响应，任务不停则在有界回收后继续占用预算租约。'
@@ -1294,6 +1297,7 @@ export const reference: ILibraryReference = {
     },
     createProcessSupervisor: {
       role: 'factory',
+      cases: supervisionCases.createProcessSupervisor,
       purpose: t(
         'Supervises shell-free native processes through an injected launcher, with optional resource monitoring, bounded output tails and durable ownership records.',
         '通过注入启动器监督不经命令解释器的原生进程，可监测资源、保留有界输出尾部并持久保存所有权记录。'
@@ -1320,6 +1324,7 @@ export const reference: ILibraryReference = {
     },
     createPrewarmPool: {
       role: 'factory',
+      cases: supervisionCases.createPrewarmPool,
       purpose: t(
         'Maintains a bounded non-restarting pool of idle native processes. Pair with createProcessSupervisor to transfer ready handles and occupied leases without cold startup.',
         '维护有界且不自动重启的空闲原生进程池。搭配 `createProcessSupervisor` 转交就绪句柄和已占用租约，减少冷启动。'
@@ -1333,6 +1338,7 @@ export const reference: ILibraryReference = {
     },
     createParentLossGuard: {
       role: 'factory',
+      cases: supervisionCases.createParentLossGuard,
       purpose: t(
         'Creates an idempotent parent-loss trigger that runs one cancellable shutdown and requests exit code zero on success or one on failure or deadline.',
         '创建幂等父进程丢失触发器，执行一次可取消关闭；成功请求退出码零，失败或截止请求退出码一。'
@@ -1369,6 +1375,7 @@ export const reference: ILibraryReference = {
     },
     reclaimOrphanProcesses: {
       role: 'operation',
+      cases: supervisionCases.reclaimOrphanProcesses,
       purpose: t(
         'Scans one durable namespace and probes fingerprints before reclaiming prior processes. Only original live identities are terminated; reused PIDs only lose stale records.',
         '扫描持久命名空间并先检查指纹再恢复旧进程；只终止原始存活身份，已复用编号仅移除旧记录。'

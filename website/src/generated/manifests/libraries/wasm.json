@@ -5,6 +5,7 @@
     "description": null,
     "version": "0.1.2",
     "exports": ["."],
+    "readmeLocales": ["zh", "en"],
     "documentation": {
       "readme": {
         "sections": [
@@ -14,7 +15,138 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "Rust 编译的 WASM 字节暂存区和 JSON ⇄ MessagePack 转码器。它提供 8 字节对齐、地址稳定的 arena 分配，以及只在字节边界工作的同步转码 API；不跨 WASM 边界传递 JavaScript 对象图。"
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "`@migaia/wasm` 提供对齐的 WASM 字节暂存区，以及同步的 JSON 与 MessagePack 转码；你显式管理字节的所有权，不把 JavaScript 对象图逐字段传过 WASM 边界。MessagePack 是一种二进制数据格式。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "创建数值视图时抛出 `RangeError`：字节分配器给出的偏移没有满足 `Float64Array` 或 `BigInt64Array` 的对齐要求。",
+                  "大分配后旧读数消失：数值视图跨越内存增长被缓存，仍指向已经失效的旧缓冲。",
+                  "第二次导出覆盖第一次结果：输出元数据放在共享的“上一次结果”中，没有绑定到各自操作。",
+                  "归档看起来成功，尾部数据却丢失：只解析第一个文档，没有检查剩余的非空白输入。",
+                  "清理后待上传数据变了：队列保留了已释放 WASM 内存的视图，没有取得 JavaScript 自有副本。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "数值视图不需要另写对齐器。 Rust 使用 `Vec<u64>`，分配地址按八字节对齐，容量向上取整；数值读数示例直接建立 `Float64Array`。",
+                  "交错转码不会串用“上一次结果”。 每次调用返回独立的输出 id、精确长度和错误；交错转码示例保留两个结果后再读取。",
+                  "拼接损坏会明确失败。 转码器检查单文档边界，不会把第二个文档悄悄丢掉；尾随文档示例得到零输出和当前操作的错误。",
+                  "输入输出都按字节交付。 JSON 读取器直接写入 MessagePack 输出，不先构造 `serde_json::Value` 树；交错转码示例把 JSON 字节交给转码器，并保留每次操作自己的输出。这里描述机制，不承诺相对原生 JSON 操作的速度。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "安装包后，将示例保存为 `.ts` 文件，用 Node 24 直接运行。示例显式读取包内 WASM 文件，不依赖对本地文件网址发起获取。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nawait init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\nconsole.log('容量:', byte_len_of(id))\nconsole.log('释放:', dealloc_bytes(id), dealloc_bytes(id))"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "容量: 16\n释放: true false"
+              },
+              {
+                "type": "paragraph",
+                "text": "遇到数值对齐看数值读数，需要转码和清理看交错转码。"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面仅展示，不运行。它用原生 WebAssembly 内存手写上一节的字节分配。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const memory = new WebAssembly.Memory({ initial: 1 })\nlet cursor = 0\nconst allocate = (byteLen: number) => {\n  const offset = cursor\n  cursor += byteLen // 隐患 1：没有对齐地址，也没有把容量向上取整。\n  return offset // 隐患 2：没有独立 id 和存活记录，不能辨别重复释放。\n}\nallocate(1)\nconst offset = allocate(9)\nconst values = new Float64Array(memory.buffer, offset, 1)\nmemory.grow(1) // 隐患 3：缓存视图会失效，偏移值却看起来没有变化。\nconsole.log(values[0])"
+              },
+              {
+                "type": "paragraph",
+                "text": "上面的数值视图会因为偏移不对齐而抛出 `RangeError`；即使修好对齐，增长内存后也必须重建视图。上一节由 Rust 的 `Vec<u64>` 保证对齐，用稳定 id 记录存活分配；第一次释放为 true，再次释放为 false。"
+              }
+            ]
+          },
+          {
+            "id": "三分钟心智模型",
+            "heading": "三分钟心智模型",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["你要回答的问题", "工具"],
+                "rows": [
+                  ["怎样拿到模块和内存？", "异步 init 或同步 `initSync`"],
+                  [
+                    "怎样存数值或原始字节？",
+                    "`alloc_bytes` 分配，`ptr_of` 定位当前 `memory.buffer`"
+                  ],
+                  ["怎样转换归档格式？", "`json_to_msgpack` 或 `msgpack_to_json`"],
+                  ["用完由谁释放？", "输入/输出 id 用 `dealloc_bytes`，结果元数据用 free"]
+                ]
+              },
+              {
+                "type": "table",
+                "headers": ["术语", "白话含义"],
+                "rows": [
+                  ["arena", "模块保存字节的暂存区。"],
+                  ["id", "一块分配的稳定编号，零表示没有分配。"],
+                  ["pointer", "当前线性内存的字节偏移，不是分配编号。"],
+                  ["capacity", "按八字节取整的容量，不等于文档长度。"],
+                  ["`ConversionResult`", "某次转码的 id、精确长度和错误；自身也需要释放。"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "典型场景",
+            "heading": "典型场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["场景", "怎么组合", "详细说明"],
+                "rows": [
+                  ["两个功能同时启动时共享同一份内存", "`init`", "完整示例"],
+                  ["不用猜内存对齐就能存数值读数", "`alloc_bytes`", "完整示例"],
+                  ["内存增长后继续读取同一块分配", "`ptr_of`", "完整示例"],
+                  ["释放 WASM 字节后保留 JavaScript 副本", "`dealloc_bytes`", "完整示例"],
+                  ["保留两次转码结果而不互相覆盖", "`json_to_msgpack`", "完整示例"],
+                  ["拒绝尾随第二个文档，避免静默丢数据", "`json_to_msgpack`", "完整示例"],
+                  ["只解码收到的 MessagePack 字节", "`msgpack_to_json`", "完整示例"]
+                ]
               }
             ]
           },
@@ -29,92 +161,66 @@
               },
               {
                 "type": "paragraph",
-                "text": "包内包含 wasm-pack 生成的 ES module 和 `.wasm` 资源。修改 Rust 实现后，用 `pnpm run build` 重新生成 `src/`；build 随后通过 scripts/finalize-glue.ts 给既有 finalizer 加入一次发布规则，不手工编辑生成文件。"
+                "text": "包内包含生成的 ES module 和 `.wasm` 资源。浏览器配置好资源加载后，可以用 `await init()` 加载包内资源；Node 等宿主应像上例一样传入字节或预编译的 `WebAssembly.Module`。"
               }
             ]
           },
           {
-            "id": "api",
-            "heading": "API",
+            "id": "常用-api",
+            "heading": "常用 API",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import init, {\n  alloc_bytes,\n  ptr_of,\n  byte_len_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  msgpack_to_json\n} from '@migaia/wasm'"
-              },
-              {
-                "type": "paragraph",
-                "text": "`alloc_bytes(byteLen)` 返回新分配 id（或 `0`）；`ptr_of(id)` 返回字节指针；`byte_len_of(id)` 返回按 8 字节取整的容量；`dealloc_bytes(id)` 显式释放并返回是否确实存在。死 id 的读操作返回 `0`，释放操作返回 `false`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "转码函数都返回同一次操作绑定的 `ConversionResult`："
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import type { ConversionResult } from '@migaia/wasm'\ndeclare const result: ConversionResult\nresult.id // 成功时的新输出分配，失败时为 0\nresult.len // 精确输出长度，失败时为 0\nresult.error // 成功为空串，失败为原因\nresult.free() // 独立释放 wasm-bindgen 结果元数据，不释放输出 arena"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "const wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ count: 2 }))\nconst input = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n  const result = json_to_msgpack(input, json.length)\n  try {\n    outputId = result.id\n    if (outputId === 0) throw new Error(result.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(input)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}"
-              },
-              {
-                "type": "paragraph",
-                "text": "`msgpack_to_json` 具有对称签名。输入必须是单个完整文档；尾随非空白字节会失败。成功和失败都只通过当前返回值报告，不存在全局“上一次结果”或兼容别名，因此两个调用的结果可以安全地交错保存。输入分配不会由转码自动释放。每次成功和失败的结果元数据均须 free()；元数据与 arena 分配是两个独立的所有权。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`json_to_msgpack` 保持 map key 为字符串并直接从 reader 转到 writer，不先构造 `serde_json::Value`；`msgpack_to_json` 同样保持单文档边界。"
+                "type": "table",
+                "headers": ["API", "作用"],
+                "rows": [
+                  ["`init()`", "异步加载模块并取得共享内存。"],
+                  ["`initSync()`", "用字节或预编译模块同步初始化。"],
+                  ["`alloc_bytes()`", "取得对齐且清零的字节分配。"],
+                  ["`dealloc_bytes()`", "释放输入或成功输出的 arena 分配。"],
+                  ["`json_to_msgpack()`", "把完整 JSON 文档转为 MessagePack。"],
+                  ["`msgpack_to_json()`", "把精确长度的 MessagePack 文档转回 JSON。"]
+                ]
               }
             ]
           },
           {
-            "id": "内存与生命周期",
-            "heading": "内存与生命周期",
+            "id": "契约细节",
+            "heading": "契约细节",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "arena 使用 `Vec<u64>`，保证指针适合 `Float64Array`/`BigInt64Array`。WASM memory 增长会使旧 `ArrayBuffer` 视图失效；每次分配或读取前都从当前 `memory.buffer` 创建视图。所有分配都必须显式释放；`@migaia/store-wasm` 另外提供 FinalizationRegistry 兜底，但不替代确定性 dispose。"
+                "text": "arena（字节暂存区）是模块内部保存字节的地方。`alloc_bytes(byte_len)` 返回稳定的非零分配 id；内存或 id 空间耗尽时返回 `0`。`ptr_of(id)` 返回字节偏移，`byte_len_of(id)` 返回向上取整为八倍数的容量。未知或已释放 id 的两个查询都返回 `0`。`dealloc_bytes(id)` 返回是否确实移除了活动分配。每次成功分配都必须显式释放，包括零长度分配。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`json_to_msgpack(id, len)` 和 `msgpack_to_json(id, len)` 每次返回独立的 `ConversionResult`。成功时它持有新的输出 `id`、精确输出长度 `len` 和空串 `error`；失败时 `id`、`len` 为零，`error` 解释本次失败。转码不会释放输入。输入和成功输出 id 用 `dealloc_bytes` 释放；成功或失败的结果元数据都要另行调用 `result.free()`。`free()` 不释放输出字节区。"
+              },
+              {
+                "type": "paragraph",
+                "text": "转码只接受一个完整文档。JSON 允许文档后的空白；MessagePack 必须精确消费传入长度。长度必须是有效载荷字节数，不能用取整后的容量。JSON 对象的 map key 保持字符串。JSON 对象直接按 map 序列化，不依赖 struct-map 配置。往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数可能被改写或拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "指针只保证释放前稳定，内存增长会替换 `memory.buffer`。每次读取前用当前缓冲重新创建视图。`.slice()` 得到 JavaScript 自有副本，可以在释放字节区后保留；零拷贝视图则要求把对应 id 的释放延后到最后一次读取之后。`@migaia/store-wasm` 额外提供字段所有权和 `FinalizationRegistry` 兜底，但不替代确定性释放，也不复制这里的暂存区。"
+              },
+              {
+                "type": "paragraph",
+                "text": "模块只发布第一份完成初始化的导出。并发调用和具名函数使用同一份内存与暂存区；仍可能并发实例化，不承诺同一个 Promise 或只编译一次。原生 `WebAssembly.CompileError`、`LinkError` 和 `RuntimeError` 原样透传，不附加包级 `source` 或 `code`。转码失败通过返回值报告，与这些原生异常不同。"
               }
             ]
           },
           {
-            "id": "高阶组合示例-交错转码并在一个所有权边界内释放全部分配",
-            "heading": "高阶组合示例 · 交错转码并在一个所有权边界内释放全部分配",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "每次转码返回独立的 `ConversionResult`，因此可以先保留多个结果，再按业务顺序读取。输入 id 和成功结果 id 都归调用者所有；用 `try/finally` 把释放收拢到同一个边界，避免异常路径泄漏 arena 分配："
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n\ntype IJsonAllocation = { id: number; length: number }\n\nfunction writeJson(value: unknown): IJsonAllocation {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst inputs: IJsonAllocation[] = []\nconst results: ConversionResult[] = []\ntry {\n  inputs.push(writeJson({ id: 1, status: 'ready' }))\n  inputs.push(writeJson({ id: 2, status: 'queued' }))\n  for (const input of inputs) results.push(json_to_msgpack(input.id, input.length))\n  for (const result of results) {\n    if (result.id === 0) throw new Error(result.error)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  for (const input of inputs) dealloc_bytes(input.id)\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n}"
-              },
-              {
-                "type": "paragraph",
-                "text": "每次读取前都重新访问 `wasm.memory.buffer`，因为后续分配可能触发 memory growth 并使旧视图失效。`.slice()` 得到 JavaScript 自有副本后即可释放 WASM 输出；如果要保留零拷贝视图，就必须把对应 id 的释放延后到最后一次读取之后。"
-              }
-            ]
-          },
-          {
-            "id": "构建与测试",
-            "heading": "构建与测试",
+            "id": "构建与验证",
+            "heading": "构建与验证",
             "blocks": [
               {
                 "type": "code",
                 "language": "bash",
-                "code": "pnpm run build       # wasm-pack build --target web --release --out-dir ../src\npnpm run test        # wasm-pack test --node rust，再运行 JS glue 回归\npnpm run test:rust   # cargo test（Rust 原生单元测试）\npnpm run typecheck   # 生成声明和包配置检查"
+                "code": "pnpm run build\npnpm run test\npnpm run test:rust\npnpm run typecheck"
               },
               {
                 "type": "paragraph",
-                "text": "生成的 glue/声明/WASM 先由 wasm-pack 覆盖，再由 TypeScript build 后处理固定首个 exports 的发布，避免晚完成的 init 替换已交付 memory。发布或验证前应执行一次确定性重复构建，并通过真实 WASM host 和 packed consumer 导入/实例化测试。"
-              },
-              {
-                "type": "paragraph",
-                "text": "转码的往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数不保证可逆，可能被改写或拒绝。JSON 对象直接走 map 序列化，不依赖 struct-map 配置。"
+                "text": "修改 Rust 后，`build` 从 `rust/` 运行 `wasm-pack build --target web --release --out-dir ../src`，再用 `scripts/finalize-glue.ts` 固定第一份发布的导出。不要手工编辑生成的 glue、声明或 WASM。发布验证还包括两次确定性构建、真实非零 WASM host 和 packed 安装、导入、实例化。`test` 运行真实 WASM Rust 测试和 JS 初始化回归；`test:rust` 运行 Rust 原生测试。"
               }
             ]
           }
@@ -128,117 +234,989 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本文记录当前单一 WASM ABI。Rust arena 和转码函数由 `@migaia/wasm` 负责；`@migaia/store-wasm` 只负责字段分配、数值视图和生命周期，不复制 arena 或转码状态机。"
-              }
-            ]
-          },
-          {
-            "id": "1-初始化",
-            "heading": "1. 初始化",
-            "blocks": [
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import init, {\n  initSync,\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n// 或：const wasm = initSync({ module: moduleOrBytes });"
+                "text": "English"
               },
               {
                 "type": "paragraph",
-                "text": "默认入口通过包内 `wasm_provider_bg.wasm` 初始化。同一模块只发布第一份完成初始化的 exports；并发 init 的返回值和具名 wrapper 共用该 memory/arena。并发实例化工作仍可能发生，不承诺同一个 Promise 或只编译一次。Node 等不支持相对 fetch 的宿主应传入 `BufferSource` 或 `WebAssembly.Module`。同步入口不发起 fetch。"
+                "text": "包的定位和选用依据见 README。安装包后，下面每个示例都能单独保存为 `.ts` 文件，用 Node 24 运行；示例显式读取包内 WASM 字节。"
               }
             ]
           },
           {
-            "id": "2-arena-契约",
-            "heading": "2. Arena 契约",
+            "id": "按场景查找",
+            "heading": "按场景查找",
             "blocks": [
               {
                 "type": "table",
-                "headers": ["API", "返回值", "语义"],
+                "headers": ["你遇到的问题", "API", "看这一节"],
                 "rows": [
                   [
-                    "`alloc_bytes(byteLen)`",
-                    "`number`",
-                    "8 字节对齐、清零的稳定分配 id，失败为 `0`"
+                    "两个功能同时启动时共享同一份内存",
+                    "`init`",
+                    "两个功能同时启动时共享同一份内存"
                   ],
-                  ["`ptr_of(id)`", "`number`", "当前线性内存中的字节偏移，未知 id 为 `0`"],
-                  ["`byte_len_of(id)`", "`number`", "实际容量（按 8 字节取整），未知 id 为 `0`"],
-                  ["`dealloc_bytes(id)`", "`boolean`", "是否确实释放了一个 live id"]
+                  ["不用猜内存对齐就能存数值读数", "`alloc_bytes`", "不用猜内存对齐就能存数值读数"],
+                  ["内存增长后继续读取同一块分配", "`ptr_of`", "内存增长后继续读取同一块分配"],
+                  [
+                    "释放 WASM 字节后保留 JavaScript 副本",
+                    "`dealloc_bytes`",
+                    "释放 WASM 字节后保留 JavaScript 副本"
+                  ],
+                  [
+                    "保留两次转码结果而不互相覆盖",
+                    "`json_to_msgpack`",
+                    "保留两次转码结果而不互相覆盖"
+                  ],
+                  [
+                    "拒绝尾随第二个文档，避免静默丢数据",
+                    "`json_to_msgpack`",
+                    "拒绝尾随第二个文档，避免静默丢数据"
+                  ],
+                  [
+                    "只解码收到的 MessagePack 字节",
+                    "`msgpack_to_json`",
+                    "只解码收到的 MessagePack 字节"
+                  ]
                 ]
-              },
-              {
-                "type": "paragraph",
-                "text": "`0` 是保留哨兵。分配使用稳定 id 并避免覆盖仍存活的块；指针只保证到释放前稳定。WASM memory 增长会替换 `memory.buffer`，所以 typed array 不能跨越后续分配调用复用。"
               }
             ]
           },
           {
-            "id": "3-单操作转码-abi",
-            "heading": "3. 单操作转码 ABI",
+            "id": "两个功能同时启动时共享同一份内存",
+            "heading": "两个功能同时启动时共享同一份内存",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "// ConversionResult 是具名 JS wrapper 返回的元数据类，还需显式 free()。\ndeclare const result: ConversionResult\nresult.id\nresult.len\nresult.error\nresult.free()\n\ndeclare function json_to_msgpack(id: number, len: number): ConversionResult\ndeclare function msgpack_to_json(id: number, len: number): ConversionResult"
-              },
-              {
                 "type": "paragraph",
-                "text": "每个调用都构造独立 `ConversionResult`，把输出 id、精确输出长度和错误绑定到同一操作；不存在共享的结果寄存器，因此交错调用不会互相覆盖结果。成功为 `{ id: nonzero, len: exactBytes, error: '' }`，失败为 `{ id: 0, len: 0, error: reason }`。输出和输入 arena id 都由调用者用 dealloc_bytes 释放；每次成功或失败返回的 ConversionResult 元数据还须独立调用 free()。free() 不释放输出 arena，dealloc_bytes 不释放结果元数据。init 返回的 InitOutput 是 raw WASM ABI；不要对它调用转码后把数字结构指针当 ConversionResult。使用导入的具名 JS wrapper。"
-              },
-              {
-                "type": "paragraph",
-                "text": "转码只读取指定分配的前 `len` 个字节，并拒绝未知 id、超过容量的长度、空文档、格式错误和尾随第二个文档。JSON 允许文档后的空白；MessagePack 必须精确消费输入。map key 以字符串保存，避免 schema 依赖。"
+                "text": "两个功能可能同时初始化模块。如果后完成的实例替换前一个实例，一个功能拿到的内存就会和具名函数使用的内存分离。初始化器只发布第一份完成初始化的导出，所有完成的调用都返回它；这不表示只编译一次，也不承诺返回同一个 Promise。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  const encoded = json_to_msgpack(inputId, json.length)\n  try {\n    outputId = encoded.id\n    if (outputId === 0) throw new Error(encoded.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), encoded.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    encoded.free()\n  }\n} finally {\n  dealloc_bytes(inputId)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}"
-              }
-            ]
-          },
-          {
-            "id": "4-错误与边界",
-            "heading": "4. 错误与边界",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "错误内容保持现有调用方可诊断的前缀：未知分配或超容量为 `unknown allocation id or length past capacity`，arena 无法分配输出为 `arena exhausted`，JSON/MessagePack 解析错误分别带 `json to msgpack failed:` 或 `msgpack to json failed:`。这些文本存在于返回值内，不通过第二个查询 API 读取。"
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst bytes = await readFile(\n  new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n)\nconst [first, second] = await Promise.all([\n  init({ module_or_path: bytes }),\n  init({ module_or_path: bytes })\n])\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  console.log('同一导出:', first === second)\n  console.log('同一分配:', first.byte_len_of(id) === byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}"
               },
               {
                 "type": "paragraph",
-                "text": "空输入、非法输入、多个连续文档和超出实际容量的长度都会返回 `id: 0`。失败不会创建可供调用者释放的输出块；输入块仍由调用者拥有，失败返回的元数据仍需 free()。"
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "同一导出: true\n同一分配: true"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `同一导出: true` 和 `同一分配: true`。两个初始化结果和具名分配函数使用同一个已发布的字节暂存区。"
               }
             ]
           },
           {
-            "id": "5-store-wasm-接入规则",
-            "heading": "5. store-wasm 接入规则",
+            "id": "不用猜内存对齐就能存数值读数",
+            "heading": "不用猜内存对齐就能存数值读数",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "字段 owner 通过 `ensureWasm()` 复用同一个初始化 Promise，并在显式 dispose 时释放自己的分配；构造失败时先完成所有已创建资源的回滚，再保留原始错误。record 字段只接受 number，并使用当前 `memory.buffer` 上的 `DataView`。这些生命周期语义不依赖转码结果 ABI，也不引入第二种 shared-buffer layout。"
+                "text": "一个能创建字节数组的偏移，用来创建 `Float64Array` 时却可能抛出 `RangeError`。手写分配器需要同时处理地址对齐和容量取整。`alloc_bytes` 一次完成这两件事：申请 9 字节会得到 16 字节的清零空间，地址按八字节对齐。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const values = new Float64Array(wasm.memory.buffer, ptr_of(id), 2)\n  values.set([21.5, 23])\n  console.log('容量:', byte_len_of(id))\n  console.log('对齐余数:', ptr_of(id) % 8)\n  console.log('读数:', values[0], values[1])\n} finally {\n  dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "容量: 16\n对齐余数: 0\n读数: 21.5 23"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出容量 16、对齐余数 0 和读数 21.5 23。取整后的分配可以容纳两个浮点数，指针符合原生数值视图的对齐要求。"
               }
             ]
           },
           {
-            "id": "6-构建与验证",
-            "heading": "6. 构建与验证",
+            "id": "内存增长后继续读取同一块分配",
+            "heading": "内存增长后继续读取同一块分配",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "后续分配触发内存增长后，之前缓存的数值视图可能变成空视图。指针稳定不代表旧 ArrayBuffer 仍然有效。保留分配 `id`，每次读取前用 `ptr_of` 和当前 `memory.buffer` 重新创建视图。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const offset = ptr_of(id)\n  const previous = new Float64Array(wasm.memory.buffer, offset, 1)\n  previous[0] = 42\n  wasm.memory.grow(1)\n  const current = new Float64Array(wasm.memory.buffer, ptr_of(id), 1)\n  console.log('偏移未变:', ptr_of(id) === offset)\n  console.log('旧视图字节数:', previous.byteLength)\n  console.log('当前读数:', current[0])\n} finally {\n  dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "偏移未变: true\n旧视图字节数: 0\n当前读数: 42"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `偏移未变: true`、`旧视图字节数: 0` 和 `当前读数: 42`。活动分配的偏移保持不变，但内存增长使旧的非共享缓冲失效。"
+              }
+            ]
+          },
+          {
+            "id": "释放-wasm-字节后保留-javascript-副本",
+            "heading": "释放 WASM 字节后保留 JavaScript 副本",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "上传队列可能比产生字节的转码任务活得更久。如果队列还拿着已释放字节区的视图，后续分配就可能改写待上传数据。在 `dealloc_bytes` 前复制字节，队列就拥有独立副本；第二次释放返回 `false`，不会释放另一块活动分配。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(3)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, ptr_of(id), 3)\n  view.set([1, 2, 3])\n  const ownedCopy = view.slice()\n  console.log('释放:', dealloc_bytes(id), dealloc_bytes(id))\n  console.log('副本:', ownedCopy.join(','))\n  console.log('已释放的查询:', ptr_of(id), byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "释放: true false\n副本: 1,2,3\n已释放的查询: 0 0"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `释放: true false`、`副本: 1,2,3` 和 `已释放的查询: 0 0`。JavaScript 副本仍可读取，已释放 id 的字节区查询返回零。"
+              }
+            ]
+          },
+          {
+            "id": "保留两次转码结果而不互相覆盖",
+            "heading": "保留两次转码结果而不互相覆盖",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "批量导出可能还没读取第一次结果就开始第二次转码。用全局“上一次结果”时，很容易把第二次输出当成第一次输出。每次 `json_to_msgpack` 都返回自己的输出 id、精确长度和错误，保留两个结果对象就能分别读取两次操作。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst inputs: number[] = []\nconst results: ConversionResult[] = []\ntry {\n  for (const json of ['{\"first\":true}', '{\"second\":true}']) {\n    const bytes = new TextEncoder().encode(json)\n    const id = alloc_bytes(bytes.length)\n    if (id === 0) throw new Error('分配失败')\n    inputs.push(id)\n    new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n    results.push(json_to_msgpack(id, bytes.length))\n  }\n  console.log(\n    '都成功:',\n    results.every((result) => result.id !== 0 && result.error === '')\n  )\n  console.log('输出各自独立:', results[0].id !== results[1].id)\n  console.log('第一个结果仍有效:', results[0].len > 0)\n} finally {\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n  for (const id of inputs) dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "都成功: true\n输出各自独立: true\n第一个结果仍有效: true"
+              },
+              {
+                "type": "paragraph",
+                "text": "三行结果都是 `true`。第二次调用没有覆盖第一个结果。`finally` 分别释放成功输出、两个输入分配和两个元数据对象。"
+              }
+            ]
+          },
+          {
+            "id": "拒绝尾随第二个文档-避免静默丢数据",
+            "heading": "拒绝尾随第二个文档，避免静默丢数据",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "导出拼接出错时，一个缓冲里可能出现两个 JSON 文档。只读取第一个会看起来成功，却丢掉后面的数据。`json_to_msgpack` 要求输入是一个完整文档；尾随非空白字节会得到失败结果，输入分配仍由调用者拥有。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst bytes = new TextEncoder().encode('{}{}')\nconst id = alloc_bytes(bytes.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  const result = json_to_msgpack(id, bytes.length)\n  try {\n    console.log('输出分配:', result.id, '字节数:', result.len)\n    console.log('拒绝第二个文档:', result.error.startsWith('json to msgpack failed:'))\n    console.log('输入仍归调用方:', ptr_of(id) !== 0)\n    if (result.id !== 0) dealloc_bytes(result.id)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "输出分配: 0 字节数: 0\n拒绝第二个文档: true\n输入仍归调用方: true"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出分配和长度都是 0，后面两个判断都是 `true`。失败没有留下输出块；调用者仍须释放输入和失败结果的元数据。"
+              }
+            ]
+          },
+          {
+            "id": "只解码收到的-messagepack-字节",
+            "heading": "只解码收到的 MessagePack 字节",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "收到的五字节消息可能占用八字节的暂存区。如果把容量当成文档长度，解码器会把填充字节也读进去，让有效消息变成尾随字节错误。把收到的精确字节数传给 `msgpack_to_json`，并且只读取结果的 `result.len` 字节。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('文档:', new TextDecoder().decode(json))\n    console.log('输入字节:', packed.length, '容量:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "文档: {\"ok\":true}\n输入字节: 5 容量: 8"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `文档: {\"ok\":true}` 和 `输入字节: 5 容量: 8`。文档长度不同于取整容量，转码只消费传入的精确文档字节。"
+              }
+            ]
+          },
+          {
+            "id": "初始化与参数",
+            "heading": "初始化与参数",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "默认初始化器导入为 `init`。`init({ module_or_path })` 接受请求字符串、`Request`、`URL`、`Response`、`BufferSource`、预编译 `WebAssembly.Module`，也接受这些输入的 Promise。省略参数时使用包内 `wasm_provider_bg.wasm` 网址。请求字符串、请求和网址走 `fetch`；字节和模块直接实例化。Node 示例通过包入口定位相邻资源并传入字节。加载失败时 Promise 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`initSync({ module })` 接受字节或预编译 `WebAssembly.Module`，不发起网络获取，`module` 必填。已初始化时，两个入口都返回已发布导出。位置参数形式仍然接受，但会输出弃用警告；使用对象形式即可。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`InitOutput.memory` 是原生 `WebAssembly.Memory`。其余函数属于生成的原始 ABI：特别是转码函数返回数字元数据指针，释放函数返回数字布尔值。应用应使用具名导入的包装函数，得到 `ConversionResult` 和布尔值。不要把字节区 id 当成元数据指针。"
+              },
+              {
+                "type": "table",
+                "headers": ["参数", "说明"],
+                "rows": [
+                  [
+                    "`byte_len`",
+                    "请求的字节数，使用非负的无符号三十二位整数；容量向上取整为八的倍数。零长度分配成功后也拥有必须释放的 id。"
+                  ],
+                  [
+                    "`id`",
+                    "同一已初始化模块中，来自 `alloc_bytes` 或成功 `ConversionResult.id` 的活动 id。零是保留哨兵，不是分配。不能传入字节指针。"
+                  ],
+                  [
+                    "`len`",
+                    "实际写入输入的文档字节数，不超过 `byte_len_of(id)`。不能使用取整容量。"
+                  ],
+                  [
+                    "`init.module_or_path`",
+                    "可选的模块来源，取值见上文。省略参数时默认使用包内 WASM 网址；提供字节时无需网络获取。"
+                  ],
+                  [
+                    "`initSync.module`",
+                    "必填的字节或预编译模块。没有默认值，不接受需要网络获取的来源。"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "暂存区与转码所有权",
+            "heading": "暂存区与转码所有权",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Rust 使用 `Vec<u64>` 管理同一个字节暂存区。分配 id 保持稳定，活动期间不会被复用。字节指针在对应 id 释放前保持有效。任何可能分配或增长内存的调用后，都应从当前 `memory.buffer` 重新创建视图。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`alloc_bytes` 在内存或 id 空间耗尽时返回 `0`。未知和已释放 id 的 `ptr_of`、`byte_len_of` 返回 `0`，`dealloc_bytes` 返回 `false`。活动的零长度分配容量同样为零，不能只凭容量判断是否仍然活动。"
+              },
+              {
+                "type": "paragraph",
+                "text": "两个转码器都是同步的，只收发字节。成功返回 `{ id: nonzero, len: exactBytes, error: '' }`；失败返回 `{ id: 0, len: 0, error: reason }`。每次调用持有独立元数据。输入 id 和成功输出 id 都归调用者，用 `dealloc_bytes` 分别释放。每个返回的元数据对象，包括失败结果，还须另行调用 `free()` 或 `[Symbol.dispose]()`。释放元数据前读取所需字段；之后不要再读取或释放该元数据。释放元数据不会释放字节区，释放字节区也不会释放元数据。"
+              },
+              {
+                "type": "paragraph",
+                "text": "转码拒绝未知 id、超过容量的长度、空文档、非法数据和尾随第二个文档。JSON 允许尾随空白，MessagePack 必须精确消费输入长度。失败没有留下输出块，调用者的输入分配和字节保持不变。JSON 读取器直接写入 MessagePack 输出，不先创建 `serde_json::Value` 树；对象的 map key 保持字符串。JSON 对象直接按 map 序列化，不依赖 struct-map 配置。"
+              },
+              {
+                "type": "paragraph",
+                "text": "JSON 往返保真限于 JSON 数据模型及可表示数值。任意 MessagePack 的 bin/ext、非 JSON map key 和超范围整数不保证可逆，可能被改写或拒绝。"
+              }
+            ]
+          },
+          {
+            "id": "错误与恢复",
+            "heading": "错误与恢复",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "失败转码把文本放在本次 `error` 属性中，不使用全局错误槽。id 非法或长度超容量返回 `unknown allocation id or length past capacity`；输出分配耗尽返回 `arena exhausted`。解析错误分别以 `json to msgpack failed:` 或 `msgpack to json failed:` 开头。读取输出前先检查 `id`，保留原始错误文本用于诊断，最后释放失败元数据和输入。"
+              },
+              {
+                "type": "paragraph",
+                "text": "原生 `WebAssembly.CompileError`、`WebAssembly.LinkError`、`WebAssembly.RuntimeError` 原样透传，保持类型、身份和堆栈，不附包级 `source` 或 `code`。它们与正常转码的失败返回值不同。本包没有自有错误码。"
+              }
+            ]
+          },
+          {
+            "id": "接入-store-wasm",
+            "heading": "接入 store-wasm",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/wasm` 负责 arena 和转码；`@migaia/store-wasm` 负责字段分配、数值视图与字段生命周期，不复制暂存区或转码状态机。字段 owner 通过 `ensureWasm()` 复用同一个初始化 Promise，显式 dispose 时释放自己的分配；构造失败时先回滚已创建资源，再保留原始错误。record 字段只接受 number，并使用当前 `memory.buffer` 上的 `DataView`。它的 `FinalizationRegistry` 只是兜底，不替代显式释放。"
+              }
+            ]
+          },
+          {
+            "id": "构建与验证",
+            "heading": "构建与验证",
             "blocks": [
               {
                 "type": "code",
                 "language": "bash",
-                "code": "pnpm run build\npnpm run test\npnpm run typecheck"
+                "code": "pnpm run build\npnpm run test\npnpm run test:rust\npnpm run typecheck"
               },
               {
                 "type": "paragraph",
-                "text": "`build` 必须从 `rust/` 运行 wasm-pack，并完整生成 `src/wasm_provider.js`、`.d.ts` 和 `.wasm`；随后运行 TypeScript scripts/finalize-glue.ts 给生成的 finalizer 加入一次发布规则；生成文件禁止手工修改。验证还应执行真实非零 WASM host runner、两次确定性构建的字节比较，以及 packed 安装、导入和实例化。`@migaia/store-wasm` 另外执行其 `fmt → lint → typecheck → typecheck:test → test` 门禁和真实 WASM consumer 检查。"
-              },
-              {
-                "type": "paragraph",
-                "text": "转码的往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数不保证可逆，可能被改写或拒绝。JSON 对象直接走 map 序列化，不依赖 struct-map 配置。"
+                "text": "`build` 从 `rust/` 运行 wasm-pack，重新生成 `src/wasm_provider.js`、声明和 `.wasm`，再执行 `scripts/finalize-glue.ts` 固定第一份发布的导出。不要手工修改生成产物。验证还包括真实非零 WASM host、两次确定性构建的字节比较，以及 packed 安装、导入和实例化。`@migaia/store-wasm` 等消费者另行运行自己的格式、lint、类型与真实 WASM 运行时门禁。"
               }
             ]
           }
         ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-wasm",
+              "heading": "@migaia/wasm",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/wasm` provides aligned WASM byte storage and synchronous JSON–MessagePack conversion, with explicit ownership instead of passing JavaScript object graphs across the WASM boundary. MessagePack is a binary data format."
+                }
+              ]
+            },
+            {
+              "id": "sound-familiar",
+              "heading": "Sound familiar?",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "A numeric view throws `RangeError`. A byte allocator supplied an offset that was not aligned for `Float64Array` or `BigInt64Array`.",
+                    "A reading disappears after a large allocation. A typed-array view was cached across memory growth and now points to a detached buffer.",
+                    "The second export overwrites the first result. Output metadata was held in a shared last-result slot rather than attached to each operation.",
+                    "An archive looks valid but loses its tail. Parsing accepted the first document without checking that all non-whitespace input was consumed.",
+                    "A background upload changes after cleanup. The queue retained a view into freed WASM memory rather than a JavaScript-owned copy."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "why-choose-it",
+              "heading": "Why choose it",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Numeric views need no separate alignment layer. Rust stores arena blocks as `Vec<u64>`, aligning addresses and rounding capacity to eight bytes; the numeric readings example constructs a `Float64Array` directly.",
+                    "Interleaved conversions keep their own results. Each call returns its own output ID, exact length and error; the interleaving example retains two results before reading either.",
+                    "A broken concatenation fails explicitly. The converters enforce one document rather than silently discarding a second; the trailing document example returns zero output with an operation-specific failure.",
+                    "The boundary carries bytes throughout. The JSON reader writes directly to the MessagePack writer without building a `serde_json::Value` tree first; the interleaving example passes JSON bytes to the converter and retains each operation’s own output. This explains the mechanism, without claiming a speed advantage over native JSON operations."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Install the module, save this example as a `.ts` file, and run it with Node 24. It reads the bundled WASM file explicitly, so initialization does not depend on fetching a local file URL."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nawait init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('allocation failed')\nconsole.log('capacity:', byte_len_of(id))\nconsole.log('release:', dealloc_bytes(id), dealloc_bytes(id))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "capacity: 16\nrelease: true false"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "For numeric alignment, read numeric readings; for conversion ownership, read interleaved conversions."
+                }
+              ]
+            },
+            {
+              "id": "what-hand-written-code-gets-wrong",
+              "heading": "What hand-written code gets wrong",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "For illustration only; do not run. This manual allocator uses native WebAssembly memory for the byte allocation shown above."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const memory = new WebAssembly.Memory({ initial: 1 })\nlet cursor = 0\nconst allocate = (byteLen: number) => {\n  const offset = cursor\n  cursor += byteLen // Pitfall 1: neither the address nor capacity is aligned.\n  return offset // Pitfall 2: no allocation ID or live record to detect repeated release.\n}\nallocate(1)\nconst offset = allocate(9)\nconst values = new Float64Array(memory.buffer, offset, 1)\nmemory.grow(1) // Pitfall 3: cached views detach even though offsets look unchanged.\nconsole.log(values[0])"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The numeric view above throws `RangeError` because its offset is misaligned. Even with alignment fixed, memory growth requires fresh views. The module uses Rust `Vec<u64>` for alignment and stable IDs for live allocations; the first release returns true and a repeated release returns false."
+                }
+              ]
+            },
+            {
+              "id": "the-model-in-three-minutes",
+              "heading": "The model in three minutes",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Your question", "Tool"],
+                  "rows": [
+                    [
+                      "How do I obtain the module and memory?",
+                      "Async init or synchronous `initSync`"
+                    ],
+                    [
+                      "How do I store numbers or raw bytes?",
+                      "Allocate with `alloc_bytes` and locate the current buffer with `ptr_of`"
+                    ],
+                    ["How do I change archive format?", "`json_to_msgpack` or `msgpack_to_json`"],
+                    [
+                      "Who releases the allocations?",
+                      "`dealloc_bytes` for input/output IDs, free for result metadata"
+                    ]
+                  ]
+                },
+                {
+                  "type": "table",
+                  "headers": ["Term", "Meaning"],
+                  "rows": [
+                    ["arena", "The module’s store for allocated bytes."],
+                    ["id", "A stable allocation identifier; zero means no allocation."],
+                    [
+                      "pointer",
+                      "A byte offset into current linear memory, not an allocation identifier."
+                    ],
+                    ["capacity", "Storage rounded to eight bytes, rather than document length."],
+                    [
+                      "`ConversionResult`",
+                      "One conversion’s output ID, exact length and error; its metadata needs separate release."
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "typical-scenarios",
+              "heading": "Typical scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Scenario", "Building blocks", "Details"],
+                  "rows": [
+                    [
+                      "Share one arena when two features start together",
+                      "`init`",
+                      "Runnable example"
+                    ],
+                    [
+                      "Store numeric readings without guessing alignment",
+                      "`alloc_bytes`",
+                      "Runnable example"
+                    ],
+                    ["Read the same allocation after memory grows", "`ptr_of`", "Runnable example"],
+                    [
+                      "Keep a JavaScript copy after releasing WASM bytes",
+                      "`dealloc_bytes`",
+                      "Runnable example"
+                    ],
+                    [
+                      "Retain two conversions without a shared last-result slot",
+                      "`json_to_msgpack`",
+                      "Runnable example"
+                    ],
+                    [
+                      "Reject a second document instead of silently dropping it",
+                      "`json_to_msgpack`",
+                      "Runnable example"
+                    ],
+                    [
+                      "Decode only the received MessagePack bytes",
+                      "`msgpack_to_json`",
+                      "Runnable example"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "install",
+              "heading": "Install",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add @migaia/wasm"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The module includes the generated ES module and `.wasm` asset. In a browser with asset loading configured, `await init()` loads that bundled asset. Node hosts should pass bytes or a precompiled `WebAssembly.Module`, as above."
+                }
+              ]
+            },
+            {
+              "id": "essential-api",
+              "heading": "Essential API",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "Purpose"],
+                  "rows": [
+                    ["`init()`", "Loads the module asynchronously and returns shared memory."],
+                    ["`initSync()`", "Initializes synchronously from bytes or a compiled module."],
+                    ["`alloc_bytes()`", "Owns an aligned, zeroed byte allocation."],
+                    [
+                      "`dealloc_bytes()`",
+                      "Releases an input or successful output arena allocation."
+                    ],
+                    ["`json_to_msgpack()`", "Converts a complete JSON document to MessagePack."],
+                    ["`msgpack_to_json()`", "Converts exact-length MessagePack bytes to JSON."]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "contract-details",
+              "heading": "Contract details",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "An arena is the module's byte store. `alloc_bytes(byte_len)` returns a stable nonzero allocation ID, or `0` on memory or identifier exhaustion. `ptr_of(id)` returns its byte offset; `byte_len_of(id)` returns capacity rounded up to eight bytes. Unknown or released IDs return `0` from both queries. `dealloc_bytes(id)` returns whether it removed a live block. Every successful allocation, including a zero-length allocation, needs explicit release."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`json_to_msgpack(id, len)` and `msgpack_to_json(id, len)` return a separate `ConversionResult` for each call. On success it holds a new output `id`, exact output `len` and empty `error`. On failure `id` and `len` are zero and `error` explains this operation's failure. Conversion never releases the input. Release input and successful output IDs with `dealloc_bytes`; separately call `result.free()` for metadata on both success and failure. `free()` does not release the output arena block."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The converters consume one complete document. JSON permits trailing whitespace; MessagePack must consume exactly the supplied length. Use the exact payload length, never rounded capacity. JSON object keys remain strings. JSON objects serialize directly as maps, independently of struct-map configuration. Roundtrip preservation is limited to the JSON data model and representable numbers; arbitrary MessagePack bin/ext values, non-JSON map keys and integers outside JSON's numeric range may change or be rejected."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Pointers stay stable until release, but memory growth replaces `memory.buffer`. Construct each view from the current buffer immediately before use. `.slice()` creates a JavaScript-owned copy that survives arena release. A zero-copy view requires its allocation to stay live until the last read. `@migaia/store-wasm` adds field ownership and a `FinalizationRegistry` fallback; it does not replace deterministic disposal or duplicate this arena."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The first completed initialization publishes the module exports. Concurrent calls and named wrappers use that same memory and arena; concurrent instantiation may still happen, and Promise identity or a single compilation is not guaranteed. Native `WebAssembly.CompileError`, `LinkError` and `RuntimeError` cross unchanged, without module `source` or `code`. Conversion failures are returned values rather than those native exceptions."
+                }
+              ]
+            },
+            {
+              "id": "build-and-verify",
+              "heading": "Build and verify",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm run build\npnpm run test\npnpm run test:rust\npnpm run typecheck"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "After editing Rust, `build` runs `wasm-pack build --target web --release --out-dir ../src` from `rust/`, then runs `scripts/finalize-glue.ts` to preserve the first published exports. Do not hand-edit generated glue, declarations or WASM bytes. Release verification includes two deterministic builds, a real nonzero WASM host, and packed installation/import/instantiation. `test` runs the WASM Rust host tests and the JS initialization regression; `test:rust` runs native Rust tests."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "migaia-wasm-usage-guide",
+              "heading": "@migaia/wasm usage guide",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Start with the README for module selection. Every example below runs as a standalone `.ts` file with Node 24 after module installation. Each reads the packaged WASM bytes explicitly."
+                }
+              ]
+            },
+            {
+              "id": "find-your-scenario",
+              "heading": "Find your scenario",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Problem", "API", "Read"],
+                  "rows": [
+                    [
+                      "Share one arena when two features start together",
+                      "`init`",
+                      "Share one arena when two features start together"
+                    ],
+                    [
+                      "Store numeric readings without guessing alignment",
+                      "`alloc_bytes`",
+                      "Store numeric readings without guessing alignment"
+                    ],
+                    [
+                      "Read the same allocation after memory grows",
+                      "`ptr_of`",
+                      "Read the same allocation after memory grows"
+                    ],
+                    [
+                      "Keep a JavaScript copy after releasing WASM bytes",
+                      "`dealloc_bytes`",
+                      "Keep a JavaScript copy after releasing WASM bytes"
+                    ],
+                    [
+                      "Retain two conversions without a shared last-result slot",
+                      "`json_to_msgpack`",
+                      "Retain two conversions without a shared last-result slot"
+                    ],
+                    [
+                      "Reject a second document instead of silently dropping it",
+                      "`json_to_msgpack`",
+                      "Reject a second document instead of silently dropping it"
+                    ],
+                    [
+                      "Decode only the received MessagePack bytes",
+                      "`msgpack_to_json`",
+                      "Decode only the received MessagePack bytes"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "share-one-arena-when-two-features-start-together",
+              "heading": "Share one arena when two features start together",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Two features can initialize the module at the same time. Publishing the last instance would make one feature hold memory that the named wrappers no longer use. The initializer keeps the first completed exports, and every completed call returns that object. This does not promise one compilation or identical Promises."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst bytes = await readFile(\n  new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n)\nconst [first, second] = await Promise.all([\n  init({ module_or_path: bytes }),\n  init({ module_or_path: bytes })\n])\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('allocation failed')\ntry {\n  console.log('same exports:', first === second)\n  console.log('same allocation:', first.byte_len_of(id) === byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "same exports: true\nsame allocation: true"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `same exports: true` and `same allocation: true`. Both initialization results and the named allocator address the same published arena."
+                }
+              ]
+            },
+            {
+              "id": "store-numeric-readings-without-guessing-alignment",
+              "heading": "Store numeric readings without guessing alignment",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A byte offset that works for a byte array may throw RangeError when reused for Float64Array. Hand-written allocators must align the address and round capacity separately. alloc_bytes does both: a request for 9 bytes owns 16 zeroed bytes at an eight-byte-aligned address."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('allocation failed')\ntry {\n  const values = new Float64Array(wasm.memory.buffer, ptr_of(id), 2)\n  values.set([21.5, 23])\n  console.log('capacity:', byte_len_of(id))\n  console.log('alignment remainder:', ptr_of(id) % 8)\n  console.log('readings:', values[0], values[1])\n} finally {\n  dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "capacity: 16\nalignment remainder: 0\nreadings: 21.5 23"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints capacity 16, alignment remainder 0 and readings 21.5 23. The rounded allocation can hold two Float64 values, and the pointer satisfies the native typed-array alignment requirement."
+                }
+              ]
+            },
+            {
+              "id": "read-the-same-allocation-after-memory-grows",
+              "heading": "Read the same allocation after memory grows",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A cached typed-array view can become detached after another allocation grows WebAssembly memory. A stable pointer does not keep its old ArrayBuffer alive. Keep the arena ID, query ptr_of, and create the view from the current memory.buffer immediately before reading."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('allocation failed')\ntry {\n  const offset = ptr_of(id)\n  const previous = new Float64Array(wasm.memory.buffer, offset, 1)\n  previous[0] = 42\n  wasm.memory.grow(1)\n  const current = new Float64Array(wasm.memory.buffer, ptr_of(id), 1)\n  console.log('same offset:', ptr_of(id) === offset)\n  console.log('old view bytes:', previous.byteLength)\n  console.log('current reading:', current[0])\n} finally {\n  dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "same offset: true\nold view bytes: 0\ncurrent reading: 42"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `same offset: true`, `old view bytes: 0` and `current reading: 42`. The live arena allocation stays at its offset while memory growth detaches the old non-shared buffer."
+                }
+              ]
+            },
+            {
+              "id": "keep-a-javascript-copy-after-releasing-wasm-bytes",
+              "heading": "Keep a JavaScript copy after releasing WASM bytes",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "An upload queue may outlive the conversion that produced its bytes. Keeping a view into a released arena block lets later allocations overwrite queued data. Copy the bytes before dealloc_bytes. A second release returns false and never frees a different live block."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(3)\nif (id === 0) throw new Error('allocation failed')\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, ptr_of(id), 3)\n  view.set([1, 2, 3])\n  const ownedCopy = view.slice()\n  console.log('release:', dealloc_bytes(id), dealloc_bytes(id))\n  console.log('copy:', ownedCopy.join(','))\n  console.log('released queries:', ptr_of(id), byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "release: true false\ncopy: 1,2,3\nreleased queries: 0 0"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `release: true false`, `copy: 1,2,3` and `released queries: 0 0`. The JavaScript copy survives; the released ID is no longer readable through the arena queries."
+                }
+              ]
+            },
+            {
+              "id": "retain-two-conversions-without-a-shared-last-result-slot",
+              "heading": "Retain two conversions without a shared last-result slot",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A batch exporter may start another conversion before reading the first result. A global last-result slot makes the first output easy to confuse with the second. Each json_to_msgpack call returns its own output ID, exact length and error, so retaining both result objects keeps both operations distinct."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst inputs: number[] = []\nconst results: ConversionResult[] = []\ntry {\n  for (const json of ['{\"first\":true}', '{\"second\":true}']) {\n    const bytes = new TextEncoder().encode(json)\n    const id = alloc_bytes(bytes.length)\n    if (id === 0) throw new Error('allocation failed')\n    inputs.push(id)\n    new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n    results.push(json_to_msgpack(id, bytes.length))\n  }\n  console.log(\n    'both succeeded:',\n    results.every((result) => result.id !== 0 && result.error === '')\n  )\n  console.log('separate outputs:', results[0].id !== results[1].id)\n  console.log('first result retained:', results[0].len > 0)\n} finally {\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n  for (const id of inputs) dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "both succeeded: true\nseparate outputs: true\nfirst result retained: true"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "All three lines end in true. The second call leaves the first result intact. The finally block releases successful output IDs, both input IDs and both metadata objects independently."
+                }
+              ]
+            },
+            {
+              "id": "reject-a-second-document-instead-of-silently-dropping-it",
+              "heading": "Reject a second document instead of silently dropping it",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A concatenated export can contain two JSON documents by mistake. Parsing only the first would report success while losing the second. json_to_msgpack requires one complete document and reports a failed result for trailing non-whitespace bytes; the input remains owned by the caller."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst bytes = new TextEncoder().encode('{}{}')\nconst id = alloc_bytes(bytes.length)\nif (id === 0) throw new Error('allocation failed')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  const result = json_to_msgpack(id, bytes.length)\n  try {\n    console.log('output allocation:', result.id, 'bytes:', result.len)\n    console.log('second document rejected:', result.error.startsWith('json to msgpack failed:'))\n    console.log('input still owned:', ptr_of(id) !== 0)\n    if (result.id !== 0) dealloc_bytes(result.id)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "output allocation: 0 bytes: 0\nsecond document rejected: true\ninput still owned: true"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints output allocation 0 and length 0, followed by two true values. No failed output allocation survives; the caller still frees the input and the failure metadata."
+                }
+              ]
+            },
+            {
+              "id": "decode-only-the-received-messagepack-bytes",
+              "heading": "Decode only the received MessagePack bytes",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A five-byte message can occupy an eight-byte arena block. Passing capacity as document length feeds padding to the decoder and turns valid input into a trailing-bytes failure. Pass the received byte length to msgpack_to_json and read exactly result.len bytes from its output."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('allocation failed')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('document:', new TextDecoder().decode(json))\n    console.log('input bytes:', packed.length, 'capacity:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "document: {\"ok\":true}\ninput bytes: 5 capacity: 8"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `document: {\"ok\":true}` and `input bytes: 5 capacity: 8`. Document length and rounded arena capacity are different, and the conversion uses only the supplied document bytes."
+                }
+              ]
+            },
+            {
+              "id": "initialization-and-parameters",
+              "heading": "Initialization and parameters",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Import the default initializer as `init`. `init({ module_or_path })` accepts a request string, `Request`, `URL`, `Response`, `BufferSource` or precompiled `WebAssembly.Module`, including a Promise of that input. Omitting the argument selects the packaged `wasm_provider_bg.wasm` URL. Request strings, requests and URLs use `fetch`; byte and module inputs instantiate directly. The Node examples read the resource beside the resolved module entry and pass its bytes. Loading failures reject the Promise."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`initSync({ module })` accepts bytes or a precompiled `WebAssembly.Module` and never fetches. `module` is required. Both initializers return the already published exports when initialized. The positional forms remain accepted but emit a deprecation warning; use the object forms."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`InitOutput.memory` is native `WebAssembly.Memory`. Its other functions are the raw generated ABI: notably, its conversion functions return numeric metadata pointers and its release function returns a numeric boolean. Application code should use the named imported wrappers to receive `ConversionResult` and boolean results. Do not pass an arena ID as a raw metadata pointer."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Parameter", "Meaning"],
+                  "rows": [
+                    [
+                      "`byte_len`",
+                      "Requested byte count, a nonnegative unsigned 32-bit integer. Capacity rounds upward to a multiple of eight. Zero-length allocations still return an owned ID on success."
+                    ],
+                    [
+                      "`id`",
+                      "A live ID returned by `alloc_bytes` or a successful `ConversionResult.id` in this initialized module. Zero is reserved, not an allocation. Never substitute a pointer."
+                    ],
+                    [
+                      "`len`",
+                      "Exact count of document bytes written to the input, no greater than `byte_len_of(id)`. It is not rounded capacity."
+                    ],
+                    [
+                      "`init.module_or_path`",
+                      "Optional module source described above. The omitted argument defaults to the bundled WASM URL; supplied bytes work without network fetching."
+                    ],
+                    [
+                      "`initSync.module`",
+                      "Required bytes or precompiled module. No network-capable source and no default."
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "arena-and-conversion-ownership",
+              "heading": "Arena and conversion ownership",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Rust owns one arena backed by `Vec<u64>`. The allocation ID remains stable and is not reused while live. A pointer remains valid until its ID is released. A view must be recreated from the current `memory.buffer` after any call that may allocate or grow memory."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`alloc_bytes` returns `0` on memory or identifier exhaustion. Unknown and released IDs return `0` from `ptr_of` and `byte_len_of`; `dealloc_bytes` returns `false`. A live zero-length allocation also has capacity zero, so capacity alone does not identify a live allocation."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Both converters are synchronous and byte-in/byte-out. Success returns `{ id: nonzero, len: exactBytes, error: '' }`; failure returns `{ id: 0, len: 0, error: reason }`. Each call has independent metadata. Both the input ID and successful output ID belong to the caller. Release each with `dealloc_bytes`. Every returned metadata object, including a failure, separately needs `free()` or `[Symbol.dispose]()`. Read required fields before releasing metadata; never read or free that metadata again. Releasing metadata does not release arena bytes, and releasing arena bytes does not release metadata."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Conversion rejects unknown IDs, lengths beyond capacity, empty documents, malformed data and a trailing second document. JSON allows trailing whitespace. MessagePack must consume exactly the supplied length. Failure leaves no output block and preserves the caller's input allocation and bytes. The JSON reader transcodes directly to the MessagePack writer without an intermediate `serde_json::Value` tree; map keys remain strings. JSON objects serialize directly as maps, independently of struct-map configuration."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "JSON roundtrips cover the JSON data model and representable numbers. Arbitrary MessagePack bin/ext values, non-JSON map keys and out-of-range integers are not guaranteed reversible; they may be rewritten or rejected."
+                }
+              ]
+            },
+            {
+              "id": "failures-and-recovery",
+              "heading": "Failures and recovery",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A failed conversion carries text in its own `error` property, not a global error slot. Invalid IDs and oversized lengths return `unknown allocation id or length past capacity`; output allocation exhaustion returns `arena exhausted`. Parsing errors begin with `json to msgpack failed:` or `msgpack to json failed:`. Check `id` before reading an output, retain the exact error for diagnostics, and always free failure metadata and the input."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Native `WebAssembly.CompileError`, `WebAssembly.LinkError` and `WebAssembly.RuntimeError` pass through unchanged, retaining their type, identity and stack without module `source` or `code`. They are separate from a normal conversion failure result. The module defines no custom error codes."
+                }
+              ]
+            },
+            {
+              "id": "using-store-wasm",
+              "heading": "Using store-wasm",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/wasm` owns arena storage and transcoding. `@migaia/store-wasm` owns field allocations, numeric views and field lifetimes; it does not copy the arena or conversion state machine. Its field owner reuses one initialization Promise through `ensureWasm()`, releases allocations on explicit disposal, and rolls back already-created resources before surfacing a construction failure with the original error preserved. Record fields accept numbers and use `DataView` over the current `memory.buffer`. Its `FinalizationRegistry` is a fallback, not a replacement for explicit disposal."
+                }
+              ]
+            },
+            {
+              "id": "build-and-verification",
+              "heading": "Build and verification",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm run build\npnpm run test\npnpm run test:rust\npnpm run typecheck"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`build` runs wasm-pack from `rust/`, regenerates `src/wasm_provider.js`, declarations and `.wasm`, then runs `scripts/finalize-glue.ts` to preserve the first published exports. Do not hand-edit generated output. Verification also includes a real nonzero WASM host, byte comparison of two deterministic builds, and packed installation/import/instantiation. Consumers such as `@migaia/store-wasm` run their own format, lint, type and runtime gates against the real WASM module."
+                }
+              ]
+            }
+          ]
+        }
       }
     }
   },
@@ -263,10 +1241,10 @@
           "name": "__wbg_init",
           "kind": "function",
           "signature": "export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;",
-          "declarationLine": 118,
+          "declarationLine": 214,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Default async initializer imported as init; fetches the bundled wasm asset when omitted, or instantiates application-provided bytes/module. Call before any allocation or conversion. The first completed initialization publishes the exports; concurrent calls return that same memory/arena as named wrappers. Concurrent instantiation may still occur: Promise identity and single compilation are not promised.",
-          "core": "module_or_path: Application module source: `RequestInfo`, `URL`, `Response`, `BufferSource` or precompiled `WebAssembly.Module`; wrap it in `{ module_or_path }` to avoid deprecated positional initialization.\nPromise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes.",
+          "core": "module_or_path: Optional initialization argument. Use `{ module_or_path: source }`, where source is `RequestInfo`, `URL`, `Response`, `BufferSource`, a precompiled `WebAssembly.Module`, or `Promise<InitInput>`. Omitting the argument selects the bundled `wasm_provider_bg.wasm` URL; Node should supply bytes or a module instead of fetching a local file URL. Positional input is deprecated.\nPromise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes.",
           "advanced": "",
           "parameters": [
             "module_or_path: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput> (optional)"
@@ -324,7 +1302,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "module_or_path: Application module source: `RequestInfo`, `URL`, `Response`, `BufferSource` or precompiled `WebAssembly.Module`; wrap it in `{ module_or_path }` to avoid deprecated positional initialization.\nPromise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes."
+              "content": "module_or_path: Optional initialization argument. Use `{ module_or_path: source }`, where source is `RequestInfo`, `URL`, `Response`, `BufferSource`, a precompiled `WebAssembly.Module`, or `Promise<InitInput>`. Omitting the argument selects the bundled `wasm_provider_bg.wasm` URL; Node should supply bytes or a module instead of fetching a local file URL. Positional input is deprecated.\nPromise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes."
             },
             {
               "id": "advanced-usage",
@@ -343,7 +1321,7 @@
           "name": "alloc_bytes",
           "kind": "function",
           "signature": "export function alloc_bytes(byte_len: number): number;",
-          "declarationLine": 37,
+          "declarationLine": 70,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Allocates a zeroed arena buffer, aligned and rounded up to eight bytes. Pair with dealloc_bytes for deterministic ownership; memory growth invalidates old ArrayBuffer views.",
           "core": "byte_len: Application-requested unsigned 32-bit byte count; actual capacity rounds upward to a multiple of eight.\nA stable nonzero arena ID or zero when memory/identifier space is exhausted. Call dealloc_bytes for every successful allocation, including zero-length allocations.",
@@ -360,9 +1338,14 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  const encoded = json_to_msgpack(inputId, json.length)\n  try {\n    outputId = encoded.id\n    if (outputId === 0) throw new Error(encoded.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), encoded.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    encoded.free()\n  }\n} finally {\n  dealloc_bytes(inputId)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "const wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ count: 2 }))\nconst input = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n  const result = json_to_msgpack(input, json.length)\n  try {\n    outputId = result.id\n    if (outputId === 0) throw new Error(result.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(input)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n\ntype IJsonAllocation = { id: number; length: number }\n\nfunction writeJson(value: unknown): IJsonAllocation {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst inputs: IJsonAllocation[] = []\nconst results: ConversionResult[] = []\ntry {\n  inputs.push(writeJson({ id: 1, status: 'ready' }))\n  inputs.push(writeJson({ id: 2, status: 'queued' }))\n  for (const input of inputs) results.push(json_to_msgpack(input.id, input.length))\n  for (const result of results) {\n    if (result.id === 0) throw new Error(result.error)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  for (const input of inputs) dealloc_bytes(input.id)\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n}"
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst bytes = await readFile(\n  new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n)\nconst [first, second] = await Promise.all([\n  init({ module_or_path: bytes }),\n  init({ module_or_path: bytes })\n])\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  console.log('同一导出:', first === second)\n  console.log('同一分配:', first.byte_len_of(id) === byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const values = new Float64Array(wasm.memory.buffer, ptr_of(id), 2)\n  values.set([21.5, 23])\n  console.log('容量:', byte_len_of(id))\n  console.log('对齐余数:', ptr_of(id) % 8)\n  console.log('读数:', values[0], values[1])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const offset = ptr_of(id)\n  const previous = new Float64Array(wasm.memory.buffer, offset, 1)\n  previous[0] = 42\n  wasm.memory.grow(1)\n  const current = new Float64Array(wasm.memory.buffer, ptr_of(id), 1)\n  console.log('偏移未变:', ptr_of(id) === offset)\n  console.log('旧视图字节数:', previous.byteLength)\n  console.log('当前读数:', current[0])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(3)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, ptr_of(id), 3)\n  view.set([1, 2, 3])\n  const ownedCopy = view.slice()\n  console.log('释放:', dealloc_bytes(id), dealloc_bytes(id))\n  console.log('副本:', ownedCopy.join(','))\n  console.log('已释放的查询:', ptr_of(id), byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst inputs: number[] = []\nconst results: ConversionResult[] = []\ntry {\n  for (const json of ['{\"first\":true}', '{\"second\":true}']) {\n    const bytes = new TextEncoder().encode(json)\n    const id = alloc_bytes(bytes.length)\n    if (id === 0) throw new Error('分配失败')\n    inputs.push(id)\n    new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n    results.push(json_to_msgpack(id, bytes.length))\n  }\n  console.log(\n    '都成功:',\n    results.every((result) => result.id !== 0 && result.error === '')\n  )\n  console.log('输出各自独立:', results[0].id !== results[1].id)\n  console.log('第一个结果仍有效:', results[0].len > 0)\n} finally {\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n  for (const id of inputs) dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst bytes = new TextEncoder().encode('{}{}')\nconst id = alloc_bytes(bytes.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  const result = json_to_msgpack(id, bytes.length)\n  try {\n    console.log('输出分配:', result.id, '字节数:', result.len)\n    console.log('拒绝第二个文档:', result.error.startsWith('json to msgpack failed:'))\n    console.log('输入仍归调用方:', ptr_of(id) !== 0)\n    if (result.id !== 0) dealloc_bytes(result.id)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('文档:', new TextDecoder().decode(json))\n    console.log('输入字节:', packed.length, '容量:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nawait init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\nconsole.log('容量:', byte_len_of(id))\nconsole.log('释放:', dealloc_bytes(id), dealloc_bytes(id))"
           ],
           "members": [],
           "composes": [],
@@ -415,7 +1398,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:alloc_bytes:export function alloc_bytes(byte_len: number): number;",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 132,
           "configuration": [],
           "fragment": "wasm-index--alloc_bytes"
         },
@@ -423,7 +1406,7 @@
           "name": "byte_len_of",
           "kind": "function",
           "signature": "export function byte_len_of(id: number): number;",
-          "declarationLine": 43,
+          "declarationLine": 82,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Returns actual rounded arena capacity for a live allocation. Pair with alloc_bytes when sizing numeric views; use ConversionResult.len instead for the exact converted document length.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nCapacity in bytes rounded upward to eight; unknown or dead IDs return zero.",
@@ -439,7 +1422,13 @@
           "returns": "number",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [],
+          "examples": [
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst bytes = await readFile(\n  new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n)\nconst [first, second] = await Promise.all([\n  init({ module_or_path: bytes }),\n  init({ module_or_path: bytes })\n])\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  console.log('同一导出:', first === second)\n  console.log('同一分配:', first.byte_len_of(id) === byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const values = new Float64Array(wasm.memory.buffer, ptr_of(id), 2)\n  values.set([21.5, 23])\n  console.log('容量:', byte_len_of(id))\n  console.log('对齐余数:', ptr_of(id) % 8)\n  console.log('读数:', values[0], values[1])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(3)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, ptr_of(id), 3)\n  view.set([1, 2, 3])\n  const ownedCopy = view.slice()\n  console.log('释放:', dealloc_bytes(id), dealloc_bytes(id))\n  console.log('副本:', ownedCopy.join(','))\n  console.log('已释放的查询:', ptr_of(id), byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('文档:', new TextDecoder().decode(json))\n    console.log('输入字节:', packed.length, '容量:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nawait init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\nconsole.log('容量:', byte_len_of(id))\nconsole.log('释放:', dealloc_bytes(id), dealloc_bytes(id))"
+          ],
           "members": [],
           "composes": [],
           "exportPath": ".",
@@ -491,15 +1480,15 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:byte_len_of:export function byte_len_of(id: number): number;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 80,
           "configuration": [],
           "fragment": "wasm-index--byte_len_of"
         },
         {
           "name": "ConversionResult",
           "kind": "class",
-          "signature": "export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }",
-          "declarationLine": 11,
+          "signature": "export class ConversionResult { private constructor(); /** * Releases the WASM metadata after reading this result, including failed results. * Call once; do not read properties or reuse this wrapper after disposal. * Input and output arena allocations remain live until `dealloc_bytes(id)`. */ free(): void; /** * Releases this result's metadata when leaving an explicit resource-management scope. * This is the same operation as `free()`; use one disposal path per result. * Input and output arena allocations require separate `dealloc_bytes(id)` calls. */ [Symbol.dispose](): void; /** * Returns an empty string on success or the current operation's failure reason. * * Invalid handles and lengths report `unknown allocation id or length past * capacity`. Initial output allocation failure reports `arena exhausted`. * Parse and write failures start with `json to msgpack failed:` or * `msgpack to json failed:`. * Read before freeing this metadata wrapper; no global error lookup is needed. */ readonly error: string; /** * Returns the new output allocation id, or `0` when conversion failed. * * A nonzero id belongs to the caller and remains live after this result's * `free()`. Read the exact output range with `len` and release the allocation * with `dealloc_bytes(id)` when finished. The input id is never consumed. */ readonly id: number; /** * Returns the exact number of output bytes, or `0` on failure. * * Use this length when reading output or passing it to another converter. * `byte_len_of(id)` includes arena padding and can exceed this value. */ readonly len: number; }",
+          "declarationLine": 16,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Generated metadata class returned by both conversion functions; its constructor is private. It owns the Rust result struct, while its output id names a separate arena allocation that free() does not release.",
           "core": "An operation-created `ConversionResult` holding this conversion’s id, exact length and error; callers do not construct it directly. Read its fields before `free()` or `[Symbol.dispose]()`, then separately release successful output and input arena IDs with `dealloc_bytes`.\nfree: Releases this Rust metadata struct; first read required fields and separately release arena IDs. Do not read or free the metadata again afterwards.\nThe metadata struct is released; input and output arena allocations remain unchanged.\n[Symbol.dispose]: Explicit resource-management alias of free when Symbol.dispose is available; it releases metadata only.\nThe metadata struct is released; release its successful output ID separately.\nid: Nonzero output arena ID on success, zero on failure; copy it before metadata free and later release with dealloc_bytes.\nlen: Exact output payload bytes on success, zero on failure; never substitute rounded arena capacity.\nerror: Empty string on success. Failure is unknown allocation id or length past capacity, arena exhausted, or text prefixed json to msgpack failed:/msgpack to json failed: with parsing details.",
@@ -516,7 +1505,7 @@
               "kind": "method",
               "optional": false,
               "signature": "free(): void;",
-              "description": null,
+              "description": "Releases the WASM metadata after reading this result, including failed results. Call once; do not read properties or reuse this wrapper after disposal. Input and output arena allocations remain live until `dealloc_bytes(id)`.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -525,7 +1514,7 @@
               "kind": "method",
               "optional": false,
               "signature": "[Symbol.dispose](): void;",
-              "description": null,
+              "description": "Releases this result's metadata when leaving an explicit resource-management scope. This is the same operation as `free()`; use one disposal path per result. Input and output arena allocations require separate `dealloc_bytes(id)` calls.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -534,7 +1523,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly error: string;",
-              "description": "Empty on success, otherwise the operation-specific failure reason.",
+              "description": "Returns an empty string on success or the current operation's failure reason. Invalid handles and lengths report `unknown allocation id or length past capacity`. Initial output allocation failure reports `arena exhausted`. Parse and write failures start with `json to msgpack failed:` or `msgpack to json failed:`. Read before freeing this metadata wrapper; no global error lookup is needed.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -543,7 +1532,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly id: number;",
-              "description": "Allocation id containing the conversion output, or zero on failure.",
+              "description": "Returns the new output allocation id, or `0` when conversion failed. A nonzero id belongs to the caller and remains live after this result's `free()`. Read the exact output range with `len` and release the allocation with `dealloc_bytes(id)` when finished. The input id is never consumed.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -552,7 +1541,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly len: number;",
-              "description": "Exact output byte length; zero on failure.",
+              "description": "Returns the exact number of output bytes, or `0` on failure. Use this length when reading output or passing it to another converter. `byte_len_of(id)` includes arena padding and can exceed this value.",
               "parameterDetails": [],
               "returns": "number"
             }
@@ -560,7 +1549,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }"
+            "export class ConversionResult { private constructor(); /** * Releases the WASM metadata after reading this result, including failed results. * Call once; do not read properties or reuse this wrapper after disposal. * Input and output arena allocations remain live until `dealloc_bytes(id)`. */ free(): void; /** * Releases this result's metadata when leaving an explicit resource-management scope. * This is the same operation as `free()`; use one disposal path per result. * Input and output arena allocations require separate `dealloc_bytes(id)` calls. */ [Symbol.dispose](): void; /** * Returns an empty string on success or the current operation's failure reason. * * Invalid handles and lengths report `unknown allocation id or length past * capacity`. Initial output allocation failure reports `arena exhausted`. * Parse and write failures start with `json to msgpack failed:` or * `msgpack to json failed:`. * Read before freeing this metadata wrapper; no global error lookup is needed. */ readonly error: string; /** * Returns the new output allocation id, or `0` when conversion failed. * * A nonzero id belongs to the caller and remains live after this result's * `free()`. Read the exact output range with `len` and release the allocation * with `dealloc_bytes(id)` when finished. The input id is never consumed. */ readonly id: number; /** * Returns the exact number of output bytes, or `0` on failure. * * Use this length when reading output or passing it to another converter. * `byte_len_of(id)` includes arena padding and can exceed this value. */ readonly len: number; }"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -599,9 +1588,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/wasm/src/wasm_provider.d.ts:ConversionResult:export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }",
+          "identity": "packages/wasm/src/wasm_provider.d.ts:ConversionResult:export class ConversionResult { private constructor(); /** * Releases the WASM metadata after reading this result, including failed results. * Call once; do not read properties or reuse this wrapper after disposal. * Input and output arena allocations remain live until `dealloc_bytes(id)`. */ free(): void; /** * Releases this result's metadata when leaving an explicit resource-management scope. * This is the same operation as `free()`; use one disposal path per result. * Input and output arena allocations require separate `dealloc_bytes(id)` calls. */ [Symbol.dispose](): void; /** * Returns an empty string on success or the current operation's failure reason. * * Invalid handles and lengths report `unknown allocation id or length past * capacity`. Initial output allocation failure reports `arena exhausted`. * Parse and write failures start with `json to msgpack failed:` or * `msgpack to json failed:`. * Read before freeing this metadata wrapper; no global error lookup is needed. */ readonly error: string; /** * Returns the new output allocation id, or `0` when conversion failed. * * A nonzero id belongs to the caller and remains live after this result's * `free()`. Read the exact output range with `len` and release the allocation * with `dealloc_bytes(id)` when finished. The input id is never consumed. */ readonly id: number; /** * Returns the exact number of output bytes, or `0` on failure. * * Use this length when reading output or passing it to another converter. * `byte_len_of(id)` includes arena padding and can exceed this value. */ readonly len: number; }",
           "guidance": [],
-          "usageScore": 68,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "wasm-index--ConversionResult"
         },
@@ -609,7 +1598,7 @@
           "name": "dealloc_bytes",
           "kind": "function",
           "signature": "export function dealloc_bytes(id: number): boolean;",
-          "declarationLine": 48,
+          "declarationLine": 92,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Releases exactly one arena allocation created by allocation or successful conversion. Pair with alloc_bytes or the conversion result ID; copied JS bytes survive, but views into the released allocation must no longer be used.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nTrue if a live allocation was removed, false for zero, unknown or already released IDs; repeated release is harmless.",
@@ -626,9 +1615,14 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  const encoded = json_to_msgpack(inputId, json.length)\n  try {\n    outputId = encoded.id\n    if (outputId === 0) throw new Error(encoded.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), encoded.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    encoded.free()\n  }\n} finally {\n  dealloc_bytes(inputId)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "const wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ count: 2 }))\nconst input = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n  const result = json_to_msgpack(input, json.length)\n  try {\n    outputId = result.id\n    if (outputId === 0) throw new Error(result.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(input)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n\ntype IJsonAllocation = { id: number; length: number }\n\nfunction writeJson(value: unknown): IJsonAllocation {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst inputs: IJsonAllocation[] = []\nconst results: ConversionResult[] = []\ntry {\n  inputs.push(writeJson({ id: 1, status: 'ready' }))\n  inputs.push(writeJson({ id: 2, status: 'queued' }))\n  for (const input of inputs) results.push(json_to_msgpack(input.id, input.length))\n  for (const result of results) {\n    if (result.id === 0) throw new Error(result.error)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  for (const input of inputs) dealloc_bytes(input.id)\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n}"
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst bytes = await readFile(\n  new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n)\nconst [first, second] = await Promise.all([\n  init({ module_or_path: bytes }),\n  init({ module_or_path: bytes })\n])\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  console.log('同一导出:', first === second)\n  console.log('同一分配:', first.byte_len_of(id) === byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const values = new Float64Array(wasm.memory.buffer, ptr_of(id), 2)\n  values.set([21.5, 23])\n  console.log('容量:', byte_len_of(id))\n  console.log('对齐余数:', ptr_of(id) % 8)\n  console.log('读数:', values[0], values[1])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const offset = ptr_of(id)\n  const previous = new Float64Array(wasm.memory.buffer, offset, 1)\n  previous[0] = 42\n  wasm.memory.grow(1)\n  const current = new Float64Array(wasm.memory.buffer, ptr_of(id), 1)\n  console.log('偏移未变:', ptr_of(id) === offset)\n  console.log('旧视图字节数:', previous.byteLength)\n  console.log('当前读数:', current[0])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(3)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, ptr_of(id), 3)\n  view.set([1, 2, 3])\n  const ownedCopy = view.slice()\n  console.log('释放:', dealloc_bytes(id), dealloc_bytes(id))\n  console.log('副本:', ownedCopy.join(','))\n  console.log('已释放的查询:', ptr_of(id), byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst inputs: number[] = []\nconst results: ConversionResult[] = []\ntry {\n  for (const json of ['{\"first\":true}', '{\"second\":true}']) {\n    const bytes = new TextEncoder().encode(json)\n    const id = alloc_bytes(bytes.length)\n    if (id === 0) throw new Error('分配失败')\n    inputs.push(id)\n    new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n    results.push(json_to_msgpack(id, bytes.length))\n  }\n  console.log(\n    '都成功:',\n    results.every((result) => result.id !== 0 && result.error === '')\n  )\n  console.log('输出各自独立:', results[0].id !== results[1].id)\n  console.log('第一个结果仍有效:', results[0].len > 0)\n} finally {\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n  for (const id of inputs) dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst bytes = new TextEncoder().encode('{}{}')\nconst id = alloc_bytes(bytes.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  const result = json_to_msgpack(id, bytes.length)\n  try {\n    console.log('输出分配:', result.id, '字节数:', result.len)\n    console.log('拒绝第二个文档:', result.error.startsWith('json to msgpack failed:'))\n    console.log('输入仍归调用方:', ptr_of(id) !== 0)\n    if (result.id !== 0) dealloc_bytes(result.id)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('文档:', new TextDecoder().decode(json))\n    console.log('输入字节:', packed.length, '容量:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nawait init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\nconsole.log('容量:', byte_len_of(id))\nconsole.log('释放:', dealloc_bytes(id), dealloc_bytes(id))"
           ],
           "members": [],
           "composes": [],
@@ -681,7 +1675,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:dealloc_bytes:export function dealloc_bytes(id: number): boolean;",
           "guidance": [],
-          "usageScore": 62,
+          "usageScore": 156,
           "configuration": [],
           "fragment": "wasm-index--dealloc_bytes"
         },
@@ -689,7 +1683,7 @@
           "name": "InitInput",
           "kind": "type",
           "signature": "export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;",
-          "declarationLine": 79,
+          "declarationLine": 147,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Native source accepted by async initialization: request/string, URL, response, bytes or a precompiled module. Request-like sources fetch; other sources instantiate directly.",
           "core": "Native source accepted by async initialization: request/string, URL, response, bytes or a precompiled module. Request-like sources fetch; other sources instantiate directly.",
@@ -752,8 +1746,8 @@
         {
           "name": "InitOutput",
           "kind": "interface",
-          "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }",
-          "declarationLine": 81,
+          "signature": "export interface InitOutput { /** Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory. */ readonly memory: WebAssembly.Memory; /** Generated metadata destructor: a is a result pointer; b selects explicit disposal (0) or finalization (1). Use ConversionResult.free() instead of calling this directly. */ readonly __wbg_conversionresult_free: (a: number, b: number) => void; /** Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper. */ readonly alloc_bytes: (a: number) => number; /** Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block. */ readonly byte_len_of: (a: number) => number; /** Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage. */ readonly conversionresult_error: (a: number) => [number, number]; /** Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id. */ readonly conversionresult_id: (a: number) => number; /** Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len. */ readonly conversionresult_len: (a: number) => number; /** Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean. */ readonly dealloc_bytes: (a: number) => number; /** Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly json_to_msgpack: (a: number, b: number) => number; /** Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly msgpack_to_json: (a: number, b: number) => number; /** Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id. */ readonly ptr_of: (a: number) => number; /** Generated table holding JavaScript references required by wasm-bindgen. Owned and initialized by the glue; application arena data does not belong here. */ readonly __wbindgen_externrefs: WebAssembly.Table; /** Generated temporary-storage release: a is a pointer, b its byte length, and c its alignment. Owned by the glue; arena ids must use dealloc_bytes instead. */ readonly __wbindgen_free: (a: number, b: number, c: number) => void; /** Generated startup hook called by module initialization. Applications must initialize through init or initSync rather than invoking this hook again. */ readonly __wbindgen_start: () => void; }",
+          "declarationLine": 150,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Initialized native exports: memory plus raw numeric ABI functions. Named JS imports wrap metadata pointers and boolean results; prefer those wrappers for normal conversion.",
           "core": "memory: Native `WebAssembly.Memory` shared with the arena; reread memory.buffer after any call that can allocate or grow memory.\nalloc_bytes: Raw byte allocator taking requested byte count; returns an arena ID, zero on exhaustion. Memory growth requires fresh typed-array views.\nalloc_bytes.a: Application-requested unsigned 32-bit byte count.\nOwned arena ID, or zero on allocation failure.\nbyte_len_of: Raw capacity query accepting an arena identifier and returning its eight-byte-rounded capacity, or zero for an unknown ID.\nbyte_len_of.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nAllocated capacity in bytes, not the encoded document length.\nptr_of: Raw arena pointer query returns a stable eight-byte-aligned byte offset until deallocation, or zero for an unknown ID.\nptr_of.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nByte offset into current memory, not an arena ID.\ndealloc_bytes: Raw arena release returns numeric one for a removed live allocation and zero for an absent ID; the named JS wrapper returns boolean.\ndealloc_bytes.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nNumeric native boolean; subsequent release of the same ID returns zero.\njson_to_msgpack: Raw JSON converter returns a result-struct pointer, unlike the named JS wrapper json_to_msgpack which returns ConversionResult. Prefer the wrapper for owned metadata.\njson_to_msgpack.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\njson_to_msgpack.b: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nRaw metadata pointer managed by generated glue; use the named wrapper for safe metadata access and free().\nmsgpack_to_json: Raw MessagePack converter returns a result-struct pointer, unlike the named JS wrapper msgpack_to_json which returns ConversionResult. Prefer the wrapper for metadata ownership.\nmsgpack_to_json.a: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nmsgpack_to_json.b: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nRaw metadata pointer; the named wrapper constructs and owns its ConversionResult.\nconversionresult_id: Raw metadata getter receives a result-struct pointer and returns its output arena ID; use ConversionResult.id instead of handling raw pointers.\nconversionresult_id.a: Raw result-struct pointer returned by the corresponding `InitOutput` conversion function; never pass an arena allocation identifier here.\nOutput arena ID, zero on conversion failure.\nconversionresult_len: Raw metadata getter receives a result-struct pointer and returns exact output byte length; use ConversionResult.len for normal consumers.\nconversionresult_len.a: Raw result-struct pointer returned by the corresponding `InitOutput` conversion function; never pass an arena allocation identifier here.\nExact output bytes, zero on conversion failure.\nconversionresult_error: Raw metadata getter copies UTF-8 error text into a temporary allocation and returns pointer/length. Generated glue decodes and frees that temporary; use ConversionResult.error.\nconversionresult_error.a: Raw result-struct pointer returned by the corresponding `InitOutput` conversion function; never pass an arena allocation identifier here.\nA [bytePointer, byteLength] tuple for generated glue, not a JavaScript string.",
@@ -770,7 +1764,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly memory: WebAssembly.Memory;",
-              "description": null,
+              "description": "Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory.",
               "parameterDetails": [],
               "returns": "WebAssembly.Memory"
             },
@@ -779,7 +1773,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly alloc_bytes: (a: number) => number;",
-              "description": null,
+              "description": "Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -788,7 +1782,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly byte_len_of: (a: number) => number;",
-              "description": null,
+              "description": "Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -797,7 +1791,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly conversionresult_error: (a: number) => [number, number];",
-              "description": null,
+              "description": "Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage.",
               "parameterDetails": [],
               "returns": "(a: number) => [number, number]"
             },
@@ -806,7 +1800,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly conversionresult_id: (a: number) => number;",
-              "description": null,
+              "description": "Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -815,7 +1809,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly conversionresult_len: (a: number) => number;",
-              "description": null,
+              "description": "Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -824,7 +1818,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly dealloc_bytes: (a: number) => number;",
-              "description": null,
+              "description": "Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             },
@@ -833,7 +1827,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly json_to_msgpack: (a: number, b: number) => number;",
-              "description": null,
+              "description": "Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper.",
               "parameterDetails": [],
               "returns": "(a: number, b: number) => number"
             },
@@ -842,7 +1836,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly msgpack_to_json: (a: number, b: number) => number;",
-              "description": null,
+              "description": "Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper.",
               "parameterDetails": [],
               "returns": "(a: number, b: number) => number"
             },
@@ -851,7 +1845,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly ptr_of: (a: number) => number;",
-              "description": null,
+              "description": "Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id.",
               "parameterDetails": [],
               "returns": "(a: number) => number"
             }
@@ -859,7 +1853,7 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }"
+            "export interface InitOutput { /** Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory. */ readonly memory: WebAssembly.Memory; /** Generated metadata destructor: a is a result pointer; b selects explicit disposal (0) or finalization (1). Use ConversionResult.free() instead of calling this directly. */ readonly __wbg_conversionresult_free: (a: number, b: number) => void; /** Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper. */ readonly alloc_bytes: (a: number) => number; /** Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block. */ readonly byte_len_of: (a: number) => number; /** Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage. */ readonly conversionresult_error: (a: number) => [number, number]; /** Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id. */ readonly conversionresult_id: (a: number) => number; /** Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len. */ readonly conversionresult_len: (a: number) => number; /** Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean. */ readonly dealloc_bytes: (a: number) => number; /** Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly json_to_msgpack: (a: number, b: number) => number; /** Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly msgpack_to_json: (a: number, b: number) => number; /** Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id. */ readonly ptr_of: (a: number) => number; /** Generated table holding JavaScript references required by wasm-bindgen. Owned and initialized by the glue; application arena data does not belong here. */ readonly __wbindgen_externrefs: WebAssembly.Table; /** Generated temporary-storage release: a is a pointer, b its byte length, and c its alignment. Owned by the glue; arena ids must use dealloc_bytes instead. */ readonly __wbindgen_free: (a: number, b: number, c: number) => void; /** Generated startup hook called by module initialization. Applications must initialize through init or initSync rather than invoking this hook again. */ readonly __wbindgen_start: () => void; }"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -898,7 +1892,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/wasm/src/wasm_provider.d.ts:InitOutput:export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }",
+          "identity": "packages/wasm/src/wasm_provider.d.ts:InitOutput:export interface InitOutput { /** Linear memory for arena views. Read its current buffer again after allocation or conversion can grow memory. */ readonly memory: WebAssembly.Memory; /** Generated metadata destructor: a is a result pointer; b selects explicit disposal (0) or finalization (1). Use ConversionResult.free() instead of calling this directly. */ readonly __wbg_conversionresult_free: (a: number, b: number) => void; /** Raw allocation entry: a is the requested byte count. Returns a live arena id or 0 on allocation failure; prefer the named alloc_bytes wrapper. */ readonly alloc_bytes: (a: number) => number; /** Raw capacity entry: a is an arena id. Returns its rounded byte capacity, or 0 for an unknown id or a live zero-byte block. */ readonly byte_len_of: (a: number) => number; /** Raw error getter: a is a live metadata pointer. Returns an allocated UTF-8 pointer/length pair; the ConversionResult.error getter decodes and releases that temporary storage. */ readonly conversionresult_error: (a: number) => [number, number]; /** Raw output-id getter: a is a live metadata pointer. Returns the output arena id, or 0 for a failed conversion; prefer ConversionResult.id. */ readonly conversionresult_id: (a: number) => number; /** Raw output-length getter: a is a live metadata pointer. Returns the exact output byte count, or 0 for failure; prefer ConversionResult.len. */ readonly conversionresult_len: (a: number) => number; /** Raw arena release: a is an allocation id. Returns 1 when a live block was released, otherwise 0; the named wrapper exposes a boolean. */ readonly dealloc_bytes: (a: number) => number; /** Raw JSON conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly json_to_msgpack: (a: number, b: number) => number; /** Raw MessagePack conversion: a is the input arena id and b its exact byte count. Returns a metadata pointer, not a ConversionResult object; use the named JavaScript wrapper. */ readonly msgpack_to_json: (a: number, b: number) => number; /** Raw pointer entry: a is an arena id. Returns its eight-byte-aligned memory offset, or 0 for an unknown id. */ readonly ptr_of: (a: number) => number; /** Generated table holding JavaScript references required by wasm-bindgen. Owned and initialized by the glue; application arena data does not belong here. */ readonly __wbindgen_externrefs: WebAssembly.Table; /** Generated temporary-storage release: a is a pointer, b its byte length, and c its alignment. Owned by the glue; arena ids must use dealloc_bytes instead. */ readonly __wbindgen_free: (a: number, b: number, c: number) => void; /** Generated startup hook called by module initialization. Applications must initialize through init or initSync rather than invoking this hook again. */ readonly __wbindgen_start: () => void; }",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -908,10 +1902,10 @@
           "name": "initSync",
           "kind": "function",
           "signature": "export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;",
-          "declarationLine": 108,
+          "declarationLine": 196,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Synchronously initializes from bytes or a precompiled native module without fetching. Use the object input form; already initialized modules return their existing exports.",
-          "core": "module: Application `SyncInitInput` wrapped as `{ module: bytesOrModule }`; positional bytes/module remain accepted but emit a deprecation warning.\nAn `InitOutput`; native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError retain their type, identity and stack without source/code, as the registered pass-through exception.",
+          "core": "module: Required application `SyncInitInput`, wrapped as `{ module: bytesOrModule }`: bytes or a precompiled `WebAssembly.Module`, with no default and no fetch. Positional bytes/module remain accepted but emit a deprecation warning.\nAn `InitOutput`; native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError retain their type, identity and stack without source/code, as the registered pass-through exception.",
           "advanced": "",
           "parameters": ["module: { module: SyncInitInput } | SyncInitInput"],
           "parameterDetails": [
@@ -924,9 +1918,7 @@
           "returns": "InitOutput",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [
-            "import init, {\n  initSync,\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n// 或：const wasm = initSync({ module: moduleOrBytes });"
-          ],
+          "examples": [],
           "members": [],
           "composes": [],
           "exportPath": ".",
@@ -969,7 +1961,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "module: Application `SyncInitInput` wrapped as `{ module: bytesOrModule }`; positional bytes/module remain accepted but emit a deprecation warning.\nAn `InitOutput`; native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError retain their type, identity and stack without source/code, as the registered pass-through exception."
+              "content": "module: Required application `SyncInitInput`, wrapped as `{ module: bytesOrModule }`: bytes or a precompiled `WebAssembly.Module`, with no default and no fetch. Positional bytes/module remain accepted but emit a deprecation warning.\nAn `InitOutput`; native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError retain their type, identity and stack without source/code, as the registered pass-through exception."
             },
             {
               "id": "advanced-usage",
@@ -980,7 +1972,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:initSync:export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "wasm-index--initSync"
         },
@@ -988,7 +1980,7 @@
           "name": "json_to_msgpack",
           "kind": "function",
           "signature": "export function json_to_msgpack(id: number, len: number): ConversionResult;",
-          "declarationLine": 64,
+          "declarationLine": 113,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Synchronously transcodes exactly one UTF-8 JSON document to MessagePack within the arena; trailing JSON whitespace is accepted. Pair with alloc_bytes and dealloc_bytes to own input and output separately. Preservation is limited to JSON data and representable numbers.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nlen: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nAn owned `ConversionResult`: success has nonzero id, exact len and empty error; invalid ID/length, parsing/trailing-document or allocation failure has id/len zero and error text. Input stays owned by the caller.",
@@ -1010,9 +2002,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  const encoded = json_to_msgpack(inputId, json.length)\n  try {\n    outputId = encoded.id\n    if (outputId === 0) throw new Error(encoded.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), encoded.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    encoded.free()\n  }\n} finally {\n  dealloc_bytes(inputId)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "const wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ count: 2 }))\nconst input = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n  const result = json_to_msgpack(input, json.length)\n  try {\n    outputId = result.id\n    if (outputId === 0) throw new Error(result.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(input)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n\ntype IJsonAllocation = { id: number; length: number }\n\nfunction writeJson(value: unknown): IJsonAllocation {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst inputs: IJsonAllocation[] = []\nconst results: ConversionResult[] = []\ntry {\n  inputs.push(writeJson({ id: 1, status: 'ready' }))\n  inputs.push(writeJson({ id: 2, status: 'queued' }))\n  for (const input of inputs) results.push(json_to_msgpack(input.id, input.length))\n  for (const result of results) {\n    if (result.id === 0) throw new Error(result.error)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  for (const input of inputs) dealloc_bytes(input.id)\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n}"
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst inputs: number[] = []\nconst results: ConversionResult[] = []\ntry {\n  for (const json of ['{\"first\":true}', '{\"second\":true}']) {\n    const bytes = new TextEncoder().encode(json)\n    const id = alloc_bytes(bytes.length)\n    if (id === 0) throw new Error('分配失败')\n    inputs.push(id)\n    new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n    results.push(json_to_msgpack(id, bytes.length))\n  }\n  console.log(\n    '都成功:',\n    results.every((result) => result.id !== 0 && result.error === '')\n  )\n  console.log('输出各自独立:', results[0].id !== results[1].id)\n  console.log('第一个结果仍有效:', results[0].len > 0)\n} finally {\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n  for (const id of inputs) dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst bytes = new TextEncoder().encode('{}{}')\nconst id = alloc_bytes(bytes.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  const result = json_to_msgpack(id, bytes.length)\n  try {\n    console.log('输出分配:', result.id, '字节数:', result.len)\n    console.log('拒绝第二个文档:', result.error.startsWith('json to msgpack failed:'))\n    console.log('输入仍归调用方:', ptr_of(id) !== 0)\n    if (result.id !== 0) dealloc_bytes(result.id)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
           ],
           "members": [],
           "composes": [],
@@ -1072,7 +2063,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:json_to_msgpack:export function json_to_msgpack(id: number, len: number): ConversionResult;",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 54,
           "configuration": [],
           "fragment": "wasm-index--json_to_msgpack"
         },
@@ -1080,7 +2071,7 @@
           "name": "msgpack_to_json",
           "kind": "function",
           "signature": "export function msgpack_to_json(id: number, len: number): ConversionResult;",
-          "declarationLine": 69,
+          "declarationLine": 132,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Synchronously transcodes exactly one MessagePack document to UTF-8 JSON, rejecting any trailing bytes. Pair with dealloc_bytes to release the new output allocation; bin/ext, non-string map keys and out-of-range integers are not promised reversible JSON forms.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nlen: Exact number of input bytes written by the application, no greater than `byte_len_of(id)`; rounded capacity is not a document length.\nAn independently owned `ConversionResult`; zero id/len and error text report failure without throwing a package error. Each successful output and every input remain separately releasable.",
@@ -1101,7 +2092,9 @@
           "returns": "ConversionResult",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [],
+          "examples": [
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('文档:', new TextDecoder().decode(json))\n    console.log('输入字节:', packed.length, '容量:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
+          ],
           "members": [],
           "composes": [],
           "exportPath": ".",
@@ -1160,7 +2153,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:msgpack_to_json:export function msgpack_to_json(id: number, len: number): ConversionResult;",
           "guidance": [],
-          "usageScore": 22,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "wasm-index--msgpack_to_json"
         },
@@ -1168,7 +2161,7 @@
           "name": "ptr_of",
           "kind": "function",
           "signature": "export function ptr_of(id: number): number;",
-          "declarationLine": 77,
+          "declarationLine": 144,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Looks up the byte offset for one live arena ID. Pair with alloc_bytes and initialized memory to construct a fresh typed-array view; offset stability does not preserve an old memory.buffer after growth.",
           "core": "id: Live allocation identifier returned by `alloc_bytes` or a successful `ConversionResult.id`, in this initialized module.\nEight-byte-aligned offset valid until this allocation is released; unknown or dead IDs return zero.",
@@ -1185,9 +2178,12 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  const encoded = json_to_msgpack(inputId, json.length)\n  try {\n    outputId = encoded.id\n    if (outputId === 0) throw new Error(encoded.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), encoded.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    encoded.free()\n  }\n} finally {\n  dealloc_bytes(inputId)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "const wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ count: 2 }))\nconst input = alloc_bytes(json.length)\nlet outputId = 0\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n  const result = json_to_msgpack(input, json.length)\n  try {\n    outputId = result.id\n    if (outputId === 0) throw new Error(result.error)\n    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()\n    console.log(packed.byteLength)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(input)\n  if (outputId !== 0) dealloc_bytes(outputId)\n}",
-            "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init()\n\ntype IJsonAllocation = { id: number; length: number }\n\nfunction writeJson(value: unknown): IJsonAllocation {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst inputs: IJsonAllocation[] = []\nconst results: ConversionResult[] = []\ntry {\n  inputs.push(writeJson({ id: 1, status: 'ready' }))\n  inputs.push(writeJson({ id: 2, status: 'queued' }))\n  for (const input of inputs) results.push(json_to_msgpack(input.id, input.length))\n  for (const result of results) {\n    if (result.id === 0) throw new Error(result.error)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  for (const input of inputs) dealloc_bytes(input.id)\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n}"
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, byte_len_of, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(9)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const values = new Float64Array(wasm.memory.buffer, ptr_of(id), 2)\n  values.set([21.5, 23])\n  console.log('容量:', byte_len_of(id))\n  console.log('对齐余数:', ptr_of(id) % 8)\n  console.log('读数:', values[0], values[1])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(8)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const offset = ptr_of(id)\n  const previous = new Float64Array(wasm.memory.buffer, offset, 1)\n  previous[0] = 42\n  wasm.memory.grow(1)\n  const current = new Float64Array(wasm.memory.buffer, ptr_of(id), 1)\n  console.log('偏移未变:', ptr_of(id) === offset)\n  console.log('旧视图字节数:', previous.byteLength)\n  console.log('当前读数:', current[0])\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, byte_len_of, dealloc_bytes } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst id = alloc_bytes(3)\nif (id === 0) throw new Error('分配失败')\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, ptr_of(id), 3)\n  view.set([1, 2, 3])\n  const ownedCopy = view.slice()\n  console.log('释放:', dealloc_bytes(id), dealloc_bytes(id))\n  console.log('副本:', ownedCopy.join(','))\n  console.log('已释放的查询:', ptr_of(id), byte_len_of(id))\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  ptr_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  type ConversionResult\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst inputs: number[] = []\nconst results: ConversionResult[] = []\ntry {\n  for (const json of ['{\"first\":true}', '{\"second\":true}']) {\n    const bytes = new TextEncoder().encode(json)\n    const id = alloc_bytes(bytes.length)\n    if (id === 0) throw new Error('分配失败')\n    inputs.push(id)\n    new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n    results.push(json_to_msgpack(id, bytes.length))\n  }\n  console.log(\n    '都成功:',\n    results.every((result) => result.id !== 0 && result.error === '')\n  )\n  console.log('输出各自独立:', results[0].id !== results[1].id)\n  console.log('第一个结果仍有效:', results[0].len > 0)\n} finally {\n  for (const result of results) {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n  for (const id of inputs) dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, { alloc_bytes, ptr_of, dealloc_bytes, json_to_msgpack } from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst bytes = new TextEncoder().encode('{}{}')\nconst id = alloc_bytes(bytes.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  const result = json_to_msgpack(id, bytes.length)\n  try {\n    console.log('输出分配:', result.id, '字节数:', result.len)\n    console.log('拒绝第二个文档:', result.error.startsWith('json to msgpack failed:'))\n    console.log('输入仍归调用方:', ptr_of(id) !== 0)\n    if (result.id !== 0) dealloc_bytes(result.id)\n  } finally {\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}",
+            "import { readFile } from 'node:fs/promises'\nimport init, {\n  alloc_bytes,\n  byte_len_of,\n  ptr_of,\n  dealloc_bytes,\n  msgpack_to_json\n} from '@migaia/wasm'\n\nconst wasm = await init({\n  module_or_path: await readFile(\n    new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))\n  )\n})\nconst packed = new Uint8Array([0x81, 0xa2, 0x6f, 0x6b, 0xc3])\nconst id = alloc_bytes(packed.length)\nif (id === 0) throw new Error('分配失败')\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), packed.length).set(packed)\n  const result = msgpack_to_json(id, packed.length)\n  try {\n    if (result.id === 0) throw new Error(result.error)\n    const json = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log('文档:', new TextDecoder().decode(json))\n    console.log('输入字节:', packed.length, '容量:', byte_len_of(id))\n  } finally {\n    if (result.id !== 0) dealloc_bytes(result.id)\n    result.free()\n  }\n} finally {\n  dealloc_bytes(id)\n}"
           ],
           "members": [],
           "composes": [],
@@ -1240,7 +2236,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:ptr_of:export function ptr_of(id: number): number;",
           "guidance": [],
-          "usageScore": 54,
+          "usageScore": 126,
           "configuration": [],
           "fragment": "wasm-index--ptr_of"
         },
@@ -1248,7 +2244,7 @@
           "name": "SyncInitInput",
           "kind": "type",
           "signature": "export type SyncInitInput = BufferSource | WebAssembly.Module;",
-          "declarationLine": 98,
+          "declarationLine": 182,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Native bytes or a precompiled WebAssembly.Module supplied by the application to initSync; no fetch-capable sources are accepted.",
           "core": "Native bytes or a precompiled WebAssembly.Module supplied by the application to initSync; no fetch-capable sources are accepted.",

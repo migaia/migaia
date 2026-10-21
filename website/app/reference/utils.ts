@@ -6,6 +6,7 @@
  * still schedules a zero-delay deadline; it does not disable the deadline.
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import { utilsCases } from './utils-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -50,8 +51,8 @@ const asyncControlMembers: Readonly<Record<string, IMemberDoc>> = {
 
 /** Reporter parameter text shared by promise helpers. */
 const reportText = t(
-  '`report(error, { operation, phase, attempt? })` receives failures that arrive after the result settled (late rejections, cleanup errors); default `hostRethrowReporter` rethrows them on a microtask so they are not lost.',
-  '`report(error, { operation, phase, attempt? })` 接收结果确定之后才出现的失败（迟到的 reject、清理错误）；默认 `hostRethrowReporter` 会在微任务中重新抛出，避免错误被吞掉。'
+  '`report(error, { operation, phase, attempt? })` receives failures that arrive after the result settled (late rejections, cleanup errors); default `hostRethrowReporter` rethrows them on a microtask so they are not lost. An operation that rejects with the exact `reason` of the signal it received is only acknowledging the cancellation, so that rejection is not reported.',
+  '`report(error, { operation, phase, attempt? })` 接收结果确定之后才出现的失败（迟到的 reject、清理错误）；默认 `hostRethrowReporter` 会在微任务中重新抛出，避免错误被吞掉。操作用它收到的 signal 的 `reason` 本身拒绝时，只是在确认取消，这个拒绝不会上报。'
 )
 
 /** Unknown-field policy shared by receiving and normalizing serialized error trees. */
@@ -606,6 +607,7 @@ isEmptyValue(0) // false`
     },
     ownConfig: {
       role: 'factory',
+      cases: utilsCases.ownConfig,
       purpose: t(
         'Accepts caller options at a boundary: validates the whole value graph, copies it (keeping cycles, shared nodes, `Date`, `RegExp`, `Map`, `Set`), and registers it as an owned configuration. Later changes by the caller do not affect it; the result is not frozen.',
         '在接收边界接纳调用方的配置：校验整张值图并复制（保留循环引用、共享节点、`Date`、`RegExp`、`Map`、`Set`），登记为“已拥有”的配置。调用方之后的修改不会影响它；结果对象本身不会被冻结。'
@@ -686,6 +688,7 @@ const next = patchConfig(config, { retries: 3, debug: CONFIG_DELETE })`
     },
     attachErrorIdentity: {
       role: 'operation',
+      cases: utilsCases.attachErrorIdentity,
       purpose: t(
         'Adds non-writable `source`, `code`, optional `phase` and `detail` fields to an existing error without wrapping or replacing it. Re-attaching the same values is a no-op; different existing values throw `ERROR_IDENTITY_CONFLICT` unless `hooks` decide.',
         '为已有错误对象添加不可写的 `source`、`code`，以及可选的 `phase`、`detail` 字段，不包装也不替换原错误。重复附加相同的值不会产生变化；已有不同的值时抛 `ERROR_IDENTITY_CONFLICT`，除非由 `hooks` 决定如何处理。'
@@ -1132,6 +1135,7 @@ if ('then' in inspection && inspection.then) throw new TypeError('钩子必须�
     },
     onceAsync: {
       role: 'operation',
+      cases: utilsCases.onceAsync,
       purpose: t(
         'Wraps a function returning `PromiseLike<T>` so it starts once; every caller shares one native `Promise<T>`, including a rejection (no automatic retry).',
         '包装返回 `PromiseLike<T>` 的函数，使其只启动一次；所有调用者共享同一个原生 `Promise<T>`，拒绝结果也会共享（不会自动重试）。'
@@ -1419,6 +1423,7 @@ probeObjectPathSegments(data, segments)`
     },
     set: {
       role: 'operation',
+      cases: utilsCases.set,
       purpose: t(
         'Writes a nested value without mutating the input: copies the objects along the path, shares untouched branches, and returns the new root (the same root when the value is unchanged by `Object.is`). The result is not frozen.',
         '写入嵌套值且不修改输入：复制路径上的对象、共享未改动的分支，并返回新根（值按 `Object.is` 未变化时返回原根）。结果不会被冻结。'
@@ -1466,6 +1471,7 @@ try {
     },
     createConcurrencyLimiter: {
       role: 'factory',
+      cases: utilsCases.createConcurrencyLimiter,
       optionDocs: {
         concurrency: {
           summary: t(
@@ -1581,6 +1587,7 @@ await ready.promise`
     },
     retry: {
       role: 'operation',
+      cases: utilsCases.retry,
       purpose: t(
         'Runs `operation` again after failures, one attempt at a time, until it succeeds, `shouldRetry` says no, or `maxAttempts` is reached. Supports a delay between attempts, a per-attempt timeout and a total timeout.',
         '在失败后逐次重新执行 `operation`，直到成功、`shouldRetry` 返回否，或达到 `maxAttempts`。支持两次尝试之间的等待、单次尝试超时和总超时。'
@@ -1637,6 +1644,7 @@ await ready.promise`
     },
     withTimeout: {
       role: 'operation',
+      cases: utilsCases.withTimeout,
       optionDocs: {
         ...asyncControlMembers,
         timeoutMs: {
@@ -1648,8 +1656,8 @@ await ready.promise`
         report: {
           ...promiseReportOption,
           summary: t(
-            'Receives late operation rejections after another outcome won; late success is discarded. Timer and listener cleanup failures surface through the returned rejection or aggregate, rather than this late-rejection callback.',
-            '接收其他结果胜出后的迟到操作拒绝；迟到成功值会丢弃。定时器与监听清理失败通过返回的拒绝或聚合暴露，而非这个迟到拒绝回调。'
+            'Receives late operation rejections after another outcome won; late success is discarded. A rejection with the exact `signal.reason` the operation received (as `fetch(url, { signal })` produces) only acknowledges the cancellation and is not reported. Timer and listener cleanup failures surface through the returned rejection or aggregate, rather than this late-rejection callback.',
+            '接收其他结果胜出后的迟到操作拒绝；迟到成功值会丢弃。操作用收到的 `signal.reason` 本身拒绝（`fetch(url, { signal })` 就是这样）只是确认取消，不会上报。定时器与监听清理失败通过返回的拒绝或聚合暴露，而非这个迟到拒绝回调。'
           )
         },
         cooperativeCancellation: {
@@ -1684,8 +1692,8 @@ await ready.promise`
         }
       },
       purpose: t(
-        'Runs `operation` with a deadline: the Promise rejects with `UtilsTimeoutError` (scope `operation`) when `timeoutMs` passes, and the operation signal aborts so cooperative code can stop. Late rejection goes to `report`; late success is discarded. Cleanup failures surface through rejection or aggregation.',
-        '为 `operation` 设置截止时间：超过 `timeoutMs` 时 Promise 以 `UtilsTimeoutError`（`scope` 为 `operation`）reject，同时操作收到的信号中止，协作式代码可以据此停止。迟到拒绝交给 `report`；迟到成功值丢弃，清理失败通过拒绝或聚合暴露。'
+        'Runs `operation` with a deadline: the Promise rejects with `UtilsTimeoutError` (scope `operation`) when `timeoutMs` passes, and the operation signal aborts so cooperative code can stop. Late rejection goes to `report`, except a rejection with the exact `signal.reason`; late success is discarded. Cleanup failures surface through rejection or aggregation.',
+        '为 `operation` 设置截止时间：超过 `timeoutMs` 时 Promise 以 `UtilsTimeoutError`（`scope` 为 `operation`）reject，同时操作收到的信号中止，协作式代码可以据此停止。迟到拒绝交给 `report`（用 `signal.reason` 本身拒绝的除外）；迟到成功值丢弃，清理失败通过拒绝或聚合暴露。'
       ),
       params: {
         operation: t(
@@ -4413,7 +4421,7 @@ try {
       scenarios: [
         t(
           'Limit how long a caller waits for work that has no cancellation support, without treating the supplied signal as a native host signal.',
-          '底层工作不支持取消、但调用方需要限制等待时间时，用这个函数类型配合关闭协作取消的选项。'
+          '底层工作不支持取消、但调用方需要限制等待时间时，用这个函数类型配合 `withTimeout` 的 `cooperativeCancellation: false` 选项。'
         )
       ],
       example: t(
@@ -4423,7 +4431,7 @@ const readCachedTitle: IDeadlineOnlyOperation<string> = () => Promise.resolve('D
 console.log(await withTimeout(readCachedTitle, {
   timeoutMs: 500, cooperativeCancellation: false
 }))`,
-        `/** 底层工作不支持取消、但调用方需要限制等待时间时，用这个函数类型配合关闭协作取消的选项。 */
+        `/** 底层工作不支持取消、但调用方需要限制等待时间时，用这个函数类型配合 withTimeout 的 cooperativeCancellation: false 选项。 */
 import { withTimeout, type IDeadlineOnlyOperation } from '@migaia/utils/promise'
 const readCachedTitle: IDeadlineOnlyOperation<string> = () => Promise.resolve('Dashboard')
 console.log(await withTimeout(readCachedTitle, {

@@ -6,14 +6,37 @@
  * path.
  */
 import type { ILibraryReference, IText } from './contract.js'
+import { storeWasmCases } from './store-wasm-cases.js'
 
 /** Localized source-backed contracts. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+/** Node reads the published binary instead of fetching the default file URL. */
+const nodeSetup = t(
+  'Install @migaia/wasm directly for these Node 24 examples. readFile receives the URL of its published sibling binary and returns bytes. initWasm({ module_or_path }) takes those bytes here; supported inputs also include a string/Request, URL, Response, WebAssembly.Module, or a Promise of an input. Omission uses the default asset URL; Node reads it explicitly because its file URL is not fetchable. ensureWasm takes no arguments and returns the shared WebAssembly.Memory.',
+  '这些 Node 24 示例还需直接安装 `@migaia/wasm`。`readFile` 接收发布入口旁二进制文件的 URL 并返回字节，交给 `initWasm({ module_or_path })`；该字段也支持字符串或 Request、URL、Response、WebAssembly.Module，以及这些输入的 Promise。省略时使用默认资源 URL，Node 不能直接 fetch 文件 URL，因此这里显式读文件。`ensureWasm()` 无参数，返回共享 WebAssembly.Memory。'
+)
+/** Store Light creates and owns the synchronous fields; its Runtime remains borrowed. */
+const storeSetup = t(
+  'Also install @migaia/store-light. createStore(initialState, options = {}) requires the field declaration; runtime defaults to Store Light defaultRuntime unless supplied. It creates the builders synchronously after readiness and owns their cleanup through await store.$dispose(). Builders themselves do not contain live field data.',
+  '还需直接安装 `@migaia/store-light`。`createStore(initialState, options = {})` 的字段声明必填，`runtime` 省略时使用 Store Light 的 `defaultRuntime`；工厂在就绪后同步创建字段，`await store.$dispose()` 统一清理。构造器本身是描述对象，不保存实际字段值。'
+)
+/** Every field example keeps its external constructor parameters on the same API page. */
+const fieldIntro = (detail: IText): IText =>
+  t(nodeSetup.en + ' ' + storeSetup.en + ' ' + detail.en, nodeSetup.zh + storeSetup.zh + detail.zh)
+/** Real Runtime effects are explicitly flushed so examples do not depend on scheduler timing. */
+const trackingSetup = t(
+  'The tracking examples also install @migaia/reactive. createRuntime() uses its default options; pass that exact runtime to createStore. effect(callback) reads synchronously, and runtime.flush() drains queued work after each write. The callback records values without returning cleanup; its returned effect is disposed before the Store.',
+  '追踪示例还需直接安装 `@migaia/reactive`。`createRuntime()` 使用默认选项，并把同一运行时交给 `createStore`；`effect(callback)` 同步读取，写入后显式调用 `runtime.flush()` 处理排队工作。回调只记录值、不返回清理函数，最终先释放观察者再释放 Store。'
+)
 /** Full real builder-to-store path exercises all public field operations. */
-const example = `import * as wasm from '@migaia/store-wasm'
+const example = `import { readFile } from 'node:fs/promises'
+import initWasm from '@migaia/wasm'
+import * as wasm from '@migaia/store-wasm'
 import { createStore } from '@migaia/store-light'
 import { createRuntime } from '@migaia/reactive'
 
+const url = new URL('./wasm_provider_bg.wasm', import.meta.resolve('@migaia/wasm'))
+await initWasm({ module_or_path: await readFile(url) })
 await wasm.ensureWasm()
 const runtime = createRuntime()
 const store = createStore({
@@ -150,16 +173,15 @@ export const storeWasmReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Initializes @migaia/wasm once; pending and successful calls preserve one Promise identity. Failed initialization clears the attempt cache so another call can retry.',
-        '只初始化一次原生模块，等待中及成功后保持同一承诺身份，失败清空尝试缓存，允许后续调用重新加载。'
+        '初始化原生模块；等待中及成功后复用同一个 Promise，失败时清空尝试缓存，后续调用可重新加载。'
       ),
       returns: t(
         'Promise<WebAssembly.Memory> for shared memory, never caller-owned. Native WebAssembly.CompileError, LinkError and RuntimeError cross unchanged without source/code as the registered native pass-through exception. The original arena trap is rethrown unchanged; only later INSTANCE_POISONED failures carry the first trap on cause. This readiness Promise remains resolved after a later trap.',
-        '承诺返回非调用者拥有的共享内存；原生编译、链接及运行时错误按已登记例外原样跨边界，不附来源或错误码；分配器首次陷阱原样重抛，只有后续 `INSTANCE_POISONED` 失败附码并将首次陷阱保留在原因链，后续陷阱不改变已兑现的就绪承诺。'
+        'Promise 返回共享内存，调用方不拥有其释放责任；原生编译、链接及运行时错误按已登记例外原样传播，不附来源或错误码。分配器首次陷阱原样重抛，后续 `INSTANCE_POISONED` 失败把首次陷阱保留在原因链；后来的陷阱不会改变已完成的就绪 Promise。'
       ),
-      example: `import { ensureWasm } from '@migaia/store-wasm'
-const ready = ensureWasm()
-const memory = await ready
-console.log(ready === ensureWasm(), memory.buffer.byteLength)`
+      exampleIntro: nodeSetup,
+      example: storeWasmCases.ensureWasm![0]!.example,
+      cases: storeWasmCases.ensureWasm
     },
     number: {
       role: 'factory',
@@ -173,7 +195,14 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
           '值为数字，类型检查允许非数及无穷值，同值比较区分正负零，非数字写入抛类型错误及无效选项码。'
         )
       ),
-      example
+      exampleIntro: fieldIntro(
+        t(
+          'number() takes no arguments and starts at 0; value accepts JavaScript numbers. memory.grow(1) adds one 64 KiB page and returns the previous page count; this example compares buffer identity instead of relying on a fixed initial size. The retained field is unusable after Store disposal.',
+          '`number()` 无参数，初始值 `0`，通过 `value` 读写数字。`memory.grow(1)` 增长一页 64 KiB 内存并返回增长前页数；示例只比较缓冲区身份，不依赖固定初始大小。Store 释放后，保留的字段引用也不能继续访问。'
+        )
+      ),
+      example: storeWasmCases.number![0]!.example,
+      cases: storeWasmCases.number
     },
     boolean: {
       role: 'factory',
@@ -198,7 +227,7 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
       params: {
         maxBytes: t(
           'Caller UTF-8 byte capacity, default 256; safe integer from 0 through 4294967291. Invalid size throws RangeError INVALID_OPTION at builder construction.',
-          '调用者选择的编码字节容量，默认二百五十六，须为零至 `4294967291` 安全整数，无效大小在描述构造阶段抛范围错误。'
+          'UTF-8 字节容量默认 `256`，须为 `0` 至 `4294967291` 的安全整数；非法大小在构造描述时抛 `RangeError`，错误码为 `INVALID_OPTION`。'
         )
       },
       returns: scalar(
@@ -207,7 +236,14 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
           '值为字符串，容量按编码字节数而非字符数计，非字符串抛类型错误，超容量在提交前抛普通无效选项错误，读取解码当前字节，损坏长度抛分配失败。'
         )
       ),
-      example
+      exampleIntro: fieldIntro(
+        t(
+          'string(maxBytes = 256) creates an initially empty value. The example supplies 6 bytes; TextEncoder.encode(value).length measures that capacity in UTF-8. Assignment accepts a string and throws INVALID_OPTION before changing memory when its encoded length exceeds maxBytes.',
+          '`string(maxBytes = 256)` 的初始值为空字符串；本例设为 `6` 字节，使用 `TextEncoder.encode(value).length` 查看 UTF-8 长度。赋值只接受字符串，编码长度超出 `maxBytes` 时先抛 `INVALID_OPTION`，不改现有字节。'
+        )
+      ),
+      example: storeWasmCases.string![0]!.example,
+      cases: storeWasmCases.string
     },
     array: {
       role: 'factory',
@@ -222,7 +258,7 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
         ),
         granularity: t(
           'Caller positive safe integer indices per bucket, default 64; one tracks each index independently, larger buckets can invalidate peers.',
-          '调用者选择的每桶下标数，须为正安全整数，默认六十四，取一独立追踪下标，更大桶可能使同桶依赖失效。'
+          '每桶下标数须为正安全整数，默认 `64`；设为 `1` 时逐下标追踪，更大的桶可能使同桶其他读取者失效。'
         )
       },
       returns: t(
@@ -231,7 +267,16 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
         builder.zh +
           '产物提供只读长度与销毁状态、幂等无参数销毁、按下标读写、范围写入及浮点视图方法。下标须为零含边界至长度不含边界的安全整数，读取追踪桶，写值须为数字且允许非数及无穷值。范围采用左闭右开，写入前完成全部类数组长度和元素读取，读取器失败不产生部分写入；未编码原生输入错误原位附 `INVALID_OPTION`，外包完整身份不变，冻结或非错误值保留在原因链。再批量为每个变化桶提交一次，提交回调内刷新当前内存视图，支持所有者在提交边界增长内存，失败尝试回滚内存。视图返回不追踪的独立拷贝，修改不回写，销毁后数据操作抛字段已销毁错误，清理先释放响应源再释放分配。'
       ),
-      example
+      exampleIntro: fieldIntro(
+        t(
+          trackingSetup.en +
+            ' array(length, granularity = 64) requires a fixed length; values begin at 0. at(index) and setAt(index, value) require a nonnegative valid index. setRange(lo, hi, values) targets [lo, hi), with exactly hi - lo numeric entries. view() takes no arguments and returns an independent Float64Array copy. The failed input getter deliberately throws its existing TypeError, whose identity and code are printed.',
+          trackingSetup.zh +
+            '`array(length, granularity = 64)` 的固定长度必填，初值均为 `0`。`at(index)` 与 `setAt(index, value)` 需要非负有效下标；`setRange(lo, hi, values)` 写入 `[lo, hi)`，输入须恰好有 `hi - lo` 个数字。`view()` 无参数，返回独立 Float64Array 副本。失败输入的访问器故意抛出已有 TypeError，输出会核对其身份和错误码。'
+        )
+      ),
+      example: storeWasmCases.array![0]!.example,
+      cases: storeWasmCases.array
     },
     record: {
       role: 'factory',
@@ -251,7 +296,16 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
         builder.zh +
           '产物把捕获键映射为初始零、直接可读写数字属性，不经过值包装，逐键读取追踪独立源，同值写入跳过，非数字写入抛类型错误。不可枚举的销毁状态及无参数无返回值幂等销毁方法保留生命周期所有权，销毁后属性访问抛字段已销毁错误，清理先响应源后分配，不支持嵌套记录数组及动态键。'
       ),
-      example
+      exampleIntro: fieldIntro(
+        t(
+          trackingSetup.en +
+            ' record(shape) requires a non-array object of number() builders. Here x and y are fixed numeric properties, initially 0; direct assignment writes their f64 values. Object.keys lists only business keys because dispose and disposed are non-enumerable lifecycle properties.',
+          trackingSetup.zh +
+            '`record(shape)` 需要由 `number()` 构造器组成的非数组对象；本例 `x`、`y` 是初始值 `0` 的固定数字属性，直接赋值即可写入 f64。`Object.keys` 只列出业务键，`dispose` 与 `disposed` 是不可枚举的生命周期属性。'
+        )
+      ),
+      example: storeWasmCases.record![0]!.example,
+      cases: storeWasmCases.record
     },
     createStoreWasmError: errorDoc('Error', true),
     createStoreWasmTypeError: errorDoc('TypeError', true),

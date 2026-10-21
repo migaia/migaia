@@ -49,7 +49,7 @@ const removals = t(
 /** Callback reporting is synchronous at invocation, while returned thenables are observed. */
 const reporter = t(
   'Application callback receiving the original listener error; a returned thenable is observed and its failure is retained in the supplied state.',
-  '应用回调接收原始监听错误，返回类承诺时会观察其结算，并将失败保留在所提供状态中。'
+  '应用回调接收原始监听错误，返回类 Promise 对象时会观察其结算，并将失败保留在所提供状态中。'
 )
 /** A complete listener dispatch boundary reports failures and drains known reporter settlements. */
 const listenerExample = `const failures = createListenerFailureState()
@@ -94,7 +94,7 @@ const types: Record<string, ITypeDoc> = {
       pending: {
         summary: t(
           'Set of tracked reporter settlement promises; terminal drain waits for this set to empty.',
-          '已跟踪报告函数结算承诺的集合，终态排空等待此集合清空。'
+          '已跟踪报告函数结算 Promise 的集合，终态排空等待此集合清空。'
         )
       },
       nextOrder: {
@@ -177,7 +177,7 @@ const types: Record<string, ITypeDoc> = {
         {
           message: t(
             'Actual message received from the physical carrier.',
-            '物理载体实际接收到的消息。'
+            '底层传输通道实际接收到的消息。'
           ),
           invoke: t(
             'Synchronous dispatcher receiving each snapshot listener and the message; use observeListener to isolate failures.',
@@ -222,7 +222,7 @@ const symbols: Record<string, ISymbolDoc> = {
     },
     t(
       'The original Error when it can retain or acquire semantic identity; otherwise a Core Error whose cause retains the original failure.',
-      '可保持或附加语义身份时返回原错误，否则返回以原失败为原因的核心错误。'
+      '可保持或附加语义身份时返回原错误，否则返回以原始失败为原因的核心错误。'
     ),
     `import { identifyRpcBoundaryFailure } from '@migaia/rpc-core/transport-kit'
 import { RpcCoreErrorCode } from '@migaia/rpc-core'
@@ -237,7 +237,7 @@ console.log(failure === original, failure instanceof DOMException)`
       {},
       t(
         'Mutable `{ failures: [], pending: new Set(), nextOrder: 0 }`. failures retain original errors and invocation order; pending tracks reporter settlement promises. Pass this exact state to observation and drain operations.',
-        '返回可变状态：失败列表与待结算集合初始为空，下一序号为零；失败列表保留原错误及调用顺序，待结算集合跟踪报告函数的承诺。将同一状态传给观察及排空操作。'
+        '返回可变状态：失败列表与待结算集合初始为空，下一序号为零；失败列表保留原错误及调用顺序，待结算集合跟踪报告函数的 Promise。将同一状态传给观察及排空操作。'
       ),
       listenerExample
     ),
@@ -297,7 +297,7 @@ if (failure) throw failure`
     { errors, boundary },
     t(
       'Returns void if no failure remains; otherwise throws. Settled state entries are removed in state order and reporter invocation order. Pending reporter promises are not awaited.',
-      '没有剩余失败时不返回值，否则抛出。已结算状态条目按状态顺序及报告调用顺序取出并删除，不等待尚未完成的报告承诺。'
+      '没有剩余失败时不返回值，否则抛出。已结算状态条目按状态顺序及报告调用顺序取出并删除，不等待尚未完成的报告 Promise。'
     ),
     `const failures = createListenerFailureState()
 collectListenerFailure(failures, secondary)
@@ -305,17 +305,17 @@ drainListenerFailures([primary], { secondaryFailures: failures })`
   ),
   drainTerminalListenerFailures: op(
     'Waits for all currently tracked reporter promises to settle before consuming failures at a terminal boundary.',
-    '在终态边界消费失败前等待当前跟踪的报告承诺全部结算。',
+    '在终态边界消费失败前等待当前跟踪的报告 Promise 全部结算。',
     { errors, boundary },
     t(
       'Void when supplied states have no pending reporters; otherwise a Promise. Throws or rejects with primary-first collected failures. It does not await unrelated pending listener work.',
-      '所提供状态没有待结算报告时同步返回空值，否则返回承诺。以主失败优先的收集结果抛出或拒绝，不等待无关的待结算监听工作。'
+      '所提供状态没有待结算报告时同步返回空值，否则返回 Promise。以主失败优先的收集结果抛出或拒绝，不等待无关的待结算监听工作。'
     ),
     listenerExample
   ),
   observeListener: op(
     'Invokes a listener now, observes sync throws and thenable rejections, and reports them without throwing into the carrier dispatch.',
-    '立即调用监听器，观察同步抛错及类承诺拒绝，通过报告路径处理，不抛进载体派发。',
+    '立即调用监听器，观察同步抛错及类 Promise 对象拒绝，通过报告路径处理，不抛进传输对象派发。',
     {
       invoke: t(
         'Zero-argument callback running the actual listener; its successful value is ignored.',
@@ -466,7 +466,7 @@ export const kitReference: ILibraryReference = {
     'transport-kit': {
       summary: t(
         'Use this entry when writing a transport that must share one native event listener among several subscribers and clean it up correctly. `createMessageListenerHub()` attaches the native listener for the first subscriber and removes it after the last one leaves. `createListenerFailureState()` tracks failures raised while reporting listener errors so cleanup can await and report them.\n\nThese are adapter-building helpers, not an endpoint factory; pass the finished transport to the root `createEndpoint()`.',
-        '编写传输载体时，若多个订阅者要共用一个原生事件监听，并在无人订阅后清理它，可使用这个入口。`createMessageListenerHub()` 在首个订阅者加入时挂上原生监听，在最后一个离开时移除。`createListenerFailureState()` 记录上报监听错误时产生的失败，让清理过程能够等待并报告这些失败。这里提供编写适配器的工具，不创建端点；完成的载体可交给根入口的 `createEndpoint()`。'
+        '编写传输传输对象时，若多个订阅者要共用一个原生事件监听，并在无人订阅后清理它，可使用这个入口。`createMessageListenerHub()` 在首个订阅者加入时挂上原生监听，在最后一个离开时移除。`createListenerFailureState()` 记录上报监听错误时产生的失败，让清理过程能够等待并报告这些失败。这里提供编写适配器的工具，不创建端点；完成的传输对象可交给根入口的 `createEndpoint()`。'
       ),
       example: hubExample
     }

@@ -106,7 +106,7 @@ const type = (
   scenarios: [
     t(
       'Use the original physical I/O and let Core retain protocol and lifecycle ownership.',
-      '使用原物理读写，由核心保留协议及生命周期所有权。'
+      '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
     )
   ],
   example,
@@ -115,22 +115,22 @@ const type = (
 /** Original physical transfers are caller-supplied references. */
 const transfer = p(
   'Optional ordered original transfer references; the actual native carrier validates support and detaches accepted ownership.',
-  '可选有序原转移引用，实际原生载体验证支持并转移已接受所有权。',
+  '可选的转移列表，按调用方给出的顺序传给底层载体；由宿主检查可转移对象并完成所有权转移。',
   t('Absent: no explicit physical transfer.', '默认没有显式物理转移。')
 )
 /** Canonical physical transport surface, shared by actual wrappers and inherited memory types. */
 export const transportMembers: Record<string, IMemberDoc> = {
   send: m(
     'Sends one actual carrier value; completion means the physical boundary completed, not that a remote provider executed.',
-    '发送一个实际载体值，完成只表示物理边界完成，不表示远端提供方已经执行。',
+    '发送一条底层消息；返回或完成承诺只说明发送操作已完成，不说明对端的业务函数已执行。',
     {
       message: t(
         'Original complete message value accepted by this actual carrier domain.',
-        '此实际载体值域接受的原完整消息值。'
+        '交给底层载体的完整消息值，必须属于该载体支持的类型。'
       ),
       options: t(
         'Optional IRpcSendOptions supplies original physical transfer references.',
-        '可选载体发送选项提供原物理转移引用。'
+        '可选的 `IRpcSendOptions`，其中 `transfer` 指定本次发送要转移的对象。'
       )
     },
     t(
@@ -141,132 +141,135 @@ export const transportMembers: Record<string, IMemberDoc> = {
   ),
   subscribe: m(
     'Subscribes to actual inbound messages; the original native registration is detached when its last logical listener leaves.',
-    '订阅实际入站消息，最后一个逻辑监听离开时移除原原生登记。',
+    '订阅收到的消息；最后一个逻辑订阅被移除时，适配器才移除底层事件监听。',
     {
       listener: t(
         'Application callback receives a record containing data and optional actual peerId/origin/source; return void. Adapter-owned listener errors use onListenerError.',
-        '应用回调接收含数据及可选实际对端、来源域、来源对象的记录，返回空值；适配器拥有的监听错误交监听错误观察。'
+        '回调收到含 `data` 的记录，并可能带有 `peerId`、`origin`、`source`，返回 `void`；回调失败由 `onListenerError` 观察。'
       )
     },
     t(
       'Idempotent removal of this registration; native cleanup failure may throw and preserve retry ownership.',
-      '返回本登记的幂等移除函数，原生清理失败可抛错并保留重试所有权。'
+      '返回仅取消这次订阅的函数，可重复调用；底层监听移除失败时可能抛错，尚未释放的部分仍可重试。'
     ),
     memoryExample
   ),
   close: m(
     'Retires this transport according to actual ownership; owned resources may be closed, borrowed resources retain their caller-owned native lifetime.',
-    '按实际所有权退役此载体，拥有资源可能关闭，借用资源保留调用方原生生命周期。',
+    '释放这个传输适配器；是否同时关闭底层资源，取决于它接管了资源还是只借用资源。',
     {},
     t(
       'Void or Promise<void>; actual native cleanup failures remain observable. Consult the adapter-specific close policy.',
-      '返回空值或承诺，实际原生清理失败仍可观察，具体关闭策略见适配器。'
+      '返回 `void` 或 `Promise<void>`，清理失败仍会报告；底层资源的关闭规则见具体适配器。'
     ),
     memoryExample
   ),
   onTransportError: m(
     'Subscribes to original physical/read/terminal failures without treating them as application provider results.',
-    '订阅原物理、读取及终止失败，不将其当作应用提供方结果。',
+    '观察底层读写和连接终止的失败；这些错误与对端业务函数的返回值分开处理。',
     {
       listener: t(
         'Application callback receives original unknown error, returns void; secondary failure is retained by the adapter reporter boundary.',
-        '应用回调接收原未知错误并返回空值，次级失败由适配器上报边界保留。'
+        '回调接收原始错误并返回 `void`；若回调自身也失败，适配器会保留并报告这次次级失败。'
       )
     },
-    t('Removal releases this failure observer only.', '移除函数只释放此失败观察者。'),
+    t('Removal releases this failure observer only.', '返回仅取消这次错误订阅的函数。'),
     memoryExample
   ),
   onListenerError: m(
     'Subscribes to original message-listener or physical-observer callback failures independently of transport failure.',
-    '独立于载体失败订阅原消息监听或物理观察回调失败。',
+    '观察消息监听器或载体探针回调抛出的错误，与底层连接错误分开处理。',
     {
       listener: t(
         'Application callback receives original listener error and returns void; its own failure is collected by the original adapter.',
-        '应用回调接收原监听错误并返回空值，自身失败由原适配器收集。'
+        '回调收到原始监听错误并返回 `void`；回调自身的失败仍由适配器收集。'
       )
     },
     t(
       'Removal releases this diagnostic observer and may surface collected reporter failures.',
-      '移除函数释放此诊断观察者，可能显露已收集上报失败。'
+      '返回取消这次诊断订阅的函数，取消时可能报告已收集的上报器错误。'
     ),
     memoryExample
   ),
   observe: m(
     'Installs original physical observation; replacing it retires the preceding observation generation without acquiring lifecycle ownership.',
-    '安装原物理观察，替换时退役前一观察代次，不取得生命周期所有权。',
+    '安装载体探针；替换探针后，旧安装失效，但探针不会接管载体的关闭责任。',
     {
       probe: t(
         'Actual IRpcCarrierProbe port supplied by the installed endpoint emitter.',
-        '已安装端点发射器提供的实际物理探针端口。'
+        '由端点的观察模块提供的 `IRpcCarrierProbe`，用于接收底层发送与接收观察。'
       )
     },
     t(
       'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
-      '移除函数只退役此观察代次，即使相同探针之后被重新安装。'
+      '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
     ),
     memoryExample
   ),
   peerId: p(
     'Optional original peer identity attributed by the actual adapter; caller labels do not grant verified identity.',
-    '实际适配器归属的可选原对端身份，调用方标签不赋予已验证身份。'
+    '适配器记录的可选对端标识；调用方填写这个标签并不等于对端身份已经验证。'
   ),
   origin: p(
     'Optional actual origin attributed by the adapter, not a caller assertion of trust.',
-    '适配器归属的可选实际来源域，不是调用方信任声明。'
+    '适配器记录的可选来源域；它是来源信息，不能单独用作信任凭据。'
   ),
   platform: {
     ...p(
       'Actual carrier platform label for presentation and diagnostics.',
-      '用于展示及诊断的实际载体平台标签。'
+      '载体的平台标签，用于展示和诊断。'
     ),
     values: { enum: 'RpcPlatform' }
   },
   topology: {
-    ...p('Actual peer topology supplied by the adapter.', '适配器提供的实际对端拓扑。'),
+    ...p(
+      'Actual peer topology supplied by the adapter.',
+      '适配器提供的连接拓扑，说明载体怎样连接对端。'
+    ),
     values: { enum: 'RpcTransportTopology' }
   },
   encodedType: {
-    ...p('Actual accepted carrier encoding domain.', '实际接受的载体编码值域。'),
+    ...p('Actual accepted carrier encoding domain.', '载体接受的数据表示类型。'),
     values: { enum: 'RpcTransportEncoding' }
   },
   ownership: {
     ...p(
       'Actual original physical ownership determining cleanup responsibility.',
-      '决定清理责任的实际原物理所有权。'
+      '底层资源的所有权标记，用来决定谁负责关闭。'
     ),
     values: { enum: 'RpcTransportOwnership' }
   },
   sourceProof: p(
     'Optional original adapter callback receives native source and optional origin, synchronously returns boolean; labels alone cannot replace this proof.',
-    '可选原适配器回调接收原生来源及可选来源域，同步返回布尔值，标签本身不能替代此证明。'
+    '可选的来源检查函数，接收原生 `source` 和可选 `origin`，同步返回布尔值；标识标签不能代替这项检查。'
   ),
   closed: p(
     'True only when this adapter can prove no future message delivery; logical detach alone is insufficient.',
-    '只有适配器可以证明不再交付消息时为真，仅逻辑移除不充分。'
+    '只有适配器确认不会再交付消息时才为 `true`；仅移除一层逻辑监听不代表底层已关闭。'
   )
 }
 types.IRpcTransport = type(
   'Original adapter-owned carrier interface; its operations, source proof and cleanup stay separate from Core protocol ownership.',
-  '原适配器拥有的载体接口，操作、来源证明及清理与核心协议所有权分开。',
+  '传输适配器提供的载体接口；底层读写、来源检查和资源清理由适配器负责，RPC 协议由 Core 负责。',
   transportMembers
 )
 types.IRpcSendOptions = type(
   'Physical sender options contain only original transfer references, without application deadlines or RPC replay semantics.',
-  '物理发送选项只含原转移引用，不包含应用截止或调用重放语义。',
+  '底层发送选项，仅包含要转移的对象；调用超时和 RPC 重放策略不在这里配置。',
   { transfer }
 )
 types.IMemoryTransport = type(
   'One end of the original queued memory pair; it shares the same values without structured cloning and closing either end closes both.',
-  '原排队内存对的一端，不结构克隆而共享相同值，关闭任一端会关闭两端。',
+  '内存载体对的一端；消息排队交付且不做结构化克隆，关闭任一端都会关闭两端。',
   {
     ...transportMembers,
     close: m(
       'Idempotently closes both original memory ends; queued messages not yet delivered are dropped.',
-      '幂等关闭原内存对两端，尚未交付的排队消息被丢弃。',
+      '关闭内存载体对的两端，可重复调用；尚未交付的排队消息会被丢弃。',
       {},
       t(
         'Both ends reject later sends and clear existing listeners. Later subscribe calls can still register but receive no delivery; cleanup failures may throw or settle asynchronously.',
-        '两端拒绝后续发送并清空已有监听，后续订阅仍可登记但不会收到交付，清理失败可能抛出或异步结算。'
+        '两端停止接受发送并清空已有监听；之后仍可登记订阅，但不会再收到消息。清理失败可能同步抛出，也可能通过承诺报告。'
       ),
       memoryExample
     )
@@ -274,11 +277,11 @@ types.IMemoryTransport = type(
 )
 types.IMemoryTransportOptions = type(
   'Optional delivery scheduler for the memory carrier only; endpoint deadline clocks are configured separately.',
-  '只作用于内存载体交付的可选调度器，端点截止时钟另行配置。',
+  '可选的内存消息交付调度器，只控制这对载体的排队任务；端点的超时时钟另行配置。',
   {
     scheduler: p(
       'Application IScheduler passed to deferTask for actual queued memory delivery.',
-      '传给延迟任务的应用调度器，用于实际排队内存交付。',
+      '调用方提供的 `IScheduler`，供 `deferTask` 安排这对载体的消息交付。',
       t('Absent: delivery uses the host microtask queue.', '默认使用宿主微任务队列交付。')
     )
   }
@@ -289,7 +292,7 @@ symbols.createMemoryTransportPair = {
   options: 'IMemoryTransportOptions',
   returns: t(
     'Readonly pair of borrowed, exclusive Memory transports; caller owns final pair close. No native transfer is performed.',
-    '返回只读借用独占内存载体对，调用方拥有最终关闭，不执行原生转移。'
+    '返回只读的内存载体对，拓扑为 `exclusive`、所有权为 `borrowed`；最终由调用方关闭，不执行原生对象转移。'
   ),
   example: memoryExample
 }
@@ -297,11 +300,17 @@ symbols.createMemoryTransportPair = {
 const nativePortMembers: Record<string, IMemberDoc> = {
   postMessage: m(
     'Calls the actual native postMessage and forwards the exact ordered transfer list.',
-    '调用实际原生消息发送并转发精确有序转移列表。',
+    '调用底层 `postMessage`，按原顺序传入转移列表。',
     {
       message: t('Original native-supported message value.', '原生支持的原始消息值。'),
-      transfer: t('Optional original native transferable references.', '可选原原生可转移引用。'),
-      transferList: t('Optional original native transferable references.', '可选原原生可转移引用。')
+      transfer: t(
+        'Optional original native transferable references.',
+        '可选的原生可转移对象列表，保留传入的对象引用。'
+      ),
+      transferList: t(
+        'Optional original native transferable references.',
+        '可选的原生可转移对象列表，保留传入的对象引用。'
+      )
     },
     t(
       'Returns after native postMessage; synchronous clone/transfer failures propagate.',
@@ -311,83 +320,86 @@ const nativePortMembers: Record<string, IMemberDoc> = {
   ),
   start: m(
     'Starts native MessagePort delivery without replacing existing event listeners.',
-    '启动原生消息端口交付，不替换已有事件监听。',
+    '启动 MessagePort 的消息交付，不替换已有事件监听。',
     {},
     t(
       'Native delivery is enabled; no RPC connection is inferred.',
-      '原生交付已启用，不推断调用连接。'
+      '端口开始交付消息；这一步不会自行建立 RPC 连接。'
     ),
     browserExample
   ),
   close: m(
     'Calls the original native port close operation; its actual physical owner determines idempotency and errors.',
-    '调用原原生端口关闭操作，由实际物理所有者决定幂等及错误。',
+    '调用端口自己的 `close`；是否幂等、怎样报告失败，由底层端口决定。',
     {},
-    t('Native close completes or throws its original failure.', '原生关闭完成或抛出原失败。'),
+    t(
+      'Native close completes or throws its original failure.',
+      '端口关闭完成，或抛出原始关闭错误。'
+    ),
     browserExample
   ),
   addEventListener: m(
     'Registers an additional native event callback without taking a mutable onmessage slot.',
-    '登记额外原生事件回调，不占用可变消息处理槽。',
+    '通过原生事件接口增加监听，不覆盖 `onmessage`。',
     {
       type: t(
         'Actual supported native message/messageerror/error event name for this structural port.',
-        '此结构端口实际支持的消息、消息错误或错误事件名。'
+        '该端口支持的 `message`、`messageerror` 或 `error` 事件名。'
       ),
       listener: t(
         'Synchronous callback receives the original native event, returns void; native dispatch owns invocation.',
-        '同步回调接收原原生事件并返回空值，原生派发拥有调用。'
+        '回调接收原生事件并返回 `void`，由端口的事件系统同步调用。'
       )
     },
-    t('Original event callback is registered.', '原事件回调已经登记。'),
+    t('Original event callback is registered.', '事件回调已登记。'),
     workerExample
   ),
   removeEventListener: m(
     'Removes the exact original event callback without removing other registrations.',
-    '移除精确原事件回调，不移除其他登记。',
+    '按回调引用移除对应监听，不影响其他监听。',
     {
       type: t('Same native event name passed when registering.', '登记时传入的相同原生事件名。'),
       listener: t(
         'Same original callback reference passed to registration.',
-        '登记时传入的相同原回调引用。'
+        '登记时使用的同一个回调引用。'
       )
     },
-    t('Native removal completes or throws its original failure.', '原生移除完成或抛出原失败。'),
+    t(
+      'Native removal completes or throws its original failure.',
+      '监听移除完成，或抛出底层移除错误。'
+    ),
     workerExample
   ),
   on: m(
     'Adds an actual EventEmitter message, messageerror or close listener.',
-    '添加实际事件发射器消息、消息错误或关闭监听。',
+    '通过事件订阅接口监听消息、消息解码错误或连接关闭，事件名分别为 `message`、`messageerror`、`close`。',
     {
       event: t(
         'Supported native message/messageerror/close event name.',
-        '受支持原生消息、消息错误或关闭事件名。'
+        '受支持的原生事件名：`message`、`messageerror` 或 `close`。'
       ),
       listener: t(
         'Synchronous callback receives original message or optional original error; returns void.',
-        '同步回调接收原消息或可选原错误，返回空值。'
+        '回调同步接收原始消息或可选错误，返回 `void`。'
       )
     },
-    t(
-      'Native emitter registration result is not used by Core.',
-      '核心不使用原生发射器登记返回值。'
-    ),
+    t('Native emitter registration result is not used by Core.', 'Core 不使用底层 `on` 的返回值。'),
     nodeExample
   ),
   off: m(
     'Removes an exact EventEmitter listener registration.',
-    '移除精确事件发射器监听登记。',
+    '通过 EventEmitter 接口移除对应监听。',
     {
       event: t(
         'Original supported native event name used when adding.',
-        '添加时使用的原受支持原生事件名。'
+        '添加监听时使用的同一个原生事件名。'
       ),
       listener: t(
         'Exact original listener reference used when adding.',
-        '添加时使用的精确原监听引用。'
+        '添加监听时使用的同一个回调引用。'
       )
     },
-    t('Native emitter removal result is not used by Core.', '核心不使用原生发射器移除返回值。'),
+    t('Native emitter removal result is not used by Core.', 'Core 不使用底层 `off` 的返回值。'),
     nodeExample
   ),
   onError: transportMembers.onTransportError,
@@ -395,7 +407,7 @@ const nativePortMembers: Record<string, IMemberDoc> = {
 }
 types.IBrowserMessagePortLike = type(
   'Original browser MessagePort structural surface with explicit start/close and optional raw physical observation.',
-  '原浏览器消息端口结构表面，含显式启动关闭及可选原物理观察。',
+  '浏览器 MessagePort 需要满足的接口，包括启动、关闭及可选的载体观察能力。',
   Object.fromEntries(
     [
       'postMessage',
@@ -411,13 +423,13 @@ types.IBrowserMessagePortLike = type(
 )
 types.INodeMessagePortLike = type(
   'Original Node EventEmitter MessagePort structural surface; Core borrows the native resource without importing Node types.',
-  '原节点事件发射器消息端口结构表面，核心借用原生资源而不导入节点类型。',
+  'Node MessagePort 需要满足的 EventEmitter 接口；Core 借用端口，不导入 Node 类型。',
   Object.fromEntries(['postMessage', 'on', 'off'].map((k) => [k, nativePortMembers[k]])),
   nodeExample
 )
 types.IWebWorkerLikePort = type(
   'Original Worker/MessagePort event-listener surface; mutable onmessage ownership is never required.',
-  '原工作者或消息端口事件监听表面，不要求可变消息处理槽所有权。',
+  'Worker 或 MessagePort 需要满足的事件监听接口，不要求接管 `onmessage`。',
   Object.fromEntries(
     ['postMessage', 'addEventListener', 'removeEventListener'].map((k) => [k, nativePortMembers[k]])
   ),
@@ -425,15 +437,15 @@ types.IWebWorkerLikePort = type(
 )
 types.IWebWorkerPortEvent = type(
   'Original native event fields read once at the adapter boundary; getter failure is reported as transport failure.',
-  '适配器边界读取一次的原生事件字段，读取器失败作为载体失败上报。',
+  '适配器读取一次的原生事件字段；属性访问失败会作为传输错误报告。',
   {
     data: p('Original native event message payload, when present.', '存在时的原生事件消息载荷。'),
     origin: p(
       'Original untrusted event origin before string classification.',
-      '字符串分类前的原不可信事件来源域。'
+      '尚未确认是字符串的原始 `origin`，不能直接当作可信来源。'
     ),
     source: p('Original native event source reference.', '保留原对象身份的原生事件来源引用。'),
-    type: p('Original native event classification when supplied.', '提供时的原生事件分类。'),
+    type: p('Original native event classification when supplied.', '宿主提供的原始事件类型。'),
     error: p(
       'Optional original ErrorEvent failure retained as transport cause; it remains reachable with its native type and stack.',
       '可选原生错误事件失败，保留为载体错误原因；其原生类型及堆栈仍可经原因链追踪。'
@@ -443,13 +455,16 @@ types.IWebWorkerPortEvent = type(
 )
 types.IBrowserMessagePortTransportOptions = type(
   'Explicit cleanup ownership of the exact browser port supplied to its adapter.',
-  '传给适配器的精确浏览器端口的显式清理所有权。',
+  '指定浏览器端口由适配器关闭，还是继续由调用方关闭。',
   {
     ownership: {
       ...p(
         'Owned closes the native port; borrowed only removes this wrapper registrations.',
-        '拥有时关闭原生端口，借用时只移除此包装登记。',
-        t('owned: wrapper closes the original native port.', '默认拥有，包装会关闭原原生端口。')
+        '`owned` 会关闭端口；`borrowed` 只移除本适配器的监听。',
+        t(
+          'owned: wrapper closes the original native port.',
+          '默认 `owned`，关闭适配器时也关闭端口。'
+        )
       ),
       values: { enum: 'RpcTransportOwnership' }
     }
@@ -458,21 +473,21 @@ types.IBrowserMessagePortTransportOptions = type(
 )
 types.IWebWorkerTransportOptions = type(
   'Static dedicated-channel presentation and explicit capability agreement; both deployment ends must use the same actual capabilities.',
-  '静态专用通道展示及显式能力约定，两端部署须使用相同实际能力。',
+  '专用通道的标签和静态能力约定，两端必须配置相同的能力。',
   {
     capabilities: p(
       'Application static capability list agreed on both actual deployment ends; never inferred from metadata labels.',
-      '应用在实际部署两端约定的静态能力列表，不从元数据标签推断。',
-      t('Canonical batch@1 capability is enabled.', '默认启用规范批次第一版能力。')
+      '部署时在两端约定的能力列表，不根据标签自动推断。',
+      t('Canonical batch@1 capability is enabled.', '默认启用 `batch@1`。')
     ),
     peerId: p(
       'Optional actual peer identifier issued by this known dedicated deployment owner.',
-      '此已知专用部署所有者签发的可选实际对端标识。',
+      '`options.peerId` 来自调用方的部署配置，用于标记专用连接的对端；这个标签不代替身份验证。',
       t('Absent: no explicit peer label.', '默认没有显式对端标签。')
     ),
     origin: p(
       'Optional actual origin label supplied by the dedicated deployment owner.',
-      '专用部署所有者提供的可选实际来源域标签。',
+      '部署方提供的可选来源域标签。',
       t('Absent: no configured origin label.', '默认没有配置来源域标签。')
     )
   },
@@ -482,21 +497,21 @@ for (const [name, en, zh, example, option] of [
   [
     'createBrowserMessagePortTransport',
     'Wraps an original browser MessagePort with lazy native listeners, generation-bound observation and explicit physical cleanup ownership.',
-    '以延迟原生监听、代次绑定观察及显式物理清理所有权包装原浏览器消息端口。',
+    '把浏览器 MessagePort 接入 Core，按需登记底层监听，隔离探针的多次安装，并明确端口的关闭责任。',
     browserExample,
     'IBrowserMessagePortTransportOptions'
   ],
   [
     'createNodeMessagePortTransport',
     'Wraps an original Node MessagePort as a borrowed exclusive carrier; close only retires observation, so callers still close their native ports.',
-    '把原节点消息端口包装为借用独占载体，关闭只退役观察，调用方仍须关闭原生端口。',
+    '把 Node MessagePort 包装为借用的独占载体；关闭适配器只移除观察，端口仍由调用方关闭。',
     nodeExample,
     undefined
   ],
   [
     'createWebWorkerTransport',
     'Wraps original Worker-like event I/O as a borrowed exclusive carrier; script/clone/read failures use transport errors, and cleanup never terminates the Worker.',
-    '把原工作者事件读写包装为借用独占载体，脚本、克隆及读取失败交载体错误，清理不会终止工作者。',
+    '把 Worker 事件接口包装为借用的独占载体；脚本、克隆和读取失败通过传输错误通道报告，清理不会终止 Worker。',
     workerExample,
     'IWebWorkerTransportOptions'
   ]
@@ -507,13 +522,13 @@ for (const [name, en, zh, example, option] of [
     params: {
       port: t(
         'Original native port created by the application MessageChannel, Worker launcher or actual runtime resource.',
-        '应用消息通道、工作者启动器或实际运行资源创建的原原生端口。'
+        '调用方用 MessageChannel、Worker 启动器或其他运行资源取得的原生端口。'
       )
     },
     ...(option ? { options: option } : {}),
     returns: t(
       'IRpcTransport retaining the actual carrier and native failures; endpoint composition does not acquire capabilities from copied labels.',
-      '返回保留实际载体及原生失败的传输对象，端点组合不从复制标签取得能力。'
+      '返回 `IRpcTransport`，保留底层载体和原生错误；复制它的标签不能获得额外能力。'
     ),
     example
   }
@@ -527,7 +542,7 @@ for (const [name, en, zh, example, option] of [
     behaviors: [
       t(
         'Endpoint uses this original physical I/O; its explicit ownership determines cleanup.',
-        '端点使用此原物理读写，由显式所有权决定清理。'
+        '端点使用这个载体读写消息，按所有权设置决定谁负责关闭。'
       )
     ],
     scenarios: [
@@ -541,146 +556,153 @@ const adapterPeerOptions: Record<string, IMemberDoc> = {
   ...runtimePeerOptionMembers,
   spawn: p(
     'Application physical input issued by its deployment launcher; selects this definition launch operation.',
-    '应用部署启动器签发的物理输入，选择此定义的启动操作。',
-    t('Absent: no launch source.', '默认没有启动来源。')
+    '传给应用启动器的输入；提供 `spawn` 就选择适配器定义的启动操作。',
+    t('Absent: no launch source.', '默认不指定 `spawn`。')
   ),
   connect: p(
     'Application physical input issued by its connection owner; selects this definition open/dial operation.',
-    '应用连接所有者签发的物理输入，选择此定义打开或拨号操作。',
-    t('Absent: no connect source.', '默认没有连接来源。')
+    '传给连接操作的输入；提供 `connect` 就选择适配器定义的打开或拨号操作。',
+    t('Absent: no connect source.', '默认不指定 `connect`。')
   ),
   listen: p(
     'Application physical input issued by its listener owner; selects this definition listening operation.',
-    '应用监听所有者签发的物理输入，选择此定义监听操作。',
-    t('Absent: no listener source.', '默认没有监听来源。')
+    '传给监听操作的输入；提供 `listen` 就选择适配器定义的监听操作。',
+    t('Absent: no listener source.', '默认不指定 `listen`。')
   ),
   peerId: p(
     'Actual remote identifier learned by the deployment owner; message adapters may learn it through their original initial exchange.',
-    '部署所有者获知的实际远端标识，消息适配器可通过原初始交换获知。',
+    '部署方确定的远端标识；消息适配器也可通过连接建立时的身份交换取得它。',
     t(
       'Absent: message exchange may learn the address; byte construction requires its actual address.',
-      '默认由消息交换获知地址，字节构造要求实际地址。'
+      '省略时，消息适配器可通过身份交换取得标识；字节适配器要求调用方提供对端标识。'
     )
   ),
   signal: p(
     'Application cancellation signal retires physical opening and the original directory handshake, including byte preparation. An existing preparation signal keeps priority.',
-    '应用取消信号退役物理打开及原目录握手，也覆盖字节准备；既有准备信号仍优先。',
-    t('Absent: no caller cancellation.', '默认没有调用方取消。')
+    '用于取消连接打开和身份握手，也覆盖字节连接的准备工作；若准备阶段已有信号，则优先使用已有信号。',
+    t('Absent: no caller cancellation.', '默认不提供调用方取消信号。')
   ),
   scheduler: p(
     'Application monotonic IScheduler shared by the original connection owners.',
-    '原连接所有者共用的应用单调调度器。',
+    '调用方提供的单调时钟与调度器，由连接管理各阶段共用。',
     t('systemScheduler uses native time and timers.', '默认使用原生时间及计时器。')
   ),
   offer: p(
     'Local rpc-contract IRpcHandshakeOffer proposal; received I/O determines accepted capabilities.',
-    '本地握手提议，接收读写决定认可能力。',
-    t('Absent: Core compiles its canonical local offer.', '默认核心编译规范本地提议。')
+    '本地的 `IRpcHandshakeOffer`；最终采用的能力要经过底层连接的握手确认。',
+    t('Absent: Core compiles its canonical local offer.', '默认由 Core 生成本地握手提议。')
   ),
   auth: p(
     'Actual responder verifier configuration; required mode receives portable credentials and admitted peer, returns principal string or void synchronously/asynchronously. Throws reject authentication.',
-    '实际响应方验证配置，必需模式接收可移植凭证及已准入对端，同步或异步返回主体字符串或空值，抛错拒绝认证。',
-    t('Absent: no explicit responder verifier.', '默认没有显式响应方验证器。')
+    '响应方的认证配置；必需模式下，验证函数接收可移植凭证和已接纳的对端，返回主体字符串或 `void`，支持异步；抛错表示认证失败。',
+    t('Absent: no explicit responder verifier.', '默认不提供响应方验证函数。')
   ),
   ipc: p(
     'Actual connection/session diagnostic labels, capacities and local log sink chosen by the physical owner.',
-    '物理所有者选择的实际连接会话诊断标签、容量及本地日志接收器。',
-    t('Absent: original Core connection defaults apply.', '默认应用原核心连接默认值。')
+    '连接管理方配置的会话诊断标签、容量和本地日志接收函数。',
+    t('Absent: original Core connection defaults apply.', '省略时使用 Core 的连接默认配置。')
   ),
   governor: p(
     'Actual original connection policy for call-rate, payload, repeated-timeout, idle and violation limits; it borrows original provider admission.',
-    '实际原连接策略，含调用速率、载荷、连续超时、空闲及违规限制，借用原提供方准入。',
-    t('Absent: no extra connection governor.', '默认没有额外连接治理。')
+    '连接治理策略，包括调用速率、载荷、连续超时、空闲和违规限制；沿用已有的提供方准入机制。',
+    t('Absent: no extra connection governor.', '默认不增加连接治理策略。')
   ),
   scope: p(
     'Genuine scope returned by this adapter scope method; borrowed across peers and closed by its caller after peers close.',
-    '此适配器作用域方法返回的真实作用域，跨对端借用，由调用方在对端关闭后关闭。',
-    t('Absent: no caller-shared provider scope.', '默认没有调用方共享提供方作用域。')
+    '由此适配器的 `scope()` 创建，供多个对端借用；全部对端关闭后，调用方再关闭它。',
+    t('Absent: no caller-shared provider scope.', '默认不提供跨对端共享的提供方作用域。')
   )
 }
 types.IAdapterDefinitionPeerOptions = type(
   'Exactly one deployment source selects original raw opening; common runtime peer policy remains owned by the canonical remote layer.',
-  '精确一个部署来源选择原始打开，共同运行对端策略仍由规范远端层拥有。',
+  '从 `spawn`、`connect`、`listen` 中恰选一个来源来打开底层资源；对端的公共运行策略沿用 Remote 层。',
   adapterPeerOptions,
   adapterExample
 )
 types.IAdapterDefinitionPluginOptions = type(
   'Original host plugin name/projection policy and raw deployment input share the same canonical runtime peer construction.',
-  '原宿主插件名称投影策略及原部署输入共用同一规范运行对端构造。',
-  { ...adapterPeerOptions, ...runtimePluginOptionMembers },
+  '在对端的连接选项之外，配置宿主插件名称和公开方法；它们仍使用同一套 Runtime Peer 构造流程。',
+  {
+    // Plugin installation picks only some peer options; it has no per-opening `signal`.
+    ...Object.fromEntries(Object.entries(adapterPeerOptions).filter(([name]) => name !== 'signal')),
+    ...runtimePluginOptionMembers
+  },
   adapterExample
 )
 types.IMessageAdapterOptions = type(
   'Raw messaging recipe supplies actual operations only; Core owns identity exchange, accepted capabilities and endpoint construction.',
-  '原消息配方只提供实际操作，核心拥有身份交换、认可能力及端点构造。',
+  '调用方提供打开或启动消息资源的操作，Core 负责身份交换、能力协商和端点构造。',
   {
     open: m(
       'Opens the original raw messaging resource for one deployment input; rejects propagate through canonical construction cleanup.',
-      '为一个部署输入打开原始消息资源，拒绝经规范构造清理传播。',
+      '根据一次连接输入打开消息资源；失败时由 Core 的构造流程清理已取得的资源并报告原错误。',
       {
         input: t(
           'Actual physical input supplied by the application connect/listen deployment choice.',
-          '应用连接或监听部署选择提供的实际物理输入。'
+          '调用方通过 `connect` 或 `listen` 提供的底层连接输入。'
         )
       },
       t(
         'Original IMessageAdapterPort synchronously or asynchronously; no fabricated transport recipe is accepted.',
-        '同步或异步返回原始消息端口，不接受伪造载体配方。'
+        '同步或异步返回 `IMessageAdapterPort`；这里需要原始消息端口，不接受预先组装的传输配置。'
       ),
       adapterExample
     ),
     launch: {
       ...m(
         'Launches the actual native resource and returns its real exit/termination operations.',
-        '启动实际原生资源并返回真实退出及终止操作。',
+        '启动底层资源，返回它的消息端口、退出结果和终止操作。',
         {
           input: t(
             'Actual application launch input selected by spawn.',
-            '启动来源选择的实际应用启动输入。'
+            '调用方通过 `spawn` 提供的启动输入。'
           ),
           context: t(
             'Original runtime source context containing configured self and local capability offer.',
-            '包含配置自身身份及本地能力提议的原运行来源上下文。'
+            '包含本端 `self` 和本地能力提议的运行上下文。'
           )
         },
         t(
           'Promise of IMessageAdapterLaunch; rejection fails original peer construction.',
-          '返回原消息启动句柄承诺，拒绝使原对端构造失败。'
+          '返回 `Promise<IMessageAdapterLaunch>`；启动失败会使对端构造失败。'
         ),
         adapterExample
       ),
-      default: t('Absent: spawn is unavailable for this recipe.', '默认此配方不能启动。')
+      default: t(
+        'Absent: spawn is unavailable for this recipe.',
+        '省略时，该适配器不支持 `spawn`。'
+      )
     }
   },
   adapterExample
 )
 types.IMessageAdapterLaunch = type(
   'Actual launch resource includes its original messaging port, exit Promise and native termination request.',
-  '实际启动资源包含原消息端口、退出承诺及原生终止请求。',
+  '启动操作返回的资源，包括消息端口、退出承诺和终止请求函数。',
   {
     port: p(
       'Original raw messaging port returned by the actual launcher.',
-      '实际启动器返回的原始消息端口。'
+      '启动器取得的原始消息端口。'
     ),
     exited: p(
       'Actual native exit observation; requesting terminate does not settle it by assertion.',
-      '实际原生退出观察，发出终止请求不会凭声明结算。'
+      '资源实际退出时结算的承诺；仅发出终止请求不代表它已经退出。'
     ),
     failed: p(
       'Optional original native failure observation before eventual exit.',
-      '最终退出前可选原原生失败观察。'
+      '可选的失败观察，在资源最终退出前报告底层故障。'
     ),
     initialMessage: p(
       'Original initial launch message supplied by this actual launcher.',
-      '此实际启动器提供的原初始启动消息。'
+      '启动器提供的初始消息，保留原始消息值。'
     ),
     terminate: m(
       'Requests actual native termination without claiming observed exit.',
-      '请求实际原生终止，不宣称已观察退出。',
+      '请求底层资源终止，不把请求发出当作退出完成。',
       {},
       t(
         'Termination request is issued; await exited for actual completion.',
-        '终止请求已发出，实际完成须等待退出观察。'
+        '发出终止请求；仍须等待 `exited` 才能确认资源实际退出。'
       ),
       adapterExample
     )
@@ -689,27 +711,30 @@ types.IMessageAdapterLaunch = type(
 )
 types.IMessageAdapterPort = type(
   'Original EventEmitter or EventTarget raw messaging operations; this structural input alone grants no accepted runtime channel identity.',
-  '原事件发射器或事件目标原始消息操作，此结构输入本身不赋予认可运行通道身份。',
+  'EventEmitter 或 EventTarget 风格的原始消息接口；仅满足这些方法形状，不代表已经完成通道身份验证。',
   {
-    ...nativePortMembers,
+    // Raw adapter ports borrow lifecycle from the held resource, so they have no `start` / `close`.
+    ...Object.fromEntries(
+      Object.entries(nativePortMembers).filter(([name]) => name !== 'start' && name !== 'close')
+    ),
     listenerCount: m(
       'Reports actual native message listener count when the raw EventEmitter supports it.',
-      '原事件发射器支持时报告实际原生消息监听数量。',
-      { event: t('The original message event name.', '原消息事件名称。') },
-      t('Actual native listener count.', '返回实际原生监听数量。'),
+      '底层 EventEmitter 支持时，查询消息监听器的数量。',
+      { event: t('The original message event name.', '原生 `message` 事件名。') },
+      t('Actual native listener count.', '返回底层监听器数量。'),
       adapterExample
     ),
     once: m(
       'Registers an actual one-shot close observation on the native resource.',
-      '在原生资源登记实际一次性关闭观察。',
+      '在底层资源上登记一次性的关闭监听。',
       {
-        event: t('The original native close event name.', '原原生关闭事件名称。'),
+        event: t('The original native close event name.', '原生 `close` 事件名。'),
         listener: t(
           'Application zero-argument synchronous close callback returning void.',
-          '应用无参同步关闭回调，返回空值。'
+          '无参的同步关闭回调，返回 `void`。'
         )
       },
-      t('Native registration result is not consumed by Core.', '核心不消费原生登记结果。'),
+      t('Native registration result is not consumed by Core.', 'Core 不使用底层监听登记的返回值。'),
       adapterExample
     )
   },
@@ -723,110 +748,110 @@ const byteOpen = (en: string, zh: string) =>
     {
       input: t(
         'Actual application physical input selected by connect/listen deployment options.',
-        '应用连接或监听部署选项选择的实际物理输入。'
+        '调用方通过 `connect` 或 `listen` 选择的底层连接输入。'
       )
     },
     t(
       'Original ordered byte I/O with kind byte, async write, data/close subscriptions and actual close; Core owns wire control.',
-      '返回含字节类别、异步写入、数据关闭订阅及实际关闭的原有序字节读写，核心拥有线路控制。'
+      '返回 `kind` 为 `byte` 的有序字节连接，提供异步写入、数据与关闭订阅以及关闭操作；线上协议仍由 Core 负责。'
     ),
     byteExample
   )
 types.IByteAdapterOptions = type(
   'Raw ordered-byte recipe delegates opening to the application and retains all wire handshake, authentication and protocol control in Core.',
-  '原有序字节配方把打开交给应用，全部线路握手、认证及协议控制仍在核心。',
+  '调用方负责打开有序字节连接，Core 负责连接上的握手、认证和协议控制。',
   {
     open: byteOpen(
       'Opens original physical ordered-byte I/O; an async rejection fails construction.',
-      '打开原物理有序字节读写，异步拒绝使构造失败。'
+      '打开底层有序字节连接；异步打开失败会使对端构造失败。'
     ),
     listen: {
       ...byteOpen(
         'Opens an actual accepted listening byte connection, without supplying a fabricated runtime agreement.',
-        '打开实际接受的监听字节连接，不提供伪造运行约定。'
+        '打开监听端已接纳的字节连接；不由调用方预填一份已协商的运行约定。'
       ),
       default: t(
         'Absent: use open for the original listening input.',
-        '默认对原监听输入使用打开操作。'
+        '省略时，把监听输入交给 `open`。'
       )
     },
     dial: {
       ...byteOpen(
         'Opens an actual dialed byte connection while retaining the original byte owner.',
-        '打开实际拨号字节连接，保留原字节所有者。'
+        '通过拨号取得字节连接，保留底层资源已有的所有权。'
       ),
       default: t(
         'Absent: use open for the original connecting input.',
-        '默认对原连接输入使用打开操作。'
+        '省略时，把连接输入交给 `open`。'
       )
     },
     diagnostics: p(
       'Optional adapter-owned canonical error source/code/message records and text for actual byte failures.',
-      '可选适配器拥有的规范错误来源、码、消息及实际字节失败文本。',
-      t('Absent: Core canonical byte diagnostics.', '默认使用核心规范字节诊断。')
+      '可选的适配器诊断配置，提供字节连接失败时使用的错误来源、错误码和消息。',
+      t('Absent: Core canonical byte diagnostics.', '默认使用 Core 的字节连接诊断。')
     ),
     'presentation.platform': p(
       'Actual platform label selected by the byte adapter author; presentation grants no provenance.',
-      '字节适配作者选择的实际平台标签，展示不赋予来源身份。'
+      '适配器作者配置的平台标签，只用于展示，不能证明来源身份。'
     ),
     'presentation.expectedStringText': p(
       'Adapter-owned canonical diagnostic text for an unsupported non-string semantic carrier.',
-      '适配器拥有的规范诊断文本，用于不受支持的非字符串语义载体。'
+      '适配器提供的错误文本，用于说明不支持的非字符串消息值。'
     ),
     presentation: p(
       'Optional platform label and expected-string diagnostic text; presentation cannot establish channel provenance.',
-      '可选平台标签及预期字符串诊断文本，展示不能建立通道来源身份。',
-      t('Absent: Core process presentation defaults.', '默认使用核心进程展示。')
+      '可选的平台标签和预期字符串错误文本，只用于展示与诊断，不能证明通道来源。',
+      t('Absent: Core process presentation defaults.', '默认沿用 Core 的进程标签与诊断文本。')
     )
   },
   byteExample
 )
 types.IAdapterDefinition = type(
   'Genuine raw-I/O recipe handle creates canonical peers, host plugins and provider scopes; copied methods cannot select a different recipe.',
-  '真实原始读写配方句柄创建规范对端、宿主插件及提供方作用域，复制方法不能选择不同配方。',
+  '由适配器工厂创建的定义，可生成对端、宿主插件和共享提供方作用域；复制方法不会改变它绑定的连接操作。',
   {
     peer: m(
       'Constructs the canonical runtime peer from exactly one original physical deployment source.',
-      '从精确一个原物理部署来源构造规范运行对端。',
+      '从 `spawn`、`connect`、`listen` 中恰选一个来源，构造 Runtime Peer。',
       {
         options: t(
           'Application IAdapterDefinitionPeerOptions retaining original raw input and runtime policy.',
-          '应用提供保留原始输入及运行策略的适配器对端选项。'
+          '调用方的 `IAdapterDefinitionPeerOptions`，包含底层连接输入和对端运行策略。'
         )
       },
       t(
         'Promise of IRuntimePeer or typed peer; byte recipes reject transfer options and expose a no-transfer typed peer, while message recipes retain the ordinary typed API. Construction rollback retains the primary failure.',
-        '返回运行对端或类型对端承诺；字节配方拒绝转移选项并提供无转移的类型对端，消息配方保留普通类型接口；构造回滚保留原主要失败。'
+        '返回 Runtime Peer 或带方法类型推导的 Peer；字节适配器不支持对象转移选项，消息适配器保留普通类型接口。构造回滚不会替换原始失败。'
       ),
       adapterExample
     ),
     plugin: m(
       'Creates a genuine Host plugin using the same actual raw recipe and runtime method whitelist.',
-      '使用同一实际原始配方及运行方法白名单创建真实宿主插件。',
+      '用同一套底层连接操作和方法白名单创建宿主插件。',
       {
         options: t(
           'Application plugin name, provide/expose and exactly one raw deployment source.',
-          '应用插件名称、提供公开配置及精确一个原始部署来源。'
+          '插件名称、`provide`、`expose` 配置，以及恰好一个底层连接来源。'
         )
       },
       t(
         'Canonical runtime plugin definition with the actual process/thread slot family.',
-        '返回带实际进程或线程槽族的规范运行插件定义。'
+        '返回 Runtime 插件定义，沿用对应的 process 或 thread 插件槽位。'
       ),
       adapterExample
     ),
     scope: m(
       'Creates a genuine shared provider admission/store scope; callers own its final close after every borrowing peer closes.',
-      '创建真实共享提供方准入及存储作用域，调用方在全部借用对端关闭后拥有最终关闭。',
+      '创建跨对端共享的提供方准入和存储作用域；全部借用它的对端关闭后，由调用方最终关闭。',
       {
         store: t(
           'Optional actual IRpcIdempotencyStore returned by createRpcIdempotencyStore or application implementation.',
-          '可选实际幂等存储，由幂等存储工厂或应用实现提供。'
+          '可选的 `IRpcIdempotencyStore`，可由 `createRpcIdempotencyStore` 创建，也可由应用实现。'
         )
       },
       t(
         'Scope exposes generated namespace, original admission, session(channel, limits) and idempotent close(); only real constructed channels may create sessions.',
-        '返回作用域，含生成命名空间、原准入、会话及幂等关闭，只有真实构造通道可以创建会话。'
+        '返回含命名空间、准入控制、`session(channel, limits)` 和幂等 `close()` 的作用域；会话只接受实际构造得到的通道。'
       ),
       adapterExample
     )
@@ -839,14 +864,14 @@ for (const [name, option, example, en, zh] of [
     'IMessageAdapterOptions',
     adapterExample,
     'Defines one genuine raw-message adapter recipe; its peer/plugin operations reuse original Core assembly rather than accepting a prebuilt trusted channel.',
-    '定义一个真实原消息适配配方，对端及插件操作复用原核心组装，不接受预构造可信通道。'
+    '定义消息适配器，把原始端口接入 Core；对端和插件复用已有构造流程，不接受调用方预先声明为可信的通道。'
   ],
   [
     'defineByteAdapter',
     'IByteAdapterOptions',
     byteExample,
     'Defines one genuine ordered-byte adapter recipe; the existing Core owner performs handshake, authentication, framing and endpoint assembly.',
-    '定义一个真实有序字节适配配方，由现有核心所有者执行握手、认证、分帧及端点组装。'
+    '定义有序字节适配器，由 Core 继续负责握手、认证、分帧和端点组装。'
   ]
 ] as const) {
   symbols[name] = {
@@ -855,7 +880,7 @@ for (const [name, option, example, en, zh] of [
     options: option,
     returns: t(
       'Frozen genuine IAdapterDefinition retaining the exact original physical operations.',
-      '返回冻结真实适配器定义，保留精确原物理操作。'
+      '返回冻结的 `IAdapterDefinition`，保持与这组底层连接操作的绑定。'
     ),
     example
   }
@@ -871,13 +896,13 @@ for (const [name, option, example, en, zh] of [
     behaviors: [
       t(
         'Actual physical I/O selects Core construction; metadata does not grant accepted capability authority.',
-        '实际物理读写选择核心构造，元数据不赋予认可能力权限。'
+        'Core 根据实际连接完成构造；填写元数据标签不能额外取得已协商的能力。'
       )
     ],
     scenarios: [
       t(
         'Bind an existing native raw resource to canonical runtime peers.',
-        '把现有原生原始资源绑定到规范运行对端。'
+        '把已有原生资源接入 Runtime Peer。'
       )
     ],
     example

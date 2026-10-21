@@ -5,6 +5,7 @@
  * interfaces (`IKeyValueStore`, `IRecordStore`, ...) belong to `@migaia/storage-contract`.
  */
 import { storageContractReference } from './storage-contract.js'
+import { storageWebCases } from './storage-web-cases.js'
 import type {
   ICode,
   IEnhancerDoc,
@@ -443,15 +444,15 @@ const hostMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'An `IReactiveBackendHandle`; non-reactive ids throw `REACTIVE_ADAPTER_NOT_INSTALLED`.',
-      '一个 `IReactiveBackendHandle`；非响应式 id 抛 `REACTIVE_ADAPTER_NOT_INSTALLED`。'
+      'An `IReactiveBackendHandle`, or `undefined` when the id has no installed reactive adapter.',
+      '返回 `IReactiveBackendHandle`；该 id 没有安装响应式适配器时返回 `undefined`。'
     ),
     example: `const handle = host.reactiveBackend('app')`
   },
   dispose: {
     summary: t(
-      'Stops admission, cancels an installation in progress, waits for running work, then releases adapters and stores. Repeated calls share one Promise; afterwards every call throws `STORAGE_HOST_DISPOSED`.',
-      '停止接纳、取消进行中的安装、等待运行中的工作，然后释放适配器与存储。重复调用共享同一个 Promise；之后的调用都会抛 `STORAGE_HOST_DISPOSED`。'
+      'Stops admission, cancels an installation in progress, waits for running work, then releases adapters and stores. Repeated dispose calls share one Promise; other Host operations reject with `STORAGE_HOST_DISPOSED` after closing begins.',
+      '停止接纳、取消进行中的安装、等待运行中的工作，然后释放适配器与存储；重复释放共享同一个 Promise，关闭开始后，其他宿主操作以 `STORAGE_HOST_DISPOSED` 拒绝。'
     ),
     returns: t(
       'Resolves when released; cleanup errors are aggregated.',
@@ -874,8 +875,12 @@ for await (const [key, value] of db.iterateRecords()) console.log(key, value)`
         '在内存中创建独立的易失存储，支持记录、字节、事务与变更通知。跨通道替换先完成所有删除和目标写入，再依次发布删除与写入通知，重入观察者看到完整提交；每次调用之间不共享数据。'
       ),
       returns: t('A record store with `sync` and change feed.', '带 `sync` 与变更通知的记录存储。'),
-      example: `const store = memoryStorageHost<{ id: string }>()
-await store.putRecord({ id: '1' }, '1')`
+      exampleIntro: t(
+        'The factory takes no arguments. `setBytes(key, value)` accepts a string key and a `Uint8Array`; `getBytes(key)` returns a fresh copy or `null`. `putRecord(value, key?)` accepts the generic record value and a storage key: string, finite number, valid Date, ArrayBuffer, or a nonempty dense array of such keys. Omitting the key generates a token. `getRecord(key)` returns a cloned value or `undefined`. These async methods accept an optional final operation context, omitted here: no signal or timeout is installed, and cross-channel writes default to `conflict`, rejecting `DUPLICATE_KEY`; `replace` explicitly evicts the other channel. `transaction(run)` awaits `(tx) => Promise<T>` and returns its result; `tx.get(key)`, `tx.put(value, key?, options?)` and `tx.delete(key)` operate on the record draft. `options.conflictPolicy` defaults to `conflict`; `replace` permits cross-channel eviction on commit. The optional transaction context is also omitted. `subscribeChanges(listener)` calls the listener after committed writes and returns an unsubscribe function. The shared `change.kind` domain is `put` (write), `remove` (delete), `clear` (broad removal), `batch` (record transaction), or `migrate` (migration invalidation); this memory example emits `put`. `dispose()` takes no arguments and closes the instance.',
+        '工厂不接收参数。`setBytes(key, value)` 接收字符串键和 `Uint8Array`，`getBytes(key)` 返回新副本，不存在时为 `null`；`putRecord(value, key?)` 接收泛型记录值，以及字符串、有限数值、有效日期、ArrayBuffer 或由这些值组成的非空稠密数组键，省略键时自动生成标识；`getRecord(key)` 返回克隆记录，不存在时为 `undefined`。这些异步方法可接收最后一个操作上下文参数，本例省略，不设置取消信号或超时；跨通道写入默认采用 `conflict`，以 `DUPLICATE_KEY` 拒绝冲突，显式 `replace` 才驱逐其他通道。`transaction(run)` 等待回调 `(tx) => Promise<T>` 并返回其结果，`tx.get(key)`、`tx.put(value, key?, options?)`、`tx.delete(key)` 操作记录草稿；`options.conflictPolicy` 默认 `conflict`，显式 `replace` 才在提交时驱逐其他通道，本例也省略事务上下文。`subscribeChanges(listener)` 在写入提交后调用监听器，并返回退订函数，共享 `change.kind` 取值为 `put`（写入）、`remove`（删除）、`clear`（整体清理）、`batch`（记录事务）或 `migrate`（迁移失效通知），本内存示例只发出 `put`；`dispose()` 无参数，关闭当前实例。'
+      ),
+      example: storageWebCases.memoryStorageHost![0]!.example,
+      cases: storageWebCases.memoryStorageHost
     },
     lengthPrefixedNamespaceCodec: {
       role: 'constant',
@@ -947,7 +952,12 @@ await store.putRecord({ id: '1' }, '1')`
         '返回 `IEntityDefinition`；必须声明从二到当前版本的每个目标迁移步骤。高于一的版本省略迁移表也属于不完整，抛 `INVALID_CONFIG`。'
       ),
       options: 'IEntityOptions',
-      example: repositoryExample,
+      example: storageWebCases.defineEntity![0]!.example,
+      exampleIntro: t(
+        '`connect(store)` borrows the supplied backend; disposing that backend remains the owner’s job. Repository `put(value)` takes a domain object whose configured key field supplies its ID; `get(id)` and `remove(id)` accept that storage key. `findBy(index, key)` takes a declared index name and its projected key. `batch(run)` passes an entity transaction with `get(id)`, `put(value)` and `remove(id)` and returns the callback result after commit. Every optional operation context is omitted in these examples, so no signal or timeout is requested. `migrate({ batchSize })` accepts a positive safe integer, default `100`; `onInvalid` defaults to `skip`, while `throw` or a callback returning either action changes failure handling. Its `migrated` result counts saved upgrades.',
+        '`connect(store)` 借用传入后端，仍由后端所有者负责释放；仓储 `put(value)` 接收领域对象，以配置的主键字段确定 ID，`get(id)` 与 `remove(id)` 接收该存储键；`findBy(index, key)` 接收已声明索引名和投影键。`batch(run)` 把提供 `get(id)`、`put(value)`、`remove(id)` 的实体事务交给回调，提交后返回回调结果。本例均省略可选操作上下文，不请求取消或超时。`migrate({ batchSize })` 的批次大小须为正安全整数，默认 `100`；无效记录默认按 `skip` 跳过，可改为 `throw`，或返回这两种动作之一的回调；返回结果中的 `migrated` 统计已保存的升级记录数。'
+      ),
+      cases: storageWebCases.defineEntity,
       scenarios: [
         t(
           'Store user preferences or cached records with validation and safe upgrades.',
@@ -966,7 +976,12 @@ await store.putRecord({ id: '1' }, '1')`
         '一个按插件 id 类型化的 `IStorageHost`；安装失败时抛 `BACKEND_INSTALL_FAILED`。'
       ),
       options: 'IStorageHostCreateOptions',
-      example: createHostExample,
+      example: storageWebCases.createStorageHost![0]!.example,
+      exampleIntro: t(
+        'Install `@migaia/storage-contract` directly when importing its `StorageContractError`. Each `memoryBackendPlugin({ id })` creates one store; omitted `id` is `memory`. Choose distinct IDs beginning with an ASCII letter, followed by letters, digits, dots, underscores, or hyphens, with 1–64 characters. `backend(id)` returns the actual installed store; `backends()` returns a copied map. Store `set(key, value)` accepts two strings and overwrites the same value-channel key; `get(key)` returns a string or `null`. Their optional context is omitted here. `host.dispose()` takes no arguments and awaits owned cleanup; retained memory stores then reject operations with `StorageContractError` code `STORE_DISPOSED`.',
+        '导入 `StorageContractError` 时须直接安装 `@migaia/storage-contract`。每个 `memoryBackendPlugin({ id })` 创建一个存储，省略 `id` 时使用 `memory`；多个插件须选择不同 ID，以 ASCII 字母开头，后续仅含字母、数字、点、下划线或连字符，总长为 1–64。`backend(id)` 返回真实安装的存储，`backends()` 返回映射副本。存储 `set(key, value)` 接收两个字符串，覆盖同一文本通道键；`get(key)` 返回字符串，不存在时为 `null`，本例省略两者的可选上下文。`host.dispose()` 无参数，等待所拥有资源清理完成；之后，残留内存存储引用的操作以 `StorageContractError` 和错误码 `STORE_DISPOSED` 拒绝。'
+      ),
+      cases: storageWebCases.createStorageHost,
       scenarios: [
         t(
           'Choose between memory, local and IndexedDB storage by id at runtime.',
@@ -1436,6 +1451,12 @@ try {
             '不设置：只能与 `version: 1` 一起使用。'
           )
         },
+        'migrations.<targetVersion>': {
+          summary: t(
+            'Async `(previous, context) => upgradedValue` step keyed by the target version. `previous` is the prior stored representation; migration precedes `schema.decode`. The context supplies `fromVersion`, `toVersion`, and optional `signal` (undefined when the operation has none). The returned value proceeds to the next step, decoding, and read validation. Ordinary step failures become `MIGRATION_FAILED` with the original cause; `StorageContractError` and `StorageError` with `INVALID_CONFIG` retain their classification.',
+            '以目标版本号为键的异步步骤 `(previous, context) => upgradedValue`；`previous` 是此前的存储表示，迁移先于 `schema.decode` 执行。`context` 提供 `fromVersion`、`toVersion` 与可选 `signal`（操作无信号时为 `undefined`），返回值进入下一步、解码及读取校验；普通步骤失败归类为 `MIGRATION_FAILED` 并保留原始原因，`StorageContractError` 与错误码为 `INVALID_CONFIG` 的 `StorageError` 保留原分类。'
+          )
+        },
         validateOnRead: {
           summary: t('Validate records when reading them.', '读取记录时也进行 schema 校验。'),
           default: t('`true`.', '`true`：读取时也校验。')
@@ -1460,6 +1481,47 @@ try {
             '实体自带的二级索引定义 `{ 名称: { path | paths | select, unique?, multiEntry?, revision? } }`。'
           ),
           default: t('Not set: no indexes.', '不设置：没有二级索引。')
+        },
+        'indexes.<name>.path': {
+          summary: t(
+            'Single object path, such as `email`, whose value becomes the index key. Use exactly one of `path`, compound `paths`, or custom `select`; index names must be nonempty and must not begin with `__`.',
+            '单个对象路径，例如 `email`，其值成为索引键；`path`、复合 `paths` 与自定义 `select` 必须只选其一，索引名须非空且不能以 `__` 开头。'
+          )
+        },
+        'indexes.<name>.unique': {
+          summary: t(
+            'Whether one projected key may belong to only one record; replacement by its existing owner is allowed.',
+            '一个投影键是否只能属于一条记录；现有所有者更新自己仍被允许。'
+          ),
+          default: t('`false`.', '`false`：不强制唯一。'),
+          values: {
+            true: t(
+              'Reject another owner with `INDEX_UNIQUE_CONFLICT`.',
+              '以 `INDEX_UNIQUE_CONFLICT` 拒绝其他所有者。'
+            ),
+            false: t(
+              'Allow several records to share the projected key.',
+              '允许多条记录共享投影键。'
+            )
+          }
+        },
+        'indexes.<name>.multiEntry': {
+          summary: t(
+            'For `path`, expand an array into separate index keys when true; false keeps one key. Compound paths permit only false, and custom selectors must omit this field.',
+            '用于 `path` 时，`true` 把数组展开成独立索引键，`false` 保留一个键；复合路径仅允许 `false`，自定义选择器须省略此字段。'
+          ),
+          default: t('`false` for path projections.', '路径投影默认为 `false`。'),
+          values: {
+            true: t('Project array elements separately.', '分别投影数组元素。'),
+            false: t('Keep a single key.', '保留一个键。')
+          }
+        },
+        'indexes.<name>.revision': {
+          summary: t(
+            'Positive safe-integer projection revision; custom selectors require an explicit revision.',
+            '正安全整数的投影修订号，自定义选择器必须显式提供。'
+          ),
+          default: t('`1` for path or compound projections.', '路径与复合路径投影默认为 `1`。')
         }
       }
     },
@@ -1686,12 +1748,22 @@ console.log(byStatus.select({ status: 'ready' }))`
       ),
       members: {
         batchSize: {
-          summary: t('Records handled per batch.', '每个批次处理的记录数量。'),
+          summary: t(
+            'Positive safe-integer record count handled per batch.',
+            '每个批次处理的记录数量，须为正安全整数。'
+          ),
           default: t('`100`.', '默认值为 `100` 条。')
         },
         onInvalid: {
-          summary: t('What to do with invalid records.', '遇到无效记录时的处理方式。'),
-          default: t('`skip`.', '`skip`：跳过无效记录。')
+          summary: t(
+            '`skip`, `throw`, or `(issue) => action` for an invalid record.',
+            '遇到无效记录时使用 `skip`、`throw`，或返回动作的回调 `(issue) => action`。'
+          ),
+          default: t('`skip`.', '`skip`：跳过无效记录。'),
+          values: {
+            skip: t('Count and skip the invalid record.', '计数并跳过无效记录。'),
+            throw: t('Reject the migration at the invalid record.', '在无效记录处拒绝本次迁移。')
+          }
         }
       }
     },
@@ -1827,7 +1899,10 @@ console.log(byStatus.select({ status: 'ready' }))`
     },
     IStorageHostBase: {
       summary: t('Members every storage host has.', '每个存储宿主都具备的成员。'),
-      members: hostMembers
+      // `liveQuery` belongs to `IStorageHostReactiveApi`, which only a reactive host adds.
+      members: Object.fromEntries(
+        Object.entries(hostMembers).filter(([name]) => name !== 'liveQuery')
+      )
     },
     StorageHostFacade: {
       summary: t(
@@ -2431,10 +2506,35 @@ try {
         }
       }
     },
-    IStandardSchemaV1: alias(
-      'Standard Schema v1 shape (`~standard.validate`) implemented by zod, valibot and arktype.',
-      '由 zod、valibot、arktype 等校验库实现的 Standard Schema v1 形状（`~standard.validate`）。'
-    ),
+    IStandardSchemaV1: {
+      summary: t(
+        'Standard Schema v1 shape (`~standard.validate`) implemented by zod, valibot and arktype.',
+        '由 zod、valibot、arktype 等校验库实现的 Standard Schema v1 形状（`~standard.validate`）。'
+      ),
+      members: {
+        '~standard': {
+          summary: t(
+            'Interface object the validation library attaches to each schema. `fromStandardSchema()` checks that `version` is `1`, `vendor` is a non-empty string and `validate` is a function, and throws `INVALID_CONFIG` otherwise.',
+            '校验库挂在每个 schema 上的接口对象。`fromStandardSchema()` 会检查 `version` 为 `1`、`vendor` 是非空字符串、`validate` 是函数，不满足时抛出 `INVALID_CONFIG`。'
+          )
+        },
+        '~standard.version': {
+          summary: t('Spec version; must be `1`.', '规范版本号，必须是 `1`。')
+        },
+        '~standard.vendor': {
+          summary: t(
+            'Nonempty validator vendor label; the adapter is named `standard-schema:<vendor>`.',
+            '校验器的非空提供方标签；适配器名称为 `standard-schema:<vendor>`。'
+          )
+        },
+        '~standard.validate': {
+          summary: t(
+            'Validates one value and returns `{ value }` on success or `{ issues }` on failure, directly or as a Promise. A throw, a rejection, an invalid result or any issue becomes `VALIDATION_FAILED`.',
+            '校验一个值，成功时返回 `{ value }`，失败时返回 `{ issues }`，可以直接返回或返回 Promise。抛错、拒绝、结果格式不对或带有 issues，都会变成 `VALIDATION_FAILED`。'
+          )
+        }
+      }
+    },
     ISelectedCodec: {
       summary: t(
         'Codec route chosen by `selectCodec()` for one backend.',

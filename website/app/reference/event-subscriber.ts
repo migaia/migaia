@@ -4,6 +4,7 @@
  * style.ts, state-constants.ts, error-code.ts) on 2026-10-17.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import { eventSubscriberCases } from './event-subscriber-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -127,8 +128,8 @@ stop() // 两条登记一起移除`
   },
   publish: {
     summary: t(
-      'Calls every listener of the current snapshot synchronously with `value`, in registration order. Promises returned by listeners are not awaited; their later rejections go to `report`. A listener that publishes again is delivered recursively by default, or after the snapshot when `dispatchPolicy` is `queued`.',
-      '用 `value` 按登记顺序同步调用当前快照中的全部 listener。不等待 listener 返回的 Promise，它们稍后的 reject 交给 `report`。listener 内部再次发布时，默认立即递归交付；`dispatchPolicy` 为 `queued` 时排到当前快照之后。'
+      'Delivers `value` synchronously to the current listener snapshot in registration order, within `publishBudget`. Promises returned by listeners are not awaited; their later rejections go to `report`. A listener that publishes again is delivered recursively by default, or after the snapshot when `dispatchPolicy` is `queued`.',
+      '用 `value` 按登记顺序同步交付当前监听者快照，调用总数受 `publishBudget` 限制。不等待监听者返回的 Promise，它们稍后的拒绝交给 `report`。监听者内部再次发布时，默认立即递归交付；`dispatchPolicy` 为 `queued` 时排到当前快照之后。'
     ),
     params: {
       value: t(
@@ -137,8 +138,8 @@ stop() // 两条登记一起移除`
       )
     },
     returns: t(
-      'Nothing. Synchronous listener failures are collected and thrown together as an `AggregateError` with code `PUBLISH_FAILED` after every listener ran.',
-      '无返回值。所有 listener 执行完后，同步抛出的错误合并为带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出。'
+      'Nothing. Ordinary synchronous listener failures are collected and thrown together as an `AggregateError` with code `PUBLISH_FAILED` after the snapshot completes. If `publishBudget` is exhausted, delivery stops early and throws `PUBLISH_FAILED`; some listeners may not have run.',
+      '无返回值。普通的监听者同步错误会被收集，在快照完成后合并为带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出。若 `publishBudget` 耗尽，则提前停止交付并抛出 `PUBLISH_FAILED`，部分监听者可能没有被调用。'
     ),
     whenToUse: t(
       'Notifications where the publisher does not need listener results. To wait for results use `invokeParallel`, `invokeSerial` or `invokeTask`.',
@@ -171,8 +172,8 @@ await invokeSerial(channel.filterTaskId('persist'), document)`
   },
   clear: {
     summary: t(
-      'Removes every registration at once. Existing handles become no-ops; listeners get no callback.',
-      '一次移除全部登记。已有句柄调用后不再有效果；listener 不会收到任何回调。'
+      'Removes every current registration without calling listeners. With the default `removalPolicy: "handle"`, old handles cannot remove later registrations. With `removalPolicy: "listener-all"` and multiple admission, an unused old handle can still remove current registrations of the same listener after clear; unique admission keeps handles bound to their original registration.',
+      '一次移除当前全部登记，不调用监听者。默认 `removalPolicy: "handle"` 下，旧句柄不会移除后续新建的登记。选择 `removalPolicy: "listener-all"` 并允许重复登记时，尚未调用过的旧句柄仍会移除清空后同一监听函数的当前登记；唯一登记模式则把句柄绑定在原登记上。'
     ),
     returns: t('Nothing; after the call `size` is `0`.', '无返回值；调用后 `size` 为 `0`。'),
     whenToUse: t(
@@ -394,22 +395,12 @@ subscribeOnce(channel, (event) => console.log('只执行一次', event.value))`
         '创建好的 channel（`ICanonicalEventChannel`）；设置了 `style` 时还带有对应的别名方法。选项形状不合法时在构造前抛 `INVALID_OPTIONS`；不可调用的上报器使用 `INVALID_REPORTER`。'
       ),
       options: 'IEventChannelOptions',
-      example: {
-        en: `import { createEventChannel } from '@migaia/event-subscriber'
-
-type IJob = { id: string }
-const jobs = createEventChannel<IJob>()
-const stop = jobs.subscribe(({ value }) => console.log('processed', value.id))
-jobs.publish({ id: 'job-1' }) // processed job-1
-stop()`,
-        zh: `import { createEventChannel } from '@migaia/event-subscriber'
-
-type IJob = { id: string }
-const jobs = createEventChannel<IJob>()
-const stop = jobs.subscribe(({ value }) => console.log('已处理', value.id))
-jobs.publish({ id: 'job-1' }) // 已处理 job-1
-stop()`
-      },
+      exampleIntro: t(
+        'A listener receives the payload as `event.value`. `dispatchPolicy` is `recursive` by default; choose `queued` to finish the current round before nested publishes. `clear()` removes the remaining registrations after the example.',
+        '监听者通过 `event.value` 收到发布的数据。`dispatchPolicy` 默认是 `recursive`；选择 `queued` 时，当前这一轮结束后才交付嵌套事件。示例最后用 `clear()` 移除剩余登记。'
+      ),
+      cases: eventSubscriberCases.createEventChannel,
+      example: eventSubscriberCases.createEventChannel[0].example,
       scenarios: channelScenarios,
       avoid: [
         t(
@@ -436,7 +427,12 @@ stop()`
         '创建好的 hub（`IEventHub`；设置 `style` 时为带别名方法的 `IStyledEventHub`）。选项形状不合法时抛 `INVALID_OPTIONS`；不可调用的上报器使用 `INVALID_REPORTER`。'
       ),
       options: 'IEventHubOptions',
-      example: hubExample,
+      exampleIntro: t(
+        'The type map assigns a payload to each event name. `subscribe(key, listener)` receives the payload as `event.value`; chaining a different key joins the same cleanup handle. `size()` without a key counts all registrations.',
+        '事件映射为每个事件名指定数据类型。`subscribe(key, listener)` 的监听者通过 `event.value` 接收数据；链式订阅另一个事件名时，登记加入同一个清理句柄。不传事件名的 `size()` 统计全部登记。'
+      ),
+      cases: eventSubscriberCases.createEventHub,
+      example: eventSubscriberCases.createEventHub[0].example,
       scenarios: hubScenarios,
       avoid: [
         t(
@@ -513,8 +509,8 @@ const failed = results.filter((result) => result.status === EventSubscriberState
     invokeEachLive: {
       role: 'operation',
       purpose: t(
-        'Low-level, synchronous traversal for framework integrations: hands each registration to `visitor` as an invocation, and registrations added during the traversal are visited too (each at most once). The visitor must finish synchronously. A visitor failure receives `VISITOR_FAILED`; native identity is retained where possible, otherwise the original, including undefined, remains on `cause`. Ordinary publishing should use the snapshot-based `invoke*` functions, whose target set cannot change while they run.',
-        '供框架集成使用的底层同步遍历：把每条登记作为一个调用对象交给 `visitor`，遍历过程中新增的登记也会被访问到（每条最多一次）。`visitor` 必须同步完成。访问失败附 `VISITOR_FAILED`；尽量保留原生身份，否则原值（含显式空缺值）保存在 `cause`。普通发布请使用基于快照的 `invoke*` 函数，它们的目标集合在执行期间不会变化。'
+        'Low-level synchronous traversal for framework integrations: hands admitted registrations to `visitor` as invocations, each at most once. Appended registrations may join while no registration has been removed or cleared during the traversal. After a removal or clear, later appends are no longer admitted, but already admitted pending entries are still visited. The visitor must finish synchronously. A visitor failure receives `VISITOR_FAILED`; native identity is retained where possible, otherwise the original, including undefined, remains on `cause`. Ordinary publishing should use the snapshot-based `invoke*` functions, whose target set cannot change while they run.',
+        '供框架集成使用的底层同步遍历：把已接纳的登记作为调用对象交给 `visitor`，每条最多访问一次。遍历中尚未发生移除或清空时，可以接纳追加的登记；发生移除或清空后，不再接纳之后追加的登记，但已经接纳的待访问项仍会被访问。`visitor` 必须同步完成。访问失败附 `VISITOR_FAILED`；尽量保留原生身份，否则原值（含显式空缺值）保存在 `cause`。普通发布请使用基于快照的 `invoke*` 函数，它们的目标集合在执行期间不会变化。'
       ),
       params: {
         channel: asyncChannelParam,
@@ -544,16 +540,20 @@ const failed = results.filter((result) => result.status === EventSubscriberState
     invokeParallelSettled: {
       role: 'operation',
       purpose: t(
-        'Like `invokeParallel`, but never rejects: resolves with one `{ status, value }` or `{ status, reason }` entry per listener in registration order.',
-        '与 `invokeParallel` 相同，但永远不会 reject：按登记顺序为每个 listener 给出一个 `{ status, value }` 或 `{ status, reason }`。'
+        'Starts listeners in parallel and collects their successes and failures as `{ status, value }` or `{ status, reason }`, in registration order. Listener failures do not reject the returned Promise. Invalid channel admission still throws synchronously before a Promise is returned.',
+        '并行启动监听者，按登记顺序收集每个成功值 `{ status, value }` 或失败原因 `{ status, reason }`。监听者失败不会让返回的 Promise 拒绝；非法通道仍在返回 Promise 前同步抛错。'
       ),
       params: { channel: asyncChannelParam, value: asyncValueParam },
       returns: t(
-        'An array of `IListenerResult` in registration order, not completion order.',
-        '`IListenerResult` 数组，按登记顺序排列，而不是完成顺序。'
+        'An array of `IListenerResult` in registration order, not completion order. Invalid channel input throws synchronously with `INVALID_CHANNEL`.',
+        '`IListenerResult` 数组，按登记顺序排列，而不是完成顺序。非法通道输入同步抛出 `INVALID_CHANNEL`。'
       ),
-      example: `const results = await invokeParallelSettled(channel, value)
-for (const result of results) if (result.status === 'rejected') console.warn(result.reason)`
+      exampleIntro: t(
+        '`createEventChannel<number, number>()` accepts numeric payloads and numeric listener results. Both handlers receive `3` as `event.value`. Inspect `status`: `fulfilled` carries `value`, and `rejected` carries the original `reason`; compare against `EventSubscriberState`.',
+        '`createEventChannel<number, number>()` 的输入和监听者返回值都是数字。两个处理者都通过 `event.value` 收到 `3`。结果的 `status` 为 `fulfilled` 时读取 `value`，为 `rejected` 时读取原始 `reason`；用 `EventSubscriberState` 比较状态。'
+      ),
+      cases: eventSubscriberCases.invokeParallelSettled,
+      example: eventSubscriberCases.invokeParallelSettled[0].example
     },
     invokeSerial: {
       role: 'operation',
@@ -566,13 +566,18 @@ for (const result of results) if (result.status === 'rejected') console.warn(res
         'Resolves with the results in registration order; rejects with `PUBLISH_FAILED` when any failed.',
         '按登记顺序 resolve 结果；任一失败则以 `PUBLISH_FAILED` reject。'
       ),
-      example: `await invokeSerial(migrations, database) // 按登记顺序依次执行`
+      exampleIntro: t(
+        'The channel accepts strings and string listener results. The example passes the same order ID to both handlers and awaits their result array. Returning a Promise delays the next handler until that Promise settles; results are not passed to the next handler.',
+        '通道接收字符串，监听者也返回字符串。示例把同一个订单标识交给两个处理者，再等待结果数组。前一个返回 Promise 时，下一个等它结算后才开始；返回值不会传给下一个处理者。'
+      ),
+      cases: eventSubscriberCases.invokeSerial,
+      example: eventSubscriberCases.invokeSerial[0].example
     },
     invokeSerialSettled: {
       role: 'operation',
       purpose: t(
-        'Like `invokeSerial`, but never rejects: resolves with one settled entry per listener.',
-        '与 `invokeSerial` 相同，逐个执行 listener，但永远不会 reject：为每个 listener 给出一个成功或失败的结算结果。'
+        'Runs listeners serially and resolves with one success or failure entry for each. Listener failures are collected; invalid channel admission still throws synchronously before a Promise is returned.',
+        '逐个执行监听者，返回每个监听者的成功值或失败原因。监听者失败会被收集；非法通道仍在返回 Promise 前同步抛错。'
       ),
       params: { channel: asyncChannelParam, value: asyncValueParam },
       returns: t(
@@ -602,8 +607,12 @@ for (const result of results) if (result.status === 'rejected') console.warn(res
         'Resolves with the listener result; rejects with `PUBLISH_FAILED` when it fails.',
         'resolve 为该 listener 的结果；listener 失败则以 `PUBLISH_FAILED` reject。'
       ),
-      example: `tasks.subscribe(sendEmail, { taskId: 'email' })
-const receipt = await invokeTask(tasks, 'email', { to: 'ada@example.com' })`
+      exampleIntro: t(
+        'The channel accepts numbers and numeric results. In `subscribe(listener, { taskId })`, `taskId` is an optional non-empty registration name and defaults to unset. `invokeTask(channel, taskId, value)` selects that name exactly; the default multiple admission mode lets the example register the same function twice.',
+        '通道的输入和监听者结果都是数字。`subscribe(listener, { taskId })` 的 `taskId` 是可选的非空登记名称，默认不设置。`invokeTask(channel, taskId, value)` 精确选择这个名称；默认允许重复登记，所以示例可以两次登记同一个函数。'
+      ),
+      cases: eventSubscriberCases.invokeTask,
+      example: eventSubscriberCases.invokeTask[0].example
     },
     invokeTaskSettled: {
       role: 'operation',
@@ -717,9 +726,12 @@ const stop = subscribeSubscriber(numbers, new Counter())`
         'An idempotent synchronous unsubscribe function. Pre-aborted defaults to a no-op with no registration or Promise; strict `throwOnAborted: true` synchronously throws TypeError/`ABORTED`. Projected aliases remain available alongside live abort controls.',
         '可重复调用的同步退订函数。信号已取消时默认返回空操作，不登记也不返回 Promise；严格设置 `throwOnAborted: true` 时同步抛出 `TypeError` 与 `ABORTED`。投影别名保留，取消控制保持实时。'
       ),
-      example: `const controller = new AbortController()
-subscribeUntil(updates, controller.signal, (event) => render(event.value))
-controller.abort() // 自动退订`
+      exampleIntro: t(
+        '`updates` is a string channel. `page.signal` comes from the page-owned `AbortController`; the listener reads `event.value`. Calling `page.abort()` removes the registration, and the returned `stop()` can also unsubscribe earlier. Optional `options.taskId` defaults to unset.',
+        '`updates` 是传递字符串的通道。`page.signal` 来自页面持有的 `AbortController`，监听者读取 `event.value`。调用 `page.abort()` 会移除登记，也可以提前调用返回的 `stop()`。可选的 `options.taskId` 默认不设置。'
+      ),
+      cases: eventSubscriberCases.subscribeUntil,
+      example: eventSubscriberCases.subscribeUntil[0].example
     }
   },
   types: {

@@ -6,6 +6,7 @@
  * representation.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import { storePersistCases } from './store-persist-cases.js'
 
 /** Constructs one bilingual explanation. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -29,8 +30,8 @@ const key = t(
 )
 /** Shared low-level cancellation context. */
 const ctx = t(
-  'Required context object; optional signal comes from the caller AbortController and is forwarded to the codec and storage operation.',
-  '必填上下文对象；可选信号来自调用方中止控制器，并转交编解码器与存储操作。'
+  'Required context object; signal defaults to undefined. A supplied caller AbortSignal is forwarded to the codec and storage operation.',
+  '必填上下文对象；`signal` 默认 `undefined`，提供时转交编解码器与存储操作。'
 )
 /** Core example injects an ordinary Store through the minimal unit contract. */
 const coreExample = `import { createStore } from '@migaia/store-light'
@@ -48,42 +49,11 @@ await handle.flush()
 handle.dispose()
 await store.$dispose()`
 /** Light adapter example owns both the subscription and original Store. */
-const lightExample = `import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { persist } from '@migaia/store-persist/light'
-const store = createStore({ theme: 'light' })
-const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })
-await handle.ready
-store.theme = 'dark'
-await handle.flush()
-handle.dispose()
-await store.$dispose()`
+const lightExample = storePersistCases.persist![0]!.example
 /** Collection example releases persistence before its source collection. */
-const indexedExample = `import { observableMap } from '@migaia/store-indexed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { persistCollection } from '@migaia/store-persist/indexed'
-const cart = observableMap<string, number>()
-const handle = persistCollection(cart, { key: 'cart', storage: memoryStorageHost() })
-await handle.ready
-cart.set('book', 2)
-await handle.flush()
-handle.dispose()
-cart.dispose()`
+const indexedExample = storePersistCases.persistCollection![0]!.example
 /** One writable definition gets one archive and one independent handle. */
-const keyedExample = `import { createRuntime } from '@migaia/reactive'
-import { createAtomStore, familyDef } from '@migaia/store-keyed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { persistKeyed } from '@migaia/store-persist/keyed'
-const runtime = createRuntime()
-const atomStore = createAtomStore(runtime)
-const preference = familyDef(() => ({ theme: 'light' }))
-const def = preference('u1')
-const handle = persistKeyed(atomStore, def, 'u1', { namespace: 'prefs', storage: memoryStorageHost() })
-await handle.ready
-atomStore.set(def, { theme: 'dark' })
-await handle.flush()
-handle.dispose()
-atomStore.dispose()`
+const keyedExample = storePersistCases.persistKeyed![0]!.example
 /** Canonical options reused only where the public wrapper exposes them. */
 const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   key: { summary: key },
@@ -179,7 +149,7 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   debounceMs: {
     summary: t(
       'Quiet interval before requesting a serialized write; finite milliseconds in [0, 2147483647]. It does not bound storage latency.',
-      '请求串行写入前的安静间隔，必须是定时器范围内的有限毫秒数；不限制存储延迟。'
+      '请求串行写入前的安静间隔，必须是 `[0, 2147483647]` 内的有限毫秒数；不限制存储延迟。'
     ),
     default: t(
       '0: enqueue a write without a debounce timer.',
@@ -189,11 +159,11 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
   maxWaitMs: {
     summary: t(
       'Maximum debounce window from the first post-hydration change; finite milliseconds in [0, 2147483647]. Relevant only when debounceMs is positive.',
-      '成功水合后首次变更起的防抖窗口上限，必须是定时器范围内的有限毫秒数；仅在防抖间隔为正时使用。'
+      '成功恢复后首次变更起的防抖窗口上限，必须是 `[0, 2147483647]` 内的有限毫秒数；仅在 `debounceMs` 为正时使用。'
     ),
     default: t(
-      'Omitted: only the quiet interval controls enqueueing.',
-      '省略时仅由安静间隔决定写入入队。'
+      'undefined: only the quiet interval controls enqueueing.',
+      '`undefined`：仅由安静间隔决定写入入队。'
     )
   },
   scheduler: {
@@ -283,28 +253,28 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
   ready: {
     summary: t(
       'Original first-hydration-attempt Promise: resolves only on success and rejects on failure or disposal before completion with AbortError/ABORTED_BY_DISPOSE. Retries do not replace this Promise.',
-      '原始首次水合尝试的承诺；仅成功时完成，失败或完成前释放时以 `AbortError`／`ABORTED_BY_DISPOSE` 拒绝。重试不替换此承诺。'
+      '首次恢复尝试的原始 Promise；仅成功时兑现，恢复失败会拒绝，完成前释放则以 `AbortError`／`ABORTED_BY_DISPOSE` 拒绝。重试不替换此 Promise。'
     )
   },
   settled: {
     summary: t(
-      'Original initial-hydration Promise that resolves after either success or failure; it does not await future retries.',
-      '原始初次水合承诺，成功或失败后均完成，不等待未来重试。'
+      'Barrier derived from the initial ready Promise that resolves after either success or failure; it does not await future retries.',
+      '从首次 `ready` 派生的 Promise，成功或失败后均兑现，不等待后续重试。'
     )
   },
   disposed: {
     summary: t(
       'Live terminal-disposal getter on the original IPersistHandle; becomes true once dispose is called.',
-      '原始持久化句柄上的实时终态释放读取器，调用释放方法后变为真。'
+      '原始持久化句柄上的实时 `disposed` 属性，调用 `dispose` 后变为 `true`。'
     )
   },
   retryHydrate: method(
-    'Retries storage reading only after hydration failure and shares concurrent recovery attempts. Successful recovery reopens automatic writes.',
-    '仅在水合失败后重试存储读取，并共享并发恢复尝试；恢复成功后重新开放自动写入。',
+    'Retries storage reading after hydration failure. An ongoing recovery prevents another read but does not make every concurrent invocation wait for it; await the invocation that starts recovery. Success reopens automatic writes.',
+    '恢复失败后重新读取存档；已有重试在执行时不重复读取，但后来的并发调用不保证等待该次重试，应等待发起恢复的那次调用。恢复成功后重新开放自动写入。',
     {},
     t(
       'Promise of recovery; rejects on another failure or post-disposal invocation. Initial ready and settled remain their original Promises.',
-      '返回恢复承诺，再次失败或释放后调用时拒绝；初始就绪与完成承诺保持原对象。'
+      '返回此次调用的 Promise，再次失败或释放后调用时拒绝；初始 `ready` 与 `settled` 保持原对象。'
     ),
     'try { await handle.ready } catch { await handle.retryHydrate() }'
   ),
@@ -314,7 +284,7 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     {},
     t(
       'Promise resolving after the write; hydration/write failures reject, and disposal during the wait produces AbortError.',
-      '写入完成后承诺完成；水合或写入失败会拒绝，等待期间释放产生中止错误。'
+      '写入完成后 Promise 兑现；恢复或写入失败会拒绝，等待期间释放产生 `AbortError`。'
     ),
     'await handle.ready\nawait handle.flush()'
   ),
@@ -324,7 +294,7 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     {},
     t(
       'Promise resolving after removal; hydration/removal failures or disposal reject. A later source change can recreate the archive.',
-      '移除完成后承诺完成；水合、移除失败或释放会拒绝，后续源变更可重新创建存档。'
+      '移除完成后 Promise 兑现；恢复、移除失败或释放会拒绝，后续源变更可重新创建存档。'
     ),
     'await handle.ready\nawait handle.clear()'
   ),
@@ -418,17 +388,19 @@ const adapter = (
   zh: string,
   params: Readonly<Record<string, IText>>,
   options: string,
-  example: string
+  example: string | IText,
+  details?: Pick<ISymbolDoc, 'exampleIntro' | 'cases'>
 ): ISymbolDoc => ({
   role: 'factory',
   purpose: t(en, zh),
   params,
   options,
   returns: t(
-    'Complete caller-owned persistence handle. Facades capture option getters once with their original options receiver; inaccessible options throw INVALID_OPTION with cause before engine construction. Hydration failures reject ready and remain observable through status.',
-    '返回调用方持有的完整持久化句柄。各适配入口以原选项对象为读取器接收者捕获一次，选项读取失败在引擎构造前抛带原因的 `INVALID_OPTION`。水合失败拒绝初始承诺并通过状态可见。'
+    'Complete caller-owned persistence handle. The engine captures recognized configuration once at entry; adapters first snapshot options using their original getter receiver. Inaccessible adapter options throw INVALID_OPTION with cause before construction. Hydration failures reject ready and remain observable through status.',
+    '返回调用方持有的完整持久化句柄。引擎在入口捕获一次已知配置，各适配入口先以原选项对象作为 getter 接收者拍下选项；适配选项读取失败在引擎构造前抛带 `cause` 的 `INVALID_OPTION`。恢复失败使 `ready` 拒绝，并通过状态可见。'
   ),
-  example
+  example,
+  ...details
 })
 /** Full persistence reference. */
 export const storePersistReference: ILibraryReference = {
@@ -485,11 +457,18 @@ export const storePersistReference: ILibraryReference = {
         )
       },
       'IPersistOptions',
-      lightExample
+      lightExample,
+      {
+        exampleIntro: {
+          en: "Run these examples with Node 24 and install @migaia/store-light and @migaia/storage-web directly alongside this package. createStore(shape, options?) receives the shown initial fields; omitted options use defaultRuntime, debugName 'Store', warnAsyncActions false and no mutationPolicy. Scalar fields use Object.is for equality.\n\nmemoryStorageHost() takes no arguments and creates an isolated in-memory backend; it does not survive process exit. The codec encodes the complete { version, state } envelope; version is a nonnegative safe integer and state must be present and non-null. Decode its string result before inspecting state. Persistence options and callback arguments are listed below; dispose persistence first, then release the Store and backend separately.",
+          zh: "在 Node 24 运行示例；除本包外，直接安装 `@migaia/store-light` 和 `@migaia/storage-web`。`createStore(shape, options?)` 接收代码中的初始字段；省略选项时使用 `defaultRuntime`、`debugName: 'Store'`、`warnAsyncActions: false`，不设置 `mutationPolicy`，标量字段按 `Object.is` 判断相等。\n\n`memoryStorageHost()` 无参数，每次创建独立的内存后端，进程退出后数据不保留。编解码器处理完整的 `{ version, state }` 存档：版本是安全非负整数，状态必须存在且不为 `null` 或 `undefined`；检查状态前先解码字符串。下表列出持久化选项与回调参数；先停止持久化，再分别释放 Store 和后端。"
+        },
+        cases: storePersistCases.persist
+      }
     ),
     persistCollection: adapter(
       'Persists one observable collection via snapshot and replace, observing its owning Runtime effect while skipping the initial subscription evaluation.',
-      '使用 `observableMap` 等外部集合工厂产生的集合，通过快照与整体替换持久化状态；使用所属运行时副作用观察，跳过订阅初次求值。',
+      '使用 `ObservableObject`、`ObservableArray`、`ObservableMap` 或 `ObservableSet`，通过快照与整体替换持久化状态；用所属运行时副作用观察，跳过订阅初次求值。',
       {
         collection: t(
           'Caller-owned store-indexed collection or structural IPersistableCollection with a tracked snapshot method.',
@@ -497,7 +476,14 @@ export const storePersistReference: ILibraryReference = {
         )
       },
       'IPersistCollectionOptions',
-      indexedExample
+      indexedExample,
+      {
+        exampleIntro: {
+          en: "Install @migaia/store-indexed and @migaia/storage-web directly for this Node 24 example. new ObservableMap(entries = [], runtime = defaultRuntime, options = {}) accepts iterable key/value pairs. Omitted options leave mutationGuard undefined and use debugName 'ObservableMap'; the collection borrows its Runtime.\n\nmemoryStorageHost() takes no arguments and creates isolated memory storage. The first handle writes an envelope with version 0 and the Map snapshot; the second restores it into a collection initially containing stale. No custom codec or merge is supplied. Persistence owns only its subscription and status; release both collections and the backend separately.",
+          zh: "此 Node 24 示例需直接安装 `@migaia/store-indexed` 与 `@migaia/storage-web`。`new ObservableMap(entries = [], runtime = defaultRuntime, options = {})` 接收键值对可迭代对象；省略选项时 `mutationGuard` 为 `undefined`，`debugName` 为 `'ObservableMap'`，集合借用运行时。\n\n`memoryStorageHost()` 无参数，创建独立内存后端。首个句柄保存版本 `0` 和 `Map` 快照，第二个句柄将其恢复到原本含 `stale` 的集合；未提供自定义编解码器或合并函数。持久化只持有订阅与状态，两个集合和后端仍需分别释放。"
+        },
+        cases: storePersistCases.persistCollection
+      }
     ),
     persistKeyed: adapter(
       'Persists one writable AtomStore definition under namespace:id, creating an independent engine per invocation. Returned value is captured before hydration; read live state through AtomStore.',
@@ -517,7 +503,14 @@ export const storePersistReference: ILibraryReference = {
         )
       },
       'IPersistKeyedOptions',
-      keyedExample
+      keyedExample,
+      {
+        exampleIntro: {
+          en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-web directly. createAtomStore(runtime) requires a real Runtime; createRuntime() uses the host adapter and its default microtask scheduler. familyDef(initial, options = {}) calls initial(key) for new definitions; options default to maxSize 4096 and debugLabel 'family'.\n\nThe shown initial callback creates a name record; the namespace and explicit id select namespace:id in storage, independently of the definition cache. memoryStorageHost() has no arguments and owns isolated memory storage. version and debounceMs default to 0; migrate is not an option on this adapter. value is an initial snapshot; use atoms.peek(def) for the current value. Dispose every persistence handle before AtomStore and storage.",
+          zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-web`。`createAtomStore(runtime)` 必须接收真实运行时，`createRuntime()` 使用宿主适配器及其默认微任务调度；`familyDef(initial, options = {})` 为新定义调用 `initial(key)`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例初始回调返回含 `name` 的记录；命名空间与显式标识决定 `namespace:id` 存储键，不从定义缓存推导。`memoryStorageHost()` 无参数并持有独立内存数据；`version`、`debounceMs` 默认 `0`，此适配器不提供 `migrate` 选项。`value` 是初始快照，当前值用 `atoms.peek(def)` 读取；先逐个释放持久化句柄，再释放原子存储和后端。"
+        },
+        cases: storePersistCases.persistKeyed
+      }
     ),
     clearFamily: {
       role: 'operation',
@@ -536,7 +529,12 @@ export const storePersistReference: ILibraryReference = {
         'Number of matched records after all removals succeed; backend failure rejects and earlier removals remain applied.',
         '全部移除成功后返回匹配记录数；后端失败会拒绝，先前已移除记录保持生效。'
       ),
-      example: "const count = await clearFamily(storage, 'prefs')"
+      exampleIntro: {
+        en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-web directly. createAtomStore requires the Runtime created here; createRuntime() keeps the host's default microtask scheduling. familyDef(initial, options = {}) uses the shown initial value 0, default maxSize 4096 and debugLabel 'family'.\n\nThe example first writes through a real persistKeyed handle with required namespace 'users' and id 'u1'; version and debounceMs are both omitted and default to 0. memoryStorageHost() takes no arguments. clearFamily receives that same backend and the exact namespace, without a colon; it adds the colon when matching keys. It neither stops persistence nor disposes the borrowed AtomStore or backend.",
+        zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-web`。`createAtomStore` 使用本例创建的运行时，`createRuntime()` 保留宿主默认的微任务调度；`familyDef(initial, options = {})` 的初始回调返回 `0`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例先用真实 `persistKeyed` 句柄写入，必填命名空间为 `'users'`，标识为 `'u1'`；未提供的 `version` 与 `debounceMs` 均默认 `0`。`memoryStorageHost()` 无参数；`clearFamily` 接收同一后端与不含尾部冒号的命名空间，匹配时自行追加冒号。它不停止持久化，也不释放借用的原子存储与后端。"
+      },
+      cases: storePersistCases.clearFamily,
+      example: storePersistCases.clearFamily![0]!.example
     },
     assertEnvelope: {
       role: 'operation',
@@ -570,8 +568,8 @@ export const storePersistReference: ILibraryReference = {
     writeEnvelope: {
       role: 'operation',
       purpose: t(
-        'Encodes the supplied value and routes it to text or binary storage. Structured output rejects; binary capability requires byte methods and Uint8Array output, while text routing requires a string.',
-        '编码传入值并写入文本或二进制存储路径；拒绝结构化输出，二进制能力要求字节方法及字节数组输出，文本路径要求字符串。'
+        'Encodes the value and routes its output. structured writes reject. With binary output and capabilities.binary true, byte methods and Uint8Array output are required; otherwise writes use text and require a string. No automatic base64 conversion occurs.',
+        '编码传入值后选择路径；`structured` 写入会拒绝。`binary` 且 `capabilities.binary` 为 `true` 时要求字节方法和 `Uint8Array` 输出，否则走文本路径并要求字符串，不会自动转成 base64。'
       ),
       params: {
         storage,
@@ -588,7 +586,7 @@ export const storePersistReference: ILibraryReference = {
       },
       returns: t(
         'Promise resolving after the selected backend write; codec, capability and backend failures reject.',
-        '所选后端写入完成后承诺完成；编解码、能力或后端失败会拒绝。'
+        '所选后端写入完成后 Promise 兑现；编解码、能力或后端失败会拒绝。'
       ),
       example:
         "await writeEnvelope(storage, 'counter', defaultJsonCodec, { version: 0, state: { count: 1 } }, {})"
@@ -609,8 +607,8 @@ export const storePersistReference: ILibraryReference = {
         ctx
       },
       returns: t(
-        'Decoded unknown value, or undefined for missing storage; unsupported binary reads and backend/codec failures reject.',
-        '返回未知类型的解码值，记录缺失时为空值；不受支持的二进制读取及后端、编解码失败会拒绝。'
+        'undefined when the selected backend returns null for a missing record; otherwise the codec result is forwarded, including undefined if the codec returns it. Unsupported binary reads and backend/codec failures reject.',
+        '所选后端用 `null` 表示缺失时返回 `undefined`；非缺失记录透传编解码器结果，编解码器也可能返回 `undefined`。不受支持的二进制读取及后端、编解码失败会拒绝。'
       ),
       example:
         "const raw = await readEnvelope(storage, 'counter', defaultJsonCodec, {})\nif (raw !== undefined) assertEnvelope(raw, 'counter')"
@@ -624,7 +622,7 @@ export const storePersistReference: ILibraryReference = {
       params: { storage, key, ctx },
       returns: t(
         'Promise resolving after backend removal; backend failure rejects unchanged.',
-        '后端移除后承诺完成；后端失败原样拒绝。'
+        '后端移除完成后 Promise 兑现；后端失败原样拒绝。'
       ),
       example: "await removeEnvelope(storage, 'counter', {})"
     },
@@ -761,7 +759,7 @@ export const storePersistReference: ILibraryReference = {
       ...handleType,
       summary: t(
         'The actual complete engine handle extended with value captured before initial hydration. Live status and disposed getters retain their original owner; read live business values through AtomStore.',
-        '在实际完整引擎句柄上增加初次水合前采样的值，实时状态及释放读取器保留原拥有者；业务实时值从原子存储读取。'
+        '在完整引擎句柄上增加首次恢复前捕获的值，保留实时状态与 `disposed` 属性；业务当前值从原子存储读取。'
       ),
       example: keyedExample,
       members: {

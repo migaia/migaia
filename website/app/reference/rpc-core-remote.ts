@@ -121,7 +121,7 @@ const endpointFactory = m(
   },
   t(
     'Promise of endpoint, optional one-way surface and stream runtime; failure rolls construction back.',
-    '返回端点及可选单向、流式能力的承诺；失败会触发构造回滚。'
+    '返回端点及可选单向、流式能力的 Promise；失败会触发构造回滚。'
   ),
   `const served = await endpointFactory(channel, signal)`
 )
@@ -214,7 +214,7 @@ for (const name of ['spawn', 'connect', 'listen']) {
     },
     returns: t(
       'Promise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.',
-      '返回完整来源结果的承诺，包含已约定管线与特性；失败拒绝构造，并回滚已经取得的资源。'
+      '返回完整来源结果的 Promise，包含已约定管线与特性；失败拒绝构造，并回滚已经取得的资源。'
     )
   }
 }
@@ -223,7 +223,10 @@ const pluginMembers = { ...sourceMembers, ...runtimePluginOptionMembers }
 /** Parent and child fields are exclusive; never-valued fields forbid the opposite mode. */
 const coroutineMembers: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(
-    Object.entries(pluginMembers).filter(([name]) => name !== 'spawn' && name !== 'listen')
+    // Coroutine options omit the plugin source, naming and provider fields; `connect` is redefined below.
+    Object.entries(pluginMembers).filter(
+      ([name]) => !['spawn', 'listen', 'name', 'provide', 'expose'].includes(name)
+    )
   ),
   task: p(
     'Parent-only task callback receiving signal, heartbeat and the opaque child connect token; task settlement is unit exit and rejection retains its cause.',
@@ -358,7 +361,7 @@ const channelMembers: Readonly<Record<string, IMemberDoc>> = {
     {},
     t(
       'Promise completing channel cleanup; ownership and repeat-call semantics belong to the concrete channel.',
-      '返回通道清理承诺，所有权及重复调用语义由具体通道决定。'
+      '返回通道清理 Promise，所有权及重复调用语义由具体通道决定。'
     ),
     `await channel.close()`
   )
@@ -622,7 +625,7 @@ await channel.close()`,
         },
         t(
           'Promise of a complete channel; acquisition failure becomes start failure with its cause.',
-          '返回完整通道的承诺，获取失败成为保留原始原因的启动失败。'
+          '返回完整通道的 Promise，获取失败成为保留原始原因的启动失败。'
         ),
         `const channel = await binding.openChannel(unit, signal)`
       ),
@@ -662,7 +665,8 @@ await channel.close()`,
       '以目录代替单插件契约的远程宿主代理输入。'
     ),
     members: {
-      ...proxyMembers,
+      // The Host proxy replaces the single plugin `contract` with `catalog`.
+      ...Object.fromEntries(Object.entries(proxyMembers).filter(([name]) => name !== 'contract')),
       catalog: p(
         'Normalized catalog defining the only remotely installable plugin names.',
         '规范目录，定义唯一允许远程安装的插件名称范围。'
@@ -683,7 +687,7 @@ await channel.close()`,
   IRuntimeCallOptions: {
     summary: t(
       'Runtime call controls including false deadline override and explicit binary ownership transfer.',
-      '运行时调用控制，包含关闭截止时间的显式假值及二进制所有权转移。'
+      '运行时调用控制，包含关闭截止时间的显式`false`及二进制所有权转移。'
     ),
     members: {
       ...callMembers,
@@ -691,7 +695,7 @@ await channel.close()`,
         ...callMembers.timeoutMs!,
         summary: t(
           'Finite nonnegative milliseconds, or false to disable the inherited deadline for this call.',
-          '有限非负毫秒数，或用显式假值关闭本次调用的继承截止时间。'
+          '有限非负毫秒数，或用显式`false`关闭本次调用的继承截止时间。'
         ),
         default: t(
           'Omitted: request and stream inherit defaultTimeoutMs; other call kinds keep their original defaults.',
@@ -701,7 +705,7 @@ await channel.close()`,
       },
       transfer: p(
         'Caller-owned ArrayBuffers transferred through a carrier that actually supports native transfer.',
-        '由调用方拥有的缓冲区列表，经实际支持原生转移的载体转移。',
+        '由调用方拥有的缓冲区列表，经实际支持原生转移的传输对象转移。',
         t('Omitted: no explicit native ownership transfer.', '省略时不显式请求原生所有权转移。')
       )
     }
@@ -785,7 +789,7 @@ off()`
         },
         t(
           'Promise of the newer generation; cancellation rejects with the owner reason.',
-          '返回较新代次编号的承诺，取消会按拥有者原因拒绝。'
+          '返回较新代次编号的 Promise，取消会按拥有者原因拒绝。'
         ),
         `const next = await events.whenReady(events.current().generation, signal)`
       )
@@ -814,7 +818,7 @@ off()`
       ),
       key: p(
         'Original application or generated logical idempotency key.',
-        '原始应用签发或自动生成的逻辑幂等键。'
+        '原始应用提供或自动生成的逻辑幂等键。'
       ),
       generation: p(
         'Original accepted generation number from the generation event owner.',
@@ -841,7 +845,7 @@ off()`
         },
         t(
           'Promise of one portable result; a departure may leave the logical result unknown.',
-          '返回单次可移植结果的承诺，代次离开可能使逻辑结果未知。'
+          '返回单次可移植结果的 Promise，代次离开可能使逻辑结果未知。'
         ),
         `const value = await input.sendOnce({ expectedGeneration: input.generation, key: input.key })`
       )
@@ -894,7 +898,7 @@ const value = await port.dispatch(input)`,
           ),
           options: t('Explicit suspension policy.', '显式挂起策略。')
         },
-        t('Promise of the Host operation result.', '返回宿主操作结果的承诺。'),
+        t('Promise of the Host operation result.', '返回宿主操作结果的 Promise。'),
         `await hostPort.disable('math', { policy: 'suspend' })`
       ),
       enable: m(
@@ -906,7 +910,7 @@ const value = await port.dispatch(input)`,
             '在 `createRemotePlugin()` 选项中指定的名称。'
           )
         },
-        t('Promise of the Host operation result.', '返回宿主操作结果的承诺。'),
+        t('Promise of the Host operation result.', '返回宿主操作结果的 Promise。'),
         `await hostPort.enable('math')`
       )
     }
@@ -930,7 +934,7 @@ const value = await port.dispatch(input)`,
         {},
         t(
           'Promise resolving after directory acceptance; release rejects further readiness.',
-          '目录接纳后完成的承诺，释放后拒绝后续就绪请求。'
+          '目录接纳后完成的 Promise，释放后拒绝后续就绪请求。'
         ),
         `await remote.ready()`
       ),
@@ -946,7 +950,7 @@ const value = await port.dispatch(input)`,
         },
         t(
           'Promise of local feature proxies bound to the accepted registration.',
-          '返回绑定到已接受登记的本地特性代理承诺。'
+          '返回绑定到已接受登记的本地特性代理 Promise。'
         ),
         `const features = await remote.use('math')
 await features.calc!.double!(21)`
@@ -966,7 +970,7 @@ await features.calc!.double!(21)`
         },
         t(
           'Promise of portable removal outcome or plan; missing adoption rejects with REMOTE_HOST_NOT_ADOPTED.',
-          '返回可移植移除结果或计划承诺，未接纳时以 `REMOTE_HOST_NOT_ADOPTED` 拒绝。'
+          '返回可移植移除结果或计划 Promise，未接纳时以 `REMOTE_HOST_NOT_ADOPTED` 拒绝。'
         ),
         `await remote.use('math')
 await remote.unUse('math', { policy: 'reject' })`
@@ -984,7 +988,7 @@ await remote.unUse('math', { policy: 'reject' })`
         {},
         t(
           'Shared Promise of release; repeated calls retain the same operation.',
-          '返回共享释放承诺，重复调用保持同一操作。'
+          '返回共享释放 Promise，重复调用保持同一操作。'
         ),
         `await remote.release()
 await remote.release()`
@@ -1023,7 +1027,7 @@ await remote.release()`
   },
   IRemoteHostPluginResolver: alias(
     'Synchronous server callback receiving an admitted catalog name and optional portable config; returns a local defined plugin and rejects thenables.',
-    '同步服务端回调接收已接纳目录名称与可选可移植配置，返回本地已定义插件，不接受类承诺。'
+    '同步服务端回调接收已接纳目录名称与可选可移植配置，返回本地已定义插件，不接受类 Promise 对象。'
   ),
   IRuntimePeer: {
     summary: t(
@@ -1188,7 +1192,7 @@ await remote.release()`
   ),
   ICoroutineUserTask: alias(
     'Task callback receiving ICoroutineTaskContext; synchronous completion or Promise settlement is native exit, and rejection preserves its original cause.',
-    '任务回调接收 `ICoroutineTaskContext`，同步完成或承诺确定即原生退出，拒绝保留原始原因。'
+    '任务回调接收 `ICoroutineTaskContext`，同步返回或 Promise 完成时视为执行单元退出，拒绝保留原始原因。'
   ),
   ICoroutineReplaceSpec: {
     summary: t(
@@ -1205,7 +1209,7 @@ await remote.release()`
     members: {
       signal: p(
         'Original native cancellation signal from the coroutine supervisor.',
-        '协程监督器提供的原始原生取消信号。'
+        '协程监督器提供的原生取消信号。'
       ),
       connect: coroutineMembers.connect!,
       heartbeat: m(
@@ -1307,7 +1311,7 @@ await service.close()`,
         {},
         t(
           'Promise after owned registrations and endpoint resources are released.',
-          '返回其拥有的登记及端点资源释放后的承诺。'
+          '返回其拥有的登记及端点资源释放后的 Promise。'
         ),
         `await service.close()`
       )
@@ -1384,7 +1388,7 @@ const symbols: Record<string, ISymbolDoc> = {
       },
       t(
         'Promise of IRuntimePeer or typed IRuntimeTypedPeer after directory acceptance; caller owns close.',
-        '目录接纳后返回 `IRuntimePeer` 或带类型连接的承诺，调用方负责关闭。'
+        '目录接纳后返回 `IRuntimePeer` 或带类型连接的 Promise，调用方负责关闭。'
       ),
       peerExample
     ),
@@ -1423,7 +1427,7 @@ const symbols: Record<string, ISymbolDoc> = {
       },
       t(
         'Promise of managed IRuntimePeer; close continues channel, owned binding and carrier-listener release even after an earlier cleanup failure. One failure retains identity; multiple failures retain their complete cause/errors graph. Async source wrappers need not return the identical Promise.',
-        '返回托管连接承诺；关闭时即使前项清理失败，仍继续释放通道、所拥有绑定及载体错误监听；单错保持身份，多错保留完整原因及错误图，异步来源包装不承诺承诺引用相同。'
+        '返回托管连接 Promise；关闭时即使前项清理失败，仍继续释放通道、所拥有绑定及传输错误监听；单错保持身份，多错保留完整原因及错误图，异步来源包装不保证返回同一个 Promise 对象。'
       ),
       `const peer = await createManagedRuntimePeer(options, binding)
 await peer.close()`
@@ -1519,7 +1523,13 @@ const value = await port.dispatch(input)`
       coroutineExample
     ),
     role: 'enhancer',
-    optionDocs: coroutineMembers
+    // The factory re-adds the naming and provider fields the coroutine option types omit.
+    optionDocs: {
+      ...coroutineMembers,
+      name: pluginMembers.name!,
+      provide: pluginMembers.provide!,
+      expose: pluginMembers.expose!
+    }
   },
   createRuntimePlugin: {
     ...op(
@@ -1630,7 +1640,7 @@ console.log(sameRemoteContract(a, b))`
       },
       t(
         'Promise of a service close handle; missing stream support fails with CAPABILITY_CONFLICT after endpoint rollback.',
-        '返回服务关闭句柄承诺，缺少流式支持时先回滚端点，再以 `CAPABILITY_CONFLICT` 失败。'
+        '返回服务关闭句柄 Promise，缺少流式支持时先回滚端点，再以 `CAPABILITY_CONFLICT` 失败。'
       ),
       `const service = await serveRemotePlugin({ host, contract, endpoint, report })
 await service.close()`
@@ -1650,7 +1660,7 @@ await service.close()`
       },
       t(
         'Promise of a close handle releasing the endpoint; installed catalog plugins remain owned by the Host.',
-        '返回释放端点的关闭句柄承诺，已安装目录插件仍由宿主持有。'
+        '返回释放端点的关闭句柄 Promise，已安装目录插件仍由宿主持有。'
       ),
       `const service = await serveRemoteHost({ host, catalog, resolvePlugin, endpoint, report })
 await service.close()`
@@ -1799,7 +1809,7 @@ export const remoteReference: ILibraryReference = {
               payload: t('One application payload.', '单个应用负载。'),
               options: t('Optional IRuntimeCallOptions.', '可选运行时调用控制设置。')
             },
-            t('Promise of the remote method result.', '返回远端方法结果的承诺。'),
+            t('Promise of the remote method result.', '返回远端方法结果的 Promise。'),
             coroutineExample
           )
         }
@@ -1809,7 +1819,7 @@ export const remoteReference: ILibraryReference = {
       scenarios: [
         t(
           'Implement a platform adapter using the original runtime Host slot.',
-          '使用原运行时宿主槽位实现平台适配器。'
+          '使用既有运行时宿主槽位实现平台适配器。'
         )
       ],
       example: `const plugin = createRuntimePlugin(options, slotResource)
@@ -1842,7 +1852,7 @@ await host.dispose()`,
             },
             t(
               'Promise of the method result, governed by the original contribution lifecycle.',
-              '返回受原贡献生命周期约束的方法结果承诺。'
+              '返回远端方法结果的 Promise；方法仍受原始功能注册的生命周期约束。'
             ),
             `await host[slotResource.key].request(options.name, 'echo', 'hello')`
           )

@@ -11,10 +11,10 @@
  * discovery: its launcher rejects bootstrap and non-ignore stdin; use explicit message sources.
  * Windows Job launch always rejects and does not import koffi. The public launch helpers prepare
  * bootstrap/channel ownership; native spawning is still the custom launcher's responsibility.
- * Electron parentPort event.data comes from the native API documented at
- * https://www.electronjs.org/docs/latest/api/parent-port (read 2026-10-17).
+ * Electron parentPort exposes the native payload through event.data.
  */
 import type { ICode, ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+import { rpcProcessCases } from './rpc-process-cases.js'
 import {
   runtimeOutletGrants,
   runtimePeerOptionMembers,
@@ -23,6 +23,12 @@ import {
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** External public owners and their explicitly selected policies in the governance examples. */
+const resilienceExampleSetup: IText = {
+  en: "Directly install `@migaia/utils` and, for the second example, `@migaia/supervision`. The required `scheduler` is the borrowed `systemScheduler`; required `report(error)` collects original diagnostics. `sessionOptions` receives `connectionId`, `sessionId`, verified `principalId`, and optional `processId` (default `undefined`); these labels do not authenticate a connection. Its scope callback accepts admission `token` and `senderId` but derives this scope from the principal. The second example gives the real supervisor an `id`, a native launcher (default options `{}`), a `{ kind: 'process', maxUnits: 1 }` budget, and an explicit shell-free spec: `command`, `args`, `env.inherit/set`, and required stdio fields: stdin is channel or ignore, stdout is channel/drain/ignore, and stderr is drain or ignore. `restart.mode: 'never'` overrides `'on-failure'`; its full domain is `'never' | 'on-failure' | 'always'`. `isolation: 'best-effort'` overrides `'required'` and reports unsupported guarantees. `health: 'none'` adds no ping. The binding projects the original supervisor methods; the standalone owner's `release` disposes that supervisor only if liquidation occurs. `guard.beforeDispatch` receives method, request mode and the real generation; it checks this registration, not a business operation. One fulfilled `onTerminal` callback handles that diagnostic; ordinary governance close does not dispose the supervisor.",
+  zh: "直接安装 `@migaia/utils`，第二例还需直接安装 `@migaia/supervision`。必填 `scheduler` 借用 `systemScheduler`；必填 `report(error)` 收集原始诊断。`sessionOptions` 接收 `connectionId`、`sessionId`、已认证的 `principalId`，可选 `processId` 默认为 `undefined`；标签本身不完成认证。返回的范围回调接收准入 `token`、`senderId`，但这里按主体身份划分范围。第二例给真实监督器提供 `id`、原生启动器（选项默认 `{}`）、`{ kind: 'process', maxUnits: 1 }` 预算，以及不经 shell 的完整规格：`command`、`args`、`env.inherit/set` 和必填标准流模式：stdin 取 channel 或 ignore，stdout 取 channel、drain 或 ignore，stderr 取 drain 或 ignore。`restart.mode: 'never'` 覆盖默认 `'on-failure'`，完整取值为 `'never' | 'on-failure' | 'always'`；`isolation: 'best-effort'` 覆盖默认 `'required'`，不支持的保证仍会上报。`health: 'none'` 不增加 ping。绑定只是原监督器方法的投影；独立所有者的 `release` 仅在清算时释放该监督器。`guard.beforeDispatch` 接收方法名、request 模式和真实代次，只检查登记状态，不执行任务。任一 `onTerminal` 回调成功完成即处理该诊断；普通治理关闭不释放监督器。"
+}
 
 /** Public bootstrap readers only create a timer when the caller explicitly supplies a budget. */
 const bootstrapTimeoutMember: IMemberDoc = {
@@ -1199,133 +1205,11 @@ try {
   return t(code(false), code(true))
 })()
 
-/** The advanced plugin owns a real supervised deployment and replaces only after installation. */
-const legacyReplaceExample: ICode = (() => {
-  const declarations = `type IServiceApi = { math: { double(value: number): Promise<number> } }
-type IMainApi = { parent: { prefix(value: string): string } }
-const serviceContract: IRemoteContract = {
-  schemaVersion: 1, plugin: 'service',
-  features: { math: { methods: { double: { mode: 'request', idempotent: false } } } }
-}`
-  const code = (
-    zh: boolean
-  ) => `// ${zh ? 'service.ts：Node 子进程，使用显式原生协议，不读取自动启动帧' : 'service.ts: Node child using an explicit native protocol, without an automatic bootstrap frame'}
-import process from 'node:process'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createEndpoint, connect, contract, ping } from '@migaia/rpc-core'
-import { serveRemotePlugin, type IRemoteContract } from '@migaia/rpc-core/remote'
-import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
-import { createAdapterProcessStdio } from '@migaia/rpc-process/adapters/node-child-process'
-
-${declarations}
-const channel = await createProcessTransport(createAdapterProcessStdio(process), {
-  role: 'responder', peerId: 'legacy-main',
-  offer: createNativeProcessOffer({ peer: { id: 'legacy-service', runtime: 'node' }, stream: false, capabilities: ['runtime-api@1'] }),
-  auth: { mode: 'required', verify: (auth) => {
-    if (auth !== 'legacy-demo') throw new TypeError('invalid credential')
-    return 'legacy-main'
-  } },
-  ipc: { connectionId: 'legacy-child', sessionId: 'legacy-session', log: () => undefined },
-  report: console.error
-})
-// ${zh ? '原生字节通道返回的两个真实特性分别持有发送队列与诊断日志，原样安装。' : 'The native byte channel returns its actual queue and log features; install both unchanged.'}
-const [queue, log] = channel.features
-const endpoint = await createEndpoint({
-  id: 'legacy-service', targetIds: ['legacy-main'], transport: channel.transport, scheduler: channel.scheduler,
-  codec: channel.pipeline.codec, framer: channel.pipeline.framer,
-  features: [queue!, log!] as const,
-  middlewares: [connect({ transport: channel.transport }), contract({ version: '1.0.0' }), ping()]
-})
-const api: IServiceApi = { math: { double: async (value) => {
-  console.error(await endpoint.send<ReturnType<IMainApi['parent']['prefix']>>('legacy-main', 'parent.prefix', 'double'))
-  return value * 2
-} } }
-const local = definePlugin({ name: 'service', features: { math: defineFeature(() => api.math) }, install: () => ({}) })
-const childHost = defineHost<Record<string, never>, never, readonly [typeof local]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-await childHost.use(local)
-const served = await serveRemotePlugin({ host: childHost, contract: serviceContract, endpoint: { endpoint }, report: console.error })
-let offClose: () => void = () => undefined
-const closed = new Promise<void>((resolve) => {
-  offClose = channel.transport.onTransportError!(() => resolve())
-})
-channel.activateReceive?.()
-try {
-  await closed
-} finally {
-  offClose()
-  try { await served.close() } finally {
-    try { await childHost.dispose() } finally { await channel.close() }
-  }
+/** One Node entry installs and replaces a real advanced process plugin. */
+const legacyReplaceExample: ICode = {
+  en: "import { fileURLToPath } from 'node:url'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\nimport { createEndpoint, connect, contract, abort, timeout, hooks, ping } from '@migaia/rpc-core'\nimport { serveRemotePlugin, type IRemoteContract } from '@migaia/rpc-core/remote'\nimport {\n  createNativeProcessOffer,\n  createProcessPlugin,\n  createProcessTransport,\n  type IProcessByteChannel,\n  type IProcessPlugin\n} from '@migaia/rpc-process'\nimport {\n  openProcessStdioChannel,\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IServiceApi = { math: { double(params: readonly [number]): Promise<number> } }\nconst serviceContract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'service',\n  features: { math: { methods: { double: { mode: 'request', idempotent: false } } } }\n}\nconst reports: unknown[] = []\nconst report = (error: unknown) => {\n  reports.push(error)\n}\nconst token = 'replacement-demo'\nif (process.argv.includes('--child')) {\n  const invalidCredential = new TypeError('invalid demo credential')\n  const { channel: raw } = await openProcessStdioChannel({ bootstrap: 'stdin' })\n  const channel = await createProcessTransport(raw, {\n    role: 'responder',\n    peerId: 'main',\n    offer: createNativeProcessOffer({\n      peer: { id: 'service', runtime: 'node' },\n      stream: false,\n      capabilities: ['runtime-api@1']\n    }),\n    auth: {\n      mode: 'required',\n      verify: (auth) => {\n        if (auth !== token) throw invalidCredential\n        return 'main'\n      }\n    },\n    ipc: { connectionId: 'child', sessionId: 'child-session', log: () => undefined },\n    report\n  })\n  const [queue, log] = channel.features\n  const endpoint = await createEndpoint({\n    id: 'service',\n    targetIds: ['main'],\n    transport: channel.transport,\n    scheduler: channel.scheduler,\n    codec: channel.pipeline.codec,\n    framer: channel.pipeline.framer,\n    features: [queue!, log!] as const,\n    middlewares: [\n      abort(),\n      timeout(),\n      hooks({ onHookError: report }),\n      connect({ transport: channel.transport }),\n      contract({ version: '1.0.0' }),\n      ping()\n    ]\n  })\n  const local = definePlugin({\n    name: 'service',\n    features: { math: defineFeature(() => ({ double: async (value: number) => value * 2 })) },\n    install: () => ({})\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof local]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  await host.use(local)\n  const served = await serveRemotePlugin({\n    host,\n    contract: serviceContract,\n    endpoint: { endpoint },\n    report\n  })\n  let off: () => void = () => undefined\n  const closed = new Promise<void>((resolve) => {\n    off = channel.transport.onTransportError!(() => {\n      resolve()\n    })\n  })\n  channel.activateReceive?.()\n  try {\n    await closed\n  } finally {\n    off()\n    try {\n      await served.close()\n    } finally {\n      try {\n        await host.dispose()\n      } finally {\n        await channel.close()\n      }\n    }\n  }\n} else {\n  const host = defineHost<Record<string, never>, never, readonly [IProcessPlugin]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  const plugin = createProcessPlugin<INodeProcessHandle>({\n    name: 'service',\n    contract: serviceContract,\n    registrationOwner: { name: 'service', host },\n    host: {\n      disable: (name, options) => host.plugin.disable(name, options),\n      enable: (name) => host.plugin.enable(name),\n      replace: (name, candidate) => host.replace(name, candidate)\n    },\n    endpointFactory: async (channel) => {\n      const [queue, log] = channel.features\n      const endpoint = await createEndpoint({\n        id: 'main',\n        targetIds: [channel.peerId],\n        transport: channel.transport,\n        scheduler: channel.scheduler,\n        codec: channel.pipeline.codec,\n        framer: channel.pipeline.framer,\n        features: [queue!, log!] as const,\n        middlewares: [\n          abort(),\n          timeout(),\n          hooks({ onHookError: report }),\n          connect({ transport: channel.transport }),\n          contract({ version: '1.0.0' }),\n          ping()\n        ]\n      })\n      return { endpoint }\n    },\n    deployment: {\n      kind: 'spawn',\n      channelKind: 'byte',\n      wire: 'native',\n      token,\n      offer: createNativeProcessOffer({\n        peer: { id: 'main', runtime: 'node' },\n        auth: token,\n        stream: false,\n        capabilities: ['runtime-api@1']\n      }),\n      supervision: {\n        id: 'service',\n        launcher: createNodeProcessLauncher(),\n        budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n        scheduler: systemScheduler,\n        isolation: 'best-effort',\n        report,\n        spec: {\n          command: process.execPath,\n          args: [...process.execArgv, fileURLToPath(import.meta.url), '--child'],\n          env: { inherit: ['PATH'], set: {} },\n          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n          bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n        }\n      },\n      rawChannel: async (handle) => handle.channel!,\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'service',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    },\n    report\n  })\n  try {\n    const [handle] = await host.use(plugin)\n    const math = handle.getFeature('math') as IServiceApi['math']\n    console.log(await math.double([21]))\n    const result = await plugin.replace({ strategy: 'stop-then-start' })\n    console.log(result.strategy)\n    if (result.strategy === 'stop-then-start') console.log(result.outcome.kind)\n  } finally {\n    await host.dispose()\n  }\n}",
+  zh: "import { fileURLToPath } from 'node:url'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\nimport { createEndpoint, connect, contract, abort, timeout, hooks, ping } from '@migaia/rpc-core'\nimport { serveRemotePlugin, type IRemoteContract } from '@migaia/rpc-core/remote'\nimport {\n  createNativeProcessOffer,\n  createProcessPlugin,\n  createProcessTransport,\n  type IProcessByteChannel,\n  type IProcessPlugin\n} from '@migaia/rpc-process'\nimport {\n  openProcessStdioChannel,\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IServiceApi = { math: { double(params: readonly [number]): Promise<number> } }\nconst serviceContract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'service',\n  features: { math: { methods: { double: { mode: 'request', idempotent: false } } } }\n}\nconst reports: unknown[] = []\nconst report = (error: unknown) => {\n  reports.push(error)\n}\nconst token = 'replacement-demo'\nif (process.argv.includes('--child')) {\n  const invalidCredential = new TypeError('invalid demo credential')\n  const { channel: raw } = await openProcessStdioChannel({ bootstrap: 'stdin' })\n  const channel = await createProcessTransport(raw, {\n    role: 'responder',\n    peerId: 'main',\n    offer: createNativeProcessOffer({\n      peer: { id: 'service', runtime: 'node' },\n      stream: false,\n      capabilities: ['runtime-api@1']\n    }),\n    auth: {\n      mode: 'required',\n      verify: (auth) => {\n        if (auth !== token) throw invalidCredential\n        return 'main'\n      }\n    },\n    ipc: { connectionId: 'child', sessionId: 'child-session', log: () => undefined },\n    report\n  })\n  const [queue, log] = channel.features\n  const endpoint = await createEndpoint({\n    id: 'service',\n    targetIds: ['main'],\n    transport: channel.transport,\n    scheduler: channel.scheduler,\n    codec: channel.pipeline.codec,\n    framer: channel.pipeline.framer,\n    features: [queue!, log!] as const,\n    middlewares: [\n      abort(),\n      timeout(),\n      hooks({ onHookError: report }),\n      connect({ transport: channel.transport }),\n      contract({ version: '1.0.0' }),\n      ping()\n    ]\n  })\n  const local = definePlugin({\n    name: 'service',\n    features: { math: defineFeature(() => ({ double: async (value: number) => value * 2 })) },\n    install: () => ({})\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof local]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  await host.use(local)\n  const served = await serveRemotePlugin({\n    host,\n    contract: serviceContract,\n    endpoint: { endpoint },\n    report\n  })\n  let off: () => void = () => undefined\n  const closed = new Promise<void>((resolve) => {\n    off = channel.transport.onTransportError!(() => {\n      resolve()\n    })\n  })\n  channel.activateReceive?.()\n  try {\n    await closed\n  } finally {\n    off()\n    try {\n      await served.close()\n    } finally {\n      try {\n        await host.dispose()\n      } finally {\n        await channel.close()\n      }\n    }\n  }\n} else {\n  const host = defineHost<Record<string, never>, never, readonly [IProcessPlugin]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  const plugin = createProcessPlugin<INodeProcessHandle>({\n    name: 'service',\n    contract: serviceContract,\n    registrationOwner: { name: 'service', host },\n    host: {\n      disable: (name, options) => host.plugin.disable(name, options),\n      enable: (name) => host.plugin.enable(name),\n      replace: (name, candidate) => host.replace(name, candidate)\n    },\n    endpointFactory: async (channel) => {\n      const [queue, log] = channel.features\n      const endpoint = await createEndpoint({\n        id: 'main',\n        targetIds: [channel.peerId],\n        transport: channel.transport,\n        scheduler: channel.scheduler,\n        codec: channel.pipeline.codec,\n        framer: channel.pipeline.framer,\n        features: [queue!, log!] as const,\n        middlewares: [\n          abort(),\n          timeout(),\n          hooks({ onHookError: report }),\n          connect({ transport: channel.transport }),\n          contract({ version: '1.0.0' }),\n          ping()\n        ]\n      })\n      return { endpoint }\n    },\n    deployment: {\n      kind: 'spawn',\n      channelKind: 'byte',\n      wire: 'native',\n      token,\n      offer: createNativeProcessOffer({\n        peer: { id: 'main', runtime: 'node' },\n        auth: token,\n        stream: false,\n        capabilities: ['runtime-api@1']\n      }),\n      supervision: {\n        id: 'service',\n        launcher: createNodeProcessLauncher(),\n        budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n        scheduler: systemScheduler,\n        isolation: 'best-effort',\n        report,\n        spec: {\n          command: process.execPath,\n          args: [...process.execArgv, fileURLToPath(import.meta.url), '--child'],\n          env: { inherit: ['PATH'], set: {} },\n          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n          bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n        }\n      },\n      rawChannel: async (handle) => handle.channel!,\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'service',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    },\n    report\n  })\n  try {\n    const [handle] = await host.use(plugin)\n    const math = handle.getFeature('math') as IServiceApi['math']\n    console.log(await math.double([21]))\n    const result = await plugin.replace({ strategy: 'stop-then-start' })\n    console.log(result.strategy)\n    if (result.strategy === 'stop-then-start') console.log(result.outcome.kind)\n  } finally {\n    await host.dispose()\n  }\n}"
 }
-
-// ${zh ? 'main.ts：Node 父进程；安装真实插件并调用，替换结果只证明原生就绪，不保证代理已经重新绑定。' : 'main.ts: Node parent; install and call the plugin. Replacement proves native readiness, not proxy rebinding.'}
-import process from 'node:process'
-import { fileURLToPath } from 'node:url'
-import { defineHost } from '@migaia/plugin-host'
-import { createEndpoint, connect, contract, ping } from '@migaia/rpc-core'
-import type { IRemoteContract } from '@migaia/rpc-core/remote'
-import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessPlugin, createProcessTransport, createNativeProcessOffer, type IProcessByteChannel, type IProcessPlugin } from '@migaia/rpc-process'
-
-${declarations}
-const host = defineHost<Record<string, never>, never, readonly [IProcessPlugin]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-const api: IMainApi = { parent: { prefix: (value) => 'main: ' + value } }
-const plugin = createProcessPlugin<INodeProcessHandle>({
-  name: 'service', contract: serviceContract,
-  registrationOwner: { name: 'service', host },
-  host: {
-    disable: (name, options) => host.plugin.disable(name, options),
-    enable: (name) => host.plugin.enable(name),
-    replace: (name, candidate) => host.replace(name, candidate)
-  },
-  endpointFactory: async (channel) => {
-    const [queue, log] = channel.features
-    const endpoint = await createEndpoint({
-      id: 'legacy-main', targetIds: [channel.peerId], transport: channel.transport, scheduler: channel.scheduler,
-      codec: channel.pipeline.codec, framer: channel.pipeline.framer,
-      features: [queue!, log!] as const,
-      provider: { 'parent.prefix': (context) => context.success(api.parent.prefix(context.data as Parameters<IMainApi['parent']['prefix']>[0])) },
-      middlewares: [connect({ transport: channel.transport }), contract({ version: '1.0.0' }), ping()]
-    })
-    return { endpoint }
-  },
-  deployment: {
-    kind: 'spawn', channelKind: 'byte', wire: 'native', token: 'legacy-demo',
-    offer: createNativeProcessOffer({ peer: { id: 'legacy-main', runtime: 'node' }, auth: 'legacy-demo', stream: false, capabilities: ['runtime-api@1'] }),
-    supervision: {
-      id: 'legacy-service', launcher: createNodeProcessLauncher(),
-      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),
-      scheduler: systemScheduler, isolation: 'best-effort', report: console.error,
-      spec: {
-        command: process.execPath, args: [...process.execArgv, fileURLToPath(new URL('./service.ts', import.meta.url))],
-        env: { inherit: ['PATH'], set: {} },
-        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
-      }
-    },
-    rawChannel: async (handle) => handle.channel!,
-    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {
-      role: 'initiator', offer: prepared.offer!, peerId: 'legacy-service', scheduler: prepared.scheduler,
-      signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report: console.error
-    })
-  },
-  report: console.error
-})
-try {
-  const [handle] = await host.use(plugin)
-  const math = handle.getFeature('math') as IServiceApi['math']
-  console.log(await math.double(21))
-  console.log(await plugin.replace({ strategy: 'stop-then-start' }))
-} finally {
-  await host.dispose()
-}`
-  return t(code(false), code(true))
-})()
 
 /** Doc of a `report(error)` callback member. */
 const reportMember: IMemberDoc = {
@@ -1808,7 +1692,10 @@ const processPeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   report: {
     ...reportMember,
-    default: t('`console.error`.', '`console.error`：输出到控制台。')
+    default: t(
+      '`defaultRpcReporter`, which reports through the default console path.',
+      '`defaultRpcReporter`，使用默认控制台报告路径。'
+    )
   },
   token: {
     summary: t(
@@ -1837,7 +1724,7 @@ const processPeerOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     },
     returns: t(
       'Verified principal string or its Promise; throw or rejection refuses the candidate.',
-      '返回已验证主体字符串或其承诺；抛错或拒绝会拒绝候选。'
+      '返回已验证主体字符串或其 Promise；抛错或拒绝会拒绝候选。'
     ),
     default: t('Not set: the `token` comparison is used.', '不设置：使用 `token` 比较。')
   },
@@ -1998,7 +1885,7 @@ const processResilienceOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   maxPayloadBytes: {
     summary: t('Largest payload accepted.', '可接受的最大参数字节数。'),
-    default: t('16 MiB.', '默认值为 16 MiB。')
+    default: t('`16777216` (16 MiB).', '默认值为 `16777216`（16 MiB）。')
   },
   maxConsecutiveTimeouts: {
     summary: t('Timeouts in a row that close the connection.', '连续超时达到该次数时关闭该连接。'),
@@ -2162,8 +2049,8 @@ const processResilienceDocs: Readonly<Record<string, IMemberDoc>> = {
       '终态清算是否通过现有宿主依赖拥有者同时移除依赖此登记的其他登记。'
     ),
     default: t(
-      'False: dependants are suspended instead of cascade removal.',
-      '默认假值，依赖方被挂起，不执行级联移除。'
+      '`false`: dependants are suspended instead of cascade removal.',
+      '默认 `false`，依赖方被挂起，不执行级联移除。'
     ),
     values: {
       true: t(
@@ -2412,22 +2299,27 @@ export const rpcProcessReference: ILibraryReference = {
   symbols: {
     createProcessPeer: {
       role: 'factory',
+      cases: rpcProcessCases.createProcessPeer,
+      exampleIntro: {
+        en: "Install this package plus its Core and Contract peers; run these complete ESM files with Node 24. `provide` is a tree of own enumerable method values; functions accept the payload and return portable data, while an async generator supplies a stream. Omitted `provide` publishes no application methods. `spawn: true` reexecutes the real entry and its script arguments; `isProcessChild()` prevents recursion. The short source selects a one-process budget, `isolation: 'best-effort'`, a random stdin token, `env: { inherit: ['PATH'], set: {} }`, and stdio `channel/channel/drain`. `defaultTimeoutMs` is `30000`. With named `listen`/`connect`, each client owns only its connection; `connectTimeoutMs` is `5000` and explicit addresses do not retry. The random name is fixture data; Node/POSIX same-user permissions do not distinguish applications of that user. Windows requires an explicit token.",
+        zh: "直接安装本包及 Core、Contract 两个 peer，以 Node 24 运行完整 ESM 文件。`provide` 是由自身可枚举方法组成的对象树；函数接收参数并返回可移植数据，异步生成器提供流；省略时不发布应用方法。`spawn: true` 重新执行真实入口及其程序参数，先用 `isProcessChild()` 防止递归启动。短来源默认使用容量 `1` 的进程预算、`isolation: 'best-effort'`、随机 stdin token、`env: { inherit: ['PATH'], set: {} }`，以及 `channel/channel/drain` 标准流。`defaultTimeoutMs` 默认 `30000`。命名 `listen`/`connect` 的客户端只拥有各自连接；`connectTimeoutMs` 默认 `5000`，显式地址不做此重试。随机名称仅为示例数据；Node/POSIX 同用户权限不区分该用户的不同应用，Windows 需要显式 token。"
+      },
       optionDocs: processPeerOptionMembers,
       purpose: t(
-        'Opens a Runtime Peer to another process. Choose exactly one source: `spawn` (start and own a child), `connect` (dial a running service) or `listen` (accept sessions). A child started by the library may omit the source to connect back. Resolves after the authenticated handshake.',
-        '打开一个与另一个进程通信的 Runtime Peer。三种来源必须且只能选择一种：`spawn`（启动并拥有子进程）、`connect`（连接运行中的服务）或 `listen`（接受会话）。由本库启动的子进程可以省略来源以连回父进程。配合 `isProcessChild` 判断子进程入口；独立服务需要先建立监听再连接。认证握手完成后 resolve。'
+        'Opens a Runtime Peer to another process. Choose one source: `spawn` starts and owns a child, `connect` dials a running service, and `listen` binds an accepting endpoint. A library-launched child may omit the source to connect back. Spawn/connect/child discovery resolves after readiness; listen resolves after binding, before any client must arrive.',
+        '打开与另一个进程通信的 Runtime Peer。必须选择一种来源：`spawn` 启动并拥有子进程，`connect` 连接运行中的服务，`listen` 绑定接纳入口。由本库启动的子进程可省略来源以连回父端，并用 `isProcessChild` 区分入口。启动、连接或子端发现流程就绪后返回；监听模式在绑定后返回，此时可以还没有客户端。'
       ),
       params: {
         options: t(
-          'See `IRuntimeProcessPeerOptions`: the source, `provide`, `report` (default `console.error`), `token`, `verify`, `connectTimeoutMs`, `defaultTimeoutMs` (default 30000) and the Core Peer options.',
-          '见 `IRuntimeProcessPeerOptions`：来源、`provide`、`report`（默认 `console.error`）、`token`、`verify`、`connectTimeoutMs`、`defaultTimeoutMs`（默认 30000）以及 Core Peer 的通用选项。'
+          'See `IRuntimeProcessPeerOptions`: source, `provide`, `report` (default `defaultRpcReporter`), `token`, `verify`, `connectTimeoutMs`, `defaultTimeoutMs` (default `30000`) and Core Peer options.',
+          '见 `IRuntimeProcessPeerOptions`：来源、`provide`、`report`（默认 `defaultRpcReporter`）、`token`、`verify`、`connectTimeoutMs`、`defaultTimeoutMs`（默认 `30000`）以及 Core Peer 的通用选项。'
         )
       },
       returns: t(
-        'An `IRuntimeTypedPeer<TRemote>`. `close()` stops accepting calls, lets accepted calls finish, closes the connection, and also stops a spawned child.',
-        '一个 `IRuntimeTypedPeer<TRemote>`。`close()` 停止接受新调用，等待已接受的调用完成后关闭连接；spawn 来源还会停止子进程。'
+        'An `IRuntimeTypedPeer<TRemote>`. `close()` stops new work and drains/closes under the owning runtime budget, normally `5000` ms narrowed by remaining stop time; it does not guarantee uncooperative calls finish. Spawn ownership also stops its child.',
+        '返回 `IRuntimeTypedPeer<TRemote>`。`close()` 停止新工作，按所属运行时预算排空并关闭；通常为 `5000` 毫秒，还会受剩余停止时间收窄，不保证所有在途调用都完成。启动型所有权还会停止其子进程。'
       ),
-      example: peerExample,
+      example: rpcProcessCases.createProcessPeer![0]!.example,
       scenarios: [
         t(
           'Isolate CPU-heavy or crash-prone work in a child process.',
@@ -2455,6 +2347,11 @@ export const rpcProcessReference: ILibraryReference = {
     },
     createProcessPlugin: {
       role: 'enhancer',
+      cases: rpcProcessCases.createProcessPlugin,
+      exampleIntro: {
+        en: "Install `@migaia/plugin-host` directly for the complete example. `name: 'service'` selects the Host outlet target; `spawn: true` uses the guarded child branch and publishes its `double` method. `provide` defaults to no methods and `expose` to an empty whitelist. `host.use(service)` installs the cold definition; `host.process.request(name, method, payload)` waits for a result, and `list()` reads all connections. `defineHost` requires both `host.execution.mutationTimeoutMs` and `pipelineDrainTimeoutMs`; this example explicitly sets each to `false` for no deadline. `host.dispose()` owns release. The advanced `IProcessPlugin.replace` member below has its own complete Node file; its explicit byte deployment writes a token bootstrap which the child reads before handshake.",
+        zh: "完整示例还需直接安装 `@migaia/plugin-host`。`name: 'service'` 是 Host 出口的目标名，`spawn: true` 使用已分支的子入口并发布 `double` 方法；`provide` 默认没有方法，`expose` 默认空白名单。`host.use(service)` 安装尚未启动的定义；`host.process.request(name, method, payload)` 等待结果，`list()` 查看全部连接。`defineHost` 必须明确提供 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs`；此例都设为 `false`，表示不设期限。`host.dispose()` 负责释放。下方高级 `IProcessPlugin.replace` 成员另有完整 Node 文件，其显式字节部署写入 token 启动前缀，由子端在握手前消费。"
+      },
       optionDocs: processPluginDocs,
       purpose: t(
         'Creates a plugin that installs one process connection into a PluginHost; the host owns it and gains `host.process`. The advanced overload takes a full `IProcessPluginOptions` remote-plugin deployment.',
@@ -2467,7 +2364,7 @@ export const rpcProcessReference: ILibraryReference = {
         )
       },
       returns: t('A plugin for `host.use()`.', '可传给 `host.use()` 的插件对象。'),
-      example: pluginExample
+      example: rpcProcessCases.createProcessPlugin![0]!.example
     },
     isProcessChild: {
       role: 'operation',
@@ -2480,6 +2377,8 @@ export const rpcProcessReference: ILibraryReference = {
     },
     createProcessResilience: {
       role: 'factory',
+      cases: rpcProcessCases.createProcessResilience,
+      exampleIntro: resilienceExampleSetup,
       optionDocs: processResilienceDocs,
       purpose: t(
         'Creates the governance owner for process connections: connection, call-rate and payload limits, idle and timeout handling, terminal diagnostics and liquidation. Pass it as `resilience` to plugins or listeners.',
@@ -2495,7 +2394,7 @@ export const rpcProcessReference: ILibraryReference = {
         'An `IProcessResilience`; bad limits throw `PROCESS_RESILIENCE_INVALID_OPTION`.',
         '一个 `IProcessResilience`；限制配置不合法时抛 `PROCESS_RESILIENCE_INVALID_OPTION`。'
       ),
-      example: registrationExample,
+      example: rpcProcessCases.createProcessResilience![1]!.example,
       scenarios: [
         t(
           'Protect a shared daemon from clients that open too many connections or send huge payloads.',
@@ -3149,8 +3048,8 @@ console.log(event)`
     },
     IProcessResilience: {
       summary: t(
-        'Governance owner returned by `createProcessResilience()`.',
-        '`createProcessResilience()` 返回的进程连接治理对象。'
+        'Governance owner returned by `createProcessResilience()`. ' + resilienceExampleSetup.en,
+        '`createProcessResilience()` 返回的进程连接治理对象。' + resilienceExampleSetup.zh
       ),
       scenarios: [
         t(
@@ -3167,11 +3066,12 @@ console.log(event)`
           ),
           params: {
             identity: t(
-              'Session identity from the accepted connection.',
-              '来自已接受连接的会话身份。'
+              '`{ connectionId, sessionId, principalId, processId? }`: accepted connection labels; principalId must be a nonempty verified principal. processId defaults to undefined. This method derives options and does not authenticate. The returned scope accepts { token, senderId }, but partitions by principalId under this governor.',
+              '`{ connectionId, sessionId, principalId, processId? }`：已接纳连接的标签；principalId 必须是非空已认证主体，processId 默认 undefined。此方法只派生配置，不完成认证。返回的范围回调接收 { token, senderId }，但在本治理对象内按 principalId 划分。'
             )
           },
-          returns: t('`{ idempotency, limits }`.', '`{ idempotency, limits }` 配置对象。')
+          returns: t('`{ idempotency, limits }`.', '`{ idempotency, limits }` 配置对象。'),
+          example: rpcProcessCases.createProcessResilience![0]!.example
         },
         listenRegistrations: {
           summary: t(
@@ -3197,18 +3097,31 @@ console.log(event)`
           ),
           params: {
             name: t('Registration name, the plugin `name`.', '登记名称，即插件的 `name`。'),
-            binding: t('Ownership, supervisor and health mode.', '所有权、监督器与健康检查方式。'),
-            liquidation: t('Who removes it when liquidated.', '被清算时由谁负责移除它。')
+            binding: t(
+              '`ownership` is spawn-owned or connection-borrowed; `health` is ping, custom or none; both are required. supervisor supplies restart(), inspect(), dispose() and onTerminal(listener). The example forwards methods to the original process supervisor.',
+              '`ownership` 必填，取 spawn-owned 或 connection-borrowed；`health` 必填，取 ping、custom 或 none。supervisor 提供 restart()、inspect()、dispose()、onTerminal(listener)，示例将方法转发给原始进程监督器。'
+            ),
+            liquidation: t(
+              'Required owner union: standalone-host supplies release(): Promise<void>; proxy-plugin supplies the same registration name and actual Host with unUse. It runs on liquidation, not ordinary registration.close().',
+              '必填所有者联合：standalone-host 提供 release(): Promise<void>；proxy-plugin 提供相同登记名及具有 unUse 的真实 Host。仅在清算时执行，普通 registration.close() 不调用它。'
+            )
           },
-          returns: t('An `IProcessRegistration`.', '一个登记对象 `IProcessRegistration`。')
+          returns: t('An `IProcessRegistration`.', '一个登记对象 `IProcessRegistration`。'),
+          example: rpcProcessCases.createProcessResilience![1]!.example
         },
         callGuard: {
           summary: t(
-            'Returns a check that can refuse remote calls when this registration is unhealthy or terminal, meaning it cannot recover under the current restart policy. Call guard.beforeDispatch() before each request, as shown above. Calls that bypass the guard do not receive this check.',
-            '返回远程调用前的检查对象。登记不健康，或进入 terminal、无法按当前重启规则恢复时，它可以拒绝调用。应像上方示例一样，在每次请求前调用 guard.beforeDispatch()；绕过它的调用不会执行这项检查。'
+            'Returns a stable check for this registration: terminal state refuses new calls, and liquidation keeps refusing them through the retained diagnostic record. Run guard.beforeDispatch() before each dispatch; bypassing it skips this check. Terminal is not permanent disposal and can still admit an explicit restart.',
+            '返回此登记的稳定检查对象：终态拒绝新调用，清算后保留的诊断记录仍继续拒绝。每次派发前执行 `guard.beforeDispatch()`，绕过它就不会检查。终态不等于永久释放，仍可显式重启。'
           ),
-          params: { name: t('Registration name.', '要守卫的登记名称。') },
-          returns: t('A remote call guard.', '远程调用守卫对象。')
+          params: {
+            name: t(
+              'Registration name. Invoke `beforeDispatch({ method, mode, generation })` before work: method is the remote path, generation is the actual supervisor generation, and mode is request, one-way, generator, async-generator or host-control; the example uses request.',
+              '要守卫的登记名称。在发送前调用 `beforeDispatch({ method, mode, generation })`：method 为远程路径，generation 使用真实监督器代次；mode 可取 request、one-way、generator、async-generator 或 host-control，示例使用 request。'
+            )
+          },
+          returns: t('A remote call guard.', '远程调用守卫对象。'),
+          example: rpcProcessCases.createProcessResilience![1]!.example
         },
         inspect: {
           summary: t(
@@ -3219,15 +3132,22 @@ console.log(event)`
           returns: t(
             'An `IProcessResilienceSnapshot`, or `undefined`.',
             '一个快照 `IProcessResilienceSnapshot`；未知 id 时为 `undefined`。'
-          )
+          ),
+          example: rpcProcessCases.createProcessResilience![1]!.example
         },
         onTerminal: {
           summary: t(
-            'Subscribes to registrations entering terminal, the state where the current restart policy can no longer recover the process. The listener receives the registration snapshot so the application can respond. The returned function removes the subscription; call it during cleanup as shown above.',
-            '订阅登记进入 terminal 的事件。该状态表示当前重启规则已无法恢复进程。监听器收到登记快照后，应用可以作出处理。返回的函数用于解除订阅，应像上方示例一样在清理时调用。'
+            'Subscribes to terminal entries reported by the actual supervisor and receives the registration snapshot. This observes the current terminal state rather than declaring the process permanently unrecoverable. The returned function removes this observer; call it during cleanup.',
+            '订阅真实监督器报告的终态进入事件，并接收登记快照。这只观察当前终态，不表示进程永久无法恢复。返回函数用于移除此观察回调，清理时应主动调用。'
           ),
-          params: { listener: t('Receives the snapshot.', '接收登记快照的监听函数。') },
-          returns: t('An unsubscribe function.', '取消订阅的函数。')
+          params: {
+            listener: t(
+              'Receives a registration snapshot and returns void or Promise<void>; one fulfilled handler marks this report handled and stops subsequent ticks. Rejection is reported. The returned unsubscribe is separate from closing governance.',
+              '接收登记快照，返回 void 或 Promise<void>；任一回调成功完成即处理该报告，停止后续计时上报。拒绝会被报告。返回的退订函数与治理对象关闭分别管理。'
+            )
+          },
+          returns: t('An unsubscribe function.', '取消订阅的函数。'),
+          example: rpcProcessCases.createProcessResilience![1]!.example
         },
         close: {
           summary: t(
@@ -3237,7 +3157,8 @@ console.log(event)`
           returns: t(
             'Resolves after owned governance resources close; it does not dispose caller-owned endpoints or supervisors.',
             '治理资源关闭后完成，不会代替调用方释放端点或监督器。'
-          )
+          ),
+          example: rpcProcessCases.createProcessResilience![1]!.example
         }
       }
     },
@@ -3447,11 +3368,17 @@ console.log(event)`
             'Replaces the child process while the Host keeps running. Choose stop-then-start to stop the old child before starting its replacement, or start-then-switch to start the replacement before switching over. The complete deployment example above demonstrates replacement; inspect the returned strategy and outcome.',
             '在 Host 继续运行时替换子进程。stop-then-start 表示先停止旧子进程，再启动新进程；start-then-switch 表示先启动替代进程，再切换过去。上方完整部署示例展示了替换操作，调用后应检查返回的策略和结果。'
           ),
-          params: { options: t('`{ spec?, strategy? }`.', '替换选项 `{ spec?, strategy? }`。') },
+          params: {
+            options: t(
+              '`{ spec?, strategy? }`, default {}. strategy defaults to stop-then-start; start-then-switch requires the real Host replace port and capacity for overlapping processes. Omitted spec reuses the deployment spec. Explicit spec includes command, args, env.inherit/set, stdio.stdin/stdout/stderr and the same token bootstrap; optional cwd/limits/permissions remain under supervision. Only the installed current definition may replace.',
+              '`{ spec?, strategy? }` 默认 {}。strategy 默认 stop-then-start；start-then-switch 需要真实 Host 的 replace 端口及允许进程重叠的容量。省略 spec 沿用部署规格；显式规格须完整提供 command、args、env.inherit/set、stdio.stdin/stdout/stderr 和相同 token 启动前缀，可选 cwd/limits/permissions 由监督层处理。只有当前已安装定义能够替换。'
+            )
+          },
           returns: t(
-            'The strategy used and its outcome or new plugin.',
-            '采用的策略，以及替换结果或新插件。'
-          )
+            'stop-then-start returns { strategy, outcome }, with outcome.kind replaced, rejected or failed; start-then-switch returns { strategy, plugin } after Host replacement. This complete Node file prints 42, stop-then-start and replaced: it proves native replacement readiness, not automatic proxy rebinding. The advanced facade takes an argument array [21], unlike typed Peer.request with a scalar payload.',
+            'stop-then-start 返回 { strategy, outcome }，outcome.kind 取 replaced、rejected 或 failed；start-then-switch 在 Host 替换后返回 { strategy, plugin }。完整 Node 文件输出 42、stop-then-start、replaced，只证明原生替换就绪，不证明代理自动重新绑定。高级 facade 接收参数数组 [21]，不同于 typed Peer.request 的标量载荷。'
+          ),
+          example: legacyReplaceExample
         }
       }
     },

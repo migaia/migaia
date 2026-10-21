@@ -5,6 +5,7 @@
  * package prose remains stale.
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
+import { storeKeyedCases } from './store-keyed-cases.js'
 
 /** Creates one bilingual sentence pair. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -382,6 +383,10 @@ store.dispose()`
     ),
     params: {
       definition: definitionParam,
+      update: t(
+        'For a source definition (`atomDef`, `atomDefFactory`): the new value, or a function receiving the previous value and returning the next one. The function runs synchronously and its throw propagates.',
+        '写源定义（`atomDef`、`atomDefFactory`）时传入：新值，或者接收旧值、返回新值的函数。函数同步执行，抛出的错误原样向外传播。'
+      ),
       args: t(
         'Primitive: one value or synchronous previous-to-next callback, with throws propagated. Writable-derived: the Args declared by writableDef, forwarded unchanged.',
         '基础定义接收一个新值或同步旧值转新值回调，抛错传播，可写派生接收定义声明的精确参数并原样转发。'
@@ -748,8 +753,8 @@ assertNotThenable({ count: 1 }, 'initial state')`
     createAtomStore: {
       role: 'factory',
       purpose: t(
-        'Creates an independent definition instance table inside one reactive Runtime. Pair with atomDef or derivedDef to materialize state lazily; instances are strongly retained until release or store disposal, rather than collected when a token leaves a family cache.',
-        '在一个响应运行时内创建独立定义实例表，搭配 `atomDef` 或 `derivedDef` 惰性实例化状态，实例强保留到单独释放或存储销毁，不因令牌离开族缓存而回收。'
+        'Creates a store: a scope that keeps its own value for every definition it reads. Definitions (`atomDef`, `derivedDef`, ...) hold no value, so the same definitions give separate values in each store, for example one store per server request or per test. A value is created the first time its definition is read and kept until `release(definition)` or `dispose()`.',
+        '创建一个 store：为它读到的每个定义各保存一份值的作用域。定义（`atomDef`、`derivedDef` 等）本身不保存值，所以同一批定义在每个 store 里各有一份值，例如每个服务端请求或每个测试用一个 store。某个定义第一次被读取时才创建它的值，一直保留到 `release(definition)` 或 `dispose()`。'
       ),
       params: {
         runtime: t(
@@ -761,7 +766,8 @@ assertNotThenable({ count: 1 }, 'initial state')`
         'Caller-owned IAtomStore; dispose it to release its subscriptions and instantiated graph nodes.',
         '返回调用者拥有的原子存储，销毁以释放订阅与已实例化图节点。'
       ),
-      example: storeExample
+      example: storeExample,
+      cases: storeKeyedCases.createAtomStore
     },
     defaultAtomStore: {
       role: 'factory',
@@ -834,8 +840,8 @@ store.dispose()`
     focusDef: {
       role: 'factory',
       purpose: t(
-        'Creates a typed writable lens for one through three property segments. Pair with createAtomStore to update immutable nested state; reads and writes reject inaccessible intermediate containers and writes treat __proto__ as an own data field.',
-        '为一至三个属性段创建类型化可写透镜，搭配 `createAtomStore` 更新不可变嵌套状态，读写拒绝不可达中间容器，原型特殊键按自有数据字段写入。'
+        'Defines one field of a writable definition, one to three keys deep. Reading it subscribes only to that field, so readers are not notified when other fields change; writing it produces a new source object with the field replaced, without hand-written immutable updates. A missing intermediate object throws instead of returning `undefined`.',
+        '定义一个可写定义里的某个字段，路径一到三层。读取它只订阅这个字段，其他字段变化时读取方不会收到通知；写入它会生成替换了该字段的新源对象，不用手写不可变更新。路径中间的对象不存在时会抛错，而不是返回 `undefined`。'
       ),
       params: {
         source: t(
@@ -859,13 +865,14 @@ store.dispose()`
         'Writable-derived focused token. Empty runtime paths or inaccessible segments use INVALID_OPTION; unclassified accessor failures use OPTIC_ACCESS_FAILED, retaining original native identity or cause, while existing foreign identities stay unchanged.',
         '返回焦点可写派生令牌，运行时空路径或不可达段使用 `INVALID_OPTION`，未分类访问器失败使用 `OPTIC_ACCESS_FAILED`，保留原生身份或原始原因，已有外包身份不变。'
       ),
-      example: opticsExample
+      example: opticsExample,
+      cases: storeKeyedCases.focusDef
     },
     splitDef: {
       role: 'factory',
       purpose: t(
-        'Splits an array definition into stable per-key writable item tokens and a derived token list. Pair with createAtomStore for source reads and writes; source reordering keeps token identity for unchanged keys. Create focusDef and splitDef tokens outside derived callbacks, then reuse them across recalculations.',
-        '把数组定义拆为稳定逐键可写条目令牌及派生令牌列表，搭配 `createAtomStore` 读写源，源重排时未变键保持令牌身份；在派生回调外创建焦点和拆分令牌，并跨重算复用。'
+        'Splits a writable array definition into one writable definition per key (`of(key)`) plus `items`, the list of those definitions in current order. Each row can read and write its own item and is notified only when that item changes; reordering keeps the same definition for the same key. Create it once at module level, not inside a derived callback.',
+        '把一个可写数组定义按 key 拆成逐项的可写定义（`of(key)`），另有 `items` 按当前顺序列出这些定义。每一行只读写自己那一项，只在这一项变化时收到通知；重新排序时同一个 key 仍是同一个定义。在模块顶层创建一次，不要放在派生回调里创建。'
       ),
       params: {
         source: t(
@@ -881,13 +888,14 @@ store.dispose()`
         'ISplitDefinition with cached of(key), derived items and insert/remove/prune operations. Missing item access or duplicate keys use INVALID_OPTION; prune does not release store instances.',
         '返回含缓存逐键定义、派生条目及插入删除裁剪操作的拆分对象，缺失条目访问或重复键使用 `INVALID_OPTION`，裁剪不释放存储实例。'
       ),
-      example: opticsExample
+      example: opticsExample,
+      cases: storeKeyedCases.splitDef
     },
     familyDef: {
       role: 'factory',
       purpose: t(
-        'Creates a callable keyed family of source factory definitions with bounded strong LRU retention and weak canonical identity in a strong-key Map with weak definition values, not a WeakMap. Pair with createAtomStore for independent scoped values; forgetting identity never disposes existing state.',
-        '创建可调用源工厂定义族，具有有界强最近使用保留，规范表使用强键映射与弱定义值，搭配 `createAtomStore` 获得独立作用域值，遗忘身份不销毁已有状态。'
+        'Creates a function from key to source definition, for state per chat, channel or document id. The same key always returns the same definition, and each store keeps its own value for it. At most `maxSize` definitions are held strongly; older ones are held weakly and still found while something uses them. `forget(key)` drops a key without releasing values already created in stores.',
+        '创建一个“key → 源定义”的函数，用于每个对话、频道或文档 id 各一份状态。同一个 key 永远返回同一个定义，每个 store 为它保存自己的值。最多强引用 `maxSize` 个定义，更早的改为弱引用，只要还有地方在用就仍能找到。`forget(key)` 删除一个 key，但不会释放 store 里已经创建的值。'
       ),
       params: {
         initial: t(
@@ -900,7 +908,8 @@ store.dispose()`
         'IFamilyDef callable: family(key) returns a writable source-factory token with previewSafe false; size/forget/clear control token caches. Missing WeakRef or FinalizationRegistry uses ENV_UNSUPPORTED.',
         '返回可调用族，传键取得预览不安全可写源工厂令牌，大小、遗忘及清空控制令牌缓存，缺少弱引用或终结注册能力使用 `ENV_UNSUPPORTED`。'
       ),
-      example: familyExample
+      example: familyExample,
+      cases: storeKeyedCases.familyDef
     },
     derivedFamilyDef: {
       role: 'factory',
@@ -1322,8 +1331,8 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
     ),
     IAtomStore: {
       summary: t(
-        'Caller-owned scoped definition instance table returned by createAtomStore or defaultAtomStore; separates shared token identity from per-store state and explicit lifecycle.',
-        '存储工厂返回的调用者作用域定义实例表，分离共享令牌身份、每存储状态及显式生命周期。'
+        'A store returned by `createAtomStore` or `defaultAtomStore`: it keeps one value per definition, and its caller decides when to dispose it.',
+        '由 `createAtomStore` 或 `defaultAtomStore` 返回的 store：为每个定义保存一份值，何时释放由调用方决定。'
       ),
       scenarios: [
         t(

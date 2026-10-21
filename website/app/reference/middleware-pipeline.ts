@@ -4,6 +4,7 @@
  * state-constants.ts, error-code.ts) and README on 2026-10-18.
  */
 import type { ILibraryReference, IText } from './contract.js'
+import { middlewarePipelineCases } from './middleware-pipeline-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -25,50 +26,7 @@ const pipelineScenarios = [
 ]
 
 /** End-to-end example of a pipeline instance. */
-const pipelineExample = {
-  en: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-
-type IRequest = { readonly url: string; headers: Record<string, string> }
-const pipeline = createPipeline<IRequest>({ mode: MiddlewarePipelineMode.async })
-
-// A sync stage reused in the async pipeline.
-const auth = pipeline.lift((request, next) => {
-  request.headers.authorization = 'Bearer token'
-  next(request)
-}, MiddlewarePipelineMode.sync)
-
-// Onion stage: code after await next() runs after downstream finished.
-const timing = async (request: IRequest, next: (value: IRequest) => Promise<void>) => {
-  const started = performance.now()
-  await next(request)
-  console.log(request.url, performance.now() - started, 'ms')
-}
-
-await pipeline.run([auth, timing], { url: '/api/users', headers: {} }, async (request) => {
-  await fetch(request.url, { headers: request.headers })
-})`,
-  zh: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-
-type IRequest = { readonly url: string; headers: Record<string, string> }
-const pipeline = createPipeline<IRequest>({ mode: MiddlewarePipelineMode.async })
-
-// 把同步步骤提升后放进异步 pipeline 复用
-const auth = pipeline.lift((request, next) => {
-  request.headers.authorization = 'Bearer token'
-  next(request)
-}, MiddlewarePipelineMode.sync)
-
-// 洋葱步骤：await next() 之后的代码在下游全部完成后执行
-const timing = async (request: IRequest, next: (value: IRequest) => Promise<void>) => {
-  const started = performance.now()
-  await next(request)
-  console.log(request.url, performance.now() - started, 'ms')
-}
-
-await pipeline.run([auth, timing], { url: '/api/users', headers: {} }, async (request) => {
-  await fetch(request.url, { headers: request.headers })
-})`
-}
+const pipelineExample = middlewarePipelineCases.createPipeline[2].example
 
 /** Reference of `@migaia/middleware-pipeline`. */
 export const middlewarePipelineReference: ILibraryReference = {
@@ -96,24 +54,12 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
         '返回所选模式及 `TSignals` 控制域的 `IMiddlewarePipeline`，控制信号不扩张 `TValue` 载荷。选项只读取一次并冻结；非法值或读取失败抛 `TypeError/INVALID_OPTION`，读取原错保留在原因上。'
       ),
       options: 'ICreatePipelineOptions',
-      example: {
-        en: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
-pipeline.run(
-  [(value, next) => next(value + 1), (value, next) => next(value * 2)],
-  2,
-  (result) => console.log(result) // 6
-)`,
-        zh: `import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
-pipeline.run(
-  [(value, next) => next(value + 1), (value, next) => next(value * 2)],
-  2,
-  (result) => console.log(result) // 输出 6
-)`
-      },
+      exampleIntro: t(
+        '`mode` is required and has four values: `sync`, `async`, `generator`, and `async-generator`. The examples call `run(stages, value, done, control?)`: stages receive the current value; `done` receives the final value. `control.signal` overrides the optional construction-time signal and otherwise defaults to it. An effective signal is exposed as `context.signal`; without one, no context is passed.',
+        '`mode` 必填，四个取值是 `sync`、`async`、`generator`、`async-generator`。示例调用 `run(stages, value, done, control?)`：步骤接收当前值，`done` 接收最终值。可选的 `control.signal` 覆盖构造时的信号，未提供时默认使用构造信号；两处都未提供则没有取消信号。有效信号通过 `context.signal` 传给步骤，没有信号时不传上下文。'
+      ),
+      cases: middlewarePipelineCases.createPipeline,
+      example: middlewarePipelineCases.createPipeline[0].example,
       scenarios: pipelineScenarios,
       avoid: [
         t(
@@ -139,11 +85,12 @@ pipeline.run(
         'Return it from a generator stage to stop the whole pipeline; later stages and the final callback do not run.',
         '在生成器步骤中 `return` 它，表示终止整条 pipeline：后续步骤与终点回调都不再执行。'
       ),
-      example: `function* (value) {
-  if (!value.valid) return GENERATOR_HALT
-  yield value
-  return GENERATOR_CONTINUE
-}`
+      exampleIntro: t(
+        'Control symbols are return values interpreted by generator modes. `createPipeline` requires `mode`: `sync`, `async`, `generator`, or `async-generator`; this example selects `generator`. `run(stages, value, done)` starts with -1. Each generator returns a new value or a control symbol; returning the default halt symbol skips both the remaining stages and `done`.',
+        '控制符是生成器模式用来决定下一步的返回值。`createPipeline` 的必填 `mode` 可选 `sync`、`async`、`generator`、`async-generator`，示例使用 `generator`。`run(stages, value, done)` 从 -1 开始；每个生成器返回新值或控制符，返回默认停止符时跳过其余步骤和 `done`。'
+      ),
+      cases: middlewarePipelineCases.GENERATOR_HALT,
+      example: middlewarePipelineCases.GENERATOR_HALT[0].example
     },
     GENERATOR_UNDEFINED: {
       role: 'constant',
@@ -151,9 +98,12 @@ pipeline.run(
         'Return it from a generator stage when `undefined` itself is the intended final value (a plain `return undefined` cannot be told apart from returning nothing).',
         '当 `undefined` 本身就是想要的结果时，在生成器步骤中 `return` 它（直接 `return undefined` 无法与“没有返回值”区分）。'
       ),
-      example: `function* () {
-  return GENERATOR_UNDEFINED // 下游收到 undefined
-}`
+      exampleIntro: t(
+        '`createPipeline<string | undefined>` explicitly allows an undefined payload. Its required `mode` accepts `sync`, `async`, `generator`, and `async-generator`; the example uses `generator`. Each `run(stages, value, done)` starts with a cached string. Plain `undefined` stops; the default explicit-undefined control symbol instead calls `done(undefined)`.',
+        '`createPipeline<string | undefined>` 显式允许载荷为空值。必填 `mode` 可选 `sync`、`async`、`generator`、`async-generator`，示例使用 `generator`。每次 `run(stages, value, done)` 从缓存字符串开始：普通 `undefined` 表示停止，默认显式空值控制符则让 `done(undefined)` 被调用。'
+      ),
+      cases: middlewarePipelineCases.GENERATOR_UNDEFINED,
+      example: middlewarePipelineCases.GENERATOR_UNDEFINED[0].example
     },
     MIDDLEWARE_PIPELINE_SOURCE: {
       role: 'error',
@@ -238,12 +188,12 @@ pipeline.run(
             'Reuse simple sync stages (trim, validate, tag) in async or generator pipelines.',
             '在异步或生成器 pipeline 中复用简单的同步步骤（去空白、校验、打标签）。'
           ),
-          example: `const trim = pipeline.lift((value, next) => next(value.trim()), MiddlewarePipelineMode.sync)`
+          example: middlewarePipelineCases.createPipeline[2].example
         },
         run: {
           summary: t(
-            'Runs `stages` in order on `value`. Each stage continues by calling `next(value)`; a stage that does not continue stops the run. After the last stage, `done(value)` receives the final value. In `sync` mode `next()` only hands the value over and downstream starts after the stage returns; in `async` mode `next()` starts downstream immediately and returns its Promise (onion model).',
-            '按顺序对 `value` 执行 `stages`。步骤调用 `next(value)` 继续，不调用则结束本次运行；最后一个步骤之后，`done(value)` 收到最终值。`sync` 模式下 `next()` 只提交值，步骤返回后下游才开始；`async` 模式下 `next()` 立即启动下游并返回其 Promise（洋葱模型）。'
+            'Runs `stages` in order on `value`. Sync and async stages call `next(value)` to continue; omitting it stops the run. Generator modes continue or stop according to the final return value or control symbol; yielding alone does not advance downstream. After the last stage, `done(value)` receives the final value. In `sync` mode `next()` only hands the value over and downstream starts after the stage returns; in `async` mode `next()` starts downstream immediately and returns its Promise (onion model).',
+            '按顺序对 `value` 执行 `stages`。同步和异步步骤调用 `next(value)` 继续，不调用则结束本次运行。生成器模式由最终返回值或控制符决定继续或停止，单次 `yield` 不会推进下游。最后一个步骤之后，`done(value)` 收到最终值。`sync` 模式下 `next()` 只提交值，步骤返回后下游才开始；`async` 模式下 `next()` 立即启动下游并返回其 Promise（洋葱模型）。'
           ),
           params: {
             stages: t(
@@ -256,16 +206,15 @@ pipeline.run(
               '终点回调；步骤中途停止或生成器返回 `GENERATOR_HALT` 时不会调用。'
             ),
             control: t(
-              '`signal` for this run; it overrides the creation-time signal and is visible to stages as `context.signal`.',
-              '本次运行的 `signal`，优先于创建时的 `signal`，步骤通过 `context.signal` 读取。'
+              'Optional `{ signal }` for this run. `control.signal` defaults to the construction-time signal when omitted; with neither, no signal or context is supplied. A supplied run signal overrides the construction signal and is visible as `context.signal`.',
+              '可选的本次运行控制对象 `{ signal }`。`control.signal` 未提供时默认使用构造信号；两处都未提供则没有信号，也不传上下文。提供本次信号时覆盖构造信号，步骤通过 `context.signal` 读取。'
             )
           },
           returns: t(
             '`void` in sync/generator and Promise<void> in async/async-generator. Error cancellation reasons retain native identity when writable; unclassified reasons receive ABORTED, foreign identities stay unchanged, and primitive or undefined reasons use ordinary Error with cause. Every async outer stage checks activity after returning, even after done; rejection does not undo done.',
             '`sync/generator` 返回 `void`，`async/async-generator` 返回 `Promise<void>`。取消原因为可写原生错误时保留身份，未分类原因附 `ABORTED`，外包身份不改写，原始值或 `undefined` 使用带原因的普通 `Error`。异步外层步骤返回后即使终点已执行仍复核存活；拒绝不撤销终点副作用。'
           ),
-          example: `const controller = new AbortController()
-await pipeline.run(stages, input, async (result) => save(result), { signal: controller.signal })`
+          example: middlewarePipelineCases.createPipeline[3].example
         }
       }
     },
@@ -424,75 +373,17 @@ pipeline.run([halt], 1, () => { console.log('not reached') })`
     },
     IMiddlewarePipelineStage: {
       summary: t(
-        'The stage type selected from all four mode mappings; TSignals keeps generator controls separate from TValue and defaults to the exported unique-symbol signal set.',
-        '从四种模式映射选出步骤类型；`TSignals` 将生成器控制域与 `TValue` 载荷分离，默认使用导出的精确唯一符号信号组。'
+        'Stage function type selected by `TMode`. `sync` selects `ISyncMiddlewareStage`; `async` selects `IAsyncMiddlewareStage`; `generator` selects `IGeneratorMiddlewareStage`; `async-generator` selects `IAsyncGeneratorMiddlewareStage`. `TSignals` keeps generator controls separate from `TValue` and defaults to the exported unique-symbol signal set.',
+        '由 `TMode` 选择出的步骤函数类型。`sync` 选择 `ISyncMiddlewareStage`，`async` 选择 `IAsyncMiddlewareStage`，`generator` 选择 `IGeneratorMiddlewareStage`，`async-generator` 选择 `IAsyncGeneratorMiddlewareStage`。`TSignals` 将生成器控制符与 `TValue` 载荷分开，默认使用导出的唯一符号信号组。'
       ),
-      members: {
-        sync: {
-          summary: t(
-            'Stage type of `sync` mode: `ISyncMiddlewareStage`.',
-            '`sync` 模式下步骤函数的类型，即 `ISyncMiddlewareStage`。'
-          )
-        },
-        async: {
-          summary: t(
-            'Stage type of `async` mode: `IAsyncMiddlewareStage`.',
-            '`async` 模式下步骤函数的类型，即 `IAsyncMiddlewareStage`。'
-          )
-        },
-        generator: {
-          summary: t(
-            'Stage type of `generator` mode: `IGeneratorMiddlewareStage`.',
-            '`generator` 模式下步骤函数的类型，即 `IGeneratorMiddlewareStage`。'
-          )
-        },
-        'async-generator': {
-          summary: t(
-            'The async-generator mapping selects IAsyncGeneratorMiddlewareStage<TValue, TSignals>, preserving the custom control domain.',
-            '异步生成器映射选择 `IAsyncGeneratorMiddlewareStage<TValue, TSignals>`，保留自定义控制域。'
-          )
-        }
-      }
+      members: {}
     },
     IMiddlewarePipelineLiftSource: {
       summary: t(
-        'Modes that `lift()` accepts as the source for each target mode.',
-        '每种目标模式下 `lift()` 允许的来源模式。'
+        'Source-mode string union accepted by `lift()` for the selected target. Target `sync` accepts only `sync`; target `async` accepts `sync` or `async`; target `generator` accepts `sync` or `generator`; target `async-generator` accepts `sync`, `generator`, or `async-generator`. Same-mode stages are used unchanged. Lifted sync stages retain sync ordering; async onion stages cannot be lifted into async-generator mode.',
+        '由目标模式选出的 `lift()` 来源模式字符串联合类型。目标 `sync` 只接受 `sync`；目标 `async` 接受 `sync` 或 `async`；目标 `generator` 接受 `sync` 或 `generator`；目标 `async-generator` 接受 `sync`、`generator` 或 `async-generator`。同模式步骤原样使用；提升后的同步步骤保留同步顺序，异步洋葱步骤不能提升到异步生成器模式。'
       ),
-      members: {
-        sync: {
-          summary: t(
-            'Target `sync`: only `sync` stages can be used.',
-            '目标模式为 `sync` 时：只能使用 `sync` 步骤，无需提升。'
-          )
-        },
-        async: {
-          summary: t(
-            'Target `async`: `sync` or `async` stages.',
-            '目标模式为 `async` 时：可以使用 `sync` 或 `async` 步骤。'
-          ),
-          values: {
-            sync: t('Lifted; keeps sync ordering.', '会被提升，仍保持同步步骤的执行顺序。'),
-            async: t('Used as is.', '原样使用，无需转换。')
-          }
-        },
-        generator: {
-          summary: t(
-            'Target `generator`: `sync` or `generator` stages.',
-            '目标模式为 `generator` 时：可以使用 `sync` 或 `generator` 步骤。'
-          ),
-          values: {
-            sync: t('Lifted into a generator stage.', '会被提升为生成器步骤。'),
-            generator: t('Used as is.', '原样使用，无需转换。')
-          }
-        },
-        'async-generator': {
-          summary: t(
-            'Target async-generator supports sync, generator and async-generator stages; async onion stages cannot be lifted into it.',
-            '异步生成器目标支持同步、生成器及异步生成器步骤，不能提升异步洋葱步骤。'
-          )
-        }
-      }
+      members: {}
     },
     IMiddlewarePipelineDone: {
       summary: t(

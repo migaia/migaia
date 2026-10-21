@@ -8,6 +8,7 @@
 import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityReference } from './capability.js'
 import { runtimeSharedTypes } from './rpc-runtime-shared.js'
+import { trayCases } from './tray-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -134,48 +135,10 @@ await host.unUse('provider') // 'late' 变为 blocked`
 }
 
 /** Runtime example shared by `createRuntime` and `IRuntime`. */
-const runtimeExample: ICode = {
-  en: `import { createRuntime } from '@migaia/tray/runtime'
-
-const result = await host.use(searchPlugin)
-if (!result.ok) throw result.error
-const runtime = createRuntime(result.view)
-const hits = await runtime.run('search', { timeoutMs: 5000 }, async ({ extensions, signal }) =>
-  extensions.search('tray', { signal })
-)
-const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())
-await ticket.completion // the plugin is removed after the callback settled
-await runtime.dispose()`,
-  zh: `import { createRuntime } from '@migaia/tray/runtime'
-
-const result = await host.use(searchPlugin)
-if (!result.ok) throw result.error
-const runtime = createRuntime(result.view)
-const hits = await runtime.run('search', { timeoutMs: 5000 }, async ({ extensions, signal }) =>
-  extensions.search('tray', { signal })
-)
-const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())
-await ticket.completion // callback 结束后插件才被移除
-await runtime.dispose()`
-}
+const runtimeExample: ICode = trayCases.createRuntime![0]!.example
 
 /** Loader example shared by the loader symbols. */
-const loaderExample = `import { defineAdapter } from '@migaia/tray/adapter'
-import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
-
-const moduleLoader = defineLoader<string, { plugin: typeof searchPlugin }>({
-  load: async (url) => ({ value: await import(url), release: { force: () => undefined } })
-})
-const moduleAdapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin }) => artifact.plugin })
-const result = await loadIntoHost({
-  host,
-  source: './plugins/search.js',
-  loader: moduleLoader,
-  adapter: moduleAdapter,
-  mutation: 'use',
-  timeoutMs: 10_000
-})
-if (!result.ok) console.error(result.error)`
+const loaderExample: ICode = trayCases.loadIntoHost![0]!.example
 
 /** Fields shared by instance snapshots (`ITrayInstanceInfo` and its extensions). */
 const infoMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -190,8 +153,8 @@ const infoMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   config: {
     summary: t(
-      'Configuration of the current generation: the output of the host `config` validator, or the raw spawn input without one.',
-      '当前 generation 的配置：host 的 `config` 校验函数的输出；没有校验函数时为 spawn 时传入的原始值。'
+      'Inside plugins(instance) and the child client self(), config is the validator output, or the input without a validator. Parent list/get snapshots instead retain the portable spawn/replace input; they do not publish the transformed child value.',
+      '在 `plugins(instance)` 与子端客户端 `self()` 中，`config` 是校验函数输出，没有校验器时使用输入；父端 `list()`、`get()` 快照保留可移植的 spawn/replace 输入，不发布子端转换后的值。'
     )
   },
   generation: {
@@ -792,7 +755,12 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
         'An `ITrayGraph`; invalid entries throw `TRAY_INVALID_ENTRY`, duplicate keys `TRAY_DUPLICATE_ENTRY`.',
         '一个 `ITrayGraph`；条目不合法时抛 `TRAY_INVALID_ENTRY`，key 重复时抛 `TRAY_DUPLICATE_ENTRY`。'
       ),
-      example: graphExample,
+      exampleIntro: {
+        en: 'Run the complete .ts file with Node 24. Each entry requires a non-empty unique branded key, kind and start. kind accepts value, computed, resource or service and does not make the payload reactive. requires defaults to undefined and normalizes to an empty dependency list; readiness defaults to undefined, so no external gate is applied. start returns a value and a required release callback. context.get(key) reads a declared provider. ready starts the graph; get is unavailable before readiness and after disposal.\n\nReadiness snapshots require state and error: state is ready, blocked or failed; error may be undefined. The second example returns a fresh snapshot from a getter only when the caller explicitly retries a blocked gate. Failed or invalid gates cache their Promise. The local Error values are example failure reasons, not a new error-code API. There is no automatic timeout or retry loop.',
+        zh: '完整 `.ts` 文件用 Node 24 运行。每项必填非空、唯一的品牌键 `key`、`kind` 与 `start`；`kind` 接受 `value`、`computed`、`resource`、`service`，不让载荷自动变成响应式值。`requires` 默认 `undefined`，内部归一为空依赖列表；`readiness` 默认 `undefined`，不设置外部就绪门。`start` 必须返回 `value` 与可调用的 `release`；`context.get(key)` 读取已声明的提供者。`ready()` 启动，未就绪和释放后都不能通过 `get()` 读取值。\n\n就绪快照包含 `state` 与 `error`：`state` 为 `ready`、`blocked` 或 `failed`，`error` 可以是 `undefined`。第二例通过 getter 提供新快照，只有调用者显式重试 `blocked` 才重新读取；`failed` 或非法就绪门缓存原 Promise。本地 Error 是示例失败原因，不是新增错误码接口；没有自动超时或后台重试。'
+      },
+      cases: trayCases.createTrayGraph,
+      example: trayCases.createTrayGraph![0]!.example,
       scenarios: [
         t(
           'Application composition root: config, database pool and API client started in order and closed in reverse.',
@@ -1018,15 +986,20 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     createHost: {
       role: 'factory',
       purpose: t(
-        'Creates a managed host around one PluginHost built by `create()`. Plugins are admitted, ordered by Feature dependencies and installed before resolution. Rollback releases only the claim acquired by this call; rejecting an already claimed host leaves its existing managed session intact.',
-        '围绕由 `create()` 构建的一个 PluginHost 创建托管宿主。插件在返回前完成接纳、按 Feature 依赖排序并安装。回滚只释放本次取得的认领；拒绝已被认领的宿主不会清理其既有托管会话。'
+        'Creates a managed host around one PluginHost built by `create()`. Definitions are admitted and ready plugins install in Feature dependency order before resolution; missing required providers keep their consumers blocked. Rollback releases only the claim acquired by this call; rejecting an already claimed host leaves its existing managed session intact.',
+        '围绕由 `create()` 构建的一个 PluginHost 创建托管宿主。定义先接纳，就绪插件在返回前按 Feature 依赖排序并安装；缺少必需提供者的使用者保留为 `blocked`。回滚只释放本次取得的认领；拒绝已被认领的宿主不会清理其既有托管会话。'
       ),
       returns: t(
         'The managed `ITrayHost`, supporting `await using`. Construction failures carry `detail` with the phase and rollback state. Safe native errors retain identity, type and stack; frozen errors or existing detail are preserved through cause rather than overwritten.',
         '支持 `await using` 的托管 `ITrayHost`。构造失败通过 `detail` 给出阶段与回滚状态。可安全注记的原生错误保留对象身份、类型和堆栈；冻结错误或已有详情通过 `cause` 保留，不被覆写。'
       ),
       options: 'ICreateHostOptions',
-      example: managedExample,
+      exampleIntro: {
+        en: "Run with Node 24 and install @migaia/plugin-host directly. AppHost is a real PluginHost subclass. Its required execution.mutationTimeoutMs and execution.pipelineDrainTimeoutMs are explicitly false, meaning unbounded; this is not an omitted default. createHost requires create, plugins, mutationAdmissionMs, quiescenceMs and shutdown, with no implicit defaults. The two millisecond budgets accept finite nonnegative numbers; the examples use 1000. shutdown.mode accepts bounded or strict-drain; here strict-drain waits for actual cleanup. report defaults to undefined.\n\nPlugin name and install define each local plugin. Feature definitions are optional; here the consumer's Feature references provider.getFeature('value') as a required dependency, because optional is not enabled. This dependency remains blocked until the provider arrives. The config and screen strings are application plugin names, not state constants. Check mutation results before using result.view to retain the new static capabilities. Dispose the managed facade instead of mutating or disposing its captured raw Host.",
+        zh: "用 Node 24 运行，并直接安装 `@migaia/plugin-host`。`AppHost` 是真实 PluginHost 子类；其必填 `execution.mutationTimeoutMs` 与 `execution.pipelineDrainTimeoutMs` 显式设置为 `false`，表示不设上限，不是省略后的默认值。`createHost` 的 `create`、`plugins`、`mutationAdmissionMs`、`quiescenceMs`、`shutdown` 均必填，无隐含默认；两个毫秒预算接受有限非负数，示例取 `1000`。`shutdown.mode` 为 `bounded` 或 `strict-drain`，本例使用后者等待实际清理；`report` 默认 `undefined`。\n\n插件以 `name` 和 `install` 声明。`features` 可以省略，本例使用者通过 Feature 引用 `provider.getFeature('value')`，未启用 `optional`，因此是必需依赖，提供者未到达前保持 `blocked`。`config` 和 `screen` 是应用插件名，不是状态常量；检查变更结果后从 `result.view` 继续，才能保留新能力的静态类型。关闭托管视图，不绕过它变更或释放捕获的原始 Host。"
+      },
+      cases: trayCases.createHost,
+      example: trayCases.createHost![0]!.example,
       scenarios: [
         t(
           'Install and remove plugins at runtime while dependants wait as `blocked`.',
@@ -1071,6 +1044,11 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
         '`use` / `replace` 的变更结果（`ok`、`committed`、`view`）。已提交产物持续归该世代保管，直至移除时释放一次；事务监听器和定时器此时已解除。'
       ),
       options: 'ILoadIntoHostOptions',
+      exampleIntro: {
+        en: "Run with Node 24 and install @migaia/plugin-host directly. AppHost is a real PluginHost subclass. Its required execution.mutationTimeoutMs and execution.pipelineDrainTimeoutMs are explicitly false, meaning unbounded; this is not an omitted default. createHost requires create, plugins, mutationAdmissionMs, quiescenceMs and shutdown, with no implicit defaults. The two millisecond budgets accept finite nonnegative numbers; the examples use 1000. shutdown.mode accepts bounded or strict-drain; here strict-drain waits for actual cleanup. report defaults to undefined.\n\nThe complete example constructs a real managed Host first. source is an application value, 42 or 7; defineLoader captures the required load(source, context) function and returns an artifact with value and required release.force. This disposer receives the retained artifact through the lifecycle contract. defineAdapter captures adapt(artifact, context); it returns a plugin with name and install. Neither definition acquires a resource by itself.\n\nloadIntoHost requires host, source, loader, adapter, mutation and timeoutMs. mutation is use or replace. timeoutMs is false or a finite nonnegative number, including zero; false creates no deadline. signal and report both default to undefined. Context provides signal and deadlineAt, plus report for the loader; false produces an undefined deadlineAt. Context cancellation is cooperative. The result's ok and committed are separate facts; an artifact in a committed blocked or failed definition remains owned until that generation is removed.",
+        zh: '用 Node 24 运行，并直接安装 `@migaia/plugin-host`。`AppHost` 是真实 PluginHost 子类；其必填 `execution.mutationTimeoutMs` 与 `execution.pipelineDrainTimeoutMs` 显式设置为 `false`，表示不设上限，不是省略后的默认值。`createHost` 的 `create`、`plugins`、`mutationAdmissionMs`、`quiescenceMs`、`shutdown` 均必填，无隐含默认；两个毫秒预算接受有限非负数，示例取 `1000`。`shutdown.mode` 为 `bounded` 或 `strict-drain`，本例使用后者等待实际清理；`report` 默认 `undefined`。\n\n完整示例先构造真实托管 Host。`source` 是应用值 `42` 或 `7`；`defineLoader` 捕获必填的 `load(source, context)`，返回包含 `value` 与必填 `release.force` 的制品，生命周期契约把保留的制品传给该释放函数。`defineAdapter` 捕获 `adapt(artifact, context)`，返回包含 `name` 与 `install` 的插件；定义加载器或适配器本身不会取得资源。\n\n`loadIntoHost` 必填 `host`、`source`、`loader`、`adapter`、`mutation`、`timeoutMs`；`mutation` 为 `use` 或 `replace`，`timeoutMs` 为 `false` 或包含零的有限非负数，`false` 不设截止时间。`signal` 与 `report` 默认 `undefined`；上下文提供 `signal`、`deadlineAt`，加载器还获得 `report`，不设期限时 `deadlineAt` 为 `undefined`。取消只是合作式信号；结果的 `ok` 与 `committed` 要分别判断，已提交的阻塞或失败定义仍拥有制品，直到对应代次被移除。'
+      },
+      cases: trayCases.loadIntoHost,
       example: loaderExample
     },
     defineAdapter: {
@@ -1089,13 +1067,13 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
         'The frozen adapter; an invalid shape throws `ADAPTER_CONTRACT_INVALID`.',
         '冻结的适配器；外形不合法时抛 `ADAPTER_CONTRACT_INVALID`。'
       ),
-      example: `const adapter = defineAdapter({ adapt: (artifact: { default: typeof plugin }) => artifact.default })`
+      example: loaderExample
     },
     createRuntime: {
       role: 'factory',
       purpose: t(
-        'Creates a runtime bound to a managed host (or a mutation `view`) that runs callbacks against one ready plugin at a time.',
-        '创建绑定到托管宿主（或变更结果 `view`）的运行器，每次针对一个就绪插件运行回调。'
+        'Creates a runtime bound to a managed host (or a mutation `view`); each run selects one ready plugin generation for its callback, and separate runs may overlap.',
+        '创建绑定到托管宿主（或变更结果 `view`）的运行器；每次运行选择一个就绪插件代次供回调使用，不同运行可以并发。'
       ),
       params: {
         host: t(
@@ -1155,6 +1133,11 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
           )
         }
       },
+      exampleIntro: {
+        en: "Run with Node 24 and install @migaia/plugin-host directly. AppHost is a real PluginHost subclass. Its required execution.mutationTimeoutMs and execution.pipelineDrainTimeoutMs are explicitly false, meaning unbounded; this is not an omitted default. createHost requires create, plugins, mutationAdmissionMs, quiescenceMs and shutdown, with no implicit defaults. The two millisecond budgets accept finite nonnegative numbers; the examples use 1000. shutdown.mode accepts bounded or strict-drain; here strict-drain waits for actual cleanup. report defaults to undefined.\n\ncreateRuntime borrows the managed Host. options defaults to {}, shutdown to { mode: 'strict-drain' } and report to undefined. bounded disposal returns a cleanupComplete snapshot without waiting for all callbacks; strict-drain waits for actual settlement. Neither mode disposes the Host. In these complete examples the local plugin install function returns the exact extensions used by its callback.\n\nrun(name, options, execute) requires an application plugin name, an options object and callback. options.timeoutMs is required: false means no deadline; otherwise it must be finite and nonnegative, including zero. signal defaults to undefined. The callback receives only that ready plugin generation's extensions, plus signal, self, runId, plugin and deadlineAt. The native AbortController supplies the caller signal and reason. A Promise gate makes cancellation and settlement separate, without a sleep. self.unUse returns a non-thenable ticket; await its completion only outside the originating callback.",
+        zh: "用 Node 24 运行，并直接安装 `@migaia/plugin-host`。`AppHost` 是真实 PluginHost 子类；其必填 `execution.mutationTimeoutMs` 与 `execution.pipelineDrainTimeoutMs` 显式设置为 `false`，表示不设上限，不是省略后的默认值。`createHost` 的 `create`、`plugins`、`mutationAdmissionMs`、`quiescenceMs`、`shutdown` 均必填，无隐含默认；两个毫秒预算接受有限非负数，示例取 `1000`。`shutdown.mode` 为 `bounded` 或 `strict-drain`，本例使用后者等待实际清理；`report` 默认 `undefined`。\n\n`createRuntime` 借用托管 Host。`options` 默认 `{}`，`shutdown` 默认 `{ mode: 'strict-drain' }`，`report` 默认 `undefined`；`bounded` 释放立即给出 `cleanupComplete` 快照，`strict-drain` 等待回调实际完成，两者都不关闭 Host。完整示例的本地插件通过 `install` 返回回调实际使用的扩展。\n\n`run(name, options, execute)` 必填应用插件名、选项对象与回调；`options.timeoutMs` 必填，`false` 不设期限，否则接受包含零的有限非负数，`signal` 默认 `undefined`。回调仅获得该就绪插件代次的 `extensions`，另有 `signal`、`self`、`runId`、`plugin`、`deadlineAt`。原生 `AbortController` 提供调用者信号与原因，Promise 门明确分开取消和完成，没有固定等待；`self.unUse()` 返回非类 Promise 回执，只能在原回调外等待其 `completion`。"
+      },
+      cases: trayCases.createRuntime,
       example: runtimeExample,
       scenarios: [
         t(
@@ -2180,8 +2163,8 @@ console.log(same.id) // 'alice'`,
         },
         deadlineAt: {
           summary: t(
-            'Absolute deadline on `systemScheduler.now()`, or `undefined` without `timeoutMs`.',
-            '基于 `systemScheduler.now()` 的绝对截止时间；未设置 `timeoutMs` 时为 `undefined`。'
+            'Absolute deadline on `systemScheduler.now()`, or `undefined` when the required `timeoutMs` is false.',
+            '基于 `systemScheduler.now()` 的绝对截止时间；必填 `timeoutMs` 为 `false` 时是 `undefined`。'
           )
         },
         report: {
@@ -2247,25 +2230,34 @@ console.log(same.id) // 'alice'`,
           }
         },
         signal: {
-          summary: t('Cancels the transaction before commit.', '在提交之前取消整个加载事务。'),
-          default: t('Not set: not cancellable.', '不设置：不可取消。')
+          summary: t(
+            'Optional caller signal forwarded cooperatively while loading; an abort does not forcibly stop user code or guarantee that a later mutation cannot commit.',
+            '加载期间转发的可选调用者合作式信号；取消不会强制终止用户代码，也不保证后续变更一定无法提交。'
+          ),
+          default: t(
+            'undefined: no caller cancellation bridge; the transaction deadline or owned scope may still abort its signal.',
+            '默认 `undefined`，不设置调用者取消桥；事务截止时间或所属作用域仍可能中止信号。'
+          )
         },
         timeoutMs: {
           summary: t(
-            'Deadline of load and adapt, or `false` for none.',
-            '加载与适配的截止时间；`false` 表示不设截止时间。'
+            'Required finite nonnegative millisecond deadline, including zero, or false for none; expiry aborts the context signal cooperatively.',
+            '必填，接受包含零的有限非负毫秒数，或用 `false` 不设截止时间；到期合作式中止上下文信号。'
           )
         },
         report: {
           summary: t('Receives secondary failures.', '接收次要失败（例如清理失败）。'),
-          default: t('Not set: they are reported nowhere else.', '不设置：不会另行上报。')
+          default: t(
+            'undefined: no caller-supplied reporter.',
+            '默认 `undefined`，没有调用者提供的上报器。'
+          )
         }
       }
     },
     ILoadIntoHostResult: {
       summary: t(
-        'Managed `use` or `replace` outcome returned after loader custody transfers to the host.',
-        '加载资源的保管权转交宿主后返回的安装或替换结果。'
+        'Managed use or replace observation, including uncommitted outcomes; only committed admission transfers artifact custody to that definition generation.',
+        '托管安装或替换的观察结果，也包括未提交分支；只有已提交接纳才把制品保管责任交给对应定义代次。'
       ),
       scenarios: [
         t(
@@ -2366,8 +2358,8 @@ console.log(result.view, result.cleanupComplete)`,
         signal: { summary: t('Aborts on cancellation or deadline.', '取消或到达截止时间时中止。') },
         deadlineAt: {
           summary: t(
-            'Absolute deadline, or `undefined` without a timeout.',
-            '绝对截止时间；没有超时设置时为 `undefined`。'
+            'Absolute deadline, or undefined when the required timeoutMs is false.',
+            '绝对截止时间；必填 `timeoutMs` 为 `false` 时是 `undefined`。'
           )
         }
       }
@@ -2465,12 +2457,15 @@ console.log(result.view, result.cleanupComplete)`,
             'Signal the caller aborts to cancel the run.',
             '调用方用于取消本次运行的信号。'
           ),
-          default: t('Not set: not cancellable by the caller.', '不设置：调用方无法取消。')
+          default: t(
+            'undefined: no caller-signal bridge; deadline and Runtime disposal still abort the run context.',
+            '默认 `undefined`，不设置调用者信号桥；截止时间与 Runtime 释放仍会中止运行上下文。'
+          )
         },
         timeoutMs: {
           summary: t(
-            'Deadline in milliseconds, or `false` for none.',
-            '截止时间（毫秒），`false` 表示不设。'
+            'Required finite nonnegative millisecond deadline, including zero, or false for none; it only signals cooperative cancellation.',
+            '必填，接受包含零的有限非负毫秒数，或用 `false` 不设期限；仅发出合作式取消信号。'
           )
         }
       }
@@ -2756,8 +2751,8 @@ console.log(result.view, result.cleanupComplete)`,
           '`RUNTIME_EXECUTION_FAILED`：运行的回调函数抛错；原始错误见 `cause`。'
         ),
         runtimeAborted: t(
-          '`RUNTIME_ABORTED`: cancelled or past the deadline.',
-          '`RUNTIME_ABORTED`：被取消或超过截止时间。'
+          '`RUNTIME_ABORTED`: fallback classification for an unclassified generation-acquisition failure; an existing source/code is preserved. Caller cancellation and deadlines only abort the cooperative signal and do not force callback settlement.',
+          '`RUNTIME_ABORTED`：取得插件代次失败时，对未分类错误使用的后备分类；原有完整 source/code 保留。调用者取消与截止时间只中止合作式信号，不会强制结束回调。'
         ),
         artifactCleanupFailed: t(
           '`ARTIFACT_CLEANUP_FAILED`: releasing an artifact failed; see `cleanupErrors`.',

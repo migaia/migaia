@@ -103,7 +103,7 @@ domain(
     [
       'envelope',
       'Normalized protocol envelope observation before encoding.',
-      '编码之前规范协议信封的观察阶段。'
+      '编码之前规范协议消息封装的观察阶段。'
     ],
     [
       'encoded',
@@ -114,7 +114,7 @@ domain(
     [
       'protected',
       'Protected carrier observation after signing or encryption.',
-      '签名或加密之后受保护载体的观察阶段。'
+      '签名或加密之后受保护传输对象的观察阶段。'
     ],
     [
       'carrier',
@@ -299,7 +299,7 @@ const definition: Record<string, IMemberDoc> = {
   ),
   methods: p(
     'Application method-name filter for method-bearing logical/envelope observations; methodless controls remain visible.',
-    '应用方法名过滤器作用于含方法的逻辑及信封观察，无方法控制仍可见。',
+    '应用方法名过滤器作用于含方法的逻辑及消息封装观察，无方法控制仍可见。',
     t('Absent: all methods remain eligible.', '默认所有方法均可被观察。')
   ),
   sample: p(
@@ -323,7 +323,7 @@ const definition: Record<string, IMemberDoc> = {
       },
       t(
         'The synchronous redacted capture value; no Promise is awaited.',
-        '返回同步脱敏捕获值，不等待承诺。'
+        '返回同步脱敏捕获值，不等待 Promise。'
       ),
       probeExample
     ),
@@ -361,7 +361,7 @@ const definition: Record<string, IMemberDoc> = {
     },
     t(
       'Observation completes synchronously; returned thenable rejections are observed, but a retained view still needs a synchronous snapshot.',
-      '同步完成观察，返回类承诺的拒绝仍被观察，但保留视图仍须同步快照。'
+      '同步完成观察，返回类 Promise 对象的拒绝仍被观察，但保留视图仍须同步快照。'
     ),
     probeExample
   ),
@@ -443,11 +443,11 @@ types.IRpcProbeDescriptor = type(
     ),
     topology: p(
       'Actual transport topology when the adapter supplies it.',
-      '适配器提供时的实际载体拓扑。'
+      '适配器提供时的实际传输对象拓扑。'
     ),
     encodedType: p(
       'Actual encoded carrier domain reported by the owner.',
-      '所有者报告的实际编码载体值域。'
+      '所有者报告的实际编码传输值类型。'
     ),
     authentication: {
       ...p(
@@ -470,7 +470,7 @@ types.IRpcProbeDescriptor = type(
     carrier: {
       ...p(
         'Actual carrier label or unavailable when physical observation is unsupported.',
-        '实际载体标签，不支持物理观察时表示不可用。'
+        '实际传输对象标签，不支持物理观察时表示不可用。'
       ),
       values: {
         unavailable: t(
@@ -526,7 +526,7 @@ const eventFields: Record<string, IMemberDoc> = {
   ),
   variation: p(
     'Original variation-control route only on applicable message/envelope observations.',
-    '只在适用逻辑或信封观察中的原变体控制路由。'
+    '只在适用逻辑或消息封装观察中的原变体控制路由。'
   ),
   senderId: p(
     'Original admitted sender identifier from the observed message.',
@@ -542,7 +542,7 @@ const eventFields: Record<string, IMemberDoc> = {
   ),
   peerId: p(
     'Actual physical peer identifier attributed by the held transport.',
-    '持有载体归属的实际物理对端标识。'
+    '持有传输对象归属的实际物理对端标识。'
   ),
   trace: p(
     'Original explicitly supplied application trace when present.',
@@ -610,11 +610,11 @@ types.IRpcCarrierProbe = type(
     ),
     emit: m(
       'Records actual synchronous carrier observation without changing the physical send or receive result.',
-      '同步记录实际载体观察，不改变物理发送或接收结果。',
+      '同步记录实际传输对象观察，不改变物理发送或接收结果。',
       {
         direction: t(
           'Actual RpcProbeDirection ordinal, supplied by the carrier owner.',
-          '载体所有者提供的实际方向序号。'
+          '传输对象所有者提供的实际方向序号。'
         ),
         sizeBytes: t(
           'Measured physical byte size or -1 when unknown.',
@@ -622,7 +622,7 @@ types.IRpcCarrierProbe = type(
         ),
         carrier: t(
           'Physical carrier label chosen by the actual adapter.',
-          '实际适配器选择的物理载体标签。'
+          '实际适配器选择的底层传输通道标签。'
         ),
         detail: t('Actual scalar diagnostic record, or undefined.', '实际标量诊断记录，或不提供。'),
         content: t(
@@ -795,7 +795,7 @@ domain(
     [
       'ipc.backlog.rejected',
       'The corresponding whole-envelope lane refused capacity.',
-      '对应完整信封通道拒绝容量准入。'
+      '对应完整消息封装通道拒绝容量准入。'
     ],
     [
       'ipc.send.failed',
@@ -812,7 +812,7 @@ domain(
 domain(
   'IpcSendClass',
   'Whole-envelope admission reserves separate total capacities for business data and control messages.',
-  '完整信封准入分别为业务数据及控制消息预留总容量。',
+  '完整消息封装准入分别为业务数据及控制消息预留总容量。',
   [
     [
       'data',
@@ -839,7 +839,7 @@ const queueOptions: Record<string, IMemberDoc> = {
   ),
   maxPendingData: p(
     'Positive safe-integer data capacity counting running and queued whole envelopes together.',
-    '正安全整数数据容量，同时统计运行及排队的完整信封。',
+    '正安全整数数据容量，同时统计运行及排队的完整消息封装。',
     t('256 total accepted data envelopes.', '默认总计二百五十六个准入数据信封。')
   ),
   maxPendingControl: p(
@@ -867,11 +867,11 @@ const backlog: Record<string, IMemberDoc> = {
   sessionId: queueOptions.sessionId,
   pendingData: p(
     'Snapshot of accepted queued plus running business envelopes.',
-    '已准入排队及运行业务信封的计数快照。'
+    '已准入排队及运行业务消息封装的计数快照。'
   ),
   pendingControl: p(
     'Snapshot of accepted queued plus running control envelopes.',
-    '已准入排队及运行控制信封的计数快照。'
+    '已准入排队及运行控制消息封装的计数快照。'
   ),
   active: {
     ...p(
@@ -941,15 +941,15 @@ types.IIpcSendAdmission = type(
 const gateMembers: Record<string, IMemberDoc> = {
   run: m(
     'Reserves the actual envelope class and serializes its physical callback; full capacity rejects OVERLOADED. New work after close rejects ENDPOINT_DISPOSED; already queued work receives the original close(reason).',
-    '预留实际信封类别并串行运行物理回调，容量满时拒绝过载；关闭后新工作拒绝端点已释放错误，已有排队工作接收原关闭原因。',
+    '预留实际消息封装类别并串行运行物理回调，容量满时拒绝过载；关闭后新工作拒绝端点已释放错误，已有排队工作接收原关闭原因。',
     {
       envelope: t(
         'Original normalized rpc-contract envelope supplied by the outbound owner.',
-        '原出站所有者提供的规范契约信封。'
+        '原出站所有者提供的规范契约消息封装。'
       ),
       sendNow: t(
         'Original zero-argument physical send callback returns void or Promise<void>; throws/rejections retain their original failure.',
-        '原无参物理发送回调返回空值或承诺，抛错及拒绝保留原失败。'
+        '执行原始发送的无参回调，返回 `void` 或 `Promise<void>`；抛错及拒绝仍保留原始失败。'
       ),
       admission: t(
         'Optional original Core outbound admission; omission attaches no extra live cancellation.',
@@ -958,7 +958,7 @@ const gateMembers: Record<string, IMemberDoc> = {
     },
     t(
       'Promise settles with the original send and releases its accepted capacity exactly once.',
-      '承诺随原发送结算，并精确释放一次已准入容量。'
+      'Promise 随原发送结算，并精确释放一次已准入容量。'
     ),
     queueExample
   ),
@@ -986,7 +986,7 @@ const gateMembers: Record<string, IMemberDoc> = {
   ),
   close: m(
     'Idempotently closes admission and rejects queued work with the original reason; active physical I/O keeps its own settlement.',
-    '幂等关闭准入并用原原因拒绝排队工作，活动物理读写保留自身结算。',
+    '幂等关闭准入并用原始原因拒绝排队工作，活动物理读写保留自身结算。',
     {
       reason: t(
         'Optional original shutdown failure issued by the connection owner.',
@@ -1002,13 +1002,13 @@ const gateMembers: Record<string, IMemberDoc> = {
 }
 types.IIpcSendGate = type(
   'One connection-owned complete-envelope queue with independent data/control capacity and original cancellation.',
-  '一个连接拥有的完整信封队列，保留独立数据控制容量及原取消。',
+  '一个连接拥有的完整消息封装队列，保留独立数据控制容量及原取消。',
   gateMembers,
   queueExample
 )
 types.IIpcSendQueueInstallation = type(
   'Original gate and native feature must be installed with the same createIpcSendQueueTransport wrapper.',
-  '原门控及原生功能须搭配 `createIpcSendQueueTransport` 的同一包装安装。',
+  '返回的队列控制对象与原生功能，须和使用同一控制对象的 `createIpcSendQueueTransport` 配套安装。',
   {
     feature: p(
       'Native feature token placed in the same endpoint features tuple.',
@@ -1016,7 +1016,7 @@ types.IIpcSendQueueInstallation = type(
     ),
     gate: p(
       'Original queue gate passed unchanged to the transport wrapper and logger.',
-      '不变传给载体包装及日志的原队列门控。'
+      '发送队列返回的容量控制对象；将同一引用交给传输包装与日志功能。'
     )
   },
   queueExample
@@ -1051,7 +1051,7 @@ symbols.createIpcSendQueueFeature = {
   role: 'enhancer',
   purpose: t(
     'Creates one bounded original connection gate and its native feature. Pair the feature with createIpcSendQueueTransport using that exact gate.',
-    '创建一个有界原连接门控及原生功能，须搭配 `createIpcSendQueueTransport` 并使用该精确门控。'
+    '为现有连接创建有界发送队列和原生功能，再把同一个队列控制对象交给 `createIpcSendQueueTransport`。'
   ),
   options: 'IIpcSendQueueOptions',
   returns: t(
@@ -1064,12 +1064,12 @@ symbols.createIpcSendQueueTransport = {
   role: 'enhancer',
   purpose: t(
     'Wraps one original physical transport with its exact gate, preserving native identities and capability references. Rewrapping the same physical connection is rejected.',
-    '用精确门控包装一个原物理载体，保留原生身份及能力引用，重复包装同一物理连接会被拒绝。'
+    '用精确门控包装一个原底层传输通道，保留原生身份及能力引用，重复包装同一物理连接会被拒绝。'
   ),
   params: {
     transport: t(
       'Actual unwrapped IRpcTransport returned by the native adapter.',
-      '原生适配器返回的实际未包装载体。'
+      '原生适配器返回的实际未包装传输对象。'
     ),
     gate: t(
       'Exact gate returned by createIpcSendQueueFeature for this connection.',
@@ -1078,7 +1078,7 @@ symbols.createIpcSendQueueTransport = {
   },
   returns: t(
     'IIpcGatedTransport requiring installation of the paired native feature in the same endpoint.',
-    '返回门控载体，要求同一端点安装对应原生功能。'
+    '返回门控传输对象，要求同一端点安装对应原生功能。'
   ),
   example: queueExample
 }
@@ -1086,20 +1086,20 @@ symbols.createIpcLogFeature = {
   role: 'enhancer',
   purpose: t(
     'Observes the original gate and explicit stderr without changing operation results; asynchronous sink failures are observed through the mandatory secondary sink.',
-    '观察原门控及显式标准错误，不改变操作结果，异步接收失败由必需次级接收器观察。'
+    '观察现有队列及应用显式提供的标准错误记录，不改变发送结果；异步报告失败交给必填的次级错误回调。'
   ),
   optionDocs: {
     gate: p(
       'Exact original connection gate returned by createIpcSendQueueFeature.',
-      '本连接发送队列功能返回的精确原门控。'
+      '本连接发送队列功能返回的同一个容量控制对象。'
     ),
     report: p(
       'Application callback receives IIpcLogRecord, returns void or Promise<void>; throws/rejections go to onReportError.',
-      '应用回调接收本地日志记录，返回空值或承诺，抛错及拒绝交上报错误回调。'
+      '应用回调接收本地日志记录，返回空值或 Promise，抛错及拒绝交上报错误回调。'
     ),
     onReportError: p(
       'Application callback receives original error and the same record, returns void or Promise<void>; secondary failure goes to hostRethrowReporter.',
-      '应用回调接收原错误及同一记录，返回空值或承诺，次级失败交规范宿主上报。'
+      '应用回调接收原错误及同一记录，返回空值或 Promise，次级失败交规范宿主上报。'
     )
   },
   returns: t(
@@ -1128,7 +1128,7 @@ for (const name of [
     scenarios: [
       t(
         'Bound whole-envelope backlog for one physical connection.',
-        '限制单个物理连接的完整信封积压。'
+        '限制单个物理连接的完整消息封装积压。'
       )
     ],
     example: queueExample
@@ -1153,7 +1153,7 @@ export const observationReference: ILibraryReference = {
     'plugins/send-queue': {
       summary: t(
         "Use this entry when a physical connection needs a bounded queue for complete outgoing messages. `createIpcSendQueueFeature()` creates the queue and its endpoint feature. `createIpcSendQueueTransport()` wraps the transport with that same queue's gate; install the feature on the endpoint using the wrapper. Data and control messages have separate limits, while `plugins/log` only reports queue events.",
-        '一条实际连接需要限制待发送的完整消息数量时，使用这个入口。`createIpcSendQueueFeature()` 创建队列和可安装到端点的功能。再用 `createIpcSendQueueTransport()` 将同一队列的发送控制对象接到载体上，并在使用该载体的端点安装此功能。数据消息和控制消息分别设限，`plugins/log` 只负责报告队列事件。'
+        '一条实际连接需要限制待发送的完整消息数量时，使用这个入口。`createIpcSendQueueFeature()` 创建队列和可安装到端点的功能。再用 `createIpcSendQueueTransport()` 将同一队列的发送控制对象接到传输对象上，并在使用该传输对象的端点安装此功能。数据消息和控制消息分别设限，`plugins/log` 只负责报告队列事件。'
       ),
       example: queueExample
     },

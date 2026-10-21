@@ -1,6 +1,7 @@
 /** Static Graph reference, checked against capability/src/graph/index.ts on 2026-10-17. */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityDynamicReference } from './capability-dynamic.js'
+import { capabilityCases } from './capability-cases.ts'
 /** Builds bilingual reader text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Documents a stored value. */
@@ -31,8 +32,8 @@ const members: Record<string, IMemberDoc> = {
     ),
     params: {
       node: t(
-        'Application-created id, nonempty kind, required provider dependencies and start(context) callback returning one instance or thenable.',
-        '应用创建的标识、非空分类、必需提供方依赖及 `start(context)` 回调，回调返回一个实例或其类承诺。'
+        'Required definition with no field defaults: `id` is an application-issued nonempty `IGraphNodeId`, `kind` is a nonempty diagnostic string, `dependencies` is an array (use `[]` for none), and `start(context)` is callable. Each edge requires `provider` (a registered node ID) and `required: true`, with no duplicate providers. `start` receives `nodeId`, a graph-owned native `signal`, `get(provider)` for declared ready direct providers and `own(resource, descriptor)` for auxiliary lifecycle ownership. Return `{ value, release(context) }`, or its thenable; `value` may be any value including `undefined`, and required `release` returns void or a completion thenable. Its context contains `nodeId`, `signal` and `report(error)`.',
+        '必填定义，各字段无默认值：`id` 是应用签发的非空 `IGraphNodeId`，`kind` 是非空诊断字符串，`dependencies` 必须是数组（无依赖时传 `[]`），`start(context)` 必须可调用。每条依赖须有已登记节点标识 `provider` 和 `required: true`，不能重复提供方。`start` 收到 `nodeId`、图拥有的原生 `signal`、读取已声明且就绪的直接提供方的 `get(provider)`，以及接纳辅助资源的 `own(resource, descriptor)`。返回 `{ value, release(context) }` 或其类 Promise；`value` 可为任意值，包含 `undefined`，必填 `release` 返回空值或清理完成的类 Promise，其上下文含 `nodeId`、`signal` 和 `report(error)`。'
       )
     },
     returns: t(
@@ -321,8 +322,8 @@ const types: Record<string, ITypeDoc> = {
           '通过 `(error)` 接收受控或次级失败，不消费返回值，报告函数抛错或类承诺拒绝进入工具包共享宿主异常队列，不改变图结果。'
         ),
         default: t(
-          'Omitted: no external reporting sink is installed.',
-          '省略时不安装外部失败报告接收方。'
+          '`undefined`: no external reporting sink is installed.',
+          '`undefined`：不安装外部失败报告接收方。'
         )
       }
     }
@@ -357,8 +358,8 @@ const types: Record<string, ITypeDoc> = {
         '供诊断使用的非空应用分类，不会据此选择运行时。'
       ),
       dependencies: p(
-        'Caller-authored direct required provider list copied and checked for duplicate edges and cycles.',
-        '调用方声明的直接必需提供方列表，会复制并检查重复边和依赖环。'
+        'Required array, with `[]` explicitly representing no dependencies. Each edge requires `provider: IGraphNodeId` and `required: true`; neither field has a default. Duplicate edges are rejected at registration; missing providers and cycles reject readiness.',
+        '必填数组，无依赖须显式传 `[]`。每条边必须有 `provider: IGraphNodeId` 和 `required: true`，两者均无默认值。登记时拒绝重复边，就绪时拒绝缺失提供方与依赖环。'
       ),
       start: p(
         'Receives IGraphStartContext with nodeId, signal, get and own. Return a primary IGraphNodeInstance or its thenable; rejection fails startup and triggers rollback.',
@@ -556,15 +557,18 @@ export const capabilityGraphReference: ILibraryReference = {
     createCapabilityGraph: {
       role: 'factory',
       purpose: t(
-        'Creates a runtime-neutral static dependency graph. Register all nodes before readiness, start providers before consumers, and let the graph own rollback and reverse-order release.',
-        '创建运行时无关的静态依赖图；在就绪前登记全部节点，按提供方先于消费方的顺序启动，由图负责回滚以及按依赖逆序释放资源。'
+        'Creates a runtime-neutral static resource dependency graph: providers produce values used by consumers. Register all nodes before the first `ready()`, which freezes admission. Startup proceeds by dependency level, starting every node in a level before awaiting that level; cleanup reverses level and registration order. `options` defaults to `{}` and omitted `onError` is `undefined`. The graph owns rollback and resource release, without tracking reactive data changes.',
+        '创建运行时无关的静态资源依赖图：提供方产出值，消费方使用它。首次 `ready()` 前须登记全部节点，此后登记被冻结。启动按依赖层级推进，同层节点全部开始后才等待该层；清理按层级和登记顺序的逆序执行。`options` 默认 `{}`，省略 `onError` 为 `undefined`。图负责回滚和资源释放，不跟踪响应式数据变化。'
       ),
       options: 'ICapabilityGraphOptions',
       returns: t(
         'Caller-owned ICapabilityGraph with one startup transaction and shared disposal Promise; invalid options throw GRAPH_INVALID_OPTION.',
         '返回调用方拥有的 `ICapabilityGraph`，具有一次启动事务与共享释放承诺；非法选项抛出 `GRAPH_INVALID_OPTION`。'
       ),
-      example: `${setup}\nawait graph.ready()\nawait graph.dispose()`
+      exampleIntro: capabilityCases.createCapabilityGraph![0]!.problem,
+      example: capabilityCases.createCapabilityGraph![0]!.example,
+      exampleResult: capabilityCases.createCapabilityGraph![0]!.result,
+      cases: capabilityCases.createCapabilityGraph
     },
     ...capabilityDynamicReference.symbols
   },

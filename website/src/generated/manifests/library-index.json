@@ -5,13 +5,15 @@
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
       "version": "0.0.6",
-      "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"]
+      "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
       "version": "0.0.9",
-      "exports": [".", "./subscriber"]
+      "exports": [".", "./subscriber"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "lifecycle",
@@ -26,37 +28,43 @@
         "./quiescence",
         "./scheduler",
         "./scope"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "logger",
       "description": null,
       "version": "0.0.10",
-      "exports": [".", "./plugins", "./plugins/file"]
+      "exports": [".", "./plugins", "./plugins/file"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
       "version": "0.0.8",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
       "version": "0.0.10",
-      "exports": [".", "./composition"]
+      "exports": [".", "./composition"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
       "version": "0.0.8",
-      "exports": [".", "./extension"]
+      "exports": [".", "./extension"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
       "version": "0.0.8",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-browser",
@@ -70,7 +78,8 @@
         "./adapters/shared-worker",
         "./adapters/web-transport",
         "./adapters/window"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-contract",
@@ -96,7 +105,8 @@
         "./stream",
         "./v1",
         "./wire"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-core",
@@ -126,19 +136,22 @@
         "./testing",
         "./transport-constants",
         "./transport-kit"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-devtools",
       "description": "RPC probe, service and offline record contracts.",
       "version": "0.0.10",
-      "exports": [".", "./contract", "./hub", "./log"]
+      "exports": [".", "./contract", "./hub", "./log"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
       "version": "0.0.10",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-process",
@@ -154,13 +167,15 @@
         "./adapters/node-child-process",
         "./adapters/node-socket",
         "./adapters/windows-job"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
       "version": "0.0.10",
-      "exports": [".", "./adapters/electron-main", "./adapters/node"]
+      "exports": [".", "./adapters/electron-main", "./adapters/node"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "serialize",
@@ -177,13 +192,15 @@
         "./core",
         "./plugins",
         "./registry"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
       "version": "0.0.7",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "storage-web",
@@ -212,85 +229,99 @@
         "./schema",
         "./serialize",
         "./session-storage"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-devtools",
       "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-indexed",
       "description": "Indexed reactive collections with lazy cell materialization.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-keyed",
       "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
       "version": "0.0.3",
-      "exports": [".", "./atom/definition", "./atom/store", "./optics", "./reactive/atom"]
+      "exports": [".", "./atom/definition", "./atom/store", "./optics", "./reactive/atom"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-light",
       "description": "Minimal object-state Store facade.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-middleware",
       "description": "Store mutation policy and middleware pipeline.",
       "version": "0.0.3",
-      "exports": [".", "./tolerant-clone"]
+      "exports": [".", "./tolerant-clone"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-persist",
       "description": "Store snapshot persistence and storage adapter protocol.",
       "version": "0.0.3",
-      "exports": [".", "./indexed", "./keyed", "./light"]
+      "exports": [".", "./indexed", "./keyed", "./light"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-react",
       "description": "React Provider and hooks for the Store runtime.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-shared",
       "description": "SharedArrayBuffer and Atomics-backed Store state.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-ssr",
       "description": "Request-scoped Store SSR dehydration and hydration.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-wasm",
       "description": "Optional WASM-backed fields for Store light.",
       "version": "0.0.3",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "store-worker",
       "description": "Worker adapters and worker-backed Resource/serialization integrations.",
       "version": "0.0.3",
-      "exports": [".", "./serialize/worker"]
+      "exports": [".", "./serialize/worker"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "supervision",
       "description": "Runtime-neutral supervision for execution units and coroutines.",
       "version": "0.0.4",
-      "exports": [".", "./coroutine", "./process", "./threads"]
+      "exports": [".", "./coroutine", "./process", "./threads"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "tray",
       "description": null,
       "version": "0.0.5",
-      "exports": [".", "./adapter", "./host", "./loader", "./runtime"]
+      "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "utils",
@@ -311,13 +342,15 @@
         "./testing",
         "./typing",
         "./value"
-      ]
+      ],
+      "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "wasm",
       "description": null,
       "version": "0.1.2",
-      "exports": ["."]
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
     }
   ]
 }

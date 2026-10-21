@@ -9,6 +9,7 @@
  * integration.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
+import { rpcDevtoolsCases } from './rpc-devtools-cases.js'
 
 /** Creates one localized sentence pair. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -20,6 +21,18 @@ const f = (en: string, zh: string, defaultEn?: string, defaultZh?: string): IMem
     ? { default: t(defaultEn, defaultZh) }
     : {})
 })
+
+/** Endpoint examples use the actual public business pipeline, never a hand-filled probe view. */
+const endpointIntro = t(
+  'Install this package and its @migaia/rpc-core and @migaia/rpc-contract peers directly. In Node 24, createMemoryTransportPair() returns two borrowed sides with default native-microtask delivery. Each createEndpoint receives its local id and transport; connect() supplies normal message delivery and probePlugin installs the returned probe on the client only. The provider receives context.data and returns context.success(value). send(targetId, method, data) waits for the remote result; both endpoints are disposed before the caller closes the pair.',
+  '直接安装本包及 `@migaia/rpc-core`、`@migaia/rpc-contract` 两个 peer。Node 24 中，`createMemoryTransportPair()` 默认按原生微任务交付，返回两个借用端。每个 `createEndpoint` 传入本端 `id` 与 `transport`；`connect()` 负责正常消息交付，`probePlugin` 只把探针安装在客户端。提供方从 `context.data` 取输入，以 `context.success(value)` 返回；`send(targetId, method, data)` 等待远端结果。最终先释放两个端点，再由调用方关闭传输对。'
+)
+
+/** The offline examples construct complete record inputs without claiming live-host observations. */
+const offlineIntro = t(
+  'The offline inputs are complete application-authored records, not live probe views. header uses RpcDevtoolsRecordFormat: format is "migaia-rpc-devtools" and version is 1. Every event supplies finite seq and at, an endpointId string, a stage string, and inbound or outbound direction; optional kind, senderId, messageId, method and trace describe only identities explicitly present in the file. encodeRpcDevtoolsRecord converts the record to text without writing a file.',
+  '离线输入是应用编写的完整记录，不是实时探针视图。`header` 使用 `RpcDevtoolsRecordFormat`，其中 `format` 为 `migaia-rpc-devtools`、`version` 为 `1`。每个事件提供有限数值 `seq`、`at`，字符串 `endpointId`、`stage` 及 `inbound` 或 `outbound` 方向；可选 `kind`、`senderId`、`messageId`、`method`、`trace` 只描述文件明确保存的身份。`encodeRpcDevtoolsRecord` 把记录转换为文本，不写文件。'
+)
 
 /** Collector example includes its canonical probe installation and resource release. */
 const collectorExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
@@ -109,21 +122,20 @@ devtools.close()`
 /** A local client adapter demonstrates the exact supported service routes without network setup. */
 const liveHubExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
 import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
-import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'
+import type { IRpcDevtoolsQuery } from '@migaia/rpc-devtools/contract'
 
 const devtools = createRpcDevtools()
-const service = devtools.service as unknown as IRpcDevtoolsServiceApi
 const client = {
   request: async (method: string, payload?: unknown) => method === 'query'
-    ? service.query(payload as IRpcDevtoolsQuery)
-    : method === 'stats' ? service.stats() : service.describe(),
-  stream: (_method: string, payload?: unknown) => service.watch(payload as Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>)
+    ? devtools.query(payload as IRpcDevtoolsQuery)
+    : method === 'stats' ? devtools.stats() : devtools.describe(),
+  stream: (_method: string, payload?: unknown) => devtools.watch(payload as Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>)
 }
 const hub = createRpcDevtoolsHub({ onError: (error) => console.error(error) })
 await hub.addTarget('local', client)
 console.log(hub.status('local'), await hub.stats('local'))
-devtools.close()
-await hub.close()`
+await hub.close()
+devtools.close()`
 
 /** Watch setup owns its generator and observes closure rather than leaving a pending iterator. */
 const watchExample = `import { createRpcDevtools } from '@migaia/rpc-devtools'
@@ -168,8 +180,8 @@ const probeOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   sample: f(
     'Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.',
     '大于零且小于或等于一的确定性采样比例，按发送者与消息身份采样，而非逐阶段随机决定。',
-    'One, retaining all eligible identities before retention limits.',
-    '默认一，在保留上限生效前接纳所有符合条件的身份。'
+    '`1`, retaining all eligible identities before retention limits.',
+    '默认 `1`，在保留上限生效前接纳所有符合条件的身份。'
   ),
   capture: f(
     'Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-core/probe and keep capture within initially subscribed stages.',
@@ -676,7 +688,14 @@ export const rpcDevtoolsReference: ILibraryReference = {
         'Caller-owned IRpcDevtools, also IRpcProbe from @migaia/rpc-core/probe. Close explicitly; invalid construction options throw native TypeError with INVALID_OPTION and original cause.',
         '返回调用者拥有的采集器，同时满足核心包探针契约，需显式关闭，构造选项非法抛带 `INVALID_OPTION` 及原始原因的原生类型错误。'
       ),
-      example: collectorExample
+      exampleIntro: t(
+        endpointIntro.en +
+          ' options defaults to {}; stages defaults to ["message", "peer"], while these examples explicitly select ["message"]. maxEvents is 2 here instead of 10000. query({methods:["double"],limit:2}) selects the exact method; afterSeq defaults to 0 and limit otherwise to 1000. stats() takes no arguments. record({maxEvents:64}) overrides its inherited ring capacity; stop(), clear(), exportRecord(record) and importRecord(text) are shown separately so clearing live data is not confused with ending a recording.',
+        endpointIntro.zh +
+          '`options` 默认 `{}`，`stages` 默认 `["message", "peer"]`，本例显式选择 `["message"]`，把 `maxEvents` 从 `10000` 改为 `2`。`query({ methods: ["double"], limit: 2 })` 精确筛选方法，`afterSeq` 默认 `0`，`limit` 未设置时为 `1000`；`stats()` 无参数。`record({ maxEvents: 64 })` 覆盖继承容量，示例分别调用 `stop()`、`clear()`、`exportRecord(record)` 与 `importRecord(text)`，避免把清实时数据误当成结束录制。'
+      ),
+      example: rpcDevtoolsCases.createRpcDevtools![0]!.example,
+      cases: rpcDevtoolsCases.createRpcDevtools
     },
     encodeRpcDevtoolsRecord: {
       role: 'operation',
@@ -694,7 +713,14 @@ export const rpcDevtoolsReference: ILibraryReference = {
         'Complete NDJSON string; unsupported header, event, bytes or error conversion throws RECORD_FORMAT_INVALID with original cause. Input errors and stacks are not mutated.',
         '返回完整逐行文本，头、事件、字节或错误转换失败抛 `RECORD_FORMAT_INVALID` 并保留原始原因，不修改输入错误与堆栈。'
       ),
-      example: recordExample
+      exampleIntro: t(
+        offlineIntro.en +
+          ' This event stores a Uint8Array content and an Error with a TypeError cause. Object.defineProperties adds example diagnostic source/code fields without replacing either Error; new Error(message,{cause}) retains the original cause. The matching decoder returns newly reconstructed errors and byte arrays, so value and stack preservation do not imply original object identity.',
+        offlineIntro.zh +
+          '本例事件的 `content` 是 Uint8Array，`error` 是带 TypeError 原因的 Error。`Object.defineProperties` 为示例错误附加 `source`、`code`，不替换对象，`new Error(message, { cause })` 保留原原因。配套解码器重建错误与字节数组，值和堆栈相同不代表跨文本边界后仍是原对象。'
+      ),
+      example: rpcDevtoolsCases.encodeRpcDevtoolsRecord![0]!.example,
+      cases: rpcDevtoolsCases.encodeRpcDevtoolsRecord
     },
     decodeRpcDevtoolsRecord: {
       role: 'operation',
@@ -729,15 +755,22 @@ export const rpcDevtoolsReference: ILibraryReference = {
       },
       returns: t(
         'IRpcDevtoolsHub; close returns the same promise on repeated calls. Invalid options throw INVALID_OPTION; target and lifecycle errors use the package error table.',
-        '返回聚合器，重复关闭返回同一承诺，非法选项抛 `INVALID_OPTION`，目标及生命周期失败使用包错误表。'
+        '返回聚合器，重复关闭复用同一个 Promise；非法选项抛 `INVALID_OPTION`，目标及生命周期失败使用包错误表。'
       ),
-      example: hubExample
+      exampleIntro: t(
+        offlineIntro.en +
+          ' createRpcDevtoolsHub(options?) defaults maxEvents to 50000 per target, realignMs to undefined and onError to console.error. importRecord(name,text) requires a unique nonempty name. timeline({targets:["saved"],limit:2}) selects that target and the earliest two retained events; omitted filters match all and omitted limit is unbounded within retained data. interactions(trace?) defaults to all interactions, status(name?) to all statuses, and stats(name?) to live-target aggregation. removeTarget(name) releases only that target; close() takes no arguments.',
+        offlineIntro.zh +
+          '`createRpcDevtoolsHub(options?)` 的 `maxEvents` 默认每目标 `50000`，`realignMs` 默认 `undefined`，`onError` 默认 `console.error`。`importRecord(name, text)` 的名称须非空且唯一。`timeline({ targets: ["saved"], limit: 2 })` 选择该目标最早的两个保留事件；省略筛选时全选，省略上限时不额外限制保留数据。`interactions(trace?)` 默认全部交互，`status(name?)` 默认全部状态，`stats(name?)` 默认聚合实时目标。`removeTarget(name)` 只释放指定目标，`close()` 无参数。'
+      ),
+      example: rpcDevtoolsCases.createRpcDevtoolsHub![0]!.example,
+      cases: rpcDevtoolsCases.createRpcDevtoolsHub
     },
     createRpcLogProbe: {
       role: 'enhancer',
       purpose: t(
         'Creates a standalone Core probe that logs qualifying failed, rejected, slow or peer-lifecycle events. Install it through probePlugin. Each qualifying event makes one synchronous logger call; sink promise rejection is observed without awaiting or changing business RPC.',
-        '创建记录失败、拒绝、慢调用或连接生命周期的独立核心探针，将其传给探针插件安装，每个符合条件事件同步调用日志一次，并观察日志承诺拒绝而不等待或改变业务调用。'
+        '创建记录失败、拒绝、慢调用或连接生命周期的独立核心探针，通过探针插件安装；每个合格事件同步调用一次日志方法，观察其 Promise 拒绝但不等待，不改变业务调用。'
       ),
       params: {
         logger: t(
@@ -754,7 +787,14 @@ export const rpcDevtoolsReference: ILibraryReference = {
         'IRpcProbe from @migaia/rpc-core/probe; its protocol surface remains owned there. Invalid sink or options throw TypeError with INVALID_OPTION, while observer failures use onError.',
         '返回 `@migaia/rpc-core/probe` 的探针，协议表面归核心包拥有，接收端或选项非法抛带 `INVALID_OPTION` 的类型错误，观察失败经错误回调处理。'
       ),
-      example: logExample
+      exampleIntro: t(
+        endpointIntro.en +
+          ' The complete logger implements debug/info/warn/error(message,fields); warn stores only the extracted field object and deliberately throws an existing Error. stages:["message"] and capture:["message"] select logical content; redact(stage,content) returns the masked object by reference. slowMs:0 includes every measured settled call instead of its default undefined. onError(error) records sink failures and returns nothing; without it, the host reporter owns failures. Other category levels retain their documented defaults.',
+        endpointIntro.zh +
+          '完整日志对象实现 `debug/info/warn/error(message, fields)`；`warn` 只保存提取后的字段对象，并故意抛出已有 Error。`stages: ["message"]` 与 `capture: ["message"]` 选择逻辑内容，`redact(stage, content)` 以引用返回脱敏对象。`slowMs: 0` 取代默认 `undefined`，纳入所有有耗时的成功事件。`onError(error)` 保存接收端失败且不返回值；未提供时由宿主报告通道处理。其他分类保留下面列出的默认级别。'
+      ),
+      example: rpcDevtoolsCases.createRpcLogProbe![0]!.example,
+      cases: rpcDevtoolsCases.createRpcLogProbe
     },
     RPC_DEVTOOLS_SOURCE: {
       role: 'error',
@@ -814,17 +854,40 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       example: collectorExample,
       members: {
         ...probeOptionMembers,
-        stages: f(
-          'Initial nonempty stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.',
-          '核心规范阶段名中的初始非空订阅，物理阶段需显式选择，选择本身不会开启内容捕获。',
-          'message and peer; physical stages are not subscribed.',
-          '默认 `message` 与 `peer`，不订阅物理阶段。'
-        ),
+        stages: {
+          ...f(
+            'Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.',
+            '核心规范阶段名中的初始订阅，物理阶段需显式选择，选择本身不会开启内容捕获。',
+            '`["message", "peer"]`; physical stages are not subscribed.',
+            '默认 `["message", "peer"]`，不订阅物理阶段。'
+          ),
+          values: {
+            message: t(
+              'Logical request, response and control observations.',
+              '逻辑请求、响应与控制观察。'
+            ),
+            peer: t('Connection lifecycle observations.', '连接生命周期观察。'),
+            envelope: t('Envelope observations; explicit opt-in.', '封装观察，需要显式选择。'),
+            encoded: t(
+              'Encoded content observations; explicit opt-in.',
+              '编码内容观察，需要显式选择。'
+            ),
+            frame: t('Frame observations; explicit opt-in.', '分帧观察，需要显式选择。'),
+            protected: t(
+              'Protected content observations; explicit opt-in.',
+              '保护后内容观察，需要显式选择。'
+            ),
+            carrier: t(
+              'Physical carrier observations; explicit opt-in.',
+              '物理载体观察，需要显式选择。'
+            )
+          }
+        },
         maxEvents: f(
           'Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.',
           '主环正安全整数容量，不超过语言数组长度上限，新事件淘汰最旧事件。',
           '10000 retained events in the main ring.',
-          '默认主环保留一万事件。'
+          '默认主环保留 `10000` 个事件。'
         ),
         maxContentBytes: f(
           'Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.',
@@ -836,7 +899,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           'Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.',
           '读取时名称表的正安全整数上限，不超过最大安全整数平方根向下取整再减一，溢出使用显式标记。',
           '65536 names; ingestion itself retains raw string references.',
-          '默认六万五千五百三十六个名称，摄取本身保留原始字符串引用。'
+          '默认 `65536` 个名称，摄取本身保留原始字符串引用。'
         ),
         exposeContent: f(
           'Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.',
@@ -1338,13 +1401,13 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           'Positive safe per-target retention capacity, at most 4294967295 events.',
           '每目标保留容量的正安全整数，最多 `4294967295` 个事件。',
           '50000 events independently for each target.',
-          '默认每个目标独立保留五万事件。'
+          '默认每个目标独立保留 `50000` 个事件。'
         ),
         realignMs: f(
           'Finite positive period in milliseconds for five-sample live target realignment; at most one realignment runs per target.',
           '实时目标五次采样重对齐的有限正毫秒周期，每目标至多运行一个重对齐任务。',
-          'Omitted; only initial registration performs alignment.',
-          '默认省略，仅初始注册执行对齐。'
+          '`undefined`; only initial live registration performs alignment.',
+          '默认 `undefined`，仅实时目标初始注册时执行对齐。'
         ),
         onError: {
           ...onErrorDoc,
@@ -1543,8 +1606,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
         slowMs: f(
           'Finite nonnegative settlement duration threshold for successful slow-call logging.',
           '为成功慢调用记录日志的有限非负毫秒结算阈值。',
-          'Absent; successful calls do not qualify as slow.',
-          '默认省略，成功调用不会按慢调用条件进入日志。'
+          '`undefined`; successful calls do not qualify as slow.',
+          '默认 `undefined`，成功调用不会按慢调用条件进入日志。'
         ),
         stages: {
           ...f(
@@ -1568,7 +1631,7 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           'Enables capture for subscribed stages when capture is omitted; explicit capture also permits captured fields to reach the logger.',
           '未指定捕获列表时为订阅阶段开启捕获，显式捕获列表同样允许捕获字段进入日志。',
           'false, with capture disabled unless explicitly requested.',
-          '默认假，除非显式要求，否则不捕获内容。'
+          '默认 `false`，除非显式要求，否则不捕获内容。'
         ),
         levels: {
           ...f(

@@ -1,5 +1,6 @@
 /** Pure topology and dependency planning, checked against graph sources on 2026-10-17. */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText, ITypeDoc } from './contract.js'
+import { capabilityCases } from './capability-cases.ts'
 /** Builds bilingual reader text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Documents one field without guessing its policy. */
@@ -320,8 +321,8 @@ const types: Record<string, ITypeDoc> = {
         '节点依赖列表引用的、应用指定的非空提供方标识。'
       ),
       required: p(
-        'True participates in required ordering and dependent closure; false remains an optional relationship.',
-        '为真时参与必需排序与消费方闭包，为假时保留可选关系。'
+        'Required boolean with no default. `true` rejects a missing provider and participates in required dependent closure. `false` permits a missing provider and does not propagate a required cascade; when its provider exists, the edge still participates in ordering and cycle checks.',
+        '必填布尔值，无默认值。`true` 拒绝缺失提供方，并参与必需消费方闭包；`false` 允许提供方缺失，也不传播必需依赖级联，但提供方存在时仍参与排序和依赖环检查。'
       )
     }
   },
@@ -751,27 +752,30 @@ const symbols: Record<string, ISymbolDoc> = {
     ),
     params: {
       nodes: t(
-        'Application-authored static nodes with unique nonempty IDs and ordinals covering zero through nodeCount minus one.',
-        '应用编写的静态节点，标识非空且唯一，序号覆盖零至节点数减一。'
+        'Required caller-authored array; every field is required with no default. `nodes[].id` is a unique nonempty string, `nodes[].ordinal` is a unique safe integer collectively covering 0 through nodeCount minus one, and `nodes[].dependencies` is an array (`[]` for none). Each dependency has a nonempty string `provider` and boolean `required`, with no duplicate provider within a node. `required: true` requires the provider to exist; `false` permits absence, while present optional edges still affect levels and cycles. Caller input is copied, not reordered.',
+        '调用方必填数组，每个字段均必填且无默认值。`nodes[].id` 为唯一非空字符串，`nodes[].ordinal` 为唯一安全整数，合计覆盖 0 至节点数减一，`nodes[].dependencies` 为数组（无依赖传 `[]`）。每条依赖含非空字符串 `provider` 与布尔 `required`，同一节点不能重复提供方。`required: true` 要求提供方存在；`false` 允许缺失，但已存在的可选边仍影响层级和环检查。复制调用方输入，不重排原数组。'
       ),
       onUnknownProvider: t(
-        'Synchronous (nodeId, provider) receives application IDs for an unknown required edge and must throw; the error propagates unchanged.',
-        '同步 `(nodeId, provider)` 接收缺失必需依赖边两端的应用标识，必须抛错，错误原样传播。'
+        'Required synchronous `(nodeId, provider) => never`, with no default. Both string arguments come from the caller’s node and missing required-provider edge. Must throw a caller-owned error, which propagates unchanged.',
+        '必填同步 `(nodeId, provider) => never`，无默认值。两个字符串分别来自调用方节点和缺失的必需提供方依赖边。必须抛出调用方错误，错误原样传播。'
       ),
       onCycle: t(
-        'Synchronous (path) receives a closed cycle of application IDs, rotated to its smallest registration ordinal, and must throw.',
-        '同步 `(path)` 接收应用标识组成的闭合环，从最小登记序号开始排列，必须抛错。'
+        'Required synchronous `(path) => never`, with no default. The frozen string array is a closed cycle (first ID repeated last), rotated to its smallest registration ordinal. Must throw a caller-owned error.',
+        '必填同步 `(path) => never`，无默认值。冻结字符串数组为闭合环，首个标识在末尾重复，并从最小登记序号开始排列。必须抛出调用方错误。'
       ),
       onInvalid: t(
-        'Synchronous (reason, nodeId?, failure?) receives structural TopologyInvalidReason, attributable application node ID and optional { cause } for captured access failures. Must throw; the boundary retains the original cause/errors without replacing the adapter-selected native error.',
-        '同步 `(reason, nodeId?, failure?)` 接收结构性 `TopologyInvalidReason`、可归因应用标识与捕获访问失败的可选 `{ cause }`。必须抛错；边界保留原始原因或错误列表，不替换适配器选定的原生错误。'
+        'Required synchronous `(reason, nodeId?, failure?) => never`, with no default. The `TopologyInvalidReason` domain is `invalid-node`, `duplicate-node`, `duplicate-edge`, `duplicate-ordinal`, `unknown-node`, `transaction-open` or `transaction-closed`; this static builder uses the first four structural reasons. Optional `nodeId` is the attributable caller ID, otherwise `undefined`; optional `failure` is `{ cause: unknown }` for a captured access error, otherwise `undefined`. Must throw. The boundary retains the original cause/errors without replacing the adapter-selected native error.',
+        '必填同步 `(reason, nodeId?, failure?) => never`，无默认值。`TopologyInvalidReason` 包含 `invalid-node`、`duplicate-node`、`duplicate-edge`、`duplicate-ordinal`、`unknown-node`、`transaction-open`、`transaction-closed`；静态构建器使用前四种结构原因。可选 `nodeId` 为可归因的调用方标识，否则为 `undefined`；可选 `failure` 为捕获访问错误的 `{ cause: unknown }`，否则为 `undefined`。必须抛错，边界保留原始原因或错误列表，不替换适配器选定的原生错误。'
       )
     },
     returns: t(
       'Deeply frozen ICapabilityTopology. Error adapters own failure construction; their errors propagate rather than being silently replaced.',
       '返回深度冻结的 `ICapabilityTopology`，失败由错误适配器构造并原样传播，不会静默替换。'
     ),
-    example: `import { buildCapabilityTopology } from '@migaia/capability/graph/topology'\nconst fail = (reason: unknown): never => { throw new TypeError(String(reason)) }\nconst topology = buildCapabilityTopology([{ id: 'cache', dependencies: [], ordinal: 0 }], fail, fail, fail)\nconsole.log(topology.ordered)`
+    exampleIntro: capabilityCases.buildCapabilityTopology![0]!.problem,
+    example: capabilityCases.buildCapabilityTopology![0]!.example,
+    exampleResult: capabilityCases.buildCapabilityTopology![0]!.result,
+    cases: capabilityCases.buildCapabilityTopology
   },
   collectPlanEdges: {
     role: 'operation',

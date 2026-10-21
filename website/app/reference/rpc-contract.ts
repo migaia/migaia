@@ -11,6 +11,7 @@ import type {
   ITypeDoc,
   IEnumDoc
 } from './contract.js'
+import { rpcContractCases } from './rpc-contract-cases.ts'
 
 /** Every reader-facing text has explicit locales. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -1764,8 +1765,8 @@ Object.assign(symbols, {
         '应用必需的 `IRpcSerializeErrorOptions`；上报同步接收指针、字段及原始读取或规范化错误。'
       ),
       metadata: t(
-        'Optional caller-held WeakMap readers assigning presentation summaries or diagnostic routes by exact Error reference.',
-        '调用方可选持有的弱映射读取端，按精确错误引用选择展示摘要或诊断路由。'
+        'Optional caller-held metadata, default undefined. summaries.get(error) chooses exact-reference presentation; routes.get(error) supplies bounded node routes. Each field defaults to absent, never creates runtime authority, and is separate from ordinary serialized properties.',
+        '可选调用方元数据，默认 `undefined`；`summaries.get(error)` 按精确引用选择展示，`routes.get(error)` 提供有界节点路由，两字段均默认省略，与普通序列化属性分开，也不创建运行权限。'
       )
     },
     returns: t(
@@ -1905,8 +1906,8 @@ Object.assign(symbols, {
   normalizePortable: {
     role: 'operation',
     purpose: t(
-      'Snapshots supported portable scalars, arrays and records into frozen wire-compatible values; rejects cycles, nonfinite numbers and unsupported object types. Native binary requires its independently negotiated profile.',
-      '把受支持可移植标量、数组和记录快照为冻结线上兼容值；拒绝循环、非有限数和不支持对象，原生二进制要求独立协商形态。'
+      'Snapshots supported portable values without sending or executing a request. The default wire domain is null, boolean, finite number, string, array, plain record or a canonical bytes tag; Uint8Array becomes {$rpc: "bytes", base64url}. Records become frozen null-prototype snapshots.\n\nRejects cycles, nonfinite numbers and unsupported objects with INVALID_ENVELOPE. Ordinary record getters are read once and can execute user code. Native binary belongs to an independently negotiated profile, not the default wire result.',
+      '快照支持的可移植值，不发送或执行请求；默认线上值域为 `null`、布尔、有限数、字符串、数组、普通记录或规范字节标签，`Uint8Array` 转为 `{ $rpc: "bytes", base64url }`，记录成为冻结的空原型快照。\n\n循环、非有限数与不支持的对象以 `INVALID_ENVELOPE` 拒绝；普通记录访问器读取一次，可能执行用户代码；原生二进制属于独立协商形态，不是默认线上结果。'
     ),
     params: {
       value: t(
@@ -1914,12 +1915,12 @@ Object.assign(symbols, {
         '需要纯可移植数据快照的应用或对端值。'
       ),
       depth: t(
-        'Optional existing traversal depth, default zero; preserve the shared maximum nesting bound.',
-        '可选已有遍历深度，默认零，保持共享最大嵌套边界。'
+        'Optional existing traversal depth, default 0 at the root; RPC_PORTABLE_MAX_DEPTH is 64. Ordinary application calls omit this traversal-integration parameter.',
+        '可选已有遍历深度，根默认为 `0`，`RPC_PORTABLE_MAX_DEPTH` 为 `64`，普通应用调用省略此遍历集成参数。'
       ),
       active: t(
-        'Optional caller-provided active-object Set used by the same traversal for cycle detection.',
-        '同一遍历用于循环检测的可选调用方活动对象集合。'
+        'Optional caller-provided ancestor Set for the same traversal, default undefined with traversal-local cycle tracking. It tracks active ancestors rather than deduplicating all repeated references.',
+        '可选同一遍历的祖先 `Set`，默认 `undefined`，使用遍历本地循环追踪；它记录活动祖先，不对所有重复引用去重。'
       ),
       nativeBinary: t(
         'Optional native-binary branch flag, default false; true admits native bytes, or a synchronous rejection callback supplies the failure boundary.',
@@ -2021,8 +2022,8 @@ for (const [name, kind] of [
     ),
     params: {
       options: t(
-        'Optional IRpcFramerOptions supplied by the application; its numeric limits must be positive safe integers.',
-        '应用提供的可选 `IRpcFramerOptions`；数值限制须为正安全整数。'
+        'Optional application IRpcFramerOptions, default {} with the field defaults below. Numeric limits must be positive safe integers; chunkBytes cannot exceed maxMessageBytes, which cannot exceed maxBufferedBytes.',
+        '应用可选 `IRpcFramerOptions`，默认 `{}` 并采用下表字段默认值，数值限制须为正安全整数，`chunkBytes` 不得超过 `maxMessageBytes`，后者不得超过 `maxBufferedBytes`。'
       )
     },
     returns: t(
@@ -2810,13 +2811,19 @@ const wireErrorOptions: Record<string, IMemberDoc> = {
     ),
     values: { enum: 'RpcWireErrorUnknownFieldMode' }
   },
-  onUnknownField: envelopeOptions.onUnknownField
+  onUnknownField: {
+    ...envelopeOptions.onUnknownField,
+    default: t(
+      'Omitted; no observer is called. The default unknownFields policy still rejects unknown error-node fields.',
+      '默认省略，不调用观察者；默认 `unknownFields` 策略仍拒绝未知错误节点字段。'
+    )
+  }
 }
 /** Canonical framer numeric defaults are captured once by the constructor. */
 const framerOptions: Record<string, IMemberDoc> = {
   chunkBytes: p(
-    'Positive safe-integer fragment size: byte count for binary, UTF-16 code-unit count for string framing.',
-    '正安全整数分片大小：二进制按字节计量，字符串分片按文本编码单元计量。',
+    'Positive safe-integer fragment size: bytes for binary, UTF-16 code units for strings; cannot exceed maxMessageBytes.',
+    '正安全整数分片大小，二进制按字节、字符串按 UTF-16 码元计量，不得超过 `maxMessageBytes`。',
     t('`16384` units per fragment.', '默认每片 `16384` 个计量单位。')
   ),
   maxMessageBytes: p(
@@ -2847,7 +2854,7 @@ const framerOptions: Record<string, IMemberDoc> = {
   now: p(
     'Optional synchronous application clock callback returning a numeric time; current implementation snapshots but never invokes it.',
     '可选应用同步时钟回调，返回数字时间；当前实现只保存该回调，从不调用。',
-    t('Absent; current framing does not read this option.', '默认不设置，当前分帧不会读取该选项。')
+    t('Omitted; no application clock callback is invoked.', '默认省略，不调用应用时钟回调。')
   ),
   schedule: p(
     'Optional synchronous timer adapter receives a no-argument expiry callback and delayMs; returns the opaque handle passed to cancel. A failed scheduler keeps prior semantic identity or gains `CALLBACK_FAILED`; unattachable failures remain on `cause`.',
@@ -4618,6 +4625,25 @@ scalar(
   `import schema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }
 console.log(schema.$schema)`
 )
+/** Runnable task evidence is attached after all symbol option refinements. */
+for (const name of ['normalizePortable', 'serializeRpcError', 'createStringFramer']) {
+  const first = rpcContractCases[name]![0]!
+  symbols[name] = {
+    ...symbols[name],
+    exampleIntro: first.problem,
+    example: first.example,
+    exampleResult: first.result,
+    cases: rpcContractCases[name]
+  }
+}
+/** String framing exposes its real context and result choices beside its runnable cases. */
+symbols.createStringFramer = {
+  ...symbols.createStringFramer,
+  purpose: t(
+    'Creates an ordered bounded string fragment framer. frame(value, context) returns either one whole string or ordered rpc.frame.v1 fragments. context.source is the caller-owned source namespace and context.messageId is the sender correlation id; neither authenticates a peer.\n\naccept(frame, context) returns pending, complete with a reassembled string, or rejected with an Error carrying a semantic code. Assemblies are isolated by both context fields. close() clears retained assemblies/timers and makes later accept calls reject; it does not send network messages.',
+    '创建有序有界的字符串分帧器，`frame(value, context)` 返回整字符串或有序 `rpc.frame.v1` 分片；`context.source` 为调用方拥有的来源命名空间，`context.messageId` 为发送方关联标识，两者均不认证对端。\n\n`accept(frame, context)` 返回 `pending`、携带重组字符串的 `complete`，或携带带码错误的 `rejected`，按两个上下文字段共同隔离；`close()` 清理保留组装与计时器，并使之后的接收拒绝，不会发送网络消息。'
+  )
+}
 /** Module orientation uses canonical entry points even when other entries are aliases. */
 const modules: ILibraryReference['modules'] = {
   index: {
