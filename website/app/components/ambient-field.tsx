@@ -1,3 +1,6 @@
+import { log } from '../log.js'
+import { useProvidedStore } from '@migaia/store-react'
+import { resolveTheme, uiStoreToken } from '../ui-state.js'
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigation, useNavigationType } from 'react-router'
 import { prefersReducedMotion } from '../motion.js'
@@ -23,7 +26,7 @@ const AMBIENT_SHADER = /* wgsl */ `
 struct Uniforms {
   res: vec2f, time: f32, dark: f32, level: f32, flow: f32, drift: vec2f,
   focus: vec4f, focusLevel: f32, release: f32, corner: f32,
-  hero: vec4f, heroLevel: f32
+  hero: vec4f, heroLevel: f32, tint: f32, breath: f32
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
@@ -51,15 +54,21 @@ fn fbm(p0: vec2f) -> f32 {
   let t = u.flow;
   let indigo = mix(vec3f(0.36, 0.39, 0.84), vec3f(0.55, 0.6, 1.0), u.dark);
   let teal = mix(vec3f(0.12, 0.55, 0.6), vec3f(0.36, 0.8, 0.82), u.dark);
+  // Not-found page: the flowing waves turn blue and cyan and run a little stronger.
+  let blue = mix(vec3f(0.2, 0.44, 0.96), vec3f(0.36, 0.62, 1.0), u.dark);
+  let cyan = mix(vec3f(0.05, 0.62, 0.78), vec3f(0.3, 0.9, 0.96), u.dark);
+  let waveLow = mix(indigo, blue, u.tint);
+  let waveHigh = mix(teal, cyan, u.tint);
 
   // Aurora: two warped noise layers, strongest toward the top of the viewport.
   let n = fbm(p * 1.1 + vec2f(t, -t * 0.7));
   let m = fbm(p * 1.8 - vec2f(t * 0.6, t) + n * 1.4);
-  let auroraColor = mix(indigo, teal, smoothstep(0.35, 0.7, n));
+  let auroraColor = mix(waveLow, waveHigh, smoothstep(0.35, 0.7, n));
   // Docs home: waves passing the top-right corner swell; empty sky there stays empty.
   let cornerWeight = u.corner * (1.0 - smoothstep(0.1, 1.05, length(p - vec2f(aspect, 0.0))));
-  let aurora = smoothstep(0.38 - 0.08 * cornerWeight, 0.85, m) * mix(0.07, 0.11, u.dark)
-    * (1.0 - 0.55 * uv.y) * (1.0 + 2.4 * cornerWeight);
+  // Not-found page: lower threshold and no top bias spread the bands over the whole viewport.
+  let aurora = smoothstep(0.38 - 0.08 * cornerWeight - 0.1 * u.tint, 0.85, m) * mix(0.07, 0.11, u.dark)
+    * (1.0 - 0.55 * uv.y * (1.0 - u.tint)) * (1.0 + 2.4 * cornerWeight) * (1.0 + 0.5 * u.tint);
 
   // Particles: one jittered point per grid cell, carried by the accumulated drift.
   let grid = 30.0;
@@ -75,8 +84,10 @@ fn fbm(p0: vec2f) -> f32 {
   let radius = mix(0.05, 0.11, h) * (1.0 - 0.75 * u.release) * (1.0 + 0.6 * bloom);
   let dotMask = smoothstep(radius, radius * mix(0.35, 0.0, u.level), length(d)) * step(0.62, h);
   let twinkle = 0.55 + 0.45 * sin(u.time * 0.9 + h * 40.0);
+  // Not-found page: particles breathe against the CSS dot grid, bright while the grid dims.
+  let breathe = mix(1.0, mix(1.7, 0.25, u.breath), u.tint);
   let particles = dotMask * mix(0.14, 0.2, u.dark) * twinkle * (1.0 - u.level * 0.35)
-    * (1.0 - 0.5 * u.release) * (1.0 + 1.4 * bloom);
+    * (1.0 - 0.5 * u.release) * (1.0 + 1.4 * bloom) * breathe;
   let particleColor = mix(indigo, teal, h);
 
   // Focused card: inside the hovered card's rect the aurora thickens and a second, finer particle
@@ -108,9 +119,9 @@ fn fbm(p0: vec2f) -> f32 {
   let band = abs(fract(f * 9.0) - 0.5);
   let line = smoothstep(0.035, 0.0, band) * (0.55 + 0.45 * smoothstep(0.3, 0.8, f));
   let glow = smoothstep(0.25, 0.95, f);
-  let contour = (glow * (0.008 + 0.05 * cornerWeight) + line * mix(0.065, 0.05, u.dark)
-    * (1.0 + 1.6 * cornerWeight)) * (1.0 - 0.3 * uv.y);
-  let contourColor = mix(indigo, teal, smoothstep(0.35, 0.75, w.x));
+  let contour = (glow * (0.008 + 0.05 * cornerWeight + 0.03 * u.tint) + line * mix(0.065, 0.05, u.dark)
+    * (1.0 + 1.6 * cornerWeight + 0.9 * u.tint)) * (1.0 - 0.3 * uv.y);
+  let contourColor = mix(waveLow, waveHigh, smoothstep(0.35, 0.75, w.x));
 
   let a = clamp(aurora + particles + contour + focusParticles + focusAurora, 0.0, 1.0);
   let color =
@@ -134,6 +145,28 @@ const TRANSITION_EASE_SECONDS = 0.22
 
 /** Idle motion speeds (units per second): aurora flow, particle drift along x and y. */
 const IDLE_SPEED = { flow: 0.024, driftX: 0.14, driftY: -0.156 } as const
+
+/**
+ * Extra aurora flow speed at full blue-cyan tint, as a multiple of the idle flow. The not-found
+ * page has no reading content to protect, so its waves drift visibly, but slowly enough to stay
+ * smooth.
+ */
+const TINT_FLOW_BOOST = 1.5
+
+/**
+ * Extra particle drift speed at full tint while the not-found grid is darkest, as a multiple of the
+ * idle drift. Particles brighten and quicken as the grid fades, then calm as it returns.
+ */
+const TINT_DRIFT_BOOST = 2
+
+/** Seconds per not-found breath cycle shared by the CSS dot grid and the shader particles. */
+const BREATH_PERIOD_SECONDS = 7
+
+/**
+ * CSS custom property (0..1) carrying the breath phase to the not-found dot grid in app.css, so the
+ * grid and the particles follow one clock in opposite phase.
+ */
+const BREATH_PROPERTY = '--not-found-breath'
 
 /**
  * Extra speed at full transition strength. Particles race along the navigation direction (x, signed
@@ -162,8 +195,9 @@ const UNIFORM_COPY_DST_USAGE = 0x40 | 0x08
 /**
  * Uniform block size in bytes: res, time, dark, level, flow, drift (8 × f32), the focused card rect
  * (vec4f at offset 32), its strength (f32 at 48), the release strength (f32 at 52), the corner
- * strength (f32 at 56), the docs home search rect (vec4f at 64) and its strength (f32 at 80),
- * padded to the struct's 16-byte alignment.
+ * strength (f32 at 56), the docs home search rect (vec4f at 64), its strength (f32 at 80) and the
+ * blue-cyan wave tint (f32 at 84) and the not-found breath phase (f32 at 88), padded to the
+ * struct's 16-byte alignment.
  */
 const UNIFORM_BYTES = 96
 
@@ -227,7 +261,19 @@ function historyIndex(): number | null {
  * `--canvas` color. It pauses while the tab is hidden, draws one still frame under reduced motion
  * (with no transitions), and releases its GPU device on unmount.
  */
-export default function AmbientField() {
+export default function AmbientField({
+  blueCyan = false
+}: {
+  /** Tints the flowing aurora and contour waves blue and cyan; used by the not-found page. */
+  readonly blueCyan?: boolean
+}) {
+  /** Wave tint read by the render loop each frame (0 = brand colors, 1 = blue and cyan). */
+  const tintRef = useRef(blueCyan ? 1 : 0)
+  tintRef.current = blueCyan ? 1 : 0
+  /** Resolved appearance comes from the page owner, never from its DOM projection. */
+  const theme = useProvidedStore(uiStoreToken, resolveTheme)
+  /** The GPU loop reads the latest appearance without rebuilding its device. */
+  const themeRef = useRef(theme)
   /** Fixed full-viewport canvas owned by this component. */
   const canvasRef = useRef<HTMLCanvasElement>(null)
   /**
@@ -238,6 +284,11 @@ export default function AmbientField() {
   const transitionRef = useRef({ dir: 1, loading: false, holdUntil: 0, releaseUntil: 0 })
   /** Render-loop resume hook, installed once the device is ready. */
   const wakeRef = useRef<() => void>(() => {})
+  /** A theme change also repaints a reduced-motion still frame. */
+  useEffect(() => {
+    themeRef.current = theme
+    wakeRef.current()
+  }, [theme])
   const { pathname } = useLocation()
   /** Whether the current route is the docs home; read by the render loop each step. */
   const homeRef = useRef(isDocsHome(pathname))
@@ -315,6 +366,11 @@ export default function AmbientField() {
       const origin = performance.now() - 60_000
       /** Constant reduced-motion decision for this mount; only still frames are drawn. */
       const still = prefersReducedMotion()
+      /** Not-found breath phase at `now`: 0 at rest, 1 at the brightest grid; still frames hold 0.5. */
+      const breathAt = (now: number) =>
+        still
+          ? 0.5
+          : 0.5 - 0.5 * Math.cos((2 * Math.PI * (now - origin)) / 1000 / BREATH_PERIOD_SECONDS)
       /** Timestamp of the last drawn frame, for the idle cap. */
       let lastDraw = 0
       /** Timestamp of the previous loop step, for speed integration and easing. */
@@ -379,9 +435,15 @@ export default function AmbientField() {
             : null
         heroLevel += ((search ? 1 : 0) - heroLevel) * (1 - Math.exp(-dt / CORNER_EASE_SECONDS))
         if (search) heroRect = search
-        flow += dt * (IDLE_SPEED.flow + level * TRANSITION_SPEED.flow)
-        driftX += dt * (IDLE_SPEED.driftX + level * TRANSITION_SPEED.driftX * transition.dir)
-        driftY += dt * (IDLE_SPEED.driftY + level * TRANSITION_SPEED.driftY)
+        flow +=
+          dt *
+          (IDLE_SPEED.flow * (1 + TINT_FLOW_BOOST * tintRef.current) +
+            level * TRANSITION_SPEED.flow)
+        /** Particle speed multiplier: quickest while the not-found grid is darkest. */
+        const driftBoost = 1 + TINT_DRIFT_BOOST * tintRef.current * (1 - breathAt(now))
+        driftX +=
+          dt * (IDLE_SPEED.driftX * driftBoost + level * TRANSITION_SPEED.driftX * transition.dir)
+        driftY += dt * (IDLE_SPEED.driftY * driftBoost + level * TRANSITION_SPEED.driftY)
         const focusTarget = focusCard ? 1 : 0
         focusLevel += (focusTarget - focusLevel) * (1 - Math.exp(-dt / FOCUS_EASE_SECONDS))
         if (focusTarget === 0 && focusLevel < TRANSITION_EPSILON) focusLevel = 0
@@ -399,7 +461,7 @@ export default function AmbientField() {
         uniforms[0] = canvas.width
         uniforms[1] = canvas.height
         uniforms[2] = (now - origin) / 1000
-        uniforms[3] = document.documentElement.dataset.theme === 'dark' ? 1 : 0
+        uniforms[3] = themeRef.current === 'dark' ? 1 : 0
         uniforms[4] = level
         uniforms[5] = flow
         uniforms[6] = driftX
@@ -418,6 +480,12 @@ export default function AmbientField() {
         uniforms[18] = heroRect.right * scale
         uniforms[19] = heroRect.bottom * scale
         uniforms[20] = heroLevel
+        uniforms[21] = tintRef.current
+        /** Grid brightness phase shared with the CSS dot grid, opposite the particles. */
+        const breath = breathAt(now)
+        uniforms[22] = breath
+        if (tintRef.current > 0)
+          document.documentElement.style.setProperty(BREATH_PROPERTY, breath.toFixed(3))
         gpuDevice.queue.writeBuffer(uniformBuffer, 0, uniforms)
         const encoder = gpuDevice.createCommandEncoder()
         const pass = encoder.beginRenderPass({
@@ -444,7 +512,8 @@ export default function AmbientField() {
           return
         }
         const transitioning = step(now)
-        if (transitioning || now - lastDraw >= IDLE_FRAME_INTERVAL_MS) {
+        // The not-found page draws every frame: its faster waves judder at the idle cap.
+        if (transitioning || tintRef.current > 0 || now - lastDraw >= IDLE_FRAME_INTERVAL_MS) {
           lastDraw = now
           draw(now)
         }
@@ -464,8 +533,6 @@ export default function AmbientField() {
       }
 
       wakeRef.current = resume
-      const themeObserver = new MutationObserver(resume)
-      themeObserver.observe(document.documentElement, { attributeFilter: ['data-theme'] })
       document.addEventListener('visibilitychange', resume)
       window.addEventListener('resize', resume)
       /** Hover focus only animates; the reduced-motion still frame ignores it. */
@@ -477,14 +544,14 @@ export default function AmbientField() {
           })
       detach = () => {
         stopFocus()
-        themeObserver.disconnect()
+        document.documentElement.style.removeProperty(BREATH_PROPERTY)
         document.removeEventListener('visibilitychange', resume)
         window.removeEventListener('resize', resume)
         uniformBuffer.destroy()
       }
       void gpuDevice.lost.then((info) => {
         // A lost device ends the effect; the plain background stays. Report unexpected loss only.
-        if (info.reason !== 'destroyed') console.error(info.message)
+        if (info.reason !== 'destroyed') log.error(info.message)
         canvas.dataset.ready = 'false'
         canvas.style.filter = ''
         if (frame) cancelAnimationFrame(frame)
@@ -496,7 +563,7 @@ export default function AmbientField() {
 
     start().catch((error: unknown) => {
       // Decorative only: report and keep the plain background.
-      console.error(error)
+      log.error(error)
     })
     return () => {
       disposed = true

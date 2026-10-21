@@ -1,9 +1,11 @@
+import { useResource, useStore } from '@migaia/store-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { interfaceCopyFor } from '../copy.js'
 import { LIBRARY_INDEX, libraryReferenceDescription } from '../library-descriptions.js'
 import { domainPath, type ILocale } from '../route-contract.js'
-import { loadSearchIndex } from '../search.js'
+import { createSearchQuery } from '../search.js'
+import { createSearchHistory } from '../search-history.js'
 import {
   Dialog,
   DialogContent,
@@ -23,32 +25,8 @@ type IPaletteItem = {
   readonly to: string
 }
 
-/** Resolved data of one Pagefind result. */
-type IPagefindHit = {
-  readonly url: string
-  readonly excerpt: string
-  readonly meta: { readonly title?: string }
-}
-
-/** Subset of the Pagefind runtime this palette calls. */
-type IPagefind = {
-  /** Sets init options; `language` picks the per-locale index before the next search loads it. */
-  readonly options: (options: { readonly language: ILocale }) => Promise<void>
-  /** Drops the loaded index so the next `options` + `search` loads another language. */
-  readonly destroy: () => Promise<void>
-  readonly search: (query: string) => Promise<{
-    readonly results: readonly { readonly data: () => Promise<IPagefindHit> }[]
-  } | null>
-}
-
-/** Maximum Pagefind hits rendered; more would push the keyboard target off-screen. */
-const MAX_PAGE_RESULTS = 8
-
 /** Maximum library rows shown for a non-empty query. */
 const MAX_LIBRARY_RESULTS = 5
-
-/** Delay before querying Pagefind so each keystroke does not start a search. */
-const SEARCH_DEBOUNCE_MS = 120
 
 /** Converts a Pagefind result URL into the basename-relative route React Router expects. */
 function routeFromSearchUrl(url: string): string {
@@ -68,32 +46,75 @@ function plainExcerpt(excerpt: string): string {
  * the local Pagefind index (loaded on first open, no remote service). Arrow keys move the active
  * row, Enter opens it, Escape closes the dialog.
  */
-export default function CommandPalette({
+function PaletteSession({
   locale,
   onOpenChange,
-  open
+  open,
+  searchQuery,
+  history
 }: {
   readonly locale: ILocale
   readonly onOpenChange: (open: boolean) => void
   readonly open: boolean
+  readonly searchQuery: ReturnType<typeof createSearchQuery>
+  readonly history: ReturnType<typeof createSearchHistory>
 }) {
   const copy = interfaceCopyFor(locale)
   const navigate = useNavigate()
+  /** History keeps language partitions and persistence feedback in its single owner. */
+  const historyState = useStore(history.store, (state) => ({
+    entries: state.entries,
+    status: state.status,
+    feedback: state.feedback
+  }))
+  /** Only the route's language is visible in this palette. */
+  const historyEntries = historyState.entries.filter((entry) => entry.locale === locale)
+  /** Feedback is announced only after the history owner's flush settles. */
+  const historyFeedback =
+    historyState.feedback === 'saving'
+      ? copy.historySaving
+      : historyState.feedback === 'saved'
+        ? copy.historySaved
+        : historyState.feedback === 'deleted'
+          ? copy.historyDeleted
+          : historyState.feedback === 'failed'
+            ? copy.historyFailed
+            : ''
   /** Current input text. */
   const [query, setQuery] = useState('')
-  /** Pagefind hits for the latest settled query. */
-  const [pages, setPages] = useState<readonly IPaletteItem[]>([])
-  /** True between a query change and its Pagefind response. */
-  const [searching, setSearching] = useState(false)
+  /**
+   * Recent searches shown for the current input: all of them while the input is empty, otherwise
+   * only those containing it. The section is hidden whenever this list is empty, including while
+   * history loads or when storage is unavailable.
+   */
+  const visibleHistory =
+    historyState.status === 'ready'
+      ? historyEntries.filter((entry) =>
+          entry.query.toLowerCase().includes(query.trim().toLowerCase())
+        )
+      : []
+  /** Resource is the sole owner of current page results. */
+  const result = useResource(searchQuery.resource)
+  /** Distinguishes the debounce interval from a completed empty result. */
+  const settledInput = useStore(searchQuery.needle, (state) => state.query)
+  /** Both debounce and resource replacement keep the searching state visible. */
+  const searching =
+    query.trim() !== settledInput ||
+    result.status === 'pending' ||
+    (result.status === 'success' && result.refreshing === true)
+  /** Old resource data stays hidden while a newer query is waiting. */
+  const pages: readonly IPaletteItem[] =
+    !searching && result.status === 'success'
+      ? result.data.map((hit) => ({
+          key: `page:${hit.url}`,
+          group: 'pages',
+          title: hit.meta.title?.replace(/ · migaia$/, '') ?? hit.url,
+          detail: plainExcerpt(hit.excerpt),
+          to: routeFromSearchUrl(hit.url)
+        }))
+      : []
   /** Index of the highlighted row across both groups. */
   const [active, setActive] = useState(0)
-  /** Lazily loaded Pagefind module; null when the index is unavailable (local dev). */
-  const pagefindRef = useRef<Promise<IPagefind | null> | undefined>(undefined)
-  /**
-   * Locale whose index the Pagefind singleton holds. Pagefind binds one language at first search,
-   * so a client-side language switch must reload it or results stay in the previous language.
-   */
-  const indexLocaleRef = useRef<ILocale | undefined>(undefined)
   /** Scroll container used to keep the active row visible. */
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -115,59 +136,8 @@ export default function CommandPalette({
     return needle ? rows.slice(0, MAX_LIBRARY_RESULTS) : rows
   }, [locale, query])
 
-  useEffect(() => {
-    const needle = query.trim()
-    if (!open || !needle) {
-      setPages([])
-      setSearching(false)
-      return
-    }
-    setSearching(true)
-    /** Set when a newer query supersedes this one so its late response is dropped. */
-    let stale = false
-    const timer = window.setTimeout(async () => {
-      if (!pagefindRef.current)
-        pagefindRef.current = loadSearchIndex().then(
-          (module) => module as IPagefind,
-          (error: unknown) => {
-            // The index exists only in built output; report and fall back to library rows.
-            console.error(error)
-            return null
-          }
-        )
-      const pagefind = await pagefindRef.current
-      /** Resolved hit data; a failed query reports and shows the empty state. */
-      let hits: readonly IPagefindHit[] = []
-      try {
-        if (pagefind && indexLocaleRef.current !== locale) {
-          await pagefind.destroy()
-          await pagefind.options({ language: locale })
-          indexLocaleRef.current = locale
-        }
-        const response = pagefind ? await pagefind.search(needle) : null
-        hits = await Promise.all(
-          (response?.results ?? []).slice(0, MAX_PAGE_RESULTS).map((result) => result.data())
-        )
-      } catch (error) {
-        console.error(error)
-      }
-      if (stale) return
-      setPages(
-        hits.map((hit) => ({
-          key: `page:${hit.url}`,
-          group: 'pages',
-          title: hit.meta.title?.replace(/ · migaia$/, '') ?? hit.url,
-          detail: plainExcerpt(hit.excerpt),
-          to: routeFromSearchUrl(hit.url)
-        }))
-      )
-      setSearching(false)
-    }, SEARCH_DEBOUNCE_MS)
-    return () => {
-      stale = true
-      window.clearTimeout(timer)
-    }
-  }, [locale, open, query])
+  /** Input debounce belongs to the same session as the query Resource. */
+  useEffect(() => searchQuery.setInput(query), [query, searchQuery])
 
   /** Flat keyboard order: libraries first, then pages. */
   const items = useMemo(() => [...libraries, ...pages], [libraries, pages])
@@ -176,12 +146,10 @@ export default function CommandPalette({
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [active])
-  useEffect(() => {
-    if (!open) setQuery('')
-  }, [open])
 
   /** Navigates to one row and closes the palette. */
   const choose = (item: IPaletteItem | undefined) => {
+    void history.record(locale, query)
     if (!item) return
     onOpenChange(false)
     navigate(item.to)
@@ -257,6 +225,41 @@ export default function CommandPalette({
             <kbd>esc</kbd>
           </div>
           <div className="palette-results" id="palette-results" ref={listRef} role="listbox">
+            {visibleHistory.length > 0 ? (
+              <section className="palette-group" aria-label={copy.historyTitle}>
+                <p className="palette-group-label">{copy.historyTitle}</p>
+                {visibleHistory.map((entry) => (
+                  <div className="palette-history-row" key={entry.query}>
+                    <button
+                      className="palette-item"
+                      type="button"
+                      onClick={() => setQuery(entry.query)}
+                    >
+                      <span className="palette-item-title">{entry.query}</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${copy.historyDelete}: ${entry.query}`}
+                      disabled={historyState.feedback === 'saving'}
+                      onClick={() => void history.remove(locale, entry.query)}
+                    >
+                      {copy.historyDelete}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  disabled={historyState.feedback === 'saving'}
+                  onClick={() => void history.clear(locale)}
+                >
+                  {copy.historyClear}
+                </button>
+              </section>
+            ) : null}
+            {/* Stays mounted so save and delete results are still announced after the list empties. */}
+            <p className={historyFeedback ? 'palette-state' : 'sr-only'} role="status">
+              {historyFeedback}
+            </p>
             {renderGroup('libraries', libraries)}
             {renderGroup('pages', pages)}
             {query.trim() && !searching && pages.length === 0 ? (
@@ -273,4 +276,45 @@ export default function CommandPalette({
       </DialogPortal>
     </Dialog>
   )
+}
+
+/** Acquires browser query resources only after a committed open, including StrictMode replay. */
+export default function CommandPalette({
+  locale,
+  onOpenChange,
+  open
+}: {
+  readonly locale: ILocale
+  readonly onOpenChange: (open: boolean) => void
+  readonly open: boolean
+}) {
+  /** History is acquired once when the lazy palette first mounts, then survives closing. */
+  const [history, setHistory] = useState<ReturnType<typeof createSearchHistory> | null>(null)
+  useEffect(() => {
+    /** Each committed effect owns its own attachment, including StrictMode replay. */
+    const owner = createSearchHistory()
+    setHistory(owner)
+    return () => owner.dispose()
+  }, [])
+  /** Each open owns a fresh query; a closed panel has no live resource. */
+  const [query, setQuery] = useState<ReturnType<typeof createSearchQuery> | null>(null)
+  useEffect(() => {
+    if (!open) return
+    /** Effect-local owner cannot be reused after terminal cleanup. */
+    const owner = createSearchQuery(locale)
+    setQuery(owner)
+    return () => {
+      owner.dispose()
+      setQuery(null)
+    }
+  }, [locale, open])
+  return open && history && query?.locale === locale ? (
+    <PaletteSession
+      locale={locale}
+      onOpenChange={onOpenChange}
+      open={open}
+      searchQuery={query}
+      history={history}
+    />
+  ) : null
 }

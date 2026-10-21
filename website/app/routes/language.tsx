@@ -2,7 +2,8 @@ import { data, Link, type MetaFunction as IMetaFunction } from 'react-router'
 import { copyFor, domainDescription, domainTitle, interfaceCopyFor } from '../copy.js'
 import { LIBRARY_INDEX, libraryReferenceDescription } from '../library-descriptions.js'
 import { domainPath, LOCALES, type ILocale } from '../route-contract.js'
-import { requestSearch } from '../search.js'
+import { useProvidedStore, useStoreFromProvider } from '@migaia/store-react'
+import { uiStoreToken } from '../ui-state.js'
 
 type ILanguageRouteProps = { readonly params: { readonly lang?: string } }
 
@@ -168,6 +169,10 @@ const ARCHITECTURE_FAMILIES = [
  * library's learning path.
  */
 function DocsIndex({ locale }: { locale: ILocale }) {
+  /** Page-owned search visibility is shared with the shell. */
+  const store = useStoreFromProvider(uiStoreToken)
+  /** Search opens only after stored preferences are in control, like the header controls. */
+  const persistenceReady = useProvidedStore(uiStoreToken, (state) => state.persistenceReady)
   const ui = interfaceCopyFor(locale)
   /** Public entry-point count shown beside the library count. */
   const entryPoints = LIBRARY_INDEX.reduce((total, library) => total + library.exports.length, 0)
@@ -190,7 +195,12 @@ function DocsIndex({ locale }: { locale: ILocale }) {
           {domainDescription(locale, 'docs')}
         </p>
         <div className="docs-hero-actions" data-reveal="3">
-          <button className="docs-hero-search" onClick={requestSearch} type="button">
+          <button
+            className="docs-hero-search"
+            disabled={!persistenceReady}
+            onClick={() => store.$set({ searchOpen: true })}
+            type="button"
+          >
             <svg aria-hidden="true" viewBox="0 0 16 16">
               <circle cx="7" cy="7" r="4.75" />
               <path d="m10.5 10.5 3 3" />

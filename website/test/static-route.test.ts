@@ -494,11 +494,13 @@ test('uses the canonical Migaia name on every rendered page', () => {
 })
 
 test('exposes persistent light, dark, and system color modes', () => {
-  assert.match(rootSource, /type IThemeChoice = 'light' \| 'dark' \| 'system'/)
-  assert.match(rootSource, /localStorage\.setItem\(THEME_STORAGE_KEY/)
+  /** Theme state and persistence now belong to the shared UI owner. */
+  const uiStateSource = readFileSync(new URL('../app/ui-state.ts', import.meta.url), 'utf8')
+  assert.match(uiStateSource, /type IThemeChoice = 'light' \| 'dark' \| 'system'/)
+  assert.match(uiStateSource, /handle = persist\(store, \{/)
   /** The boot script resolves `system` before paint and maps retired time-theme values to it. */
   assert.match(rootSource, /if\(c!=='light'&&c!=='dark'\)c='system'/)
-  assert.match(rootSource, /prefers-color-scheme: dark/)
+  assert.match(rootSource + uiStateSource, /prefers-color-scheme: dark/)
   assert.match(styleSource, /:root\[data-theme='dark'\] \{/)
   for (const retired of ['sunrise', 'sunset', 'midnight', 'data-time-phase', 'refreshPhase'])
     assert.doesNotMatch(rootSource + styleSource, new RegExp(retired))

@@ -919,6 +919,20 @@ svg {
   text-transform: uppercase;
 }
 
+/* Submitted queries share the palette row layout while keeping delete a separate control. */
+.palette-history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.palette-history-row > .palette-item {
+  flex: 1;
+  min-width: 0;
+}
+.palette-history-row > button:last-child {
+  flex-shrink: 0;
+}
+
 .palette-item {
   background: transparent;
   border: 0;
@@ -2417,6 +2431,190 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
   z-index: -1;
 }
 
+/* Not-found page: a dotted grid over the whole viewport that breathes against the shader particles. */
+.not-found-page {
+  display: grid;
+  /* One column capped at the panel width; minmax(0) lets a long path shrink instead of overflowing. */
+  grid-template-columns: minmax(0, 34rem);
+  isolation: isolate;
+  justify-content: center;
+  min-height: 100svh;
+  place-items: center;
+  position: relative;
+}
+
+/* Message column: no frame of its own, so the text sits inside the aurora rather than on top of it. */
+.not-found-panel {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--space-10) var(--space-4);
+  position: relative;
+  text-align: center;
+}
+
+/* Edgeless calm zone behind the message: the canvas colour softens waves and dots for legibility, with no visible border. */
+.not-found-panel::before {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--canvas) 70%, transparent),
+    color-mix(in oklab, var(--canvas) 35%, transparent) 55%,
+    transparent
+  );
+  content: '';
+  inset: -30% -40%;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+/*
+ * Title and explanation read as light in the scene, not as a document heading: lighter weight,
+ * colours drawn from the brand eye's blue, and a faint accent halo.
+ */
+.not-found-panel h1 {
+  /* Site accent blue (the brand eye's hue in dark mode) mixed into the strong text colour. */
+  color: color-mix(in oklab, var(--accent-default) 45%, var(--text-strong));
+  font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: 0;
+  text-shadow: 0 0 1.5rem color-mix(in oklab, var(--accent-default) 28%, transparent);
+}
+
+/* Two quiet links instead of solid buttons: no fill, generous spacing, lit only on hover. */
+.not-found-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  /* Links sit well apart with the beacon centred between them. */
+  gap: var(--space-3) clamp(2.5rem, 10vw, 9rem);
+  justify-content: center;
+  margin-top: var(--space-12);
+}
+
+.not-found-link {
+  align-items: center;
+  border-bottom: 1px solid transparent;
+  color: color-mix(in oklab, var(--accent-default) 40%, var(--text-muted));
+  display: inline-flex;
+  font-size: var(--text-sm);
+  gap: var(--space-2);
+  letter-spacing: 0.02em;
+  padding: var(--space-1) 0;
+  text-decoration: none;
+  transition:
+    border-color var(--motion-quick) var(--motion-ease),
+    color var(--motion-quick) var(--motion-ease);
+}
+
+.not-found-link svg {
+  height: 0.875rem;
+  transition: transform var(--motion-quick) var(--motion-ease);
+  width: 0.875rem;
+}
+
+.not-found-link.primary {
+  color: var(--accent-default);
+}
+
+.not-found-link:hover,
+.not-found-link:focus-visible {
+  border-bottom-color: currentColor;
+  color: var(--text-strong);
+}
+
+.not-found-link.primary:hover,
+.not-found-link.primary:focus-visible {
+  color: var(--accent-strong);
+}
+
+.not-found-link:hover svg {
+  transform: translateX(2px);
+}
+
+/* Brand eye with a blue-cyan halo; it whirls once on load and again on hover. */
+.not-found-emblem {
+  display: grid;
+  margin-bottom: var(--space-6);
+  place-items: center;
+  position: relative;
+}
+
+.not-found-emblem::before {
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--accent-default) 45%, transparent),
+    transparent 70%
+  );
+  border-radius: 50%;
+  content: '';
+  filter: blur(18px);
+  inset: -45%;
+  position: absolute;
+  z-index: -1;
+}
+
+.not-found-emblem .brand-mark {
+  height: 4.5rem;
+  width: 4.5rem;
+}
+
+/*
+ * Hollow numeral: transparent fill so the aurora shows through, a thin accent-blue stroke for the edge,
+ * and a faint text-shadow glow that swells and fades with the background breath. Stacked text
+ * shadows cannot draw the edge alone: each shadow is the solid glyph, so they would fill it.
+ */
+.not-found-code {
+  -webkit-text-stroke: 1.5px color-mix(in oklab, var(--accent-default) 70%, transparent);
+  color: transparent;
+  /* Static faces: the variable Inter glyphs overlap their own contours, which a stroke would show. */
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: clamp(6rem, 4rem + 10vw, 11rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  margin: 0 0 var(--space-6);
+  text-shadow: 0 0 calc(1rem + 1.5rem * var(--not-found-breath, 0.5))
+    color-mix(in oklab, var(--accent-default) 30%, transparent);
+}
+
+/* Small accent beacon between the two links, breathing with the background like the grid. */
+.not-found-beacon {
+  background: var(--accent-default);
+  border-radius: 50%;
+  box-shadow: 0 0 calc(4px + 6px * var(--not-found-breath, 0.5)) var(--accent-default);
+  flex: none;
+  height: 5px;
+  opacity: calc(0.35 + 0.55 * var(--not-found-breath, 0.5));
+  width: 5px;
+}
+
+.not-found-grid {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--accent-default) 45%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-position: center;
+  background-size: 24px 24px;
+  /* A clearing around the message: dots thin out toward the centre and return toward the edges. */
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 45%,
+    transparent 0,
+    transparent 10rem,
+    #000 28rem
+  );
+  mask-image: radial-gradient(circle at 50% 45%, transparent 0, transparent 10rem, #000 28rem);
+  /* Breath phase (0..1) written each frame by the background shader loop, opposite its particles. */
+  opacity: calc(0.22 + 0.38 * var(--not-found-breath, 0.5));
+}
+
 /* Docs home title: display size in Inter's optical display cut (opsz axis from root.tsx). */
 .domain-index-page .docs-hero h1 {
   color: var(--text-strong);
@@ -2472,6 +2670,15 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
 .docs-hero-search:hover {
   border-color: var(--accent-default);
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent-default) 12%, transparent);
+}
+
+/* Disabled until theme persistence attaches; no hover feedback while unavailable. */
+.search-trigger:disabled,
+.library-switcher:disabled,
+.theme-toggle:disabled,
+.docs-hero-search:disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .docs-hero-stats {

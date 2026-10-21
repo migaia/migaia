@@ -15,8 +15,8 @@ export const meta: IMetaFunction = () => [
  * Sends the site root to a language home: the reader's last visited language, else the browser
  * language. Runs in the browser only; the prerendered root keeps the neutral introduction below.
  */
-export function clientLoader() {
-  throw redirect(`/${preferredLocale()}`)
+export async function clientLoader() {
+  throw redirect(`/${await preferredLocale()}`)
 }
 
 /** Runs the redirect on the first page load, not only on client-side navigation to the root. */

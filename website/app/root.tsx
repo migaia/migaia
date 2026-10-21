@@ -1,3 +1,10 @@
+import { throttle } from '@migaia/utils/scheduler'
+import {
+  StoreProvider,
+  createStoreRegistry,
+  useProvidedStore,
+  useStoreFromProvider
+} from '@migaia/store-react'
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
@@ -23,16 +30,19 @@ import { energizeCardEdge, trackCardFocus } from './card-focus.js'
 import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { dissolveRouteContent, emergeRouteContent, settleRouteContent } from './motion.js'
-import { OPEN_SEARCH_EVENT } from './search.js'
+import {
+  attachUiRuntime,
+  normalizeThemeChoice,
+  createUiStore,
+  uiStoreToken,
+  DARK_MEDIA_QUERY,
+  THEME_PHYSICAL_KEY,
+  LEGACY_THEME_KEY,
+  type IThemeChoice
+} from './ui-state.js'
 import { preferredLocale, rememberLocale } from './locale-preference.js'
 import { Button } from './components/ui/button.js'
 import type { IPageNavigationContext } from './components/page-navigation.js'
-
-/**
- * Reader-selected color mode. `system` follows `prefers-color-scheme`; the document root always
- * carries the resolved `light` or `dark` value in `data-theme`.
- */
-type IThemeChoice = 'light' | 'dark' | 'system'
 
 /** Order the header toggle cycles through. */
 const THEME_CYCLE: readonly IThemeChoice[] = ['light', 'dark', 'system']
@@ -40,46 +50,26 @@ const THEME_CYCLE: readonly IThemeChoice[] = ['light', 'dark', 'system']
 /** Existing recovery-page purpose used when no page route supplies more specific metadata. */
 const ROOT_DESCRIPTION = 'The path does not map to a current library or documented topic.'
 
-/** Keeps the document titled when a route resolves to the shared recovery boundary. */
-export const meta: IMetaFunction = () => [
-  { title: 'migaia' },
-  { name: 'description', content: ROOT_DESCRIPTION }
-]
+/**
+ * Keeps the document titled when a route resolves to the shared recovery boundary. When the
+ * boundary is showing, the tab names the 404 in the address's language.
+ */
+export const meta: IMetaFunction = ({ error, location }) => {
+  /** Interface copy for the locale named by the failed address. */
+  const copy = copyFor(localeFromPath(location.pathname))
+  return [
+    { title: error ? `${copy.notFoundCode} · ${copy.pageUnavailable} · migaia` : 'migaia' },
+    { name: 'description', content: ROOT_DESCRIPTION }
+  ]
+}
 
 /** Tab icon: the brand mark, emitted through Vite so it ships with the hashed assets. */
 export const links: ILinksFunction = () => [
   { rel: 'icon', type: 'image/svg+xml', href: faviconHref }
 ]
 
-/** Persistent browser key for the reader-selected color mode. */
-const THEME_STORAGE_KEY = 'migaia-theme'
-
-/**
- * Applies the saved theme before styles paint so hydration never flashes the wrong palette. Legacy
- * stored values from the retired time theme fall back to `system`.
- */
-const THEME_BOOT_SCRIPT = `(()=>{try{const r=document.documentElement;let c=localStorage.getItem('migaia-theme');if(c!=='light'&&c!=='dark')c='system';const d=c==='dark'||(c==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'dark':'light';r.dataset.themeChoice=c;r.style.colorScheme=d?'dark':'light'}catch{}})()`
-
-/** Resolves a choice against the platform preference and applies it to the document root. */
-function applyTheme(choice: IThemeChoice) {
-  const root = document.documentElement
-  const dark =
-    choice === 'dark' ||
-    (choice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  root.dataset.theme = dark ? 'dark' : 'light'
-  root.dataset.themeChoice = choice
-  root.style.colorScheme = dark ? 'dark' : 'light'
-}
-
-/** Reads the stored choice; anything unknown (including retired time-theme values) is `system`. */
-function storedTheme(): IThemeChoice {
-  try {
-    const value = window.localStorage.getItem(THEME_STORAGE_KEY)
-    return value === 'light' || value === 'dark' ? value : 'system'
-  } catch {
-    return 'system'
-  }
-}
+/** Resolves the saved preference before CSS paints; the legacy key remains read-only. */
+const THEME_BOOT_SCRIPT = `(()=>{const r=document.documentElement;let c='system';try{const raw=localStorage.getItem(${JSON.stringify(THEME_PHYSICAL_KEY)});c=raw!==null?JSON.parse(raw).state.theme:localStorage.getItem(${JSON.stringify(LEGACY_THEME_KEY)})}catch{}if(c!=='light'&&c!=='dark')c='system';const d=c==='dark'||(c==='system'&&matchMedia(${JSON.stringify(DARK_MEDIA_QUERY)}).matches);r.dataset.theme=d?'dark':'light';r.dataset.themeChoice=c;r.style.colorScheme=d?'dark':'light'})()`
 
 /**
  * Strips a trailing slash from the address before hydration. Static hosts redirect `/zh/docs/x` to
@@ -184,13 +174,18 @@ const CommandPalette = lazy(() => import('./components/command-palette.js'))
 
 /** Renders the sticky header: brand, library context, ⌘K search, language, and theme. */
 function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactNode }) {
-  /** Palette visibility. */
-  const [searchOpen, setSearchOpen] = useState(false)
+  /** Borrowed page Store; all shell writes use its canonical state. */
+  const store = useStoreFromProvider(uiStoreToken)
+  /** Selective subscriptions keep unrelated page state from rendering the header. */
+  const searchOpen = useProvidedStore(uiStoreToken, (state) => state.searchOpen)
+  /** Mobile navigation follows the same page owner. */
+  const mobileNavOpen = useProvidedStore(uiStoreToken, (state) => state.mobileNavOpen)
+  /** Reader preference is projected to CSS by the client attachment. */
+  const theme = useProvidedStore(uiStoreToken, (state) => normalizeThemeChoice(state.theme))
+  /** Theme and search controls wait until stored preferences are in control. */
+  const persistenceReady = useProvidedStore(uiStoreToken, (state) => state.persistenceReady)
   /** Mounts the lazy palette only after the first open so the shell ships without it. */
   const [searchMounted, setSearchMounted] = useState(false)
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  /** Choice starts as `system` so prerendered markup matches; mount reads the stored value. */
-  const [theme, setTheme] = useState<IThemeChoice>('system')
   /** Header shows its hairline only after the page scrolls under it. */
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
@@ -224,16 +219,16 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
   const onLocaleRoute = /^\/(?:en|zh)(?=\/|$)/.test(canonicalPathname)
   /** Remembers each language the reader opens, so the site root reopens their last choice. */
   useEffect(() => {
-    if (onLocaleRoute) rememberLocale(locale)
+    if (onLocaleRoute) void rememberLocale(locale)
   }, [locale, onLocaleRoute])
 
   /** Page navigation links close the existing menu after React Router changes the route. */
-  useEffect(() => setMobileNavOpen(false), [location.pathname])
+  useEffect(() => store.$set({ mobileNavOpen: false }), [location.pathname, store])
 
   /** Opens the palette, mounting its lazy chunk on first use. */
   const openSearch = () => {
     setSearchMounted(true)
-    setSearchOpen(true)
+    store.$set({ searchOpen: true })
   }
 
   useEffect(() => {
@@ -243,48 +238,34 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
       const optionJ = event.altKey && !event.metaKey && !event.ctrlKey && event.code === 'KeyJ'
       if (!commandK && !optionJ) return
       event.preventDefault()
-      openSearch()
+      if (store.persistenceReady) openSearch()
     }
     window.addEventListener('keydown', handleSearchShortcut)
-    window.addEventListener(OPEN_SEARCH_EVENT, openSearch)
     return () => {
       window.removeEventListener('keydown', handleSearchShortcut)
-      window.removeEventListener(OPEN_SEARCH_EVENT, openSearch)
     }
-  }, [])
+  }, [store])
 
+  /** Store writes from any search entry mount the lazy chunk on first open. */
   useEffect(() => {
-    const initial = storedTheme()
-    setTheme(initial)
-    applyTheme(initial)
-    /** A `system` choice follows live platform changes without a reload. */
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const follow = () => {
-      if (document.documentElement.dataset.themeChoice === 'system') applyTheme('system')
-    }
-    media.addEventListener('change', follow)
-    return () => media.removeEventListener('change', follow)
-  }, [])
+    if (searchOpen) setSearchMounted(true)
+  }, [searchOpen])
 
   useEffect(() => {
     /** Passive scroll probe; only the boolean crossing re-renders. */
-    const update = () => setScrolled(window.scrollY > 8)
-    update()
+    const update = throttle(() => setScrolled(window.scrollY > 8), 'animationFrame')
+    setScrolled(window.scrollY > 8)
     window.addEventListener('scroll', update, { passive: true })
-    return () => window.removeEventListener('scroll', update)
+    return () => {
+      update.cancel()
+      window.removeEventListener('scroll', update)
+    }
   }, [])
 
   /** Advances light → dark → system and persists the explicit reader choice. */
   function cycleTheme() {
     const next = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length]!
-    setTheme(next)
-    applyTheme(next)
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, next)
-    } catch (error) {
-      // Storage can be unavailable (private mode); the choice still applies to this page.
-      console.error(error)
-    }
+    store.$set({ theme: next })
   }
 
   return (
@@ -314,6 +295,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
                 <button
                   aria-label={`${ui.switchLibrary}: ${currentLibrary}`}
                   className="library-switcher"
+                  disabled={!persistenceReady}
                   onClick={openSearch}
                   type="button"
                 >
@@ -329,6 +311,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
             <button
               aria-keyshortcuts="Meta+K Control+K Alt+J"
               className="search-trigger"
+              disabled={!persistenceReady}
               onClick={openSearch}
               type="button"
             >
@@ -345,7 +328,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
               className="mobile-nav-trigger"
               aria-expanded={mobileNavOpen}
               aria-controls="mobile-navigation"
-              onClick={() => setMobileNavOpen((open) => !open)}
+              onClick={() => store.$set({ mobileNavOpen: !mobileNavOpen })}
             >
               {copy.menu}
             </Button>
@@ -360,6 +343,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
               aria-label={`${ui.themeCurrent}: ${themeName}`}
               className="theme-toggle"
               data-choice={theme}
+              disabled={!persistenceReady}
               onClick={cycleTheme}
               title={`${ui.themeCurrent}: ${themeName}`}
               type="button"
@@ -376,12 +360,16 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
           open
           aria-label={copy.mobileNavigation}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setMobileNavOpen(false)
+            if (event.key === 'Escape') store.$set({ mobileNavOpen: false })
           }}
         >
           <div className="mobile-sheet-header">
             <strong>{copy.navigate}</strong>
-            <Button type="button" variant="quiet" onClick={() => setMobileNavOpen(false)}>
+            <Button
+              type="button"
+              variant="quiet"
+              onClick={() => store.$set({ mobileNavOpen: false })}
+            >
               {copy.close}
             </Button>
           </div>
@@ -392,22 +380,54 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
       ) : null}
       {searchMounted ? (
         <Suspense fallback={null}>
-          <CommandPalette locale={locale} onOpenChange={setSearchOpen} open={searchOpen} />
+          <CommandPalette
+            locale={locale}
+            onOpenChange={(open) => store.$set({ searchOpen: open })}
+            open={searchOpen}
+          />
         </Suspense>
       ) : null}
     </>
   )
 }
 
+/**
+ * Creates the page UI Store and the registry that owns it, and attaches browser persistence once
+ * mounted. Shared by the normal shell and the error page so both read theme state the same way.
+ */
+function usePageUiRegistry() {
+  /** Server-safe page state; the Provider retires it after the last committed mount. */
+  const [store] = useState(() => createUiStore())
+  /** Registry owns the Store and handles StrictMode effect replay before final retirement. */
+  const [registry] = useState(() => {
+    /** Request-local registry shares the Store's reactive graph. */
+    const owner = createStoreRegistry(store.$runtime)
+    owner.register(uiStoreToken, store, { owned: true })
+    return owner
+  })
+  useEffect(() => attachUiRuntime(store), [store])
+  return registry
+}
+
+/** Client-only aurora background, mounted after hydration so prerendered markup stays static. */
+function AmbientBackground({ blueCyan = false }: { readonly blueCyan?: boolean }) {
+  /** Turns true after hydration; gates the client-only ambient background. */
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
+  return hydrated ? (
+    <Suspense fallback={null}>
+      <AmbientField blueCyan={blueCyan} />
+    </Suspense>
+  ) : null
+}
+
 /** Renders the active route inside the shared orientation shell. */
 function App() {
+  const registry = usePageUiRegistry()
   /** The active outlet supplies category links without moving its article into the header. */
   const [pageNavigation, setPageNavigation] = useState<React.ReactNode>(null)
   /** A stable registration boundary keeps route updates from repeatedly installing the same menu. */
   const navigationContext = useMemo<IPageNavigationContext>(() => ({ setPageNavigation }), [])
-  /** Turns true after hydration; gates the client-only ambient background. */
-  const [hydrated, setHydrated] = useState(false)
-  useEffect(() => setHydrated(true), [])
   /** Speeds up and flickers the edge light of the card under the pointer. */
   useEffect(() => {
     /** Restores the previously focused card's edge light. */
@@ -422,17 +442,13 @@ function App() {
     }
   }, [])
   return (
-    <>
-      {hydrated ? (
-        <Suspense fallback={null}>
-          <AmbientField />
-        </Suspense>
-      ) : null}
+    <StoreProvider registry={registry} disposeOnUnmount>
+      <AmbientBackground />
       <ShellHeader pageNavigation={pageNavigation} />
       <RouteProgress />
       <RouteScrollReset />
       <Outlet context={navigationContext} />
-    </>
+    </StoreProvider>
   )
 }
 
@@ -503,27 +519,57 @@ export function ErrorBoundary() {
    */
   const [locale, setLocale] = useState<ILocale>(() => localeFromPath(pathname))
   useEffect(() => {
-    setLocale(pathHasLocale ? localeFromPath(pathname) : preferredLocale())
+    if (pathHasLocale) return setLocale(localeFromPath(pathname))
+    /** Set when this effect is superseded, so a late stored-preference read is dropped. */
+    let stale = false
+    void preferredLocale().then((preferred) => {
+      if (!stale) setLocale(preferred)
+    })
+    return () => {
+      stale = true
+    }
   }, [pathHasLocale, pathname])
   const copy = copyFor(locale)
   /**
    * A not-found page often fails hydration, and React then rebuilds `<html>` without the boot
-   * script's theme attributes. The header that normally re-applies the theme is not mounted here.
+   * script's theme attributes. The normal shell is not mounted here, so the error page owns its own
+   * page Store: it re-applies the saved theme and feeds the aurora background.
    */
-  useEffect(() => applyTheme(storedTheme()), [])
+  const registry = usePageUiRegistry()
   return (
-    <main className="page-shell">
-      <p className="eyebrow">{copy.notFound}</p>
-      <h1>{copy.pageUnavailable}</h1>
-      <p className="lede">{copy.pageUnavailableBody}</p>
-      <div className="actions">
-        <Link className="button button-primary" to={`/${locale}/docs`}>
-          {copy.browseDocs}
-        </Link>
-        <Link className="button button-secondary" to={`/${locale}`}>
-          {copy.languageHome}
-        </Link>
-      </div>
-    </main>
+    <StoreProvider registry={registry} disposeOnUnmount>
+      <AmbientBackground blueCyan />
+      <main className="page-shell not-found-page">
+        <div className="not-found-grid" aria-hidden="true" />
+        <section className="not-found-panel" aria-labelledby="not-found-title">
+          <div
+            aria-hidden="true"
+            className="not-found-emblem"
+            onMouseEnter={(event) =>
+              whirlBrandMark(event.currentTarget.querySelector('.brand-mark'))
+            }
+          >
+            <BrandMark />
+          </div>
+          <p className="not-found-code" aria-hidden="true">
+            {copy.notFoundCode}
+          </p>
+          <h1 id="not-found-title">{copy.pageUnavailable}</h1>
+          <nav className="not-found-actions" aria-label={copy.primaryNavigation}>
+            <Link className="not-found-link primary" to={`/${locale}/docs`}>
+              {copy.browseDocs}
+              <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </Link>
+            {/* Beacon between the two ways out; it brightens and dims with the background breath. */}
+            <span aria-hidden="true" className="not-found-beacon" />
+            <Link className="not-found-link" to={`/${locale}`}>
+              {copy.languageHome}
+            </Link>
+          </nav>
+        </section>
+      </main>
+    </StoreProvider>
   )
 }

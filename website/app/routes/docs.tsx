@@ -1,3 +1,5 @@
+import { log } from '../log.js'
+import { throttle } from '@migaia/utils/scheduler'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, redirect, useNavigate, type MetaFunction as IMetaFunction } from 'react-router'
 import {
@@ -1269,31 +1271,26 @@ function useScrollSpy(railRef: React.RefObject<HTMLElement | null>, resetKey?: s
     })
     /** Section tops above this line count as "read"; matches the sticky header plus breathing room. */
     const line = 120
-    /** Pending animation frame of the scroll handler, so one frame recomputes at most once. */
-    let frame = 0
     /**
      * Recomputes on every scroll frame. An IntersectionObserver only fires when a section crosses
      * its band, so a section taller than the viewport (an instance API list) could pass the reading
      * line without any callback and leave the previous entry highlighted.
      */
-    const onScroll = () => {
-      if (frame) return
-      frame = requestAnimationFrame(() => {
-        frame = 0
-        let current: string | undefined = targets[0]?.href
-        for (const target of targets)
-          if (target.element.getBoundingClientRect().top <= line) current = target.href
-        mark(current)
-      })
-    }
+    const onScroll = throttle(() => {
+      /** Last section above the sticky header's reading line. */
+      let current: string | undefined = targets[0]?.href
+      for (const target of targets)
+        if (target.element.getBoundingClientRect().top <= line) current = target.href
+      mark(current)
+    }, 'animationFrame')
     window.addEventListener('scroll', onScroll, { passive: true })
     /** Fragment navigation marks its own entry immediately. */
     const onHash = () => mark(window.location.hash || targets[0]?.href)
     onHash()
     window.addEventListener('hashchange', onHash)
     return () => {
+      onScroll.cancel()
       window.removeEventListener('scroll', onScroll)
-      cancelAnimationFrame(frame)
       wide.removeEventListener('change', syncDisclosure)
       window.removeEventListener('hashchange', onHash)
     }
@@ -3015,7 +3012,7 @@ function CopyText({ locale, text }: { readonly locale: ILocale; readonly text: s
       await navigator.clipboard.writeText(text)
       setState('copied')
     } catch (error) {
-      console.error(error)
+      log.error(error)
       setState('failed')
     }
     window.setTimeout(() => setState('ready'), 1600)
@@ -5430,7 +5427,7 @@ function CodeBlock({
       await navigator.clipboard.writeText(commentary.code)
       setCopyState('copied')
     } catch (error) {
-      console.error(error)
+      log.error(error)
       setCopyState('failed')
     }
   }
