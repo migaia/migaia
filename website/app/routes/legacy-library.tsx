@@ -7,8 +7,8 @@ type ILegacyLibraryRouteProps = {
 }
 
 /**
- * Sends a retired `/<locale>/<library>` link to that library's page under `/<locale>/docs`.
- * Unknown locales or libraries stay a 404 so this route never invents pages.
+ * Sends a retired `/<locale>/<library>` link to that library's page under `/<locale>/docs`. Unknown
+ * locales or libraries stay a 404 so this route never invents pages.
  */
 export function loader({ params }: ILegacyLibraryRouteProps) {
   /** Locale segment, accepted only when it is one of the public locales. */
