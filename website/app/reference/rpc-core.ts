@@ -21,7 +21,7 @@ import { transportReference, transportMembers } from './rpc-core-transports.js'
 import { remoteReference } from './rpc-core-remote.js'
 import { authenticationOptionMembers as authenticationOptions } from './rpc-core-auth.js'
 import { kitReference } from './rpc-core-transport-kit.js'
-import { rpcCoreCases } from './rpc-core-cases.js'
+import { rpcCoreCases, rpcCoreOptionCases, rpcCoreOptionFields } from './rpc-core-cases.js'
 
 /** Produces explicit bilingual prose at every node. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -3783,7 +3783,7 @@ for (const name of ['timeout', 'abort'] as const)
     behaviors: [symbols[name].purpose]
   }
 /** Documentation object remains unregistered until every node passes its audit. */
-export const reference: ILibraryReference = {
+const coreReference: ILibraryReference = {
   modules: {
     ...modules,
     ...observationReference.modules,
@@ -3817,5 +3817,81 @@ export const reference: ILibraryReference = {
     ...transportReference.enhancers,
     ...remoteReference.enhancers,
     ...kitReference.enhancers
+  }
+}
+
+/** Keep option examples local to Core without changing imported shared reference records. */
+const optionTypes: Record<string, ITypeDoc> = { ...coreReference.types }
+const optionSymbols: Record<string, ISymbolDoc> = { ...coreReference.symbols }
+for (const [name, optionCases] of Object.entries(rpcCoreOptionCases)) {
+  const symbol = optionSymbols[name]!
+  const original = symbol.options ? optionTypes[symbol.options]!.members : symbol.optionDocs!
+  const members = { ...original }
+  for (const [field, choice] of Object.entries(rpcCoreOptionFields[name] ?? {})) {
+    members[field] = {
+      ...members[field]!,
+      whenToUse: choice.whenToUse,
+      example: optionCases[choice.index]!.example
+    }
+  }
+  if (name === 'connect') {
+    members.receiverSelector = {
+      ...members.receiverSelector!,
+      summary: t(
+        'Captured optional receiver selector. Current public send routing does not invoke this callback, so it does not currently change which receiver is selected.',
+        '捕获的可选接收端选择器。当前公开 send 路由未调用此回调，因此它目前不会改变接收端选择。'
+      ),
+      default: t(
+        'Omitted: keep existing routing. Supplying this callback currently leaves public send routing unchanged too.',
+        '省略时保留现有路由；当前即使提供此回调，公开 send 路由也保持不变。'
+      )
+    }
+  }
+  if (name === 'createManagedRuntimePeer') {
+    for (const field of ['spawn', 'connect', 'listen']) {
+      members[field] = {
+        ...members[field]!,
+        summary: t(
+          'Inherited direct-source callback. This managed factory obtains its channel from binding.openChannel and does not invoke this callback.',
+          '继承的直接来源回调。此托管工厂通过 binding.openChannel 取得通道，不调用该回调。'
+        ),
+        default: t(
+          'Omitted or supplied: the actual binding remains the channel acquisition owner.',
+          '无论省略或提供，实际绑定始终负责取得通道。'
+        )
+      }
+    }
+  }
+  if (symbol.options) {
+    optionTypes[symbol.options] = {
+      ...optionTypes[symbol.options]!,
+      members,
+      optionCases
+    }
+    optionSymbols[name] = { ...symbol, optionCases }
+  } else optionSymbols[name] = { ...symbol, optionDocs: members, optionCases }
+}
+/** The typed coroutine example supplies its remote method type explicitly. */
+const typedCoroutineExample = rpcCoreOptionCases.createCoroutinePlugin![0]!.example
+optionSymbols.createCoroutinePlugin = {
+  ...optionSymbols.createCoroutinePlugin!,
+  example: typedCoroutineExample
+}
+optionTypes.IRuntimePluginTyping = {
+  ...optionTypes.IRuntimePluginTyping!,
+  example: typedCoroutineExample
+}
+/** The assembled Core reference uses scoped option tables and preserves all module guides. */
+export const reference: ILibraryReference = {
+  ...coreReference,
+  types: optionTypes,
+  symbols: optionSymbols,
+  enhancers: {
+    ...coreReference.enhancers,
+    createCoroutinePlugin: {
+      ...coreReference.enhancers!.createCoroutinePlugin!,
+      install: typedCoroutineExample,
+      example: typedCoroutineExample
+    }
   }
 }
