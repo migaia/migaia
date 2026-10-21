@@ -1281,7 +1281,7 @@ await host.dispose()`,
             'Normally omit this retained hook. The default structured cleanup path does not call it, so it cannot transform cleanupErrors. Setting it does not change those collected failures.',
             '普通调用方应省略这个保留钩子。默认结构化清理路径不调用它，因此不能转换 cleanupErrors。设置后也不改变这些收集的失败。'
           ),
-          example: pluginHostOptionExamples.disposal,
+          example: pluginHostOptionExamples.translation,
           summary: t(
             'Retained counterpart of the class translateDisposalError hook. The default structured-cleanup result path does not invoke it and does not convert individual cleanupErrors through this callback.',
             '保留的类 `translateDisposalError` 钩子对应选项；默认结构化清理结果路径不调用它，也不通过此回调逐项转换 `cleanupErrors`。'
