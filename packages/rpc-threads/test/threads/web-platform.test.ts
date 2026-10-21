@@ -37,3 +37,40 @@ describe('Web Worker platform error cancellation', () => {
     )
   }
 })
+
+describe('Deno owned Worker exit-observation boundary', () => {
+  /** The fixture uses a genuine local Deno runtime; another host cannot prove this boundary. */
+  const available = spawnSync('deno', ['--version']).status === 0
+  it.skipIf(!available)(
+    'reports EXIT_UNOBSERVABLE promptly instead of waiting for reap',
+    () => {
+      /** Deno executes TypeScript directly while importing the ordinary built package entries. */
+      const fixture = fileURLToPath(new URL('./fixtures/deno-owned-exit.mts', import.meta.url))
+      /** Successful business output cannot bypass the assertions on all close diagnostics. */
+      const output = execFileSync('deno', ['run', '-A', fixture], {
+        encoding: 'utf8',
+        timeout: 15_000
+      })
+      /** Assertion output includes full classification and timing when the old timeout reproduces. */
+      const receipt = JSON.parse(output.trim().split('\n').at(-1)!)
+      expect(receipt.value).toBe('actual-deno-owned-worker')
+      expect(receipt.admissionDiagnostics).toEqual([
+        expect.objectContaining({ source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' })
+      ])
+      expect(receipt.closeDiagnostics, JSON.stringify(receipt)).toEqual([
+        expect.objectContaining({
+          source: '@migaia/supervision',
+          code: 'EXIT_UNOBSERVABLE',
+          name: 'Error',
+          detail: { kind: 'thread', generation: 1, phase: 'exit', capability: 'exit-observation' },
+          message: expect.any(String)
+        })
+      ])
+      expect(JSON.stringify(receipt.closeDiagnostics)).not.toMatch(
+        /"code":"(?:REAP_TIMEOUT|DISPOSE_STEP_TIMEOUT)"/
+      )
+      expect(receipt.elapsedMs, JSON.stringify(receipt)).toBeLessThan(receipt.reapTimeoutMs / 2)
+    },
+    20_000
+  )
+})

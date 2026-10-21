@@ -24,6 +24,7 @@ export default defineConfig(
             include: ['test/**/*.{test,spec}.ts'],
             exclude: [
               ...configDefaults.exclude,
+              'test/e2e/**',
               'test/process/conformance*.test.ts',
               'test/bridge/conformance-faults.test.ts',
               'test/merge/suite-parity.test.ts',

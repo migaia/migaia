@@ -59,6 +59,12 @@ export const CapabilityLevel = {
 } as const
 export type CapabilityLevel = (typeof CapabilityLevel)[keyof typeof CapabilityLevel]
 
+/**
+ * Shared launcher key used by thread admission and core recovery to preserve declared exit
+ * boundaries.
+ */
+export const EXIT_OBSERVATION_CAPABILITY = 'exit-observation'
+
 /** Admission strictness for a requested capability. */
 export const IsolationMode = { required: 'required', bestEffort: 'best-effort' } as const
 export type IsolationMode = (typeof IsolationMode)[keyof typeof IsolationMode]

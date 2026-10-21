@@ -16,6 +16,8 @@ export const SupervisionErrorText = {
   resourceLimitExceeded: 'unit resource limit exceeded',
   /** Bounded launch or exit recovery ended before the unit disappeared. */
   reapTimeout: 'unit recovery timed out',
+  /** Forced recovery reports a declared exit-observation boundary without waiting for a timeout. */
+  exitUnobservable: 'unit exit cannot be observed',
   /** Restart policy exhausted its window and entered terminal state. */
   supervisionExhausted: 'supervision restart limit exhausted',
   /** Unit-producing command attempted while disposal is in progress. */

@@ -166,6 +166,8 @@ The core depends only on `@migaia/lifecycle` and `@migaia/utils`. A profile may 
 
 Supervisor-created failures carry `source: '@migaia/supervision'` and one semantic `SupervisionErrorCode`; wrapped original failures remain on `cause`, and cleanup failures remain reachable through `errors`. Passive observer and late-check failures sent to `report` retain their original objects. States and budget outcomes are values, not thrown codes.
 
+When a launcher explicitly declares `exit-observation: 'unsupported'`, forced termination immediately reports `EXIT_UNOBSERVABLE` and marks the generation abandoned without waiting for `reapTimeoutMs`. Details include kind, generation and capability. Its lease remains held until actual exit: an unavailable observation is not an exit receipt. Observable exit that misses its deadline still reports `REAP_TIMEOUT`; launch-phase recovery timeouts also retain their existing behavior.
+
 The `./process` entry adds a shell-free specification, capability checks, usage monitoring,
 bounded output tails, durable orphan records and recovery, a parent-loss guard, and an optional
 bounded prewarm pool. It defines a launcher port and does not start an operating-system process

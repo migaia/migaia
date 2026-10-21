@@ -38508,7 +38508,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 原生 exited 只由真实 exit 结算；Web 的 exited 保持 pending，因此超时后可能报告 REAP_TIMEOUT 并保留 abandoned budget lease，不能提前把槽位当空闲。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
+                  "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 由原生 exit、Bun 由原生 Worker close 结算 exited；Deno、浏览器和 Electron renderer 的退出观察为 unsupported，强制回收立即报告 supervision EXIT_UNOBSERVABLE 并保留 abandoned budget lease，不等待 reapTimeoutMs，也不能提前把槽位当空闲。可观察退出超时仍报告 REAP_TIMEOUT；best-effort 准入诊断 CAPABILITY_UNSUPPORTED 不变。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
                 },
                 {
                   "type": "paragraph",
@@ -38553,6 +38553,10 @@
                     [
                       "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                       "线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。"
+                    ],
+                    [
+                      "@migaia/supervision / EXIT_UNOBSERVABLE",
+                      "退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。"
                     ],
                     [
                       "@migaia/rpc/core / INVALID_CONFIG",
@@ -39260,7 +39264,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 原生 exited 只由真实 exit 结算；Web 的 exited 保持 pending，因此超时后可能报告 REAP_TIMEOUT 并保留 abandoned budget lease，不能提前把槽位当空闲。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
+                  "text": "handle.identity 含稳定 fingerprint，Node 另含创建时 threadId；handle.port 为实际消息资源，terminate 只请求停止，exited 表示退出，Web 还提供 prepared。Node 由原生 exit、Bun 由原生 Worker close 结算 exited；Deno、浏览器和 Electron renderer 的退出观察为 unsupported，强制回收立即报告 supervision EXIT_UNOBSERVABLE 并保留 abandoned budget lease，不等待 reapTimeoutMs，也不能提前把槽位当空闲。可观察退出超时仍报告 REAP_TIMEOUT；best-effort 准入诊断 CAPABILITY_UNSUPPORTED 不变。自定义 Node / Web handle 的 open(signal, { scheduler, capabilities? }) 打开对应代次；channel factory 与它使用同一 scheduler。"
                 },
                 {
                   "type": "paragraph",
@@ -39305,6 +39309,10 @@
                     [
                       "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                       "线程 CPU / 内存采样失败，原因为 cause；显示不可用，不据此改变 Worker 生命周期。"
+                    ],
+                    [
+                      "@migaia/supervision / EXIT_UNOBSERVABLE",
+                      "退出观察明确不支持；立即 abandoned，不等回收窗口，租约仍保留。"
                     ],
                     [
                       "@migaia/rpc/core / INVALID_CONFIG",
@@ -39882,7 +39890,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node exited settles only from the real exit event. Web exited remains pending, so a bounded close may report REAP_TIMEOUT and retain an abandoned budget lease instead of falsely freeing admission capacity. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
+                    "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node settles exited from native exit and Bun from native Worker close. Deno, browsers and Electron renderer declare exit observation unsupported: forced reap immediately reports supervision EXIT_UNOBSERVABLE and retains an abandoned budget lease without waiting for reapTimeoutMs or falsely freeing admission capacity. Observable exit timeouts still report REAP_TIMEOUT; best-effort admission still reports CAPABILITY_UNSUPPORTED. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
                   },
                   {
                     "type": "paragraph",
@@ -39927,6 +39935,10 @@
                       [
                         "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                         "Thread CPU / memory sampling failed, with cause retained; display unavailable without changing Worker lifecycle."
+                      ],
+                      [
+                        "@migaia/supervision / EXIT_UNOBSERVABLE",
+                        "Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait."
                       ],
                       [
                         "@migaia/rpc/core / INVALID_CONFIG",
@@ -40649,7 +40661,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node exited settles only from the real exit event. Web exited remains pending, so a bounded close may report REAP_TIMEOUT and retain an abandoned budget lease instead of falsely freeing admission capacity. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
+                    "text": "handle.identity contains a stable fingerprint and, on Node, the threadId captured at construction. handle.port holds real messaging; terminate requests stopping; exited observes exit; Web also exposes prepared. Node settles exited from native exit and Bun from native Worker close. Deno, browsers and Electron renderer declare exit observation unsupported: forced reap immediately reports supervision EXIT_UNOBSERVABLE and retains an abandoned budget lease without waiting for reapTimeoutMs or falsely freeing admission capacity. Observable exit timeouts still report REAP_TIMEOUT; best-effort admission still reports CAPABILITY_UNSUPPORTED. Custom Node / Web handles open a generation with open(signal, { scheduler, capabilities? }); the factory must share its scheduler."
                   },
                   {
                     "type": "paragraph",
@@ -40694,6 +40706,10 @@
                       [
                         "@migaia/rpc/threads / THREAD_USAGE_SAMPLE_FAILED",
                         "Thread CPU / memory sampling failed, with cause retained; display unavailable without changing Worker lifecycle."
+                      ],
+                      [
+                        "@migaia/supervision / EXIT_UNOBSERVABLE",
+                        "Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait."
                       ],
                       [
                         "@migaia/rpc/core / INVALID_CONFIG",
@@ -79201,6 +79217,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "启动器明确声明 `exit-observation: 'unsupported'` 时，强制终止后立即报告 `EXIT_UNOBSERVABLE` 并将该代记为 abandoned，不等待 `reapTimeoutMs`。诊断详情包含 kind、generation 和 capability。名额仍保留到真实退出，不能把无法观察当作已经退出；可观察退出但超时的路径仍报告 `REAP_TIMEOUT`，启动阶段的回收超时也保持原行为。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`./process` 提供不经过 shell 的进程规格、能力检查、资源用量监控、有上限的输出尾部、持久的进程记录与回收、父进程断开保护，以及可选的有上限预热池。它只定义启动器接口，自己不创建操作系统进程。"
                 },
                 {
@@ -79421,11 +79441,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "1. 应用收尾：如果提供了 `stop.beforeTerminate`，先让它完成手头的工作（`drainTimeoutMs`）。 2. 正常退出：请求单元退出，等待它真正退出（`exitTimeoutMs`）。 3. 强制回收：强制结束后再等一段时间（`reapTimeoutMs`）。仍然没有退出，就报告 `REAP_TIMEOUT` 并放弃等待。"
+                  "text": "1. 应用收尾：如果提供了 `stop.beforeTerminate`，先让它完成手头的工作（`drainTimeoutMs`）。 2. 正常退出：请求单元退出，等待它真正退出（`exitTimeoutMs`）。 3. 强制回收：强制结束后等待实际退出（`reapTimeoutMs`），超时报告 `REAP_TIMEOUT`。如果启动器已明确声明 `exit-observation: 'unsupported'`，则立即报告 `EXIT_UNOBSERVABLE` 并按 abandoned 处理，不等待该回收窗口；诊断详情为 kind、generation 和 capability: `'exit-observation'`。重复释放不会重复报告。"
                 },
                 {
                   "type": "paragraph",
                   "text": "`stop()` 一定会在这些时限内返回。但如果单元还没有真正退出，它占用的名额会一直保留，直到它真正退出为止。这样新任务就不会和一个没停干净的旧任务同时运行。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`EXIT_UNOBSERVABLE` 是能力边界，不表示线程卡死，也不表示退出已获确认。调用方应按 source/code 区分它与 `REAP_TIMEOUT`；需要真实退出保证时更换启动器。best-effort 准入时的 `CAPABILITY_UNSUPPORTED`、required 模式的准入拒绝以及 launch 阶段超时均不改变。"
                 },
                 {
                   "type": "code",
@@ -79579,7 +79603,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "启动器必须如实声明 `termination: 'enforced' | 'monitored' | 'unsupported'` 和 `fault-isolation: 'unsupported'`。在 `required` 隔离要求下，`enforced` 或 `monitored` 的结束能力可以通过，`unsupported` 会被拒绝；`monitored` 不代表运行时会强制执行。启动器还要如实声明 `heap-limit: 'enforced' | 'unsupported'` 和 `exit-observation: 'enforced' | 'unsupported'`。只有 `heap-limit` 为 `enforced` 时才接受 `heapBytes`；`callWallTimeMs` 原样交给启动器，用于它面向调用方的操作。不能可靠观察退出的启动器必须配置 `health` 检查，这样无声退出或停滞的线程才能被发现并结束。监督器不采样堆内存，线程也没有单独的“正常退出”阶段：先执行可选的 `beforeTerminate`，然后调用一次 `terminate()`，再在回收时限内等待线程真正退出。没有确认退出时，预算名额保持占用。"
+                  "text": "启动器必须如实声明 `termination: 'enforced' | 'monitored' | 'unsupported'` 和 `fault-isolation: 'unsupported'`。在 `required` 隔离要求下，`enforced` 或 `monitored` 的结束能力可以通过，`unsupported` 会被拒绝；`monitored` 不代表运行时会强制执行。启动器还要如实声明 `heap-limit: 'enforced' | 'unsupported'` 和 `exit-observation: 'enforced' | 'unsupported'`。只有 `heap-limit` 为 `enforced` 时才接受 `heapBytes`；`callWallTimeMs` 原样交给启动器，用于它面向调用方的操作。不能可靠观察退出的启动器必须配置 `health` 检查，这样无声退出或停滞的线程才能被发现并结束。监督器不采样堆内存，线程也没有单独的“正常退出”阶段：先执行可选的 `beforeTerminate`，然后调用一次 `terminate()`；退出可观察时在回收时限内等待，明确不支持退出观察时立即报告 `EXIT_UNOBSERVABLE`。这两种 abandoned 结果都不会释放尚未确认实际退出的预算名额。"
                 },
                 {
                   "type": "paragraph",
@@ -79889,6 +79913,10 @@
                   },
                   {
                     "type": "paragraph",
+                    "text": "When a launcher explicitly declares `exit-observation: 'unsupported'`, forced termination immediately reports `EXIT_UNOBSERVABLE` and marks the generation abandoned without waiting for `reapTimeoutMs`. Details include kind, generation and capability. Its lease remains held until actual exit: an unavailable observation is not an exit receipt. Observable exit that misses its deadline still reports `REAP_TIMEOUT`; launch-phase recovery timeouts also retain their existing behavior."
+                  },
+                  {
+                    "type": "paragraph",
                     "text": "The `./process` entry adds a shell-free specification, capability checks, usage monitoring, bounded output tails, durable orphan records and recovery, a parent-loss guard, and an optional bounded prewarm pool. It defines a launcher port and does not start an operating-system process itself. See USEGUIDE.en.md for the process contract, defaults and cleanup."
                   },
                   {
@@ -80154,11 +80182,15 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "1. Application drain. If you passed `stop.beforeTerminate`, it finishes in-flight work first (`drainTimeoutMs`). 2. Normal exit. The unit is asked to exit and the supervisor waits for the actual exit (`exitTimeoutMs`). 3. Forced reap. After a forced stop, the supervisor waits once more (`reapTimeoutMs`). If the unit still has not exited, it reports `REAP_TIMEOUT` and stops waiting."
+                    "text": "1. Application drain. If you passed `stop.beforeTerminate`, it finishes in-flight work first (`drainTimeoutMs`). 2. Normal exit. The unit is asked to exit and the supervisor waits for the actual exit (`exitTimeoutMs`). 3. Forced reap. After a forced stop, the supervisor waits for actual exit (`reapTimeoutMs`) and reports `REAP_TIMEOUT` on expiry. If the launcher explicitly declares `exit-observation: 'unsupported'`, it immediately reports `EXIT_UNOBSERVABLE` and abandons that generation without waiting for this window. Details contain kind, generation and capability: `'exit-observation'`. Repeated disposal does not repeat the report."
                   },
                   {
                     "type": "paragraph",
                     "text": "`stop()` always returns within these deadlines. If the unit has not really exited, though, its slot stays occupied until it does, so new work never runs next to a unit that has not finished stopping."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`EXIT_UNOBSERVABLE` identifies a capability boundary, not a stuck thread or confirmed exit. Branch on source/code to distinguish it from `REAP_TIMEOUT`; choose another launcher when actual-exit guarantees are required. Best-effort admission's `CAPABILITY_UNSUPPORTED`, required-mode admission rejection and launch-phase timeouts remain unchanged."
                   },
                   {
                     "type": "code",
@@ -80312,7 +80344,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The launcher must declare `termination: 'enforced' | 'monitored' | 'unsupported'` and `fault-isolation: 'unsupported'` truthfully. Required isolation accepts enforced or monitored termination, and rejects unsupported termination; a monitored declaration does not promise native enforcement. It also declares `heap-limit: 'enforced' | 'unsupported'`, and `exit-observation: 'enforced' | 'unsupported'` truthfully. `heapBytes` is accepted only when `heap-limit` is enforced; `callWallTimeMs` is passed unchanged to the launcher for its caller-facing operations. A launcher without enforced exit observation requires a `health` check so a silent exit or stalled thread can be stopped. The supervisor performs no heap sampling and has no separate graceful thread phase: it drains the optional `beforeTerminate` hook, requests `terminate()` once, then waits up to the core reap deadline for actual exit. An unconfirmed exit keeps its budget lease occupied."
+                    "text": "The launcher must declare `termination: 'enforced' | 'monitored' | 'unsupported'` and `fault-isolation: 'unsupported'` truthfully. Required isolation accepts enforced or monitored termination, and rejects unsupported termination; a monitored declaration does not promise native enforcement. It also declares `heap-limit: 'enforced' | 'unsupported'`, and `exit-observation: 'enforced' | 'unsupported'` truthfully. `heapBytes` is accepted only when `heap-limit` is enforced; `callWallTimeMs` is passed unchanged to the launcher for its caller-facing operations. A launcher without enforced exit observation requires a `health` check so a silent exit or stalled thread can be stopped. The supervisor performs no heap sampling and has no separate graceful thread phase: it drains the optional `beforeTerminate` hook and requests `terminate()` once. Observable exit waits up to the core reap deadline; explicitly unsupported exit observation reports `EXIT_UNOBSERVABLE` immediately instead. Either abandoned outcome keeps its budget lease occupied until actual exit."
                   },
                   {
                     "type": "paragraph",

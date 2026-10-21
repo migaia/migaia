@@ -144,7 +144,9 @@ describe('platform capability admission', () => {
       await peer.close()
       await fixture.close()
     }
-    expect(fixture.budget.inUse).toBe(0)
+    /** Unobservable close returns before native exit; only that real receipt releases the lease. */
+    await Promise.all(fixture.handles.map((handle) => handle.exited))
+    await expect.poll(() => fixture.budget.inUse).toBe(0)
   })
   it.each([false, true])('real Worker ping health with missing server ping=%s', async (noPing) => {
     const scheduler = createManualScheduler()

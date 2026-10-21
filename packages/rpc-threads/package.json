@@ -45,7 +45,8 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
     "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test vitest.config.ts",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "test:e2e": "playwright test --config=test/e2e/playwright.config.ts"
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
@@ -57,12 +58,14 @@
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-core": "workspace:*",
     "@migaia/utils": "workspace:^",
+    "@playwright/test": "^1.62.1",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
     "elysia": "1.4.30",
     "msgpackr": "2.1.0",
     "protobufjs": "8.8.0",
     "typescript": "^7.0.2",
+    "vite": "8.1.1",
     "vitest": "^4.1.10"
   },
   "peerDependencies": {

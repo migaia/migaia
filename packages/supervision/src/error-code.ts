@@ -25,6 +25,12 @@ export const SupervisionErrorCode = {
   resourceLimitExceeded: 'RESOURCE_LIMIT_EXCEEDED',
   /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */
   reapTimeout: 'REAP_TIMEOUT',
+  /**
+   * Forced recovery cannot observe unit exit because the launcher declares exit-observation
+   * unsupported; retain its lease until actual exit. Enforces the declared exit-observation
+   * boundary; choose an observable launcher when confirmed recovery is required.
+   */
+  exitUnobservable: 'EXIT_UNOBSERVABLE',
   /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */
   supervisionExhausted: 'SUPERVISION_EXHAUSTED',
   /** A command attempted to create a unit while disposal is in progress; wait for disposal. */

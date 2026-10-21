@@ -165,13 +165,17 @@ describe('thread limits and exit observation', () => {
       'exit-observation': 'unsupported'
     })
     const budget = createUnitBudget({ kind: ThreadUnitKind.thread, maxUnits: 1, scheduler })
+    /** Recovery diagnostics must retain the health failure that caused forced teardown. */
+    const reported: unknown[] = []
     const base = {
       id: 'health',
       spec: threadSpec(),
       launcher,
       budget,
       scheduler,
-      report: () => undefined
+      report: (error: unknown) => {
+        reported.push(error)
+      }
     }
     expect(() => createThreadSupervisor(base)).toThrowError(
       expect.objectContaining({
@@ -207,14 +211,29 @@ describe('thread limits and exit observation', () => {
     expect(signals).toHaveLength(3)
     expect(signals.every((signal) => signal.aborted)).toBe(true)
     expect(launcher.handles[0]?.terminations).toBe(1)
-    expect(supervisor.inspect().lastExit?.reason).toBe('unhealthy')
-    const error = supervisor.inspect().lastExit?.error as Error & {
+    expect(supervisor.inspect().lastExit?.reason).toBe('abandoned')
+    /** The public recovery diagnostic keeps the primary health classification reachable. */
+    const recoveryError = supervisor.inspect().lastExit?.error as Error & { code: string }
+    expect(recoveryError.code).toBe(SupervisionErrorCode.exitUnobservable)
+    expect(reported).toContain(recoveryError)
+    /** Timed-out checks have no original thrown cause, but keep their coded health detail. */
+    const error = recoveryError.cause as Error & {
       code: string
       detail: { timedOut: boolean; kind: string }
     }
     expect(error.code).toBe(SupervisionErrorCode.unhealthy)
     expect(error.detail).toMatchObject({ timedOut: true, kind: 'thread' })
+    expect(supervisor.state).toBe('backoff')
+    scheduler.advance(250)
+    await settle()
+    expect(launcher.handles).toHaveLength(2)
+    expect(supervisor.state).toBe('ready')
+    expect(supervisor.inspect().restartCount).toBe(1)
     await supervisor.dispose()
+    expect(launcher.handles.every((handle) => !handle.alive)).toBe(true)
+    expect(budget.inUse).toBe(0)
+    expect(budget.pending).toBe(0)
+    expect(scheduler.pendingCount).toBe(0)
   })
 
   it('rejects an unsupported replacement limit without stopping the serving thread', async () => {
