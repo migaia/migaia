@@ -15,39 +15,57 @@ const setup = `import { createStore } from '@migaia/store-light'
 import { createStoreDevTools } from '@migaia/store-devtools'
 const store = createStore({ count: 0 })
 const tools = createStoreDevTools(store)`
-/** Bounded diagnostic history and action queues use the application's timestamp source. */
+/** A support panel retains recent checkout history without unbounded queues. */
 const capacityOptionsExample = `import { createStore } from '@migaia/store-light'
 import { createStoreDevTools } from '@migaia/store-devtools'
-const store = createStore({ count: 0 })
-const tools = createStoreDevTools(store, { maxHistory: 2, maxTrace: 1, now: () => 100 })
-tools.record('first')
-tools.record('second')
-tools.recordAction({ name: 'save' })
-tools.recordAction({ name: 'submit' })
-console.log(tools.history.map((entry) => entry.label))
-console.log(tools.actions.map((entry) => [entry.name, entry.timestamp]))
-tools.dispose()
-store.$dispose()`
-/** Only diagnostic snapshots receive the application's redaction policy. */
+
+const store = createStore({ quantity: 1 })
+const tools = createStoreDevTools(store, { maxHistory: 50, maxTrace: 200 })
+store.quantity = 2
+tools.record('quantity-updated')
+renderHistory(tools.history)
+renderActions(tools.actions)
+onSupportPanelClosed(() => tools.dispose())`
+/** Diagnostic snapshots redact email before they reach the support view. */
 const cloneOptionsExample = `import { createStore } from '@migaia/store-light'
 import { createStoreDevTools } from '@migaia/store-devtools'
+
 const store = createStore({ name: 'Ada', email: 'ada@example.com' })
 const tools = createStoreDevTools(store, {
   clone: (state) => ({ ...structuredClone(state), email: '[redacted]' })
 })
-console.log(tools.history[0]!.state.email, store.email)
-tools.dispose()
-store.$dispose()`
-/** Manual action recording remains available without a runtime trace subscription. */
-const captureOptionsExample = `import { createStore } from '@migaia/store-light'
-import { createStoreDevTools } from '@migaia/store-devtools'
-const store = createStore({ count: 0 })
-const tools = createStoreDevTools(store, { captureRuntimeTrace: false })
-store.$runtime.runTracedAction('increment', () => { store.count++ })
-tools.recordAction({ name: 'save' })
-console.log(tools.trace.length, tools.actions.map((entry) => entry.name))
-tools.dispose()
-store.$dispose()`
+renderSupportSnapshot(tools.history[0]!.state)
+onSupportPanelClosed(() => tools.dispose())`
+/** Selected manual records keep a checkout view focused on business actions. */
+const captureOptionsExample = `import { createStoreDevTools } from '@migaia/store-devtools'
+
+const tools = createStoreDevTools(checkoutStore, { captureRuntimeTrace: false })
+await submitOrder(checkoutStore.$plain())
+tools.recordAction({ name: 'order-submitted' })
+renderActions(tools.actions)
+onSupportPanelClosed(() => tools.dispose())`
+/** Diagnostic times use the same application clock as the support timeline. */
+const clockOptionsExample = `import { createStoreDevTools } from '@migaia/store-devtools'
+
+const tools = createStoreDevTools(checkoutStore, {
+  now: () => supportClock.now()
+})
+tools.recordAction({ name: 'checkout-opened' })
+renderTimeline(tools.actions)`
+/** A capture explanation keeps the original snapshot failure available to monitoring. */
+const captureFailureExample = `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
+
+try {
+  exportSupportSnapshot(tools.record('support-export'))
+} catch (cause) {
+  const error = createStoreDevtoolsError(
+    StoreDevtoolsErrorCode.callbackFailed,
+    'Support snapshot could not be captured',
+    { cause }
+  )
+  showCaptureError(error.message)
+  reportToMonitoring(error)
+}`
 /** Complete session example records, replays and releases only the diagnostic subscription. */
 const session = `${setup}\nconst anchor = tools.record('before-change')\nstore.$batch(draft => { draft.count++ })\ntools.jumpTo(anchor.id)\nconsole.log(tools.history, tools.actions, tools.trace)\ntools.dispose()\nstore.$dispose()`
 /** Public runtime graph handles used without a diagnostic session. */
@@ -208,17 +226,17 @@ const types: Record<string, ITypeDoc> = {
     ),
     optionCases: [
       {
-        title: t('Keep a short, repeatable capture', '保留短而可重复的诊断记录'),
+        title: t('Keep recent checkout history in a small panel', '在小面板保留最近的结账记录'),
         problem: t(
-          'A small panel needs only the latest two snapshots and the latest action. Defaults retain 100 snapshots and 1000 actions. Set both limits independently and fix now() when comparing captures from repeated runs.',
-          '小面板只需要最近两份快照和最后一个动作。默认会保留 100 份快照和 1000 个动作。分别设置两个上限；需要比较重复运行的结果时，用 now() 固定时间戳。'
+          'A support panel stays open throughout a checkout session. Defaults retain 100 state snapshots and 1000 action and trace records. Lower `maxHistory` and `maxTrace` independently to keep only the recent activity the panel needs.',
+          '支持面板会在整个结账会话中保持打开。默认保留 100 份状态快照，以及各 1000 条动作和追踪记录。分别调低 `maxHistory` 和 `maxTrace`，只保留面板需要的近期活动。'
         ),
         example: capacityOptionsExample,
         result: t(
-          "History contains first and second; actions contains only ['submit', 100].",
-          "历史只保留 first、second；动作只保留 ['submit', 100]。"
+          'The history view includes the quantity change and retains at most 50 snapshots; actions and trace each retain at most 200 entries.',
+          '历史视图包含数量变更，最多保留 50 份快照；动作和追踪各最多保留 200 条。'
         ),
-        covers: ['maxHistory', 'maxTrace', 'now']
+        covers: ['maxHistory', 'maxTrace']
       },
       {
         title: t('Hide email in diagnostic snapshots', '隐藏诊断快照中的邮箱'),
@@ -228,8 +246,8 @@ const types: Record<string, ITypeDoc> = {
         ),
         example: cloneOptionsExample,
         result: t(
-          'The snapshot prints [redacted]; the live store still prints ada@example.com.',
-          '快照输出 [redacted]；存活的存储仍输出 ada@example.com。'
+          'The support view shows `[redacted]` for email; creating the snapshot leaves the checkout store unchanged.',
+          '支持视图中的邮箱显示为 `[redacted]`；创建快照不会改动结账存储。'
         ),
         covers: ['clone']
       },
@@ -241,8 +259,8 @@ const types: Record<string, ITypeDoc> = {
         ),
         example: captureOptionsExample,
         result: t(
-          'trace is empty; actions contains only save, without the automatic increment action.',
-          'trace 为空；actions 只包含 save，没有自动捕获的 increment 动作。'
+          'The panel shows the manual `order-submitted` record, without automatically collecting runtime activity.',
+          '面板显示手动记录的 `order-submitted`，不自动收集运行时活动。'
         ),
         covers: ['captureRuntimeTrace']
       }
@@ -298,7 +316,7 @@ const types: Record<string, ITypeDoc> = {
           'Supply your clock when timestamps must match another log or remain fixed across repeated captures. Snapshots and action records call it. Without it, timestamps use Date.now().',
           '时间戳需要匹配其它日志，或需要固定时间以便重复比较时，传入应用时钟。快照和动作记录都会调用它。不设置则使用 Date.now()。'
         ),
-        example: capacityOptionsExample,
+        example: clockOptionsExample,
         ...p(
           'Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.',
           '同步无参数时钟，返回应用使用的毫秒时间戳；准备期未归属失败附 `CALLBACK_FAILED`，手动捕获抛出，自动捕获经运行时报告。'
@@ -545,44 +563,46 @@ const symbols: Record<string, ISymbolDoc> = {
     params: errorParams,
     optionCases: [
       {
-        title: t('Keep the snapshot exception', '保留快照异常'),
+        title: t('Explain a failed support capture', '说明支持快照捕获失败'),
         problem: t(
-          'Add an operation-specific explanation without losing the original exception. Pass cause to preserve it; otherwise the new error has no cause property.',
-          '添加具体操作的失败说明，同时保留原始异常。传入 cause 可保留它；否则新错误没有 cause 属性。'
+          'A support agent exports a checkout snapshot. If capture fails, a short export error alone hides the clone or clock exception. Keep it in `cause` so the agent sees the failed operation and monitoring retains the original exception.',
+          '支持人员需要导出结账快照。捕获失败时，只有导出提示会掩盖克隆或时钟异常。用 `cause` 保留异常，页面说明失败的操作，监控继续查看原始异常。'
         ),
-        example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
-const cause = new TypeError('snapshot invalid')
-const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, 'capture failed', { cause })
-console.log(error.cause === cause)`,
+        example: captureFailureExample,
         result: t(
-          'Prints true; the original TypeError remains reachable.',
-          '输出 true；仍能找到原始 TypeError。'
+          'The support view reports the capture failure, with its original exception available in monitoring.',
+          '支持视图提示捕获失败，监控中仍能查看原始异常。'
         ),
         covers: ['cause']
       },
       {
-        title: t('Keep structured capture details', '保留结构化捕获详情'),
+        title: t('Keep rejected snapshot export details', '保留快照导出被拒绝的详情'),
         problem: t(
-          'An application may report a details object instead of throwing Error. cause accepts this value directly, so the caller does not need to parse the error message.',
-          '应用可能返回详情对象，而非抛出 Error。cause 可以直接接收这个值，调用方无需解析错误消息。'
+          'The support export policy can reject a snapshot with a record naming the restricted fields. Turning that record into a message loses the field details. Keep it in `cause` when reporting the rejected export.',
+          '支持导出策略可能用记录指出快照中受限制的字段。只把记录变成文字会丢失字段详情。报告导出被拒绝时，把该记录保留在 `cause` 中。'
         ),
         example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
-const cause = { operation: 'record', recordId: 'draft-7' }
-const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, 'capture failed', { cause })
-console.log(error.cause === cause)`,
+
+const rejection = validateSupportExport(snapshot)
+if (rejection) {
+  const error = createStoreDevtoolsError(
+    StoreDevtoolsErrorCode.callbackFailed,
+    'Support snapshot export rejected',
+    { cause: rejection }
+  )
+  showExportError(error.message)
+  reportToMonitoring(error)
+}`,
         result: t(
-          'Prints true; cause is the original details object.',
-          '输出 true；cause 是原始详情对象。'
+          'The support view reports the rejected export, and monitoring keeps the restricted-field details.',
+          '支持视图提示导出被拒绝，监控记录保留受限字段详情。'
         ),
         covers: ['cause']
       }
     ],
     optionDocs: {
       cause: {
-        example: `import { createStoreDevtoolsError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'
-const cause = new TypeError('snapshot invalid')
-const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, 'capture failed', { cause })
-console.log(error.cause === cause)`,
+        example: captureFailureExample,
         ...p(
           'Original application failure preserved by identity on Error.cause when supplied and not undefined.',
           '提供且不为 `undefined` 时按原始身份保存在错误原因上的应用失败值。'
