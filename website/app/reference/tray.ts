@@ -8,7 +8,7 @@
 import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityReference } from './capability.js'
 import { runtimeSharedTypes } from './rpc-runtime-shared.js'
-import { trayCases } from './tray-cases.js'
+import { trayCases, trayOptionCases, trayOptionExamples } from './tray-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -801,6 +801,7 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
     },
     createTray: {
       role: 'factory',
+      optionCases: trayOptionCases.registry,
       optionDocs: {
         hosts: {
           summary: t(
@@ -826,6 +827,11 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
           default: t('Omitted: no observation probes are attached.', '省略时不挂接观察探针。')
         },
         report: {
+          whenToUse: t(
+            'Set it to send background and listener failures to application monitoring. It does not replace the result of a business request. Omission uses console.error.',
+            '需要把后台失败和监听器失败交给应用监控时设置。它不会替换业务请求结果。省略时使用 console.error。'
+          ),
+          example: trayOptionExamples.registry,
           summary: t(
             'Synchronous diagnostic callback receiving background and listener failures.',
             '同步诊断回调，接收后台错误与监听失败。'
@@ -861,6 +867,7 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
     },
     serveTrayHost: {
       role: 'operation',
+      optionCases: trayOptionCases.serve,
       optionDocs: {
         probe: {
           summary: t(
@@ -870,6 +877,11 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
           default: t('Omitted: no probes are installed.', '省略时不安装观察探针。')
         },
         report: {
+          whenToUse: t(
+            'Set it in the child entry to receive serving failures where they occur. It runs synchronously; omission writes diagnostics to console.error.',
+            '在子端入口设置，以便在发生处接收服务失败。回调同步执行；省略时向 console.error 输出诊断。'
+          ),
+          example: trayOptionExamples.registry,
           summary: t(
             'Receives background failures from serving the child host.',
             '接收为子宿主提供服务期间出现的后台失败。'
@@ -1070,6 +1082,7 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
       example: loaderExample
     },
     createRuntime: {
+      optionCases: trayOptionCases.runtime,
       role: 'factory',
       purpose: t(
         'Creates a runtime bound to a managed host (or a mutation `view`); each run selects one ready plugin generation for its callback, and separate runs may overlap.',
@@ -1101,6 +1114,11 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
             'Whether runtime disposal returns after logical shutdown or waits for physical callback completion.',
             '运行器释放是在逻辑关闭后返回，还是继续等待回调物理完成。'
           ),
+          whenToUse: t(
+            'Keep default strict-drain to wait for every callback. Choose bounded when disposal must return while cooperative callbacks still settle. Neither mode disposes the managed host.',
+            '保留默认 strict-drain 可等待每个回调。需要在合作式回调仍结算时先返回，则选 bounded。两种模式都不释放托管宿主。'
+          ),
+          example: trayOptionExamples.runtimeBounded,
           values: {
             bounded: t(
               'Permit return while callbacks that ignore cancellation remain active.',
@@ -1117,6 +1135,11 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
             'Optional synchronous `(error) => void` receiver for runtime diagnostics; the return value is ignored and synchronous throws are contained.',
             '接收运行器诊断的可选同步 `(error) => void`；不使用返回值，同步抛错会被隔离。'
           ),
+          whenToUse: t(
+            'Set it when runtime diagnostics need an application receiver. Return no value synchronously. Omission has no diagnostic receiver, and callback failures do not replace runtime operation results.',
+            '运行器诊断需要应用接收方时设置。同步返回空值。省略时没有诊断接收方，回调失败不会替换运行操作结果。'
+          ),
+          example: trayOptionExamples.runtimeStrict,
           default: t(
             'Omitted: runtime diagnostics have no callback receiver.',
             '省略时运行器诊断没有回调接收方。'
@@ -1791,8 +1814,14 @@ console.log(same.id) // 'alice'`,
         'Options of `createHost()`.',
         '`createHost()` 的选项：宿主构造、初始插件、等待上限与关闭方式。'
       ),
+      optionCases: trayOptionCases.host,
       members: {
         create: {
+          whenToUse: t(
+            'Supply this required factory to construct the one PluginHost owned by the managed host. Return a real PluginHost instance or defineHost handle; the managed host releases it.',
+            '提供这个必填工厂，构造托管宿主持有的唯一 PluginHost。返回真实 PluginHost 实例或 defineHost 句柄；由托管宿主释放它。'
+          ),
+          example: trayOptionExamples.hostStrict,
           summary: t(
             'Builds the one PluginHost the managed host owns (a class instance or `defineHost()` handle).',
             '构建托管宿主所拥有的唯一 PluginHost（类实例或 `defineHost()` 句柄）。'
@@ -1823,6 +1852,11 @@ console.log(same.id) // 'alice'`,
           )
         },
         'shutdown.mode': {
+          whenToUse: t(
+            'Choose bounded to return after quiescenceMs while physical cleanup continues, or strict-drain to wait for real release. This required host option has no implicit mode.',
+            '选择 bounded 可在 quiescenceMs 后先返回，让物理清理继续；选择 strict-drain 则等待真正释放。此宿主必填选项没有隐含模式。'
+          ),
+          example: trayOptionExamples.hostBounded,
           summary: t('Waiting strategy of disposal.', '托管宿主释放时采用的等待策略。'),
           values: {
             bounded: t(
@@ -1836,6 +1870,11 @@ console.log(same.id) // 'alice'`,
           }
         },
         report: {
+          whenToUse: t(
+            'Set a synchronous receiver for lifecycle and secondary cleanup diagnostics. Omission leaves no application diagnostic receiver; operation results still retain their own failures.',
+            '需要接收生命周期及次要清理诊断时设置同步回调。省略时没有应用诊断接收方；操作结果仍保留自身失败。'
+          ),
+          example: trayOptionExamples.hostStrict,
           summary: t('Receives lifecycle and cleanup diagnostics.', '接收生命周期与清理诊断信息。'),
           default: t(
             'Not set: diagnostics are dropped after classification.',
@@ -2197,6 +2236,7 @@ console.log(same.id) // 'alice'`,
         'Options of `loadIntoHost()`.',
         '`loadIntoHost()` 的选项：宿主、来源、加载器、适配器与变更方式。'
       ),
+      optionCases: trayOptionCases.loader,
       members: {
         host: {
           summary: t(
@@ -2223,6 +2263,11 @@ console.log(same.id) // 'alice'`,
           )
         },
         mutation: {
+          whenToUse: t(
+            'Choose use for a new definition or replace for a new generation of the same name. The choice is required and has no default.',
+            '新定义选 use；同名定义的新代次选 replace。该选择必填，没有默认值。'
+          ),
+          example: trayOptionExamples.replace,
           summary: t('Whether to add or replace the plugin.', '是新增插件还是替换插件。'),
           values: {
             use: t('Add with `use()`.', '通过 `use()` 新增。'),
@@ -2246,6 +2291,11 @@ console.log(same.id) // 'alice'`,
           )
         },
         report: {
+          whenToUse: t(
+            'Set it to observe secondary failures such as artifact cleanup without hiding the primary loading result. Omission provides no caller-supplied reporter.',
+            '需要观察制品清理等次要失败，同时保留加载主结果时设置。省略时没有调用者提供的上报器。'
+          ),
+          example: trayOptionExamples.load,
           summary: t('Receives secondary failures.', '接收次要失败（例如清理失败）。'),
           default: t(
             'undefined: no caller-supplied reporter.',

@@ -1,4 +1,292 @@
-import type { ICaseDoc } from './contract.js'
+import type { ICaseDoc, IOptionCaseDoc, IText } from './contract.js'
+
+/** Localized option stories share complete public-entry programs. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Managed operations borrow one explicitly constructed PluginHost. */
+const managedOptionsSetup = `import { PluginHost, definePlugin } from '@migaia/plugin-host'
+import { createHost } from '@migaia/tray/host'
+class AppHost extends PluginHost<Record<string, never>, string> {}`
+
+/** Both registry and child option chapters can run this same real Thread entry. */
+const registryOptionsExample = (
+  customRouting: boolean
+): string => `import { isMainThread } from 'node:worker_threads'
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { createTray, defineTrayHost, defineRoutingPolicy, serveTrayHost } from '@migaia/tray'
+import { defineProbe } from '@migaia/rpc-core/probe'
+const firstReady = defineRoutingPolicy('firstReady', (candidates) => candidates[0]!.id)
+const agent = defineTrayHost({
+  name: 'agent', runtime: 'thread', entry: new URL(import.meta.url),
+  routing: [firstReady] as const,
+  plugins: () => [definePlugin({ name: 'node', features: {
+    svc: defineFeature(() => ({ echo: (value: string) => value }))
+  }, install: () => ({}) })] as const,
+  exposes: ['node.svc'] as const
+})
+const probe = defineProbe({ stages: ['peer'], emit: () => {} })
+const report = (error: unknown) => { console.error(error) }
+if (!isMainThread) {
+  await serveTrayHost(agent, { probe, report })
+} else {
+  const tray = createTray({ hosts: [agent] as const, routing: [firstReady] as const, probe, report })
+  try {
+    const instance = await tray.spawn('agent', { id: 'one' })
+    console.log(await ${customRouting ? 'tray.routing.firstReady(agent)' : 'instance'}.request('node.svc.echo', '${customRouting ? 'routed' : 'hello'}'))
+  } finally {
+    await tray.dispose()
+  }
+}`
+
+/** Managed shutdown examples resolve every held cleanup before their process exits. */
+const hostOptionsExample = (bounded: boolean): string => `${managedOptionsSetup}
+const release = Promise.withResolvers<void>()
+const started = Promise.withResolvers<void>()
+const host = await createHost({
+  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
+  plugins: [definePlugin({ name: 'counter', install: () => ({ count: 1 }), dispose: () => {
+    started.resolve(); ${bounded ? 'return release.promise' : 'return undefined'}
+  } })] as const,
+  mutationAdmissionMs: 1000,
+  quiescenceMs: ${bounded ? '0' : '1000'},
+  shutdown: { mode: '${bounded ? 'bounded' : 'strict-drain'}' },
+  report: (error) => { console.error(error) }
+})
+console.log(host.readyPlugins)
+const closing = host.dispose()
+await started.promise
+const result = await closing
+console.log(result.cleanupComplete)
+release.resolve()
+await result.physicalCompletion`
+
+/** Loading and replacement use local artifacts, never network access or a private loader path. */
+const loadOptionsExample = (replace: boolean): string => `${managedOptionsSetup}
+import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
+import { defineAdapter } from '@migaia/tray/adapter'
+const host = await createHost({
+  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
+  plugins: [], mutationAdmissionMs: 1000, quiescenceMs: 1000, shutdown: { mode: 'strict-drain' }
+})
+let releases = 0
+const loader = defineLoader({ load: (value: number) => ({ value, release: { force: () => { releases++ } } }) })
+const adapter = defineAdapter({ adapt: (value: number) => ({ name: 'answer' as const, install: () => ({ answer: () => value }) }) })
+const caller = new AbortController()
+try {
+  ${replace ? "await loadIntoHost({ host, source: 42, loader, adapter, mutation: 'use', timeoutMs: false })" : ''}
+  const result = await loadIntoHost({
+    host, source: ${replace ? '7' : '42'}, loader, adapter, mutation: '${replace ? 'replace' : 'use'}',
+    timeoutMs: ${replace ? 'false' : '5000'}, signal: caller.signal,
+    report: (error) => { console.error(error) }
+  })
+  if (result.ok) {
+    const extensions = result.view.extensions as { answer(): number }
+    console.log(extensions.answer(), result.operation, releases)
+  }
+} finally {
+  await host.dispose()
+}`
+
+/** Runtime shutdown controls callback waiting and never takes ownership of its managed Host. */
+const runtimeOptionsExample = (bounded: boolean): string => `${managedOptionsSetup}
+import { createRuntime } from '@migaia/tray/runtime'
+const host = await createHost({
+  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
+  plugins: [{ name: 'billing', install: () => ({ double: (value: number) => value * 2 }) }] as const,
+  mutationAdmissionMs: 1000, quiescenceMs: 1000, shutdown: { mode: 'strict-drain' }
+})
+const runtime = createRuntime(host, {
+  shutdown: { mode: '${bounded ? 'bounded' : 'strict-drain'}' },
+  report: (error) => { console.error(error) }
+})
+const release = Promise.withResolvers<void>()
+try {
+  const running = runtime.run('billing', { timeoutMs: false }, async ({ extensions }) => {
+    await release.promise
+    return extensions.double(21)
+  })
+  const closing = runtime.dispose()
+  ${bounded ? 'console.log((await closing).cleanupComplete)' : ''}
+  release.resolve()
+  ${bounded ? '' : 'console.log((await closing).cleanupComplete)'}
+  console.log(await running, host.state)
+} finally {
+  release.resolve()
+  await runtime.dispose()
+  await host.dispose()
+}`
+
+/** Own field examples reuse the complete scenario that demonstrates their setting. */
+export const trayOptionExamples = {
+  registry: registryOptionsExample(false),
+  routing: registryOptionsExample(true),
+  hostStrict: hostOptionsExample(false),
+  hostBounded: hostOptionsExample(true),
+  load: loadOptionsExample(false),
+  replace: loadOptionsExample(true),
+  runtimeStrict: runtimeOptionsExample(false),
+  runtimeBounded: runtimeOptionsExample(true)
+}
+
+/** Related ownership and waiting fields stay in one observable configuration workflow. */
+export const trayOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  registry: [
+    {
+      title: t('Register and observe a Thread host', '登记并观察线程宿主'),
+      problem: t(
+        'A parent must register host definitions before spawning them. hosts selects those definitions; probe observes connections on each side and report receives background failures. Omitted probes do not observe; the default reporter is console.error.',
+        '父端必须先登记宿主定义，再创建实例。hosts 选择定义；两端的 probe 观察连接，report 接收后台失败。省略探针则不观察；默认上报器为 console.error。'
+      ),
+      example: trayOptionExamples.registry,
+      result: t(
+        'A real Thread serves the request and prints hello; registry disposal asks the child to exit.',
+        '真实线程处理请求并输出 hello；注册表释放时要求子端退出。'
+      ),
+      covers: ['hosts', 'probe', 'report', 'routing']
+    },
+    {
+      title: t('Choose a shared routing policy', '选择共享路由策略'),
+      problem: t(
+        'A service needs a deterministic first-ready policy. Register the exact defineRoutingPolicy result in routing and the host tuple. Without custom registration, only built-ins and declared host policies are available.',
+        '服务需要确定的首个就绪实例策略。把 defineRoutingPolicy 的原对象登记到 routing 和宿主元组中。不额外登记时，只能使用内置策略和宿主声明的策略。'
+      ),
+      example: trayOptionExamples.routing,
+      result: t(
+        'The custom routing namespace dispatches to the ready Thread and prints routed.',
+        '自定义路由命名空间向就绪线程派发并输出 routed。'
+      ),
+      covers: ['hosts', 'routing', 'probe', 'report']
+    }
+  ],
+  serve: [
+    {
+      title: t('Observe a child connection', '观察子端连接'),
+      problem: t(
+        'A child entry must attach probes when it starts serving, rather than after requests have begun. Supply probe to serveTrayHost; omitted probes collect no child observations. report handles serving diagnostics.',
+        '子端入口需要在开始服务时挂接探针，而非请求开始后再挂接。向 serveTrayHost 提供 probe；省略时不收集子端观察。report 处理服务诊断。'
+      ),
+      example: trayOptionExamples.registry,
+      result: t(
+        'The complete parent/child program prints hello and closes the child after cleanup.',
+        '完整父子程序输出 hello，并在清理后关闭子端。'
+      ),
+      covers: ['probe', 'report']
+    },
+    {
+      title: t('Keep serving diagnostics with routed calls', '为路由调用保留服务诊断'),
+      problem: t(
+        'Routing still uses an ordinary child connection. Its report callback observes background serving failures and defaults to console.error; a business request keeps its own success or failure.',
+        '路由仍使用普通子端连接。report 回调观察后台服务失败，默认使用 console.error；业务请求保留自身的成功或失败结果。'
+      ),
+      example: trayOptionExamples.routing,
+      result: t(
+        'Prints routed from the actual child; the configured diagnostic receiver remains attached until exit.',
+        '实际子端输出 routed；配置的诊断接收方保持到退出。'
+      ),
+      covers: ['probe', 'report']
+    }
+  ],
+  host: [
+    {
+      title: t('Construct and strictly release a managed host', '构造并严格释放托管宿主'),
+      problem: t(
+        'A managed host needs one canonical PluginHost and its initial definitions. create constructs that owner; plugins selects definitions. mutationAdmissionMs and quiescenceMs are required budgets. strict-drain waits for real release; report receives lifecycle diagnostics.',
+        '托管宿主需要唯一的规范 PluginHost 和初始定义。create 构造所有者，plugins 选择定义。mutationAdmissionMs 与 quiescenceMs 是必填预算。strict-drain 等待真正释放；report 接收生命周期诊断。'
+      ),
+      example: trayOptionExamples.hostStrict,
+      result: t(
+        "Prints ['counter'] then true; cleanup finishes before disposal returns.",
+        "输出 ['counter'] 和 true；释放返回前已完成清理。"
+      ),
+      covers: [
+        'create',
+        'plugins',
+        'mutationAdmissionMs',
+        'quiescenceMs',
+        'shutdown',
+        'shutdown.mode',
+        'report'
+      ]
+    },
+    {
+      title: t('Return while slow plugin cleanup continues', '慢速插件清理期间先返回'),
+      problem: t(
+        'A closing screen cannot wait indefinitely for plugin cleanup. bounded uses quiescenceMs before returning a logical result; unfinished work remains observable through physicalCompletion. strict-drain would wait instead.',
+        '页面关闭不能无限等待插件清理。bounded 按 quiescenceMs 等待后返回逻辑结果；未完成工作仍通过 physicalCompletion 可观察。strict-drain 则继续等待。'
+      ),
+      example: trayOptionExamples.hostBounded,
+      result: t(
+        'Prints false while cleanup waits, then awaits physicalCompletion after releasing the gate.',
+        '清理等待时输出 false，放行后等待 physicalCompletion 完成。'
+      ),
+      covers: [
+        'create',
+        'plugins',
+        'mutationAdmissionMs',
+        'quiescenceMs',
+        'shutdown',
+        'shutdown.mode',
+        'report'
+      ]
+    }
+  ],
+  loader: [
+    {
+      title: t('Load a local artifact into a host', '把局部制品加载到宿主'),
+      problem: t(
+        'Loading needs a source, a loader that owns the artifact, an adapter that creates a compatible plugin, and the receiving host. mutation use adds a definition; timeoutMs is required. signal is cooperative and report receives secondary failures.',
+        '加载需要来源、持有制品的 loader、创建兼容插件的 adapter，以及接收宿主。mutation use 新增定义；timeoutMs 必填。signal 采用合作式取消，report 接收次要失败。'
+      ),
+      example: trayOptionExamples.load,
+      result: t(
+        'Prints 42 use 0; the committed generation owns the artifact until host cleanup.',
+        '输出 42 use 0；提交后的代次持有制品，直到宿主清理。'
+      ),
+      covers: ['host', 'source', 'loader', 'adapter', 'mutation', 'timeoutMs', 'signal', 'report']
+    },
+    {
+      title: t('Replace a loaded plugin generation', '替换已加载的插件代次'),
+      problem: t(
+        'An updated artifact must replace the same-name definition. mutation replace performs that operation rather than adding a duplicate. timeoutMs false removes the loading deadline; report observes secondary cleanup failure without changing the primary outcome.',
+        '更新后的制品需要替换同名定义。mutation replace 执行替换，避免新增重复定义。timeoutMs false 关闭加载截止期限；report 观察次要清理失败，不改变主结果。'
+      ),
+      example: trayOptionExamples.replace,
+      result: t(
+        'Prints 7 replace 1; the prior artifact has been released once.',
+        '输出 7 replace 1；先前制品已释放一次。'
+      ),
+      covers: ['host', 'source', 'loader', 'adapter', 'mutation', 'timeoutMs', 'signal', 'report']
+    }
+  ],
+  runtime: [
+    {
+      title: t('Wait for every runtime callback', '等待全部运行器回调'),
+      problem: t(
+        'A runtime shutdown must wait for callback settlement when released resources are still in use. strict-drain is the default. report receives runtime diagnostics and is absent by default; disposing the runtime never disposes its host.',
+        '运行器关闭时，仍在使用的资源需要等待回调结算。默认 strict-drain 会等待。report 接收运行器诊断，默认没有接收方；释放运行器不会释放宿主。'
+      ),
+      example: trayOptionExamples.runtimeStrict,
+      result: t(
+        'Prints true, then 42 active; callback work settled and the host remains active.',
+        '输出 true，以及 42 active；回调已结算，宿主仍存活。'
+      ),
+      covers: ['shutdown', 'shutdown.mode', 'report']
+    },
+    {
+      title: t('Close runtime admission before callbacks finish', '在回调结束前关闭运行接纳'),
+      problem: t(
+        'A runtime may need to return without waiting for callbacks that ignore cancellation. bounded returns a cleanup snapshot immediately. It does not stop those callbacks, which must still settle before the host is released.',
+        '运行器可能需要先返回，而不等待忽略取消的回调。bounded 立即返回清理快照，不会停止这些回调；释放宿主前仍需让它们结算。'
+      ),
+      example: trayOptionExamples.runtimeBounded,
+      result: t(
+        'Prints false, then 42 active after the callback is released.',
+        '先输出 false，放行回调后输出 42 active。'
+      ),
+      covers: ['shutdown', 'shutdown.mode', 'report']
+    }
+  ]
+}
 
 /** Complete Node examples use real local Graphs and managed PluginHosts. */
 export const trayCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
