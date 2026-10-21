@@ -9,7 +9,7 @@ export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host supervision rpc-contract rpc-core rpc-process rpc-threads tray rpc-pool rpc-browser rpc-devtools logger storage-web
 # Store packages release independently from the foundation ship. `wasm` is the
 # package-owned prerequisite for store-wasm and therefore leads this plan.
-STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm
+STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm micro-hub
 PUBLISHABLE_PACKAGES := $(RELEASE_PACKAGES) $(STORE_RELEASE_PACKAGES)
 RELEASE_BRANCH ?= main
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
