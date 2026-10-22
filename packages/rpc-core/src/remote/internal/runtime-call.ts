@@ -614,6 +614,8 @@ export function createManagedRuntimeCalls(
         options?: IRpcRuntimeSendOptions
       ): Promise<readonly IRpcRuntimeStepOutcome[]>
       currentPeer(): ReturnType<typeof createRuntimePeerCalls>
+      /** True while the next generation is starting and no current Peer exists. */
+      readonly restarting: boolean
     }>
   }>
 ) {
@@ -621,6 +623,30 @@ export function createManagedRuntimeCalls(
   const binding = { trackRequest: config.trackRequest }
   const request = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
     registration.invokeRequest(method, payload, callOptions)
+  /**
+   * While the next generation is starting there is no current Peer. That is a passing state of a
+   * live registration, not invalid caller input, so notify, group and outcome reject instead of
+   * throwing; a closed or stopped registration keeps its synchronous REMOTE_CLOSED admission
+   * failure.
+   */
+  const notifyCurrent = (
+    method: string,
+    payload: unknown,
+    callOptions: ICoreRuntimeCallOptions | undefined
+  ): Promise<void> =>
+    registration.restarting
+      ? new Promise<void>((resolve) => {
+          resolve(registration.currentPeer().notify(method, payload, callOptions))
+        })
+      : registration.currentPeer().notify(method, payload, callOptions)
+  /**
+   * While restarting, the lazy registration stream reports unavailability at its first read, so
+   * creating the stream does not throw for that passing state.
+   */
+  const streamCurrent = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
+    registration.restarting
+      ? registration.invokeStream(method, payload, callOptions)
+      : registration.currentPeer().stream(method, payload, callOptions)
   return Object.freeze({
     request: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
       restrictTransfer?.(callOptions)
@@ -633,18 +659,29 @@ export function createManagedRuntimeCalls(
       restrictTransfer?.(callOptions)
       return isForwardedPayload(callOptions, payload)
         ? registration.invokeRequest(method, payload, callOptions, 'notify').then(() => undefined)
-        : registration.currentPeer().notify(method, payload, callOptions)
+        : notifyCurrent(method, payload, callOptions)
     },
     stream: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
       restrictTransfer?.(callOptions)
       return isForwardedPayload(callOptions, payload) || config.callDeadlineCapMs !== undefined
         ? registration.invokeStream(method, payload, callTimeout(callOptions))
-        : registration.currentPeer().stream(method, payload, callTimeout(callOptions))
+        : streamCurrent(method, payload, callTimeout(callOptions))
     },
     group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
       restrictTransfer?.(callOptions)
-      return registration.invokeGroup(steps, callOptions)
+      return registration.restarting
+        ? new Promise<readonly IRpcRuntimeStepOutcome[]>((resolve) => {
+            resolve(registration.invokeGroup(steps, callOptions))
+          })
+        : registration.invokeGroup(steps, callOptions)
     },
-    outcome: (key: string) => registration.currentPeer().outcome(key)
+    outcome: (key: string) =>
+      registration.restarting
+        ? new Promise<Awaited<ReturnType<ReturnType<typeof registration.currentPeer>['outcome']>>>(
+            (resolve) => {
+              resolve(registration.currentPeer().outcome(key))
+            }
+          )
+        : registration.currentPeer().outcome(key)
   })
 }

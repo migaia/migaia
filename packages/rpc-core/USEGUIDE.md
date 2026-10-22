@@ -474,7 +474,7 @@ provide 只读自身可枚举数据属性，嵌套普通对象生成 math.double
 
 调用选项含 timeoutMs、signal、idempotencyKey、orderKey、cancel、transfer。request/stream 默认 30000 毫秒，单次 false 关闭默认、0 立即到期，并受来源单次上限约束；重试和等待下一代沿用同一个绝对期限，不在新代次重置。signal 为协作取消；cancel: 'before-start' 只撤销尚未开始的调用，已开始则保留真实结果。同 orderKey 在提供方串行。transfer 仅支持已协商的线程能力，不适用于普通内存 pair。
 
-非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。
+非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。Peer 已经关闭、或它的代次已被停止和替换时，新调用会同步抛出 REMOTE_CLOSED；监督器正在启动下一代（例如 Worker 崩溃后正在重启）时，调用返回以 REMOTE_CLOSED 拒绝的 Promise，不会同步抛错。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。
 
 ### Host 出口、安装与 Coroutine
 

@@ -241,7 +241,7 @@ provide reads only own enumerable data properties and builds dotted paths from n
 
 Call options are timeoutMs, signal, idempotencyKey, orderKey, cancel, and transfer. Request/stream default to 30000 ms; per-call false disables the default and zero expires immediately, subject to source call ceilings. Retries and waiting for a successor generation retain the original absolute deadline. Signal cancellation is cooperative. cancel:'before-start' only retracts work that has not started; started work retains its actual outcome. Calls sharing orderKey run serially at the provider. Transfer is for negotiated thread capability rather than a normal memory pair.
 
-Invalid names, values, or options may throw before a Promise is returned. Wrap the whole call expression in try instead of only attaching catch. Close/events provide no business rollback and cannot turn disconnection into proof of non-execution.
+Invalid names, values, or options may throw before a Promise is returned. Wrap the whole call expression in try instead of only attaching catch. After the Peer is closed, or its generation was stopped and replaced, a new call throws REMOTE_CLOSED synchronously; while the supervisor starts the next generation (for example while a crashed Worker restarts), the call returns a Promise that rejects with REMOTE_CLOSED instead of throwing. Close/events provide no business rollback and cannot turn disconnection into proof of non-execution.
 
 ### Host outlets, installation, and coroutines
 

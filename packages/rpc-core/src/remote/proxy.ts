@@ -137,6 +137,8 @@ export type IRemoteRuntimeRegistration = Pick<
     /** Passive lifecycle observers read the same original supervisor, including local connections. */
     readonly supervisor: ISupervisor<unknown, unknown>
     currentPeer(): IRuntimePeer
+    /** True while the next generation is starting and no current Peer exists. */
+    readonly restarting: boolean
     /** Whole forwarded groups retain the original accepted generation and leave reason. */
     invokeGroup(...args: Parameters<IRuntimePeer['group']>): ReturnType<IRuntimePeer['group']>
     /** Read original native state and bounded safe lifecycle history without preparing a generation. */
@@ -803,6 +805,22 @@ class RemoteRegistration<TUnit, TSpec> {
     return this.#options.binding.supervisor as ISupervisor<unknown, unknown>
   }
 
+  /**
+   * True while a live registration waits for its supervisor to start the next generation after the
+   * previous one left (backoff, queued or starting). Calls in this window reject with REMOTE_CLOSED
+   * instead of throwing; a released registration, or one whose supervisor stopped, keeps the
+   * synchronous REMOTE_CLOSED admission failure.
+   */
+  get restarting(): boolean {
+    if (this.#releaseReason !== undefined || this.#current) return false
+    const state = this.#options.binding.supervisor.state
+    return (
+      state === SupervisorState.backoff ||
+      state === SupervisorState.queued ||
+      state === SupervisorState.starting
+    )
+  }
+
   /** Return only the current original generation, never a cached same-name successor handle. */
   currentPeer(): IRuntimePeer {
     const active = this.#runtimeActive()
@@ -1061,6 +1079,11 @@ class RemoteRegistration<TUnit, TSpec> {
 
   /** Admit the logical business mode from the same precompiled index used by direct Peer calls. */
   #runtimeMethod(method: string, mode: RuntimeApiMode) {
+    /**
+     * While the next generation is being started there is no directory to check; the call's own
+     * admission then rejects with REMOTE_CLOSED instead of this declaration read throwing.
+     */
+    if (this.restarting) return undefined
     const connection = readRuntimePeerConnection(this.currentPeer())
     if (!connection.description) return undefined
     const declaration = connection.routes.get(method)
