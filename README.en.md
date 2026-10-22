@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <a href="https://hk.vps.kaeo.app/migaia/en/">Docs site</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#packages">Packages</a> ·
   <a href="#documentation">Documentation</a> ·
@@ -210,11 +211,11 @@ Bottom                 utils   wasm
 
 ## Documentation
 
-| Document  | Location                         | What it covers                                                                         |
-| --------- | -------------------------------- | -------------------------------------------------------------------------------------- |
-| README    | `packages/<name>/README.en.md`   | The problem the package solves, a runnable starting example, and why you would pick it |
-| USEGUIDE  | `packages/<name>/USEGUIDE.en.md` | Complete usage organized by scenario, each with code and output                        |
-| Docs site | `website/`                       | Guides and API reference for every package, searchable. Run `pnpm website:dev` locally |
+| Document  | Location                                                     | What it covers                                                                                                              |
+| --------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| README    | `packages/<name>/README.en.md`                               | The problem the package solves, a runnable starting example, and why you would pick it                                      |
+| USEGUIDE  | `packages/<name>/USEGUIDE.en.md`                             | Complete usage organized by scenario, each with code and output                                                             |
+| Docs site | [hk.vps.kaeo.app/migaia](https://hk.vps.kaeo.app/migaia/en/) | Guides and API reference for every package, searchable. Source lives in `website/`; preview locally with `pnpm website:dev` |
 
 Every document also has a Chinese version without the `.en` suffix.
 

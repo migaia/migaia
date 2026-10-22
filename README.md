@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <a href="https://hk.vps.kaeo.app/migaia/zh/">文档站</a> ·
   <a href="#快速上手">快速上手</a> ·
   <a href="#包一览">包一览</a> ·
   <a href="#文档">文档</a> ·
@@ -210,11 +211,11 @@ RPC              rpc-core → rpc-threads · rpc-process · rpc-browser → rpc-
 
 ## 文档
 
-| 文档     | 位置                          | 内容                                                           |
-| -------- | ----------------------------- | -------------------------------------------------------------- |
-| README   | `packages/<包名>/README.md`   | 这个包解决什么问题，一段可以直接运行的入门代码，为什么选它     |
-| USEGUIDE | `packages/<包名>/USEGUIDE.md` | 按场景组织的完整用法，每个场景都有代码和输出                   |
-| 文档站   | `website/`                    | 所有包的指南和 API 参考，可以搜索。本地运行 `pnpm website:dev` |
+| 文档     | 位置                                                         | 内容                                                                                  |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| README   | `packages/<包名>/README.md`                                  | 这个包解决什么问题，一段可以直接运行的入门代码，为什么选它                            |
+| USEGUIDE | `packages/<包名>/USEGUIDE.md`                                | 按场景组织的完整用法，每个场景都有代码和输出                                          |
+| 文档站   | [hk.vps.kaeo.app/migaia](https://hk.vps.kaeo.app/migaia/zh/) | 所有包的指南和 API 参考，可以搜索。源码在 `website/`，本地预览运行 `pnpm website:dev` |
 
 每份文档都有英文版，文件名后缀为 `.en.md`。
 
