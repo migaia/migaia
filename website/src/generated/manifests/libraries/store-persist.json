@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-persist",
     "description": "Store snapshot persistence and storage adapter protocol.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": [".", "./indexed", "./keyed", "./light"],
     "readmeLocales": ["zh", "en"],
     "documentation": {

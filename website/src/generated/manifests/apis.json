@@ -604,7 +604,9 @@
           "examples": [
             "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenant: 'demo' })\nhost.register({\n  name: 'export',\n  activate: ({ tenant }) => {\n    console.log('启用:', tenant)\n    return {\n      dispose: () => {\n        console.log('释放: export')\n      }\n    }\n  }\n})\nconsole.log('首次尝试:', (await host.enable('export')).status)\nhost.setFlag('export', true)\nconsole.log('授权后:', host.state('export'))\nconsole.log('启用结果:', (await host.enable('export')).status)\nawait host.dispose()",
             "import { createCapabilityHost } from '@migaia/capability'\n\nlet activations = 0\nconst host = createCapabilityHost(undefined, { flags: { search: true } })\nhost.register({\n  name: 'search',\n  activate: async () => {\n    activations += 1\n    await Promise.resolve()\n    return { dispose() {} }\n  }\n})\nconst first = host.enable('search')\nconst second = host.enable('search')\nconsole.log('同一 Promise:', first === second)\nconst results = await Promise.all([first, second])\nconsole.log('结果:', results.map((result) => result.status).join(','))\nconsole.log('激活次数:', activations)\nawait host.dispose()",
-            "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\nlet finish!: (handle: ICapabilityHandle) => void\nconst pending = new Promise<ICapabilityHandle>((resolve) => {\n  finish = resolve\n})\nconst host = createCapabilityHost(undefined, { flags: { export: true } })\nhost.register({ name: 'export', activate: () => pending })\nconst enabling = host.enable('export')\nhost.setFlag('export', false)\nfinish({\n  dispose: () => {\n    console.log('释放晚到句柄')\n  }\n})\nconsole.log('启用结果:', (await enabling).status)\nconsole.log('状态:', host.state('export'))\nconsole.log('已接纳句柄:', host.handle('export') !== undefined)\nawait host.dispose()"
+            "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\nlet finish!: (handle: ICapabilityHandle) => void\nconst pending = new Promise<ICapabilityHandle>((resolve) => {\n  finish = resolve\n})\nconst host = createCapabilityHost(undefined, { flags: { export: true } })\nhost.register({ name: 'export', activate: () => pending })\nconst enabling = host.enable('export')\nhost.setFlag('export', false)\nfinish({\n  dispose: () => {\n    console.log('释放晚到句柄')\n  }\n})\nconsole.log('启用结果:', (await enabling).status)\nconsole.log('状态:', host.state('export'))\nconsole.log('已接纳句柄:', host.handle('export') !== undefined)\nawait host.dispose()",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenant: 'acme' }, { flags: { liveChat: true } })\nhost.register({\n  name: 'liveChat',\n  activate: ({ tenant }) => {\n    console.log('连接客服:', tenant)\n    const heartbeat = setInterval(() => console.log('心跳'), 1_000)\n    return {\n      dispose: () => {\n        clearInterval(heartbeat)\n        console.log('断开客服')\n      }\n    }\n  }\n})\nconsole.log('启用结果:', (await host.enable('liveChat')).status)\nhost.setFlag('liveChat', false)\nconsole.log('状态:', host.state('liveChat'), '句柄:', host.handle('liveChat'))\nawait host.disable('liveChat')\nconsole.log('释放完成')",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost(undefined, {\n  flags: { search: true, export: true, chat: true }\n})\nfor (const name of ['search', 'export', 'chat']) {\n  host.register({\n    name,\n    activate: () => {\n      console.log('启动', name)\n      return { dispose: () => console.log('停止', name) }\n    }\n  })\n}\nawait host.enable('search')\nawait host.enable('chat')\nawait host.enable('export')\nhost.setFlags({ search: true, chat: false })\nconsole.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))\nawait host.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -676,8 +678,53 @@
             }
           ],
           "identity": "packages/capability/dist/index.d.ts:createCapabilityHost:export declare function createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>;",
-          "guidance": [],
-          "usageScore": 84,
+          "guidance": [
+            {
+              "id": "用一份新配置替换全部开关-未列出的功能自动释放",
+              "heading": "用一份新配置替换全部开关，未列出的功能自动释放",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "应用启动后打开了搜索、客服和导出三项功能。配置中心推送了一份新配置：保留搜索，关闭客服，导出没有出现在新配置里。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "常见做法拿到新配置后，要自己和旧配置逐项比较，找出哪些功能被关掉、哪些被删掉，再逐个调用各自的停止函数；漏掉一项，它就继续运行。停止的顺序通常是代码里写的顺序，后启动、可能依赖先启动功能的那个，反而可能先被留下或后被关闭。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`setFlags(flags)` 用一整份新配置原子替换全部开关。没有出现在新配置里的名字一律视为关闭；被关闭的功能按实际启动完成的相反顺序释放。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "options.flags 初始允许三项功能。三项按搜索、客服、导出的顺序启动。新配置只列出 search: true 和 chat: false，export 没有列出。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost(undefined, {\n  flags: { search: true, export: true, chat: true }\n})\nfor (const name of ['search', 'export', 'chat']) {\n  host.register({\n    name,\n    activate: () => {\n      console.log('启动', name)\n      return { dispose: () => console.log('停止', name) }\n    }\n  })\n}\nawait host.enable('search')\nawait host.enable('chat')\nawait host.enable('export')\nhost.setFlags({ search: true, chat: false })\nconsole.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))\nawait host.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "输出："
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "启动 search\n启动 chat\n启动 export\n停止 export\n停止 chat\nsearch=on export=gated chat=gated\n停止 search"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "依次输出三次启动，然后是 `停止 export`、`停止 chat`、`search=on export=gated chat=gated`，最后 `dispose()` 输出 `停止 search`。导出没有出现在新配置里，和明确关闭的客服一样被释放；释放顺序与启动完成顺序相反。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "新配置是整份替换，不是合并：想保留的功能必须写进新配置。替换只负责关闭和释放，新允许的功能仍要调用 `enable(name)` 才会启动。多租户应各建一个宿主，各自持有自己的开关快照。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 124,
           "configuration": [
             {
               "name": "flags",
@@ -151678,7 +151725,7 @@
               "optional": true,
               "description": "Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter.",
               "descriptionEn": "Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter.",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "spawn",
@@ -151686,7 +151733,7 @@
               "optional": true,
               "description": "Owned Worker source: callback, full deployment, short object, true, or an entry URL/path.",
               "descriptionEn": "Owned Worker source: callback, full deployment, short object, true, or an entry URL/path.",
-              "descriptionZh": "主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "endpointFactory",
@@ -151734,7 +151781,7 @@
               "optional": true,
               "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
               "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
-              "descriptionZh": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。"
+              "descriptionZh": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
             },
             {
               "name": "authentication",
@@ -151981,6 +152028,10 @@
           "examples": [
             "import { threadId } from 'node:worker_threads'\nimport { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { double(value: number): number; identity(): { pid: number; threadId: number } }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      double: (value: number) => value * 2,\n      identity: () => ({ pid: process.pid, threadId })\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n    const identity = await worker.request('identity')\n    console.log(identity.pid === process.pid)\n    console.log(identity.threadId !== threadId)\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IParentApi = { prefix(value: string): string }\ntype IWorkerApi = {\n  label(value: string): Promise<string>\n  count(limit: number): AsyncGenerator<number>\n}\nif (await isThreadChild()) {\n  const parent = createThreadPeer<IParentApi>({\n    provide: {\n      label: async (value: string): Promise<string> => (await parent).request('prefix', value),\n      count: async function* (limit: number) {\n        for (let value = 1; value <= limit; value++) yield value\n      }\n    }\n  })\n  await parent\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({\n    spawn: true,\n    provide: { prefix: (value: string) => '主端:' + value }\n  })\n  try {\n    console.log(await worker.request('label', '任务'))\n    const values: number[] = []\n    for await (const value of worker.stream('count', 3)) values.push(value)\n    console.log(values.join(','))\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IReportApi = { render(pages: number): Promise<string> }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      render: (pages: number) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IReportApi>({ spawn: true })\n  try {\n    console.log(await worker.request('render', 2))\n    try {\n      await worker.request('render', 500, { timeoutMs: 100 })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n    const controller = new AbortController()\n    setTimeout(() => controller.abort(), 50)\n    try {\n      await worker.request('render', 500, { signal: controller.signal })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IJobApi = { convert(file: string): Promise<string>; crash(): void }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      convert: (file: string) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),\n      crash: () => process.exit(1)\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IJobApi>({\n    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }\n  })\n  try {\n    const started = performance.now()\n    const converting = worker.request('convert', 'invoice.docx')\n    void worker.notify('crash')\n    try {\n      await converting\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.code)\n      console.log(performance.now() - started < 1_000)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nclass OrderError extends Error {\n  readonly code = 'ORDER_INVALID'\n  constructor(message: string, options?: ErrorOptions) {\n    super(message, options)\n    this.name = 'OrderError'\n  }\n}\n\ntype IOrderApi = { place(quantity: number): string }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      place: (quantity: number) => {\n        if (quantity <= 0)\n          throw new OrderError('order rejected', {\n            cause: new RangeError('quantity must be positive')\n          })\n        return 'placed'\n      }\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IOrderApi>({ spawn: true })\n  try {\n    await worker.request('place', 0)\n  } catch (error) {\n    const failure = error as Error & { code?: string }\n    console.log(failure.name, failure.code, failure.message)\n    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IResizeApi = { resize(id: number): Promise<number>; started(): number }\nif (await isThreadChild()) {\n  let started = 0\n  await createThreadPeer({\n    providerLimits: { maxPerPeer: 2 },\n    provide: {\n      resize: (id: number) => {\n        started++\n        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))\n      },\n      started: () => started\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IResizeApi>({ spawn: true })\n  try {\n    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))\n    console.log(\n      results\n        .map((result) =>\n          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code\n        )\n        .join(' ')\n    )\n    console.log(await worker.request('started'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IBytesApi = {\n  inspect(buffer: ArrayBuffer): { length: number; first: number }\n  calls(): number\n}\nif (await isThreadChild()) {\n  let calls = 0\n  await createThreadPeer({\n    provide: {\n      inspect: (buffer: ArrayBuffer) => {\n        calls++\n        const bytes = new Uint8Array(buffer)\n        const result = { length: buffer.byteLength, first: bytes[0]! }\n        bytes[0] = 99\n        return result\n      },\n      calls: () => calls\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IBytesApi>({ spawn: true })\n  try {\n    const bytes = new Uint8Array([7, 8, 9])\n    const result = await worker.request('inspect', bytes.buffer)\n    console.log(result.length, result.first)\n    console.log(bytes.byteLength, bytes[0])\n    try {\n      await worker.request('inspect', bytes.buffer, { transfer: [bytes.buffer] })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      if (failure.code !== 'CAPABILITY_UNSUPPORTED') throw error\n      console.log(failure.code)\n    }\n    console.log(bytes.byteLength, await worker.request('calls'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPeer, createThreadPlugin, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { next(): number }\nif (await isThreadChild()) {\n  let count = 0\n  await createThreadPeer({ provide: { next: () => ++count } })\n} else {\n  const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n    name: 'worker',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(worker)\n    console.log(await host.thread!.request('worker', 'next'))\n    const restarted = await host.thread!.restart('worker')\n    console.log(restarted.state)\n    console.log(await host.thread!.request('worker', 'next'))\n  } finally {\n    const result = await host.dispose()\n    console.log(result.cleanupComplete)\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n  } finally {\n    await worker.close()\n  }\n}"
@@ -152129,23 +152180,23 @@
           ],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions, runtime?: IThreadRuntimeResource): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
-          "usageScore": 102,
+          "usageScore": 174,
           "configuration": [
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。",
+              "description": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。",
               "descriptionEn": "Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter.",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "spawn",
               "type": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike",
               "optional": true,
-              "description": "主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。",
+              "description": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。",
               "descriptionEn": "Owned Worker source: callback, full deployment, short object, true, or an entry URL/path.",
-              "descriptionZh": "主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "endpointFactory",
@@ -152191,9 +152242,9 @@
               "name": "providerLimits",
               "type": "IRpcProviderLimits",
               "optional": true,
-              "description": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。",
+              "description": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。",
               "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
-              "descriptionZh": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。"
+              "descriptionZh": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
             },
             {
               "name": "authentication",
@@ -152483,7 +152534,7 @@
               "optional": true,
               "description": "",
               "descriptionEn": "",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "spawn",
@@ -152555,7 +152606,7 @@
               "optional": true,
               "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
               "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
-              "descriptionZh": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。"
+              "descriptionZh": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
             },
             {
               "name": "authentication",
@@ -152987,7 +153038,7 @@
               "optional": false,
               "description": "Required native error sink; reporter failures remain observable through the host route.",
               "descriptionEn": "Required native error sink; reporter failures remain observable through the host route.",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "runtimeApi",
@@ -155634,6 +155685,10 @@
           "examples": [
             "import { threadId } from 'node:worker_threads'\nimport { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { double(value: number): number; identity(): { pid: number; threadId: number } }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      double: (value: number) => value * 2,\n      identity: () => ({ pid: process.pid, threadId })\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n    const identity = await worker.request('identity')\n    console.log(identity.pid === process.pid)\n    console.log(identity.threadId !== threadId)\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IParentApi = { prefix(value: string): string }\ntype IWorkerApi = {\n  label(value: string): Promise<string>\n  count(limit: number): AsyncGenerator<number>\n}\nif (await isThreadChild()) {\n  const parent = createThreadPeer<IParentApi>({\n    provide: {\n      label: async (value: string): Promise<string> => (await parent).request('prefix', value),\n      count: async function* (limit: number) {\n        for (let value = 1; value <= limit; value++) yield value\n      }\n    }\n  })\n  await parent\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({\n    spawn: true,\n    provide: { prefix: (value: string) => '主端:' + value }\n  })\n  try {\n    console.log(await worker.request('label', '任务'))\n    const values: number[] = []\n    for await (const value of worker.stream('count', 3)) values.push(value)\n    console.log(values.join(','))\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IReportApi = { render(pages: number): Promise<string> }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      render: (pages: number) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IReportApi>({ spawn: true })\n  try {\n    console.log(await worker.request('render', 2))\n    try {\n      await worker.request('render', 500, { timeoutMs: 100 })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n    const controller = new AbortController()\n    setTimeout(() => controller.abort(), 50)\n    try {\n      await worker.request('render', 500, { signal: controller.signal })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IJobApi = { convert(file: string): Promise<string>; crash(): void }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      convert: (file: string) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),\n      crash: () => process.exit(1)\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IJobApi>({\n    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }\n  })\n  try {\n    const started = performance.now()\n    const converting = worker.request('convert', 'invoice.docx')\n    void worker.notify('crash')\n    try {\n      await converting\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.code)\n      console.log(performance.now() - started < 1_000)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nclass OrderError extends Error {\n  readonly code = 'ORDER_INVALID'\n  constructor(message: string, options?: ErrorOptions) {\n    super(message, options)\n    this.name = 'OrderError'\n  }\n}\n\ntype IOrderApi = { place(quantity: number): string }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      place: (quantity: number) => {\n        if (quantity <= 0)\n          throw new OrderError('order rejected', {\n            cause: new RangeError('quantity must be positive')\n          })\n        return 'placed'\n      }\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IOrderApi>({ spawn: true })\n  try {\n    await worker.request('place', 0)\n  } catch (error) {\n    const failure = error as Error & { code?: string }\n    console.log(failure.name, failure.code, failure.message)\n    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IResizeApi = { resize(id: number): Promise<number>; started(): number }\nif (await isThreadChild()) {\n  let started = 0\n  await createThreadPeer({\n    providerLimits: { maxPerPeer: 2 },\n    provide: {\n      resize: (id: number) => {\n        started++\n        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))\n      },\n      started: () => started\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IResizeApi>({ spawn: true })\n  try {\n    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))\n    console.log(\n      results\n        .map((result) =>\n          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code\n        )\n        .join(' ')\n    )\n    console.log(await worker.request('started'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IBytesApi = {\n  inspect(buffer: ArrayBuffer): { length: number; first: number }\n  calls(): number\n}\nif (await isThreadChild()) {\n  let calls = 0\n  await createThreadPeer({\n    provide: {\n      inspect: (buffer: ArrayBuffer) => {\n        calls++\n        const bytes = new Uint8Array(buffer)\n        const result = { length: buffer.byteLength, first: bytes[0]! }\n        bytes[0] = 99\n        return result\n      },\n      calls: () => calls\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IBytesApi>({ spawn: true })\n  try {\n    const bytes = new Uint8Array([7, 8, 9])\n    const result = await worker.request('inspect', bytes.buffer)\n    console.log(result.length, result.first)\n    console.log(bytes.byteLength, bytes[0])\n    try {\n      await worker.request('inspect', bytes.buffer, { transfer: [bytes.buffer] })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      if (failure.code !== 'CAPABILITY_UNSUPPORTED') throw error\n      console.log(failure.code)\n    }\n    console.log(bytes.byteLength, await worker.request('calls'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPeer, createThreadPlugin, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { next(): number }\nif (await isThreadChild()) {\n  let count = 0\n  await createThreadPeer({ provide: { next: () => ++count } })\n} else {\n  const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n    name: 'worker',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(worker)\n    console.log(await host.thread!.request('worker', 'next'))\n    const restarted = await host.thread!.restart('worker')\n    console.log(restarted.state)\n    console.log(await host.thread!.request('worker', 'next'))\n  } finally {\n    const result = await host.dispose()\n    console.log(result.cleanupComplete)\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n  } finally {\n    await worker.close()\n  }\n}"
@@ -155682,7 +155737,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/child.d.ts:isThreadChild:export declare function isThreadChild(): Promise<boolean>;",
           "guidance": [],
-          "usageScore": 84,
+          "usageScore": 140,
           "configuration": [],
           "fragment": "rpc-threads-index--isThreadChild"
         },
