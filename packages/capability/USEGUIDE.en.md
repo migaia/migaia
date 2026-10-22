@@ -6,14 +6,16 @@ Choose a scenario for the problem at hand, then consult the boundaries between H
 
 ## Find a scenario
 
-| Scenario                                              | Tools                     | Details                                                                                    |
-| ----------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ |
-| Keep permission separate from activation              | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#keep-permission-separate-from-activation)              |
-| Share one activation while two callers wait           | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait)           |
-| Release a late handle after permission is withdrawn   | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn)   |
-| Start providers first and release consumers first     | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#start-providers-first-and-release-consumers-first)     |
-| Roll back a provider when its consumer fails to start | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start) |
-| Inspect startup order before acquiring resources      | `buildCapabilityTopology` | [Complete example](./USEGUIDE.en.md#inspect-startup-order-before-acquiring-resources)      |
+| Scenario                                                                | Tools                     | Details                                                                                                      |
+| ----------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Keep permission separate from activation                                | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#keep-permission-separate-from-activation)                                |
+| Share one activation while two callers wait                             | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait)                             |
+| Release a late handle after permission is withdrawn                     | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn)                     |
+| Stop a running feature when its flag is turned off                      | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#stop-a-running-feature-when-its-flag-is-turned-off)                      |
+| Replace every flag with a new config and release features it leaves out | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#replace-every-flag-with-a-new-config-and-release-features-it-leaves-out) |
+| Start providers first and release consumers first                       | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#start-providers-first-and-release-consumers-first)                       |
+| Roll back a provider when its consumer fails to start                   | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start)                   |
+| Inspect startup order before acquiring resources                        | `buildCapabilityTopology` | [Complete example](./USEGUIDE.en.md#inspect-startup-order-before-acquiring-resources)                        |
 
 ## Keep permission separate from activation
 
@@ -149,6 +151,103 @@ adopted handle: false
 Prints `released late handle`, `activation: gated`, `state: gated`, then `adopted handle: false`.
 
 With permission still withdrawn, the old result cannot become the active handle. The host does not forcibly interrupt user activation code; it owns the returned handle when that work finishes. Async release can continue after a flag update, so await `disable()` or `dispose()` to drain it.
+
+## Stop a running feature when its flag is turned off
+
+A live chat feature has opened a connection for the current tenant and sends a heartbeat every second. An operator turns it off in the config center.
+
+The usual approach fetches a set of booleans from a config center or feature flag service and writes `if (flags.liveChat) startChat()` in code. The flag service tells you a value; it does not deal with what happens when the value changes. The check runs once, before startup, so after the flag goes off the connection and timer already created keep running, unless every feature listens for flag changes and finds and closes its own resources.
+
+In a host, the handle a feature returns when it starts is owned by the host. `setFlag(name, false)` takes that handle down synchronously and calls its `dispose`, so the feature actually stops; `disable(name)` waits for the release to finish.
+
+The context's tenant is acme and is passed to activate unchanged. options.flags.liveChat starts as true. activate opens the connection and starts a heartbeat timer, and the handle it returns stops the timer and disconnects.
+
+```ts doc-test=run
+import { createCapabilityHost } from '@migaia/capability'
+
+const host = createCapabilityHost({ tenant: 'acme' }, { flags: { liveChat: true } })
+host.register({
+  name: 'liveChat',
+  activate: ({ tenant }) => {
+    console.log('chat connected:', tenant)
+    const heartbeat = setInterval(() => console.log('heartbeat'), 1_000)
+    return {
+      dispose: () => {
+        clearInterval(heartbeat)
+        console.log('chat disconnected')
+      }
+    }
+  }
+})
+console.log('activation:', (await host.enable('liveChat')).status)
+host.setFlag('liveChat', false)
+console.log('state:', host.state('liveChat'), 'handle:', host.handle('liveChat'))
+await host.disable('liveChat')
+console.log('release finished')
+```
+
+Output:
+
+```text
+chat connected: acme
+activation: enabled
+chat disconnected
+state: gated handle: undefined
+release finished
+```
+
+Prints `chat connected: acme`, `activation: enabled`, `chat disconnected`, `state: gated handle: undefined`, then `release finished`. Turning the flag off already ran the handle's `dispose`, so the timer stops and the process exits normally with no heartbeat left behind.
+
+Turning a flag off only stops the feature; turning it back on does not start it again, so call `enable(name)` once more. When `dispose` is asynchronous the release continues in the background; wait for `disable(name)` or `dispose()` when you need to know the resources are gone.
+
+## Replace every flag with a new config and release features it leaves out
+
+After startup the app has enabled search, chat and export. The config center pushes a new config: search stays on, chat is turned off, and export is not in the new config at all.
+
+The usual approach compares the new config with the old one entry by entry, works out which features were turned off or removed, and calls each one's stop function. Miss one and it keeps running. Features are usually stopped in the order the code lists them, so a feature that started later, and may depend on earlier ones, can be left running or closed after the features it relies on.
+
+`setFlags(flags)` atomically replaces every flag with one new config. Any name missing from the new config counts as off, and the features that are turned off are released in the reverse order they finished starting.
+
+options.flags initially allows all three features, which start in the order search, chat, export. The new config lists only search: true and chat: false; export is left out.
+
+```ts doc-test=run
+import { createCapabilityHost } from '@migaia/capability'
+
+const host = createCapabilityHost(undefined, {
+  flags: { search: true, export: true, chat: true }
+})
+for (const name of ['search', 'export', 'chat']) {
+  host.register({
+    name,
+    activate: () => {
+      console.log('start', name)
+      return { dispose: () => console.log('stop', name) }
+    }
+  })
+}
+await host.enable('search')
+await host.enable('chat')
+await host.enable('export')
+host.setFlags({ search: true, chat: false })
+console.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))
+await host.dispose()
+```
+
+Output:
+
+```text
+start search
+start chat
+start export
+stop export
+stop chat
+search=on export=gated chat=gated
+stop search
+```
+
+Prints the three starts, then `stop export`, `stop chat`, `search=on export=gated chat=gated`, and finally `stop search` from `dispose()`. Export, absent from the new config, is released just like chat, which was turned off explicitly, and the release order is the reverse of the order in which they finished starting.
+
+A new config replaces the old one; it is not merged, so every feature you want to keep must be in it. Replacing only turns features off and releases them; a newly allowed feature still starts only when you call `enable(name)`. Give each tenant its own host with its own flag snapshot.
 
 ## Start providers first and release consumers first
 

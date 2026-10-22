@@ -2,23 +2,27 @@
 
 [中文](./README.md)
 
-Control optional feature permission and activation, then coordinate service dependencies with owned startup, rollback and cleanup.
+Make feature flags govern the feature itself: when a flag turns off, the connections, timers and subscriptions the feature started are released, and features that depend on each other start, roll back and shut down in dependency order.
 
 ## You may have run into this
 
-- A feature starts before permission is granted because permission and activation are treated as one step.
-- Two parts of a page create duplicate connections because they check only existing handles without sharing pending activation.
-- A revoked feature comes back when old loading finishes because stale async results are adopted unconditionally.
-- A screen starts before configuration, or leaves a service behind on failure, because startup and cleanup do not follow dependency ownership.
-- Previewing startup order already acquires resources because topology planning and lifecycle execution are coupled.
+- **The config center turned a feature off, but its connection and timers keep running.** The flag was checked once, before startup, and nothing is responsible for closing what the feature created. [Run the example](./USEGUIDE.en.md#stop-a-running-feature-when-its-flag-is-turned-off)
+- **A new config arrives and you diff it against the old one by hand.** Miss one entry and a feature that should be off stays running. [Run the example](./USEGUIDE.en.md#replace-every-flag-with-a-new-config-and-release-features-it-leaves-out)
+- **Two parts of a page turn on the same feature and open two connections.** The first start had not finished, so the second caller could not see it and started again. [Run the example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait)
+- **An admin turned a feature off, and a slow load switched it back on.** When the asynchronous start returned, nothing checked whether the flag had changed. [Run the example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn)
+- **Features depend on each other, but start and stop order is written by hand.** A screen starts before the service it needs, or one step fails and the services started before it stay running. [Run the example](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start)
 
 ## Why choose it
 
-- **Permission and execution stay separate.** A boolean gate can start work as soon as permission changes; Host denies by default, setFlag(true) only permits, and enable activates. [Run the example](./USEGUIDE.en.md#keep-permission-separate-from-activation).
-- **Concurrent callers share pending activation.** Checking a handle misses the waiting window; Host publishes its pending Promise before the callback so two callers activate once. [Run the example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait).
-- **Late results cannot restore a revoked feature.** A pre-await check is insufficient; Host generations invalidate old results and release late handles. [Run the example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn).
-- **Dependencies govern startup and cleanup together.** Registration or completion order can invert resource dependencies; static Graph starts topologically, releases in reverse and rolls back failed startup. [See ordering](./USEGUIDE.en.md#start-providers-first-and-release-consumers-first) and [failure handling](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start).
-- **Inspect a plan before acquiring resources.** Starting services just to inspect order has side effects; pure topology returns frozen order and levels without executing start/release. [Run the example](./USEGUIDE.en.md#inspect-startup-order-before-acquiring-resources).
+The usual approach fetches a set of booleans from a config center or feature flag service and writes `if (flags.chat) startChat()` in code. The flag service tells you a value; it does not deal with the connections, timers and subscriptions a feature has already started once that value changes. This package turns each feature into a lifecycle owned by a host: the flag decides whether it may run, and the host starts it, stops it and cleans up after it.
+
+- **Turning a flag off actually stops the feature.** In the usual approach a flag going false only affects later checks, and a running feature keeps working. Here `setFlag(name, false)` takes the feature down immediately and calls its `dispose`, so the connection closes and the timer stops. [Run the example](./USEGUIDE.en.md#stop-a-running-feature-when-its-flag-is-turned-off)
+- **One new config replaces them all, and features left out are released.** No diffing old and new configs yourself. `setFlags` atomically replaces every flag, treats any feature missing from the new config as off, and releases features in the reverse order they finished starting. [Run the example](./USEGUIDE.en.md#replace-every-flag-with-a-new-config-and-release-features-it-leaves-out)
+- **Turning a feature on twice starts it once.** Checking "is there an instance already" misses the time while the first start is still running. Here concurrent `enable` calls share one start and one Promise. [Run the example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait)
+- **A late start cannot bring a disabled feature back.** If the flag is already off when an asynchronous start completes, the host discards the result and releases the resources it just created. [Run the example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn)
+- **Dependencies decide the order of start, rollback and shutdown.** Once dependencies between features are registered in a graph, a provider starts first and stops last; if one step fails to start, the parts already started roll back in reverse order. [Start order](./USEGUIDE.en.md#start-providers-first-and-release-consumers-first), [rollback on failure](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start)
+
+When you do not need it: if a flag only decides which button the UI shows, and the feature holds no connections, timers or subscriptions that need cleaning up, a plain boolean is enough.
 
 ## Start here
 
@@ -94,14 +98,16 @@ A “handle” is the activated business object whose dispose performs cleanup. 
 
 ## Typical scenarios
 
-| Scenario                                              | Tools                     | Details                                                                                    |
-| ----------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ |
-| Keep permission separate from activation              | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#keep-permission-separate-from-activation)              |
-| Share one activation while two callers wait           | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait)           |
-| Release a late handle after permission is withdrawn   | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn)   |
-| Start providers first and release consumers first     | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#start-providers-first-and-release-consumers-first)     |
-| Roll back a provider when its consumer fails to start | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start) |
-| Inspect startup order before acquiring resources      | `buildCapabilityTopology` | [Complete example](./USEGUIDE.en.md#inspect-startup-order-before-acquiring-resources)      |
+| Scenario                                                                | Tools                     | Details                                                                                                      |
+| ----------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Keep permission separate from activation                                | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#keep-permission-separate-from-activation)                                |
+| Share one activation while two callers wait                             | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#share-one-activation-while-two-callers-wait)                             |
+| Release a late handle after permission is withdrawn                     | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#release-a-late-handle-after-permission-is-withdrawn)                     |
+| Stop a running feature when its flag is turned off                      | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#stop-a-running-feature-when-its-flag-is-turned-off)                      |
+| Replace every flag with a new config and release features it leaves out | `createCapabilityHost`    | [Complete example](./USEGUIDE.en.md#replace-every-flag-with-a-new-config-and-release-features-it-leaves-out) |
+| Start providers first and release consumers first                       | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#start-providers-first-and-release-consumers-first)                       |
+| Roll back a provider when its consumer fails to start                   | `createCapabilityGraph`   | [Complete example](./USEGUIDE.en.md#roll-back-a-provider-when-its-consumer-fails-to-start)                   |
+| Inspect startup order before acquiring resources                        | `buildCapabilityTopology` | [Complete example](./USEGUIDE.en.md#inspect-startup-order-before-acquiring-resources)                        |
 
 ## Installation
 

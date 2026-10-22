@@ -55494,7 +55494,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'capability:index': {
     zh: {
       title: 'Capability：让功能启停有归属、依赖有顺序',
-      lede: '用能力宿主按许可启停独立功能，用依赖图先启动提供服务的一方，再启动使用服务的一方。',
+      lede: '让功能开关管住功能本身：开关关掉时，功能已经启动的连接、计时器和订阅随之释放；功能之间有依赖时，按依赖启动、回滚和关闭。',
       document: {
         sections: [
           {
@@ -55504,11 +55504,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'list',
                 items: [
-                  '管理员关闭功能后，旧激活结果却又把它打开，见 [释放晚到句柄](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3)。',
-                  '页面两个位置同时启用功能，建立了重复连接，见 [共享一次在途激活](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2)。',
-                  '页面先于依赖服务启动，或者依赖服务先于页面被关闭，见 [按依赖启停](/zh/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-1)。',
-                  '消费方启动失败，先前启动的提供方却仍留在后台，见 [失败后回滚资源](/zh/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-2)。',
-                  '配置编辑器只想预览启动顺序，却先创建了服务资源，见 [只计算拓扑计划](/zh/docs/capability/api/graph/topology/buildCapabilityTopology#capability-graph/topology--buildCapabilityTopology--case-1)。'
+                  '配置中心已经关掉了功能，它建立的连接和计时器还在跑，见 [关掉开关即停止](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-4)。',
+                  '推送新配置后要自己和旧配置逐项比对，漏掉一项就留下一个后台功能，见 [整份替换开关](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-5)。',
+                  '页面两个位置同时打开同一功能，建立了两条连接，见 [共享一次启动](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2)。',
+                  '管理员已经关掉功能，慢一步完成的加载又把它打开了，见 [释放晚到的启动结果](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3)。',
+                  '某一步启动失败后，前面已经启动的服务留在后台，见 [失败后回滚](/zh/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-2)。'
                 ]
               }
             ]
@@ -55520,11 +55520,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'list',
                 items: [
-                  '缺失开关默认拒绝激活，授予许可也不会自动启动，见 [许可与激活分开](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-1)。',
-                  '同一宿主的并发调用共享在途 Promise 和一次激活，见 [并发启用示例](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2)。',
-                  '撤回许可后不接纳旧结果，并释放晚到句柄，见 [过期结果清理示例](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3)。',
-                  '静态图让提供方先启动、消费方先释放，见 [依赖顺序示例](/zh/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-1)。',
-                  '纯拓扑工具在申请资源前给出稳定顺序和层级，见 [配置预检示例](/zh/docs/capability/api/graph/topology/buildCapabilityTopology#capability-graph/topology--buildCapabilityTopology--case-1)。'
+                  '关掉开关，功能真的停下：`setFlag(name, false)` 立即调用功能的 `dispose`，连接断开、计时器停止，见 [运行示例](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-4)。',
+                  '整份配置一次替换，没列出的功能视为关闭，并按启动完成的相反顺序释放，见 [运行示例](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-5)。',
+                  '并发的 `enable` 共享同一次启动和同一个 Promise，不会建立重复连接，见 [运行示例](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2)。',
+                  '开关关闭后，晚到的启动结果会被丢弃，刚创建的资源随即释放，见 [运行示例](/zh/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3)。',
+                  '依赖图让提供服务的一方先启动、后关闭，启动失败时按相反顺序回滚，见 [启动顺序](/zh/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-1)、[失败回滚](/zh/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-2)。'
                 ]
               }
             ]
@@ -55612,7 +55612,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Capability: owned feature lifetimes and ordered dependencies',
-      lede: 'Use a capability host to activate independent features when permitted, and a dependency graph to start providers before their consumers.',
+      lede: 'Make feature flags govern the feature itself: when a flag turns off, the connections, timers and subscriptions the feature started are released, and dependent features start, roll back and shut down in dependency order.',
       document: {
         sections: [
           {
@@ -55622,11 +55622,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'list',
                 items: [
-                  'An old activation reopens a feature after its permission was withdrawn; see [release the late handle](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3).',
-                  'Two parts of a page enable one feature together and create duplicate connections; see [share pending activation](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2).',
-                  'A screen starts before its provider or outlives that provider during cleanup; see [start and stop by dependency](/en/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-1).',
-                  'A consumer fails to start while its provider keeps running in the background; see [roll back startup](/en/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-2).',
-                  'A configuration editor creates services just to preview their startup order; see [plan without startup](/en/docs/capability/api/graph/topology/buildCapabilityTopology#capability-graph/topology--buildCapabilityTopology--case-1).'
+                  'The config center turned a feature off, but its connection and timers keep running; see [stop on flag off](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-4).',
+                  'After a new config arrives you diff it against the old one by hand, and a missed entry leaves a feature running; see [replace all flags](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-5).',
+                  'Two parts of a page turn on the same feature and open two connections; see [share one start](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2).',
+                  'An admin turned a feature off, and a slow load switched it back on; see [release a late start](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3).',
+                  'One step fails to start and the services started before it stay running; see [roll back on failure](/en/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-2).'
                 ]
               }
             ]
@@ -55638,11 +55638,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'list',
                 items: [
-                  'Missing flags deny activation and granting permission alone does not start work; see [permission versus activation](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-1).',
-                  'Concurrent callers on one host share the pending Promise and one activation; see [the shared activation case](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2).',
-                  'Revoked permission prevents adoption and releases a late handle; see [the stale completion case](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3).',
-                  'A static graph starts providers first and releases consumers first; see [the dependency order case](/en/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-1).',
-                  'Pure topology tools produce stable order and levels before resources are acquired; see [the configuration preview case](/en/docs/capability/api/graph/topology/buildCapabilityTopology#capability-graph/topology--buildCapabilityTopology--case-1).'
+                  'Turning a flag off actually stops the feature: `setFlag(name, false)` calls its `dispose` at once, closing connections and stopping timers; see [the example](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-4).',
+                  'One new config replaces every flag; features left out count as off and are released in reverse start order; see [the example](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-5).',
+                  'Concurrent `enable` calls share one start and one Promise, so no duplicate connection is opened; see [the example](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-2).',
+                  'Once a flag is off, a late start result is discarded and the resources it just created are released; see [the example](/en/docs/capability/api/createCapabilityHost#capability-index--createCapabilityHost--case-3).',
+                  'A dependency graph starts providers first and stops them last, and rolls back in reverse order when a start fails; see [start order](/en/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-1) and [rollback](/en/docs/capability/api/graph/createCapabilityGraph#capability-graph--createCapabilityGraph--case-2).'
                 ]
               }
             ]

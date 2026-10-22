@@ -19,7 +19,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "把可选功能的许可、启停和服务依赖放进明确的生命周期，避免重复启动、撤权后复活与启动失败造成的资源遗留。"
+                "text": "让功能开关管住功能本身：开关关掉时，功能已经启动的连接、计时器和订阅随之释放；功能之间有依赖时，按依赖启动、回滚和关闭。"
               }
             ]
           },
@@ -30,11 +30,11 @@
               {
                 "type": "list",
                 "items": [
-                  "开关未授权，功能却已经开始工作，根因是把“允许使用”和“立即启动”混在一起。",
-                  "页面两个位置建立重复连接，根因是只检查已有句柄，没有共享正在进行的激活。",
-                  "撤权后旧加载完成又把功能打开，根因是异步结果没有校验是否已经过期。",
-                  "页面抢在配置前启动，或失败后留下服务，根因是启动顺序和清理责任没有对应依赖关系。",
-                  "只想预览启动顺序，却已经申请资源，根因是把拓扑规划与生命周期执行耦在一起。"
+                  "配置中心已经关掉了功能，它建立的连接和计时器还在跑。 开关只在启动前判断了一次，之后没人负责关掉它创建的资源。运行示例",
+                  "推送了一份新配置，要自己和旧配置逐项比对。 漏掉一项，就有一个本该关闭的功能留在后台。运行示例",
+                  "页面两个位置同时打开同一项功能，建立了两条连接。 第一次启动还没完成，第二个调用方看不到它，又启动了一次。运行示例",
+                  "管理员已经关掉功能，慢一步完成的加载又把它打开了。 异步启动的结果回来时，没人检查开关是否已经变了。运行示例",
+                  "功能之间有依赖，启动和关闭的顺序却靠手写。 页面比它依赖的服务先启动；或者某一步启动失败，前面已经启动的服务留在后台。运行示例"
                 ]
               }
             ]
@@ -44,14 +44,22 @@
             "heading": "为什么选它",
             "blocks": [
               {
+                "type": "paragraph",
+                "text": "常见做法是从配置中心或功能开关服务拿到一组布尔值，在代码里写 `if (flags.chat) startChat()`。开关服务只告诉你值是多少，不管值变了以后，功能已经启动的连接、计时器和订阅怎么办。本包把每个功能变成一个由宿主持有的生命周期：开关决定能不能运行，宿主负责启动、停止和清理。"
+              },
+              {
                 "type": "list",
                 "items": [
-                  "许可与执行分开。 常见布尔开关容易在授权时直接启动，Host 默认拒绝，setFlag(true) 只放行，enable 才激活。运行证明。",
-                  "并发调用共享正在进行的激活。 只检查句柄会漏掉等待窗口，Host 在回调前发布 pending Promise，两个调用方只激活一次。运行证明。",
-                  "晚到结果不能恢复已撤权的功能。 await 前检查一次不够，Host 用世代作废旧结果并释放晚到句柄。运行证明。",
-                  "服务依赖同时决定启动和清理。 按登记或完成顺序手写容易颠倒依赖，静态 Graph 按拓扑启动、逆序释放，并在启动失败时回滚。顺序证明、失败证明。",
-                  "先看计划，再决定是否申请资源。 为看顺序就启动服务会产生副作用，纯拓扑入口只返回冻结的顺序与层级，不执行 start/release。运行证明。"
+                  "关掉开关，功能真的停下。 常见做法里，开关变成 false 只影响以后的判断，已经运行的功能照常工作。这里 `setFlag(name, false)` 会立即撤下功能并调用它的 `dispose`，连接断开，计时器停止。运行示例",
+                  "整份配置一次替换，没列出的功能自动释放。 不用自己比对新旧配置。`setFlags` 原子替换全部开关，没有出现在新配置里的功能视为关闭，并按启动完成的相反顺序释放。运行示例",
+                  "同时打开只启动一次。 只检查“是否已经有实例”会漏掉启动还没完成的那段时间。这里并发的 `enable` 共享同一次启动和同一个 Promise。运行示例",
+                  "关掉之后，晚到的启动不会把功能复活。 异步启动完成时如果开关已经关闭，宿主丢弃这个结果，并释放它刚创建的资源。运行示例",
+                  "依赖决定启动、回滚和关闭的顺序。 用依赖图登记功能之间的依赖后，提供服务的一方先启动、后关闭；某一步启动失败时，已经启动的部分按相反顺序回滚。启动顺序、失败回滚"
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "什么时候不需要它：开关只决定界面上显示哪个按钮，功能本身不持有连接、计时器或订阅这类需要清理的资源时，普通布尔值就够了。"
               }
             ]
           },
@@ -134,6 +142,12 @@
                   ["把开关许可与实际启用分开", "`createCapabilityHost`", "完整示例"],
                   ["两个调用方等待时只激活一次", "`createCapabilityHost`", "完整示例"],
                   ["撤回许可后释放晚到的句柄", "`createCapabilityHost`", "完整示例"],
+                  ["关掉开关时，已经运行的功能随之停止", "`createCapabilityHost`", "完整示例"],
+                  [
+                    "用一份新配置替换全部开关，未列出的功能自动释放",
+                    "`createCapabilityHost`",
+                    "完整示例"
+                  ],
                   ["先启动提供方，先释放消费方", "`createCapabilityGraph`", "完整示例"],
                   ["消费方启动失败时回滚已启动的提供方", "`createCapabilityGraph`", "完整示例"],
                   ["申请资源前先查看依赖启动顺序", "`buildCapabilityTopology`", "完整示例"]
@@ -668,6 +682,12 @@
                   ["把开关许可与实际启用分开", "`createCapabilityHost`", "完整示例"],
                   ["两个调用方等待时只激活一次", "`createCapabilityHost`", "完整示例"],
                   ["撤回许可后释放晚到的句柄", "`createCapabilityHost`", "完整示例"],
+                  ["关掉开关时，已经运行的功能随之停止", "`createCapabilityHost`", "完整示例"],
+                  [
+                    "用一份新配置替换全部开关，未列出的功能自动释放",
+                    "`createCapabilityHost`",
+                    "完整示例"
+                  ],
                   ["先启动提供方，先释放消费方", "`createCapabilityGraph`", "完整示例"],
                   ["消费方启动失败时回滚已启动的提供方", "`createCapabilityGraph`", "完整示例"],
                   ["申请资源前先查看依赖启动顺序", "`buildCapabilityTopology`", "完整示例"]
@@ -804,6 +824,94 @@
               {
                 "type": "paragraph",
                 "text": "许可仍被撤回时，旧结果不能成为启用句柄。宿主不会强行打断用户的激活代码，而是在它结束时接管返回句柄。开关更新后异步释放可能仍在继续，需要等待 `disable()` 或 `dispose()` 才能排空。"
+              }
+            ]
+          },
+          {
+            "id": "关掉开关时-已经运行的功能随之停止",
+            "heading": "关掉开关时，已经运行的功能随之停止",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "在线客服功能已经为当前租户建立了连接，并每秒发送一次心跳。运营在配置中心把它关掉了。"
+              },
+              {
+                "type": "paragraph",
+                "text": "常见做法是从配置中心或功能开关服务拿到一组布尔值，在代码里写 `if (flags.liveChat) startChat()`。开关服务只告诉你值是多少，不管值变了以后怎么办：判断只在启动前做一次，开关关掉后，已经建立的连接和计时器照常运行，除非你在每个功能里自己监听开关变化、自己找到并关闭它创建的资源。"
+              },
+              {
+                "type": "paragraph",
+                "text": "在宿主里，功能启动时返回的句柄由宿主持有。`setFlag(name, false)` 会同步撤下这个句柄并调用它的 `dispose`，功能真正停下来；`disable(name)` 等待释放完成。"
+              },
+              {
+                "type": "paragraph",
+                "text": "context 的 tenant 为 acme，会原样交给 activate。options.flags.liveChat 初始为 true。activate 建立连接并启动心跳计时器，返回的句柄负责停止计时器并断开连接。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenant: 'acme' }, { flags: { liveChat: true } })\nhost.register({\n  name: 'liveChat',\n  activate: ({ tenant }) => {\n    console.log('连接客服:', tenant)\n    const heartbeat = setInterval(() => console.log('心跳'), 1_000)\n    return {\n      dispose: () => {\n        clearInterval(heartbeat)\n        console.log('断开客服')\n      }\n    }\n  }\n})\nconsole.log('启用结果:', (await host.enable('liveChat')).status)\nhost.setFlag('liveChat', false)\nconsole.log('状态:', host.state('liveChat'), '句柄:', host.handle('liveChat'))\nawait host.disable('liveChat')\nconsole.log('释放完成')"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "连接客服: acme\n启用结果: enabled\n断开客服\n状态: gated 句柄: undefined\n释放完成"
+              },
+              {
+                "type": "paragraph",
+                "text": "依次输出 `连接客服: acme`、`启用结果: enabled`、`断开客服`、`状态: gated 句柄: undefined`、`释放完成`。关掉开关的同时，句柄的 `dispose` 已经执行，计时器停止，进程也随之正常退出，没有遗留的心跳。"
+              },
+              {
+                "type": "paragraph",
+                "text": "关掉开关只负责停下功能，重新打开时不会自动启动，需要再调用 `enable(name)`。`dispose` 是异步时，释放会在后台继续，需要确认资源已经回收时等待 `disable(name)` 或 `dispose()`。"
+              }
+            ]
+          },
+          {
+            "id": "用一份新配置替换全部开关-未列出的功能自动释放",
+            "heading": "用一份新配置替换全部开关，未列出的功能自动释放",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "应用启动后打开了搜索、客服和导出三项功能。配置中心推送了一份新配置：保留搜索，关闭客服，导出没有出现在新配置里。"
+              },
+              {
+                "type": "paragraph",
+                "text": "常见做法拿到新配置后，要自己和旧配置逐项比较，找出哪些功能被关掉、哪些被删掉，再逐个调用各自的停止函数；漏掉一项，它就继续运行。停止的顺序通常是代码里写的顺序，后启动、可能依赖先启动功能的那个，反而可能先被留下或后被关闭。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`setFlags(flags)` 用一整份新配置原子替换全部开关。没有出现在新配置里的名字一律视为关闭；被关闭的功能按实际启动完成的相反顺序释放。"
+              },
+              {
+                "type": "paragraph",
+                "text": "options.flags 初始允许三项功能。三项按搜索、客服、导出的顺序启动。新配置只列出 search: true 和 chat: false，export 没有列出。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost(undefined, {\n  flags: { search: true, export: true, chat: true }\n})\nfor (const name of ['search', 'export', 'chat']) {\n  host.register({\n    name,\n    activate: () => {\n      console.log('启动', name)\n      return { dispose: () => console.log('停止', name) }\n    }\n  })\n}\nawait host.enable('search')\nawait host.enable('chat')\nawait host.enable('export')\nhost.setFlags({ search: true, chat: false })\nconsole.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))\nawait host.dispose()"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "启动 search\n启动 chat\n启动 export\n停止 export\n停止 chat\nsearch=on export=gated chat=gated\n停止 search"
+              },
+              {
+                "type": "paragraph",
+                "text": "依次输出三次启动，然后是 `停止 export`、`停止 chat`、`search=on export=gated chat=gated`，最后 `dispose()` 输出 `停止 search`。导出没有出现在新配置里，和明确关闭的客服一样被释放；释放顺序与启动完成顺序相反。"
+              },
+              {
+                "type": "paragraph",
+                "text": "新配置是整份替换，不是合并：想保留的功能必须写进新配置。替换只负责关闭和释放，新允许的功能仍要调用 `enable(name)` 才会启动。多租户应各建一个宿主，各自持有自己的开关快照。"
               }
             ]
           },
@@ -1416,7 +1524,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Control optional feature permission and activation, then coordinate service dependencies with owned startup, rollback and cleanup."
+                  "text": "Make feature flags govern the feature itself: when a flag turns off, the connections, timers and subscriptions the feature started are released, and features that depend on each other start, roll back and shut down in dependency order."
                 }
               ]
             },
@@ -1427,11 +1535,11 @@
                 {
                   "type": "list",
                   "items": [
-                    "A feature starts before permission is granted because permission and activation are treated as one step.",
-                    "Two parts of a page create duplicate connections because they check only existing handles without sharing pending activation.",
-                    "A revoked feature comes back when old loading finishes because stale async results are adopted unconditionally.",
-                    "A screen starts before configuration, or leaves a service behind on failure, because startup and cleanup do not follow dependency ownership.",
-                    "Previewing startup order already acquires resources because topology planning and lifecycle execution are coupled."
+                    "The config center turned a feature off, but its connection and timers keep running. The flag was checked once, before startup, and nothing is responsible for closing what the feature created. Run the example",
+                    "A new config arrives and you diff it against the old one by hand. Miss one entry and a feature that should be off stays running. Run the example",
+                    "Two parts of a page turn on the same feature and open two connections. The first start had not finished, so the second caller could not see it and started again. Run the example",
+                    "An admin turned a feature off, and a slow load switched it back on. When the asynchronous start returned, nothing checked whether the flag had changed. Run the example",
+                    "Features depend on each other, but start and stop order is written by hand. A screen starts before the service it needs, or one step fails and the services started before it stay running. Run the example"
                   ]
                 }
               ]
@@ -1441,14 +1549,22 @@
               "heading": "Why choose it",
               "blocks": [
                 {
+                  "type": "paragraph",
+                  "text": "The usual approach fetches a set of booleans from a config center or feature flag service and writes `if (flags.chat) startChat()` in code. The flag service tells you a value; it does not deal with the connections, timers and subscriptions a feature has already started once that value changes. This module turns each feature into a lifecycle owned by a host: the flag decides whether it may run, and the host starts it, stops it and cleans up after it."
+                },
+                {
                   "type": "list",
                   "items": [
-                    "Permission and execution stay separate. A boolean gate can start work as soon as permission changes; Host denies by default, setFlag(true) only permits, and enable activates. Run the example.",
-                    "Concurrent callers share pending activation. Checking a handle misses the waiting window; Host publishes its pending Promise before the callback so two callers activate once. Run the example.",
-                    "Late results cannot restore a revoked feature. A pre-await check is insufficient; Host generations invalidate old results and release late handles. Run the example.",
-                    "Dependencies govern startup and cleanup together. Registration or completion order can invert resource dependencies; static Graph starts topologically, releases in reverse and rolls back failed startup. See ordering and failure handling.",
-                    "Inspect a plan before acquiring resources. Starting services just to inspect order has side effects; pure topology returns frozen order and levels without executing start/release. Run the example."
+                    "Turning a flag off actually stops the feature. In the usual approach a flag going false only affects later checks, and a running feature keeps working. Here `setFlag(name, false)` takes the feature down immediately and calls its `dispose`, so the connection closes and the timer stops. Run the example",
+                    "One new config replaces them all, and features left out are released. No diffing old and new configs yourself. `setFlags` atomically replaces every flag, treats any feature missing from the new config as off, and releases features in the reverse order they finished starting. Run the example",
+                    "Turning a feature on twice starts it once. Checking \"is there an instance already\" misses the time while the first start is still running. Here concurrent `enable` calls share one start and one Promise. Run the example",
+                    "A late start cannot bring a disabled feature back. If the flag is already off when an asynchronous start completes, the host discards the result and releases the resources it just created. Run the example",
+                    "Dependencies decide the order of start, rollback and shutdown. Once dependencies between features are registered in a graph, a provider starts first and stops last; if one step fails to start, the parts already started roll back in reverse order. Start order, rollback on failure"
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "When you do not need it: if a flag only decides which button the UI shows, and the feature holds no connections, timers or subscriptions that need cleaning up, a plain boolean is enough."
                 }
               ]
             },
@@ -1543,6 +1659,16 @@
                     ],
                     [
                       "Release a late handle after permission is withdrawn",
+                      "`createCapabilityHost`",
+                      "Complete example"
+                    ],
+                    [
+                      "Stop a running feature when its flag is turned off",
+                      "`createCapabilityHost`",
+                      "Complete example"
+                    ],
+                    [
+                      "Replace every flag with a new config and release features it leaves out",
                       "`createCapabilityHost`",
                       "Complete example"
                     ],
@@ -2171,6 +2297,16 @@
                       "Complete example"
                     ],
                     [
+                      "Stop a running feature when its flag is turned off",
+                      "`createCapabilityHost`",
+                      "Complete example"
+                    ],
+                    [
+                      "Replace every flag with a new config and release features it leaves out",
+                      "`createCapabilityHost`",
+                      "Complete example"
+                    ],
+                    [
                       "Start providers first and release consumers first",
                       "`createCapabilityGraph`",
                       "Complete example"
@@ -2318,6 +2454,94 @@
                 {
                   "type": "paragraph",
                   "text": "With permission still withdrawn, the old result cannot become the active handle. The host does not forcibly interrupt user activation code; it owns the returned handle when that work finishes. Async release can continue after a flag update, so await `disable()` or `dispose()` to drain it."
+                }
+              ]
+            },
+            {
+              "id": "stop-a-running-feature-when-its-flag-is-turned-off",
+              "heading": "Stop a running feature when its flag is turned off",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A live chat feature has opened a connection for the current tenant and sends a heartbeat every second. An operator turns it off in the config center."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The usual approach fetches a set of booleans from a config center or feature flag service and writes `if (flags.liveChat) startChat()` in code. The flag service tells you a value; it does not deal with what happens when the value changes. The check runs once, before startup, so after the flag goes off the connection and timer already created keep running, unless every feature listens for flag changes and finds and closes its own resources."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "In a host, the handle a feature returns when it starts is owned by the host. `setFlag(name, false)` takes that handle down synchronously and calls its `dispose`, so the feature actually stops; `disable(name)` waits for the release to finish."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The context's tenant is acme and is passed to activate unchanged. options.flags.liveChat starts as true. activate opens the connection and starts a heartbeat timer, and the handle it returns stops the timer and disconnects."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenant: 'acme' }, { flags: { liveChat: true } })\nhost.register({\n  name: 'liveChat',\n  activate: ({ tenant }) => {\n    console.log('chat connected:', tenant)\n    const heartbeat = setInterval(() => console.log('heartbeat'), 1_000)\n    return {\n      dispose: () => {\n        clearInterval(heartbeat)\n        console.log('chat disconnected')\n      }\n    }\n  }\n})\nconsole.log('activation:', (await host.enable('liveChat')).status)\nhost.setFlag('liveChat', false)\nconsole.log('state:', host.state('liveChat'), 'handle:', host.handle('liveChat'))\nawait host.disable('liveChat')\nconsole.log('release finished')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "chat connected: acme\nactivation: enabled\nchat disconnected\nstate: gated handle: undefined\nrelease finished"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints `chat connected: acme`, `activation: enabled`, `chat disconnected`, `state: gated handle: undefined`, then `release finished`. Turning the flag off already ran the handle's `dispose`, so the timer stops and the process exits normally with no heartbeat left behind."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Turning a flag off only stops the feature; turning it back on does not start it again, so call `enable(name)` once more. When `dispose` is asynchronous the release continues in the background; wait for `disable(name)` or `dispose()` when you need to know the resources are gone."
+                }
+              ]
+            },
+            {
+              "id": "replace-every-flag-with-a-new-config-and-release-features-it-leaves-out",
+              "heading": "Replace every flag with a new config and release features it leaves out",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "After startup the app has enabled search, chat and export. The config center pushes a new config: search stays on, chat is turned off, and export is not in the new config at all."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The usual approach compares the new config with the old one entry by entry, works out which features were turned off or removed, and calls each one's stop function. Miss one and it keeps running. Features are usually stopped in the order the code lists them, so a feature that started later, and may depend on earlier ones, can be left running or closed after the features it relies on."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`setFlags(flags)` atomically replaces every flag with one new config. Any name missing from the new config counts as off, and the features that are turned off are released in the reverse order they finished starting."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "options.flags initially allows all three features, which start in the order search, chat, export. The new config lists only search: true and chat: false; export is left out."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost(undefined, {\n  flags: { search: true, export: true, chat: true }\n})\nfor (const name of ['search', 'export', 'chat']) {\n  host.register({\n    name,\n    activate: () => {\n      console.log('start', name)\n      return { dispose: () => console.log('stop', name) }\n    }\n  })\n}\nawait host.enable('search')\nawait host.enable('chat')\nawait host.enable('export')\nhost.setFlags({ search: true, chat: false })\nconsole.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))\nawait host.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "start search\nstart chat\nstart export\nstop export\nstop chat\nsearch=on export=gated chat=gated\nstop search"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Prints the three starts, then `stop export`, `stop chat`, `search=on export=gated chat=gated`, and finally `stop search` from `dispose()`. Export, absent from the new config, is released just like chat, which was turned off explicitly, and the release order is the reverse of the order in which they finished starting."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A new config replaces the old one; it is not merged, so every feature you want to keep must be in it. Replacing only turns features off and releases them; a newly allowed feature still starts only when you call `enable(name)`. Give each tenant its own host with its own flag snapshot."
                 }
               ]
             },
@@ -3578,7 +3802,9 @@
           "examples": [
             "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenant: 'demo' })\nhost.register({\n  name: 'export',\n  activate: ({ tenant }) => {\n    console.log('启用:', tenant)\n    return {\n      dispose: () => {\n        console.log('释放: export')\n      }\n    }\n  }\n})\nconsole.log('首次尝试:', (await host.enable('export')).status)\nhost.setFlag('export', true)\nconsole.log('授权后:', host.state('export'))\nconsole.log('启用结果:', (await host.enable('export')).status)\nawait host.dispose()",
             "import { createCapabilityHost } from '@migaia/capability'\n\nlet activations = 0\nconst host = createCapabilityHost(undefined, { flags: { search: true } })\nhost.register({\n  name: 'search',\n  activate: async () => {\n    activations += 1\n    await Promise.resolve()\n    return { dispose() {} }\n  }\n})\nconst first = host.enable('search')\nconst second = host.enable('search')\nconsole.log('同一 Promise:', first === second)\nconst results = await Promise.all([first, second])\nconsole.log('结果:', results.map((result) => result.status).join(','))\nconsole.log('激活次数:', activations)\nawait host.dispose()",
-            "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\nlet finish!: (handle: ICapabilityHandle) => void\nconst pending = new Promise<ICapabilityHandle>((resolve) => {\n  finish = resolve\n})\nconst host = createCapabilityHost(undefined, { flags: { export: true } })\nhost.register({ name: 'export', activate: () => pending })\nconst enabling = host.enable('export')\nhost.setFlag('export', false)\nfinish({\n  dispose: () => {\n    console.log('释放晚到句柄')\n  }\n})\nconsole.log('启用结果:', (await enabling).status)\nconsole.log('状态:', host.state('export'))\nconsole.log('已接纳句柄:', host.handle('export') !== undefined)\nawait host.dispose()"
+            "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\nlet finish!: (handle: ICapabilityHandle) => void\nconst pending = new Promise<ICapabilityHandle>((resolve) => {\n  finish = resolve\n})\nconst host = createCapabilityHost(undefined, { flags: { export: true } })\nhost.register({ name: 'export', activate: () => pending })\nconst enabling = host.enable('export')\nhost.setFlag('export', false)\nfinish({\n  dispose: () => {\n    console.log('释放晚到句柄')\n  }\n})\nconsole.log('启用结果:', (await enabling).status)\nconsole.log('状态:', host.state('export'))\nconsole.log('已接纳句柄:', host.handle('export') !== undefined)\nawait host.dispose()",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenant: 'acme' }, { flags: { liveChat: true } })\nhost.register({\n  name: 'liveChat',\n  activate: ({ tenant }) => {\n    console.log('连接客服:', tenant)\n    const heartbeat = setInterval(() => console.log('心跳'), 1_000)\n    return {\n      dispose: () => {\n        clearInterval(heartbeat)\n        console.log('断开客服')\n      }\n    }\n  }\n})\nconsole.log('启用结果:', (await host.enable('liveChat')).status)\nhost.setFlag('liveChat', false)\nconsole.log('状态:', host.state('liveChat'), '句柄:', host.handle('liveChat'))\nawait host.disable('liveChat')\nconsole.log('释放完成')",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost(undefined, {\n  flags: { search: true, export: true, chat: true }\n})\nfor (const name of ['search', 'export', 'chat']) {\n  host.register({\n    name,\n    activate: () => {\n      console.log('启动', name)\n      return { dispose: () => console.log('停止', name) }\n    }\n  })\n}\nawait host.enable('search')\nawait host.enable('chat')\nawait host.enable('export')\nhost.setFlags({ search: true, chat: false })\nconsole.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))\nawait host.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -3650,8 +3876,53 @@
             }
           ],
           "identity": "packages/capability/dist/index.d.ts:createCapabilityHost:export declare function createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>;",
-          "guidance": [],
-          "usageScore": 84,
+          "guidance": [
+            {
+              "id": "用一份新配置替换全部开关-未列出的功能自动释放",
+              "heading": "用一份新配置替换全部开关，未列出的功能自动释放",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "应用启动后打开了搜索、客服和导出三项功能。配置中心推送了一份新配置：保留搜索，关闭客服，导出没有出现在新配置里。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "常见做法拿到新配置后，要自己和旧配置逐项比较，找出哪些功能被关掉、哪些被删掉，再逐个调用各自的停止函数；漏掉一项，它就继续运行。停止的顺序通常是代码里写的顺序，后启动、可能依赖先启动功能的那个，反而可能先被留下或后被关闭。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`setFlags(flags)` 用一整份新配置原子替换全部开关。没有出现在新配置里的名字一律视为关闭；被关闭的功能按实际启动完成的相反顺序释放。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "options.flags 初始允许三项功能。三项按搜索、客服、导出的顺序启动。新配置只列出 search: true 和 chat: false，export 没有列出。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost(undefined, {\n  flags: { search: true, export: true, chat: true }\n})\nfor (const name of ['search', 'export', 'chat']) {\n  host.register({\n    name,\n    activate: () => {\n      console.log('启动', name)\n      return { dispose: () => console.log('停止', name) }\n    }\n  })\n}\nawait host.enable('search')\nawait host.enable('chat')\nawait host.enable('export')\nhost.setFlags({ search: true, chat: false })\nconsole.log(host.names.map((name) => `${name}=${host.state(name)}`).join(' '))\nawait host.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "输出："
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "启动 search\n启动 chat\n启动 export\n停止 export\n停止 chat\nsearch=on export=gated chat=gated\n停止 search"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "依次输出三次启动，然后是 `停止 export`、`停止 chat`、`search=on export=gated chat=gated`，最后 `dispose()` 输出 `停止 search`。导出没有出现在新配置里，和明确关闭的客服一样被释放；释放顺序与启动完成顺序相反。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "新配置是整份替换，不是合并：想保留的功能必须写进新配置。替换只负责关闭和释放，新允许的功能仍要调用 `enable(name)` 才会启动。多租户应各建一个宿主，各自持有自己的开关快照。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 124,
           "configuration": [
             {
               "name": "flags",
