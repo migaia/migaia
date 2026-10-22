@@ -4,19 +4,23 @@ Run functions in real Workers and use one bidirectional request and stream API t
 
 ## You may have run into this
 
-- A computation leaves the main code path, but a process-id check cannot show whether it reached a different thread.
-- A Worker needs parent methods and incremental results, so separate message routes duplicate correlation and cleanup.
-- Byte ownership becomes unclear when copying and transfer are treated as the same native send.
-- Requests after restart rely on arbitrary delays because native startup and application catalog readiness are confused.
-- Cleaning up one component closes a shared port because connection lifetime is mistaken for physical ownership.
+- **A Worker gets stuck and the call never returns.** The input is too large, the algorithm loops, or the user has cancelled, yet the main thread's Promise stays pending and you have to build timeouts and cancel messages yourself. [Example](./USEGUIDE.en.md#fail-a-stuck-call-at-its-deadline-or-cancel-it-midway)
+- **After a Worker crashes, waiting calls never get a reply.** The thread is gone and nothing rejects the Promises still waiting on it. [Example](./USEGUIDE.en.md#fail-in-flight-calls-at-once-when-the-worker-crashes)
+- **An error thrown in a Worker reaches the main thread without its `code`.** A custom error turns into a plain `Error`, so you cannot handle it by kind. [Example](./USEGUIDE.en.md#get-the-error-class-code-and-cause-back-from-the-worker)
+- **Under a request peak, messages pile up in the Worker's queue.** Every call waits longer, memory grows, and the caller cannot tell the Worker is overloaded. [Example](./USEGUIDE.en.md#reject-calls-beyond-the-workers-limit-instead-of-queueing-them)
+- **A Worker needs to call back into the main thread or return results one by one.** You end up adding another set of message types and routes and matching requests to replies all over again. [Example](./USEGUIDE.en.md#call-the-parent-and-consume-worker-results-through-one-connection)
 
 ## Why choose it
 
-- **Distinguish a real Worker from a separate process.** Rather than checking only a result, the example compares native process and thread ids to establish another thread in the same process, as shown in [the scenario](./USEGUIDE.en.md#run-work-on-a-real-worker-without-confusing-it-with-another-process).
-- **Use one connection for reverse calls and result streams.** Separate parent routes and sequence protocols are unnecessary here: the example independently returns a parent-produced label and three stream values, as shown in [the scenario](./USEGUIDE.en.md#call-the-parent-and-consume-worker-results-through-one-connection).
-- **Keep caller bytes with default copying and reject unauthorized transfer.** The example checks copy mutation, original storage, and provider call count rather than assuming a native port grants RPC transfer, as shown in [the scenario](./USEGUIDE.en.md#keep-copied-bytes-usable-when-unsigned-rpc-transfer-is-refused).
-- **Call immediately after the Host reports restart readiness.** The example reads the fresh Worker counter immediately after ready instead of guessing catalog publication with a delay, as shown in [the scenario](./USEGUIDE.en.md#call-a-restarted-worker-as-soon-as-its-host-reports-ready).
-- **Keep borrowed ports alive after logical closure.** The example exchanges a native message after the shared close Promise settles, separating subscription cleanup from physical ownership, as shown in [the scenario](./USEGUIDE.en.md#close-a-borrowed-channel-while-keeping-its-native-port-usable).
+The usual approach is to add request ids on top of `postMessage`, or to use a thin wrapper that turns a Worker into a proxy object so calls read `await api.method()`. Those make a call look local, but they leave you on your own once the call goes wrong. That is the part this package covers:
+
+- **Stuck calls expire, and any call can be cancelled.** A typical wrapper resolves only when the Worker replies, so timeouts and cancellation are yours to build. Here every call has a 30-second deadline by default, which `timeoutMs` overrides, and accepts an `AbortSignal`; a call that expires or is cancelled rejects with a `TimeoutError` or `AbortError` carrying a `code`. [Example](./USEGUIDE.en.md#fail-a-stuck-call-at-its-deadline-or-cancel-it-midway)
+- **When the Worker crashes, calls in flight fail at once.** A typical wrapper leaves you to listen for `exit` and reject each waiting call yourself. Here, as soon as the connection drops, unfinished calls reject with `REMOTE_RESULT_UNKNOWN`, which tells you plainly that the result is unknown and should be reconciled before a retry. [Example](./USEGUIDE.en.md#fail-in-flight-calls-at-once-when-the-worker-crashes)
+- **Errors come back intact.** Structured cloning turns a custom error into a plain `Error` and drops custom fields such as `code`. Here the class name, `code` and `cause` chain are restored, so the main thread keeps branching on `code`. [Example](./USEGUIDE.en.md#get-the-error-class-code-and-cause-back-from-the-worker)
+- **Overload is rejected, not queued forever.** A typical wrapper pushes every message into the Worker's queue. Here the number of calls running at once is capped; a call over the cap rejects immediately with `OVERLOADED` without running the provider, so the caller can throttle or degrade right away. [Example](./USEGUIDE.en.md#reject-calls-beyond-the-workers-limit-instead-of-queueing-them)
+- **Calls in both directions and streams share one connection.** Either side can provide methods and make calls, and a method that returns an async generator is read item by item with `stream()`, with no extra message routing. [Example](./USEGUIDE.en.md#call-the-parent-and-consume-worker-results-through-one-connection)
+
+When you do not need it: if you only hand the occasional computation to a Worker and do not care about timeouts, crashes or overload, plain `postMessage` is simpler. When you need process-level permission or fault isolation, use [rpc-process](../rpc-process/README.en.md).
 
 ## Start here
 

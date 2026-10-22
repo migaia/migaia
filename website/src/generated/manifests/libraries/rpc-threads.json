@@ -26,11 +26,11 @@
               {
                 "type": "list",
                 "items": [
-                  "计算移出主线程后仍只检查进程 id，无法确认任务是否进入了不同线程。",
-                  "Worker 还要调用父端并逐项返回结果，多套消息路由让请求关联与释放重复出现。",
-                  "发送字节后不知道谁还能使用原 buffer，把复制和转移混在一起造成所有权误判。",
-                  "重启完成后仍靠固定等待再调用，因为原生启动与应用目录就绪没有对齐。",
-                  "清理一个组件就关闭共享端口，因为连接的生命周期被误当成原生资源的所有权。"
+                  "Worker 卡住了，调用一直等不到结果。 输入太大、算法陷入死循环，或者用户已经取消，主线程的 Promise 却一直 pending，只能自己拼超时和取消消息。示例",
+                  "Worker 崩溃后，等待中的调用永远等不到回复。 线程已经退出，没人去拒绝那些还在等的 Promise。示例",
+                  "Worker 抛出的错误到了主线程，`code` 不见了。 自定义错误变成普通 `Error`，没法按错误类型处理。示例",
+                  "请求高峰时，消息在 Worker 队列里越堆越多。 每个调用等得越来越久，内存一起上涨，调用方却看不出 Worker 已经过载。示例",
+                  "Worker 要回调主线程、或要逐项返回结果。 只好另建一套消息类型和路由，再维护一遍请求和回复的对应关系。示例"
                 ]
               }
             ]
@@ -40,14 +40,22 @@
             "heading": "为什么选它",
             "blocks": [
               {
+                "type": "paragraph",
+                "text": "常见做法是给 `postMessage` 加一层请求编号，或者用把 Worker 包装成代理对象的轻量封装，把调用写成 `await api.method()`。它们让调用看起来像本地函数，却不管调用出了问题之后怎么办。本包补上的正是这一段："
+              },
+              {
                 "type": "list",
                 "items": [
-                  "区分真实 Worker 与独立进程。 常见做法只看返回值，本例同时比较原生 pid 和 threadId，证明计算来自同进程的另一线程，见同名场景。",
-                  "反向请求与结果流使用同一连接。 不必另建父端路由和序列协议，例子分别返回父端处理结果与三个流值，见同名场景。",
-                  "默认复制保留调用方字节，未授权转移明确拒绝。 不依赖“原生端口就能转移”的假设，例子验证副本修改、原 buffer 和提供方调用次数，见同名场景。",
-                  "Host 报告重启就绪后可立即调用。 不靠固定延时猜目录是否切换，例子在 ready 后立即读到新 Worker 的初始计数，见同名场景。",
-                  "逻辑关闭保留借入端口。 不把注销连接等同于销毁物理资源，例子在共享关闭 Promise 完成后仍通过原端口收发，见同名场景。"
+                  "卡住的调用会到期，也能随时取消。 常见封装只在 Worker 回复时 resolve，超时和取消都要自己拼。这里每次调用默认有 30 秒期限，可以用 `timeoutMs` 单独设置，也可以传入 `AbortSignal`；到期或取消时分别以带 `code` 的 `TimeoutError`、`AbortError` 拒绝。示例",
+                  "Worker 崩溃，进行中的调用立刻失败。 常见封装要你自己监听 `exit`，再逐个拒绝还在等的调用。这里连接一断，未完成的调用就以 `REMOTE_RESULT_UNKNOWN` 拒绝，明确告诉你“结果未知，先对账再重试”。示例",
+                  "错误原样回到主线程。 结构化克隆会把自定义错误变成普通 `Error`，并丢掉 `code` 这类自定义字段。这里类名、`code` 和 `cause` 链都会还原，主线程可以继续按 `code` 分支。示例",
+                  "忙不过来时直接拒绝，不无限排队。 常见封装把消息全部塞进 Worker 的队列。这里同时执行的调用数有上限，超出的调用立即以 `OVERLOADED` 拒绝，提供方函数不会执行，调用方可以马上限流或降级。示例",
+                  "双向调用和流共用一条连接。 两端都能提供方法、发起调用；返回异步生成器的方法用 `stream()` 逐项读取，不用另建消息路由。示例"
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "什么时候不需要它：只是偶尔把一段计算交给 Worker，不在乎超时、崩溃和过载时，原生 `postMessage` 更简单。需要进程级的权限或故障隔离时，用 rpc-process。"
               }
             ]
           },
@@ -627,6 +635,26 @@
                     "代码与输出"
                   ],
                   [
+                    "调用卡住时按期限失败，或中途取消",
+                    "request + timeoutMs / signal",
+                    "代码与输出"
+                  ],
+                  [
+                    "Worker 崩溃时，进行中的调用立即失败",
+                    "request → Worker 退出 → REMOTE_RESULT_UNKNOWN",
+                    "代码与输出"
+                  ],
+                  [
+                    "错误类名、code 和 cause 跨 Worker 原样返回",
+                    "provide 抛错 → request 捕获",
+                    "代码与输出"
+                  ],
+                  [
+                    "Worker 忙不过来时直接拒绝超额调用",
+                    "providerLimits → request → OVERLOADED",
+                    "代码与输出"
+                  ],
+                  [
                     "未签名的 RPC 转移被拒绝后仍可使用原字节",
                     "request → transfer admission → request",
                     "代码与输出"
@@ -656,7 +684,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "下面六个示例各自保存为一个 .ts 文件，用 Node 24 直接运行；self spawn 会再次执行该文件，必须保留 child guard。它们不依赖浏览器授权，也不证明 Electron 或 Web Worker 的退出能力。"
+                "text": "下面十个示例各自保存为一个 .ts 文件，用 Node 24 直接运行；self spawn 会再次执行该文件，必须保留 child guard。它们不依赖浏览器授权，也不证明 Electron 或 Web Worker 的退出能力。"
               },
               {
                 "type": "code",
@@ -766,6 +794,206 @@
               {
                 "type": "paragraph",
                 "text": "这是同一连接上的两个独立方法；流开始迭代时才执行发送，`notify` 完成也不表示提供方已经执行完成。"
+              }
+            ]
+          },
+          {
+            "id": "调用卡住时按期限失败-或中途取消",
+            "heading": "调用卡住时按期限失败，或中途取消",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "主线程把报表渲染交给 Worker。某次输入太大，Worker 一直算不完；或者用户已经点了“取消”，结果不再需要。"
+              },
+              {
+                "type": "paragraph",
+                "text": "常见的 `postMessage` 封装只在结果回来时 resolve。Worker 卡住，这个 Promise 就永远 pending。想要超时，只能自己用 `Promise.race` 再包一层，到期后还得记得删掉回调表里的那一项；想要取消，还得另外设计一种“取消”消息，并让 Worker 认得它。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里每次 `request` 默认有 30 秒期限，也可以用 `timeoutMs` 单独设置；传入 `AbortSignal` 就能取消。到期和取消都会让调用以带 `code` 的原生错误拒绝。"
+              }
+            ]
+          },
+          {
+            "id": "示例参数",
+            "heading": "示例参数",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`render` 每页约 20 ms，500 页需要约 10 秒。第一次调用只渲染 2 页，正常返回；第二次设置 `timeoutMs: 100`；第三次在 50 ms 后调用 `controller.abort()`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IReportApi = { render(pages: number): Promise<string> }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      render: (pages: number) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IReportApi>({ spawn: true })\n  try {\n    console.log(await worker.request('render', 2))\n    try {\n      await worker.request('render', 500, { timeoutMs: 100 })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n    const controller = new AbortController()\n    setTimeout(() => controller.abort(), 50)\n    try {\n      await worker.request('render', 500, { signal: controller.signal })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n  } finally {\n    await worker.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "2 pages\nTimeoutError DEADLINE_EXCEEDED\nAbortError CANCELLED"
+              },
+              {
+                "type": "paragraph",
+                "text": "正常的调用照常返回；超时的调用以 `TimeoutError` 拒绝，取消的调用以 `AbortError` 拒绝，两者都带有可以用来分支的 `code`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "期限和取消只结束调用方的等待，不会强行中断 Worker 里已经开始执行的函数，函数会继续运行到结束，并一直占用并发名额。所以超时或取消都不能证明 Worker 没有执行；非幂等操作重试前要先对账。需要立刻停下计算时，关闭或重启 Worker。"
+              }
+            ]
+          },
+          {
+            "id": "worker-崩溃时-进行中的调用立即失败",
+            "heading": "Worker 崩溃时，进行中的调用立即失败",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Worker 正在转换文件时崩溃了，例如原生模块出错，线程直接退出。"
+              },
+              {
+                "type": "paragraph",
+                "text": "常见封装把每个调用的 resolve 和 reject 存在一张表里，等 Worker 回消息时按编号取出。Worker 一旦退出，就再也不会有回复，表里所有调用都永远 pending。除非你另外监听 `exit` 事件，自己遍历这张表逐个拒绝，否则调用方会一直等下去。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里连接断开时，所有还没完成的调用立即以 `REMOTE_RESULT_UNKNOWN` 拒绝。这个 code 的意思是“结果未知”：Worker 可能已经执行了一部分，调用方据此决定是先对账还是重试。"
+              }
+            ]
+          },
+          {
+            "id": "示例参数",
+            "heading": "示例参数",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IJobApi = { convert(file: string): Promise<string>; crash(): void }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      convert: (file: string) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),\n      crash: () => process.exit(1)\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IJobApi>({\n    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }\n  })\n  try {\n    const started = performance.now()\n    const converting = worker.request('convert', 'invoice.docx')\n    void worker.notify('crash')\n    try {\n      await converting\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.code)\n      console.log(performance.now() - started < 1_000)\n    }\n  } finally {\n    await worker.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "REMOTE_RESULT_UNKNOWN\ntrue"
+              },
+              {
+                "type": "paragraph",
+                "text": "转换调用在 Worker 退出后不到 1 秒就以 `REMOTE_RESULT_UNKNOWN` 拒绝，既没有等满 5 秒，也没有永远等下去。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这个拒绝只说明结果未知，不说明 Worker 没有执行；非幂等操作重试前要先对账。崩溃后是否重启由 `supervisor.restart` 决定，本例关闭了重启。"
+              }
+            ]
+          },
+          {
+            "id": "错误类名-code-和-cause-跨-worker-原样返回",
+            "heading": "错误类名、code 和 cause 跨 Worker 原样返回",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Worker 里的下单校验失败，抛出自定义的 `OrderError`。它带有 `code`，`cause` 上是导致失败的原始 `RangeError`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`postMessage` 靠结构化克隆传递数据。错误经过克隆后，内置错误类型和 `message` 能保留，但自定义错误类会变成普通的 `Error`，类名丢失，`code` 这类自定义字段会被直接丢掉。主线程想按 `code` 分支处理时，就拿不到依据。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里错误跨 Worker 返回时，保留类名、`message`、`code` 和 `cause` 链。调用方可以像处理本地错误一样按 `code` 分支，并沿着 `cause` 找到原因。"
+              }
+            ]
+          },
+          {
+            "id": "示例参数",
+            "heading": "示例参数",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`OrderError` 设置自己的 `name` 和 `code`，`cause` 是一个 `RangeError`。Worker 一侧的默认 `report` 也会把这次失败写到 stderr，方便在 Worker 端排查。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nclass OrderError extends Error {\n  readonly code = 'ORDER_INVALID'\n  constructor(message: string, options?: ErrorOptions) {\n    super(message, options)\n    this.name = 'OrderError'\n  }\n}\n\ntype IOrderApi = { place(quantity: number): string }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      place: (quantity: number) => {\n        if (quantity <= 0)\n          throw new OrderError('order rejected', {\n            cause: new RangeError('quantity must be positive')\n          })\n        return 'placed'\n      }\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IOrderApi>({ spawn: true })\n  try {\n    await worker.request('place', 0)\n  } catch (error) {\n    const failure = error as Error & { code?: string }\n    console.log(failure.name, failure.code, failure.message)\n    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)\n  } finally {\n    await worker.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "OrderError ORDER_INVALID order rejected\ntrue quantity must be positive"
+              },
+              {
+                "type": "paragraph",
+                "text": "类名、`code` 和 `message` 都还原了，`cause` 仍是一个 `RangeError`，消息也没变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "还原的是错误的类名和字段，不是同一个对象：主线程拿到的错误不是 `OrderError` 的实例。请按 `code` 分支，不要依赖 `instanceof` 自定义类，也不要匹配 `message` 文本。"
+              }
+            ]
+          },
+          {
+            "id": "worker-忙不过来时直接拒绝超额调用",
+            "heading": "Worker 忙不过来时直接拒绝超额调用",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "图片上传高峰时，主线程在很短时间内向 Worker 发出大量缩放请求。"
+              },
+              {
+                "type": "paragraph",
+                "text": "常见封装把每个请求都直接 `postMessage` 给 Worker，消息在 Worker 的队列里排队，没有上限。Worker 处理不过来时，请求越积越多，每个调用等得越来越久，内存也跟着上涨，调用方却看不出 Worker 已经过载。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里提供方同时执行的调用数有上限，默认每个对端 64 个、全局 256 个，可以用 `providerLimits` 调整。超出上限的调用立即以 `OVERLOADED` 拒绝，提供方函数不会执行，调用方可以马上降级、限流或稍后重试。"
+              }
+            ]
+          },
+          {
+            "id": "示例参数",
+            "heading": "示例参数",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IResizeApi = { resize(id: number): Promise<number>; started(): number }\nif (await isThreadChild()) {\n  let started = 0\n  await createThreadPeer({\n    providerLimits: { maxPerPeer: 2 },\n    provide: {\n      resize: (id: number) => {\n        started++\n        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))\n      },\n      started: () => started\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IResizeApi>({ spawn: true })\n  try {\n    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))\n    console.log(\n      results\n        .map((result) =>\n          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code\n        )\n        .join(' ')\n    )\n    console.log(await worker.request('started'))\n  } finally {\n    await worker.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "1 2 OVERLOADED\n2"
+              },
+              {
+                "type": "paragraph",
+                "text": "前两个调用正常完成，第三个立即被拒绝，提供方只执行了两次。"
+              },
+              {
+                "type": "paragraph",
+                "text": "上限限制的是同时执行的数量，不是排队长度。已经超时或取消、但仍在 Worker 里运行的函数也占用名额。`OVERLOADED` 保证提供方没有执行，可以放心重试。"
               }
             ]
           },
@@ -1366,11 +1594,11 @@
                 {
                   "type": "list",
                   "items": [
-                    "A computation leaves the main code path, but a process-id check cannot show whether it reached a different thread.",
-                    "A Worker needs parent methods and incremental results, so separate message routes duplicate correlation and cleanup.",
-                    "Byte ownership becomes unclear when copying and transfer are treated as the same native send.",
-                    "Requests after restart rely on arbitrary delays because native startup and application catalog readiness are confused.",
-                    "Cleaning up one component closes a shared port because connection lifetime is mistaken for physical ownership."
+                    "A Worker gets stuck and the call never returns. The input is too large, the algorithm loops, or the user has cancelled, yet the main thread's Promise stays pending and you have to build timeouts and cancel messages yourself. Example",
+                    "After a Worker crashes, waiting calls never get a reply. The thread is gone and nothing rejects the Promises still waiting on it. Example",
+                    "An error thrown in a Worker reaches the main thread without its `code`. A custom error turns into a plain `Error`, so you cannot handle it by kind. Example",
+                    "Under a request peak, messages pile up in the Worker's queue. Every call waits longer, memory grows, and the caller cannot tell the Worker is overloaded. Example",
+                    "A Worker needs to call back into the main thread or return results one by one. You end up adding another set of message types and routes and matching requests to replies all over again. Example"
                   ]
                 }
               ]
@@ -1380,14 +1608,22 @@
               "heading": "Why choose it",
               "blocks": [
                 {
+                  "type": "paragraph",
+                  "text": "The usual approach is to add request ids on top of `postMessage`, or to use a thin wrapper that turns a Worker into a proxy object so calls read `await api.method()`. Those make a call look local, but they leave you on your own once the call goes wrong. That is the part this module covers:"
+                },
+                {
                   "type": "list",
                   "items": [
-                    "Distinguish a real Worker from a separate process. Rather than checking only a result, the example compares native process and thread ids to establish another thread in the same process, as shown in the scenario.",
-                    "Use one connection for reverse calls and result streams. Separate parent routes and sequence protocols are unnecessary here: the example independently returns a parent-produced label and three stream values, as shown in the scenario.",
-                    "Keep caller bytes with default copying and reject unauthorized transfer. The example checks copy mutation, original storage, and provider call count rather than assuming a native port grants RPC transfer, as shown in the scenario.",
-                    "Call immediately after the Host reports restart readiness. The example reads the fresh Worker counter immediately after ready instead of guessing catalog publication with a delay, as shown in the scenario.",
-                    "Keep borrowed ports alive after logical closure. The example exchanges a native message after the shared close Promise settles, separating subscription cleanup from physical ownership, as shown in the scenario."
+                    "Stuck calls expire, and any call can be cancelled. A typical wrapper resolves only when the Worker replies, so timeouts and cancellation are yours to build. Here every call has a 30-second deadline by default, which `timeoutMs` overrides, and accepts an `AbortSignal`; a call that expires or is cancelled rejects with a `TimeoutError` or `AbortError` carrying a `code`. Example",
+                    "When the Worker crashes, calls in flight fail at once. A typical wrapper leaves you to listen for `exit` and reject each waiting call yourself. Here, as soon as the connection drops, unfinished calls reject with `REMOTE_RESULT_UNKNOWN`, which tells you plainly that the result is unknown and should be reconciled before a retry. Example",
+                    "Errors come back intact. Structured cloning turns a custom error into a plain `Error` and drops custom fields such as `code`. Here the class name, `code` and `cause` chain are restored, so the main thread keeps branching on `code`. Example",
+                    "Overload is rejected, not queued forever. A typical wrapper pushes every message into the Worker's queue. Here the number of calls running at once is capped; a call over the cap rejects immediately with `OVERLOADED` without running the provider, so the caller can throttle or degrade right away. Example",
+                    "Calls in both directions and streams share one connection. Either side can provide methods and make calls, and a method that returns an async generator is read item by item with `stream()`, with no extra message routing. Example"
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "When you do not need it: if you only hand the occasional computation to a Worker and do not care about timeouts, crashes or overload, plain `postMessage` is simpler. When you need process-level permission or fault isolation, use rpc-process."
                 }
               ]
             },
@@ -2010,6 +2246,26 @@
                       "Code and output"
                     ],
                     [
+                      "Fail a stuck call at its deadline or cancel it midway",
+                      "request + timeoutMs / signal",
+                      "Code and output"
+                    ],
+                    [
+                      "Fail in-flight calls at once when the Worker crashes",
+                      "request → Worker exits → REMOTE_RESULT_UNKNOWN",
+                      "Code and output"
+                    ],
+                    [
+                      "Get the error class, code and cause back from the Worker",
+                      "provider throws → request catches",
+                      "Code and output"
+                    ],
+                    [
+                      "Reject calls beyond the Worker's limit instead of queueing them",
+                      "providerLimits → request → OVERLOADED",
+                      "Code and output"
+                    ],
+                    [
                       "Keep copied bytes usable when unsigned RPC transfer is refused",
                       "request → transfer admission → request",
                       "Code and output"
@@ -2149,6 +2405,206 @@
                 {
                   "type": "paragraph",
                   "text": "These are separate methods on the same connection; streams are lazy until iteration, and notify completion would not acknowledge provider completion."
+                }
+              ]
+            },
+            {
+              "id": "fail-a-stuck-call-at-its-deadline-or-cancel-it-midway",
+              "heading": "Fail a stuck call at its deadline or cancel it midway",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The main thread hands report rendering to a Worker. One input is too large and the Worker never finishes, or the user has already pressed \"Cancel\" and no longer needs the result."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A typical `postMessage` wrapper resolves only when a reply arrives. If the Worker gets stuck, that Promise stays pending forever. For a timeout you wrap it again in `Promise.race` and must remember to delete the entry from your callback table when time runs out. For cancellation you design another \"cancel\" message and teach the Worker to recognize it."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Here every `request` has a 30-second deadline by default, which `timeoutMs` overrides per call, and passing an `AbortSignal` cancels it. Both reject the call with a native error that carries a `code`."
+                }
+              ]
+            },
+            {
+              "id": "example-parameters",
+              "heading": "Example parameters",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`render` takes about 20 ms per page, so 500 pages take about 10 seconds. The first call renders only 2 pages and returns normally. The second sets `timeoutMs: 100`. The third calls `controller.abort()` after 50 ms."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IReportApi = { render(pages: number): Promise<string> }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      render: (pages: number) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IReportApi>({ spawn: true })\n  try {\n    console.log(await worker.request('render', 2))\n    try {\n      await worker.request('render', 500, { timeoutMs: 100 })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n    const controller = new AbortController()\n    setTimeout(() => controller.abort(), 50)\n    try {\n      await worker.request('render', 500, { signal: controller.signal })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n  } finally {\n    await worker.close()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "2 pages\nTimeoutError DEADLINE_EXCEEDED\nAbortError CANCELLED"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The normal call returns as usual. The call that runs out of time rejects with `TimeoutError`, the cancelled call with `AbortError`, and both carry a `code` you can branch on."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A deadline or cancellation only ends the caller's wait. It does not interrupt a function that has already started in the Worker; that function runs to completion and keeps its concurrency slot until then. So neither a timeout nor a cancellation proves the Worker did nothing, and a non-idempotent operation must be reconciled before it is retried. To stop the computation right away, close or restart the Worker."
+                }
+              ]
+            },
+            {
+              "id": "fail-in-flight-calls-at-once-when-the-worker-crashes",
+              "heading": "Fail in-flight calls at once when the Worker crashes",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A Worker crashes while converting a file, for example because a native module fails and the thread exits."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A typical wrapper keeps each call's resolve and reject in a table and looks them up by id when the Worker replies. Once the Worker exits, no reply ever comes, and every call in that table stays pending forever. Unless you also listen for the `exit` event and walk the table to reject each call yourself, callers wait indefinitely."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Here, when the connection drops, every unfinished call rejects immediately with `REMOTE_RESULT_UNKNOWN`. The code means \"result unknown\": the Worker may have done part of the work, so the caller decides whether to reconcile or retry."
+                }
+              ]
+            },
+            {
+              "id": "example-parameters",
+              "heading": "Example parameters",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`convert` takes 5 seconds to return. `crash` makes the Worker thread exit with `process.exit(1)`, and the parent triggers it with `notify`, which does not wait for a reply. The `spawn` object sets `supervisor.restart.mode` to `'never'` so the Worker is not restarted; this example only looks at the call in flight. The default `report` writes a \"supervision stopped\" diagnostic to stderr."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IJobApi = { convert(file: string): Promise<string>; crash(): void }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      convert: (file: string) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),\n      crash: () => process.exit(1)\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IJobApi>({\n    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }\n  })\n  try {\n    const started = performance.now()\n    const converting = worker.request('convert', 'invoice.docx')\n    void worker.notify('crash')\n    try {\n      await converting\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.code)\n      console.log(performance.now() - started < 1_000)\n    }\n  } finally {\n    await worker.close()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "REMOTE_RESULT_UNKNOWN\ntrue"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The conversion call rejects with `REMOTE_RESULT_UNKNOWN` less than a second after the Worker exits. It neither waits the full 5 seconds nor hangs forever."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The rejection only says the result is unknown; it does not say the Worker did nothing, so reconcile a non-idempotent operation before retrying it. Whether the Worker restarts after a crash is set by `supervisor.restart`; this example turns restarts off."
+                }
+              ]
+            },
+            {
+              "id": "get-the-error-class-code-and-cause-back-from-the-worker",
+              "heading": "Get the error class, code and cause back from the Worker",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Order validation inside a Worker fails and throws a custom `OrderError`. It carries a `code`, and its `cause` holds the original `RangeError` behind the failure."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`postMessage` moves data by structured cloning. After cloning, built-in error types and `message` survive, but a custom error class turns into a plain `Error` and loses its name, and custom fields such as `code` are dropped. The main thread then has nothing to branch on."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Here an error coming back from a Worker keeps its class name, `message`, `code` and `cause` chain. The caller branches on `code` and follows `cause` exactly as it would for a local error."
+                }
+              ]
+            },
+            {
+              "id": "example-parameters",
+              "heading": "Example parameters",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`OrderError` sets its own `name` and `code`, and its `cause` is a `RangeError`. The Worker's default `report` also writes this failure to stderr, so it can be traced from the Worker side too."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nclass OrderError extends Error {\n  readonly code = 'ORDER_INVALID'\n  constructor(message: string, options?: ErrorOptions) {\n    super(message, options)\n    this.name = 'OrderError'\n  }\n}\n\ntype IOrderApi = { place(quantity: number): string }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      place: (quantity: number) => {\n        if (quantity <= 0)\n          throw new OrderError('order rejected', {\n            cause: new RangeError('quantity must be positive')\n          })\n        return 'placed'\n      }\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IOrderApi>({ spawn: true })\n  try {\n    await worker.request('place', 0)\n  } catch (error) {\n    const failure = error as Error & { code?: string }\n    console.log(failure.name, failure.code, failure.message)\n    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)\n  } finally {\n    await worker.close()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "OrderError ORDER_INVALID order rejected\ntrue quantity must be positive"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The class name, `code` and `message` are restored, and `cause` is still a `RangeError` with its original message."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "What comes back is the error's name and fields, not the same object: the error the main thread receives is not an `OrderError` instance. Branch on `code`; do not rely on `instanceof` with a custom class or on matching `message` text."
+                }
+              ]
+            },
+            {
+              "id": "reject-calls-beyond-the-worker-s-limit-instead-of-queueing-them",
+              "heading": "Reject calls beyond the Worker's limit instead of queueing them",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "During an upload peak, the main thread sends a burst of image resize requests to a Worker."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A typical wrapper posts every request straight to the Worker, where messages queue without limit. When the Worker cannot keep up, requests pile up, every call waits longer, memory grows, and the caller cannot tell that the Worker is overloaded."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Here the number of calls a provider runs at the same time is capped, by default 64 per peer and 256 overall, and `providerLimits` adjusts both. A call over the cap rejects at once with `OVERLOADED` and the provider function does not run, so the caller can degrade, throttle or retry later right away."
+                }
+              ]
+            },
+            {
+              "id": "example-parameters",
+              "heading": "Example parameters",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The Worker sets `providerLimits.maxPerPeer: 2`, so it runs at most two calls from the parent at a time; each resize takes 100 ms. The parent sends three calls at once, and `started` counts how many times the provider actually began work."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IResizeApi = { resize(id: number): Promise<number>; started(): number }\nif (await isThreadChild()) {\n  let started = 0\n  await createThreadPeer({\n    providerLimits: { maxPerPeer: 2 },\n    provide: {\n      resize: (id: number) => {\n        started++\n        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))\n      },\n      started: () => started\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IResizeApi>({ spawn: true })\n  try {\n    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))\n    console.log(\n      results\n        .map((result) =>\n          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code\n        )\n        .join(' ')\n    )\n    console.log(await worker.request('started'))\n  } finally {\n    await worker.close()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "1 2 OVERLOADED\n2"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The first two calls complete, the third is rejected at once, and the provider ran only twice."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The cap limits how many calls run at the same time, not how long a queue grows. A function that has timed out or been cancelled but is still running in the Worker keeps its slot. `OVERLOADED` guarantees the provider did not run, so the call is safe to retry."
                 }
               ]
             },
@@ -3184,7 +3640,7 @@
               "optional": true,
               "description": "Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter.",
               "descriptionEn": "Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter.",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "spawn",
@@ -3192,7 +3648,7 @@
               "optional": true,
               "description": "Owned Worker source: callback, full deployment, short object, true, or an entry URL/path.",
               "descriptionEn": "Owned Worker source: callback, full deployment, short object, true, or an entry URL/path.",
-              "descriptionZh": "主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "endpointFactory",
@@ -3240,7 +3696,7 @@
               "optional": true,
               "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
               "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
-              "descriptionZh": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。"
+              "descriptionZh": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
             },
             {
               "name": "authentication",
@@ -3487,6 +3943,10 @@
           "examples": [
             "import { threadId } from 'node:worker_threads'\nimport { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { double(value: number): number; identity(): { pid: number; threadId: number } }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      double: (value: number) => value * 2,\n      identity: () => ({ pid: process.pid, threadId })\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n    const identity = await worker.request('identity')\n    console.log(identity.pid === process.pid)\n    console.log(identity.threadId !== threadId)\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IParentApi = { prefix(value: string): string }\ntype IWorkerApi = {\n  label(value: string): Promise<string>\n  count(limit: number): AsyncGenerator<number>\n}\nif (await isThreadChild()) {\n  const parent = createThreadPeer<IParentApi>({\n    provide: {\n      label: async (value: string): Promise<string> => (await parent).request('prefix', value),\n      count: async function* (limit: number) {\n        for (let value = 1; value <= limit; value++) yield value\n      }\n    }\n  })\n  await parent\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({\n    spawn: true,\n    provide: { prefix: (value: string) => '主端:' + value }\n  })\n  try {\n    console.log(await worker.request('label', '任务'))\n    const values: number[] = []\n    for await (const value of worker.stream('count', 3)) values.push(value)\n    console.log(values.join(','))\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IReportApi = { render(pages: number): Promise<string> }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      render: (pages: number) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IReportApi>({ spawn: true })\n  try {\n    console.log(await worker.request('render', 2))\n    try {\n      await worker.request('render', 500, { timeoutMs: 100 })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n    const controller = new AbortController()\n    setTimeout(() => controller.abort(), 50)\n    try {\n      await worker.request('render', 500, { signal: controller.signal })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IJobApi = { convert(file: string): Promise<string>; crash(): void }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      convert: (file: string) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),\n      crash: () => process.exit(1)\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IJobApi>({\n    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }\n  })\n  try {\n    const started = performance.now()\n    const converting = worker.request('convert', 'invoice.docx')\n    void worker.notify('crash')\n    try {\n      await converting\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.code)\n      console.log(performance.now() - started < 1_000)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nclass OrderError extends Error {\n  readonly code = 'ORDER_INVALID'\n  constructor(message: string, options?: ErrorOptions) {\n    super(message, options)\n    this.name = 'OrderError'\n  }\n}\n\ntype IOrderApi = { place(quantity: number): string }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      place: (quantity: number) => {\n        if (quantity <= 0)\n          throw new OrderError('order rejected', {\n            cause: new RangeError('quantity must be positive')\n          })\n        return 'placed'\n      }\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IOrderApi>({ spawn: true })\n  try {\n    await worker.request('place', 0)\n  } catch (error) {\n    const failure = error as Error & { code?: string }\n    console.log(failure.name, failure.code, failure.message)\n    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IResizeApi = { resize(id: number): Promise<number>; started(): number }\nif (await isThreadChild()) {\n  let started = 0\n  await createThreadPeer({\n    providerLimits: { maxPerPeer: 2 },\n    provide: {\n      resize: (id: number) => {\n        started++\n        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))\n      },\n      started: () => started\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IResizeApi>({ spawn: true })\n  try {\n    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))\n    console.log(\n      results\n        .map((result) =>\n          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code\n        )\n        .join(' ')\n    )\n    console.log(await worker.request('started'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IBytesApi = {\n  inspect(buffer: ArrayBuffer): { length: number; first: number }\n  calls(): number\n}\nif (await isThreadChild()) {\n  let calls = 0\n  await createThreadPeer({\n    provide: {\n      inspect: (buffer: ArrayBuffer) => {\n        calls++\n        const bytes = new Uint8Array(buffer)\n        const result = { length: buffer.byteLength, first: bytes[0]! }\n        bytes[0] = 99\n        return result\n      },\n      calls: () => calls\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IBytesApi>({ spawn: true })\n  try {\n    const bytes = new Uint8Array([7, 8, 9])\n    const result = await worker.request('inspect', bytes.buffer)\n    console.log(result.length, result.first)\n    console.log(bytes.byteLength, bytes[0])\n    try {\n      await worker.request('inspect', bytes.buffer, { transfer: [bytes.buffer] })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      if (failure.code !== 'CAPABILITY_UNSUPPORTED') throw error\n      console.log(failure.code)\n    }\n    console.log(bytes.byteLength, await worker.request('calls'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPeer, createThreadPlugin, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { next(): number }\nif (await isThreadChild()) {\n  let count = 0\n  await createThreadPeer({ provide: { next: () => ++count } })\n} else {\n  const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n    name: 'worker',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(worker)\n    console.log(await host.thread!.request('worker', 'next'))\n    const restarted = await host.thread!.restart('worker')\n    console.log(restarted.state)\n    console.log(await host.thread!.request('worker', 'next'))\n  } finally {\n    const result = await host.dispose()\n    console.log(result.cleanupComplete)\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n  } finally {\n    await worker.close()\n  }\n}"
@@ -3635,23 +4095,23 @@
           ],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions, runtime?: IThreadRuntimeResource): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
-          "usageScore": 102,
+          "usageScore": 174,
           "configuration": [
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。",
+              "description": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。",
               "descriptionEn": "Optional diagnostics sink; ordinary root construction defaults to Core's defaultRpcReporter.",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "spawn",
               "type": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike",
               "optional": true,
-              "description": "主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。",
+              "description": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。",
               "descriptionEn": "Owned Worker source: callback, full deployment, short object, true, or an entry URL/path.",
-              "descriptionZh": "主线程可以指定短 `spawn`、完整 `spawn` 或 Core 的 `connect` / `listen` 来源；来源不能混用。库 launcher 创建的 Worker 内省略来源，由真实 Node parentPort / workerData 或 Web Worker bootstrap 自动连接父线程。单独执行普通 Worker 文件不会获得这种连接。`isThreadChild()` 只读取库的启动标记以区分父子分支，不为外部 Worker 授权，也不替代能力确认。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "endpointFactory",
@@ -3697,9 +4157,9 @@
               "name": "providerLimits",
               "type": "IRpcProviderLimits",
               "optional": true,
-              "description": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。",
+              "description": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。",
               "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
-              "descriptionZh": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。"
+              "descriptionZh": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
             },
             {
               "name": "authentication",
@@ -3989,7 +4449,7 @@
               "optional": true,
               "description": "",
               "descriptionEn": "",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "spawn",
@@ -4061,7 +4521,7 @@
               "optional": true,
               "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
               "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
-              "descriptionZh": "`defaultTimeoutMs` 缺省 30000，必须是正有限值，只用于 request / stream。单次 `timeoutMs` 可为非负有限值或 `false`；0 表示立即到期，false 关闭该次期限。全局并发默认 256，每个对端 64，通过 `providerLimits.maxGlobal`、`providerLimits.maxPerPeer` 调整；超额以 `OVERLOADED` 拒绝，不执行该次 provider。设置 `spec.limits.callWallTimeMs` 会进一步压低调用期限。"
+              "descriptionZh": "Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。"
             },
             {
               "name": "authentication",
@@ -4493,7 +4953,7 @@
               "optional": false,
               "description": "Required native error sink; reporter failures remain observable through the host route.",
               "descriptionEn": "Required native error sink; reporter failures remain observable through the host route.",
-              "descriptionZh": "`signal` 是协作取消，超时、取消或断线都不能证明 Worker 尚未执行。非幂等写入先用业务标识对账；已声明幂等且仍保留结果的调用可结合 `idempotencyKey` / `outcome(key)`，不能把任意重试当作只执行一次。`report` 缺省 Core 的默认诊断输出（通常为 console.error）；它接收后台失败。`probe`、`contract`、`authentication`、`endpointFactory`、`keyFactory`、`retryPort` 延续 Core 各自 owner 的契约。"
+              "descriptionZh": "`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。"
             },
             {
               "name": "runtimeApi",
@@ -7140,6 +7600,10 @@
           "examples": [
             "import { threadId } from 'node:worker_threads'\nimport { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { double(value: number): number; identity(): { pid: number; threadId: number } }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      double: (value: number) => value * 2,\n      identity: () => ({ pid: process.pid, threadId })\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n    const identity = await worker.request('identity')\n    console.log(identity.pid === process.pid)\n    console.log(identity.threadId !== threadId)\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IParentApi = { prefix(value: string): string }\ntype IWorkerApi = {\n  label(value: string): Promise<string>\n  count(limit: number): AsyncGenerator<number>\n}\nif (await isThreadChild()) {\n  const parent = createThreadPeer<IParentApi>({\n    provide: {\n      label: async (value: string): Promise<string> => (await parent).request('prefix', value),\n      count: async function* (limit: number) {\n        for (let value = 1; value <= limit; value++) yield value\n      }\n    }\n  })\n  await parent\n} else {\n  const worker = await createThreadPeer<IWorkerApi>({\n    spawn: true,\n    provide: { prefix: (value: string) => '主端:' + value }\n  })\n  try {\n    console.log(await worker.request('label', '任务'))\n    const values: number[] = []\n    for await (const value of worker.stream('count', 3)) values.push(value)\n    console.log(values.join(','))\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IReportApi = { render(pages: number): Promise<string> }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      render: (pages: number) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IReportApi>({ spawn: true })\n  try {\n    console.log(await worker.request('render', 2))\n    try {\n      await worker.request('render', 500, { timeoutMs: 100 })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n    const controller = new AbortController()\n    setTimeout(() => controller.abort(), 50)\n    try {\n      await worker.request('render', 500, { signal: controller.signal })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.name, failure.code)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IJobApi = { convert(file: string): Promise<string>; crash(): void }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      convert: (file: string) =>\n        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),\n      crash: () => process.exit(1)\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IJobApi>({\n    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }\n  })\n  try {\n    const started = performance.now()\n    const converting = worker.request('convert', 'invoice.docx')\n    void worker.notify('crash')\n    try {\n      await converting\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      console.log(failure.code)\n      console.log(performance.now() - started < 1_000)\n    }\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nclass OrderError extends Error {\n  readonly code = 'ORDER_INVALID'\n  constructor(message: string, options?: ErrorOptions) {\n    super(message, options)\n    this.name = 'OrderError'\n  }\n}\n\ntype IOrderApi = { place(quantity: number): string }\nif (await isThreadChild()) {\n  await createThreadPeer({\n    provide: {\n      place: (quantity: number) => {\n        if (quantity <= 0)\n          throw new OrderError('order rejected', {\n            cause: new RangeError('quantity must be positive')\n          })\n        return 'placed'\n      }\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IOrderApi>({ spawn: true })\n  try {\n    await worker.request('place', 0)\n  } catch (error) {\n    const failure = error as Error & { code?: string }\n    console.log(failure.name, failure.code, failure.message)\n    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)\n  } finally {\n    await worker.close()\n  }\n}",
+            "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IResizeApi = { resize(id: number): Promise<number>; started(): number }\nif (await isThreadChild()) {\n  let started = 0\n  await createThreadPeer({\n    providerLimits: { maxPerPeer: 2 },\n    provide: {\n      resize: (id: number) => {\n        started++\n        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))\n      },\n      started: () => started\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IResizeApi>({ spawn: true })\n  try {\n    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))\n    console.log(\n      results\n        .map((result) =>\n          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code\n        )\n        .join(' ')\n    )\n    console.log(await worker.request('started'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IBytesApi = {\n  inspect(buffer: ArrayBuffer): { length: number; first: number }\n  calls(): number\n}\nif (await isThreadChild()) {\n  let calls = 0\n  await createThreadPeer({\n    provide: {\n      inspect: (buffer: ArrayBuffer) => {\n        calls++\n        const bytes = new Uint8Array(buffer)\n        const result = { length: buffer.byteLength, first: bytes[0]! }\n        bytes[0] = 99\n        return result\n      },\n      calls: () => calls\n    }\n  })\n} else {\n  const worker = await createThreadPeer<IBytesApi>({ spawn: true })\n  try {\n    const bytes = new Uint8Array([7, 8, 9])\n    const result = await worker.request('inspect', bytes.buffer)\n    console.log(result.length, result.first)\n    console.log(bytes.byteLength, bytes[0])\n    try {\n      await worker.request('inspect', bytes.buffer, { transfer: [bytes.buffer] })\n    } catch (error) {\n      const failure = error as Error & { code?: string }\n      if (failure.code !== 'CAPABILITY_UNSUPPORTED') throw error\n      console.log(failure.code)\n    }\n    console.log(bytes.byteLength, await worker.request('calls'))\n  } finally {\n    await worker.close()\n  }\n}",
             "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPeer, createThreadPlugin, isThreadChild } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { next(): number }\nif (await isThreadChild()) {\n  let count = 0\n  await createThreadPeer({ provide: { next: () => ++count } })\n} else {\n  const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n    name: 'worker',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(worker)\n    console.log(await host.thread!.request('worker', 'next'))\n    const restarted = await host.thread!.restart('worker')\n    console.log(restarted.state)\n    console.log(await host.thread!.request('worker', 'next'))\n  } finally {\n    const result = await host.dispose()\n    console.log(result.cleanupComplete)\n  }\n}",
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21))\n  } finally {\n    await worker.close()\n  }\n}"
@@ -7188,7 +7652,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/child.d.ts:isThreadChild:export declare function isThreadChild(): Promise<boolean>;",
           "guidance": [],
-          "usageScore": 84,
+          "usageScore": 140,
           "configuration": [],
           "fragment": "rpc-threads-index--isThreadChild"
         },

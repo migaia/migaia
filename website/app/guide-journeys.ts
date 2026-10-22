@@ -85952,7 +85952,7 @@ class CheckoutElement extends HTMLElement {
   'rpc-threads:index': {
     zh: {
       title: '把计算移出主线程，并明确谁负责关闭 Worker',
-      lede: '用真实 Worker 执行函数、反向调用父端和逐项返回结果；默认复制、显式转移以及借用端口各有清晰边界。',
+      lede: '把计算移到真实 Worker，并让卡住、取消、崩溃和过载的调用都有明确结果；双向调用和流共用一条连接。',
       document: {
         sections: [
           {
@@ -85962,11 +85962,11 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'list',
                 items: [
-                  '任务返回了结果，但只看进程 id 无法确认它是否真的离开主线程执行，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-1)',
-                  'Worker 既要反向调用父端又要返回序列时，多套 postMessage 路由会重复维护结果对应与清理，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)',
-                  '调用方还要使用原始字节时，把复制与转移混为一谈会意外让存储失效，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-3)',
-                  '重启后立刻调用时，只收到原生启动结果还不能说明应用目录已经切换到新 Worker，[查看示例](/zh/docs/rpc-threads/api/createThreadPlugin#rpc-threads-index--createThreadPlugin--case-1)',
-                  '组件不再使用已有 MessagePort 时，直接关闭原生端口会扩大清理范围，[查看示例](/zh/docs/rpc-threads/api/createNodeThreadChannel#rpc-threads-index--createNodeThreadChannel--case-1)'
+                  'Worker 卡住或用户已取消，主线程的 Promise 却一直 pending，只能自己拼超时和取消消息，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-4)',
+                  'Worker 崩溃退出后，还在等待的调用永远等不到回复，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-5)',
+                  'Worker 抛出的自定义错误到主线程后变成普通 Error，`code` 不见了，没法按错误类型处理，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-6)',
+                  '请求高峰时消息在 Worker 队列里越堆越多，延迟和内存一起上涨，调用方却看不出已经过载，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-7)',
+                  'Worker 要回调主线程或逐项返回结果，只好另建一套消息类型和路由，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)'
                 ]
               }
             ]
@@ -85978,11 +85978,11 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'list',
                 items: [
-                  '真实 Worker 与父端共享进程但使用不同线程，示例同时核对结果、process.pid 和 threadId，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-1)',
-                  '同一连接支持反向请求与惰性流，示例分别读取父端计算结果和三个 Worker 流项，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)',
-                  '默认 RPC 复制保留调用方存储，未配置签名的转移在执行提供方前拒绝且不让原字节失效，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-3)',
-                  'Host 出口返回重启 ready 时后继已进入目录，示例无需延时即可读取新 Worker 从一开始的计数，[查看示例](/zh/docs/rpc-threads/api/createThreadPlugin#rpc-threads-index--createThreadPlugin--case-1)',
-                  '借用通道关闭只解除本端通信职责，示例等待关闭后仍能通过同一原生端口交付消息，[查看示例](/zh/docs/rpc-threads/api/createNodeThreadChannel#rpc-threads-index--createNodeThreadChannel--case-1)'
+                  '卡住的调用会到期也能取消：每次调用默认 30 秒期限，可设 `timeoutMs` 或传 `AbortSignal`，以带 `code` 的 `TimeoutError`、`AbortError` 拒绝，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-4)',
+                  'Worker 崩溃时，进行中的调用立即以 `REMOTE_RESULT_UNKNOWN` 拒绝，不用自己监听退出再逐个清理，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-5)',
+                  '错误跨 Worker 保留类名、`code` 和 `cause` 链，而结构化克隆会丢掉这些信息，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-6)',
+                  '同时执行的调用数有上限，超额调用立即以 `OVERLOADED` 拒绝且不执行，不会在队列里无限堆积，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-7)',
+                  '两端都能提供方法和发起调用，异步生成器用 `stream()` 逐项读取，全部走同一条连接，[查看示例](/zh/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)'
                 ]
               }
             ]
@@ -86079,7 +86079,7 @@ class CheckoutElement extends HTMLElement {
     },
     en: {
       title: 'Move work off the main thread and keep its Worker owner explicit',
-      lede: 'Use real Workers for functions, reverse calls and sequential results, with explicit boundaries for copying, transfer and borrowed ports.',
+      lede: 'Move work into real Workers and get a definite outcome when a call gets stuck, is cancelled, crashes or overloads; calls in both directions and streams share one connection.',
       document: {
         sections: [
           {
@@ -86089,11 +86089,11 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'list',
                 items: [
-                  'A returned result and a process id alone do not reveal whether work left the main thread, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-1)',
-                  'Separate postMessage routes duplicate correlation and cleanup when a Worker needs reverse calls and sequential results, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)',
-                  'Confusing copying with transfer can detach storage that the caller still needs, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-3)',
-                  'After a restart, native startup alone does not establish that the application directory points to the new Worker, [see the example](/en/docs/rpc-threads/api/createThreadPlugin#rpc-threads-index--createThreadPlugin--case-1)',
-                  'Closing a native MessagePort when one component leaves can release a resource its caller still owns, [see the example](/en/docs/rpc-threads/api/createNodeThreadChannel#rpc-threads-index--createNodeThreadChannel--case-1)'
+                  "A Worker gets stuck or the user cancels, yet the main thread's Promise stays pending and you build timeouts and cancel messages yourself, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-4)",
+                  'After a Worker crashes, calls still waiting on it never get a reply, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-5)',
+                  'A custom error thrown in a Worker reaches the main thread as a plain Error without its `code`, so you cannot handle it by kind, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-6)',
+                  'Under a request peak, messages pile up in the Worker queue, latency and memory climb, and the caller cannot tell the Worker is overloaded, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-7)',
+                  'A Worker that must call back into the main thread or return results one by one needs yet another set of message types and routes, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)'
                 ]
               }
             ]
@@ -86105,11 +86105,11 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'list',
                 items: [
-                  "A real Worker shares the parent's process but has a different thread, with the example checking its result, process.pid and threadId, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-1)",
-                  'One connection supports reverse requests and lazy streams, with the example reading a parent result and three Worker stream items, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)',
-                  'Default RPC copying preserves caller storage, while unsigned transfer rejects before provider execution without detaching the original bytes, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-3)',
-                  'Host restart returns ready after the successor enters the outlet directory, allowing the example to call its fresh counter without a delay, [see the example](/en/docs/rpc-threads/api/createThreadPlugin#rpc-threads-index--createThreadPlugin--case-1)',
-                  'Borrowed channel closure retires its local messaging role, while the same native port still delivers after close completes, [see the example](/en/docs/rpc-threads/api/createNodeThreadChannel#rpc-threads-index--createNodeThreadChannel--case-1)'
+                  'Stuck calls expire and can be cancelled: every call has a 30-second default deadline, accepts `timeoutMs` or an `AbortSignal`, and rejects with a coded `TimeoutError` or `AbortError`, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-4)',
+                  'When a Worker crashes, calls in flight reject at once with `REMOTE_RESULT_UNKNOWN`, with no exit listener or manual cleanup to write, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-5)',
+                  'Errors keep their class name, `code` and `cause` chain across the Worker boundary, which structured cloning would drop, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-6)',
+                  'Concurrent calls are capped, and a call over the cap rejects at once with `OVERLOADED` without running, instead of piling up in a queue, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-7)',
+                  'Both sides can provide methods and make calls, and async generators are read item by item with `stream()`, all over one connection, [see the example](/en/docs/rpc-threads/api/createThreadPeer#rpc-threads-index--createThreadPeer--case-2)'
                 ]
               }
             ]

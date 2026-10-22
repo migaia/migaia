@@ -8,6 +8,10 @@
 | ------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------- |
 | 在真实 Worker 上执行任务并区分线程与进程   | isThreadChild → createThreadPeer → request → close               | [代码与输出](#在真实-worker-上执行任务并区分线程与进程)   |
 | 通过同一连接反向调用父端并消费 Worker 结果 | provide → request / stream → close                               | [代码与输出](#通过同一连接反向调用父端并消费-worker-结果) |
+| 调用卡住时按期限失败，或中途取消           | request + timeoutMs / signal                                     | [代码与输出](#调用卡住时按期限失败或中途取消)             |
+| Worker 崩溃时，进行中的调用立即失败        | request → Worker 退出 → REMOTE_RESULT_UNKNOWN                    | [代码与输出](#worker-崩溃时进行中的调用立即失败)          |
+| 错误类名、code 和 cause 跨 Worker 原样返回 | provide 抛错 → request 捕获                                      | [代码与输出](#错误类名code-和-cause-跨-worker-原样返回)   |
+| Worker 忙不过来时直接拒绝超额调用          | providerLimits → request → OVERLOADED                            | [代码与输出](#worker-忙不过来时直接拒绝超额调用)          |
 | 未签名的 RPC 转移被拒绝后仍可使用原字节    | request → transfer admission → request                           | [代码与输出](#未签名的-rpc-转移被拒绝后仍可使用原字节)    |
 | Host 报告重启就绪后立即调用新 Worker       | createThreadPlugin → host.use → restart → request → dispose      | [代码与输出](#host-报告重启就绪后立即调用新-worker)       |
 | 关闭借用通道后继续使用原生端口             | createNodeThreadChannel → subscribe → close → native postMessage | [代码与输出](#关闭借用通道后继续使用原生端口)             |
@@ -15,7 +19,7 @@
 
 ## 运行准备
 
-下面六个示例各自保存为一个 .ts 文件，用 Node 24 直接运行；self spawn 会再次执行该文件，必须保留 child guard。它们不依赖浏览器授权，也不证明 Electron 或 Web Worker 的退出能力。
+下面十个示例各自保存为一个 .ts 文件，用 Node 24 直接运行；self spawn 会再次执行该文件，必须保留 child guard。它们不依赖浏览器授权，也不证明 Electron 或 Web Worker 的退出能力。
 
 ```bash
 pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract @migaia/plugin-host @migaia/utils
@@ -128,6 +132,239 @@ if (await isThreadChild()) {
 输出为 `主端:任务`、`1,2,3`：一个请求反向调用父端，流则提供三个值。
 
 这是同一连接上的两个独立方法；流开始迭代时才执行发送，`notify` 完成也不表示提供方已经执行完成。
+
+## 调用卡住时按期限失败，或中途取消
+
+主线程把报表渲染交给 Worker。某次输入太大，Worker 一直算不完；或者用户已经点了“取消”，结果不再需要。
+
+常见的 `postMessage` 封装只在结果回来时 resolve。Worker 卡住，这个 Promise 就永远 pending。想要超时，只能自己用 `Promise.race` 再包一层，到期后还得记得删掉回调表里的那一项；想要取消，还得另外设计一种“取消”消息，并让 Worker 认得它。
+
+这里每次 `request` 默认有 30 秒期限，也可以用 `timeoutMs` 单独设置；传入 `AbortSignal` 就能取消。到期和取消都会让调用以带 `code` 的原生错误拒绝。
+
+### 示例参数
+
+`render` 每页约 20 ms，500 页需要约 10 秒。第一次调用只渲染 2 页，正常返回；第二次设置 `timeoutMs: 100`；第三次在 50 ms 后调用 `controller.abort()`。
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IReportApi = { render(pages: number): Promise<string> }
+if (await isThreadChild()) {
+  await createThreadPeer({
+    provide: {
+      render: (pages: number) =>
+        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IReportApi>({ spawn: true })
+  try {
+    console.log(await worker.request('render', 2))
+    try {
+      await worker.request('render', 500, { timeoutMs: 100 })
+    } catch (error) {
+      const failure = error as Error & { code?: string }
+      console.log(failure.name, failure.code)
+    }
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), 50)
+    try {
+      await worker.request('render', 500, { signal: controller.signal })
+    } catch (error) {
+      const failure = error as Error & { code?: string }
+      console.log(failure.name, failure.code)
+    }
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+输出：
+
+```text
+2 pages
+TimeoutError DEADLINE_EXCEEDED
+AbortError CANCELLED
+```
+
+正常的调用照常返回；超时的调用以 `TimeoutError` 拒绝，取消的调用以 `AbortError` 拒绝，两者都带有可以用来分支的 `code`。
+
+期限和取消只结束调用方的等待，不会强行中断 Worker 里已经开始执行的函数，函数会继续运行到结束，并一直占用并发名额。所以超时或取消都不能证明 Worker 没有执行；非幂等操作重试前要先对账。需要立刻停下计算时，关闭或重启 Worker。
+
+## Worker 崩溃时，进行中的调用立即失败
+
+Worker 正在转换文件时崩溃了，例如原生模块出错，线程直接退出。
+
+常见封装把每个调用的 resolve 和 reject 存在一张表里，等 Worker 回消息时按编号取出。Worker 一旦退出，就再也不会有回复，表里所有调用都永远 pending。除非你另外监听 `exit` 事件，自己遍历这张表逐个拒绝，否则调用方会一直等下去。
+
+这里连接断开时，所有还没完成的调用立即以 `REMOTE_RESULT_UNKNOWN` 拒绝。这个 code 的意思是“结果未知”：Worker 可能已经执行了一部分，调用方据此决定是先对账还是重试。
+
+### 示例参数
+
+`convert` 要 5 秒后才返回；`crash` 用 `process.exit(1)` 让 Worker 线程直接退出，父端用不等待回复的 `notify` 触发它。`spawn` 对象把 `supervisor.restart.mode` 设为 `'never'`，崩溃后不重启，本例只观察进行中的调用。默认 `report` 会把“监督已停止”的诊断写到 stderr。
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IJobApi = { convert(file: string): Promise<string>; crash(): void }
+if (await isThreadChild()) {
+  await createThreadPeer({
+    provide: {
+      convert: (file: string) =>
+        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),
+      crash: () => process.exit(1)
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IJobApi>({
+    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }
+  })
+  try {
+    const started = performance.now()
+    const converting = worker.request('convert', 'invoice.docx')
+    void worker.notify('crash')
+    try {
+      await converting
+    } catch (error) {
+      const failure = error as Error & { code?: string }
+      console.log(failure.code)
+      console.log(performance.now() - started < 1_000)
+    }
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+输出：
+
+```text
+REMOTE_RESULT_UNKNOWN
+true
+```
+
+转换调用在 Worker 退出后不到 1 秒就以 `REMOTE_RESULT_UNKNOWN` 拒绝，既没有等满 5 秒，也没有永远等下去。
+
+这个拒绝只说明结果未知，不说明 Worker 没有执行；非幂等操作重试前要先对账。崩溃后是否重启由 `supervisor.restart` 决定，本例关闭了重启。
+
+## 错误类名、code 和 cause 跨 Worker 原样返回
+
+Worker 里的下单校验失败，抛出自定义的 `OrderError`。它带有 `code`，`cause` 上是导致失败的原始 `RangeError`。
+
+`postMessage` 靠结构化克隆传递数据。错误经过克隆后，内置错误类型和 `message` 能保留，但自定义错误类会变成普通的 `Error`，类名丢失，`code` 这类自定义字段会被直接丢掉。主线程想按 `code` 分支处理时，就拿不到依据。
+
+这里错误跨 Worker 返回时，保留类名、`message`、`code` 和 `cause` 链。调用方可以像处理本地错误一样按 `code` 分支，并沿着 `cause` 找到原因。
+
+### 示例参数
+
+`OrderError` 设置自己的 `name` 和 `code`，`cause` 是一个 `RangeError`。Worker 一侧的默认 `report` 也会把这次失败写到 stderr，方便在 Worker 端排查。
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+class OrderError extends Error {
+  readonly code = 'ORDER_INVALID'
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'OrderError'
+  }
+}
+
+type IOrderApi = { place(quantity: number): string }
+if (await isThreadChild()) {
+  await createThreadPeer({
+    provide: {
+      place: (quantity: number) => {
+        if (quantity <= 0)
+          throw new OrderError('order rejected', {
+            cause: new RangeError('quantity must be positive')
+          })
+        return 'placed'
+      }
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IOrderApi>({ spawn: true })
+  try {
+    await worker.request('place', 0)
+  } catch (error) {
+    const failure = error as Error & { code?: string }
+    console.log(failure.name, failure.code, failure.message)
+    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+输出：
+
+```text
+OrderError ORDER_INVALID order rejected
+true quantity must be positive
+```
+
+类名、`code` 和 `message` 都还原了，`cause` 仍是一个 `RangeError`，消息也没变。
+
+还原的是错误的类名和字段，不是同一个对象：主线程拿到的错误不是 `OrderError` 的实例。请按 `code` 分支，不要依赖 `instanceof` 自定义类，也不要匹配 `message` 文本。
+
+## Worker 忙不过来时直接拒绝超额调用
+
+图片上传高峰时，主线程在很短时间内向 Worker 发出大量缩放请求。
+
+常见封装把每个请求都直接 `postMessage` 给 Worker，消息在 Worker 的队列里排队，没有上限。Worker 处理不过来时，请求越积越多，每个调用等得越来越久，内存也跟着上涨，调用方却看不出 Worker 已经过载。
+
+这里提供方同时执行的调用数有上限，默认每个对端 64 个、全局 256 个，可以用 `providerLimits` 调整。超出上限的调用立即以 `OVERLOADED` 拒绝，提供方函数不会执行，调用方可以马上降级、限流或稍后重试。
+
+### 示例参数
+
+Worker 用 `providerLimits.maxPerPeer: 2` 规定同时最多执行父端的两个调用；每次缩放需要 100 ms。父端同时发出三次调用，`started` 统计提供方真正开始执行的次数。
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IResizeApi = { resize(id: number): Promise<number>; started(): number }
+if (await isThreadChild()) {
+  let started = 0
+  await createThreadPeer({
+    providerLimits: { maxPerPeer: 2 },
+    provide: {
+      resize: (id: number) => {
+        started++
+        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))
+      },
+      started: () => started
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IResizeApi>({ spawn: true })
+  try {
+    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))
+    console.log(
+      results
+        .map((result) =>
+          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code
+        )
+        .join(' ')
+    )
+    console.log(await worker.request('started'))
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+输出：
+
+```text
+1 2 OVERLOADED
+2
+```
+
+前两个调用正常完成，第三个立即被拒绝，提供方只执行了两次。
+
+上限限制的是同时执行的数量，不是排队长度。已经超时或取消、但仍在 Worker 里运行的函数也占用名额。`OVERLOADED` 保证提供方没有执行，可以放心重试。
 
 ## 未签名的 RPC 转移被拒绝后仍可使用原字节
 

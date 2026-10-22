@@ -8,6 +8,10 @@ Run functions in real Workers while keeping Worker ownership separate from borro
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Run work on a real Worker without confusing it with another process          | isThreadChild → createThreadPeer → request → close               | [Code and output](#run-work-on-a-real-worker-without-confusing-it-with-another-process)          |
 | Call the parent and consume Worker results through one connection            | provide → request / stream → close                               | [Code and output](#call-the-parent-and-consume-worker-results-through-one-connection)            |
+| Fail a stuck call at its deadline or cancel it midway                        | request + timeoutMs / signal                                     | [Code and output](#fail-a-stuck-call-at-its-deadline-or-cancel-it-midway)                        |
+| Fail in-flight calls at once when the Worker crashes                         | request → Worker exits → REMOTE_RESULT_UNKNOWN                   | [Code and output](#fail-in-flight-calls-at-once-when-the-worker-crashes)                         |
+| Get the error class, code and cause back from the Worker                     | provider throws → request catches                                | [Code and output](#get-the-error-class-code-and-cause-back-from-the-worker)                      |
+| Reject calls beyond the Worker's limit instead of queueing them              | providerLimits → request → OVERLOADED                            | [Code and output](#reject-calls-beyond-the-workers-limit-instead-of-queueing-them)               |
 | Keep copied bytes usable when unsigned RPC transfer is refused               | request → transfer admission → request                           | [Code and output](#keep-copied-bytes-usable-when-unsigned-rpc-transfer-is-refused)               |
 | Call a restarted Worker as soon as its Host reports ready                    | createThreadPlugin → host.use → restart → request → dispose      | [Code and output](#call-a-restarted-worker-as-soon-as-its-host-reports-ready)                    |
 | Close a borrowed channel while keeping its native port usable                | createNodeThreadChannel → subscribe → close → native postMessage | [Code and output](#close-a-borrowed-channel-while-keeping-its-native-port-usable)                |
@@ -128,6 +132,239 @@ main:job
 Output is `main:job` and `1,2,3`: one request crosses back to the parent and the stream supplies three values.
 
 These are separate methods on the same connection; streams are lazy until iteration, and notify completion would not acknowledge provider completion.
+
+## Fail a stuck call at its deadline or cancel it midway
+
+The main thread hands report rendering to a Worker. One input is too large and the Worker never finishes, or the user has already pressed "Cancel" and no longer needs the result.
+
+A typical `postMessage` wrapper resolves only when a reply arrives. If the Worker gets stuck, that Promise stays pending forever. For a timeout you wrap it again in `Promise.race` and must remember to delete the entry from your callback table when time runs out. For cancellation you design another "cancel" message and teach the Worker to recognize it.
+
+Here every `request` has a 30-second deadline by default, which `timeoutMs` overrides per call, and passing an `AbortSignal` cancels it. Both reject the call with a native error that carries a `code`.
+
+### Example parameters
+
+`render` takes about 20 ms per page, so 500 pages take about 10 seconds. The first call renders only 2 pages and returns normally. The second sets `timeoutMs: 100`. The third calls `controller.abort()` after 50 ms.
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IReportApi = { render(pages: number): Promise<string> }
+if (await isThreadChild()) {
+  await createThreadPeer({
+    provide: {
+      render: (pages: number) =>
+        new Promise<string>((resolve) => setTimeout(() => resolve(`${pages} pages`), pages * 20))
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IReportApi>({ spawn: true })
+  try {
+    console.log(await worker.request('render', 2))
+    try {
+      await worker.request('render', 500, { timeoutMs: 100 })
+    } catch (error) {
+      const failure = error as Error & { code?: string }
+      console.log(failure.name, failure.code)
+    }
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), 50)
+    try {
+      await worker.request('render', 500, { signal: controller.signal })
+    } catch (error) {
+      const failure = error as Error & { code?: string }
+      console.log(failure.name, failure.code)
+    }
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+Output:
+
+```text
+2 pages
+TimeoutError DEADLINE_EXCEEDED
+AbortError CANCELLED
+```
+
+The normal call returns as usual. The call that runs out of time rejects with `TimeoutError`, the cancelled call with `AbortError`, and both carry a `code` you can branch on.
+
+A deadline or cancellation only ends the caller's wait. It does not interrupt a function that has already started in the Worker; that function runs to completion and keeps its concurrency slot until then. So neither a timeout nor a cancellation proves the Worker did nothing, and a non-idempotent operation must be reconciled before it is retried. To stop the computation right away, close or restart the Worker.
+
+## Fail in-flight calls at once when the Worker crashes
+
+A Worker crashes while converting a file, for example because a native module fails and the thread exits.
+
+A typical wrapper keeps each call's resolve and reject in a table and looks them up by id when the Worker replies. Once the Worker exits, no reply ever comes, and every call in that table stays pending forever. Unless you also listen for the `exit` event and walk the table to reject each call yourself, callers wait indefinitely.
+
+Here, when the connection drops, every unfinished call rejects immediately with `REMOTE_RESULT_UNKNOWN`. The code means "result unknown": the Worker may have done part of the work, so the caller decides whether to reconcile or retry.
+
+### Example parameters
+
+`convert` takes 5 seconds to return. `crash` makes the Worker thread exit with `process.exit(1)`, and the parent triggers it with `notify`, which does not wait for a reply. The `spawn` object sets `supervisor.restart.mode` to `'never'` so the Worker is not restarted; this example only looks at the call in flight. The default `report` writes a "supervision stopped" diagnostic to stderr.
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IJobApi = { convert(file: string): Promise<string>; crash(): void }
+if (await isThreadChild()) {
+  await createThreadPeer({
+    provide: {
+      convert: (file: string) =>
+        new Promise<string>((resolve) => setTimeout(() => resolve(file + '.pdf'), 5_000)),
+      crash: () => process.exit(1)
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IJobApi>({
+    spawn: { entry: true, supervisor: { restart: { mode: 'never' } } }
+  })
+  try {
+    const started = performance.now()
+    const converting = worker.request('convert', 'invoice.docx')
+    void worker.notify('crash')
+    try {
+      await converting
+    } catch (error) {
+      const failure = error as Error & { code?: string }
+      console.log(failure.code)
+      console.log(performance.now() - started < 1_000)
+    }
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+Output:
+
+```text
+REMOTE_RESULT_UNKNOWN
+true
+```
+
+The conversion call rejects with `REMOTE_RESULT_UNKNOWN` less than a second after the Worker exits. It neither waits the full 5 seconds nor hangs forever.
+
+The rejection only says the result is unknown; it does not say the Worker did nothing, so reconcile a non-idempotent operation before retrying it. Whether the Worker restarts after a crash is set by `supervisor.restart`; this example turns restarts off.
+
+## Get the error class, code and cause back from the Worker
+
+Order validation inside a Worker fails and throws a custom `OrderError`. It carries a `code`, and its `cause` holds the original `RangeError` behind the failure.
+
+`postMessage` moves data by structured cloning. After cloning, built-in error types and `message` survive, but a custom error class turns into a plain `Error` and loses its name, and custom fields such as `code` are dropped. The main thread then has nothing to branch on.
+
+Here an error coming back from a Worker keeps its class name, `message`, `code` and `cause` chain. The caller branches on `code` and follows `cause` exactly as it would for a local error.
+
+### Example parameters
+
+`OrderError` sets its own `name` and `code`, and its `cause` is a `RangeError`. The Worker's default `report` also writes this failure to stderr, so it can be traced from the Worker side too.
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+class OrderError extends Error {
+  readonly code = 'ORDER_INVALID'
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'OrderError'
+  }
+}
+
+type IOrderApi = { place(quantity: number): string }
+if (await isThreadChild()) {
+  await createThreadPeer({
+    provide: {
+      place: (quantity: number) => {
+        if (quantity <= 0)
+          throw new OrderError('order rejected', {
+            cause: new RangeError('quantity must be positive')
+          })
+        return 'placed'
+      }
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IOrderApi>({ spawn: true })
+  try {
+    await worker.request('place', 0)
+  } catch (error) {
+    const failure = error as Error & { code?: string }
+    console.log(failure.name, failure.code, failure.message)
+    console.log(failure.cause instanceof RangeError, (failure.cause as Error).message)
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+Output:
+
+```text
+OrderError ORDER_INVALID order rejected
+true quantity must be positive
+```
+
+The class name, `code` and `message` are restored, and `cause` is still a `RangeError` with its original message.
+
+What comes back is the error's name and fields, not the same object: the error the main thread receives is not an `OrderError` instance. Branch on `code`; do not rely on `instanceof` with a custom class or on matching `message` text.
+
+## Reject calls beyond the Worker's limit instead of queueing them
+
+During an upload peak, the main thread sends a burst of image resize requests to a Worker.
+
+A typical wrapper posts every request straight to the Worker, where messages queue without limit. When the Worker cannot keep up, requests pile up, every call waits longer, memory grows, and the caller cannot tell that the Worker is overloaded.
+
+Here the number of calls a provider runs at the same time is capped, by default 64 per peer and 256 overall, and `providerLimits` adjusts both. A call over the cap rejects at once with `OVERLOADED` and the provider function does not run, so the caller can degrade, throttle or retry later right away.
+
+### Example parameters
+
+The Worker sets `providerLimits.maxPerPeer: 2`, so it runs at most two calls from the parent at a time; each resize takes 100 ms. The parent sends three calls at once, and `started` counts how many times the provider actually began work.
+
+```ts doc-test=run
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IResizeApi = { resize(id: number): Promise<number>; started(): number }
+if (await isThreadChild()) {
+  let started = 0
+  await createThreadPeer({
+    providerLimits: { maxPerPeer: 2 },
+    provide: {
+      resize: (id: number) => {
+        started++
+        return new Promise<number>((resolve) => setTimeout(() => resolve(id), 100))
+      },
+      started: () => started
+    }
+  })
+} else {
+  const worker = await createThreadPeer<IResizeApi>({ spawn: true })
+  try {
+    const results = await Promise.allSettled([1, 2, 3].map((id) => worker.request('resize', id)))
+    console.log(
+      results
+        .map((result) =>
+          result.status === 'fulfilled' ? result.value : (result.reason as { code?: string }).code
+        )
+        .join(' ')
+    )
+    console.log(await worker.request('started'))
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+Output:
+
+```text
+1 2 OVERLOADED
+2
+```
+
+The first two calls complete, the third is rejected at once, and the provider ran only twice.
+
+The cap limits how many calls run at the same time, not how long a queue grows. A function that has timed out or been cancelled but is still running in the Worker keeps its slot. `OVERLOADED` guarantees the provider did not run, so the call is safe to retry.
 
 ## Keep copied bytes usable when unsigned RPC transfer is refused
 
