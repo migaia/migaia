@@ -246,7 +246,7 @@ true
 
 转换调用在 Worker 退出后不到 1 秒就以 `REMOTE_RESULT_UNKNOWN` 拒绝，既没有等满 5 秒，也没有永远等下去。
 
-这个拒绝只说明结果未知，不说明 Worker 没有执行；非幂等操作重试前要先对账。崩溃后是否重启由 `supervisor.restart` 决定，本例关闭了重启。
+这个拒绝只说明结果未知，不说明 Worker 没有执行；非幂等操作重试前要先对账。崩溃后是否重启由 `supervisor.restart` 决定，本例关闭了重启；默认的 `on-failure` 会按递增的间隔自动重启 Worker。重启完成前发出的调用会以 `REMOTE_CLOSED` 拒绝，重启完成后的调用由新 Worker 处理。
 
 ## 错误类名、code 和 cause 跨 Worker 原样返回
 

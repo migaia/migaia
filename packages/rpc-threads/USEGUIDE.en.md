@@ -246,7 +246,7 @@ true
 
 The conversion call rejects with `REMOTE_RESULT_UNKNOWN` less than a second after the Worker exits. It neither waits the full 5 seconds nor hangs forever.
 
-The rejection only says the result is unknown; it does not say the Worker did nothing, so reconcile a non-idempotent operation before retrying it. Whether the Worker restarts after a crash is set by `supervisor.restart`; this example turns restarts off.
+The rejection only says the result is unknown; it does not say the Worker did nothing, so reconcile a non-idempotent operation before retrying it. Whether the Worker restarts after a crash is set by `supervisor.restart`; this example turns restarts off, while the default `on-failure` restarts it automatically with a growing delay. Calls made before the restart finishes reject with `REMOTE_CLOSED`; calls made after it are handled by the new Worker.
 
 ## Get the error class, code and cause back from the Worker
 
