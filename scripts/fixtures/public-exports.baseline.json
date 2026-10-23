@@ -1285,11 +1285,9 @@
     "@migaia/store-persist": {
       ".": [
         "PersistCodecOutput",
-        "PersistEnvelopeError",
         "PersistState",
         "STORE_PERSIST_SOURCE",
         "StorePersistErrorCode",
-        "assertEnvelope",
         "createStorePersistAbortError",
         "createStorePersistAggregateError",
         "createStorePersistError",

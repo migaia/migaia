@@ -1,6 +1,13 @@
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IReactiveComputed, IDisposer, IRuntime } from '@migaia/reactive'
-import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-contract'
+import type {
+  ICodec,
+  IKeyValueStore,
+  IRecordStore,
+  IMigrationStep,
+  IMigrationReset,
+  ICodecStageObserver
+} from '@migaia/storage-contract'
 import { PersistState } from '../state-constants.js'
 
 /**
@@ -101,6 +108,8 @@ export type IPersistHandle = {
    * dispose the borrowed store/runtime.
    */
   disposeAsync(): Promise<void>
+  /** Reports cleanup failure then completes; owns a separate cached Promise for the same cleanup. */
+  [Symbol.asyncDispose](): Promise<void>
 }
 
 /**
@@ -124,11 +133,10 @@ export type IPersistUnitOptions<TState> = {
   codec?: ICodec
   /** Archive schema version, default 0; must be a nonnegative safe integer. */
   version?: number
-  /**
-   * Synchronously transforms a different archived version; absence makes a version mismatch fail
-   * hydration.
-   */
-  migrate?: (persisted: TState, fromVersion: number) => TState
+  /** Contiguous synchronous upgrade steps, or one old-archive reset. Future archives are rejected. */
+  migrations?: Readonly<Record<number, IMigrationStep>> | IMigrationReset
+  /** Store-bound codec observations; failures report without controlling conversion or storage. */
+  codecStages?: ICodecStageObserver
   /** Synchronously selects state for each write, default identity; does not change in-memory state. */
   partialize?: (state: TState) => Partial<TState>
   /**

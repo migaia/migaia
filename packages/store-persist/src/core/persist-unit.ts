@@ -3,13 +3,26 @@ import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/sche
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IDisposer } from '@migaia/reactive'
-import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec.js'
+import {
+  readEnvelopeWithStages,
+  removeEnvelope,
+  writeEnvelopeWithStages
+} from '../storage/codec.js'
 import { defaultJsonCodec } from '../storage/codec.js'
-import { assertEnvelope, type IEnvelope } from './envelope.js'
+import {
+  assertVersionedEnvelope,
+  migrateEnvelopeSync,
+  StorageStageKind,
+  type IVersionedEnvelope,
+  type IMigrationStep,
+  type IMigrationReset,
+  type ISyncMigrationSteps
+} from '@migaia/storage-contract'
+import { asyncDisposeKey } from '@migaia/plugin-host'
+import { observeThenableRejection } from '@migaia/utils/function'
 import {
   createStorePersistAbortError,
   createStorePersistAggregateError,
-  createStorePersistError,
   createStorePersistTypeError
 } from '../errors.js'
 import { StorePersistErrorCode } from '../error-code.js'
@@ -23,7 +36,7 @@ import type {
 } from './types.js'
 import { PersistState } from '../state-constants.js'
 import { StorePersistErrorText } from '../error-text.js'
-import { assertPersistString } from './options.js'
+import { assertPersistString, createPersistMigrationPlan } from './options.js'
 
 /** Maximum single delay accepted by Web/Node timers. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -110,6 +123,15 @@ function mergePersistedPlainState<TState>(
  * hydration/write failures are exposed by the handle's promises and error values. Storage, unit and
  * Runtime are borrowed; dispose stops this attachment rather than disposing those resources.
  */
+export function persistUnit<
+  TState,
+  const TSteps extends Readonly<Record<number, IMigrationStep>> | IMigrationReset
+>(
+  unit: IPersistUnit<TState>,
+  options: Omit<IPersistUnitOptions<TState>, 'migrations'> & {
+    readonly migrations?: TSteps & ISyncMigrationSteps<NoInfer<TSteps>>
+  }
+): IPersistHandle
 export function persistUnit<TState>(
   unit: IPersistUnit<TState>,
   options: IPersistUnitOptions<TState>
@@ -120,7 +142,8 @@ export function persistUnit<TState>(
     storage: IPersistUnitOptions<TState>['storage']
     codec: IPersistUnitOptions<TState>['codec']
     version: IPersistUnitOptions<TState>['version']
-    migrate: IPersistUnitOptions<TState>['migrate']
+    migrations: IPersistUnitOptions<TState>['migrations']
+    codecStages: IPersistUnitOptions<TState>['codecStages']
     partialize: IPersistUnitOptions<TState>['partialize']
     merge: IPersistUnitOptions<TState>['merge']
     debounceMs: IPersistUnitOptions<TState>['debounceMs']
@@ -134,7 +157,8 @@ export function persistUnit<TState>(
       storage: options.storage,
       codec: options.codec,
       version: options.version,
-      migrate: options.migrate,
+      migrations: options.migrations,
+      codecStages: options.codecStages,
       partialize: options.partialize,
       merge: options.merge,
       debounceMs: options.debounceMs,
@@ -154,7 +178,8 @@ export function persistUnit<TState>(
     storage,
     codec = defaultJsonCodec,
     version = 0,
-    migrate,
+    migrations,
+    codecStages,
     partialize = (state: TState) => state as Partial<TState>,
     // Plain-object snapshots use a shallow current-first merge so a startup
     // mutation is not lost while storage is loading. Collection/array shapes
@@ -225,7 +250,6 @@ export function persistUnit<TState>(
     )
   }
   for (const [name, callback] of [
-    ['migrate', migrate],
     ['partialize', partialize],
     ['merge', merge]
   ] as const) {
@@ -256,6 +280,25 @@ export function persistUnit<TState>(
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.maxWait(key)
+    )
+  }
+  /** One frozen plan is shared by every hydration attempt and never rebuilt during reads. */
+  const migrationPlan = createPersistMigrationPlan(key, version, migrations)
+  /** Stage-family metadata is captured at the same option boundary as other accessor-backed input. */
+  let codecStageKind: unknown
+  try {
+    codecStageKind = codecStages?.kind
+  } catch (cause) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.codecStagesInvalid,
+      { cause }
+    )
+  }
+  if (codecStages !== undefined && codecStageKind !== StorageStageKind.codec) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.codecStagesInvalid
     )
   }
   /** Own the debounce clock and timer through the same admitted scheduler snapshot. */
@@ -294,6 +337,10 @@ export function persistUnit<TState>(
   /** First-change deadline remains stable while later changes extend the quiet interval. */
   let writeDeadline: number | undefined
   let disposed = false
+  /** The one cleanup outcome survives a prior synchronous dispose call. */
+  let disposalFailure: unknown
+  /** A thrown undefined is still a cleanup failure and must reject asynchronous disposal. */
+  let disposalFailed = false
   let generationEpoch = 0
   const activeOperations = new Set<IAbortController>()
   let hydrationSettled = false
@@ -362,11 +409,11 @@ export function persistUnit<TState>(
         writeRequested = false
         await runWriteOperation(() =>
           runAdapterOperation(async (signal) => {
-            const envelope: IEnvelope<Partial<TState>> = {
+            const envelope: IVersionedEnvelope<Partial<TState>> = {
               version,
               state: assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
             }
-            await writeEnvelope(storage, key, codec, envelope, { signal })
+            await writeEnvelopeWithStages(storage, key, codec, envelope, { signal }, codecStages)
           })
         )
       }
@@ -397,7 +444,9 @@ export function persistUnit<TState>(
   /** Coalesces changes until quiet time or the first change's optional maximum deadline. */
   function scheduleWrite(): void {
     if (disposed) return
-    if (hydrating || hydrationFailed || !hydrationSettled) {
+    // Restoring an archive is not an application mutation and must not write that archive back.
+    if (hydrating) return
+    if (hydrationFailed || !hydrationSettled) {
       dirtyDuringHydrate = true
       return
     }
@@ -428,7 +477,7 @@ export function persistUnit<TState>(
    */
   function startFinalWrite(): void {
     /** Envelope built from the snapshot at dispose time. */
-    let envelope: IEnvelope<Partial<TState>>
+    let envelope: IVersionedEnvelope<Partial<TState>>
     try {
       envelope = {
         version,
@@ -439,7 +488,7 @@ export function persistUnit<TState>(
       return
     }
     writeChain = writeChain
-      .then(() => writeEnvelope(storage, key, codec, envelope, {}))
+      .then(() => writeEnvelopeWithStages(storage, key, codec, envelope, {}, codecStages))
       .catch((caught: unknown) => {
         writeError.value = caught
       })
@@ -454,25 +503,12 @@ export function persistUnit<TState>(
     hydrationError.value = undefined
     try {
       const raw = await runAdapterOperation((signal) =>
-        readEnvelope(storage, key, codec, { signal })
+        readEnvelopeWithStages(storage, key, codec, { signal }, codecStages)
       )
       assertActive()
       if (raw !== undefined) {
-        const envelope = assertEnvelope<Partial<TState>>(raw, key)
-        let state = envelope.state
-        if (envelope.version !== version) {
-          if (!migrate) {
-            throw createStorePersistError(
-              StorePersistErrorCode.envelopeInvalid,
-              StorePersistErrorText.versionMismatch(key, envelope.version, version)
-            )
-          }
-          state = assertSynchronousCallbackResult(
-            key,
-            'migrate',
-            migrate(state as TState, envelope.version)
-          ) as Partial<TState>
-        }
+        const envelope = assertVersionedEnvelope(raw)
+        const state = migrateEnvelopeSync(migrationPlan, envelope) as Partial<TState>
         // Always reconcile the persisted snapshot with the current snapshot. The
         // default object merge preserves fields initialized or mutated while the
         // async read was in flight; custom store shapes can provide their own merge.
@@ -513,19 +549,54 @@ export function persistUnit<TState>(
   /** Stops admission immediately and queues the final snapshot before releasing the subscription. */
   const dispose = (): void => {
     if (disposed) return
-    disposed = true
-    generationEpoch++
-    for (const controller of activeOperations) controller.abort()
-    activeOperations.clear()
-    writeStatus.value = PersistState.disposed
-    lifecycleDisposed.value = true
-    /** An admitted write is aborted below or never starts, because its loop stops on `disposed`. */
-    const writeAdmitted = writeDrain !== undefined
-    if (clearWriteTimer() || writeAdmitted) {
-      // A pending debounce window or an admitted write still owes storage the latest state.
-      startFinalWrite()
+    try {
+      disposed = true
+      generationEpoch++
+      for (const controller of activeOperations) controller.abort()
+      activeOperations.clear()
+      writeStatus.value = PersistState.disposed
+      lifecycleDisposed.value = true
+      /** An admitted write is aborted below or never starts, because its loop stops on `disposed`. */
+      const writeAdmitted = writeDrain !== undefined
+      if (clearWriteTimer() || writeAdmitted) {
+        // A pending debounce window or an admitted write still owes storage the latest state.
+        startFinalWrite()
+      }
+      stopSubscription?.()
+    } catch (cause) {
+      disposalFailed = true
+      disposalFailure = cause
+      throw cause
     }
-    stopSubscription?.()
+  }
+
+  /** Explicit and symbol callers share cleanup but retain separate stable Promise identities. */
+  let disposalPromise: Promise<void> | undefined
+  /** Symbol disposal reports primary failure without rejecting a language-managed cleanup. */
+  let symbolDisposalPromise: Promise<void> | undefined
+  /** Synchronous admission stops first; the Promise still waits for all admitted writes. */
+  const disposeAsync = (): Promise<void> => {
+    if (disposalPromise !== undefined) return disposalPromise
+    // Cache before unsubscribe can reenter disposal, while stopping admission synchronously.
+    disposalPromise = Promise.resolve()
+      .then(() => writeChain)
+      .then(() => {
+        if (disposalFailed) throw disposalFailure
+      })
+    try {
+      dispose()
+    } catch (cause) {
+      disposalFailed = true
+      disposalFailure = cause
+    }
+    return disposalPromise
+  }
+  /** Runtime reporting uses the observer's owning reporter when one was supplied. */
+  const reportDisposalFailure = (cause: unknown): void => {
+    observeThenableRejection(undefined, { error: cause }, (error) => {
+      if (codecStages === undefined) throw error
+      codecStages.report(error)
+    })
   }
 
   return {
@@ -587,13 +658,10 @@ export function persistUnit<TState>(
       return disposed
     },
     dispose,
-    /** Drains admitted storage work even when synchronous subscription cleanup throws. */
-    async disposeAsync() {
-      try {
-        dispose()
-      } finally {
-        await writeChain
-      }
+    disposeAsync,
+    [asyncDisposeKey]() {
+      symbolDisposalPromise ??= disposeAsync().catch(reportDisposalFailure)
+      return symbolDisposalPromise
     }
   }
 }

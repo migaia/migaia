@@ -8,7 +8,7 @@
 | -------------------------- | ------------------------------------------------------- | ----------------------------------------- |
 | 恢复存档时保留启动期修改   | persist → local edit → ready → flush                    | [代码与输出](#恢复存档时保留启动期修改)   |
 | 修复坏存档后再恢复写入     | ready rejection → repair storage → retryHydrate → flush | [代码与输出](#修复坏存档后再恢复写入)     |
-| 迁移旧设置并只保存指定字段 | version / migrate → partialize → flush                  | [代码与输出](#迁移旧设置并只保存指定字段) |
+| 迁移旧设置并只保存指定字段 | version / migrations → partialize → flush               | [代码与输出](#迁移旧设置并只保存指定字段) |
 | 完整恢复 Map 条目          | persistCollection → flush → new Map → ready             | [代码与输出](#完整恢复-map-条目)          |
 | 独立停止某个键的持久化     | persistKeyed × 2 → ready → dispose one → flush          | [代码与输出](#独立停止某个键的持久化)     |
 | 清理存档而不重置内存值     | clearFamily → inspect memory → change → flush           | [代码与输出](#清理存档而不重置内存值)     |
@@ -35,11 +35,12 @@ memoryStorageHost() 提供本例真实内存后端，初始存档 key 为 settin
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defaultJsonCodec } from '@migaia/store-persist'
 import { persist } from '@migaia/store-persist/light'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 await storage.set(
   'settings',
   (await defaultJsonCodec.encode({
@@ -59,7 +60,6 @@ const saved = (await defaultJsonCodec.decode(await storage.get('settings'))) as 
 console.log('保存：', saved.state.theme, saved.state.count)
 handle.dispose()
 await settings.$dispose()
-storage.dispose()
 ```
 
 输出：
@@ -87,11 +87,12 @@ storage.set 先写入坏 JSON，本例保留首次 ready 和错误对象。ready
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defaultJsonCodec } from '@migaia/store-persist'
 import { persist } from '@migaia/store-persist/light'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 await storage.set('settings', '{')
 const settings = createStore({ count: 0 })
 const handle = persist(settings, { key: 'settings', storage })
@@ -114,7 +115,6 @@ console.log('恢复完成：', handle.status.value, settings.count, handle.ready
 console.log('首次尝试：', (await handle.ready.catch((error: unknown) => error)) === failure)
 handle.dispose()
 await settings.$dispose()
-storage.dispose()
 ```
 
 输出：
@@ -136,19 +136,20 @@ storage.dispose()
 
 把旧数据当成新结构读取会漏掉改名字段；每次保存整个对象又会把临时数据写进存档。
 
-显式设置 `version: 2`，用同步 `migrate` 转换旧状态，再用 `partialize` 选择保存字段；本例读取版本 `1`，写入时只保留主题。
+显式设置 `version: 2`，用同步 `migrations` 转换旧状态，再用 `partialize` 选择保存字段；本例读取版本 `1`，写入时只保留主题。
 
 ### 示例参数
 
-目标 version 从默认 0 覆盖为 2，旧 envelope.version 为 1。migrate 接收旧 state 和 fromVersion，必须同步返回新 state；partialize 只返回 theme，覆盖默认完整保存。temporary 未持久化但保留在当前 Store；默认 merge 仍基于启动快照，light 恢复走 $hydrate。字符串转换是本例 schema 规则，不是通用迁移策略。
+目标 version 从默认 0 覆盖为 2，旧 envelope.version 为 1。migrations[2] 接收 unknown 旧 state 与 { fromVersion, toVersion }，必须同步返回新 state；partialize 只返回 theme，覆盖默认完整保存。temporary 未持久化但保留在当前 Store；默认 merge 仍基于启动快照，light 恢复走 $hydrate。字符串转换是本例 schema 规则，不是通用迁移策略。
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defaultJsonCodec } from '@migaia/store-persist'
 import { persist } from '@migaia/store-persist/light'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 await storage.set(
   'settings',
   (await defaultJsonCodec.encode({
@@ -162,9 +163,12 @@ const handle = persist(settings, {
   key: 'settings',
   storage,
   version: 2,
-  migrate: (state, fromVersion) => {
-    migratedFrom = fromVersion
-    return { theme: String(state.legacyTheme) }
+  migrations: {
+    2: (previous, { fromVersion }) => {
+      const state = previous as Record<string, unknown>
+      migratedFrom = fromVersion
+      return { theme: String(state.legacyTheme) }
+    }
   },
   partialize: (state) => ({ theme: state.theme })
 })
@@ -179,7 +183,6 @@ const saved = (await defaultJsonCodec.decode(await storage.get('settings'))) as 
 console.log('存档：', saved.version, saved.state.theme, Object.hasOwn(saved.state, 'temporary'))
 handle.dispose()
 await settings.$dispose()
-storage.dispose()
 ```
 
 输出：
@@ -191,7 +194,7 @@ storage.dispose()
 
 依次输出 `迁移： 1 dark session-only`、`存档： 2 contrast false`：旧主题完成转换，临时字段没有进入存档。
 
-`version` 默认 `0`，不匹配且未提供 `migrate` 会恢复失败；`partialize` 默认原样保存，两个回调都必须同步返回。`migrate` 转换待恢复状态，本例等待 `flush` 确认新版存档写入。
+`version` 默认 `0`，缺少步骤或未来存档会恢复失败；步骤与 partialize 同步返回。升级本身不写回，flush 保存新版存档。
 
 ## 完整恢复 Map 条目
 
@@ -207,11 +210,12 @@ ObservableMap 初始为空，恢复目标初始只有 stale: 99，两者均省�
 
 ```ts doc-test=run
 import { ObservableMap } from '@migaia/store-indexed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defaultJsonCodec } from '@migaia/store-persist'
 import { persistCollection } from '@migaia/store-persist/indexed'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 const cart = new ObservableMap<string, number>()
 const first = persistCollection(cart, { key: 'cart', storage })
 await first.ready
@@ -227,7 +231,6 @@ const saved = (await defaultJsonCodec.decode(await storage.get('cart'))) as { st
 console.log('映射：', saved.state instanceof Map)
 second.dispose()
 restored.dispose()
-storage.dispose()
 ```
 
 输出：
@@ -256,11 +259,12 @@ createAtomStore 使用本例显式创建的 Runtime；familyDef 初始化各 key
 ```ts doc-test=run
 import { createRuntime } from '@migaia/reactive'
 import { createAtomStore, familyDef } from '@migaia/store-keyed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defaultJsonCodec } from '@migaia/store-persist'
 import { persistKeyed } from '@migaia/store-persist/keyed'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 await storage.set(
   'users:u1',
   (await defaultJsonCodec.encode({
@@ -291,7 +295,6 @@ console.log('两个存档：', one.state.name, two.state.name)
 console.log('内存：', atoms.peek(profile('u1')).name)
 second.dispose()
 atoms.dispose()
-storage.dispose()
 ```
 
 输出：
@@ -321,10 +324,11 @@ clearFamily 的 storage 与 namespace 两参数必填，users 只匹配 users: �
 ```ts doc-test=run
 import { createRuntime } from '@migaia/reactive'
 import { createAtomStore, familyDef } from '@migaia/store-keyed'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 await storage.set('other:u1', 'keep')
 const atoms = createAtomStore(createRuntime())
 const counter = familyDef(() => 0)
@@ -345,7 +349,6 @@ await handle.flush()
 console.log('重新保存：', (await storage.get('users:u1')) !== null)
 handle.dispose()
 atoms.dispose()
-storage.dispose()
 ```
 
 输出：
@@ -386,7 +389,7 @@ persistUnit(unit, options) 是三个适配器共用的引擎。unit 必须提供
 | storage    | 必填，满足最小 KeyValueStore 投影；见后文选路。                                                                                |
 | codec      | defaultJsonCodec；编码完整的 version / state 信封，而不只编码 state。                                                          |
 | version    | 0；必须是非负安全整数。                                                                                                        |
-| migrate    | 未设置；存档版本不同时执行 migrate(persisted, fromVersion)，缺失则水合失败。keyed facade 不公开此选项。                        |
+| migrations | 连续目标版本步骤或 `{ reset: () => state }`，只允许同步。未来或不可升级版本报 VERSION_UNSUPPORTED；keyed 不公开此选项。        |
 | partialize | 恒等函数；写入前从当前快照裁出需要保存的字段。                                                                                 |
 | merge      | 核心 / indexed / keyed 可自定义 merge(persisted, current)；缺省浅三向合并普通对象，其他形状整体替换。light 不公开 merge 选项。 |
 | debounceMs | 0，不防抖；有限数，范围 0 到 2147483647，允许小数。                                                                            |
@@ -395,7 +398,7 @@ persistUnit(unit, options) 是三个适配器共用的引擎。unit 必须提供
 
 facade 先捕获 options 自身属性；getter 使用原 options 作为 receiver 读取一次。核心也在创建时捕获配置字段，恢复使用已捕获并验证的 merge，不重新读取调用方的 getter。非对象、反射或 getter 失败以 INVALID_OPTION TypeError 报告，捕获的原因为 cause。key、namespace、id 在拼接前检查字符串，不把对象或数字悄悄转成键，也不额外要求非空字符串。容量时间、version 与回调形状在创建持久化状态前按实际配置校验。
 
-migrate、partialize、merge 都是同步回调，不能返回 Promise / thenable；异步结果或读取 then 失败以 INVALID_OPTION 拒绝，避免 Promise 被当作业务状态写入。普通同步业务回调或后端异常保留原来的公共错误路径；不要把所有失败都改判为某一个本包码。
+迁移步骤必须同步；类型拒绝已知 Promise/thenable，运行时 MIGRATION_FAILED 保留原始 cause。partialize 与 merge 保留同步 INVALID_OPTION 规则。
 
 ### 三个状态适配器
 
@@ -415,7 +418,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 
 ### 加载、版本迁移与本地修改
 
-构造时先捕获启动快照并建立变化订阅，再异步读取存档。存档不存在时水合成功，保留内存初值。存档存在时先解码、验证 envelope，再在 version 不同且提供 migrate 时迁移，最后合并并同步 restore。版本相同不调用 migrate；版本不同而未提供 migrate 以 ENVELOPE_INVALID 拒绝，不把旧值冒充新 schema。
+创建时构造唯一冻结计划，再订阅。水合复用 storage-contract 的 assertVersionedEnvelope 与 migrateEnvelopeSync。同版本保留状态；可升级旧档执行连续步骤或一次 reset，未来版本报 VERSION_UNSUPPORTED。水合错误原样传出并阻止写入；升级与恢复本身不写回，应用变化与 flush 沿原调度保存。
 
 缺省 merge 对普通对象（Object.prototype 或 null 原型）按字段浅比较：以构造时启动快照为基线，用 Object.is 比较当前字段；本地已改字段保留当前值，未改字段接受存档值，同时保留未归档的当前字段。它不是深度冲突解决，嵌套引用内部变化不自动得到逐层比较；重试也沿用这一启动基线。非普通对象、数组、Map、Set 等整体接受持久化形状，自定义 merge 则负责应用自己的规则。
 
@@ -461,11 +464,11 @@ dispose 同步、幂等：标记终态、请求 abort 所有在途适配器操�
 
 ### 存档、默认 codec 与兼容读取
 
-信封格式为 version（非负安全整数）与 state（非 null / undefined）。assertEnvelope(value, key) 拒绝非对象、数组、非法 version 或缺失 state，返回捕获的 version / state；两属性各读一次，属性访问或反射失败由 PersistEnvelopeError 包装并在 cause 保留。PersistEnvelopeError 继承 TypeError、携带 ENVELOPE_INVALID，key 用于标明存档身份。
+统一 envelope 为普通对象，自有 version 是非负安全整数，自有 state 非 null/undefined。assertVersionedEnvelope 与 IVersionedEnvelope 从 @migaia/storage-contract 导入；属性各读一次，ENVELOPE_INVALID 保留访问失败 cause。store-persist 不再拥有重复校验器或 envelope 错误类。
 
-defaultJsonCodec 名称为 migaia-collections-json-v1，output 为 text；委托 storage-contract 的 collectionsJsonCodec，支持真实 Map / Set（含跨 realm）往返，避免普通 JSON 将集合静默编码为空对象。它仍继承 JSON 的循环引用、BigInt 等限制，不是任意对象图的无损编码。新格式用版本化元组，其精确保留形状不是可任意占用的普通业务数组。
+defaultJsonCodec 为名称 collections-json@1、output 为 text 的冻结对象，包装 fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))，默认就保留嵌套 Map/Set，使用 $rpc map/entries 与 set/values 保留记录。非有限数、undefined 根值、稀疏数组、循环与 Date 被拒绝；普通类实例投影可枚举字段。编码错误链依次为本包 ENCODE_FAILED、contract INVALID_ARGUMENT 与 serialize ENCODE_FAILED。非字符串或坏 JSON 保留本包 ENVELOPE_INVALID TypeError；合法 JSON 的 envelope 错误归 storage-contract。
 
-读取旧存档时，仅唯一自有键为 `__migaia_persist_map__` 或 `__migaia_persist_set__` 且值为数组的对象是旧保留 marker；多字段同名 lookalike 保持全部数据。发现精确旧 marker 后沿 legacy reviver 读取，不把其中原本的普通应用数组重新解释为新元组；没有精确旧 marker 才委托新格式解码。新写入格式与 codec name 不变，不使用相似字段猜集合。
+历史集合标记与元组形数组均为普通应用数据，不恢复成集合；解码只委托规范 codec 一次。
 
 defaultJsonCodec.encode 失败抛 ENCODE_FAILED TypeError，原因为 cause；decode 非字符串或坏 JSON / marker 抛 ENVELOPE_INVALID TypeError，解析失败的原因为 cause。默认 codec 不做加密或脱敏；自定义 codec 必须处理自己声明的数据形状。
 
@@ -492,14 +495,43 @@ STORE_PERSIST_SOURCE 为 @migaia/store-persist；稳定码由 StorePersistErrorC
 | codecNotResolved / CODEC_NOT_RESOLVED            | 未解析到 codec，显式配置或修正默认解析。                      |
 | codecOutputMismatch / CODEC_OUTPUT_MISMATCH      | codec output、实际 payload 与后端路由不一致。                 |
 | backendCapability / BACKEND_CAPABILITY           | 进入 binary 分支但缺字节方法。                                |
-| envelopeInvalid / ENVELOPE_INVALID               | 坏存档、版本不合法或不匹配且无 migrate。                      |
+| envelopeInvalid / ENVELOPE_INVALID               | Default JSON non-string input or decoding failure only.       |
 | encodeFailed / ENCODE_FAILED                     | 默认 codec 编码失败，查看 cause 与待存值。                    |
 | hydrateAndWriteFailed / HYDRATE_AND_WRITE_FAILED | 水合和写入均失败，展开 AggregateError.errors。                |
 | abortedByDispose / ABORTED_BY_DISPOSE            | 释放中止，保持 DOMException / AbortError 及原始 cause。       |
 | invalidOption / INVALID_OPTION                   | key、namespace、version、时间、回调、scheduler 或配置不合法。 |
 
-配置 version 非负安全整数等非法项同步 TypeError；信封问题由 PersistEnvelopeError 报告。水合失败后 flush / clear 继续抛 hydrationError，成功 retry 才解锁；写入失败查 writeError，并检查 codec 与后端是否匹配。已释放 handle 不能重用，业务内存和存档删除需分别管理。
+非法配置同步抛本包 INVALID_OPTION TypeError，cause 保留 contract 计划错误。水合直接保留 contract ENVELOPE_INVALID、VERSION_UNSUPPORTED 与 MIGRATION_FAILED。失败水合使 flush/clear 阻塞至重试成功；写入错误查 writeError。handle 只拥有订阅和已接纳写入，store/runtime 始终借用。
 
 公开错误工厂 createStorePersistError / createStorePersistTypeError 接收必填 code、message 和可选 options.cause；createStorePersistAbortError 接收 code、message、可选 cause，返回原生 DOMException，保持 name 为 AbortError；createStorePersistAggregateError 接收 code、errors、message，errors 保留原失败。code 类型为 IStorePersistErrorCode，工厂附加身份但不覆盖 stack。底层工具不需要在普通 Store 使用中自行重复实现。
 
 包已有 fmt、lint、typecheck、typecheck:test、test、build 和 test:packed 脚本；实际报告说明哪些被执行，不以手册列出命令当成验证结论。排查未保存字段先看 partialize 与 debounce，再看 hydrationError / writeError；Map / Set 形状不对时检查是否换用了不支持集合的 codec。
+
+## Canonical codec composition and observation
+
+```ts
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStore } from '@migaia/store-light'
+import { persist } from '@migaia/store-persist/light'
+
+const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
+const text = await codec.encode({ roles: new Map([['Ada', new Set(['read'])]]) })
+console.log(await codec.decode(text))
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const state = createStore({ count: 1 })
+await using handle = persist(state, {
+  key: 'counter',
+  storage,
+  codecStages: host.codecStages(storage)
+})
+await handle.ready
+await handle.flush()
+await handle.disposeAsync()
+await state.$dispose()
+```
+
+The default codec already preserves collections. Use `{ ...row }` to project a named class. codecStages observes each real encode/decode once; before/after/error failures only report, before never waits, and no business values enter observation. disposeAsync caches the rejecting main Promise; Symbol.asyncDispose caches a separate reporting Promise over one cleanup. Neither closes a borrowed store/runtime. Without native Symbol.asyncDispose, plugin-host asyncDisposeKey is the fixed fallback; language-level await using is not promised.

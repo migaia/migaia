@@ -2,15 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { binaryCodec } from '@migaia/storage-web/serialize'
 import { createStore } from '@migaia/store-light'
-import type { ICodec } from '@migaia/storage-contract'
+import { StorageContractError, type ICodec } from '@migaia/storage-contract'
 import { persist } from '../src/light-index.js'
-import {
-  defaultJsonCodec,
-  readEnvelope,
-  removeEnvelope,
-  writeEnvelope,
-  PersistEnvelopeError
-} from '../src/index.js'
+import { defaultJsonCodec, readEnvelope, removeEnvelope, writeEnvelope } from '../src/index.js'
 
 /** Real envelope JSON travels through the byte channel without replacing storage semantics. */
 const binaryArchiveCodec: ICodec = {
@@ -148,9 +142,9 @@ describe('public archive boundaries', () => {
       } catch (error) {
         failure = error
       }
-      expect(failure).toBeInstanceOf(PersistEnvelopeError)
+      expect(failure).toBeInstanceOf(StorageContractError)
       expect(failure).toMatchObject({
-        source: '@migaia/store-persist',
+        source: '@migaia/storage-contract',
         code: 'ENVELOPE_INVALID'
       })
       expect(store.count).toBe(1)

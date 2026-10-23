@@ -95,7 +95,6 @@ const configurationOptionDescriptions: readonly {
       'store-light:index:createStoreLightError:cause',
       'store-light:index:createStoreLightTypeError:cause',
       'store-middleware:index:createStoreMiddlewareError:cause',
-      'store-persist:index:PersistEnvelopeError:cause',
       'store-persist:index:createStorePersistError:cause',
       'store-persist:index:createStorePersistTypeError:cause',
       'store-react:index:createStoreReactError:cause',
@@ -1431,14 +1430,14 @@ const configurationOptionDescriptions: readonly {
       'store-persist:keyed:persistKeyed:version',
       'store-persist:light:persist:version'
     ],
-    en: 'Identifies the shape of your saved application state with a nonnegative safe integer; the default is 0. Change it when old saved state needs conversion before your application can use it. Loading compares this number with the saved version. A mismatch calls migrate; without migrate, restoration fails instead of applying incompatible state.',
-    zh: '用非负安全整数标识应用保存的状态结构，默认值为 0。旧状态需要转换后才能使用时，应更新版本。加载时会比较当前版本和保存的版本；不一致则调用 migrate 转换，没有提供 migrate 时恢复会失败，不会直接应用不兼容状态。'
+    en: 'Identifies the shape of your saved application state with a nonnegative safe integer; the default is 0. Change it when old saved state needs conversion before your application can use it. Loading compares this number with the saved version. Reachable older archives run migrations; future or unreachable versions fail with VERSION_UNSUPPORTED and close writes.',
+    zh: '用非负安全整数标识应用保存的状态结构，默认值为 0。旧状态需要转换后才能使用时，应更新版本。加载时会比较当前版本和保存的版本；可升级旧档执行 migrations；未来或不可达版本报 VERSION_UNSUPPORTED 并阻止写入。'
   },
   {
     keys: [
-      'store-persist:index:persistUnit:migrate',
-      'store-persist:indexed:persistCollection:migrate',
-      'store-persist:light:persist:migrate'
+      'store-persist:index:persistUnit:migrations',
+      'store-persist:indexed:persistCollection:migrations',
+      'store-persist:light:persist:migrations'
     ],
     en: 'Converts old saved state when its version differs from the configured version. The callback receives that state and its old version, and must return the converted state synchronously. Omit it if you do not support loading older or different versions; a mismatch then fails restoration. Throwing or returning a Promise also fails restoration, which you can observe through ready and hydrationError.',
     zh: '已保存版本与配置版本不一致时，用此函数转换旧状态。函数收到旧状态和旧版本号，必须同步返回转换后的状态。不需要支持其他版本时可以省略，遇到版本不一致就会恢复失败。函数抛错或返回 Promise 也会使恢复失败，可通过 ready 的拒绝和 hydrationError 查看原因。'
@@ -4315,13 +4314,13 @@ const storePersistUnitOptions: Readonly<Record<IGuideLocale, readonly IApiOption
       example: '2'
     },
     {
-      name: 'options.migrate',
+      name: 'options.migrations',
       description:
-        'Synchronous transformation from persisted state and its previous version to the current state shape.',
+        'Contiguous synchronous target-version steps, or one explicit reset of older archives; future versions are rejected.',
       defaultValue: 'undefined',
-      type: '(persisted: TState, fromVersion: number) => TState',
+      type: 'Readonly<Record<number, IMigrationStep>> | IMigrationReset',
       whenToUse: 'Read older envelopes after increasing version.',
-      example: '(old, from) => migrateSettings(old, from)'
+      example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
     },
     {
       name: 'options.partialize',
@@ -4422,12 +4421,12 @@ const storePersistUnitOptions: Readonly<Record<IGuideLocale, readonly IApiOption
       example: '2'
     },
     {
-      name: 'options.migrate',
+      name: 'options.migrations',
       description: '把 persisted state 与旧 version 同步转换为当前 state shape。',
       defaultValue: 'undefined',
-      type: '(persisted: TState, fromVersion: number) => TState',
+      type: 'Readonly<Record<number, IMigrationStep>> | IMigrationReset',
       whenToUse: 'version 增加后继续读取旧 envelope。',
-      example: '(old, from) => migrateSettings(old, from)'
+      example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
     },
     {
       name: 'options.partialize',
@@ -11131,60 +11130,31 @@ try {
       }
     ]
   }),
-  'storage-contract:index:collectionsJsonCodec': createStorageContractGuide({
+  'storage-contract:index:fromValueCodec': createStorageContractGuide({
     purposeEn:
-      'Versioned text codec that preserves genuine Map and Set instances through JSON while leaving ordinary JSON values unchanged. It emits exact tagged tuples and only revives those exact tuples; malformed roots and payloads retain parser failures under INVALID_ARGUMENT.',
+      'Adapt a value codec into the storage codec contract once. The frozen adapter preserves each callback input/output, names the format id@version and maps string/binary/unknown carriers to text/binary/structured. Failures retain the original serialize error on cause.',
     purposeZh:
-      'versioned text codec：通过 JSON 保留 genuine Map/Set instance，同时不改变普通 JSON value。它只生成并恢复精确 tagged tuple；malformed root 与 payload 会在 INVALID_ARGUMENT 下保留 parser failure。',
-    quickStart: `import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst text = await collectionsJsonCodec.encode({ roles: new Set(['admin']) })\nconst restored = (await collectionsJsonCodec.decode(text)) as { roles: Set<string> }\nconsole.log(restored.roles instanceof Set)`,
+      '将值编解码器一次适配为存储契约。冻结适配器保留真实输入输出，以 id@version 命名，并将 string/uint8array/unknown 载体映射为 text/binary/structured；失败在 cause 保留原 serialize 错误。',
+    quickStart:
+      "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst text = await codec.encode({ roles: new Set(['admin']) })\nconsole.log(await codec.decode(text))",
     scenariosEn: [
-      'Persisting JSON-compatible state containing Map or Set.',
-      'A stable text wire format is required.',
-      'Legacy plain JSON must remain readable.'
+      'Use a serialize codec with storage.',
+      'Preserve Map/Set with the collections codec.',
+      'Compose tagged readers without losing their legacy input type.'
     ],
     scenariosZh: [
-      '持久化包含 Map 或 Set 的 JSON-compatible state。',
-      '需要稳定 text wire format。',
-      'legacy plain JSON 必须保持 readable。'
+      '将 serialize codec 接入存储。',
+      '通过集合 codec 保留 Map/Set。',
+      '组合 tagged 读取器并保留旧格式输入类型。'
     ],
     avoidEn: [
-      'Values contain cycles, functions, or host objects.',
-      'Binary size or throughput is the primary requirement.',
-      'Domain schema validation or encryption is required.'
+      'Cross-store transactions.',
+      'Domain schema validation.',
+      'Creating a second migration or codec registry.'
     ],
-    avoidZh: [
-      'value 包含 cycle、function 或 host object。',
-      'binary size 或 throughput 是首要需求。',
-      '需要 domain schema validation 或 encryption。'
-    ]
+    avoidZh: ['跨 store 事务。', '业务 schema 校验。', '另建迁移或 codec 注册表。']
   }),
-  'storage-contract:index:COLLECTIONS_JSON_CODEC_NAME': createStorageContractGuide({
-    purposeEn:
-      'Stable wire identifier migaia-collections-json-v1 used by collectionsJsonCodec and its exact Map/Set tuples. Consumers may compare it for diagnostics or registry selection but must not synthesize tagged payloads manually.',
-    purposeZh:
-      'collectionsJsonCodec 及其精确 Map/Set tuple 使用的稳定 wire identifier：migaia-collections-json-v1。consumer 可用于 diagnostic 或 registry selection，但不应手工合成 tagged payload。',
-    quickStart: `import { COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst codecRegistry = new Map<string, unknown>()\ncodecRegistry.set(COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec)\nconsole.log(codecRegistry.get(COLLECTIONS_JSON_CODEC_NAME))`,
-    scenariosEn: [
-      'Registering the canonical codec.',
-      'Displaying persisted-format diagnostics.',
-      'Asserting wire compatibility in tests.'
-    ],
-    scenariosZh: [
-      '注册 canonical codec。',
-      '展示 persisted-format diagnostic。',
-      '在测试中断言 wire compatibility。'
-    ],
-    avoidEn: [
-      'Creating a second codec with the same name.',
-      'Using the identifier as a storage key.',
-      'Hand-authoring collection wire tuples.'
-    ],
-    avoidZh: [
-      '创建同名的第二个 codec。',
-      '把 identifier 当作 storage key。',
-      '手工编写 collection wire tuple。'
-    ]
-  }),
+
   'storage-contract:index:ConflictPolicy': createStorageContractGuide({
     purposeEn:
       'Canonical runtime values for write conflict behavior. conflict rejects an incompatible existing revision; replace explicitly permits overwrite. Use the constant instead of copying protocol strings.',
@@ -12806,7 +12776,8 @@ export async function readByEmail(
     en: {
       purpose:
         'Attaches one persistence state machine to any synchronous unit adapter. It owns hydration, version migration, startup-write reconciliation, debounced serialized writes, retry/flush/clear, and abort-on-dispose in one shared implementation.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nconst storage = memoryStorageHost()\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrations: { 2: (saved, ctx) => migrateSettings(saved as ISettings, ctx.fromVersion) }, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}",
       scenarios: [
         'A custom state owner can synchronously snapshot, restore, and subscribe.',
         'Hydration and writes need one observable lifecycle handle.',
@@ -12822,7 +12793,8 @@ export async function readByEmail(
     zh: {
       purpose:
         '给任意同步 unit adapter 接入一套 persistence state machine。统一拥有 hydration、version migration、startup-write reconciliation、debounced serialized write、retry/flush/clear 与 dispose abort。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nconst storage = memoryStorageHost()\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrations: { 2: (saved, ctx) => migrateSettings(saved as ISettings, ctx.fromVersion) }, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}",
       scenarios: [
         'custom state owner 能同步 snapshot、restore 与 subscribe。',
         'hydration/write 需要一个可观察 lifecycle handle。',
@@ -12839,7 +12811,7 @@ export async function readByEmail(
   'store-persist:index:defaultJsonCodec': {
     en: {
       purpose:
-        'Provides the default text codec for persistence envelopes. It round-trips Map and Set through the canonical collections JSON codec and reads only the two exact legacy collection tags.',
+        'Provides the default text codec for persistence envelopes. It composes fromValueCodec and defineCollectionsJsonCodec, preserves Map/Set by default, rejects invalid portable values, and treats historical markers/tuples as ordinary data.',
       quickStart: `import { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nconst encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)\nconsole.log(envelope)`,
       scenarios: [
         'Persisted state is JSON-compatible plus Map or Set.',
@@ -12855,12 +12827,12 @@ export async function readByEmail(
     },
     zh: {
       purpose:
-        '提供 persistence envelope 的默认 text codec。通过 canonical collections JSON codec 往返 Map/Set，并且只读取两个精确 legacy collection tag。',
+        '提供 envelope 默认 text codec，组合 fromValueCodec 与 defineCollectionsJsonCodec，默认保留 Map/Set，拒绝非法 portable 值，将历史标记与元组视为普通数据。',
       quickStart: `import { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nconst encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)\nconsole.log(envelope)`,
       scenarios: [
         'persisted state 是 JSON-compatible，并包含 Map 或 Set。',
         '目标 backend channel 是 text storage。',
-        '必须继续读取 legacy tagged Map/Set archive。'
+        '需要默认保留嵌套 Map/Set，并拒绝非法 portable 值。'
       ],
       avoidWhen: [
         'binary output 明显更小或更快。',
@@ -12874,7 +12846,8 @@ export async function readByEmail(
     en: {
       purpose:
         'Encodes one envelope and routes it to text or byte storage according to codec.output and backend capabilities. Structured output is rejected because the minimal persistence storage contract has no record channel.',
-      quickStart: `import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))`,
+      quickStart:
+        "import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))",
       scenarios: [
         'A custom persistence adapter needs the canonical output-channel routing.',
         'Binary codecs should use setBytes only on a capable backend.',
@@ -12936,7 +12909,8 @@ export async function readByEmail(
     zh: {
       purpose:
         '编码一份 envelope，并按 codec.output 与 backend capabilities 路由到 text 或 byte storage。minimal persistence storage contract 没有 record channel，因此拒绝 structured output。',
-      quickStart: `import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))`,
+      quickStart:
+        "import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))",
       scenarios: [
         'custom persistence adapter 需要 canonical output-channel routing。',
         'binary codec 只应在 capable backend 上使用 setBytes。',
@@ -12999,15 +12973,8 @@ export async function readByEmail(
     en: {
       purpose:
         'Reads and decodes one persisted value from the codec-selected text or binary channel. Missing storage values become undefined; binary codecs never silently fall back to text.',
-      quickStart: `import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-const codec = defaultJsonCodec
-const controller = new AbortController()
-const signal = controller.signal
-const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })
-if (rawEnvelope === undefined) console.log('first run: no saved envelope') // missing 是正常状态，不自动当作错误`,
+      quickStart:
+        "import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst codec = defaultJsonCodec\nconst controller = new AbortController()\nconst signal = controller.signal\nconst rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })\nif (rawEnvelope === undefined) console.log('first run: no saved envelope') // missing 是正常状态，不自动当作错误",
       scenarios: [
         'A custom adapter needs the canonical read-channel decision.',
         'Missing archives are normal first-run state.',
@@ -13059,15 +13026,8 @@ if (rawEnvelope === undefined) console.log('first run: no saved envelope') // mi
     zh: {
       purpose:
         '从 codec 选择的 text 或 binary channel 读取并解码一个 persisted value。missing storage value 返回 undefined；binary codec 绝不静默 fallback 到 text。',
-      quickStart: `import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-const codec = defaultJsonCodec
-const controller = new AbortController()
-const signal = controller.signal
-const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })
-if (rawEnvelope === undefined) console.log('首次运行：没有已保存的 envelope') // missing 是正常状态，不自动当作错误`,
+      quickStart:
+        "import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst codec = defaultJsonCodec\nconst controller = new AbortController()\nconst signal = controller.signal\nconst rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })\nif (rawEnvelope === undefined) console.log('首次运行：没有已保存的 envelope') // missing 是正常状态，不自动当作错误",
       scenarios: [
         'custom adapter 需要 canonical read-channel decision。',
         'missing archive 是正常 first-run state。',
@@ -13121,11 +13081,8 @@ if (rawEnvelope === undefined) console.log('首次运行：没有已保存的 en
     en: {
       purpose:
         'Removes one persisted envelope through the storage boundary while forwarding cancellation. It does not mutate the live state or dispose the persistence handle.',
-      quickStart: `import { removeEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state`,
+      quickStart:
+        "import { removeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state",
       scenarios: [
         'A custom adapter implements clear.',
         'A migration intentionally invalidates one archive key.',
@@ -13168,11 +13125,8 @@ await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，�
     zh: {
       purpose:
         '通过 storage boundary 移除一份 persisted envelope，并转发 cancellation；不会 mutation live state，也不会 dispose persistence handle。',
-      quickStart: `import { removeEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state`,
+      quickStart:
+        "import { removeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state",
       scenarios: [
         'custom adapter 实现 clear。',
         'migration 有意使一个 archive key 失效。',
@@ -13213,132 +13167,7 @@ await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，�
       ]
     }
   },
-  'store-persist:index:assertEnvelope': {
-    en: {
-      purpose:
-        'Validates decoded data as a versioned persistence envelope before hydration. It rejects arrays, unsafe or negative versions, and missing state with PersistEnvelopeError.',
-      quickStart: `import { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nconst envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)`,
-      scenarios: [
-        'A custom codec has decoded untrusted storage data.',
-        'Migration needs a trustworthy previous version.',
-        'Corrupt archives must fail before mutating live state.'
-      ],
-      avoidWhen: [
-        'The value has not been decoded yet.',
-        'Validating an arbitrary domain object.',
-        'Silently repairing malformed persisted data.'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Unknown decoded value to validate without trusting its shape.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'unknown',
-          whenToUse: 'Pass the direct result of codec.decode.',
-          example: 'decoded'
-        },
-        {
-          name: 'key',
-          description: 'Stable storage key included in diagnostics.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'string',
-          whenToUse: 'Identify the archive that failed validation.',
-          example: "'settings'"
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        'hydration 前把 decoded data 验证为 versioned persistence envelope。array、不安全或负 version、缺少 state 都会以 PersistEnvelopeError 失败。',
-      quickStart: `import { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nconst envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)`,
-      scenarios: [
-        'custom codec 刚解码不可信 storage data。',
-        'migration 需要可信 previous version。',
-        'corrupt archive 必须在 mutation live state 前失败。'
-      ],
-      avoidWhen: [
-        'value 尚未 decode。',
-        '验证任意 domain object。',
-        '静默修补 malformed persisted data。'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: '不预先信任 shape 的 decoded value。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'unknown',
-          whenToUse: '直接传入 codec.decode 的结果。',
-          example: 'decoded'
-        },
-        {
-          name: 'key',
-          description: '写入 diagnostic 的稳定 storage key。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'string',
-          whenToUse: '标识 validation 失败的 archive。',
-          example: "'settings'"
-        }
-      ]
-    }
-  },
-  'store-persist:index:PersistEnvelopeError': {
-    en: {
-      purpose:
-        'Native TypeError raised when persisted input is not a usable { version, state } envelope. It always carries STORE_PERSIST_SOURCE and ENVELOPE_INVALID.',
-      quickStart: `import { assertEnvelope, PersistEnvelopeError } from '@migaia/store-persist'\n\nconst value: unknown = { version: 2, state: { theme: 'dark' } }\nconst quarantine = (key: string) => console.warn('quarantine:', key)\ntry {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}`,
-      scenarios: [
-        'A boundary distinguishes corrupt archives from backend failures.',
-        'Diagnostics group invalid envelope reports.',
-        'Recovery quarantines only malformed records.'
-      ],
-      avoidWhen: [
-        'Throwing codec output mismatch.',
-        'Representing a version mismatch that migrate can handle.',
-        'Constructing it instead of calling assertEnvelope.'
-      ],
-      options: [
-        {
-          name: 'message',
-          description: 'Human-readable envelope validation failure.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'string',
-          whenToUse: 'Normally supplied internally by assertEnvelope.',
-          example: "'archive has no usable version'"
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        'persisted input 不是可用 { version, state } envelope 时抛出的 native TypeError；始终携带 STORE_PERSIST_SOURCE 与 ENVELOPE_INVALID。',
-      quickStart: `import { assertEnvelope, PersistEnvelopeError } from '@migaia/store-persist'\n\nconst value: unknown = { version: 2, state: { theme: 'dark' } }\nconst quarantine = (key: string) => console.warn('quarantine:', key)\ntry {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}`,
-      scenarios: [
-        'boundary 区分 corrupt archive 与 backend failure。',
-        'diagnostic 聚合 invalid envelope report。',
-        'recovery 只 quarantine malformed record。'
-      ],
-      avoidWhen: [
-        '抛 codec output mismatch。',
-        '表示 migrate 可以处理的 version mismatch。',
-        '绕过 assertEnvelope 直接构造。'
-      ],
-      options: [
-        {
-          name: 'message',
-          description: '面向人类的 envelope validation failure。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'string',
-          whenToUse: '通常由 assertEnvelope 内部提供。',
-          example: "'archive has no usable version'"
-        }
-      ]
-    }
-  },
+
   'store-persist:index:PersistState': {
     en: {
       purpose:
@@ -13530,12 +13359,12 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           example: '2'
         },
         {
-          name: 'options.migrate',
+          name: 'options.migrations',
           description: 'Synchronous conversion from an older stored version.',
           defaultValue: 'undefined',
           type: '(persisted, fromVersion) => state',
           whenToUse: 'Keep existing archives readable after a schema change.',
-          example: '(old, from) => migrateSettings(old, from)'
+          example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
         },
         {
           name: 'options.partialize',
@@ -13633,12 +13462,12 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           example: '2'
         },
         {
-          name: 'options.migrate',
+          name: 'options.migrations',
           description: '从旧 stored version 同步转换到当前 shape。',
           defaultValue: 'undefined',
           type: '(persisted, fromVersion) => state',
           whenToUse: 'schema 变化后继续读取现有 archive。',
-          example: '(old, from) => migrateSettings(old, from)'
+          example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
         },
         {
           name: 'options.partialize',
@@ -13680,7 +13509,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Persists one observable object, array, map, or set through its tracked snapshot and atomic replace operations. A Runtime effect observes structural changes and skips its synchronous first run.',
-      quickStart: `import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = new ObservableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst cart = new ObservableMap<string, number>()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}",
       scenarios: [
         'A reactive map or set must survive reloads.',
         'Hydration must atomically replace collection contents.',
@@ -13709,7 +13539,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     zh: {
       purpose:
         '通过 tracked snapshot 与 atomic replace 持久化 observable object、array、map 或 set。Runtime effect 观察 structural change，并跳过同步首次执行。',
-      quickStart: `import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = new ObservableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst cart = new ObservableMap<string, number>()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}",
       scenarios: [
         'reactive map 或 set 需要跨 reload 保留。',
         'hydration 必须原子替换 collection content。',
@@ -13740,7 +13571,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Persists exactly one writable atom under namespace:id. Each call owns an independent persistence lifecycle; the returned value is the atom value captured when the handle is created.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nconst storage = memoryStorageHost()\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}",
       scenarios: [
         'One family member needs independent persistence.',
         'Per-user state requires stable namespace isolation.',
@@ -13861,7 +13693,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     zh: {
       purpose:
         '把恰好一个 writable atom 持久化到 namespace:id。每次调用拥有独立 persistence lifecycle；返回 value 是创建 handle 时取得的 atom value。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nconst storage = memoryStorageHost()\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}",
       scenarios: [
         '一个 family member 需要独立 persistence。',
         'per-user state 需要稳定 namespace isolation。',
@@ -13982,14 +13815,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Removes every persisted record whose key begins with namespace:. It only changes storage; live atoms and active persistence handles remain untouched and may write again after their next change.',
-      quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { clearFamily } from '@migaia/store-persist/keyed'
-
-const storage = memoryStorageHost()
-await storage.set('sessions:alice', JSON.stringify({ token: 'a' }))
-await storage.set('sessions:bob', JSON.stringify({ token: 'b' }))
-const removed = await clearFamily(storage, 'sessions')
-console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom`,
+      quickStart:
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { clearFamily } from '@migaia/store-persist/keyed'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('sessions:alice', JSON.stringify({ token: 'a' }))\nawait storage.set('sessions:bob', JSON.stringify({ token: 'b' }))\nconst removed = await clearFamily(storage, 'sessions')\nconsole.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom",
       scenarios: [
         'Logout removes every stored session member.',
         'A tenant namespace is invalidated.',
@@ -14024,14 +13851,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '移除 key 以 namespace: 开头的全部 persisted record。它只改变 storage；live atom 与 active persistence handle 不受影响，并可能在下次 change 后重新写入。',
-      quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { clearFamily } from '@migaia/store-persist/keyed'
-
-const storage = memoryStorageHost()
-await storage.set('sessions:alice', JSON.stringify({ token: 'a' }))
-await storage.set('sessions:bob', JSON.stringify({ token: 'b' }))
-const removed = await clearFamily(storage, 'sessions')
-console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom`,
+      quickStart:
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { clearFamily } from '@migaia/store-persist/keyed'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('sessions:alice', JSON.stringify({ token: 'a' }))\nawait storage.set('sessions:bob', JSON.stringify({ token: 'b' }))\nconst removed = await clearFamily(storage, 'sessions')\nconsole.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom",
       scenarios: [
         'logout 移除全部 stored session member。',
         'tenant namespace 被整体 invalidated。',

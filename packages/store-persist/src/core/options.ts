@@ -2,6 +2,53 @@ import { StorePersistErrorCode } from '../error-code.js'
 import { createStorePersistTypeError } from '../errors.js'
 import { StorePersistErrorText } from '../error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
+import {
+  createMigrationPlan,
+  type IMigrationPlan,
+  type IMigrationStep,
+  type IMigrationReset
+} from '@migaia/storage-contract'
+
+/**
+ * Captures one canonical plan before status allocation or subscription; contract failures remain on
+ * cause.
+ */
+export function createPersistMigrationPlan(
+  key: string,
+  version: number,
+  migrations: Readonly<Record<number, IMigrationStep>> | IMigrationReset | undefined
+): IMigrationPlan {
+  try {
+    if (
+      migrations !== undefined &&
+      migrations !== null &&
+      typeof migrations === 'object' &&
+      Object.hasOwn(migrations, 'reset')
+    ) {
+      /** Only enumerable extras participate in the public reset descriptor grammar. */
+      const extra = Reflect.ownKeys(migrations).some(
+        (property) =>
+          property !== 'reset' && Object.getOwnPropertyDescriptor(migrations, property)?.enumerable
+      )
+      /** The canonical owner rejects mixed reset/steps instead of duplicating its validation. */
+      return createMigrationPlan({
+        version,
+        reset: (migrations as IMigrationReset).reset,
+        ...(extra ? { steps: migrations as Readonly<Record<number, IMigrationStep>> } : {})
+      })
+    }
+    return createMigrationPlan({
+      version,
+      steps: migrations as Readonly<Record<number, IMigrationStep>> | undefined
+    })
+  } catch (cause) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.migrationsInvalid(key),
+      { cause }
+    )
+  }
+}
 
 /** Rejects JavaScript-boundary null/non-object persistence options before property access. */
 export function assertPersistOptions(options: unknown): asserts options is object {

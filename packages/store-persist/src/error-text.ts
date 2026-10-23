@@ -16,9 +16,10 @@ export const StorePersistErrorText = {
     `[store] codec "${name}" must encode to a string when the backend has no binary channel`,
   binaryRead: (name: string): string =>
     `[store] binary codec "${name}" requires a storage backend with binary read support`,
-  archiveEnvelope: (key: string): string => `[store] persist archive "${key}" is not an envelope`,
-  archiveVersion: (key: string): string => `[store] persist archive "${key}" has no usable version`,
-  archiveState: (key: string): string => `[store] persist archive "${key}" carries no state`,
+  /** Invalid plans fail attachment before any subscription or storage operation. */
+  migrationsInvalid: (key: string): string => `[store] persist "${key}" migrations are invalid`,
+  /** Codec observers must belong to the codec stage family before attachment begins. */
+  codecStagesInvalid: '[store] persist codecStages must be a codec observer',
   aborted: '[store] persist operation was aborted by dispose',
   noCodec: (key: string): string => `[store] persist "${key}" resolved no codec`,
   invalidVersion: (key: string): string =>
@@ -34,7 +35,5 @@ export const StorePersistErrorText = {
     `[store] persist "${key}" ${name} must return synchronously`,
   codecInvalid: (key: string): string => `[store] persist "${key}" codec is invalid`,
   storageInvalid: (key: string): string => `[store] persist "${key}" storage adapter is invalid`,
-  hydrationWriteFailed: '[store] persist hydration and write both failed',
-  versionMismatch: (key: string, archive: number, current: number): string =>
-    `[store] persist archive "${key}" is version ${archive}, but this store is version ${current}; provide migrate() to convert it`
+  hydrationWriteFailed: '[store] persist hydration and write both failed'
 } as const

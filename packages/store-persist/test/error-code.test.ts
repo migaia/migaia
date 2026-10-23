@@ -37,21 +37,27 @@ describe('store-persist error-code contract', () => {
 describe('store-persist hydration failure boundary', () => {
   it('HYDRATE failure remains the original cause and blocks a subsequent write', async () => {
     const storage = memoryStorageHost()
-    // Version mismatch makes hydration fail (no migrate provided).
+    // Version mismatch makes hydration fail (no migrations provided).
     await storage.set('both-fail', JSON.stringify({ version: 5, state: { count: 1 } }))
     const store = createStore({ count: 0 })
     const handle = persist(store, { key: 'both-fail', storage, version: 1 })
-    await expect(handle.ready).rejects.toThrow(/provide migrate/)
+    await expect(handle.ready).rejects.toMatchObject({
+      source: '@migaia/storage-contract',
+      code: 'VERSION_UNSUPPORTED'
+    })
 
     // A failed hydration must not permit a write to race the unknown persisted state.
     storage.set = async () => {
       throw new Error('disk full')
     }
     store.count = 2
-    await expect(handle.flush()).rejects.toThrow(/provide migrate/)
+    await expect(handle.flush()).rejects.toMatchObject({
+      source: '@migaia/storage-contract',
+      code: 'VERSION_UNSUPPORTED'
+    })
     expect(handle.error.value).toMatchObject({
-      source: STORE_PERSIST_SOURCE,
-      code: StorePersistErrorCode.envelopeInvalid
+      source: '@migaia/storage-contract',
+      code: 'VERSION_UNSUPPORTED'
     })
     handle.dispose()
     store.$dispose()

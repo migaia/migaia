@@ -33,11 +33,10 @@ export const StorePersistErrorCode = {
   backendCapability: 'BACKEND_CAPABILITY',
 
   /**
-   * The saved envelope is invalid or incompatible with the current store version. Its state may be
-   * missing, its version invalid, its properties inaccessible, or its version different without a
-   * migration.
+   * The default JSON codec receives a non-string payload or cannot decode the supplied JSON.
    *
-   * Check the archive and configured `version`. Provide `migrate` for a version mismatch.
+   * Inspect the payload and cause chain. Envelope structure and versions belong to
+   * storage-contract.
    */
   envelopeInvalid: 'ENVELOPE_INVALID',
 
