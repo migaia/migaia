@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { deferred } from '@migaia/utils/promise'
-import { binlog, undoLog, LogRecordState, type ILogStore } from '@migaia/logger/plugins/durable'
+import {
+  binlog,
+  undoLog,
+  memoryLogStore,
+  LogRecordState,
+  type ILogStore
+} from '@migaia/logger/plugins/durable'
 import { blob, counter, kv, lockKey, rdf, term, ttl, vector } from '@migaia/storage-contract'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
 
@@ -272,6 +278,79 @@ describe('global native storage journal', () => {
       unsubscribe()
     } finally {
       await logger?.shutdown('manual')
+    }
+  })
+})
+
+describe('external storage binlog', () => {
+  it('waits for commit-only append and reports its failure without reversing committed data', async () => {
+    await using records = memoryLogStore()
+    const logger = new Logger({ execution, runtimeManager, plugins: [binlog({ store: records })] })
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const original = new RangeError('external durable append failed after commit')
+    const reports: unknown[] = []
+    const failures: unknown[] = []
+    let calls = 0
+    const borrowed = {
+      dispatchRaw: logger.dispatchRaw,
+      onFailure: logger.onFailure,
+      hook: logger.hook,
+      flush: logger.flush,
+      defer: logger.defer,
+      binlog: {
+        ...logger.binlog,
+        append: async <T>(
+          kind: string,
+          payload: T & import('@migaia/logger/plugins/durable').ILogPayloadInput<T>
+        ) => {
+          calls++
+          if (calls === 1) {
+            entered.resolve()
+            await release.promise
+            throw original
+          }
+          return logger.binlog.append(kind, payload)
+        }
+      }
+    }
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin()],
+      journal: { logger: borrowed, namespace: 'external' },
+      report: (error) => {
+        reports.push(error)
+      },
+      hooks: {
+        onBinlogAppendError: (event) => {
+          failures.push(event)
+        }
+      }
+    })
+    try {
+      const store = host.backend('memory')
+      let complete = false
+      const pending = store.set('key', 'committed').then(() => {
+        complete = true
+      })
+      await entered.promise
+      expect(await store.get('key')).toBe('committed')
+      expect(complete).toBe(false)
+      release.resolve()
+      await pending
+      expect(reports).toEqual([original])
+      expect(failures).toEqual([
+        expect.objectContaining({
+          namespace: 'external',
+          backendInstanceId: 'memory',
+          orgId: expect.any(String)
+        })
+      ])
+      await store.set('key', 'next')
+      expect(await logger.binlog.read(1)).toHaveLength(1)
+      expect(calls).toBe(2)
+    } finally {
+      release.resolve()
+      await logger.shutdown('manual')
     }
   })
 })

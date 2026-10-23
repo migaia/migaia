@@ -3053,6 +3053,7 @@ function createMemoryNamespace<T>(
       throw primary
     } finally {
       journalDraft?.complete(false)
+      if (journalAttempt?.settle !== undefined) await journalAttempt.settle()
       control.close()
       draft.clear()
       snapshots.clear()

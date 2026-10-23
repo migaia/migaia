@@ -388,8 +388,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IStorageJournalAttempt: {
       summary: t(
-        'Original authenticated txId and pre-commit record(scope) only; no new transaction or terminal authority.',
-        '仅含原认证 txId 与提交前 record(scope)，不授予新事务或终态权。'
+        'Original authenticated txId, pre-commit record(scope), and optional settle() for terminal-started external append. No new transaction or terminal authority.',
+        '原认证 txId、提交前 record(scope)，以及仅排空原 terminal 外置追加的可选 settle()；不授予新事务或终态权。'
       ),
       members: {}
     },

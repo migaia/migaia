@@ -42,6 +42,8 @@ export type IStorageJournalConfiguration =
 export type IStorageJournalAttempt = {
   readonly txId: string
   record(scope: Omit<ITransactionScope, 'use'>): Promise<void>
+  /** Drain commit-only external work; failures are reported without changing the native result. */
+  settle?(): Promise<void>
 }
 /** Fixed-org author ports prepare before acquisition and leave all commits with the original owner. */
 export type IStorageJournalExecutionPort = {

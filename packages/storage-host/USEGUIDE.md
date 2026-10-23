@@ -232,6 +232,8 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 
 
 当前自动 memory 单元覆盖根 text/bytes/record 写入、批量、前缀删除、counter/TTL、vector/RDF、clear、查询写及显式 native 事务；原 draft 在修改前捕获 portable 镜像。capacity victim 同属该 draft 的镜像，异步追加后重查原修订和实际容量计划；victim 改变沿原 commit conflict 回滚暂存日志。真实数据和 victim 完成后才发布已提交日志索引，原淘汰通知顺序保持。空写不生成 storage.commit，选中异步 journal 时同步入口沿原 guard 拒绝。clear 按实际删除项捕获镜像，保留原通道 epoch 重置与一次粗粒度 clear 通知；空 clear 不生成 storage.commit。blob 写暂在修改前报 UNSUPPORTED_CAPABILITY，不接管上传 reader，不伪造 blob 锁或镜像格式。WAL、telemetry、其它后端全局路由、undo 执行与 redo 仍待完成；缺失的已选保证明确拒绝，不静默漏记。
 
+未选 `atomicBinlog[id]` 的 memory backend 使用外置 binlog：仅在原生 COMMIT 后追加，原操作等该追加结算；失败通过宿主原 `report` 和 `onBinlogAppendError` 元数据观察事件报告，已提交数据和成功结果不回滚，后续写入仍可继续。回滚与空写不追加。后端作者的 `IStorageJournalAttempt.settle?()` 只用于排空原 terminal 已启动的外置工作；同原生追加路径不增加该等待。外置 WAL 仍待后续单元。
+
 PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 namespace generation 失效；storageLogStore 缓存读取与旧 native port 均报 STORE_DISPOSED，后续选中 journal 的写入在修改前拒绝，普通未选 journal 的 org 视图仍可复用。同一借用 logger 在 drop 后继续，需要原 logger 的正式 reset 契约；宿主不重跑一次性 initializer、不替换或关闭 logger。比较隐式复用缓存、重跑 initializer 与安全隔离后选择安全隔离，保数据/日志一致；回退只能撤回新增全局组合，或由原 owner 显式 reset 协议替换隔离。
 
 后端作者可在原安装窗口调用 core.registerFeatureClientResolver(store, resolver)，为精确已登记 store 提供组织原生客户端选择。resolver.getClient(orgId) 可先沿原 opener 准备再返回客户端；只有真实异步结果才等待，完成后再次核对原 registration。可选 getTransactionClient(scope, orgId) 必须同步返回该原认证 scope 已打开的事务，不得另开或等待。未登记 resolver 时，原 Feature 的 getClient/getTransactionClient 调用顺序与行为保持。resolver 只占原 storeCell 的一个可选字段，业务视图不能登记或获得该接点，Feature factory 不重跑。
