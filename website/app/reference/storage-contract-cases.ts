@@ -57,6 +57,31 @@ catch (error) { if (!(error instanceof StorageContractError)) throw error; conso
       )
     }
   ],
+  defineConcurrencyPolicy: [
+    {
+      title: t('Capture a genuine policy without executing it', '捕获真实策略而不执行'),
+      problem: t(
+        'A backend needs an immutable policy identity before opening resources; copying metadata must not copy decision authority.',
+        '后端须在打开资源前捕获不可变策略身份；复制元数据不能复制决策权限。'
+      ),
+      example: t(
+        `import { defineConcurrencyPolicy, ConcurrencyPolicy } from '@migaia/storage-contract'
+let calls = 0
+const custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })
+console.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)
+// custom true 0 optimistic`,
+        `import { defineConcurrencyPolicy, ConcurrencyPolicy } from '@migaia/storage-contract'
+let calls = 0
+const custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })
+console.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)
+// custom true 0 optimistic`
+      ),
+      result: t(
+        'Prints custom true 0 optimistic. No callback, transaction or lock is executed.',
+        '输出 custom true 0 optimistic，不执行回调、事务或锁。'
+      )
+    }
+  ],
   defineStorageCapability: [
     {
       title: t('Keep equal capability names independent', '同名能力仍保持独立身份'),

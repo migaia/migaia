@@ -166,3 +166,6 @@ export {
   nextTransactionIterator
 } from './transaction.js'
 export type { ITransactionInfo } from './transaction.js'
+
+export { defineConcurrencyPolicy, ConcurrencyPolicy } from './concurrency.js'
+export type { IConcurrencyConflict, ILockHolding } from './concurrency.js'

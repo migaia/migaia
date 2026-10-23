@@ -1,5 +1,7 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Policy definitions and options must be valid before any backend or decision callback runs. */
+  concurrencyArgument: 'concurrency policy or options are invalid',
   /** A backend owner, genuine fresh view and callable registration callbacks are required. */
   transactionArgument: 'transaction owner, scope or callback is invalid',
   /** Expired data views reject through the backend normalizer after releasing resource references. */

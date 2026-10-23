@@ -1,4 +1,10 @@
-import type { StorageStageKind } from './stage-kind.js'
+import {
+  ConcurrencyPolicy,
+  assertConcurrencyPolicy,
+  type IConcurrencyPolicy,
+  type IConcurrencyStageObserver
+} from './concurrency.js'
+import { StorageStageKind } from './stage-kind.js'
 import type { IConflictPolicy, IStorageKey, IKeyRange } from './context.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageBaseDetailed } from './store.js'
@@ -168,6 +174,8 @@ type IOwnerRegistration = {
   readonly backend: string
   readonly normalizeFailure: (error: unknown) => ITransactionFailure
   readonly asyncDisposeKey: typeof Symbol.asyncDispose
+  readonly defaultPolicy: IConcurrencyPolicy
+  readonly concurrencyStages: IConcurrencyStageObserver | undefined
 }
 /** Expired views release the transaction and retain only immutable facts and rejection identity. */
 type IViewRegistration = {
@@ -376,6 +384,8 @@ export function createTransactionOwner<
   options?: {
     readonly activityMode?: TransactionActivityMode
     readonly asyncDisposeKey?: typeof Symbol.asyncDispose
+    readonly defaultPolicy?: IConcurrencyPolicy
+    readonly concurrencyStages?: IConcurrencyStageObserver
   }
 ): {
   register<TScope extends TBaseScope>(
@@ -412,6 +422,16 @@ export function createTransactionOwner<
         activityMode !== TransactionActivityMode.native)
     )
       throw invalidTransaction()
+    /** The original owner is the only store-default policy registration. */
+    const configuredPolicy = options?.defaultPolicy
+    /** Observations retain their existing host registry and grant no policy or lock authority. */
+    const concurrencyStages = options?.concurrencyStages
+    if (configuredPolicy !== undefined) assertConcurrencyPolicy(configuredPolicy)
+    if (concurrencyStages !== undefined && concurrencyStages.kind !== StorageStageKind.concurrency)
+      throw invalidTransaction()
+    /** Missing policy creates exactly one authentic default for this original owner. */
+    const defaultPolicy =
+      configuredPolicy === undefined ? ConcurrencyPolicy.wait() : configuredPolicy
     /** Shared non-owning admission validates resource methods and support facts exactly once. */
     const base = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
     if (!base.valid || transactionRegistrations.has(store))
@@ -421,7 +441,9 @@ export function createTransactionOwner<
       kind: RegistrationKind.owner,
       backend: base.backend,
       normalizeFailure,
-      asyncDisposeKey
+      asyncDisposeKey,
+      defaultPolicy,
+      concurrencyStages
     }
     transactionRegistrations.set(store, owner)
     return {
@@ -765,4 +787,19 @@ export function nextTransactionIterator<_TValue, T>(
   )
     throw invalidTransaction()
   return resource.advance(scope) as Promise<IteratorResult<T>>
+}
+
+/** Backend-only policy resolution reads the original owner; it does not grant transaction authority. */
+export function resolveConcurrencyPolicy(
+  store: IStorageBase,
+  override?: IConcurrencyPolicy
+): IConcurrencyPolicy {
+  /** Authentic store identity is required even when the caller supplies a valid override. */
+  const owner = transactionRegistrations.get(store)
+  if (owner?.kind !== RegistrationKind.owner) throw invalidTransaction()
+  if (override !== undefined) {
+    assertConcurrencyPolicy(override)
+    return override
+  }
+  return owner.defaultPolicy
 }
