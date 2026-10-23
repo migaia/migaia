@@ -205,9 +205,16 @@ export const PluginHostErrorCode = {
    *
    * For example, a sync host cannot accept a generator stage. Supported lifting follows the
    * canonical middleware runner; other combinations fail with both host and stage modes in the
-   * message. Select a compatible runner instead of assuming every stage can be lifted.
+   * message. Explicit sync/async entries also reject generator hosts; use runPipeline for their
+   * existing generator protocol. Select a compatible runner rather than bypassing stages.
    */
   pipelineModeMismatch: 'PIPELINE_MODE_MISMATCH',
+
+  /**
+   * The synchronous entry sees an installed asynchronous stage. No stage or terminal runs; use
+   * runPipelineAsync or remove/disable that stage before retrying synchronously.
+   */
+  asyncStageInSyncEntry: 'ASYNC_STAGE_IN_SYNC_ENTRY',
 
   /**
    * Thrown when `next()` is called twice within one pipeline step.

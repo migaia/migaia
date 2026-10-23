@@ -249,13 +249,13 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   /** Writes one registration's enablement through the host's visibility owner. */
   setEnabled(registration: IRegistration<TDomainCore, TValue>, enabled: boolean): void {
     registration.enabled = enabled
-    this.lanes.invalidate()
+    this.lanes.refreshOwner(registration)
   }
 
   /** Writes one registration's suspension through the host's visibility owner. */
   setSuspended(registration: IRegistration<TDomainCore, TValue>, suspended: boolean): void {
     registration.suspended = suspended
-    this.lanes.invalidate()
+    this.lanes.refreshOwner(registration)
   }
 
   /** Records whether a retained instance must reinstall when its providers recover. */

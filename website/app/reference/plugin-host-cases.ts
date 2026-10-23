@@ -303,6 +303,57 @@ export const pluginHostOptionCases: Readonly<Record<string, readonly IOptionCase
 
 /** Installation, dependency and cleanup scenarios use only the published root entry. */
 export const pluginHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  dualEntry: [
+    {
+      title: t(
+        'Choose sync or async execution over one stage list',
+        '同一阶段列表选择同步或异步执行'
+      ),
+      problem: t(
+        'A host serves synchronous native work and asynchronous operations. Both must receive the same installed intervention stages; an async stage cannot be silently skipped by a synchronous call.',
+        '宿主同时处理同步原生操作和异步操作。两条路径必须消费相同的已安装干预阶段，同步调用不能静默跳过异步阶段。'
+      ),
+      example: t(
+        `import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+
+const host = defineHost<Record<string, never>, number>({
+  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }, pipeline: { mode: 'async' } }
+})
+host.usePipeline((value, next) => next(value + 1))
+console.log(host.runPipelineSync(1, (value) => value))
+console.log(await host.runPipelineAsync(1, async (value) => value))
+await host.use(definePlugin({
+  name: 'timing',
+  install: (core: IPluginHostCore<number>) => { core.useAsyncPipeline(async (value, next) => { await next(value) }); return {} }
+}))
+try { host.runPipelineSync(1, (value) => value) } catch (error) { console.log((error as { code: string }).code) }
+await host.unUse('timing')
+console.log(host.runPipelineSync(1, (value) => value))
+await host.dispose()`,
+        `import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+
+const host = defineHost<Record<string, never>, number>({
+  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }, pipeline: { mode: 'async' } }
+})
+host.usePipeline((value, next) => next(value + 1))
+console.log(host.runPipelineSync(1, (value) => value))
+console.log(await host.runPipelineAsync(1, async (value) => value))
+await host.use(definePlugin({
+  name: 'timing',
+  install: (core: IPluginHostCore<number>) => { core.useAsyncPipeline(async (value, next) => { await next(value) }); return {} }
+}))
+try { host.runPipelineSync(1, (value) => value) } catch (error) { console.log((error as { code: string }).code) }
+await host.unUse('timing')
+console.log(host.runPipelineSync(1, (value) => value))
+await host.dispose()`
+      ),
+      result: t(
+        'Prints 2, 2, ASYNC_STAGE_IN_SYNC_ENTRY, then 2. Removing the async owner restores sync execution. A halted stage returns undefined; with no stages, each entry returns the exact terminal value or Promise.',
+        '依次输出 2、2、ASYNC_STAGE_IN_SYNC_ENTRY、2。卸载异步阶段拥有者后恢复同步执行。阶段停止时返回 undefined；零阶段保留终点的原值或 Promise 身份。'
+      )
+    }
+  ],
+
   defineHost: [
     {
       title: t('Install a plugin and read its extension', '安装插件并读取扩展'),
