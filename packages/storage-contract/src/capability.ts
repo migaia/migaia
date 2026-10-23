@@ -161,12 +161,13 @@ type IScopeRecordValue<TScope> = TScope extends {
 /**
  * Adds selected query methods only to an existing standard transaction capability lookup. Native
  * scope members remain untouched, token availability follows the original use parameter, and the
- * records query keeps undefined context rather than acquiring a root operation context.
+ * record and RDF queries keep separate Feature groups and undefined operation contexts.
  */
 export type IWithTransactionQueryMethods<
   TScope,
-  TAugmentMethods extends object
-> = keyof TAugmentMethods extends never
+  TAugmentMethods extends object,
+  TRdfAugmentMethods extends object = Record<never, never>
+> = keyof (TAugmentMethods & TRdfAugmentMethods) extends never
   ? TScope
   : TScope extends { use: (...args: never[]) => unknown }
     ? Omit<TScope, 'use'> & {
@@ -179,7 +180,7 @@ export type IWithTransactionQueryMethods<
         ): TCap extends typeof records
           ? ITransactionRecordsApi<IScopeRecordValue<TScope>, TAugmentMethods>
           : TCap extends typeof rdf
-            ? ITransactionRdfApi<TAugmentMethods>
+            ? ITransactionRdfApi<TRdfAugmentMethods>
             : ITransactionCapabilityApi<TCap>
       }
     : TScope

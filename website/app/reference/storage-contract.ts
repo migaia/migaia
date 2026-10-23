@@ -3282,6 +3282,20 @@ console.log(candidate.name, candidate.output)`
         asyncDisposeKey: { summary: t('Optional original cleanup key.', '可选原清理键。') }
       }
     },
+    IWithTransactionQueryMethods: {
+      summary: t(
+        'Project independent record and RDF Feature groups onto an existing transaction scope. The optional third RDF group defaults empty, preserving two-argument record calls.',
+        '把独立的记录与 RDF Feature 组投影到既有事务 scope；可选第三 RDF 组缺省为空，保留旧两参数记录调用。'
+      ),
+      members: {
+        use: {
+          summary: t(
+            'Select only the matching token family methods; keep native scope members and undefined operation context.',
+            '仅选择对应令牌家族的方法，保留原生 scope 成员与 undefined 操作上下文。'
+          )
+        }
+      }
+    },
     IQueryRead: {
       summary: t(
         'Implemented all(ctx) and explain() terminals; all consumes and closes the original iterator.',
