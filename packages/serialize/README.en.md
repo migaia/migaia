@@ -238,7 +238,7 @@ streamBase64Chunks(bytes) is a lazy synchronous Generator, yielding pieces witho
 
 `ICodec<TValue, TEncoded, TId, TVersion>` has read-only id, version, encodedType, encode and decode. Encode/decode are function properties preserving strict parameter variance. TId defaults to string and TVersion to number. encodedType is unknown/string/uint8array. A synchronous codec is a different contract from an asynchronous registry parser. identityCodec fixes id=identity, version=1 and encodedType=unknown; both functions preserve the exact value and concrete type. The old alias and unversioned identity entry are removed.
 
-defineJsonCodec, defineMessagePackCodec and defineCBORCodec require a positive safe-integer options.version and return frozen codecs. IDs are json, message-pack and cbor; outputs are string, Uint8Array and Uint8Array respectively. All three use the same portable projection/validation. JSON sorts keys deterministically; MessagePack sorts keys without extensions. CBOR disables records and host extensions, converting decoded bigint integers to numbers only when they are exact safe integers; otherwise it rejects.
+defineJsonCodec, defineMessagePackCodec and defineCBORCodec require a positive safe-integer options.version and return frozen codecs. IDs are json, message-pack and cbor; outputs are string, Uint8Array and Uint8Array respectively. All three use the same portable projection/validation. JSON, collections JSON, CBOR and MessagePack project fields in Object.keys enumeration order without comparison sorting; getters run once in that order. MessagePack uses no extensions. CBOR disables records and host extensions, converting decoded bigint integers to numbers only when they are exact safe integers; otherwise it rejects.
 
 defineProtobufCodec requires version, schema and binding. schema.id matches /^[a-z][a-z0-9.-]*$/u and schema.version is a positive safe integer independent of codec.version. Binding must be a generated Buf DescMessage rather than custom encode/decode hooks. The returned schema identity is frozen, values use `MessageShape<TBinding>`, and encodedType is uint8array. Encode/decode validate genuine Uint8Array data and preserve original Buf failure causes. Factories provide no storage or network envelope.
 
@@ -304,3 +304,19 @@ ISerializeTaggedError adds source/code/context to a native error type. ISerializ
 For value-to-wire or mixed-value failures, return to the business value rather than forcing a representation. For CODEC_NOT_FOUND inspect types and the saved type tag. REGISTRY_DISPOSED requires a new registry. Multi-chunk byte collection requires an explicit encoder. If exports still block, inspect initial slice size, bounds and yieldTo; slicing is not preemptive termination.
 
 A complete workflow creates the registry, encodes independent frames into the real sink, decodes them individually at the receiver, reads old formats using saved type tags and writes the default primaryType. Apply UTF-8/Base64 only at an actual text boundary, then await dispose. A configured deadline limits draining only. Package scripts provide fmt, lint, typecheck, typecheck:test, test and a separate build; unverified historical measurements are not performance claims.
+
+### Preserve Map and Set in JSON
+
+Use the collection codec explicitly when values contain Map or Set. It shares the strict portable profile with JSON, adds recursive collections, projects enumerable class fields, and rejects nonfinite numbers, undefined, Date and cycles. Reserved $rpc records must have the exact bytes/map/set shape. Collection iteration preserves insertion order and uses intrinsic slots and iterators. Bytes remain bytes records after decoding; old collection tuples are ordinary data.
+
+```ts
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+
+const codec = defineCollectionsJsonCodec({ version: 1 })
+const source = new Map([['roles', new Set(['read', 'write'])]])
+const text = codec.encode(source)
+console.log(text) // {"$rpc":"map","entries":[["roles",{"$rpc":"set","values":["read","write"]}]]}
+console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
+```
+
+Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner.

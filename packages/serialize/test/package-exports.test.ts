@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   SerializeChunkKind,
@@ -85,6 +86,7 @@ describe('package exports', () => {
     expect(typeof decodeStream).toBe('function')
     expect(typeof collectStream).toBe('function')
     expect(SERIALIZE_SOURCE).toBe('@migaia/serialize')
+    expect(defineCollectionsJsonCodec({ version: 1 }).id).toBe('collections-json')
     expect(SerializeErrorCode.invalidOption).toBe('INVALID_OPTION')
     expect(typeof registryChunkToText).toBe('function')
     expect(typeof registryChunkToBytes).toBe('function')

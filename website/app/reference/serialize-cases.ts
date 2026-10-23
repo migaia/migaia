@@ -40,6 +40,23 @@ export const serializeCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
       )
     }
   ],
+  defineCollectionsJsonCodec: [
+    {
+      title: t('Preserve nested collections', '保留嵌套集合'),
+      problem: t(
+        'Persist Map and Set with the shared strict portable rules. The collection codec preserves insertion order and rejects invalid values instead of silently dropping them.',
+        '使用同一套严格 portable 规则保存 Map 与 Set，保留插入顺序并拒绝非法值，避免静默丢失数据。'
+      ),
+      example: t(
+        "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst text = codec.encode(new Map([['roles', new Set(['read'])]]))\nconsole.log(text, codec.decode(text))",
+        "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst text = codec.encode(new Map([['roles', new Set(['read'])]]))\nconsole.log(text, codec.decode(text))"
+      ),
+      result: t(
+        'The text uses $rpc map/set records; decode returns a Map containing a Set. Bytes stay reserved records. Old tuple formats remain ordinary arrays.',
+        '文本使用 $rpc map/set 记录；解码返回包含 Set 的 Map。字节保留为记录，旧元组格式仍为普通数组。'
+      )
+    }
+  ],
   defineJsonCodec: [
     {
       title: t(

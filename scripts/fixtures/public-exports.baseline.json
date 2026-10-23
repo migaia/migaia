@@ -984,6 +984,9 @@
       "./codecs/identity/v1": [
         "identityCodec"
       ],
+      "./codecs/collections-json": [
+        "defineCollectionsJsonCodec"
+      ],
       "./codecs/json": [
         "defineJsonCodec"
       ],

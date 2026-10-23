@@ -683,10 +683,6 @@ const assertionStrategy: IPortableWalkerStrategy = {
   violation: raisePortableViolation
 }
 
-/** Default fused codec strategy finishes projection before raising its first validation failure. */
-/** Capture the shared record hook once, without a strategy-object lookup in each node. */
-const projectPortableRecord = projectionStrategy.record
-
 /** Fused default policy retains legacy format behavior without exposing a consumer preset. */
 const codecStrategy: IPortableWalkerStrategy = {
   ...projectionStrategy,
@@ -694,13 +690,15 @@ const codecStrategy: IPortableWalkerStrategy = {
     value,
     violation: portableScalar(value) ? undefined : PortableViolation.scalar
   }),
-  record: (value, context) => {
-    const admitted = projectPortableRecord(value, context)
-    if (!admitted) return undefined
+  record: (value) => {
+    if (!Object.hasOwn(value, PortableBytesField.marker) && Array.isArray(value)) return undefined
+    /** Codec formats preserve enumeration order; public portable snapshots retain their sorting. */
+    const keys = Object.keys(value)
     return {
-      ...admitted,
-      validate: (output) => invalidPortableTag(output, Object.keys(output)),
-      hasBinary: admitted.hasBinary
+      entries: portableEntries(value as Record<string, unknown>, keys),
+      output: {},
+      validate: (output) => invalidPortableTag(output, keys),
+      hasBinary: keys.includes(PortableBytesField.marker)
     }
   },
   array: (value, visit) => {
@@ -751,7 +749,127 @@ export function toPortableValue(value: unknown, active = new Set<object>()): unk
   return projectPortable.value(value, active)
 }
 
-/** Fused default used only by this package's format codecs; its output remains byte-for-byte stable. */
+/** Fused format projection preserves property enumeration order without comparison sorting. */
 export function toCodecPortableValue(value: unknown): ICodecValue {
   return normalizeCodecPortable.value(value) as ICodecValue
+}
+
+/** Collection tag fields extend the same reserved record namespace as portable bytes. */
+const PortableCollectionField = {
+  map: 'map',
+  set: 'set',
+  entries: 'entries',
+  values: 'values'
+} as const
+
+/** Captured slot accessors admit genuine cross-realm collections even after prototype changes. */
+const intrinsicMapSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size')!.get!
+/** Captured Set slot accessor bypasses caller-controlled prototypes and tags. */
+const intrinsicSetSize = Object.getOwnPropertyDescriptor(Set.prototype, 'size')!.get!
+/** Captured iterators avoid caller replacements of Symbol.iterator or collection methods. */
+const intrinsicMapEntries = Map.prototype.entries
+/** Captured Set iteration retains insertion order without consulting user properties. */
+const intrinsicSetValues = Set.prototype.values
+
+/** Brand mismatch is expected during slot admission, so native TypeError means a different kind. */
+function collectionKind(value: object): 'map' | 'set' | undefined {
+  try {
+    Reflect.apply(intrinsicMapSize, value, [])
+    return PortableCollectionField.map
+  } catch {
+    // A non-Map has no Map internal slot; probe the other supported collection.
+  }
+  try {
+    Reflect.apply(intrinsicSetSize, value, [])
+    return PortableCollectionField.set
+  } catch {
+    return undefined
+  }
+}
+
+/** Reject malformed reserved records after recursively validating every admitted child. */
+function invalidCollectionTag(
+  value: Record<string, unknown>,
+  keys: readonly string[]
+): string | undefined {
+  if (!keys.includes(PortableBytesField.marker)) return undefined
+  if (value[PortableBytesField.marker] === PortableBytesField.kind)
+    return invalidPortableTag(value, keys)
+  if (keys.length !== 2) return PortableViolation.tag
+  if (value[PortableBytesField.marker] === PortableCollectionField.map) {
+    const entries = value[PortableCollectionField.entries]
+    if (
+      !Array.isArray(entries) ||
+      !entries.every((entry) => Array.isArray(entry) && entry.length === 2)
+    )
+      return PortableViolation.tag
+    return undefined
+  }
+  if (
+    value[PortableBytesField.marker] === PortableCollectionField.set &&
+    Array.isArray(value[PortableCollectionField.values])
+  )
+    return undefined
+  return PortableViolation.tag
+}
+
+/** Collection admission shares scalar, array, own-field, and bytes rules with the format profile. */
+const collectionsStrategy: IPortableWalkerStrategy = {
+  ...codecStrategy,
+  binary: (value, context) =>
+    collectionKind(value) === undefined ? codecStrategy.binary(value, context) : undefined,
+  record: (value, context) => {
+    const kind = collectionKind(value)
+    if (kind !== undefined) {
+      const field =
+        kind === PortableCollectionField.map
+          ? PortableCollectionField.entries
+          : PortableCollectionField.values
+      const children =
+        kind === PortableCollectionField.map
+          ? Array.from(Reflect.apply(intrinsicMapEntries, value, []))
+          : Array.from(Reflect.apply(intrinsicSetValues, value, []))
+      return {
+        entries: [
+          [PortableBytesField.marker, kind],
+          [field, children]
+        ],
+        output: {}
+      }
+    }
+    const admitted = codecStrategy.record(value, context)
+    if (admitted === undefined) return undefined
+    return {
+      ...admitted,
+      validate: (output) => invalidCollectionTag(output, Object.keys(output))
+    }
+  }
+}
+
+/** Encoding leaves reserved records intact for the single native JSON stringify operation. */
+const projectCollections = /* @__PURE__ */ createPortableWalker(collectionsStrategy)
+/** Decoding restores collections only after their recursively projected records pass admission. */
+const restoreCollections = /* @__PURE__ */ createPortableWalker({
+  ...collectionsStrategy,
+  finish: (value) => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return value
+    const record = value as Record<string, unknown>
+    const invalid = invalidCollectionTag(record, Object.keys(record))
+    if (invalid !== undefined) raisePortableViolation(invalid)
+    if (record[PortableBytesField.marker] === PortableCollectionField.map)
+      return new Map(record[PortableCollectionField.entries] as [unknown, unknown][])
+    if (record[PortableBytesField.marker] === PortableCollectionField.set)
+      return new Set(record[PortableCollectionField.values] as unknown[])
+    return value
+  }
+})
+
+/** Package-internal collection projection reuses the portable walker and reserved-field owner. */
+export function toCollectionsPortableValue(value: unknown): ICodecValue {
+  return projectCollections.value(value) as ICodecValue
+}
+
+/** Package-internal restoration retains bytes records while restoring nested Map and Set values. */
+export function fromCollectionsPortableValue(value: unknown): unknown {
+  return restoreCollections.value(value)
 }
