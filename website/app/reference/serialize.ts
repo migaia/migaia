@@ -1375,6 +1375,13 @@ export const serializeReference: ILibraryReference = {
       ),
       example: walkerExample
     },
+    'codecs/collections-json': {
+      summary: t(
+        'Synchronous strict portable JSON with recursive Map/Set records and insertion-order projection. No optional format peer is required.',
+        '保留递归 Map/Set 记录及属性顺序的同步严格 portable JSON，无需可选格式 peer。'
+      ),
+      example: serializeCases.defineCollectionsJsonCodec![0]!.example
+    },
     'codecs/cbor': {
       summary: t(
         'Use this entry when both ends need to encode plain data as CBOR bytes and decode it back. `defineCBORCodec({ version: 1 })` creates a synchronous codec with `encode` and `decode` methods and an explicit version.\n\nImport this format subpath because the root does not export the factory. Install `cbor-x` for this format; the codec is not a registry plugin.',
@@ -1606,6 +1613,23 @@ console.log(toPortableValue({ bytes: new Uint8Array([1, 2]) }))`
       exampleResult: serializeCases.defineJsonCodec![0]!.result,
       cases: serializeCases.defineJsonCodec
     },
+    defineCollectionsJsonCodec: {
+      options: 'IJsonCodecOptions',
+      role: 'factory',
+      purpose: t(
+        'Creates a frozen collections-json codec preserving recursive Map/Set order. Other inputs share strict portable rules; bytes decode as records, class fields are projected, and malformed reserved records reject.',
+        '创建冻结的 collections-json codec，保留递归 Map/Set 顺序，其余输入复用严格 portable 规则。字节解码为记录，类实例投影字段，非法保留记录被拒绝。'
+      ),
+      params: { options: t('Required positive safe-integer version.', '必填正安全整数版本。') },
+      returns: t(
+        'String codec with literal id and version. Format failures carry ENCODE_FAILED or DECODE_FAILED and the original error on cause.',
+        '字符串 codec，保留 id 与 version 字面量。格式失败携带 ENCODE_FAILED 或 DECODE_FAILED，原错在 cause。'
+      ),
+      exampleIntro: serializeCases.defineCollectionsJsonCodec![0]!.problem,
+      example: serializeCases.defineCollectionsJsonCodec![0]!.example,
+      exampleResult: serializeCases.defineCollectionsJsonCodec![0]!.result,
+      cases: serializeCases.defineCollectionsJsonCodec
+    },
     defineCBORCodec: {
       options: 'ICborCodecOptions',
       role: 'factory',
@@ -1631,8 +1655,8 @@ console.log(codec.decode(codec.encode({ count: 2 })))`
       options: 'IMessagePackCodecOptions',
       role: 'factory',
       purpose: t(
-        'Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, sorted record keys and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.',
-        '使用 `@msgpack/msgpack` 创建冻结同步 `MessagePack` 编解码器，对记录键排序且不使用自定义扩展，与 `JSON` 和 `CBOR` 共用可移植接纳规则。'
+        'Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, property enumeration order and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.',
+        '使用 `@msgpack/msgpack` 创建冻结同步 `MessagePack` 编解码器，按属性枚举顺序投影且不使用自定义扩展，与 `JSON` 和 `CBOR` 共用可移植接纳规则。'
       ),
       params: {
         options: t(

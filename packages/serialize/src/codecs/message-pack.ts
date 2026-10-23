@@ -19,9 +19,9 @@ export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{
 /**
  * Creates a frozen synchronous message-pack codec using the optional MessagePack peer imported by
  * this subpath. Version is required and must be a positive safe integer. Encoding normalizes
- * portable values and sorts keys without format extensions; decoding validates the result and
- * leaves inline bytes tags as records. Classified portable errors retain their code; other
- * encode/decode failures are coded with the original cause.
+ * portable values in property enumeration order without format extensions; decoding validates the
+ * result and leaves inline bytes tags as records. Classified portable errors retain their code;
+ * other encode/decode failures are coded with the original cause.
  */
 export function defineMessagePackCodec<const TVersion extends number>(
   options: IMessagePackCodecOptions<TVersion>
@@ -34,7 +34,7 @@ export function defineMessagePackCodec<const TVersion extends number>(
     encode: (value: ICodecValue): Uint8Array => {
       try {
         const portable = toCodecPortableValue(value)
-        return encode(portable, { ignoreUndefined: true, sortKeys: true })
+        return encode(portable, { ignoreUndefined: true, sortKeys: false })
       } catch (error) {
         throw normalizeCodecFailure(
           error,
