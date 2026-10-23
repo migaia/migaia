@@ -337,7 +337,8 @@ export type ICapabilityInstallPort = {
 /** Transaction binding stays private until the original transaction owner asks for its projection. */
 type IImplementationRecord = {
   readonly implementation: ICapabilityImpl
-  readonly forTransaction?: (scope: ITransactionScope) => unknown
+  /** Private storage erases the scope type; only the original token/owner can invoke the binder. */
+  readonly forTransaction?: (scope: never) => unknown
 }
 /** Authentic immutable descriptors; public symbols and lookalike fields do not authorize them. */
 const implementations = new WeakMap<object, IImplementationRecord>()
@@ -445,14 +446,19 @@ export function implement<
   capability: TCap,
   api: TApi,
   options?: {
-    readonly forTransaction?: (scope: ITransactionScope) => NoInfer<ITransactionCapabilityApi<TCap>>
+    readonly forTransaction?: (
+      scope: ITransactionScope<ICodecValue, TCap>
+    ) => NoInfer<ITransactionCapabilityApi<TCap>>
   }
 ): ICapabilityImpl<TCap, TApi> {
   if (!isToken(capability)) throw invalidCapability()
   /** Standard eligibility belongs to this exact token, never its diagnostic name. */
   const transaction = readCapabilityTokenFacts(capability)?.transaction
-  /** Capture the binder without executing it or exposing root API authority to a transaction. */
-  let forTransaction: ((scope: ITransactionScope) => unknown) | undefined
+  /**
+   * Capture its exact function identity with an erased private domain; original owner validates
+   * use.
+   */
+  let forTransaction: ((scope: never) => unknown) | undefined
   try {
     if (
       options !== undefined &&
