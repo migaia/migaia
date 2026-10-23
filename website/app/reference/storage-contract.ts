@@ -686,6 +686,48 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    sqlFragment: {
+      role: 'operation',
+      purpose: t(
+        'Construct pure opaque SQL fragments with immutable node references and scalar/byte snapshots.',
+        '通过不可变节点引用与标量、字节快照构造纯不透明 SQL 片段。'
+      ),
+      params: {
+        strings: t(
+          'Frozen cooked/raw template arrays; plain SQL strings are rejected.',
+          '冻结 cooked/raw 模板数组；拒绝普通 SQL 字符串。'
+        ),
+        values: t(
+          'ISqlValue or authentic shared fragments, in occurrence order.',
+          '按出现顺序的 ISqlValue 或真实共用片段。'
+        )
+      },
+      returns: t(
+        'ISqlFragment only, with no all/get/run. id quotes components, join preserves repeated references and empty adds no text.',
+        '仅 ISqlFragment，没有 all/get/run；id 引用各段，join 保留重复引用，empty 不增加文本。'
+      ),
+      example: storageContractCases.sqlFragment![0]!.example,
+      cases: storageContractCases.sqlFragment
+    },
+    createSqlTag: {
+      role: 'operation',
+      purpose: t(
+        'Bind the same fragment/scanner owner to original backend all/get/run callbacks.',
+        '将同一片段与 scanner owner 绑定至原后端 all/get/run 回调。'
+      ),
+      params: {
+        options: t(
+          'dialect sqlite/postgres plus original all/get/run callbacks. Each receives lazy prepare and original ctx; perform original admission before prepare.',
+          'sqlite/postgres 方言与原 all/get/run 回调；各自接收 lazy prepare 和原 ctx，先原准入，再 prepare。'
+        )
+      },
+      returns: t(
+        'ISqlTag preserving native value/result refinements and original callback Promise identity; no connection or resource authority.',
+        '保留原生值域、结果细化与原回调 Promise 身份的 ISqlTag；无连接或资源权限。'
+      ),
+      example: storageContractCases.createSqlTag![0]!.example,
+      cases: storageContractCases.createSqlTag
+    },
     snapshotConcurrencyLockHoldings: {
       role: 'operation',
       purpose: t(
@@ -2472,6 +2514,114 @@ console.log(candidate.name, candidate.output)`
     IConcurrencyStageObserver: {
       summary: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。'),
       members: {}
+    },
+    ISqlValue: {
+      summary: t(
+        'Native SQL scalar input/output domain: null, string, number, bigint, boolean or Uint8Array.',
+        '原生 SQL 标量输入、输出域：null、string、number、bigint、boolean 或 Uint8Array。'
+      ),
+      members: {}
+    },
+    ISqlRow: {
+      summary: t(
+        'Readonly default column-name mapping to the shared native scalar domain.',
+        '默认 readonly 列名至共用原生标量域的映射。'
+      ),
+      members: {}
+    },
+    ISqlRunResult: {
+      summary: t(
+        'Shared changes count only; backend insertion identity requires a concrete refinement.',
+        '仅共用 changes 计数；后端插入身份须由具体细化提供。'
+      ),
+      members: {
+        changes: { summary: t('Actual native affected-row count.', '原生实际影响行数。') }
+      }
+    },
+    ISqlFragment: {
+      summary: t(
+        'Opaque pure immutable fragment; runtime authenticity belongs to the original SQL WeakMap.',
+        '不透明纯不可变片段；运行时真实性归原 SQL WeakMap。'
+      ),
+      members: {}
+    },
+    ISqlInput: {
+      summary: t(
+        'A shared native scalar or authentic SQL fragment, never arbitrary objects or raw SQL strings as a construction API.',
+        '共用原生标量或真实 SQL 片段，不接纳任意对象或将原始 SQL 字符串作为构造 API。'
+      ),
+      members: {}
+    },
+    ISqlQuery: {
+      summary: t(
+        'A real backend-bound fragment with all/get/run and caller-declared object row schema. Native result refinements remain precise.',
+        '具备真实后端 all/get/run 的片段，行对象 schema 由调用方声明；原生结果细化保持精确。'
+      ),
+      members: {
+        all: {
+          summary: t(
+            'Return the original callback Promise of readonly declared rows.',
+            '返回原回调的 readonly 声明行 Promise。'
+          )
+        },
+        get: {
+          summary: t(
+            'Return the original callback Promise of a row or undefined.',
+            '返回原回调的行或 undefined Promise。'
+          )
+        },
+        run: {
+          summary: t(
+            'Return the original precise native execution result Promise.',
+            '返回原精确原生执行结果 Promise。'
+          )
+        }
+      }
+    },
+    ISqlTag: {
+      summary: t(
+        'Typed backend tag and pure id/join/empty tools; TValue constrains native output fields and TResult retains execution results.',
+        'Typed 后端标签与纯 id/join/empty 工具；TValue 约束原生输出字段，TResult 保留执行结果。'
+      ),
+      members: {
+        id: { summary: t('Quote each nonempty identifier segment.', '引用各非空标识符段。') },
+        join: {
+          summary: t(
+            'Join authentic child references with an authentic separator.',
+            '用真实分隔片段连接真实子节点引用。'
+          )
+        },
+        empty: { summary: t('Canonical empty pure fragment.', '规范空纯片段。') }
+      }
+    },
+    ISqlExecutor: {
+      summary: t(
+        'One sql property containing the precise bound tag, shared by stores, original transaction views and ORM functions.',
+        '仅含精确绑定标签 sql 属性，由 store、原事务视图与 ORM 函数共用。'
+      ),
+      members: {
+        sql: { summary: t('The original backend bound SQL tag.', '原后端绑定的 SQL 标签。') }
+      }
+    },
+    ICompiledStorageSql: {
+      summary: t(
+        'Pure execution-local text and readonly values projection; prepare supplies fresh bytes and no driver/control handles.',
+        '纯执行局部 text 与 readonly values 投影；prepare 提供独立字节，无驱动或控制句柄。'
+      ),
+      members: {
+        text: {
+          summary: t(
+            'Single validated statement with dialect placeholders.',
+            '使用方言占位符的单条已验证语句。'
+          )
+        },
+        values: {
+          summary: t(
+            'Readonly scalar list with execution-local copied byte views.',
+            'Readonly 标量列表，字节视图为本次执行独立副本。'
+          )
+        }
+      }
     },
     ISqlStageObserver: {
       summary: t(

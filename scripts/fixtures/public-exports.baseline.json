@@ -1045,6 +1045,7 @@
         "compileStorageWhere",
         "createMigrationPlan",
         "createRecordQuery",
+        "createSqlTag",
         "createTransactionBuilder",
         "createTransactionOwner",
         "defineConcurrencyPolicy",
@@ -1076,7 +1077,7 @@
         "runTransactionOperation",
         "runWithConcurrency",
         "snapshotCodec",
-"snapshotConcurrencyLockHoldings",
+        "snapshotConcurrencyLockHoldings",
         "snapshotKeyValueStore",
         "snapshotKeyValueStoreDetailed",
         "snapshotOperationContext",
@@ -1085,6 +1086,7 @@
         "snapshotStorageCapabilities",
         "snapshotStorageKey",
         "snapshotSyncWriteOptions",
+        "sqlFragment",
         "unprefixStorageOrgKey",
         "useStorageCapability"
       ]

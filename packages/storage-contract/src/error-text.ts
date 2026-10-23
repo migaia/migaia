@@ -1,5 +1,9 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** SQL templates, identifiers and pure fragment inputs are admitted before native execution. */
+  sqlArgument: 'SQL fragment input is invalid',
+  /** The shared lexer rejects empty/multiple statements and transaction-owned user commands. */
+  sqlStatement: 'SQL must contain one permitted statement',
   /**
    * Declarative query admission rejects malformed boolean, field, path and operator inputs before
    * reading candidates.
