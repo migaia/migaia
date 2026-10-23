@@ -1851,8 +1851,8 @@ console.log(candidate.name, candidate.output)`
         },
         value: {
           summary: t(
-            'Portable codec value, undefined, bigint, Date, or an operator list of those values; no unknown widening.',
-            'portable codec 值、undefined、bigint、Date 或这些值的操作符列表，不放宽为 unknown。'
+            'Portable codec value, undefined, bigint, Date, opaque object identity, or an operator list. Identity objects are not traversed.',
+            'portable codec 值、undefined、bigint、Date、不透明对象身份或操作符列表；不遍历身份对象内容。'
           )
         }
       }
