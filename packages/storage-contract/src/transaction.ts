@@ -199,7 +199,7 @@ type IOwnerRegistration = {
   readonly kind: typeof RegistrationKind.owner
   readonly store: IStorageBase
   readonly backend: string
-  readonly normalizeFailure: (error: unknown) => ITransactionFailure
+  readonly normalizeFailure: (error: unknown, expiredScope?: true) => ITransactionFailure
   readonly asyncDisposeKey: typeof Symbol.asyncDispose
   readonly defaultPolicy: IConcurrencyPolicy
   readonly concurrencyStages: IConcurrencyStageObserver | undefined
@@ -289,7 +289,8 @@ function awaitTransactionResult<T>(result: T): Promise<Awaited<T>> {
 /** Captures one resource-free failure before any view loses its backend state reference. */
 function expirationFailure(state: ITransactionState): ITransactionFailure {
   return (state.expiredFailure ??= state.owner.normalizeFailure(
-    new Error(StorageContractErrorText.transactionInactive)
+    new Error(StorageContractErrorText.transactionInactive),
+    true
   ))
 }
 /** Closing one view releases its data/factory access without affecting accepted sibling work. */
@@ -421,13 +422,18 @@ async function runTransactionCheck(
   }
 }
 
-/** Initializes the sole transaction owner before a backend publishes the original base. */
+/**
+ * Initializes the sole transaction owner before a backend publishes the original base. The
+ * normalizer receives expiredScope=true only when this owner creates its cached inactive-view
+ * failure, so backends can preserve their original scope-operation metadata. All other failures
+ * retain the existing single-argument normalization path; one-argument normalizers remain valid.
+ */
 export function createTransactionOwner<
   TValue = unknown,
   TBaseScope extends object = Omit<ITransactionScope<TValue>, 'use'>
 >(
   store: IStorageBase,
-  normalizeFailure: (error: unknown) => ITransactionFailure,
+  normalizeFailure: (error: unknown, expiredScope?: true) => ITransactionFailure,
   options?: {
     readonly activityMode?: TransactionActivityMode
     readonly asyncDisposeKey?: typeof Symbol.asyncDispose

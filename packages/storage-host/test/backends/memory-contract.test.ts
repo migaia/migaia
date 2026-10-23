@@ -9,7 +9,7 @@ import {
   type ITransactionKeyValueApi,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, memoryBackendPlugin, StorageError } from '../../src/index.js'
 
 /** The selected row domain belongs to the actual native memory record channel. */
 type IOrder = { state: string; total: number }
@@ -21,6 +21,8 @@ describe('memory native contract integration', () => {
     let expired!: ITransactionScope<unknown, typeof records>
     let expiredText!: ITransactionKeyValueApi
     let checkRuns = 0
+    /** Compare actual draft results with the same committed query after native commit. */
+    let transactionRows: readonly { total: number }[] | undefined
     await store.transaction(async (scope) => {
       expired = scope
       const text = scope.use(kv)
@@ -56,7 +58,8 @@ describe('memory native contract integration', () => {
       await scope.putRecord({ state: 'open', total: 7 }, 'two')
       await scope.putRecord({ state: 'paid', total: 4 }, ['tenant', 1])
       const paid = scope.use(records).query<IOrder>().where({ state: 'paid' }).select('total')
-      expect(await paid.all()).toEqual([{ total: 2 }, { total: 4 }])
+      transactionRows = await paid.all()
+      expect(transactionRows).toEqual([{ total: 2 }, { total: 4 }])
       registerTransactionFinalizer(scope, async (check) => {
         expect(check).not.toBe(scope)
         expect(
@@ -67,19 +70,31 @@ describe('memory native contract integration', () => {
     })
     expect(checkRuns).toBe(1)
     expect(await store.getBytes('bytes')).toEqual(new Uint8Array([3]))
-    expect(
-      await store.use(records).query<IOrder>().where({ state: 'paid' }).select('total').all()
-    ).toEqual([{ total: 2 }, { total: 4 }])
+    const committedRows = await store
+      .use(records)
+      .query<IOrder>()
+      .where({ state: 'paid' })
+      .select('total')
+      .all()
+    expect(committedRows).toEqual(transactionRows)
+    expect(committedRows).toEqual([{ total: 2 }, { total: 4 }])
     expect(await store.use(records).removeByPrefix(['tenant'])).toBe(1)
     expect(await store.getRecord(['tenant', 1])).toBeUndefined()
-    await expect(expired.getRecord('one')).rejects.toMatchObject({
+    /** Every escaped data method reuses the original owner's one native expiry diagnostic. */
+    const expiredFailure = await expired.getRecord('one').catch((error) => error)
+    expect(expiredFailure).toBeInstanceOf(StorageError)
+    expect(expiredFailure).toMatchObject({
       source: '@migaia/storage-host',
-      code: 'TRANSACTION_FAILED'
+      code: 'TRANSACTION_FAILED',
+      operation: 'transaction.scope'
     })
+    expect(expiredFailure).toHaveProperty('cause', expect.any(Error))
+    await expect(expired.putRecord({ state: 'late' }, 'one')).rejects.toBe(expiredFailure)
+    await expect(expired.deleteRecord('one')).rejects.toBe(expiredFailure)
     expect(() => expired.use(kv)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
-    await expect(expiredText.get('plain')).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    await expect(expiredText.get('plain')).rejects.toBe(expiredFailure)
   })
 
   it('merges only a bounded physical and draft record range including tombstones', async () => {
@@ -141,6 +156,16 @@ describe('memory native contract integration', () => {
       })
     ).rejects.toSatisfy((error: unknown) => error === first)
     expect(first).toMatchObject({ source: '@migaia/storage-host', code: 'DUPLICATE_KEY' })
+    /** Ordinary callback normalization retains its own native cause without expiry metadata. */
+    const original = new TypeError('ordinary transaction callback')
+    const failure = await store
+      .transaction(() => {
+        throw original
+      })
+      .catch((error) => error)
+    expect(failure).toBeInstanceOf(StorageError)
+    expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED', cause: original })
+    expect(failure.operation).toBeUndefined()
     expect(await store.getRecord('earlier')).toBeUndefined()
     expect(await store.get('occupied')).toBe('original')
     await expect(
