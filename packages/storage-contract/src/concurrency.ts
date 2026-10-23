@@ -901,6 +901,10 @@ export async function runWithConcurrency<TResult>(
     readonly store: IStorageBase
     readonly options: ITransactionOptions
     readonly policy?: IConcurrencyPolicy
+    /** Runs one original pipeline within this call's budget before deriving its fixed-input locks. */
+    readonly prepare?: (
+      captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
+    ) => void | PromiseLike<void>
     /** Derives additional locks once from the original frozen operation-field snapshot. */
     readonly lock?: (
       captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
@@ -930,15 +934,21 @@ export async function runWithConcurrency<TResult>(
   let capturedOverride: IConcurrencyPolicy | undefined
   /** Backend derivation is borrowed once and cannot replace any caller-declared lock. */
   let deriveLocks: typeof request.lock
+  /** Preparation is a single pre-attempt callback, never a native attempt or a retry hook. */
+  let prepare: typeof request.prepare
   try {
     capturedLocks = request.options.lock
     capturedOverride = request.options.concurrency
     deriveLocks = request.lock
+    prepare = request.prepare
   } catch (cause) {
     throw invalidConcurrencyArgument(cause)
   }
   if (capturedOverride !== undefined) assertConcurrencyPolicy(capturedOverride)
-  if (deriveLocks !== undefined && typeof deriveLocks !== 'function')
+  if (
+    (deriveLocks !== undefined && typeof deriveLocks !== 'function') ||
+    (prepare !== undefined && typeof prepare !== 'function')
+  )
     throw invalidConcurrencyArgument()
   /** Default resolution belongs to the same owner, after the original override getter is read once. */
   const policy = suppliedPolicy ?? resolveConcurrencyPolicy(request.store, capturedOverride)
@@ -952,7 +962,9 @@ export async function runWithConcurrency<TResult>(
       : normalizeLockKeys(capturedLocks, backend)
   /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
   const context = snapshotOperationContext(request.options)
-  if (deriveLocks) {
+  /** Both entry paths use one derivation; preparation only delays it until the input is fixed. */
+  function derivePreparedLocks(): void {
+    if (!deriveLocks) return
     /** Only new keys are captured and encoded; inherited normalized entries remain unchanged. */
     let additional: readonly ILockKey[]
     try {
@@ -965,8 +977,10 @@ export async function runWithConcurrency<TResult>(
     const normalized = normalizeLockKeys(additional, backend)
     if (normalized.length > 0) locks = uniqueNormalizedLockKeys([...(locks ?? []), ...normalized])
   }
+  // Preserve admission ordering for existing callers that have no preparation phase.
+  if (!prepare) derivePreparedLocks()
   /** Unchanged inherited sets retain their exact immutable identity list as well as their budget. */
-  const identities =
+  let identities =
     locks === inherited?.locks && inherited ? inherited.identities : snapshotLockIdentities(locks)
   /** Native options remain available to a backend while fixed fields keep their single capture. */
   const extensions = snapshotConcurrencyExtensions(request.options)
@@ -1005,6 +1019,25 @@ export async function runWithConcurrency<TResult>(
    */
   let lastConflict: Pick<IConcurrencyConflict, 'keys' | 'holder'> | undefined
   try {
+    if (prepare) {
+      /** An already canceled call starts neither its pipeline nor a native attempt. */
+      const beforePreparation = concurrencyAbort(budget, false)
+      if (beforePreparation) throw beforePreparation
+      /**
+       * The original fields stay captured; only this owner supplies the running cancellation
+       * signal.
+       */
+      const preparationContext = Object.freeze({ ...context, signal: budget.cancellation.signal })
+      await prepare(preparationContext)
+      /** Accepted preparation settles before cancellation can release this call's signal owner. */
+      const afterPreparation = concurrencyAbort(budget, false)
+      if (afterPreparation) throw afterPreparation
+      derivePreparedLocks()
+      identities =
+        locks === inherited?.locks && inherited
+          ? inherited.identities
+          : snapshotLockIdentities(locks)
+    }
     while (true) {
       /** Cancellation before resource admission starts no native attempt. */
       const aborted = concurrencyAbort(budget, false)
