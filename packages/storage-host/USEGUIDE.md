@@ -214,6 +214,8 @@ memory 的 `changes(scope)` 首次调用须在该真实 attempt 的首项业务�
 
 `storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding 与可靠独占，打开先完成恢复。同组织与 prefix 同时只允许一个日志句柄；不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。
 
+namespace 的可选只读事实 `indexExclusive:false` 表示原拥有者不能在整个句柄期保证缓存索引独占；storageLogStore 在恢复 I/O 和索引建立前拒绝并释放该原资源。同一个 namespace 仍可向提交桥提供真实 transactionInfo/terminal，不能用 nativeAtomic 冒充索引独占。省略此事实保持原有绑定语义。
+
 追加先捕获原 logger JSON，再沿既有 FIFO 写入记录并最终提交唯一 head；只有真实非空 commit 才更新原 logger 索引并发布一次冻结通知。状态只从 pending 前进到 done/aborted；截断先提交水位再回收物理行，重开保留最高序号与时间，不复用序号。未确认写入使句柄停止准入，必须关闭并重开；恢复忽略未提交记录及状态候选并清理残留，原错误留在 cause。私有记录或载荷损坏统一报 `JOURNAL_RECORD_INVALID`，原 logger 校验错误仍在 cause。无原生事务的私有 namespace 仍可沿同协议工作，但必须由后端提供可靠独占与单键原子 head 写入。当前内置绑定为 memory；host 内部原生追加端口已接同一日志对象与准确组织，复用原 native scope/terminal，绕过普通日志 FIFO；同一事务并发批次分配不同序号，真实 commit 才一次发布，rollback 不发布。后端还须提供可选 `runCommitted(work, committed)`，在原 head lease 释放前将实际结果交给同步发布回调；缺此接点仅不支持该原生追加组合，普通日志照常。其 callback 是提交后观察，错误仅 report，不能假回滚。该端口不从公开 entry 导出；打开日志不自动启用全局 journal，必须由宿主 journal 选项显式选择。
 
 ```ts

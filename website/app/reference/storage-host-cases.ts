@@ -432,8 +432,8 @@ await using host = await createStorageHost({
 try { await host.backend('memory').set('status', 'ready') }
 finally { for (const logger of borrowed) await logger.shutdown('manual') }`,
       result: t(
-        'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. Native clear retains per-row images, original epochs and one clear event. Without atomicBinlog the external append starts only after COMMIT; failure reports without changing committed success. Blob capture, automatic undo, WAL and redo remain unfinished.',
-        '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。原生 clear 保留逐项镜像、原 epoch 与一次 clear 事件。未选 atomicBinlog 时仅 COMMIT 后外置追加，失败报告且不改变已提交成功。blob 捕获、自动 undo、WAL 与 redo 尚未完成。'
+        'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. A namespace declaring indexExclusive:false rejects cached log construction before recovery I/O. Native clear retains per-row images, original epochs and one clear event. Without atomicBinlog the external append starts only after COMMIT; failure reports without changing committed success. Blob capture, automatic undo, WAL and redo remain unfinished.',
+        '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。namespace 声明 indexExclusive:false 时在恢复 I/O 前拒绝缓存日志构造。原生 clear 保留逐项镜像、原 epoch 与一次 clear 事件。未选 atomicBinlog 时仅 COMMIT 后外置追加，失败报告且不改变已提交成功。blob 捕获、自动 undo、WAL 与 redo 尚未完成。'
       )
     },
 

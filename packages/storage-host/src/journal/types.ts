@@ -69,6 +69,8 @@ export type IStorageJournalNamespaceView = {
 /** A namespace borrows authentic native scopes and forwards their actual terminal callbacks. */
 export type IStorageJournalNamespace = IStorageResource & {
   readonly nativeAtomic: boolean
+  /** False when the original owner cannot keep a cached log index exclusively valid for its life. */
+  readonly indexExclusive?: false
   /** Recheck the original namespace generation before cached reads or native append composition. */
   assertLive?(): void
   /** Return the original authenticated transaction identity for this exact store and organization. */
