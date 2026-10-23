@@ -15,7 +15,7 @@ import { StorePersistErrorText } from '../error-text.js'
 /** Per-definition archive options; keyed persistence has no migrate callback option. */
 export type IPersistKeyedOptions<T> = Pick<
   IPersistUnitOptions<T>,
-  'debounceMs' | 'maxWaitMs' | 'scheduler'
+  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages'
 > & {
   /**
    * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the
@@ -78,6 +78,7 @@ export function persistKeyed<T>(
     runtime: atomStore.runtime,
     storage: snapshot.storage,
     codec: snapshot.codec,
+    codecStages: snapshot.codecStages,
     version: snapshot.version,
     partialize: snapshot.partialize,
     merge: snapshot.merge,

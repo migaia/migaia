@@ -26,5 +26,13 @@ export const PersistCodecOutput = {
   binary: 'binary'
 } as const
 
+/** Stable observation operation names at the persistence codec boundary. */
+export const PersistCodecOperation = {
+  /** One complete envelope conversion preceding a backend write. */
+  encode: 'persist.encode',
+  /** One archived envelope conversion after a successful backend read. */
+  decode: 'persist.decode'
+} as const
+
 /** Full public vocabulary; each handle status uses only its relevant subset. */
 export type IPersistState = (typeof PersistState)[keyof typeof PersistState]

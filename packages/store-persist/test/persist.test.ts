@@ -55,10 +55,7 @@ describe('persist（store-light）', () => {
   it('rejects invalid persistence callbacks and codecs before subscription', () => {
     const store = createStore({ count: 1 })
     const storage = memoryStorageHost()
-    for (const [name, value] of [
-      ['migrate', 1],
-      ['partialize', null]
-    ] as const) {
+    for (const [name, value] of [['partialize', null]] as const) {
       expect(() => persist(store, { key: name, storage, [name]: value } as never)).toThrow(
         `[store] persist "${name}" ${name} must be a function`
       )
@@ -296,18 +293,21 @@ describe('persist（store-light）', () => {
     store.$dispose()
   })
 
-  it('version 不一致且未提供 migrate 时 hydrate 失败，status 变 error', async () => {
+  it('rejects archives outside the configured migration range', async () => {
     const storage = memoryStorageHost()
     await storage.set('versioned', JSON.stringify({ version: 5, state: { count: 1 } }))
     const store = createStore({ count: 0 })
     const handle = persist(store, { key: 'versioned', storage, version: 1 })
-    await expect(handle.ready).rejects.toThrow(/provide migrate/)
+    await expect(handle.ready).rejects.toMatchObject({
+      source: '@migaia/storage-contract',
+      code: 'VERSION_UNSUPPORTED'
+    })
     expect(handle.status.value).toBe('error')
     handle.dispose()
     store.$dispose()
   })
 
-  it('migrate 转换旧版本存档', async () => {
+  it('upgrades an old archive through the shared plan', async () => {
     const storage = memoryStorageHost()
     await storage.set('migratable', JSON.stringify({ version: 1, state: { legacyCount: 3 } }))
     const store = createStore({ count: 0 })
@@ -315,7 +315,9 @@ describe('persist（store-light）', () => {
       key: 'migratable',
       storage,
       version: 2,
-      migrate: (persisted) => ({ count: persisted.legacyCount as number })
+      migrations: {
+        2: (persisted) => ({ count: (persisted as { legacyCount: number }).legacyCount })
+      }
     })
     await handle.ready
     expect(store.count).toBe(3)

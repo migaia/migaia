@@ -941,9 +941,15 @@ importers:
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract

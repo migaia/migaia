@@ -16294,7 +16294,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persist } from '@migaia/store-persist/light'\n\nconst storage = memoryStorageHost()\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('已保存：', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()\nstorage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('已保存：', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -16413,7 +16413,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persist } from '@migaia/store-persist/light'\n\nconst storage = memoryStorageHost()\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('saved:', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()\nstorage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('saved:', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -16508,7 +16508,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst settings = createStore({ theme: 'light' as string })\nconst storage = memoryStorageHost()\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('已保存设置:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst settings = createStore({ theme: 'light' as string })\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('已保存设置:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -16684,7 +16684,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst settings = createStore({ theme: 'light' as string })\nconst storage = memoryStorageHost()\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('Saved settings:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst settings = createStore({ theme: 'light' as string })\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('Saved settings:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -16895,7 +16895,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('购物清单:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()\nawait storage.dispose()"
+                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('购物清单:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()"
               },
               {
                 type: 'code',
@@ -17088,7 +17088,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('Shopping list:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()\nawait storage.dispose()"
+                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('Shopping list:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()"
               },
               {
                 type: 'code',
@@ -17206,7 +17206,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`IPersistKeyedOptions<T>`',
-                    'Uses namespace instead of key and has no migrate option. See keyed persistence for every option and the id parameter.'
+                    'Uses namespace instead of key and has no migrations option. See keyed persistence for every option and the id parameter.'
                   ],
                   [
                     '`INVALID_OPTION`',
@@ -17268,7 +17268,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('恢复后的标题:', store.title)\nconsole.log('恢复后的数量:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('恢复后的标题:', store.title)\nconsole.log('恢复后的数量:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -17379,7 +17379,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('Restored title:', store.title)\nconsole.log('Restored count:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('Restored title:', store.title)\nconsole.log('Restored count:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -17465,7 +17465,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'store-persist:partialize-merge-and-migrations': {
     zh: {
       title: '筛选保存字段并升级旧格式',
-      lede: 'partialize 决定保存哪些值，migrate 转换不同版本的存档，merge 把读回数据放进当前状态。三个函数都同步返回，不能返回 Promise。',
+      lede: 'partialize 选择保存字段，migrations 提供连续同步升级步骤或一次 reset，merge 合并状态。未来版本被拒绝；升级本身不写回。',
       document: {
         sections: [
           {
@@ -17475,7 +17475,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { assertEnvelope, defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertEnvelope<Record<string, unknown>>(saved, 'settings')\nconsole.log('保存的字段:', Object.keys(envelope.state).join(', '))\npersistence.dispose()\nawait session.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertVersionedEnvelope(saved)\nconsole.log('保存的字段:', Object.keys(envelope.state as object).join(', '))\npersistence.dispose()\nawait session.$dispose()"
               },
               {
                 type: 'code',
@@ -17495,7 +17495,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrate = (saved: Record<string, unknown>) => ({ theme: saved.color })\nconst options = { key: 'settings', storage, version: 2, migrate }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('迁移后的主题:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrations = { 2: (saved: unknown) => ({ theme: (saved as Record<string, unknown>).color }) }\nconst options = { key: 'settings', storage, version: 2, migrations }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('迁移后的主题:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -17504,7 +17504,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '版本只比较是否相等，不比较谁更新。migrate 接收存档里的 state 和旧版本号，因此也要决定如何处理比当前版本更大的数值。migrate 本身只返回转换结果。需要确认新格式已保存时，等待 flush 完成。'
+                text: '共享冻结计划以连续同步步骤升级可达旧档。未来版本在恢复前被拒绝并阻止写入；升级本身不写回，等待 flush 保存新格式。'
               }
             ]
           },
@@ -17522,9 +17522,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '写入前选择数据。省略时返回完整状态。Light 适配器使用 Record<string, unknown>。'
                   ],
                   [
-                    '`migrate(persisted, fromVersion)`',
+                    '`migrations: { [targetVersion]: step }`',
                     '`TState`',
-                    '版本不一致时运行，省略时抛 ENVELOPE_INVALID。实际 persisted 可能是之前 partialize 保存的部分数据。Keyed 入口没有此选项。'
+                    '只升级可达旧档，步骤接收 unknown 与 { fromVersion, toVersion }；未来或不可达版本报 VERSION_UNSUPPORTED，步骤失败为 MIGRATION_FAILED。Keyed 没有此选项。'
                   ],
                   [
                     '`merge(persisted, current)`',
@@ -17539,7 +17539,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`INVALID_OPTION`',
                     '—',
-                    '函数返回 Promise 或读取 then 时抛错，会使当前恢复或写入失败。回调自己抛出的错误会保留。'
+                    'partialize/merge 返回 thenable 时为 INVALID_OPTION；同步迁移步骤抛错或返回 thenable 时为 contract MIGRATION_FAILED，原始错误位于 cause。'
                   ]
                 ]
               }
@@ -17588,7 +17588,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Select saved fields and upgrade old formats',
-      lede: 'partialize selects values to save, migrate converts archives from another version, and merge combines loaded data with current state. All three callbacks return synchronously, never a Promise.',
+      lede: 'partialize selects saved values, migrations provides contiguous synchronous upgrade steps or one reset, and merge reconciles loaded state. Future versions fail before restoration; upgrading does not write back.',
       document: {
         sections: [
           {
@@ -17598,7 +17598,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { assertEnvelope, defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertEnvelope<Record<string, unknown>>(saved, 'settings')\nconsole.log('Saved fields:', Object.keys(envelope.state).join(', '))\npersistence.dispose()\nawait session.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertVersionedEnvelope(saved)\nconsole.log('Saved fields:', Object.keys(envelope.state as object).join(', '))\npersistence.dispose()\nawait session.$dispose()"
               },
               {
                 type: 'code',
@@ -17618,7 +17618,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrate = (saved: Record<string, unknown>) => ({ theme: saved.color })\nconst options = { key: 'settings', storage, version: 2, migrate }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('Migrated theme:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrations = { 2: (saved: unknown) => ({ theme: (saved as Record<string, unknown>).color }) }\nconst options = { key: 'settings', storage, version: 2, migrations }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('Migrated theme:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -17627,7 +17627,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Versions are compared for equality, not age. migrate receives saved state and its version, so it must also decide how to handle a version newer than the current one. migrate itself returns converted state. Await flush when you need confirmation that the new format has been saved.'
+                text: 'A shared immutable plan upgrades reachable older archives through contiguous synchronous steps. Future versions are rejected before restoration and block writes. Upgrading alone does not write back; await flush to save the new format.'
               }
             ]
           },
@@ -17645,7 +17645,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Selects data before writing. Defaults to the full state. The Light adapter uses Record<string, unknown>.'
                   ],
                   [
-                    '`migrate(persisted, fromVersion)`',
+                    '`migrations: { [targetVersion]: step }`',
                     '`TState`',
                     'Runs on a version mismatch; omission produces ENVELOPE_INVALID. persisted may contain only fields saved by an earlier partialize. The Keyed entry has no migration option.'
                   ],
@@ -18064,34 +18064,33 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`defaultJsonCodec.name` / `output`',
-                    '名称是 migaia-collections-json-v1，输出形式为 text。对象本身已冻结。'
+                    '名称为 collections-json@1，output 为 text；对象冻结，默认就保留 Map/Set。'
                   ],
                   [
                     '`encode(value, ctx?)`',
-                    '返回 Promise<string>。使用 storage-contract 的集合 JSON 格式保存 Map 和 Set。失败时抛 ENCODE_FAILED，并在 cause 中保留原因。'
+                    '返回 Promise<string>，通过 serialize 集合 codec 与 contract adapter 保存 Map/Set；非法 portable 值报本包 ENCODE_FAILED，cause 保留两个拥有者的完整错误链。'
                   ],
                   [
                     '`decode(raw, ctx?)`',
-                    '返回 Promise<unknown>，raw 接收字符串。普通 JSON 和旧集合标签仍可读取，格式错误为 ENVELOPE_INVALID。此实现不使用 ctx。'
+                    '返回 Promise<unknown>，raw 必须为字符串。历史标记与元组为普通数据；非字符串或坏 JSON 为本包 ENVELOPE_INVALID TypeError。envelope 结构与版本由 contract 校验。'
                   ],
-                  ['`IEnvelope<TState>.version`', '非负安全整数，用于选择是否调用 migrate。'],
                   [
-                    '`IEnvelope<TState>.state`',
+                    '`IVersionedEnvelope<TState>.version`',
+                    '非负安全整数；共享计划比较版本并决定逐步升级、重置或拒绝。'
+                  ],
+                  [
+                    '`IVersionedEnvelope<TState>.state`',
                     '保存的状态，不能缺失或为 null、undefined。其他内容仍由应用检查。'
                   ],
                   [
-                    '`assertEnvelope<TState>(value, key)`',
-                    '返回新的 { version, state } 对象。key 只用于错误信息，不检查业务字段，也不冻结结果。'
-                  ],
-                  [
-                    '`new PersistEnvelopeError(message)`',
-                    '创建带 source 与 ENVELOPE_INVALID 的 TypeError，message 用作错误文字。assertEnvelope 失败时使用此类。'
+                    '`assertVersionedEnvelope(value) from @migaia/storage-contract`',
+                    '从 storage-contract 导入；只接受普通对象的自有 version/state，分别读取一次，返回新 envelope 并保留 state 引用，不检查业务 schema。'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '读取旧格式时，只识别 __migaia_persist_map__ 或 __migaia_persist_set__ 属性且对应值为数组的对象。新的集合格式使用版本标记，普通对象不会按新的集合格式随意转换。'
+                text: '历史集合标记和元组形数组均按普通数据读取，不恢复成集合。新格式使用 $rpc map/entries 与 set/values 记录。'
               }
             ]
           },
@@ -18125,7 +18124,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { assertEnvelope, readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nconst storage = memoryStorageHost()\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertEnvelope<{ theme: string }>(raw, 'settings')\nconsole.log('字节存档主题:', envelope.state.theme)\nawait storage.dispose()"
+                code: "import { readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertVersionedEnvelope(raw)\nconsole.log('字节存档主题:', (envelope.state as { theme: string }).theme)"
               },
               {
                 type: 'code',
@@ -18173,7 +18172,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`writeEnvelope(storage, key, codec, value, ctx)`',
                     '`Promise<void>`',
-                    '编码 value 并等待 set 或 setBytes。此工具不添加 version、不调用 assertEnvelope，也不创建订阅或写队列。'
+                    '编码 value 并等待 set 或 setBytes。此工具不添加 version、不调用 assertVersionedEnvelope，也不创建订阅或写队列。'
                   ],
                   [
                     '`readEnvelope(storage, key, codec, ctx)`',
@@ -18242,7 +18241,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`defaultJsonCodec.name` / `output`',
-                    'The name is migaia-collections-json-v1 and output is text. The codec object is frozen.'
+                    'The frozen codec is named collections-json@1 with text output and preserves Map/Set by default.'
                   ],
                   [
                     '`encode(value, ctx?)`',
@@ -18253,26 +18252,22 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Returns Promise<unknown> and accepts a string raw value. Plain JSON and legacy collection tags remain readable. Invalid input produces ENVELOPE_INVALID. This implementation does not use ctx.'
                   ],
                   [
-                    '`IEnvelope<TState>.version`',
-                    'A non-negative safe integer used to decide whether migrate runs.'
+                    '`IVersionedEnvelope<TState>.version`',
+                    'A nonnegative safe integer; the shared plan selects upgrade/reset or rejects unsupported versions.'
                   ],
                   [
-                    '`IEnvelope<TState>.state`',
+                    '`IVersionedEnvelope<TState>.state`',
                     'The saved state. It cannot be absent, null, or undefined. Application code checks its remaining contents.'
                   ],
                   [
-                    '`assertEnvelope<TState>(value, key)`',
+                    '`assertVersionedEnvelope(value) from @migaia/storage-contract`',
                     'Returns a new { version, state } object. key is used in error messages. It neither validates domain fields nor freezes the result.'
-                  ],
-                  [
-                    '`new PersistEnvelopeError(message)`',
-                    'Creates a TypeError with source and ENVELOPE_INVALID, using message as its text. assertEnvelope uses this class on failure.'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'Legacy reads recognize objects with __migaia_persist_map__ or __migaia_persist_set__ whose value is an array. New collection encoding uses a versioned marker to distinguish collections from ordinary objects.'
+                text: 'Historical collection markers and tuple-shaped arrays remain ordinary data. New collections use $rpc map/entries and set/values records.'
               }
             ]
           },
@@ -18306,7 +18301,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { assertEnvelope, readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nconst storage = memoryStorageHost()\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertEnvelope<{ theme: string }>(raw, 'settings')\nconsole.log('Theme in byte archive:', envelope.state.theme)\nawait storage.dispose()"
+                code: "import { readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertVersionedEnvelope(raw)\nconsole.log('Theme in byte archive:', (envelope.state as { theme: string }).theme)"
               },
               {
                 type: 'code',
@@ -18354,7 +18349,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`writeEnvelope(storage, key, codec, value, ctx)`',
                     '`Promise<void>`',
-                    'Encodes value and waits for set or setBytes. It does not add version, call assertEnvelope, or create a subscription or write queue.'
+                    'Encodes value and waits for set or setBytes. It does not add version, call assertVersionedEnvelope, or create a subscription or write queue.'
                   ],
                   [
                     '`readEnvelope(storage, key, codec, ctx)`',
@@ -18439,7 +18434,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('打开时的值:', handle.value.text)\nconsole.log('读取后的值:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('打开时的值:', handle.value.text)\nconsole.log('读取后的值:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18476,7 +18471,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`version?: number`',
-                    '默认 `0`，采用安全非负整数。keyed 没有 `migrate` 选项，版本不匹配时恢复失败。'
+                    '默认 `0`，采用安全非负整数。keyed 没有 `migrations` 选项，版本不匹配时恢复失败。'
                   ],
                   [
                     '`debounceMs?: number`',
@@ -18525,7 +18520,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('删除的草稿数:', await clearFamily(storage, 'drafts'))\nconsole.log('内存中的草稿:', atomStore.get(definition).text)\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('删除的草稿数:', await clearFamily(storage, 'drafts'))\nconsole.log('内存中的草稿:', atomStore.get(definition).text)\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18602,7 +18597,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('Value at opening:', handle.value.text)\nconsole.log('Value after reading:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('Value at opening:', handle.value.text)\nconsole.log('Value after reading:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18639,7 +18634,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`version?: number`',
-                    'Defaults to 0 and accepts safe nonnegative integers. Keyed has no migrate option, so version mismatch fails hydration.'
+                    'Defaults to 0 and accepts safe nonnegative integers. Keyed has no migrations option, so version mismatch fails hydration.'
                   ],
                   [
                     '`debounceMs?: number`',
@@ -18688,7 +18683,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('Removed drafts:', await clearFamily(storage, 'drafts'))\nconsole.log('Draft in memory:', atomStore.get(definition).text)\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('Removed drafts:', await clearFamily(storage, 'drafts'))\nconsole.log('Draft in memory:', atomStore.get(definition).text)\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18767,7 +18762,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('首次读取:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('修复后的草稿:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('首次 ready 的错误:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('首次读取:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('修复后的草稿:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('首次 ready 的错误:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -18833,7 +18828,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('关闭后保存的错误:', error.name, error.code)\n})\nconsole.log('仍可读取的草稿:', store.title)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('关闭后保存的错误:', error.name, error.code)\n})\nconsole.log('仍可读取的草稿:', store.title)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -18971,7 +18966,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('Initial read:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('Repaired draft:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('Original ready error:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('Initial read:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('Repaired draft:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('Original ready error:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -19037,7 +19032,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('Save after close error:', error.name, error.code)\n})\nconsole.log('Draft remains readable:', store.title)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('Save after close error:', error.name, error.code)\n})\nconsole.log('Draft remains readable:', store.title)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -74641,7 +74636,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('读取失败:', error.code, error.context)\n  console.log('原始原因是 SyntaxError:', error.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
+                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('读取失败:', error.code, error.context)\n  console.log('原始原因是 SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
               },
               {
                 type: 'paragraph',
@@ -74906,7 +74901,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('Read failed:', error.code, error.context)\n  console.log('Cause is SyntaxError:', error.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
+                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('Read failed:', error.code, error.context)\n  console.log('Cause is SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
               },
               {
                 type: 'paragraph',
@@ -75083,7 +75078,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: '权限数据中的 `Map`、`Set` 经普通 JSON 编码后变成空对象，见 [恢复嵌套集合](/zh/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1)。'
+                text: '权限数据中的 `Map`、`Set` 经普通 JSON 编码后变成空对象，见 [恢复嵌套集合](/zh/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1)。'
               },
               {
                 type: 'paragraph',
@@ -75109,7 +75104,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: '同一版本格式同时拥有编码与解码规则，使嵌套集合可通过文本往返，见 [集合类型恢复示例](/zh/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1)。'
+                text: '同一版本格式同时拥有编码与解码规则，使嵌套集合可通过文本往返，见 [集合类型恢复示例](/zh/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1)。'
               },
               {
                 type: 'paragraph',
@@ -75132,7 +75127,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
               },
               {
                 type: 'code',
@@ -75158,7 +75153,7 @@ class CheckoutElement extends HTMLElement {
                 headers: ['入口', '何时使用'],
                 rows: [
                   [
-                    '[collectionsJsonCodec](/zh/docs/storage-contract/api/collectionsJsonCodec)',
+                    '[fromValueCodec](/zh/docs/storage-contract/api/fromValueCodec)',
                     '用版本化文本往返 `Map`、`Set`；不打开存储。'
                   ],
                   [
@@ -75261,7 +75256,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: 'Ordinary JSON turns the Map and Set in permissions data into empty objects; see [restore nested collections](/en/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1).'
+                text: 'Ordinary JSON turns the Map and Set in permissions data into empty objects; see [restore nested collections](/en/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1).'
               },
               {
                 type: 'paragraph',
@@ -75287,7 +75282,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: 'One versioned format owns both encoding and decoding so nested collections survive a text round trip; see [the collection case](/en/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1).'
+                text: 'One versioned format owns both encoding and decoding so nested collections survive a text round trip; see [the collection case](/en/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1).'
               },
               {
                 type: 'paragraph',
@@ -75310,7 +75305,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
               },
               {
                 type: 'code',
@@ -75336,7 +75331,7 @@ class CheckoutElement extends HTMLElement {
                 headers: ['Entry', 'When to use it'],
                 rows: [
                   [
-                    '[collectionsJsonCodec](/en/docs/storage-contract/api/collectionsJsonCodec)',
+                    '[fromValueCodec](/en/docs/storage-contract/api/fromValueCodec)',
                     'Round-trip Map and Set through versioned text without opening a store.'
                   ],
                   [
@@ -77228,7 +77223,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsJsonCodec.encode(preferences)\nconst restored = await collectionsJsonCodec.decode(saved)\nconsole.log('恢复为 Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('恢复的主题:', restored.get('theme'))"
+                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('恢复为 Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('恢复的主题:', restored.get('theme'))"
               },
               {
                 type: 'code',
@@ -77240,13 +77235,10 @@ class CheckoutElement extends HTMLElement {
                 headers: ['签名或字段', '行为与处理'],
                 rows: [
                   [
-                    '`collectionsJsonCodec: ICodec<unknown, string>`',
+                    '`fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))`',
                     '冻结的编解码器对象，`output` 为 `text`；使用普通 JSON，并用保留的三元素数组保存 Map 和 Set。'
                   ],
-                  [
-                    '`COLLECTIONS_JSON_CODEC_NAME`',
-                    '固定值为 `migaia-collections-json-v1`，同时用于编解码器名称与集合格式标记。'
-                  ],
+
                   [
                     '`encode(value: unknown, ctx?: IOperationContext): Promise<string>`',
                     '返回编码文本；根值为 `undefined`、循环结构、不能编码的值等会抛出 `INVALID_ARGUMENT` 并保留原因。该内置实现不处理操作上下文。'
@@ -77317,7 +77309,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec, isStorageContractError } from '@migaia/storage-contract'\n\ntry {\n  await collectionsJsonCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('设置文件错误码:', error.code)\n  console.log('原始原因是 SyntaxError:', error.cause instanceof SyntaxError)\n}"
+                code: "import { fromValueCodec, isStorageContractError } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('设置文件错误码:', error.code)\n  console.log('原始原因是 SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
               },
               {
                 type: 'code',
@@ -77451,7 +77443,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsJsonCodec.encode(preferences)\nconst restored = await collectionsJsonCodec.decode(saved)\nconsole.log('Restored as Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('Restored theme:', restored.get('theme'))"
+                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('Restored as Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('Restored theme:', restored.get('theme'))"
               },
               {
                 type: 'code',
@@ -77463,13 +77455,10 @@ class CheckoutElement extends HTMLElement {
                 headers: ['Signature or field', 'Behavior and action'],
                 rows: [
                   [
-                    '`collectionsJsonCodec: ICodec<unknown, string>`',
+                    '`fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))`',
                     'A frozen codec object with text output. It uses JSON and reserves a three-element tuple format for Map and Set values.'
                   ],
-                  [
-                    '`COLLECTIONS_JSON_CODEC_NAME`',
-                    'Equals `migaia-collections-json-v1`, used as both the codec name and the collection-format marker.'
-                  ],
+
                   [
                     '`encode(value: unknown, ctx?: IOperationContext): Promise<string>`',
                     'Returns encoded text. An undefined root, circular data, or an encoding failure throws `INVALID_ARGUMENT` with its cause. This built-in implementation does not process the operation context.'
@@ -77543,7 +77532,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec, isStorageContractError } from '@migaia/storage-contract'\n\ntry {\n  await collectionsJsonCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('Settings file error code:', error.code)\n  console.log('Cause is SyntaxError:', error.cause instanceof SyntaxError)\n}"
+                code: "import { fromValueCodec, isStorageContractError } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('Settings file error code:', error.code)\n  console.log('Cause is SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
               },
               {
                 type: 'code',

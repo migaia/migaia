@@ -1,3 +1,4 @@
+import { assertVersionedEnvelope } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
@@ -5,7 +6,7 @@ import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { persist } from '../src/light-index.js'
 import { createAtomStore, atomDef } from '@migaia/store-keyed'
 import { persistKeyed } from '../src/keyed-index.js'
-import { assertEnvelope, persistUnit, type IPersistHandle } from '../src/index.js'
+import { persistUnit, type IPersistHandle } from '../src/index.js'
 import { defaultJsonCodec, PersistState } from '../src/index.js'
 
 describe('store-persist audit regressions', () => {
@@ -107,8 +108,8 @@ describe('store-persist audit regressions', () => {
     expect(decoded.state.currentSet).toEqual(value.state.currentSet)
   })
 
-  it('continues reading exact one-key legacy collection archives', async () => {
-    /** Exact one-key old markers remain the supported archive migration grammar. */
+  it('reads exact old collection markers as ordinary objects', async () => {
+    /** Old markers have no reserved meaning in the canonical codec. */
     const raw = JSON.stringify({
       version: 0,
       state: {
@@ -116,12 +117,12 @@ describe('store-persist audit regressions', () => {
         set: { __migaia_persist_set__: ['old'] }
       }
     })
-    /** Normal legacy archives still decode to native collections. */
+    /** The codec returns these old markers unchanged. */
     const decoded = (await defaultJsonCodec.decode(raw)) as {
-      state: { map: Map<string, number>; set: Set<string> }
+      state: { map: unknown; set: unknown }
     }
-    expect(decoded.state.map).toEqual(new Map([['old', 1]]))
-    expect(decoded.state.set).toEqual(new Set(['old']))
+    expect(decoded.state.map).toEqual({ __migaia_persist_map__: [['old', 1]] })
+    expect(decoded.state.set).toEqual({ __migaia_persist_set__: ['old'] })
   })
   it('invokes a facade option getter with the original receiver once', async () => {
     /** Both value source and storage are complete actual public implementations. */
@@ -236,20 +237,17 @@ describe('store-persist audit regressions', () => {
     /** The public unknown boundary must expose its semantic validation identity. */
     let failure: unknown
     try {
-      assertEnvelope(
-        {
-          get version() {
-            throw primary
-          },
-          state: {}
+      assertVersionedEnvelope({
+        get version() {
+          throw primary
         },
-        'audit'
-      )
+        state: {}
+      })
     } catch (error) {
       failure = error
     }
     expect(failure).toMatchObject({
-      source: '@migaia/store-persist',
+      source: '@migaia/storage-contract',
       code: 'ENVELOPE_INVALID',
       cause: primary
     })
@@ -269,9 +267,11 @@ describe('store-persist audit regressions', () => {
       state: { __migaia_persist_map__: [['literal', literal]] }
     })
     /** Legacy compatibility must retain the application value rather than reinterpret it as a Map. */
-    const decoded = (await defaultJsonCodec.decode(raw)) as { state: Map<string, unknown> }
-    expect(decoded.state).toBeInstanceOf(Map)
-    expect(decoded.state.get('literal')).toEqual(literal)
-    expect(Array.isArray(decoded.state.get('literal'))).toBe(true)
+    const decoded = (await defaultJsonCodec.decode(raw)) as {
+      state: { __migaia_persist_map__: [string, unknown][] }
+    }
+    expect(decoded.state).toEqual({ __migaia_persist_map__: [['literal', literal]] })
+    expect(decoded.state.__migaia_persist_map__[0]![1]).toEqual(literal)
+    expect(Array.isArray(decoded.state.__migaia_persist_map__[0]![1])).toBe(true)
   })
 })
