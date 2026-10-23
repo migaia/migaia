@@ -1,10 +1,12 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { isStorageErrorFamily, type IStorageErrorFamily } from '../core/error-family.js'
-import type { IStorageOperationRuntime } from '../core/operation-reporter.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from '../backends/errors.js'
+import type { IStorageOperationRuntime } from '@migaia/storage-host/authoring/backend'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { normalizeStorageException } from './quota.js'
-import { readAbortReason, snapshotOperationContext, subscribeToAbort } from '../core/operation.js'
+import { readAbortReason } from '@migaia/storage-host/authoring/backend'
+import { snapshotOperationContext } from '@migaia/storage-contract'
+import { subscribeToAbort } from '../backends/errors.js'
 import { StorageBackend } from '../constants.js'
 
 /**
@@ -105,6 +107,17 @@ export const installIdbTransactionHandlers = (
   } catch (cause) {
     throw normalizeIdbRequestFailure(cause)
   }
+}
+
+/** Observe physical rollback when a transaction's property-handler installation failed. */
+export function afterIdbTransactionAbort(transaction: IDBTransaction): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    try {
+      transaction.addEventListener('abort', () => resolve(), { once: true })
+    } catch (cause) {
+      reject(normalizeIdbRequestFailure(cause))
+    }
+  })
 }
 
 /** Install the complete open-request lifecycle as one normalized host setup boundary. */

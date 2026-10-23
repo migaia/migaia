@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { defineEntity } from '../src/entity.js'
-import { getBackendReactiveController } from '../src/backends/reactive-controller.js'
-import { memoryStorageHost } from '../src/backends/memory.js'
-import { safeJsonPayloadByteLength } from '../src/utils/json.js'
+import { defineEntity } from '@migaia/storage-host/entity'
+import { createMemoryTestStore } from './helpers/installed-backends.js'
+import { createReactiveServiceFixture } from './helpers/reactive-service.js'
+import { safeJsonPayloadByteLength } from '@migaia/storage-host/authoring/backend'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
 type IIndexedUser = {
@@ -46,7 +46,7 @@ describe('shared oracle clusters', () => {
         tags: { path: 'tags', multiEntry: true }
       }
     })
-    const repository = entity.connect(memoryStorageHost())
+    const repository = entity.connect(await createMemoryTestStore())
     await repository.put({ id: 'u2', email: 'same@example.com', tags: ['staff'] })
     await repository.put({ id: 'u1', email: 'same@example.com', tags: ['admin', 'staff'] })
     await repository.put({ id: 'u3', email: 'z@example.com', tags: ['staff'] })
@@ -55,11 +55,12 @@ describe('shared oracle clusters', () => {
       repository.list({ index: 'tags', range: { lower: 'admin', upper: 'admin' } })
     ).resolves.toEqual([{ id: 'u1', email: 'same@example.com', tags: ['admin', 'staff'] }])
     await expect(
-      repository.findManyBy(
-        'email',
-        { lower: 'same@example.com', upper: 'z@example.com' },
-        { direction: 'prev', limit: 2 }
-      )
+      repository.list({
+        index: 'email',
+        range: { lower: 'same@example.com', upper: 'z@example.com' },
+        direction: 'prev',
+        limit: 2
+      })
     ).resolves.toEqual([
       { id: 'u3', email: 'z@example.com', tags: ['staff'] },
       { id: 'u2', email: 'same@example.com', tags: ['staff'] }
@@ -68,15 +69,15 @@ describe('shared oracle clusters', () => {
 
   it('preserves private IDB authority and migration owners', () => {
     const indexedDbSource = readPackageFile('storage-web', 'src/backends/indexed-db.ts')
-    const backfillSource = readPackageFile('storage-web', 'src/backends/indexed-db-backfill.ts')
-    const repositorySource = readPackageFile('storage-web', 'src/entity/repository.ts')
+    const backfillSource = readPackageFile('storage-host', 'src/entity/backfill.ts')
+    const repositorySource = readPackageFile('storage-host', 'src/entity/repository.ts')
     expect(indexedDbSource).toContain(
       "const mutationLeaseBrand = Symbol('indexeddb-mutation-lease')"
     )
     expect(indexedDbSource).toContain('withInternalMutationLease')
     expect(indexedDbSource).toContain('secondaryIndexes: true')
     expect(indexedDbSource).toContain('changeFeed: coordination.admitted')
-    expect(backfillSource).toContain('IndexedDbBackfillPhase')
+    expect(backfillSource).toContain('RecordIndexBackfillPhase')
     expect(backfillSource).toContain('canonical')
     expect(backfillSource).toContain('legacy')
     expect(repositorySource).toContain('safeJsonPayloadByteLength')
@@ -86,9 +87,7 @@ describe('shared oracle clusters', () => {
   })
 
   it('proves one mutation lease drains before controller disposal', async () => {
-    const store = memoryStorageHost()
-    const controller = getBackendReactiveController(store)
-    if (controller === undefined) throw new Error('memory controller is not registered')
+    const { controller, host } = await createReactiveServiceFixture({ id: 'shared-lease' })
     const release = controller.beginMutation()
     const disposal = controller.dispose()
     expect(() => controller.beginMutation()).toThrow()
@@ -101,10 +100,11 @@ describe('shared oracle clusters', () => {
     release()
     await disposal
     expect(settled).toBe(true)
+    await host.dispose()
   })
 
   it('proves one JSON payload owner has exact UTF-8 and fail-closed structured-clone boundaries', () => {
-    const jsonSource = readPackageFile('storage-web', 'src/utils/json.ts')
+    const jsonSource = readPackageFile('storage-host', 'src/core/json.ts')
     expect(jsonSource.match(/JSON\.stringify/g)).toHaveLength(1)
     expect(safeJsonPayloadByteLength(undefined)).toBe(0)
     expect(safeJsonPayloadByteLength({ text: 'CJK-💡' })).toBe(

@@ -14,8 +14,8 @@ export const StorageErrorCode = Object.freeze({
    * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB,
    * or `document` is disabled or missing.
    *
-   * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access,
-   * rather than retrying the same unavailable backend. Enforces the availability probe contract.
+   * The caller selects another installed backend or asks the user to enable storage access, rather
+   * than retrying the same unavailable backend. Enforces the availability probe contract.
    */
   unavailable: 'BACKEND_UNAVAILABLE',
 
@@ -37,8 +37,8 @@ export const StorageErrorCode = Object.freeze({
   valueTooLarge: 'VALUE_TOO_LARGE',
 
   /**
-   * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output,
-   * or a memory write fails during `structuredClone`.
+   * A native IndexedDB record or byte write fails while snapshotting its payload with
+   * `structuredClone`, before asynchronous admission or physical mutation.
    *
    * The caller checks whether the value can be serialized. This is a data shape failure rather than
    * a backend failure.
@@ -46,29 +46,11 @@ export const StorageErrorCode = Object.freeze({
   serializeFailed: 'SERIALIZE_FAILED',
 
   /**
-   * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode`
-   * returns unexpected output.
+   * A decoded IndexedDB cross-instance notification contains an invalid encoded key hint.
    *
    * The caller checks whether an external writer or newer version changes the stored data.
-   * `onInvalid` handles the `decode` stage.
    */
   deserializeFailed: 'DESERIALIZE_FAILED',
-
-  /**
-   * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter
-   * converts returned issues into a validation failure.
-   *
-   * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage.
-   */
-  validationFailed: 'VALIDATION_FAILED',
-
-  /**
-   * A migration function fails.
-   *
-   * Failure to migrate one record does not affect other records. The caller isolates the failure at
-   * the `migrate` stage or repairs the migration logic.
-   */
-  migrationFailed: 'MIGRATION_FAILED',
 
   /**
    * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host
@@ -89,8 +71,7 @@ export const StorageErrorCode = Object.freeze({
   duplicateKey: 'DUPLICATE_KEY',
 
   /**
-   * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current
-   * code.
+   * The native IndexedDB schema version exceeds the version known to the current adapter.
    *
    * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite
    * data from a newer version.
@@ -105,15 +86,6 @@ export const StorageErrorCode = Object.freeze({
    * extension, and `cause` retains the original exception.
    */
   extensionFailed: 'EXTENSION_FAILED',
-
-  /**
-   * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive
-   * commit, causing a concurrent write conflict.
-   *
-   * The caller reads again and retries the entire transaction. This is a retryable concurrency
-   * conflict rather than data corruption.
-   */
-  transactionConflict: 'TRANSACTION_CONFLICT',
 
   /**
    * A cookie is not visible after a write because the browser silently rejects it.
@@ -133,9 +105,8 @@ export const StorageErrorCode = Object.freeze({
 
   /**
    * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`,
-   * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`;
-   * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s
-   * `onDiagnostic`.
+   * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; namespace
+   * codecs; and browser backend options.
    *
    * Contract shape validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers
    * adapter configuration only, as a local exception to unified argument validation.
@@ -187,54 +158,6 @@ export const StorageErrorCode = Object.freeze({
   indexBackfillFailed: 'INDEX_BACKFILL_FAILED',
 
   /**
-   * A backend definition contains an invalid identifier. Callers must correct the bounded backend
-   * ID before retrying installation.
-   */
-  backendIdInvalid: 'BACKEND_ID_INVALID',
-
-  /**
-   * A backend ID is already present in the host install batch or registry. Callers must use a
-   * distinct ID or wait for the existing batch before retrying.
-   */
-  backendDuplicate: 'BACKEND_DUPLICATE',
-
-  /**
-   * A lookup requested a valid backend ID that has not been installed. Callers must install that
-   * exact backend or select an installed ID.
-   */
-  backendNotInstalled: 'BACKEND_NOT_INSTALLED',
-
-  /**
-   * A backend plugin or store failed its runtime contract check. Callers must repair the plugin
-   * definition rather than relying on an unvalidated store.
-   */
-  backendPluginInvalid: 'BACKEND_PLUGIN_INVALID',
-
-  /**
-   * Backend creation, preparation, or PluginHost installation failed. Callers may retry after
-   * fixing the cause, while the failed batch remains unpublished.
-   */
-  backendInstallFailed: 'BACKEND_INSTALL_FAILED',
-
-  /**
-   * A host mutation was requested while another install batch is active. Callers must wait for that
-   * batch to settle and explicitly retry.
-   */
-  storageHostBusy: 'STORAGE_HOST_BUSY',
-
-  /**
-   * A host or its public operation was used after sealing or terminal disposal. Callers must create
-   * a new host instead of reviving this one.
-   */
-  storageHostDisposed: 'STORAGE_HOST_DISPOSED',
-
-  /**
-   * Host cleanup collected one or more failures. Callers must treat the host as terminal while
-   * inspecting the aggregate errors for cleanup diagnostics.
-   */
-  storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED',
-
-  /**
    * Live-query request or owned reactive cleanup collected one or more failures. Callers must treat
    * the query as terminal and inspect AggregateError.errors.
    */
@@ -245,18 +168,6 @@ export const StorageErrorCode = Object.freeze({
    * correct the exact feature/backend pairing before retrying.
    */
   reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID',
-
-  /**
-   * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Callers
-   * must repair the feature set before any host mutation occurs.
-   */
-  reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID',
-
-  /**
-   * Host live-query service is not installed. Callers must install the admitted reactive service
-   * before requesting a query.
-   */
-  reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED',
 
   /**
    * The requested backend lacks its reactive adapter or is not installed. Callers must use an

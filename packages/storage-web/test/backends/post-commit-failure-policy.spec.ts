@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { memoryStorageHost } from '../../src/backends/memory.js'
-import { indexedDbHost } from '../../src/backends/indexed-db.js'
+import { createMemoryTestStore } from '../helpers/installed-backends.js'
+import { createIndexedDbTestStore } from '../helpers/installed-backends.js'
 
 /** Creates an isolated fake IndexedDB store for each post-commit failure case. */
 const freshIndexedDb = () =>
-  indexedDbHost({
+  createIndexedDbTestStore({
     factory: new IDBFactory(),
     keyRange: IDBKeyRange,
     dbName: `storage-v2-t46-${Math.random().toString(36).slice(2)}`
@@ -13,7 +13,7 @@ const freshIndexedDb = () =>
 
 describe('storage-web post-commit failure policy', () => {
   it('resolves a committed write after synchronous listener failure and continues fanout', async () => {
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     const listenerFailure = new Error('synchronous listener failure')
     const trace: string[] = []
     const diagnostics: unknown[][] = []
@@ -39,7 +39,7 @@ describe('storage-web post-commit failure policy', () => {
   })
 
   it('resolves a committed write after late listener rejection and reports the rejection', async () => {
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     const listenerFailure = new Error('late listener failure')
     const trace: string[] = []
     const diagnostics: unknown[][] = []
@@ -62,7 +62,7 @@ describe('storage-web post-commit failure policy', () => {
   })
 
   it('resolves a committed write when the diagnostic reporter fails', async () => {
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     const listenerFailure = new Error('listener failure')
     const reporterFailure = new Error('reporter failure')
     const diagnostics: unknown[][] = []
@@ -85,7 +85,7 @@ describe('storage-web post-commit failure policy', () => {
   })
 
   it('resolves a committed write when both reporter and terminal fallback fail', async () => {
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     const listenerFailure = new Error('listener failure before terminal fallback')
     const reporterFailure = new Error('reporter and terminal fallback failure')
     let reportAttempts = 0
@@ -107,7 +107,7 @@ describe('storage-web post-commit failure policy', () => {
   })
 
   it('observes a hostile thenable returned by the diagnostic reporter', async () => {
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     const listenerFailure = new Error('listener failure before reporter thenable')
     const reporterFailure = new Error('reporter then getter failure')
     const diagnostics: unknown[][] = []
@@ -144,7 +144,7 @@ describe('storage-web post-commit failure policy', () => {
     const cases = [
       {
         key: 'indexed-sync-throw',
-        register(store: ReturnType<typeof freshIndexedDb>, trace: string[]) {
+        register(store: Awaited<ReturnType<typeof freshIndexedDb>>, trace: string[]) {
           store.subscribeChanges(() => {
             trace.push('first')
             throw syncFailure
@@ -156,7 +156,7 @@ describe('storage-web post-commit failure policy', () => {
       },
       {
         key: 'indexed-late-reject',
-        register(store: ReturnType<typeof freshIndexedDb>, trace: string[]) {
+        register(store: Awaited<ReturnType<typeof freshIndexedDb>>, trace: string[]) {
           store.subscribeChanges(() => Promise.reject(lateFailure))
           store.subscribeChanges(() => {
             trace.push('second')
@@ -165,7 +165,7 @@ describe('storage-web post-commit failure policy', () => {
       }
     ]
     for (const testCase of cases) {
-      const store = freshIndexedDb()
+      const store = await freshIndexedDb()
       const trace: string[] = []
       const diagnostics: unknown[][] = []
       const consoleError = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
@@ -183,7 +183,7 @@ describe('storage-web post-commit failure policy', () => {
       }
     }
 
-    const store = freshIndexedDb()
+    const store = await freshIndexedDb()
     const listenerFailure = new Error('indexed listener failure')
     const reporterFailure = new Error('indexed reporter failure')
     const diagnostics: unknown[][] = []

@@ -3,14 +3,13 @@ import type { ICookiesOptions } from '../../src/backends/cookie.js'
 import type { ICookieScope } from '../../src/types/cookie.js'
 import type { IExtensionStage } from '../../src/types/errors.js'
 import type { ISyncCapableStore } from '../../src/types/storage.js'
-import { memoryStorageHost } from '../../src/memory.js'
+import type { IMemoryBackendStore } from '@migaia/storage-host'
 
 expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()
 expectTypeOf<IExtensionStage>().toEqualTypeOf<
-  'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
+  NonNullable<import('@migaia/storage-host').IStorageErrorDetails['extensionStage']>
 >()
-type IMemoryStore = ReturnType<typeof memoryStorageHost>
-expectTypeOf(memoryStorageHost()).toMatchTypeOf<ISyncCapableStore<IMemoryStore>>()
+expectTypeOf<IMemoryBackendStore>().toMatchTypeOf<ISyncCapableStore<IMemoryBackendStore>>()
 import type { ICodec } from '@migaia/storage-contract'
 import type { ISchemaAdapter } from '@migaia/storage-host/entity'
 

@@ -1,7 +1,9 @@
-import { cookiesHost } from '../src/cookies.js'
-import { indexedDbHost } from '../src/indexed-db.js'
-import { localStorageHost } from '../src/local-storage.js'
-import { memoryStorageHost } from '../src/memory.js'
+import { walkErrorCauses } from '@migaia/utils/error'
+import { STORAGE_WEB_SOURCE } from '../src/index.js'
+import { cookieBackendPlugin } from '../src/cookies.js'
+import { indexedDbBackendPlugin } from '../src/indexed-db.js'
+import { localStorageBackendPlugin } from '../src/local-storage.js'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 
 type IWorkerResult = {
   readonly memory: string | null
@@ -10,27 +12,46 @@ type IWorkerResult = {
   readonly cookiesCode: string | undefined
 }
 
-const getFailureCode = (factory: () => unknown): string | undefined => {
+/** Worker admission failures come from the same public asynchronous installation as applications. */
+const getFailureCode = async (
+  factory: () => Promise<{ dispose(): Promise<void> }>
+): Promise<string | undefined> => {
   try {
-    factory()
+    const host = await factory()
+    await host.dispose()
     return undefined
   } catch (error) {
-    return (error as { code?: string }).code
+    const native = walkErrorCauses(error).find(
+      (cause) =>
+        cause !== null &&
+        typeof cause === 'object' &&
+        'source' in cause &&
+        cause.source === STORAGE_WEB_SOURCE
+    )
+    return (native as { code?: string } | undefined)?.code
   }
 }
 
 self.onmessage = async (): Promise<void> => {
-  const memory = memoryStorageHost()
+  const memoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const memory = memoryHost.backend('memory')
   await memory.set('worker-memory', 'ok')
-  const database = indexedDbHost({ dbName: `worker-${crypto.randomUUID()}` })
+  const databaseHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName: `worker-${crypto.randomUUID()}` })]
+  })
+  const database = databaseHost.backend('indexed-db')
   await database.set('worker-indexeddb', 'ok')
   const result: IWorkerResult = {
     memory: await memory.get('worker-memory'),
     indexedDb: await database.get('worker-indexeddb'),
-    localStorageCode: getFailureCode(() => localStorageHost()),
-    cookiesCode: getFailureCode(() => cookiesHost({ namespace: 'worker' }))
+    localStorageCode: await getFailureCode(() =>
+      createStorageHost({ plugins: [localStorageBackendPlugin()] })
+    ),
+    cookiesCode: await getFailureCode(() =>
+      createStorageHost({ plugins: [cookieBackendPlugin({ namespace: 'worker' })] })
+    )
   }
-  await memory.dispose()
-  await database.dispose()
+  await memoryHost.dispose()
+  await databaseHost.dispose()
   self.postMessage(result)
 }

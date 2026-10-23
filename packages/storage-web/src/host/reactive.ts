@@ -5,6 +5,7 @@ import {
   createLifecycleScope
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { tryReadProperty } from '@migaia/utils/error'
 import { Resource } from '@migaia/resource'
 import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
@@ -15,15 +16,13 @@ import {
   StorageErrorCode
 } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import {
-  getBackendReactiveController,
-  type IBackendReactiveController
-} from '../backends/reactive-controller.js'
-import { reportCleanupError } from '../core/operation-reporter.js'
+import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
+import { reportCleanupError } from '@migaia/storage-host/authoring/backend'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  type IKeyValueStore,
+  type IStorageBase,
+  type IStorageResource,
   type IStorageChange
 } from '@migaia/storage-contract'
 import { raceWithAbort, withTimeout } from '@migaia/utils/promise'
@@ -37,10 +36,6 @@ import type {
 } from './types.js'
 import { isStorageReactiveVisibility, LiveQueryStateStatus } from './state-constants.js'
 
-/** Private shared-cell key used to pass one exact materialized store to its adapter. */
-/** Private shared-cell key used to pass one Host-wide service to every adapter. */
-export const storageReactiveServiceCellKey: unique symbol = Symbol('storage-web/reactive-service')
-
 /** Query terminal callback invoked when its owning adapter seals, with a failure collector. */
 export type IStorageReactiveQueryTerminal = (
   recordFailure?: (error: unknown) => void
@@ -52,45 +47,11 @@ export type IStorageReactiveQueryLease = {
   readonly terminate: () => Promise<void>
 }
 
-/** Single-assignment shared cell preserving store identity across PluginHost extensions. */
-export type IStorageStoreCell = {
-  readonly key: symbol
-  readonly set: (store: IKeyValueStore) => void
-  readonly get: () => IKeyValueStore
-}
-
-/** Creates a private cell; adapters cannot substitute a different backend instance. */
-export const createStorageStoreCell = (): IStorageStoreCell => {
-  const key = Symbol('storage-web/reactive-store-cell')
-  let value: IKeyValueStore | undefined
-  return {
-    key,
-    set: (store) => {
-      if (value !== undefined)
-        throw new StorageError(
-          StorageErrorCode.reactiveFeatureInvalid,
-          {},
-          StorageErrorText.reactiveFeatureInvalid
-        )
-      value = store
-    },
-    get: () => {
-      if (value === undefined)
-        throw new StorageError(
-          StorageErrorCode.reactiveFeatureInvalid,
-          {},
-          StorageErrorText.reactiveFeatureInvalid
-        )
-      return value
-    }
-  }
-}
-
 /** Internal adapter handle used by the service registry and Host identity lookup. */
 export type IStorageReactiveAdapter = {
   readonly backendId: string
-  readonly store: IKeyValueStore
-  readonly controller: IBackendReactiveController
+  readonly store: IStorageBase
+  readonly controller?: IBackendChangeController
   readonly consistency: IStorageReactiveFeatureMetadata
   readonly acquireQuery: (
     terminal?: IStorageReactiveQueryTerminal,
@@ -100,17 +61,19 @@ export type IStorageReactiveAdapter = {
   readonly dispose: () => Promise<void>
 }
 
-/** Host-wide service composing lifecycle query admission with Resource request state. */
+/** One installed Feature service composes the original adapter lifecycle and Resource request state. */
 export type IStorageReactiveService = {
   readonly registerAdapter: (input: {
     readonly backendId: string
-    readonly store: IKeyValueStore
-    readonly controller: IBackendReactiveController
+    readonly store: IStorageBase
+    readonly controller?: IBackendChangeController
     readonly consistency: IStorageReactiveFeatureMetadata
     readonly subscribe: IStorageReactiveFeatureMetadata['subscribe']
     readonly report: (error: unknown) => void
   }) => IStorageReactiveAdapter
-  readonly createQuery: <T>(input: IStorageReactiveQueryInput<T>) => ILiveQuery<T>
+  readonly createQuery: <T>(
+    input: IStorageReactiveQueryInput<T>
+  ) => ILiveQuery<T> & IStorageResource
   readonly acquireQuery: (
     backendId: string,
     terminal?: IStorageReactiveQueryTerminal
@@ -123,7 +86,7 @@ export type IStorageReactiveQueryInput<T> = {
   readonly backendId: string
   readonly runtime: IRuntime
   readonly query: (context: {
-    readonly store: IKeyValueStore
+    readonly store: IStorageBase
     readonly signal: import('@migaia/utils/promise').INativeAbortSignal
     readonly scope?: string
   }) => T | PromiseLike<T>
@@ -137,7 +100,7 @@ export type IStorageReactiveQueryInput<T> = {
   readonly scheduler?: IScheduler
 }
 
-/** Creates the one service instance owned by one StorageHost. */
+/** Creates the original service instance owned by one installed reactive Feature. */
 export const createStorageReactiveService = (
   scheduler: IScheduler = systemScheduler
 ): IStorageReactiveService => {
@@ -162,8 +125,8 @@ export const createStorageReactiveService = (
 
   const registerAdapter = (input: {
     readonly backendId: string
-    readonly store: IKeyValueStore
-    readonly controller: IBackendReactiveController
+    readonly store: IStorageBase
+    readonly controller?: IBackendChangeController
     readonly consistency: IStorageReactiveFeatureMetadata
     readonly subscribe: IStorageReactiveFeatureMetadata['subscribe']
     readonly report: (error: unknown) => void
@@ -174,7 +137,11 @@ export const createStorageReactiveService = (
         {},
         StorageErrorText.reactiveFeatureInvalid
       )
-    if (getBackendReactiveController(input.store) !== input.controller)
+    if (
+      input.controller === undefined &&
+      input.subscribe === undefined &&
+      input.consistency.mode !== 'polling'
+    )
       throw new StorageError(
         StorageErrorCode.reactiveFeatureInvalid,
         {},
@@ -265,7 +232,10 @@ export const createStorageReactiveService = (
       if (adapterScope.lifecycle !== 'open') return
       let result: unknown
       try {
-        result = (input.subscribe ?? ((context) => input.controller.subscribe(context.onChange)))({
+        result = (
+          input.subscribe ??
+          ((context) => input.controller?.subscribe(context.onChange) ?? (() => undefined))
+        )({
           store: input.store,
           scheduler,
           signal: sourceAbort.signal,
@@ -907,7 +877,10 @@ export const createStorageReactiveService = (
       }
       const ready = projectCurrentPromise()
       void ready.catch(() => undefined)
+      /** The symbolic entry reports the same cleanup while retaining a separate stable Promise. */
+      let symbolicDisposePromise: Promise<void> | undefined
       return {
+        [asyncDisposeKey]: () => (symbolicDisposePromise ??= disposeQuery().catch(reportQuery)),
         state: publicState,
         consistency,
         ready,
@@ -946,23 +919,4 @@ export const createStorageReactiveService = (
       }
     })()
   }
-}
-
-/** Performs adapter lookup and registers one exact backend/controller pair. */
-export const registerReactiveAdapter = (
-  service: IStorageReactiveService,
-  backendId: string,
-  store: IKeyValueStore,
-  report: (error: unknown) => void,
-  consistency: IStorageReactiveFeatureMetadata,
-  subscribe: IStorageReactiveFeatureMetadata['subscribe']
-): IStorageReactiveAdapter => {
-  const controller = getBackendReactiveController(store)
-  if (controller === undefined)
-    throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
-      {},
-      StorageErrorText.reactiveFeatureInvalid
-    )
-  return service.registerAdapter({ backendId, store, controller, consistency, subscribe, report })
 }
