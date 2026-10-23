@@ -1766,6 +1766,7 @@
       "./authoring/backend": [
         "assertKeyRange",
         "collectUniqueIndexOwners",
+        "createBackendChangeIterator",
         "createStorageOperationReporter",
         "createStorageOperationRuntime",
         "createStorageToken",
