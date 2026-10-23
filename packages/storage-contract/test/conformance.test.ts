@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
 import { conformanceRows } from '../src/conformance/harness.js'
+import { conformanceTransactionFailure } from '../src/conformance/legacy.js'
 import {
   kv,
   ttl,
@@ -77,7 +78,8 @@ const noFeatures: IStorageCapabilities = {
 function cases(
   create: () => IStorageStore<never>,
   capabilities: readonly IAnyStorageCapability[] = [kv],
-  features = noFeatures
+  features = noFeatures,
+  prepareSecondaryIndexes?: Parameters<typeof runConformance>[1]['prepareSecondaryIndexes']
 ) {
   const selected: { name: string; run: () => void | PromiseLike<void> }[] = []
   runConformance(
@@ -90,7 +92,7 @@ function cases(
       },
       expect
     },
-    { name: 'fixture', create, capabilities, features }
+    { name: 'fixture', create, capabilities, features, prepareSecondaryIndexes }
   )
   return selected
 }
@@ -171,7 +173,8 @@ function fixture(features = noFeatures) {
 /** Every selected false implementation has callable methods, so behavior must distinguish it. */
 function wrongFixture(
   features: IStorageCapabilities,
-  indexMode?: 'empty' | 'ignore-range' | 'stale'
+  indexMode?: 'empty' | 'ignore-range' | 'stale',
+  isReady?: () => boolean
 ) {
   const item = fixture(features)
   const records = new Map<IStorageKey, unknown>()
@@ -200,7 +203,11 @@ function wrongFixture(
     iterateRecords: () => rows([]),
     transaction: async () => undefined,
     ensureRecordIndexes: async () => handle,
-    getRecordIndexReadiness: async () => ({ status: 'complete' as const, scanned: 0, indexed: 0 }),
+    getRecordIndexReadiness: async () => ({
+      status: isReady?.() === false ? ('pending' as const) : ('complete' as const),
+      scanned: 0,
+      indexed: 0
+    }),
     putIndexedRecord: async (
       value: unknown,
       key: IStorageKey,
@@ -621,6 +628,51 @@ describe('public consumer-owned conformance', () => {
     }
   })
 
+  it('observes native transaction causes while rejecting wrong codes and preserving legacy outer errors', async () => {
+    const harness: IConformanceHarness = { describe: () => undefined, it: () => undefined, expect }
+    const native = { backend: 'sqlite' }
+    const original = new StorageContractError(StorageContractErrorCode.invalidArgument)
+    const wrapped = Object.assign(
+      new Error('native transaction fixture wrapper', { cause: original }),
+      { source: 'storage.backend.fixture', code: 'TRANSACTION_FAILED' }
+    )
+    await conformanceTransactionFailure(
+      harness,
+      native,
+      () => {
+        throw wrapped
+      },
+      'INVALID_ARGUMENT'
+    )
+    await conformanceTransactionFailure(
+      harness,
+      native,
+      () => Promise.reject(original),
+      'INVALID_ARGUMENT'
+    )
+    await expect(
+      conformanceTransactionFailure(
+        harness,
+        native,
+        () => {
+          throw wrapped
+        },
+        'DUPLICATE_KEY'
+      )
+    ).rejects.toThrow()
+    for (const backend of ['memory', 'indexed-db'])
+      await expect(
+        conformanceTransactionFailure(
+          harness,
+          { backend },
+          () => {
+            throw wrapped
+          },
+          'INVALID_ARGUMENT'
+        )
+      ).rejects.toThrow()
+  })
+
   it('checks callback-only native transactions without inventing a writable token', async () => {
     const features = { ...noFeatures, transactions: true }
     const create = (ignoreCallback = false) => {
@@ -732,6 +784,40 @@ describe('public consumer-owned conformance', () => {
       await expect(selected.find((item) => item.name.startsWith(prefix))!.run()).rejects.toThrow()
     })
   }
+
+  it('prepares original pending indexes without bypassing readiness or range assertions', async () => {
+    const features = {
+      ...noFeatures,
+      records: true,
+      binary: true,
+      iteration: true,
+      transactions: true,
+      secondaryIndexes: true
+    }
+    let prepared = false
+    let item: ReturnType<typeof wrongFixture>
+    const create = () => {
+      prepared = false
+      item = wrongFixture(features, undefined, () => prepared)
+      return item.store
+    }
+    const prepare = vi.fn(
+      async (original: IStorageStore<never>, handle: IRecordIndexQuery['handle']) => {
+        expect(original).toBe(item.store)
+        expect(handle).toBe(await item.native.ensureRecordIndexes())
+        prepared = true
+      }
+    )
+    const select = (ready?: Parameters<typeof runConformance>[1]['prepareSecondaryIndexes']) =>
+      cases(create, [kv], features, ready)
+        .find((item) => item.name.startsWith('secondaryIndexes · ranges'))!
+        .run()
+    await expect(select()).rejects.toThrow()
+    await select(prepare)
+    expect(prepare).toHaveBeenCalledTimes(1)
+    prepared = false
+    await expect(select(vi.fn(async () => undefined))).rejects.toThrow()
+  })
 
   for (const mode of ['empty', 'ignore-range', 'stale'] as const) {
     it(`rejects ${mode} secondary index semantics`, async () => {

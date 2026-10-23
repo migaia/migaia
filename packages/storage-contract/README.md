@@ -738,3 +738,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 `snapshotStorageVectorSearch(query, options, configuration?)` 同样可在 schema 查询前捕获原查询、全部 options 与 filter；取得真实 schema 后只用原 `snapshotStorageVector` 复核已脱离的 query。显式配置仍先于 option getter 校验。五个原 helper 已统一核对：collection/vector/upsert/search 的 schema 均可省，filter 不依赖 schema；都不推断或查询原生配置。
 
 原生后端用 encodeStorageOrgKey(orgId, key, backend) 编码组织物理键，用 decodeStorageOrgKey(orgId, bytes, backend) 取回逻辑键。两者复用原保序线格式，组织封装不占逻辑键的深度或节点预算。无效或其它组织的头部及无效结束字节报 INVALID_ARGUMENT，截断或无效逻辑字节仍报 INVALID_KEY。prefixStorageOrgKey 可选第三参数 backend 只补逻辑键错误上下文，省略时原行为不变。
+
+原生入口验证可以同步抛出或异步拒绝；conformance 观察同一原错误。原生事务包装须在原 cause 链保留预期语义码；memory 与 IndexedDB 保持更严格的外层错误断言。subject 可提供 `prepareSecondaryIndexes(originalStore, originalHandle)`，为全新空索引 fixture 调用既有原生 backfill 拥有者。准备后套件仍要求 complete 就绪，并验证真实范围、投影与唯一性行为。
