@@ -45,6 +45,41 @@ function createBase() {
 }
 
 describe('capability identity and provider ownership', () => {
+  it('admits the original six synchronous methods while retaining the complete root API', () => {
+    /** Sync owns exactly its public six-method channel, without an invented clearAll method. */
+    const sync: NonNullable<IKeyValueApi['sync']> = {
+      get: () => null,
+      set: () => undefined,
+      remove: () => undefined,
+      has: () => false,
+      keys: () => [],
+      clearValues: () => undefined
+    }
+    /** The async root still requires its separate clearAll endpoint. */
+    const api: IKeyValueApi = {
+      get: async () => null,
+      set: async () => undefined,
+      remove: async () => undefined,
+      has: async () => false,
+      keys: async () => [],
+      clearValues: async () => undefined,
+      clearAll: async () => undefined,
+      sync
+    }
+    const store = provideCapabilities(createBase(), [implement(kv, api)])
+    expect(store.sync).toBe(sync)
+    expect(store.use(kv)).toBe(api)
+    expect(Object.keys(store.sync!)).toHaveLength(6)
+    expect(() =>
+      provideCapabilities(createBase(), [
+        implement(kv, { ...api, sync: { ...sync, clearValues: undefined } } as never)
+      ])
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    expect(() =>
+      provideCapabilities(createBase(), [implement(kv, { ...api, clearAll: undefined } as never)])
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+  })
+
   it('shares read-only token access for provided, raw and frozen resources without modifying them', () => {
     /** A native refinement must survive the read-only type projection as it does on store.use. */
     const token = defineStorageCapability<{ read(): string }>()('readonly-catalog')
