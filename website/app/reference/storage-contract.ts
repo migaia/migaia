@@ -916,6 +916,54 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.durableChangeFeed![0]!.example,
       cases: storageContractCases.durableChangeFeed
     },
+    sparql: {
+      role: 'constant',
+      purpose: t(
+        'Exact native callable SPARQL capability, without a generic transaction projection.',
+        '原生 callable SPARQL 的精确能力，不带通用事务投影。'
+      ),
+      example: storageContractCases.sparql![0]!.example,
+      cases: storageContractCases.sparql
+    },
+    sparqlFragment: {
+      role: 'operation',
+      purpose: t(
+        'Capture validated RDF values and authentic pure fragment references.',
+        '捕获已校验 RDF 值与真实纯片段引用。'
+      ),
+      params: {
+        strings: t('A real frozen template.', '真实冻结模板。'),
+        values: t(
+          'NamedNode, Literal or authentic fragment inputs.',
+          'NamedNode、Literal 或真实片段输入。'
+        )
+      },
+      returns: t(
+        'Frozen pure ISparqlFragment without terminals. var/join/empty share the same identity owner.',
+        '不带终端的冻结纯 ISparqlFragment；var/join/empty 共用同一身份 owner。'
+      ),
+      example: storageContractCases.sparqlFragment![0]!.example,
+      cases: storageContractCases.sparqlFragment
+    },
+    createSparqlTag: {
+      role: 'operation',
+      purpose: t(
+        'Bind pure SPARQL nodes to original native callbacks after their actual admission.',
+        '将纯 SPARQL 节点绑定至实际准入后的原生回调。'
+      ),
+      params: {
+        options: t(
+          'Original select/ask/construct/update callbacks receiving lazy prepare and original ctx.',
+          '接收 lazy prepare 与原 ctx 的 select/ask/construct/update 原回调。'
+        )
+      },
+      returns: t(
+        'Frozen ISparqlApi retaining native receiver and Promise identities; no endpoint or lifecycle is created.',
+        '保留原生 receiver 与 Promise 身份的冻结 ISparqlApi；不创建 endpoint 或生命周期。'
+      ),
+      example: storageContractCases.createSparqlTag![0]!.example,
+      cases: storageContractCases.createSparqlTag
+    },
     counter: {
       role: 'constant',
       purpose: t(
@@ -3890,6 +3938,73 @@ console.log(candidate.name, candidate.output)`
             '跟随提交，仅确认成功回调。'
           )
         }
+      }
+    },
+    ISparqlFragment: {
+      summary: t('Opaque pure SPARQL node identity.', '不透明纯 SPARQL 节点身份。'),
+      members: {}
+    },
+    ISparqlInput: {
+      summary: t(
+        'Named node, literal or authentic SPARQL fragment.',
+        'Named node、literal 或真实 SPARQL 片段。'
+      ),
+      members: {}
+    },
+    ISparqlRow: {
+      summary: t(
+        'Readonly binding row retaining undefined for unbound columns.',
+        '未绑定列保留 undefined 的只读绑定行。'
+      ),
+      members: {}
+    },
+    ISparqlQuery: {
+      summary: t(
+        'A native query retaining the same pure fragment identity.',
+        '保留同一纯片段身份的原生查询。'
+      ),
+      members: {
+        select: { summary: t('Return native binding rows.', '返回原生绑定行。') },
+        ask: { summary: t('Return the native boolean.', '返回原生布尔值。') },
+        construct: {
+          summary: t(
+            'Return raw quads including response-local blank terms.',
+            '返回包含响应局部 blank 项的 raw quad。'
+          )
+        },
+        update: { summary: t('Run one native body.', '执行一个原生 body。') }
+      }
+    },
+    ISparqlTagTools: {
+      summary: t(
+        'Pure VARNAME, join and empty composition tools.',
+        '纯 VARNAME、join 与 empty 组合工具。'
+      ),
+      members: {
+        var: {
+          summary: t(
+            'Validate a full SPARQL variable name without a prefix.',
+            '校验不含前缀的完整 SPARQL 变量名。'
+          )
+        },
+        join: {
+          summary: t(
+            'Join authentic fragments, defaulting to whitespace.',
+            '组合真实片段，默认空白分隔。'
+          )
+        },
+        empty: { summary: t('The single empty fragment identity.', '唯一空片段身份。') }
+      }
+    },
+    ISparqlApi: {
+      summary: t(
+        'Native callable template tag with pure tools and typed row output.',
+        '带纯工具与行输出类型的原生 callable 模板 tag。'
+      ),
+      members: {
+        var: { summary: t('Original pure variable tool.', '原纯变量工具。') },
+        join: { summary: t('Original pure join tool.', '原纯 join 工具。') },
+        empty: { summary: t('Original empty fragment.', '原空片段。') }
       }
     },
     ISqlExecutor: {

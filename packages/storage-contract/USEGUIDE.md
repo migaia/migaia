@@ -774,6 +774,10 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 
 `orderStorageKeysByBytes(entries, key)` 对每个 selector 结果只读取一次、立即复制其字节，并按稳定字节序返回原条目。它与原锁归一共用同一 radix 实现，保留前缀顺序，不建立持久索引。`encodeStorageOrgStringPrefix(orgId, prefix, backend)` 使用原组织 envelope 与 key writer，只省略最后 string 和 tuple 两个终止符。空前缀与精确 UTF-16 码元有效；编码前缀不会跨组织，也不匹配 tuple 逻辑键。
 
+SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。插值只收 NamedNode、Literal 或真实片段；raw blank/default graph、普通 string 与假片段在 I/O 前拒绝。literal 转义引号、反斜杠与控制值；变量名采用完整 SPARQL VARNAME 语法，不带问号或美元前缀。join 默认空白分隔，empty 只有一个身份；深层与重复片段按实际输出位置迭代展开。
+
+后端作者用 createSparqlTag({select,ask,construct,update}) 绑定原生回调。各回调接收返回不可变 body 的 lazy prepare 与原 context；后端先做既有操作准入，再 prepare。包装保留 receiver 与 Promise 身份。SELECT 保留未绑定字段的 undefined；CONSTRUCT 保留完整 raw quad 和响应局部 blank。纯组合不启动查询、parser、endpoint、retry loop 或资源。SPARQL 没有通用 KV/record 事务投影；端点专有原子 update 事务仍归原生后端。
+
 ## 向量与 RDF 查询作者入口
 
 `createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。

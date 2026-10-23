@@ -1,3 +1,4 @@
+import { captureStorageTemplatePieces } from './template.js'
 import type { StorageStageKind } from './stage-kind.js'
 import type { ITransactionScope } from './transaction.js'
 import type { IOperationContext } from './context.js'
@@ -133,45 +134,9 @@ function sqlFragmentTag(
   strings: TemplateStringsArray,
   ...values: readonly ISqlInput[]
 ): ISqlFragment {
-  try {
-    if (!Array.isArray(strings) || !Object.isFrozen(strings)) throw invalidSqlArgument()
-    /** Frozen raw metadata is required by the declared template input shape and read exactly once. */
-    const raw = strings.raw
-    /** Source arrays are borrowed once; every template slot is copied once below. */
-    const length = strings.length
-    if (
-      !Array.isArray(raw) ||
-      !Object.isFrozen(raw) ||
-      raw.length !== length ||
-      length !== values.length + 1
-    )
-      throw invalidSqlArgument()
-    /**
-     * Every added static block/binding/reference is appended once, preserving native parameter
-     * order.
-     */
-    const pieces: ISqlPiece[] = []
-    for (let index = 0; index < length; index++) {
-      /**
-       * A real cooked string is required; invalid escapes and sparse templates are not executable
-       * text.
-       */
-      const text = strings[index]
-      if (
-        !Object.hasOwn(strings, index) ||
-        !Object.hasOwn(raw, index) ||
-        typeof text !== 'string' ||
-        typeof raw[index] !== 'string'
-      )
-        throw invalidSqlArgument()
-      pieces.push(text)
-      if (index < values.length) pieces.push(sqlInputPiece(values[index]))
-    }
-    return length === 1 && pieces[0] === '' ? emptySqlFragment : registerSqlFragment(pieces)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidSqlArgument(cause)
-  }
+  /** The shared template owner retains the original field order and per-value SQL capture. */
+  const pieces = captureStorageTemplatePieces(strings, values, sqlInputPiece, invalidSqlArgument)
+  return pieces.length === 1 && pieces[0] === '' ? emptySqlFragment : registerSqlFragment(pieces)
 }
 /** Quotes every identifier component independently; values cannot become identifiers accidentally. */
 function sqlIdentifier(...parts: readonly [string, ...string[]]): ISqlFragment {
