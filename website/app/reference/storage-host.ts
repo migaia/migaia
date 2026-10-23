@@ -644,6 +644,38 @@ console.log(host.extensions.label('draft'))`,
         }
       }
     },
+    IStorageOrgAuthoringPort: {
+      summary: t(
+        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
+        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
+      ),
+      members: {
+        createChangeController: {
+          summary: t(
+            'Construct the original controller under this registration cleanup.',
+            '由本registration清理拥有原controller构造。'
+          )
+        },
+        createKeyLockPort: {
+          summary: t(
+            'Construct the original shared key-lock port; its physical backend retains final ownership.',
+            '构造原共享键锁接点，最终关闭权仍归物理后端。'
+          )
+        },
+        registerChangeController: {
+          summary: t(
+            'Register the exact child store in the original controller registry.',
+            '将精确子store登记到原controller登记表。'
+          )
+        },
+        registerValueCommit: {
+          summary: t(
+            'Register the child native atomic value writer in the same exact-store row.',
+            '在同一精确store行登记子后端原子value写端点。'
+          )
+        }
+      }
+    },
     IStorageBackendOrgContext: {
       summary: t(
         'Read-only immutable invocation ports from the original registration. The context grants no store registration, provider installation or close authority.',

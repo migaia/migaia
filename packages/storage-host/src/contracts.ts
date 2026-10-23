@@ -235,6 +235,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStorageHooks(): IStorageHooks
   readonly emit: IStorageHookEmitter
   readonly createKeyLockPort: IStoragePluginCore['createKeyLockPort']
+  readonly createOrgAuthoringPort: IStoragePluginCore['createOrgAuthoringPort']
   readonly createTransactionApi: IStoragePluginCore['createTransactionApi']
   readonly getChainMethods: IStoragePluginCore['getChainMethods']
   setStorageFeatureProjection(projection: IStorageFeatureProjection | undefined): void
@@ -298,6 +299,7 @@ export const definePlugin: IStorageDefinePlugin = ((
         },
         emit: nativeCore.emit,
         createKeyLockPort: nativeCore.createKeyLockPort,
+        createOrgAuthoringPort: nativeCore.createOrgAuthoringPort,
         createTransactionApi: nativeCore.createTransactionApi,
         getChainMethods: nativeCore.getChainMethods,
         createRevisionPort: nativeCore.createRevisionPort,
