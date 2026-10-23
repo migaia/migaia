@@ -37,6 +37,16 @@ import {
   counter,
   vector,
   rdf,
+  blob,
+  snapshotStorageBlobPut,
+  snapshotStorageBlobGet,
+  snapshotStorageBlobList,
+  createStorageBlobObject,
+  createStorageBlobBodyReader,
+  prefixStorageOrgKey,
+  type IBlobApi,
+  type IBlobInfo,
+  type IBlobObject,
   createRdfQuery,
   snapshotStorageRdfQuad,
   snapshotStorageRdfPattern,
@@ -96,6 +106,7 @@ import {
 import { parseObjectPath } from '@migaia/utils/object-path'
 import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
 import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-core.js'
+import { createMemoryBlobData } from './memory-blob.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
@@ -113,7 +124,13 @@ import {
 import { planChannelWrite } from '../core/channel-write.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { resolveStorageNamespace } from '../core/namespace.js'
-import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
+import {
+  throwIfAborted,
+  mergeSignals,
+  withAbort,
+  subscribeToAbort,
+  readAbortReason
+} from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { observeStorageBatch } from '../core/batch-observation.js'
 import { createBackendChangeIterator } from '../core/change-iterator.js'
@@ -180,6 +197,8 @@ type IMemoryEntry = {
 }
 /** Native vector and RDF rows share the maps and draft without legacy channel replacement. */
 type IMemoryChannel = IStorageChannel | 'vector' | 'rdf'
+/** Blobs share capacity and invalidation, while remaining outside generic transactions and locks. */
+type IMemoryPhysicalChannel = IMemoryChannel | 'blob'
 /** A transaction retains its first deadline beside the existing detached value snapshot. */
 type IMemorySnapshot = IMemoryEntry & { readonly deadline?: number }
 /** This native unit supports only its actual three physical value channels. */
@@ -316,6 +335,8 @@ function createMemoryNamespace<T>(
   }
   /** Collection metadata is private to this namespace and consumes no second physical entry. */
   const vectorCollections = new Map<string, IStorageVectorConfiguration>()
+  /** Opaque objects keep independent native identity under the same namespace and controller. */
+  const blobs = createMemoryBlobData(orgId)
   /** Full clears include native families; legacy key replacement remains three-channel. */
   const physicalChannels = [...MemoryState.channels, 'vector', 'rdf'] as const
   /** Only live expiring identities retain deadline metadata. */
@@ -367,6 +388,7 @@ function createMemoryNamespace<T>(
     capacityIndex?.clear()
     vectorCollections.clear()
     rdfIndex.clear()
+    blobs.clear()
   }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
   const normalize = (cause: unknown, expiredScope?: true) =>
@@ -400,7 +422,7 @@ function createMemoryNamespace<T>(
     ...(pid === undefined ? {} : { pid })
   })
   /** One physical channel plus the existing flat wire gives an unambiguous revision identity. */
-  const identity = (channel: IMemoryChannel, encoded: string): string =>
+  const identity = (channel: IMemoryPhysicalChannel, encoded: string): string =>
     MemoryState.identity(channel, encoded)
   /** Revision changes remain independent of whether an entry is currently present. */
   const revision = (channel: IMemoryChannel, encoded: string): number =>
@@ -449,7 +471,7 @@ function createMemoryNamespace<T>(
   }
   /** One already owned physical identity is shared by the native entry and its policy metadata. */
   const capacityFact = (
-    channel: IMemoryChannel,
+    channel: IMemoryPhysicalChannel,
     key: IStorageKey,
     bytes?: number,
     rdfLock?: ILockKey
@@ -459,7 +481,8 @@ function createMemoryNamespace<T>(
     return { id: identity(channel, encoded), channel, encoded, key, bytes, lock: rdfLock }
   }
   /** Capacity uses only native physical channels already known to this namespace. */
-  const capacityLock = (entry: IMemoryCapacityChange): ILockKey => {
+  const capacityLock = (entry: IMemoryCapacityChange): ILockKey | undefined => {
+    if (entry.channel === 'blob') return undefined
     if (entry.channel === 'value') return lockKey.text(entry.key)
     if (entry.channel === 'bytes') return lockKey.bytes(entry.key as string)
     if (entry.channel === 'rdf') return entry.lock!
@@ -487,13 +510,23 @@ function createMemoryNamespace<T>(
     const victims = capacityIndex.preview([...expired, ...changes])
     /** Canonical point identities feed only the existing physical lock owner and its original FIFO. */
     const identities = snapshotConcurrencyLockKeys(
-      [...expired, ...victims].map(capacityLock),
+      [...expired, ...victims]
+        .map(capacityLock)
+        .filter((key): key is ILockKey => key !== undefined),
       STORAGE_MEMORY_BACKEND
     ).identities
     return { expired, victims, identities }
   }
   /** Native metadata deletion is shared by expiry, explicit removal and committed capacity victims. */
-  const deletePhysical = (channel: IMemoryChannel, encoded: string): IMemoryEntry | undefined => {
+  const deletePhysical = (
+    channel: IMemoryPhysicalChannel,
+    encoded: string
+  ): IMemoryEntry | undefined => {
+    if (channel === 'blob') {
+      const entry = blobs.removeEncoded(encoded)
+      if (entry !== undefined) capacityIndex?.remove(identity(channel, encoded))
+      return entry
+    }
     const entry = data[channel].get(encoded)
     if (entry === undefined) return undefined
     data[channel].delete(encoded)
@@ -557,14 +590,14 @@ function createMemoryNamespace<T>(
    */
   let pendingChanges:
     | {
-        readonly channel: IMemoryChannel
+        readonly channel: IMemoryPhysicalChannel
         readonly kind: IStorageChange['kind']
         readonly keys?: readonly IStorageKey[]
       }[]
     | undefined
   /** Notifications retain original commit-after eviction order. */
   const publish = (
-    channel: IMemoryChannel,
+    channel: IMemoryPhysicalChannel,
     kind: IStorageChange['kind'],
     keys?: readonly IStorageKey[]
   ): void => {
@@ -573,11 +606,11 @@ function createMemoryNamespace<T>(
       return
     }
     controller.publish({
-      channel: channel === 'vector' || channel === 'rdf' ? 'all' : channel,
+      channel: channel === 'vector' || channel === 'rdf' || channel === 'blob' ? 'all' : channel,
       kind,
       orgId,
-      // RDF has no public storage-key projection; broad invalidation never exposes physical graphs.
-      ...(keys === undefined || channel === 'rdf' ? {} : { keys })
+      // Broad RDF/object invalidations never expose physical graph or organization key envelopes.
+      ...(keys === undefined || channel === 'rdf' || channel === 'blob' ? {} : { keys })
     })
   }
   /** Capacity mutations and their events share the original final synchronous native turn. */
@@ -585,7 +618,7 @@ function createMemoryNamespace<T>(
     if (plan === undefined) return run()
     pendingChanges = []
     /** Counts retain only actual capacity removals, never ordinary expiry or user values. */
-    const counts = new Map<IMemoryChannel, number>()
+    const counts = new Map<IMemoryPhysicalChannel, number>()
     try {
       for (const entry of plan.expired) {
         const removed = deletePhysical(entry.channel as IMemoryChannel, entry.encoded)
@@ -594,7 +627,7 @@ function createMemoryNamespace<T>(
       /** Input preparation and final lock checks have already completed before this callback. */
       const result = run()
       for (const entry of plan.victims) {
-        const channel = entry.channel as IMemoryChannel
+        const channel = entry.channel as IMemoryPhysicalChannel
         const removed = deletePhysical(channel, entry.encoded)
         if (removed === undefined) continue
         publish(channel, 'remove', [removed.key])
@@ -841,7 +874,7 @@ function createMemoryNamespace<T>(
   const clearAll = (): void => {
     controller.assertLive()
     /** Empty physical channels still advance epochs without manufacturing change notifications. */
-    const changed = physicalChannels.some((channel) => data[channel].size !== 0)
+    const changed = blobs.size !== 0 || physicalChannels.some((channel) => data[channel].size !== 0)
     for (const channel of physicalChannels) {
       data[channel].clear()
       ordered[channel].clear()
@@ -851,6 +884,7 @@ function createMemoryNamespace<T>(
     expiring?.clear()
     capacityIndex?.clear()
     rdfIndex.clear()
+    blobs.clear()
     if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
@@ -2870,6 +2904,315 @@ function createMemoryNamespace<T>(
     match: rootRdfQuery
   }
 
+  /** Native object failures reuse the existing memory serialization boundary and original cause. */
+  const blobFailure = (cause: unknown, key?: string) =>
+    isStorageErrorFamily(cause)
+      ? cause
+      : new StorageError(StorageErrorCode.serializeFailed, {
+          backend: STORAGE_MEMORY_BACKEND,
+          key,
+          cause
+        })
+  /** Conditions inspect the current native generation both before reading and in the final turn. */
+  function assertBlobCondition(input: ReturnType<typeof snapshotStorageBlobPut>): void {
+    /** The current opaque generation is observed without taking reader ownership. */
+    const current = blobs.get(input.key)
+    if (
+      (input.options.ifMatch !== undefined && current?.value.info.etag !== input.options.ifMatch) ||
+      (input.options.ifNoneMatch === true && current !== undefined)
+    )
+      throw new StorageContractError(StorageContractErrorCode.writeConflict, {
+        backend: STORAGE_MEMORY_BACKEND
+      })
+  }
+  /** Only the native sink buffers the complete object; reader lifecycle stays in the contract owner. */
+  async function loadBlobBody(
+    input: ReturnType<typeof snapshotStorageBlobPut>,
+    signal: IOperationContext['signal']
+  ): Promise<Uint8Array> {
+    if (isUint8Array(input.body)) return input.body
+    /** Upload consumption and cancellation reuse the sole shared body-reader resource owner. */
+    const reader = createStorageBlobBodyReader(input.body, {
+      report,
+      backend: STORAGE_MEMORY_BACKEND,
+      normalizeFailure: (cause) => blobFailure(cause, input.key)
+    })
+    /** Only memory's native sink buffers complete content; server sinks keep their own backpressure. */
+    const chunks: Uint8Array[] = []
+    /** Byte accounting belongs to the completed native body rather than metadata or indexes. */
+    let size = 0
+    /** A primary read/abort/close failure must remain reachable if cleanup also fails. */
+    let failed = false
+    /** Cleanup failure becomes primary only when the body itself completed successfully. */
+    let cleanupFailed = false
+    /** Undefined rejection is still preserved when the shared cleanup rejects with it. */
+    let cleanupFailure: unknown
+    /** A fully collected body remains private until cleanup and the final CAS both succeed. */
+    let body!: Uint8Array
+    /** Context and host closure each release their original signal listener during settlement. */
+    let stopContext: () => void = () => undefined
+    /** Root closure wakes an unfinished read before the original mutation lease drains it. */
+    let stopClosing: () => void = () => undefined
+    /** The original dispose below consumes cancellation errors after the blocked read wakes. */
+    const cancel = (target: IOperationContext['signal']) => {
+      void reader.return!(readAbortReason(target)).catch(() => undefined)
+    }
+    try {
+      stopContext = subscribeToAbort(signal, () => cancel(signal), report)
+      stopClosing = subscribeToAbort(
+        controller.closingSignal,
+        () => cancel(controller.closingSignal),
+        report
+      )
+      for (;;) {
+        throwIfAborted(signal)
+        controller.assertLive()
+        /** The original reader returns a detached byte chunk or its stable EOF result. */
+        const next = await reader.next()
+        throwIfAborted(signal)
+        controller.assertLive()
+        if (next.done) break
+        chunks.push(next.value)
+        size += next.value.byteLength
+      }
+      body = new Uint8Array(size)
+      /** A single final allocation owns the bytes installed by the synchronous native commit. */
+      let offset = 0
+      for (const chunk of chunks) {
+        body.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+    } catch (cause) {
+      failed = true
+      throwIfAborted(signal)
+      controller.assertLive()
+      throw cause
+    } finally {
+      stopContext()
+      stopClosing()
+      try {
+        await reader.dispose()
+      } catch (cause) {
+        if (failed) reportCleanupError(report, cause)
+        else {
+          cleanupFailed = true
+          cleanupFailure = cause
+        }
+      }
+    }
+    if (cleanupFailed) throw cleanupFailure
+    return body
+  }
+  /** Opaque objects use the same original operation runner and physical capacity commit. */
+  const objects: IBlobApi = {
+    async put(key, body, options) {
+      controller.assertLive()
+      /** Caller-owned body/options are captured before the original operation pipeline can await. */
+      const input = snapshotStorageBlobPut(key, body, options, STORAGE_MEMORY_BACKEND)
+      /** Pipeline intervention receives owned writable fields without reviving caller getters. */
+      const pipelineInput = { ...input, options: { ...input.options } }
+      /** Pipeline-provided fields are captured once before upload starts or native admission waits. */
+      let prepared: ReturnType<typeof snapshotStorageBlobPut>
+      /** Complete content remains private through lock waits and the final generation recheck. */
+      let bytes: Uint8Array
+      /** Opaque generation metadata is prepared before capacity can remove any original entry. */
+      let info: IBlobInfo
+      /** Capacity uses the same shared physical tuple as this namespace's native object map. */
+      let physicalKey: IStorageKey
+      /** The original lock owner's final synchronous preflight selects the exact capacity victims. */
+      let plan: ReturnType<typeof planCapacity>
+      return runWithConcurrency(
+        {
+          store: base,
+          options: input.options.ctx ?? {},
+          execute: (context, invoke) =>
+            core.execution.run(
+              { operation: MemoryOperation.blobPut, input: pipelineInput, ctx: context },
+              async (captured) => {
+                controller.assertLive()
+                /** Accepted uploads drain through the existing controller's mutation lease. */
+                const release = controller.beginMutation()
+                try {
+                  prepared = snapshotStorageBlobPut(
+                    captured.key,
+                    captured.body,
+                    captured.options,
+                    STORAGE_MEMORY_BACKEND
+                  )
+                  assertBlobCondition(prepared)
+                  bytes = await loadBlobBody(prepared, context.signal)
+                  throwIfAborted(context.signal)
+                  controller.assertLive()
+                  physicalKey = prefixStorageOrgKey(orgId, prepared.key)
+                  info = Object.freeze({
+                    key: prepared.key,
+                    size: bytes.byteLength,
+                    etag: createStorageToken(),
+                    contentType: prepared.options.contentType,
+                    metadata: prepared.options.metadata ?? Object.freeze({}),
+                    updatedAt: Date.now()
+                  })
+                  return await invoke()
+                } catch (cause) {
+                  throw blobFailure(cause, input.key)
+                } finally {
+                  release()
+                }
+              }
+            ),
+          lock: () => []
+        },
+        {
+          attempt: (attempt) =>
+            locks.attemptWrite(
+              attempt,
+              holding(),
+              () => {
+                assertBlobCondition(prepared)
+                return commitCapacity(plan, () => {
+                  /** All failure-prone input and body work precedes this final synchronous turn. */
+                  const entry = blobs.put(bytes, info)
+                  capacityIndex?.put({
+                    ...capacityFact('blob', entry.key),
+                    bytes: bytes.byteLength
+                  })
+                  publish('blob', 'put')
+                  return info
+                })
+              },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal,
+              undefined,
+              undefined,
+              () => {
+                assertBlobCondition(prepared)
+                plan =
+                  capacity === undefined
+                    ? undefined
+                    : planCapacity([capacityFact('blob', physicalKey, bytes.byteLength)])
+                return plan?.identities ?? []
+              }
+            )
+        }
+      )
+    },
+    async get(key, options) {
+      controller.assertLive()
+      /** Range and caller context are admitted before any native object snapshot is opened. */
+      const input = snapshotStorageBlobGet(key, options, STORAGE_MEMORY_BACKEND)
+      /** The original pipeline may replace or mutate this owned request before native admission. */
+      const pipelineInput = { ...input, options: { ...input.options } }
+      /** This original timeout/context lifetime transfers to the returned shared object resource. */
+      const merged = mergeSignals(input.options.ctx, report)
+      /** A pipeline failure after opening content still disposes that exact original resource. */
+      let resource: IBlobObject | undefined
+      try {
+        throwIfAborted(merged.signal)
+        return await core.execution.run(
+          { operation: MemoryOperation.blobGet, input: pipelineInput, ctx: merged.context },
+          async (captured) => {
+            controller.assertLive()
+            throwIfAborted(merged.signal)
+            /** Re-capture pipeline changes even when it retained the same request object identity. */
+            const request = snapshotStorageBlobGet(
+              captured.key,
+              captured.options,
+              STORAGE_MEMORY_BACKEND
+            )
+            /** Native metadata and body come from the same immutable committed generation. */
+            const entry = blobs.get(request.key)
+            if (entry === undefined) {
+              merged.dispose()
+              return undefined
+            }
+            capacityIndex?.touch(identity('blob', entry.encoded))
+            /** Inclusive public range bounds become a detached native slice. */
+            const range = request.options.range
+            /** A clipped endpoint also makes reads beyond EOF return an empty body. */
+            const end =
+              range?.end === undefined
+                ? entry.value.body.byteLength
+                : Math.min(entry.value.body.byteLength, range.end + 1)
+            /** Future overwrites, removal and capacity eviction cannot change returned content. */
+            const snapshot = entry.value.body.slice(range?.start ?? 0, end)
+            /** Native pull opens no second lifecycle or storage subscription. */
+            const source = new ReadableStream<Uint8Array>(
+              {
+                pull(native) {
+                  controller.assertLive()
+                  throwIfAborted(merged.signal)
+                  native.enqueue(snapshot)
+                  native.close()
+                }
+              },
+              { highWaterMark: 0 }
+            )
+            resource = createStorageBlobObject(entry.value.info, source, {
+              close: () => merged.dispose(),
+              report,
+              backend: STORAGE_MEMORY_BACKEND,
+              normalizeFailure: (cause) => blobFailure(cause, request.key)
+            })
+            return resource
+          }
+        )
+      } catch (cause) {
+        try {
+          await resource?.dispose()
+        } catch (cleanup) {
+          reportCleanupError(report, cleanup)
+        }
+        merged.dispose()
+        throw blobFailure(cause, input.key)
+      }
+    },
+    head: (key, ctx) =>
+      asyncEntry(MemoryOperation.blobHead, key, ctx, (captured) => {
+        controller.assertLive()
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        const entry = blobs.get(captured)
+        if (entry !== undefined) capacityIndex?.touch(identity('blob', entry.encoded))
+        return entry?.value.info
+      }),
+    remove: (key, ctx) =>
+      mutationEntry(MemoryOperation.blobRemove, key, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [],
+          run: () => {
+            const entry = deletePhysical('blob', blobs.encodedOf(captured))
+            if (entry !== undefined) publish('blob', 'remove')
+            return entry !== undefined
+          }
+        }
+      }),
+    async list(options, ctx) {
+      const request = snapshotStorageBlobList(options, ctx, STORAGE_MEMORY_BACKEND)
+      return asyncEntry(MemoryOperation.blobList, { ...request }, request.ctx, (captured) => {
+        controller.assertLive()
+        const input = snapshotStorageBlobList(captured, request.ctx, STORAGE_MEMORY_BACKEND)
+        const result = blobs.list(input.prefix, input.after, input.limit)
+        for (const info of result.items)
+          capacityIndex?.touch(identity('blob', blobs.encodedOf(info.key)))
+        return result
+      })
+    },
+    removeByPrefix: (prefix, ctx) =>
+      mutationEntry(MemoryOperation.blobRemoveByPrefix, prefix, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [],
+          run: () => {
+            let count = 0
+            for (const entry of blobs.rows(captured))
+              if (deletePhysical('blob', entry.encoded) !== undefined) count++
+            if (count > 0) publish('blob', 'batch')
+            return count
+          }
+        }
+      })
+  }
+
   /** Publish the real built-in APIs on the original resource, never a copied base. */
   const store = provideCapabilities(
     base,
@@ -2879,6 +3222,7 @@ function createMemoryNamespace<T>(
         forTransaction: (scope) => (scope as IMemoryScope<T>)[ttlOperations]
       }),
       implement(vector, vectors),
+      implement(blob, objects),
       implement(rdf, rdfApi, {
         forTransaction: (scope) => (scope as IMemoryScope<T>)[rdfOperations]
       }),

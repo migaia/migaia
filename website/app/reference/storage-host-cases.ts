@@ -131,6 +131,25 @@ console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, r
   ],
   memoryBackendPlugin: [
     {
+      title: t('Read an immutable native object range', '读取原生对象的不可变范围快照'),
+      problem: t(
+        'An application needs opaque objects without projecting them into KV or a transaction.',
+        '业务需要独立的不透明对象，不将其投影为KV或事务。'
+      ),
+      example: `import { blob } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const objects = host.backend('memory').use(blob)
+await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: true })
+await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
+console.log((await object.bytes())[0])`,
+      result: t(
+        'Prints 2. Conditions precede upload ownership and are rechecked at commit; the inclusive range has one original content claim.',
+        '输出2。条件先于上传reader接管并在提交时复核；包含end的范围只有一次原内容消费权。'
+      )
+    },
+    {
       title: t('Commit native RDF with the original draft', '用原 draft 提交原生 RDF'),
       problem: t(
         'Ground graph data must share namespace and transaction ownership with KV.',
