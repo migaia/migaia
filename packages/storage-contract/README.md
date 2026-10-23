@@ -718,3 +718,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 记录 update 的 patch 只经原 `immutableSnapshot` 分离一次，不额外套用便携值 profile；Date、Map 等 generic record 字段由原后端 codec 验证。事务操作仍先准入再读取 patch，访问器只在原快照过程中读取一次。
 
 根能力查询的 Feature 类型分别投影 records 的 query、向量的 vector 与 RDF 的 rdf 组；仅安装 rdf/vector 组也会生效。原生 API 方法、collection 附加成员、generic payload、原方法、select 后方法、changeFeed 和 groupBy 的真实有无保持。标准 token 缺省不声明 feed/group；仅内部实现准入类型允许真实 boolean 支持域，并保留实际 API，不能把 false 源扩大成 true。
+
+文本变更接口为 `ITextWatchApi.watch(key,ctx?)` 与 `ITextChangeFeedApi.subscribeChanges(listener)`，流返回原 `IStorageIterator<IStorageChange>`。as/isChangeFeedStore 只有在原 KV 准入、changeFeed=true、两个真实方法均可调用时才成功；仅有 subscriber 的旧形状拒绝，getter 错误保留为 cause，检查不订阅。as 返回原对象，=== 不变。已知 store 的同步、元数据、原生 API、能力集合、事务和 Feature 类型全部保留；既有 records/vector/RDF 查询得到 feed 声明，不添加不存在的能力。未知输入仍仅经原 KV/text guard 准入。该声明不实现 controller、订阅器、可靠重放或查询结果流。

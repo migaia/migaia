@@ -4,10 +4,20 @@ import type {
   IStorageCapabilitySet,
   IStorageCapabilityApiOf,
   IWithTransactionQueryMethods,
+  IRecordsApi,
+  ICapabilityImpl,
+  ICapabilityStore,
+  IAnyStorageCapability,
   records
 } from './capability.js'
-import type { rdf } from './capabilities/rdf.js'
-import type { vector, IVectorCollection, IVectorCollectionOptions } from './capabilities/vector.js'
+import type { rdf, IRdfApi } from './capabilities/rdf.js'
+import type {
+  vector,
+  IVectorApi,
+  IVectorCollection,
+  IVectorCollectionOptions
+} from './capabilities/vector.js'
+import type { IKeyValueStore } from './store.js'
 import type { IRecordQuery, IRdfQuery, IVectorQueryBuilder } from './query-chain.js'
 import type { IStorageKey, IOperationContext } from './context.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
@@ -183,6 +193,33 @@ export type IWithChainMethods<TStore, TMethods extends IChainMethods> = keyof TM
       readonly [installedChainMethods]?: TMethods
     } & IWithTransactionMethods<TStore, TMethods> &
       IWithQueryMethods<TStore, TMethods>
+/** A truthful store-wide feed refines only the three standard query APIs and keeps native members. */
+type IWithChangeFeedApi<TApi> =
+  TApi extends IRecordsApi<infer TValue, infer _TFeed, infer TMethods>
+    ? Omit<TApi, 'query'> & IRecordsApi<TValue, true, TMethods>
+    : TApi extends IVectorApi<infer TGroupable, infer _TFeed, infer TMethods>
+      ? Omit<TApi, 'collection'> & IVectorApi<TGroupable, true, TMethods>
+      : TApi extends IRdfApi<infer _TFeed, infer TMethods>
+        ? Omit<TApi, 'match'> & IRdfApi<true, TMethods>
+        : TApi
+/** Rebuilds the original implementation tuple from existing metadata without a capability registry. */
+type IChangeFeedImplementation<S, C extends IAnyStorageCapability> = C extends unknown
+  ? Omit<ICapabilityImpl<C>, 'api'> & {
+      readonly api: IWithChangeFeedApi<IStorageCapabilityApiOf<S, C>>
+    }
+  : never
+/** Known-store refinement preserves native, sync, metadata, transaction and Feature method domains. */
+export type IWithChangeFeedCapabilities<S extends Omit<IKeyValueStore, 'use'>> = ([
+  IStorageCapabilitySet<S>
+] extends [never]
+  ? S
+  : ICapabilityStore<
+        S,
+        IStorageCapabilitySet<S>,
+        readonly IChangeFeedImplementation<S, IStorageCapabilitySet<S>>[]
+      > extends infer T
+    ? IWithChainMethods<T, IChainMethodsOf<S>>
+    : never) & { readonly capabilities: S['capabilities'] & { readonly changeFeed: true } }
 
 /** Backend observations carry no client or payload authority. */
 export type IBackendStageObserver = Readonly<{

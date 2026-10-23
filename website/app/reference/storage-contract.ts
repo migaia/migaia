@@ -2438,8 +2438,8 @@ console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { prev
         )
       },
       returns: t(
-        'The exact store as `IChangeFeedStore`; incomplete feed capability throws `UNSUPPORTED_CAPABILITY`. Original reflection or accessor failures remain reachable through `cause`.',
-        '同一个存储收窄为 `IChangeFeedStore`；变更流能力不完整时抛 `UNSUPPORTED_CAPABILITY`，原始反射或访问器失败沿 `cause` 可达。'
+        'Original known store with full capability/native/sync/transaction/Feature precision plus native text watch; missing either callable rejects with UNSUPPORTED_CAPABILITY and preserves getter cause.',
+        '原已知 store，保留完整能力、原生、同步、事务与 Feature 类型并提供文本 watch；缺少任一方法时报 UNSUPPORTED_CAPABILITY，getter cause 保留。'
       ),
       example: `const feed = asChangeFeedStore(store)
 const unsubscribe = feed.subscribeChanges((change) => console.log(change.channel, change.kind))
@@ -2513,8 +2513,8 @@ unsubscribe()`
         )
       },
       returns: t(
-        'A boolean narrowing to `IChangeFeedStore`; access failures return false.',
-        '收窄到 `IChangeFeedStore` 的布尔值；访问失败返回假值。'
+        'Boolean after real KV/flag/two-callable admission; known stores retain full precision, while unknown inputs narrow only to the original KV/text feed shape.',
+        '真实 KV/flag/双 callable 准入后的布尔值；已知 store 保留完整类型，未知输入只缩窄到原 KV/text feed 形状。'
       ),
       example: `if (isChangeFeedStore(candidate)) {
   const unsubscribe = candidate.subscribeChanges((change) => console.log(change.sequence))
@@ -5348,10 +5348,31 @@ if (sync) {
       example: storeExample,
       members: recordMembers
     },
+    ITextWatchApi: {
+      summary: t(
+        'Native text-key invalidation stream through watch(key,ctx?), returning the original resource iterator.',
+        'watch(key,ctx?) 提供的原生文本键失效流，返回原资源迭代器。'
+      ),
+      members: {}
+    },
+    ITextChangeFeedApi: {
+      summary: t(
+        'Native watch and post-commit subscribeChanges methods sharing the original provider owner.',
+        '原生 watch 与提交后 subscribeChanges，共用原 provider owner。'
+      ),
+      members: {}
+    },
+    IWithChangeFeedCapabilities: {
+      summary: t(
+        'Known-store type refinement retaining native, sync, metadata, transaction and Feature types; only existing records/vector/RDF APIs gain the declared feed.',
+        '已知 store 类型细化，保留原生、同步、元数据、事务与 Feature；仅既有 records/vector/RDF API 获得 feed 声明。'
+      ),
+      members: {}
+    },
     IChangeFeedStore: {
       summary: t(
-        'Existing key-value store with a post-commit invalidation subscription, admitted through the change-feed capability guard.',
-        '具有提交后失效通知订阅的既有键值存储，通过变更流能力守卫接纳。'
+        'Existing key-value store with real subscribeChanges and watch(key,ctx?) functions; native invalidation does not promise reliable replay.',
+        '同时具有真实 subscribeChanges 与 watch(key,ctx?) 的既有键值存储；原生失效通知不承诺可靠重放。'
       ),
       scenarios: [
         t(
