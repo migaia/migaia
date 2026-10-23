@@ -180,13 +180,19 @@ export function createBackendChangeIterator(
   return {
     next: () => {
       if (failed) return Promise.reject(failure)
-      /** The existing owner admits the whole native advancement, including its pending wait. */
-      const advance = () => {
-        // Cancellation may arrive while the original pipeline awaits before invoking this body.
-        if (failed) return Promise.reject(failure)
-        return lifetime.isClosing() ? lifetime.returned() : lifetime.advance(() => native.next())
-      }
-      return captured.execute === undefined ? advance() : captured.execute(advance, merged.context)
+      if (lifetime.isClosing()) return lifetime.returned()
+      /** The original owner retains the complete pipeline Promise, including pre-native awaits. */
+      return lifetime.advance(async () => {
+        /** A late continuation must settle directly instead of waiting on its own cleanup. */
+        const advance = async (): Promise<IteratorResult<IStorageChange>> => {
+          if (failed) throw failure
+          if (lifetime.isClosing()) return { done: true, value: undefined }
+          return native.next()
+        }
+        return captured.execute === undefined
+          ? advance()
+          : captured.execute(advance, merged.context)
+      })
     },
     return: (value) => {
       void close()

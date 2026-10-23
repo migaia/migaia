@@ -183,9 +183,33 @@ describe('memory native text watch', () => {
     const pending = stream.next()
     await admitted.promise
     signal.abort(reason)
+    let disposed = false
+    const disposal = stream.dispose().then(() => {
+      disposed = true
+    })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(disposed).toBe(false)
     finish.resolve()
     await expect(pending).rejects.toMatchObject({ code: 'ABORTED', cause: reason })
-    await stream.dispose()
+    await disposal
+    expect(disposed).toBe(true)
     await controller.dispose()
+
+    const original = new Error('native watch pipeline threw')
+    const other = createBackendChangeController({ backend: 'memory' })
+    const failed = createBackendChangeIterator(other, {
+      orgId: createOrgId(),
+      channel: 'value',
+      execute: () => {
+        throw original
+      }
+    })
+    let rejection: Promise<IteratorResult<IStorageChange>> | undefined
+    expect(() => {
+      rejection = failed.next()
+    }).not.toThrow()
+    await expect(rejection).rejects.toBe(original)
+    await failed.dispose()
+    await other.dispose()
   })
 })
