@@ -33,6 +33,29 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  snapshotConcurrencyLockHoldings: [
+    {
+      title: t('Inspect detached holdings in canonical order', '按规范顺序检查独立持锁快照'),
+      problem: t(
+        'Native lock tables keep insertion order and must not duplicate canonical sorting.',
+        '原生锁表保留插入顺序，不能复制规范排序实现。'
+      ),
+      example: t(
+        `import { snapshotConcurrencyLockHoldings, type ILockHolding } from '@migaia/storage-contract'
+function inspect(rows: readonly ILockHolding[]) {
+  return snapshotConcurrencyLockHoldings(rows)
+}`,
+        `import { snapshotConcurrencyLockHoldings, type ILockHolding } from '@migaia/storage-contract'
+function inspect(rows: readonly ILockHolding[]) {
+  return snapshotConcurrencyLockHoldings(rows)
+}`
+      ),
+      result: t(
+        'Returns frozen independent key/holder rows in stable channel/key order, retaining expired and expiresAt and separate equal-key rows. No internal lock table or authority is exposed.',
+        '返回冻结的独立键与 holder 行，按通道与键稳定排序，保留 expired、expiresAt 和相同键的独立行；不暴露内部锁表或权限。'
+      )
+    }
+  ],
   readConcurrencyLockIdentities: [
     {
       title: t(

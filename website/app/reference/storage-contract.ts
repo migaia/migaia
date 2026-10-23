@@ -686,6 +686,25 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    snapshotConcurrencyLockHoldings: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot current inspection rows using the original stable canonical lock order.',
+        '复用原稳定规范锁顺序，对当前检查行制作快照。'
+      ),
+      params: {
+        rows: t(
+          'Current typed inspection rows; no acquisition or waiting occurs.',
+          '当前 typed 检查行；不取锁、不等待。'
+        )
+      },
+      returns: t(
+        'Frozen detached key/holder rows preserving expired, expiresAt and separate equal-key rows, without lock authority.',
+        '冻结的独立键与 holder 行，保留 expired、expiresAt 和相同键的独立行，不授予锁权限。'
+      ),
+      example: storageContractCases.snapshotConcurrencyLockHoldings![0]!.example,
+      cases: storageContractCases.snapshotConcurrencyLockHoldings
+    },
     readConcurrencyLockIdentities: {
       role: 'operation',
       purpose: t(
@@ -2126,6 +2145,12 @@ console.log(candidate.name, candidate.output)`
         '一次真实后端尝试的已捕获操作意图与共享准入预算。'
       ),
       members: {
+        attempt: {
+          summary: t(
+            'Original shared conflict count plus one, forwarded to observations without backend counters.',
+            '原共用冲突计数加一，直接转发给观察，不设后端计数器。'
+          )
+        },
         ...operationMembers,
         admission: {
           summary: t(

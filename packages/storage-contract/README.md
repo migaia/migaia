@@ -550,3 +550,7 @@ async function paidTotals(store: IStorageBase) {
 ```
 
 `readConcurrencyLockIdentities(ctx)` 读取真实活跃 attempt 的原元数据，返回包含通道隔离、按规范排序去重的不可变小写十六进制身份列表；列表只从已有编码字节生成一次，重复读取与嵌套尝试共用同一列表，不重新编码逻辑键、不暴露可变内部字节。伪造、已结算或只有 builder 元数据的 context 抛 INVALID_ARGUMENT；函数不授予登记、取锁或资源控制权。
+
+`snapshotConcurrencyLockHoldings(rows)` 对当前检查行制作独立快照，复用同一通道与键字节顺序稳定排序，保留每行的 holder、expired 与 expiresAt。相同键的行不会合并；返回值不关联内部锁表或授予锁权限。
+
+`IConcurrencyAttemptContext.attempt` 等于原共用冲突计数加一；后端把此只读序号转发给观察，不自行计数，嵌套尝试沿同一预算来源。
