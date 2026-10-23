@@ -773,3 +773,11 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 `durableChangeFeed` 选择原生 `readChanges` 重放与可释放的 `tailChanges`。游标不透明，至少一次重放；调用方只持久化成功处理的游标。保留期缺口为携带 `StorageContractErrorCode.changeCursorExpired` 的原生 RangeError，调用方全量失效后从 now 恢复。普通变更可携带原 host context 的只读 orgId。blob 与 durable feed 不获得通用事务投影或平铺 KV；memory 发出短暂变更并不意味着获得 durable 令牌。
 
 `orderStorageKeysByBytes(entries, key)` 对每个 selector 结果只读取一次、立即复制其字节，并按稳定字节序返回原条目。它与原锁归一共用同一 radix 实现，保留前缀顺序，不建立持久索引。`encodeStorageOrgStringPrefix(orgId, prefix, backend)` 使用原组织 envelope 与 key writer，只省略最后 string 和 tuple 两个终止符。空前缀与精确 UTF-16 码元有效；编码前缀不会跨组织，也不匹配 tuple 逻辑键。
+
+## 向量与 RDF 查询作者入口
+
+`createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。
+
+`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历、分页与写终点由后续单元补齐。
+
+两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。

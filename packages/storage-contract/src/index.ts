@@ -218,7 +218,11 @@ export {
   QueryOperation,
   compileStorageWhere,
   createRecordQuery,
-  RecordQueryMethod
+  createVectorQuery,
+  createRdfQuery,
+  RecordQueryMethod,
+  VectorQueryMethod,
+  RdfQueryMethod
 } from './query-chain.js'
 export type {
   IFieldOps,
@@ -239,7 +243,19 @@ export type {
   IRecordQueryCore,
   IRecordQueryBase,
   IRecordQueryBaseCore,
-  IRecordQueryNeedsLimit
+  IRecordQueryNeedsLimit,
+  IVectorHit,
+  IVectorQueryBuilderCore,
+  IVectorQueryBase,
+  IVectorQueryBuilder,
+  IVectorQuery,
+  IVectorQueryInput,
+  IVectorQuerySource,
+  IRdfQueryCore,
+  IRdfQuery,
+  IRdfQueryTraversal,
+  IRdfQueryInput,
+  IRdfQuerySource
 } from './query-chain.js'
 
 export { useTransactionCapability } from './transaction.js'
