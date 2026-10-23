@@ -138,9 +138,8 @@ export const createStorageTypeError = (
 
 /** Value, bytes or structured-record channel sharing one logical key conflict domain. */
 export type IStorageChannel = 'value' | 'bytes' | 'record'
-/** Extension phase locates user callbacks, including the original backend execution pipeline. */
+/** Extension phase used to locate a schema, codec, migration, comparator or diagnostic failure. */
 export type IExtensionStage =
-  | 'pipeline'
   | 'schema'
   | 'codec'
   | 'migration'
