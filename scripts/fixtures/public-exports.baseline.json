@@ -1077,7 +1077,8 @@
         "snapshotSyncWriteOptions",
         "sqlFragment",
         "unprefixStorageOrgKey",
-        "useStorageCapability"
+        "useStorageCapability",
+        "useTransactionCapability"
       ]
     },
     "@migaia/storage-web": {

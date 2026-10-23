@@ -1,4 +1,15 @@
 import {
+  kv,
+  records,
+  readTransactionImplementation,
+  type IAnyStorageCapability,
+  type ITransactionCapabilityView,
+  type ITransactionCapabilityApi
+} from './capability.js'
+import { TRANSACTION_KEY_VALUE_METHODS, StorageCapabilityMethod } from './capability-constants.js'
+import type { ICodecValue } from '@migaia/serialize/codec'
+import type { IQueryChain, IQueryResult } from './query-chain.js'
+import {
   ConcurrencyPolicy,
   assertConcurrencyPolicy,
   type IConcurrencyPolicy,
@@ -50,32 +61,37 @@ export type ITransactionKeyValueApi = {
   removeByPrefix(prefix: IStorageKey): Promise<number>
 }
 
-/** Complete backend-owned transaction view; all methods use the same physical transaction. */
-export type ITransactionScope<TValue = unknown> = {
-  get(key: string): Promise<string | null>
-  set(key: string, value: string, options?: ITransactionWriteOptions): Promise<void>
-  remove(key: string): Promise<void>
-  has(key: string): Promise<boolean>
-  getBytes(key: string): Promise<Uint8Array | null>
-  setBytes(key: string, value: Uint8Array, options?: ITransactionWriteOptions): Promise<void>
-  removeBytes(key: string): Promise<void>
-  getRecord(key: IStorageKey): Promise<TValue | undefined>
-  putRecord(
-    value: TValue,
-    key?: IStorageKey,
-    options?: ITransactionWriteOptions
-  ): Promise<IStorageKey>
-  deleteRecord(key: IStorageKey): Promise<void>
-  iterateRecords(range?: IKeyRange): IStorageIterator<[IStorageKey, TValue]>
-  putIndexedRecord?(
-    value: TValue,
-    key: IStorageKey,
-    handle: IRecordIndexHandle,
-    projection: IRecordIndexProjection,
-    options?: ITransactionWriteOptions
-  ): Promise<IStorageKey>
-  iterateRecordIndex?(query: IRecordIndexQuery): IStorageIterator<[IStorageKey, TValue]>
+/** Transaction record queries share the real executor while refusing ordinary operation contexts. */
+export type ITransactionRecordsApi<TValue = ICodecValue> = {
+  query<R = TValue>(): IQueryChain<R, undefined>
+  removeByPrefix(prefix: IStorageKey): Promise<number>
 }
+/** Complete backend-owned transaction view; all methods use the same physical transaction. */
+export type ITransactionScope<
+  TValue = unknown,
+  TCaps extends IAnyStorageCapability = never
+> = ITransactionCapabilityView<typeof kv | TCaps, TValue> &
+  ITransactionKeyValueApi & {
+    getBytes(key: string): Promise<Uint8Array | null>
+    setBytes(key: string, value: Uint8Array, options?: ITransactionWriteOptions): Promise<void>
+    removeBytes(key: string): Promise<void>
+    getRecord(key: IStorageKey): Promise<TValue | undefined>
+    putRecord(
+      value: TValue,
+      key?: IStorageKey,
+      options?: ITransactionWriteOptions
+    ): Promise<IStorageKey>
+    deleteRecord(key: IStorageKey): Promise<void>
+    iterateRecords(range?: IKeyRange): IStorageIterator<[IStorageKey, TValue]>
+    putIndexedRecord?(
+      value: TValue,
+      key: IStorageKey,
+      handle: IRecordIndexHandle,
+      projection: IRecordIndexProjection,
+      options?: ITransactionWriteOptions
+    ): Promise<IStorageKey>
+    iterateRecordIndex?(query: IRecordIndexQuery): IStorageIterator<[IStorageKey, TValue]>
+  }
 
 /**
  * Rejects a non-callable transaction callback before a provider allocates transaction resources.
@@ -171,6 +187,7 @@ const RegistrationKind = { owner: 'owner', view: 'view', iterator: 'iterator' } 
 /** One store initialization captures its backend-owned normalizer and fixed resource key. */
 type IOwnerRegistration = {
   readonly kind: typeof RegistrationKind.owner
+  readonly store: IStorageBase
   readonly backend: string
   readonly normalizeFailure: (error: unknown) => ITransactionFailure
   readonly asyncDisposeKey: typeof Symbol.asyncDispose
@@ -184,6 +201,9 @@ type IViewRegistration = {
   readonly info: ITransactionInfo
   state: ITransactionState | undefined
   expiredFailure: ITransactionFailure | undefined
+  capabilities:
+    | Map<IAnyStorageCapability, { readonly implementation: object; readonly api: unknown }>
+    | undefined
 }
 /** An actual iterator remains recognizable after its resource and original view have closed. */
 type IIteratorRegistration = {
@@ -258,6 +278,8 @@ function invalidateView(view: IViewRegistration): void {
   const state = view.state
   if (!state) return
   view.expiredFailure = expirationFailure(state)
+  view.capabilities?.clear()
+  view.capabilities = undefined
   view.state = undefined
   state.views.delete(view)
 }
@@ -315,7 +337,8 @@ function createTransactionView(state: ITransactionState): {
     backend: state.owner.backend,
     info: state.info,
     state,
-    expiredFailure: undefined
+    expiredFailure: undefined,
+    capabilities: undefined
   }
   transactionRegistrations.set(scope, view)
   state.views.add(view)
@@ -443,6 +466,7 @@ export function createTransactionOwner<
     /** No backend callbacks or connections are duplicated by this registration. */
     const owner: IOwnerRegistration = {
       kind: RegistrationKind.owner,
+      store,
       backend: base.backend,
       normalizeFailure,
       asyncDisposeKey,
@@ -494,7 +518,8 @@ export function createTransactionOwner<
             backend: base.backend,
             info,
             state,
-            expiredFailure: undefined
+            expiredFailure: undefined,
+            capabilities: undefined
           }
           state.userView = view
           state.views.add(view)
@@ -740,6 +765,152 @@ export function assertTransactionOwner(store: IStorageBase, scope: object): ITra
   )
     throw invalidTransaction()
   return view.info
+}
+
+/** Actual record projection values follow the original full backend scope. */
+type IScopeRecordValue<TScope> = TScope extends {
+  getRecord(key: IStorageKey): Promise<(infer TValue) | undefined>
+}
+  ? TValue
+  : ICodecValue
+/** Retrieves only authentic live scope state, never a public store/capabilities lookalike. */
+function liveTransactionCapability(
+  scope: object,
+  capability: IAnyStorageCapability
+): {
+  readonly state: ITransactionState
+  readonly binding: ReturnType<typeof readTransactionImplementation>
+} {
+  /** The same view record owns cache lifetime, transaction validity and its exact original store. */
+  const view = transactionView(scope)
+  /** Pure lookup cannot revive an invalidated user, operation or check view. */
+  const state = view.state
+  if (!state || state.closed || state.firstFailure) throw invalidTransaction()
+  return { state, binding: readTransactionImplementation(state.owner.store, capability) }
+}
+/** Executes one projected data method inside the original operation owner with a fresh full view. */
+function runTransactionCapabilityMethod(
+  scope: ITransactionScope<unknown>,
+  capability: IAnyStorageCapability,
+  method: string,
+  args: readonly unknown[]
+): Promise<unknown> {
+  return runTransactionOperation(scope, (operationScope) => {
+    /** Re-read publication authority rather than retaining an installation after Feature release. */
+    const { binding } = liveTransactionCapability(operationScope, capability)
+    /** Only the current operation view reaches backend binding; old views are never reused. */
+    const api = binding.forTransaction(operationScope)
+    if (typeof api !== 'object' || api === null) throw invalidTransaction()
+    /** Borrow one actual native method and preserve its API receiver and returned value. */
+    const execute = (api as Record<string, unknown>)[method]
+    if (typeof execute !== 'function') throw invalidTransaction()
+    return Reflect.apply(execute, api, args)
+  })
+}
+/** Adds original-owner admission to the actual selected chain without copying its nodes or plan. */
+function transactionRecordQueryResult<R>(
+  scope: object,
+  query: IQueryResult<R, undefined>
+): IQueryResult<R, undefined> {
+  return Object.freeze({
+    all: () => runTransactionOperation(scope, () => query.all()),
+    explain: () => query.explain(),
+    requirePushdown: () => transactionRecordQueryResult(scope, query.requirePushdown())
+  })
+}
+/** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
+function transactionRecordQuery<R>(
+  scope: object,
+  query: IQueryChain<R, undefined>
+): IQueryChain<R, undefined> {
+  /** Forwarding retains the original overloads, row inference and one-time condition capture. */
+  const where = ((...args: readonly unknown[]) =>
+    transactionRecordQuery(scope, Reflect.apply(query.where, query, args))) as IQueryChain<
+    R,
+    undefined
+  >['where']
+  /** Selection remains the original shared node constructor and never gains a second executor. */
+  const select = ((...args: readonly unknown[]) =>
+    transactionRecordQueryResult(scope, Reflect.apply(query.select, query, args))) as IQueryChain<
+    R,
+    undefined
+  >['select']
+  return Object.freeze({
+    where,
+    select,
+    all: () => runTransactionOperation(scope, () => query.all()),
+    explain: () => query.explain(),
+    requirePushdown: () => transactionRecordQuery(scope, query.requirePushdown())
+  })
+}
+/**
+ * Reads the original store capability table from an authentic view. Pure lookup invokes no binder
+ * or I/O. Cached finite projections keep only this view/token identity; invalidation clears them.
+ * Data calls still enter the original operation owner; record query construction remains pure and
+ * its authentic backend source supplies the existing iterator/complete-terminal ownership.
+ */
+export function useTransactionCapability<
+  TScope extends ITransactionScope<unknown>,
+  TCap extends IAnyStorageCapability & Parameters<TScope['use']>[0]
+>(
+  scope: TScope,
+  capability: TCap
+): TCap extends typeof records
+  ? ITransactionRecordsApi<IScopeRecordValue<TScope>>
+  : ITransactionCapabilityApi<TCap> {
+  /** Membership is checked before returning even a previously cached projection. */
+  const { binding } = liveTransactionCapability(scope, capability)
+  /** The current view is already proved authentic and active by the same owner lookup. */
+  const view = transactionView(scope)
+  /** One cached API object per actual implementation and view preserves pure lookup identity. */
+  const previous = view.capabilities?.get(capability)
+  if (previous?.implementation === binding.implementation)
+    return previous.api as TCap extends typeof records
+      ? ITransactionRecordsApi<IScopeRecordValue<TScope>>
+      : ITransactionCapabilityApi<TCap>
+  /** Complete finite methods delegate to the original binder only when an operation actually runs. */
+  const api: Record<string, unknown> = {}
+  if (capability === kv) {
+    for (const method of TRANSACTION_KEY_VALUE_METHODS)
+      api[method] = (...args: readonly unknown[]) =>
+        runTransactionCapabilityMethod(scope, capability, method, args)
+  } else {
+    /**
+     * Queries bind the current user/check/operation view without opening a cursor during
+     * construction.
+     */
+    api.query = () => {
+      /**
+       * Actual native sources retain this original view and register their iterators with its
+       * owner.
+       */
+      const { state, binding } = liveTransactionCapability(scope, capability)
+      try {
+        /** The backend's pure query constructor must use its real scope, never a root API. */
+        const bound = binding.forTransaction(scope)
+        if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
+        /** One borrowed constructor keeps the actual shared chain and its source receiver intact. */
+        const query = (bound as Record<string, unknown>).query
+        if (typeof query !== 'function') throw invalidTransaction()
+        return transactionRecordQuery(scope, Reflect.apply(query, bound, []))
+      } catch (error) {
+        throw failTransaction(state, error)
+      }
+    }
+    api.removeByPrefix = (prefix: IStorageKey) =>
+      runTransactionCapabilityMethod(scope, capability, StorageCapabilityMethod.removeByPrefix, [
+        prefix
+      ])
+  }
+  /** Only the projection object is frozen; the backend scope/API and original base are not patched. */
+  const frozen = Object.freeze(api)
+  ;(view.capabilities ??= new Map()).set(capability, {
+    implementation: binding.implementation,
+    api: frozen
+  })
+  return frozen as TCap extends typeof records
+    ? ITransactionRecordsApi<IScopeRecordValue<TScope>>
+    : ITransactionCapabilityApi<TCap>
 }
 
 /** Registers and invokes a composed operation synchronously before schema, codec or native work. */

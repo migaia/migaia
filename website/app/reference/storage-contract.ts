@@ -686,6 +686,29 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    useTransactionCapability: {
+      role: 'operation',
+      purpose: t(
+        'Read the sole capability table through an authentic original transaction view.',
+        '通过真实原事务视图读取唯一能力表。'
+      ),
+      params: {
+        scope: t(
+          'Authentic live full scope with its precise admitted capability set; raw/frozen scopes are not modified.',
+          '具备精确已接纳能力集合的真实活跃完整 scope；不修改 raw/frozen scope。'
+        ),
+        capability: t(
+          'Authentic published kv or records with an original forTransaction binder.',
+          '具备原 forTransaction 绑定的真实已发布 kv 或 records。'
+        )
+      },
+      returns: t(
+        'One frozen view-local projection with no binder/I/O during lookup. Data execution and complete query terminals enter the original owner; invalidation clears the cache.',
+        '一个冻结的视图局部投影；取用时不调用 binder、不 I/O；数据执行和完整查询终点进入原 owner，失效清空缓存。'
+      ),
+      example: storageContractCases.useTransactionCapability![0]!.example,
+      cases: storageContractCases.useTransactionCapability
+    },
     sqlFragment: {
       role: 'operation',
       purpose: t(
@@ -2514,6 +2537,37 @@ console.log(candidate.name, candidate.output)`
     IConcurrencyStageObserver: {
       summary: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。'),
       members: {}
+    },
+    ITransactionCapabilityView: {
+      summary: t(
+        'Public optional contravariant capability proof and typed transaction use; complete external scopes need no private symbol.',
+        '公开可选反变能力证明与 typed 事务 use；完整外部 scope 不需要私有 symbol。'
+      ),
+      members: {
+        use: {
+          summary: t(
+            'Accept only admitted finite transaction tokens and preserve record value inference.',
+            '仅接受已接纳有限事务 token，保留记录值推断。'
+          )
+        }
+      }
+    },
+    ITransactionRecordsApi: {
+      summary: t(
+        'Implemented original transaction record projection, without ordinary operation contexts.',
+        '已实现原事务记录投影，不接受普通操作上下文。'
+      ),
+      members: {
+        query: {
+          summary: t(
+            'Actual shared IQueryChain with undefined context and the original iterator owner.',
+            '使用 undefined context 与原 iterator owner 的真实共用 IQueryChain。'
+          )
+        },
+        removeByPrefix: {
+          summary: t('Actual native transaction deletion count.', '原生事务实际删除数。')
+        }
+      }
     },
     ISqlValue: {
       summary: t(

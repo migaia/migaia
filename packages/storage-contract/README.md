@@ -575,3 +575,19 @@ async function readUser(executor: ISqlExecutor, id: number) {
 `createSqlTag({ dialect, all, get, run })` 供原后端作者把这些节点接入真实终点。三个回调接收 `prepare: () => ICompiledStorageSql` 与原 ctx，必须先进入自己的原 operation/transaction owner，再调用 prepare，随后执行原驱动方法。标签直接返回该回调的原 Promise，并保留回调 receiver 与 ctx；不创建连接、pipeline、lease、取消计时器或 dispose 拥有者。ICompiledStorageSql 只含 text 与 readonly values。首次完整文本会检查单语句、引号、注释、事务控制与 SQLite journal_mode 修改；拒绝发生在原准入内、原生调用前，进入同一事务首错。合法末尾分号和注释允许，CREATE TRIGGER 的内部多语句列表拒绝。
 
 共享 ISqlValue 包含 boolean、bigint 与 Uint8Array；ISqlRunResult 只承诺 changes，不承诺插入 ID。后端用 ISqlTag<TValue, TResult>/ISqlExecutor<TValue, TResult> 保留具体输出值域和结果；显式行类型是调用方声明，不代表运行时验证了 SQL 输出 schema。SQLite 的布尔输入转换及 lastInsertRowid 由其原适配器负责；PostgreSQL 普通字符串采用受支持的 standard_conforming_strings=on，并支持 E 字符串、dollar quote 与嵌套块注释。真实连接、驱动错误、观察与事务清理由后端沿原拥有者执行。
+
+## 原事务能力投影
+
+`useTransactionCapability(scope, token)` 从真实 scope 的原 transaction owner 找到同一 store，再读取唯一 provider 表。它供后端原方法工厂的 `use: (token) => useTransactionCapability(scope, token)` 使用；不修改 scope，因此公开类型注解的完整 frozen scope 不需要私有 symbol 或 cast。纯 use 不调用 forTransaction、不执行 I/O；同视图、同实现重复 use 返回同一冻结投影，视图失效时清空缓存。
+
+当前标准事务投影覆盖 kv 与 records。kv 提供完整 get/set/remove/has/getMany/setMany/removeMany/removeByPrefix，保留单个真实 native batch；没有根 keys/clear、普通操作 ctx 或独立策略。records 提供真实共用 query 与 removeByPrefix；query 的 all 不接受普通 ctx。每个数据方法都进入原 runTransactionOperation，将新的完整操作视图交给 forTransaction；保存 query 的 all 也先进入同一 owner，严格计划失败、mapper 与真实 iterator 清理保持原首错和排空。关闭后的保存数据方法与 query 终点在 I/O 前拒绝原后端 TRANSACTION_FAILED。
+
+```ts
+import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}
+```
+
+声明 transactions 的 base/Feature 必须为已提供的 kv、records 提供真实 forTransaction，provider 在发布或修改 base 前检查；binder 只绑定当前原生视图，不得返回根 API。查询构造保持纯函数，后端 source 必须把真实 iterator 登记到该 scope 的原 owner。ITransactionScope 的第二泛型与 ITransactionCapabilityView 保留能力集合的反变约束；provider 重新投影原 transaction/tx 的 use 类型，同时保留原生附加成员、options、builder 增强和 Awaited 结果。其它标准事务投影与根 KV 批量面待对应后续实现，不由此处宣称完成。

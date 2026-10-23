@@ -33,6 +33,34 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  useTransactionCapability: [
+    {
+      title: t(
+        'Keep transaction capability execution in its original owner',
+        '将事务能力执行保持在原 owner'
+      ),
+      problem: t(
+        'Capability lookup must not expose root APIs, mutate frozen scopes or bypass transaction first failure and lifetime.',
+        '能力取用不能暴露根 API、修改冻结 scope 或绕过事务首错与生命周期。'
+      ),
+      example: t(
+        `import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}`,
+        `import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}`
+      ),
+      result: t(
+        'KV batches and record queries use the same native transaction. Pure repeated lookup is cached without I/O; each data call receives an original fresh operation view, and expired terminals reject before I/O.',
+        'KV 批量与记录查询使用同一原生事务；重复纯取用缓存但不 I/O；每次数据调用得到原新操作视图，过期终点在 I/O 前拒绝。'
+      )
+    }
+  ],
   sqlFragment: [
     {
       title: t(
