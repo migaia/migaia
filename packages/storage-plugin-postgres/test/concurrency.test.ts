@@ -164,3 +164,64 @@ it('isolates actual key leases and keeps concurrent root writes reliable', async
   await Promise.all(Array.from({ length: 4 }, (_, index) => store.set('same', String(index))))
   expect(await store.get('held')).toBe('waited')
 })
+
+/** Actual read/write revision changes enter the original strategy instead of physical recovery. */
+for (const retries of [0, 1]) {
+  it('classifies real SERIALIZABLE same-key conflicts with retries=' + retries, async () => {
+    const { store, counts } = await installed(true)
+    await store.set('shared', '0')
+    const ready = deferred<void>()
+    let readers = 0
+    const attempts = [0, 0]
+    const work = (index: number) =>
+      store.transaction(
+        async (scope) => {
+          attempts[index]! += 1
+          const current = Number(await scope.get('shared'))
+          if (attempts[index] === 1) {
+            readers += 1
+            if (readers === 2) ready.resolve()
+            await ready.promise
+          }
+          await scope.set('shared', String(current + 1))
+        },
+        { concurrency: ConcurrencyPolicy.optimistic({ retries, backoffMs: 0 }), timeoutMs: 5000 }
+      )
+    const results = await Promise.allSettled([work(0), work(1)])
+    expect(counts.physical).toBe(0)
+    expect(counts.conflicts).toBe(1)
+    if (retries === 0) {
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+      expect(results.find((result) => result.status === 'rejected')).toMatchObject({
+        reason: { code: 'WRITE_CONFLICT' }
+      })
+      expect(attempts).toEqual([1, 1])
+    } else {
+      expect(results.every((result) => result.status === 'fulfilled')).toBe(true)
+      expect(attempts.toSorted()).toEqual([1, 2])
+      expect(await store.get('shared')).toBe('2')
+    }
+  })
+}
+
+/** Fifty real operations per connection exercise shared revisions without a process coordinator. */
+it('commits one hundred optimistic read/increment/write transactions across two connections', async () => {
+  const { store } = await installed()
+  await store.set('total', '0')
+  const worker = async () => {
+    for (let index = 0; index < 50; index += 1) {
+      await store.transaction(
+        async (scope) => {
+          const value = Number(await scope.get('total'))
+          await scope.set('total', String(value + 1))
+        },
+        {
+          concurrency: ConcurrencyPolicy.optimistic({ retries: 100, backoffMs: 0 }),
+          timeoutMs: 5000
+        }
+      )
+    }
+  }
+  await Promise.all([worker(), worker()])
+  expect(await store.get('total')).toBe('100')
+})
