@@ -53,6 +53,7 @@ import {
   createStorageOperationReporter,
   createStorageOperationRuntime,
   reportCleanupError,
+  resolveStorageNamespace,
   type IStorageOperationRuntime
 } from '@migaia/storage-host/authoring/backend'
 import {
@@ -160,6 +161,7 @@ import { BrowserBatchMethod, observeBrowserBatch, snapshotBrowserBatchEntries } 
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { withStorageIteratorResource } from '../utils/storage-iterator.js'
 import { observeIndexedDbStage, runNativeIndexedDbTransaction } from './indexed-db-transaction.js'
+import { createBrowserOrgBinding } from './organizations.js'
 
 /** Public vector TTL is not supported by an IndexedDB backend with no vector collection source. */
 function captureTtlTarget(input: ITtlTarget): Exclude<ITtlTarget, { readonly channel: 'vector' }> {
@@ -580,7 +582,8 @@ const toIdbRecordIndexRange = (
 export const indexedDbHost = <TValue = unknown>(
   options: IIndexedDbOptions,
   runtime: IBackendRuntime,
-  declaredObjectStores: readonly string[] = []
+  declaredObjectStores: readonly string[] = [],
+  bindOrganizations = true
 ): IBackendConstruction<IIndexedDbProvidedStore<TValue>, IDBDatabase> &
   Pick<IIndexedDbFeatureExpose, 'getTransactionClient'> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
@@ -698,6 +701,9 @@ export const indexedDbHost = <TValue = unknown>(
         'IndexedDB channel store names must be non-empty, unique, and non-reserved'
       )
     })
+
+  /** Preserve original name validation, then reject reserved org suffixes before native I/O. */
+  if (bindOrganizations) resolveStorageNamespace(dbName, runtime.defaultOrgId, runtime.defaultOrgId)
 
   const recordRevisionKey = (key: IStorageKey): IDBValidKey => [
     recordsStoreName,
@@ -1825,6 +1831,13 @@ export const indexedDbHost = <TValue = unknown>(
     finalize: async () => {
       /** Cleanup keeps transport and native connection failures in their original order. */
       const failures: unknown[] = []
+      if (deleting !== undefined) {
+        try {
+          await deleting
+        } catch (cause) {
+          failures.push(cause)
+        }
+      }
       try {
         await coordination.dispose()
       } catch (cause) {
@@ -1944,6 +1957,8 @@ export const indexedDbHost = <TValue = unknown>(
   // 只开一次库，之后所有事务复用同一个连接。失败时要清掉缓存，否则一次瞬时
   // 故障（另一个标签页正卡在旧版本上）会把这个实例永久毒死。
   let connection: Promise<IDBDatabase> | undefined
+  /** The original opener waits for its native delete request before admitting a new connection. */
+  let deleting: Promise<void> | undefined
   type IPrepareState = 'idle' | 'running' | 'ready' | 'terminal' | 'disposed'
   /** Shared preparation state; callers await the same attempt but own cancellation locally. */
   let prepareState: IPrepareState = 'idle'
@@ -2488,6 +2503,7 @@ export const indexedDbHost = <TValue = unknown>(
         })
       )
     }
+    if (deleting !== undefined) return deleting.then(() => open(runtime, inheritedLease))
     if (prepareState === 'terminal') return Promise.reject(terminalPrepareFailure)
     if (connection !== undefined) return connection
     prepareState = 'running'
@@ -5100,9 +5116,61 @@ export const indexedDbHost = <TValue = unknown>(
       concurrencyStages: runtime.stageBindings.concurrencyStages(construction.store)
     }
   )
-  return {
+  /** Native close-pending drains existing transactions; deletion keeps the original opener sealed. */
+  const dropData = (): Promise<void> => {
+    assertLive()
+    if (deleting !== undefined) return deleting
+    /** Capture an opening already owned by this exact physical organization. */
+    const pending = connection
+    deleting = Promise.resolve()
+      .then(async () => {
+        /** A failed preparation acquired no successful connection and must not prevent deletion. */
+        const opened = await pending?.then(
+          (database) => database,
+          () => undefined
+        )
+        const active = activeDatabase
+        if (opened !== undefined) closeForTransition(opened)
+        if (active !== undefined && active !== opened) closeForTransition(active)
+        connection = undefined
+        if (prepareState !== 'disposed') prepareState = 'idle'
+        terminalPrepareFailure = undefined
+        await new Promise<void>((resolve, reject) => {
+          try {
+            /** The native request waits for close-pending transactions and cooperating connections. */
+            const request = factory.deleteDatabase(dbName)
+            installIdbOpenRequestHandlers(
+              request,
+              () => undefined,
+              () => undefined,
+              () => resolve(),
+              () => reject(readIdbRequestError(request))
+            )
+          } catch (cause) {
+            reject(cause)
+          }
+        }).catch((cause: unknown) => {
+          throw normalizeError(
+            cause,
+            StorageBackend.indexedDb,
+            StorageErrorCode.unavailable,
+            StorageOperation.indexedDbDelete
+          )
+        })
+        publishChange({ channel: 'all', kind: 'clear' })
+      })
+      .finally(() => {
+        deleting = undefined
+      })
+    return deleting
+  }
+  /** Retain the original provider, transaction owner, and native deletion closure for every org. */
+  const physical = {
     ...construction,
-    getTransactionClient: (scope) => {
+    dropData,
+    getTransactionClient: (
+      scope: Parameters<IIndexedDbFeatureExpose['getTransactionClient']>[0]
+    ) => {
       /** Only the canonical owner can authorize a live view for this exact provided store. */
       const { id } = assertTransactionOwner(construction.store, scope)
       /** This lookup exposes the already-open native transaction and grants no new authority. */
@@ -5111,5 +5179,29 @@ export const indexedDbHost = <TValue = unknown>(
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
       return native.native
     }
+  }
+  return {
+    ...physical,
+    ...(bindOrganizations
+      ? {
+          orgBinding: createBrowserOrgBinding(runtime, dbName, physical, (target, ports) =>
+            indexedDbHost<TValue>(
+              {
+                dbName: target,
+                kvStoreName,
+                bytesStoreName,
+                recordsStoreName,
+                cleanupLegacyRecords,
+                factory,
+                keyRange,
+                owner: { label: ownerLabel }
+              },
+              ports,
+              featureStoreNames,
+              false
+            )
+          )
+        }
+      : {})
   }
 }

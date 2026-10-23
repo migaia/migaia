@@ -10,7 +10,7 @@ export function createBrowserOrgBinding<S extends IKeyValueStore, C>(
   initial: IBackendConstruction<S, C>,
   create: (target: string, runtime: IBackendRuntime) => IBackendConstruction<S, C>,
   drop: (physical: IBackendConstruction<S, C>) => Promise<void> = (physical) =>
-    physical.store.clearAll()
+    physical.dropData?.() ?? physical.store.clearAll()
 ): IStorageOrgBinding {
   /** Only the original installation may capture this bounded author authority. */
   const author = runtime.createOrgAuthoringPort()

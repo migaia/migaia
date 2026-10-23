@@ -69,6 +69,8 @@ export type IBackendConstruction<S extends IStorageBase, C> = {
   readonly commitValueWrite?: IBackendValueCommit
   /** Physical organization lookup remains private to this installed backend construction. */
   readonly orgBinding?: IStorageOrgBinding
+  /** Physical deletion stays with the original native opener and keeps the borrowed store usable. */
+  readonly dropData?: () => Promise<void>
 }
 
 /** Publish the actual native descriptors without cloning their store or cleanup methods. */
