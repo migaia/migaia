@@ -19,14 +19,15 @@ import { createStorageIteratorLifetime } from '../src/resource.js'
 /** Original cursor ownership is shared by every family test, including early-exit cleanup. */
 function rows<T>(
   values: readonly T[],
-  close: () => void = () => undefined
+  close: () => void = () => undefined,
+  report: (error: unknown) => void = () => undefined
 ): IStorageIterator<readonly [IStorageKey, T]> {
   /** Only the original native cursor's position advances. */
   let position = 0
   /** The production resource owner supplies cached cleanup and accepted-advance draining. */
   const lifetime = createStorageIteratorLifetime<readonly [IStorageKey, T]>({
     close: async () => close(),
-    report: async () => undefined
+    report: async (error) => report(error)
   })
   return {
     next: () =>
@@ -193,6 +194,108 @@ describe('shared vector query family', () => {
 })
 
 describe('shared RDF query family', () => {
+  it('traverses client predicates through original same-graph ground matches and closes child sources first', async () => {
+    const knows = term.iri('urn:knows')
+    const graph = term.iri('urn:graph')
+    const quad = (subject: string, object: string, selectedGraph = graph): IQuad => ({
+      subject: term.iri('urn:' + subject),
+      predicate: knows,
+      object: term.iri('urn:' + object),
+      graph: selectedGraph
+    })
+    const data = [
+      quad('a', 'b'),
+      quad('b', 'c'),
+      quad('b', 'd'),
+      quad('b', 'c', term.iri('urn:other'))
+    ]
+    const closed: string[] = []
+    const execute = vi.fn((input: IRdfQueryInput) => {
+      expect(input.steps).toEqual([])
+      const pattern = input.pattern
+      const matching = data.filter((quad) =>
+        (Object.keys(pattern) as (keyof IQuad)[]).every(
+          (field) =>
+            quad[field].termType === pattern[field]!.termType &&
+            Reflect.get(quad[field], 'value') === Reflect.get(pattern[field]!, 'value')
+        )
+      )
+      return rows(matching, () =>
+        closed.push(pattern.subject?.value ?? 'object:' + pattern.object!.value)
+      )
+    })
+    const query = createRdfQuery(
+      { pushdown: { source: 'rdf-ground-match', operators: [], operations: [] }, execute },
+      { subject: term.iri('urn:a'), graph }
+    )
+      .where(() => true)
+      .follow(knows, term.iri('urn:c'))
+      .inverse(knows)
+      .limit(1)
+    expect(query.explain().client.map((step) => step.operation)).toEqual([
+      'predicate',
+      'follow',
+      'inverse',
+      'limit'
+    ])
+    expect(await query.select('subject').all()).toEqual([{ subject: term.iri('urn:a') }])
+    expect(closed).toEqual(['object:urn:b', 'urn:b', 'urn:a'])
+    expect(execute).toHaveBeenCalledTimes(3)
+    await expect(query.requirePushdown().all()).rejects.toMatchObject({
+      code: 'QUERY_NOT_PUSHABLE'
+    })
+    expect(execute).toHaveBeenCalledTimes(3)
+  })
+
+  it('retains child and root cleanup failures and reports each original symbolic resource once', async () => {
+    const knows = term.iri('urn:knows')
+    const a: IQuad = {
+      subject: term.iri('urn:a'),
+      predicate: knows,
+      object: term.iri('urn:b'),
+      graph: term.defaultGraph
+    }
+    const b: IQuad = {
+      subject: term.iri('urn:b'),
+      predicate: knows,
+      object: term.iri('urn:c'),
+      graph: term.defaultGraph
+    }
+    const childFailure = new Error('child RDF cleanup failed')
+    const rootFailure = new Error('root RDF cleanup failed')
+    const childReport = vi.fn()
+    const rootReport = vi.fn()
+    const close = vi.fn((child: boolean) => {
+      throw child ? childFailure : rootFailure
+    })
+    const query = createRdfQuery(
+      {
+        pushdown: { source: 'rdf-cleanup', operators: [], operations: [] },
+        execute: (input) => {
+          const child = input.pattern.subject?.value === 'urn:b'
+          return rows([child ? b : a], () => close(child), child ? childReport : rootReport)
+        }
+      },
+      { subject: a.subject }
+    )
+      .follow(knows)
+      .limit(1)
+    const stream = query.stream()
+    expect(await stream.next()).toEqual({ done: false, value: b })
+    const main = stream.dispose()
+    expect(stream.dispose()).toBe(main)
+    await expect(main).rejects.toBe(childFailure)
+    expect(childFailure).toMatchObject({ errors: [rootFailure] })
+    const symbolic = stream[Symbol.asyncDispose]()
+    expect(stream[Symbol.asyncDispose]()).toBe(symbolic)
+    await symbolic
+    expect(childReport).toHaveBeenCalledWith(childFailure)
+    expect(rootReport).toHaveBeenCalledWith(rootFailure)
+    expect(childReport).toHaveBeenCalledTimes(1)
+    expect(rootReport).toHaveBeenCalledTimes(1)
+    expect(close).toHaveBeenCalledTimes(2)
+  })
+
   it('pages the same RDF reader and rejects a different captured ground pattern before I/O', async () => {
     const predicate = term.iri('urn:predicate')
     const values: IQuad[] = ['a', 'b', 'c'].map((id) => ({
