@@ -1,6 +1,7 @@
 import type { RedisClient as IBunRedisClient } from 'bun'
 import type { IRedisConnection, IRedisDriver } from '../driver.js'
-import { RedisCommand } from '../constants.js'
+import { RedisErrorCode } from '../error-code.js'
+import { RedisCommand, RedisReply } from '../constants.js'
 import {
   runRedisCallback,
   captureCommand,
@@ -9,7 +10,7 @@ import {
   requireExecArray,
   subscriptionResource
 } from '../native.js'
-import { normalizeRedisError, invalidArgument } from '../errors.js'
+import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
 import {
   createStorageOperationReporter,
   reportCleanupError
@@ -43,9 +44,12 @@ export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisC
           let started = false,
             sent = false
           try {
-            await connection.send(RedisCommand.multi, [])
+            if ((await connection.send(RedisCommand.multi, [])) !== RedisReply.ok)
+              throw redisError(RedisErrorCode.decodeFailed)
             started = true
-            for (const args of captured) await connection.send(args[0]!, args.slice(1))
+            for (const args of captured)
+              if ((await connection.send(args[0]!, args.slice(1))) !== RedisReply.queued)
+                throw redisError(RedisErrorCode.decodeFailed)
             sent = true
             const replies: unknown = await connection.send(RedisCommand.exec, [])
             return replies === null ? null : execEntries(requireExecArray(replies))
@@ -114,7 +118,11 @@ export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisC
       try {
         await owned.subscribe(channel, receive)
       } catch (error) {
-        owned.close()
+        try {
+          owned.close()
+        } catch (cleanup) {
+          state.report(cleanup)
+        }
         throw normalizeRedisError(error)
       }
       return state.resource

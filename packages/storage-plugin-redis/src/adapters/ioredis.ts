@@ -68,7 +68,8 @@ export function ioredisDriver<M extends 'legacy' | 'resp3'>(
           const captured = captureCommands(commands, true)
           if (captured.length === 0) return Object.freeze([])
           const multi = owned.multi()
-          for (const args of captured) multi.call(args[0] as string, nativeArguments(args.slice(1)))
+          for (const args of captured)
+            multi.callBuffer(args[0] as string, nativeArguments(args.slice(1)))
           let replies: unknown
           try {
             replies = await multi.exec()

@@ -1,4 +1,5 @@
 import {
+  RESP_TYPES,
   WatchError,
   MultiErrorReply,
   type RedisClientPoolType,
@@ -9,8 +10,14 @@ import {
   type RespVersions,
   type TypeMapping
 } from 'redis'
+import {
+  createStorageOperationReporter,
+  reportCleanupError
+} from '@migaia/storage-host/authoring/backend'
+import { RedisCommand, RedisReply, RedisText } from '../constants.js'
+import { RedisErrorCode } from '../error-code.js'
 import type { IRedisConnection, IRedisDriver } from '../driver.js'
-import { normalizeRedisError, invalidArgument } from '../errors.js'
+import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
 import {
   runRedisCallback,
   captureCommand,
@@ -30,13 +37,15 @@ export function nodeRedisDriver<
   TM extends TypeMapping
 >(pool: RedisClientPoolType<M, F, S, RESP, TM>): IRedisDriver<RedisClientType<M, F, S, RESP, TM>> {
   if (!pool || typeof pool.execute !== 'function') throw invalidArgument()
+  const reporter = createStorageOperationReporter()
   const withConnection = async <T>(
     run: (connection: IRedisConnection<RedisClientType<M, F, S, RESP, TM>>) => Promise<T>
   ): Promise<T> => {
     if (typeof run !== 'function') throw invalidArgument()
     try {
-      return await pool.execute(async (client) =>
-        runRedisCallback(run, {
+      return await pool.execute(async (client) => {
+        const epoch = client.socketEpoch
+        return runRedisCallback(run, {
           getClient: () => client,
           command: async (input) => {
             const args = captureCommand(input, false)
@@ -49,7 +58,9 @@ export function nodeRedisDriver<
           binaryCommand: async (input) => {
             const args = captureCommand(input, true)
             try {
-              return await client.sendCommand(nativeArguments(args))
+              return await client
+                .withTypeMapping({ [RESP_TYPES.BLOB_STRING]: Buffer })
+                .sendCommand(nativeArguments(args))
             } catch (error) {
               throw normalizeRedisError(error)
             }
@@ -57,19 +68,50 @@ export function nodeRedisDriver<
           exec: async (commands) => {
             const captured = captureCommands(commands, true)
             if (captured.length === 0) return Object.freeze([])
-            const multi = client.multi()
-            for (const args of captured) multi.addCommand(nativeArguments(args))
+            // The SDK multi builder omits its mapping on EXEC; use its public raw queue instead.
+            const chainId = Symbol(RedisCommand.multi),
+              sameConnection = (): boolean => client.isReady && client.socketEpoch === epoch,
+              send = (args: readonly (string | Uint8Array)[]): Promise<unknown> =>
+                client.sendCommand(nativeArguments(args), {
+                  chainId,
+                  typeMapping: { [RESP_TYPES.BLOB_STRING]: Buffer }
+                })
+            let started = false,
+              sent = false
             try {
-              return execEntries(requireExecArray(await multi.exec()))
+              if (!sameConnection())
+                throw redisError(RedisErrorCode.failed, new Error(RedisText.connectionChanged))
+              if ((await send([RedisCommand.multi])) !== RedisReply.ok)
+                throw redisError(RedisErrorCode.decodeFailed)
+              started = true
+              for (const command of captured) {
+                if (!sameConnection())
+                  throw redisError(RedisErrorCode.failed, new Error(RedisText.connectionChanged))
+                if ((await send(command)) !== RedisReply.queued)
+                  throw redisError(RedisErrorCode.decodeFailed)
+              }
+              if (!sameConnection())
+                throw redisError(RedisErrorCode.failed, new Error(RedisText.connectionChanged))
+              sent = true
+              const reply: unknown = await send([RedisCommand.exec])
+              return reply === null ? null : execEntries(requireExecArray(reply))
             } catch (error) {
               if (error instanceof WatchError) return null
               if (error instanceof MultiErrorReply)
                 return execEntries(requireExecArray(error.replies), error)
               throw normalizeRedisError(error)
+            } finally {
+              if (started && !sent && sameConnection()) {
+                try {
+                  await send([RedisCommand.discard])
+                } catch (cleanup) {
+                  reportCleanupError(reporter, normalizeRedisError(cleanup))
+                }
+              }
             }
           }
         })
-      )
+      })
     } catch (error) {
       throw normalizeRedisError(error)
     }

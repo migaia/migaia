@@ -40,7 +40,8 @@ async function exercise(driver: IRedisDriver, key: string): Promise<void> {
         ['INCR', key]
       ])
       expect(entries).toHaveLength(2)
-      expect(entries?.[0]).toEqual({ ok: true, value: 'OK' })
+      expect(entries?.[0]?.ok).toBe(true)
+      if (entries?.[0]?.ok) expect(String(entries[0].value)).toBe('OK')
       const failed = entries?.[1]
       expect(failed?.ok).toBe(false)
       if (failed?.ok === false) {
@@ -59,13 +60,31 @@ async function exercise(driver: IRedisDriver, key: string): Promise<void> {
         ])
       ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
       expect(String(await connection.command(['GET', key]))).toBe('not-an-integer')
+      await expect(
+        connection.exec([['SET', key, 'queue-must-not-commit'], ['SET']])
+      ).rejects.toMatchObject({ code: 'REDIS_FAILED' })
+      expect(String(await connection.command(['GET', key]))).toBe('not-an-integer')
       expect(await connection.exec([])).toEqual([])
       const binary = connection.binaryCommand
       expect(binary).toBeTypeOf('function')
-      expect(await binary!(['SET', key, new Uint8Array([97, 0, 98])])).toBeTruthy()
-      expect(
-        await connection.exec([['SET', key, new Uint8Array([98, 121, 116, 101, 115])]])
-      ).toEqual([{ ok: true, value: 'OK' }])
+      const bytes = new Uint8Array([255, 0, 128])
+      expect(await binary!(['SET', key, bytes])).toBeTruthy()
+      const read = await binary!(['GET', key])
+      expect(read).toBeInstanceOf(Uint8Array)
+      expect(Array.from(read as Uint8Array)).toEqual(Array.from(bytes))
+      const binaryEntries = await connection.exec([
+        ['SET', key, bytes],
+        ['GET', key]
+      ])
+      expect(binaryEntries?.[1]?.ok).toBe(true)
+      const binaryEntry = binaryEntries?.[1]
+      if (binaryEntry?.ok) {
+        expect(binaryEntry.value).toBeInstanceOf(Uint8Array)
+        expect(Array.from(binaryEntry.value as Uint8Array)).toEqual(Array.from(bytes))
+      }
+      const stored = await connection.exec([['SET', key, new Uint8Array([98, 121, 116, 101, 115])]])
+      expect(stored?.[0]?.ok).toBe(true)
+      if (stored?.[0]?.ok) expect(String(stored[0].value)).toBe('OK')
       expect(String(await connection.command(['GET', key]))).toBe('bytes')
     })
     let callbacks = 0
