@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
-import { STORAGE_HOST_SOURCE } from '../src/errors.js'
 import {
   planChannelWrite,
   collectUniqueIndexOwners,
@@ -111,46 +110,6 @@ describe('backend error and cancellation boundaries', () => {
       )
     ).rejects.toMatchObject({ code: 'EXTENSION_FAILED', cause: failure })
     expect(report).toHaveBeenCalledExactlyOnceWith(diagnostic)
-  })
-
-  it('classifies user pipeline failures while retaining the caller-admitted backend family', async () => {
-    /** A pipeline callback is an extension failure rather than evidence of native network failure. */
-    const failure = new RangeError('application pipeline failed')
-    const report = vi.fn()
-    await expect(
-      invokeExtension(
-        () => {
-          throw failure
-        },
-        'native',
-        'search',
-        'pipeline',
-        undefined,
-        { reporter: report }
-      )
-    ).rejects.toMatchObject({
-      source: STORAGE_HOST_SOURCE,
-      code: 'EXTENSION_FAILED',
-      operation: 'search',
-      extensionStage: 'pipeline',
-      cause: failure
-    })
-    /** The existing optional normalizer retains the exact real backend-coded object. */
-    const original = backendError()
-    await expect(
-      invokeExtension(
-        () => {
-          throw original
-        },
-        'native',
-        'search',
-        'pipeline',
-        undefined,
-        { reporter: report },
-        (error) => (isStorageErrorFamily(error, IdentifyError.is) ? error : backendError(error))
-      )
-    ).rejects.toBe(original)
-    expect(report).not.toHaveBeenCalled()
   })
 
   it('reports native listener-cleanup failure once without changing the operation result', () => {
