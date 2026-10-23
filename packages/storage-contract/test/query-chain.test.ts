@@ -24,6 +24,7 @@ import {
   type IQueryResultOf,
   type IRecordQuery,
   type IQueryResult,
+  type IRecordQuerySource,
   type IQueryCondition
 } from '../src/index.js'
 
@@ -951,6 +952,100 @@ describe('record query terminals', () => {
       void query.maybe().then((result) => result.value)
     }
     void invalidTypes
+  })
+
+  it('counts filtered pages without executing comparator or selected callbacks', async () => {
+    /** A count never needs values produced by either sorting or output mapping. */
+    const compare = vi.fn((): number => {
+      throw new Error('count must not compare')
+    })
+    /** The selected result changes public row type without changing cardinality. */
+    const mapper = vi.fn((): string => {
+      throw new Error('count must not map')
+    })
+    /** Native advance counts prove count streams until the retained page bound, without a heap. */
+    const next = vi.fn()
+    /** Every execution closes its original cursor exactly once. */
+    const close = vi.fn(async () => undefined)
+    /** Count applies actual filtering before the existing limit node. */
+    const query = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([{ total: 1 }, { total: 4 }, { total: 2 }, { total: 3 }], close, undefined, {
+          onNext: next
+        })
+    })
+      .where('total', 'gt', 1)
+      .orderByComparator(compare)
+      .limit(2)
+      .select(mapper)
+    await expect(query.count()).resolves.toBe(2)
+    expect(compare).not.toHaveBeenCalled()
+    expect(mapper).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalledTimes(3)
+    expect(close).toHaveBeenCalledTimes(1)
+    /** A selected field getter is likewise output-only, so counting must never inspect it. */
+    const projected = vi.fn((): never => {
+      throw new Error('count must not project')
+    })
+    /** Field projection still uses its real public path rather than a test-only node. */
+    const selected = createRecordQuery<{ selected: number }>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([
+          {
+            get selected() {
+              return projected()
+            }
+          }
+        ])
+    }).select('selected')
+    await expect(selected.count()).resolves.toBe(1)
+    expect(projected).not.toHaveBeenCalled()
+  })
+
+  it('keeps count native conditions and cleanup failures on the original planner and resource', async () => {
+    /** Native input must contain the condition but no unused field projection. */
+    const execute = vi.fn(
+      ({ conditions, fields }: Parameters<IRecordQuerySource['execute']>[0]) => {
+        expect(conditions).toHaveLength(1)
+        expect(fields).toBeUndefined()
+        return ownedRows([{ total: 2 }])
+      }
+    )
+    /** A real native where declaration remains unchanged by count-only planning. */
+    const query = createRecordQuery<IOrder>({
+      pushdown: { source: 'count-native', operators: ['eq'], operations: ['where', 'select'] },
+      execute
+    })
+      .where({ total: 2 })
+      .select('total')
+    await expect(query.count()).resolves.toBe(1)
+    expect(execute).toHaveBeenCalledTimes(1)
+    await expect(query.requirePushdown().count()).rejects.toMatchObject({
+      code: 'QUERY_NOT_PUSHABLE'
+    })
+    expect(execute).toHaveBeenCalledTimes(1)
+    /** A count predicate failure remains the primary even when physical close also fails. */
+    const primary = new Error('count predicate failed')
+    /** Original resource normalization keeps cleanup reachable on the primary's errors chain. */
+    const cleanup = new Error('count cleanup failed')
+    /** Physical close still runs once along the existing resource owner. */
+    const close = vi.fn(async () => {
+      throw cleanup
+    })
+    /** Skipped mapper errors cannot replace the one actually executed condition failure. */
+    const failing = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([{ total: 1 }], close)
+    })
+      .where(() => {
+        throw primary
+      })
+      .select(() => 0)
+    await expect(failing.count()).rejects.toBe(primary)
+    expect(primary).toMatchObject({ errors: [expect.objectContaining({ cause: cleanup })] })
+    expect(close).toHaveBeenCalledTimes(1)
   })
 
   it('rejects invalid terminal input before I/O and preserves callback failure ahead of cleanup', async () => {

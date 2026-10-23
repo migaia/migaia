@@ -762,7 +762,8 @@ function queryConditionReason(
 /** Flattens history once and keeps the longest semantically safe native record prefix. */
 function planRecordQuery(
   source: IQuerySourceSnapshot,
-  node: IQueryNode | undefined
+  node: IQueryNode | undefined,
+  countOnly = false
 ): IRecordExecutionPlan {
   /** One reverse traversal avoids repeated prefix allocation during fluent construction. */
   const steps: IQueryNode['step'][] = []
@@ -788,6 +789,14 @@ function planRecordQuery(
   /** A reason is attached to each client step, including later safe-prefix boundaries. */
   const clientSteps: IQueryPlanStep[] = []
   for (const step of steps) {
+    /** Cardinality keeps conditions and page controls without evaluating output-only callbacks. */
+    if (
+      countOnly &&
+      (step.operation === QueryOperation.comparator ||
+        step.operation === QueryOperation.select ||
+        step.operation === QueryOperation.mapper)
+    )
+      continue
     /** A prior client node is a barrier for every subsequent record operation. */
     const reason =
       client.length > 0
@@ -1044,14 +1053,15 @@ function openRecordQuery(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
-  ctx: IOperationContext | undefined
+  ctx: IOperationContext | undefined,
+  countOnly = false
 ): {
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
   readonly ctx: IOperationContext | undefined
 } {
   /** Strictness and missing comparator bounds reject before a source can open. */
-  const plan = planRecordQuery(source, node)
+  const plan = planRecordQuery(source, node, countOnly)
   if (strict && plan.client.length > 0)
     throw new StorageContractError(
       StorageContractErrorCode.queryNotPushable,
@@ -1107,10 +1117,11 @@ async function consumeRecordQuery<R, TResult>(
   consume: (
     read: () => Promise<IteratorResult<R>>,
     ctx: IOperationContext | undefined
-  ) => Promise<TResult>
+  ) => Promise<TResult>,
+  countOnly = false
 ): Promise<TResult> {
   /** Opening synchronously admits the complete terminal to the original transaction owner. */
-  const { iterator, read, ctx: captured } = openRecordQuery(source, node, strict, ctx)
+  const { iterator, read, ctx: captured } = openRecordQuery(source, node, strict, ctx, countOnly)
   return runTransactionIteratorOperation(iterator, async (advance, fail) => {
     /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
     let result: TResult
@@ -1238,12 +1249,19 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
     exists: async (ctx) => !(await first(ctx)).done,
     count: async (ctx) => {
       assertClientTerminal()
-      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
-        /** Cardinality retains no accepted row. */
-        let count = 0
-        while (!(await read()).done) count++
-        return count
-      })
+      return consumeRecordQuery<R, number>(
+        source,
+        node,
+        strict,
+        ctx,
+        async (read) => {
+          /** Cardinality retains no accepted row and never requests output-only planner nodes. */
+          let count = 0
+          while (!(await read()).done) count++
+          return count
+        },
+        true
+      )
     },
     pluck: async (field, ctx) => {
       assertQueryField(field)
