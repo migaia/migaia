@@ -172,6 +172,8 @@ export { sqlFragment, createSqlTag } from './sql.js'
 export type { IQueryStageObserver } from './query.js'
 
 export { encodeOrderedStorageKey } from './key-order.js'
+export { snapshotStorageBatchKeys } from './key-order.js'
+export type { IStorageBatchKey } from './key-order.js'
 
 export {
   TransactionActivityMode,
@@ -244,3 +246,11 @@ export type { ITransactionCapabilityView, IWithTransactionQueryMethods } from '.
 
 export { snapshotStorageKeyPrefix } from './key-order.js'
 export type { IStorageKeyPrefix } from './key-order.js'
+export { ttl, snapshotStorageTtlTarget, assertStorageTtlDuration } from './capabilities/ttl.js'
+export type { ITtlTarget, ITtlApi, ITransactionTtlApi } from './capabilities/ttl.js'
+export { counter, snapshotStorageCounterIncrement } from './capabilities/counter.js'
+export type {
+  ICounterApi,
+  ITransactionCounterApi,
+  IStorageCounterIncrement
+} from './capabilities/counter.js'

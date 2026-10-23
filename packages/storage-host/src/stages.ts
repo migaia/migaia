@@ -100,9 +100,13 @@ export function createStorageObservers(
     operation: {
       kind: StorageStageKind.operation,
       forTransaction: (next) => createStorageObservers(binding, store, next).operation,
-      beforeStorageOperation: (operation) => {
+      beforeStorageOperation: (operation, count) => {
         if (!binding.hasListeners(Hook.beforeStorageOperation)) return
-        dispatch(Hook.beforeStorageOperation, () => ({ ...identity(), operation }))
+        dispatch(Hook.beforeStorageOperation, () => ({
+          ...identity(),
+          operation,
+          ...(count === undefined ? {} : { count })
+        }))
       },
       afterStorageOperation: (operation, elapsedMs, count) => {
         if (!binding.hasListeners(Hook.afterStorageOperation)) return
@@ -113,9 +117,18 @@ export function createStorageObservers(
           count
         }))
       },
-      onStorageOperationError: (operation, code) => {
+      onStorageOperationError: (operation, code, count) => {
         if (!binding.hasListeners(Hook.onStorageOperationError)) return
-        dispatch(Hook.onStorageOperationError, () => ({ ...identity(), operation, code }), true)
+        dispatch(
+          Hook.onStorageOperationError,
+          () => ({
+            ...identity(),
+            operation,
+            code,
+            ...(count === undefined ? {} : { count })
+          }),
+          true
+        )
       },
       onStorageIterationClose: (count) => {
         if (!binding.hasListeners(Hook.onStorageIterationClose)) return

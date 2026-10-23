@@ -17,6 +17,8 @@ console.log(host.extensions.status())
 
 Ordinary plugins can expose application extensions without pretending to provide a storage backend. They retain PluginHost's original Feature dependency protocol. Backend plugins additionally declare an authentic kind token and register one admitted store.
 
+`host.api[id]` exposes that published backend's original `store.api`; different instances may use the same method names. Each read returns a frozen backend-id snapshot, so later `use` batches do not change a saved snapshot and failed batches publish no ids. Methods retain the original Feature lifetime guard, including extracted methods after disposal.
+
 Keep native connections private. `featureExpose` contains own enumerable string-keyed functions, including `getClient`; additional transaction-aware backends supply `getTransactionClient(scope)` through the original transaction owner. The host reserves `getKind`, `getStore`, `getBackendId`, `getLifecycle`, `onDispose` and `getScheduler`.
 
 Register resources in the original install window through `core.onDispose`. Pass supported operations through `core.execution` before native I/O. Do not create a second transaction owner, middleware runner, capability table or Feature graph. `capabilityInstaller` returns the original port issued by `provideCapabilities`; genuine `implement(...)` records carry runtime authority.
@@ -75,6 +77,8 @@ await memory.transaction(async (tx) => {
 })
 console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())
 ```
+
+Memory root `getMany`, `setMany`, `removeMany` and `removeByPrefix` are also available through `use(kv)`. Batch structural keys share the original text-channel identity; string writes remain readable through single-key and sync methods. Nonempty write batches commit once through the original transaction draft, and failure leaves no earlier items behind. Duplicate write keys reject before opening the transaction; repeated removals count once. Each high-level call enters one pipeline and one operation observation pair. Empty batches enter neither a pipeline nor a new transaction; prefix deletion uses the existing radix range.
 
 Record where/select/all reuse the contract query core; this memory source honestly declares client execution. Transaction text batches support canonical structural keys and prefixes; explicit ttlMs currently rejects with UNSUPPORTED_CAPABILITY. Failure discards the draft, while commit checks key revisions and clear epochs before publishing committed batches. Closing the resource cancels this instance queued lock admission and drains accepted native transactions through actual settlement.
 

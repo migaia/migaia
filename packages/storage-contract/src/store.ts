@@ -15,6 +15,7 @@ import type {
 import type { ITransactionScope } from './transaction.js'
 import { isBackendKind } from './backend.js'
 import type { IStorageResource, IStorageIterator } from './resource.js'
+import { STORAGE_KEY_VALUE_BASE_METHODS } from './capability-constants.js'
 
 /** Runtime-neutral resource identity and facts; specialized stores need no KV methods. */
 export type IStorageBase = IStorageResource & {
@@ -254,9 +255,7 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
   const candidate = store as Record<string, unknown>
   let methods: unknown[]
   try {
-    methods = ['get', 'set', 'remove', 'has', 'keys', 'clearValues', 'clearAll'].map(
-      (name) => candidate[name]
-    )
+    methods = STORAGE_KEY_VALUE_BASE_METHODS.map((name) => candidate[name])
     methods.push(base.dispose)
     if (records)
       methods.push(

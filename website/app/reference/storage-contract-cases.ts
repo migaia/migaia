@@ -33,6 +33,26 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  snapshotStorageBatchKeys: [
+    {
+      title: t('Prepare one canonical native batch', '准备一个规范原生批次'),
+      problem: t(
+        'Native readers preserve duplicate positions while removals count each canonical key once.',
+        '原生读取保留重复位置，删除则每个规范键只计一次。'
+      ),
+      example: `import { snapshotStorageBatchKeys } from '@migaia/storage-contract'
+const reads = snapshotStorageBatchKeys([0, -0, ['users', 1]], 'memory')
+const removals = reads.filter((entry, index) => entry.firstIndex === index)
+const writes = snapshotStorageBatchKeys(['first', 'second'], 'memory', {
+  rejectDuplicates: true
+})
+// Use reads in input order, removals once per identity, and writes in one native operation.`,
+      result: t(
+        'The first two read positions share one identity. Duplicate write keys reject INVALID_ARGUMENT before native work; malformed logical keys retain INVALID_KEY.',
+        '前两个读取位置共享同一身份。重复写键在原生操作前抛 INVALID_ARGUMENT；非法逻辑键保留 INVALID_KEY。'
+      )
+    }
+  ],
   snapshotStorageKeyPrefix: [
     {
       title: t('Locate one typed canonical prefix', '定位一个 typed 规范前缀'),

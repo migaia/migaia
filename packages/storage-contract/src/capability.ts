@@ -19,10 +19,23 @@ import type {
 import {
   STORAGE_CAPABILITY_METHODS,
   STORAGE_KEY_VALUE_METHODS,
-  SYNC_KEY_VALUE_METHODS,
   STORAGE_KEY_VALUE_PROPERTIES,
   StorageCapabilityMethod
 } from './capability-constants.js'
+import {
+  invalidCapability,
+  isCapabilityToken as isToken,
+  readCapabilityTokenFacts
+} from './capability-token.js'
+import type { kv } from './capabilities/kv.js'
+import type { records } from './capabilities/records.js'
+import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
+import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
+export { defineStorageCapability } from './capability-token.js'
+export { kv } from './capabilities/kv.js'
+export { records } from './capabilities/records.js'
+export { ttl } from './capabilities/ttl.js'
+export { counter } from './capabilities/counter.js'
 
 /** Type-only API carrier; runtime authority belongs exclusively to the private token set. */
 declare const capabilityApi: unique symbol
@@ -61,7 +74,32 @@ export type IStorageStore<TCaps extends IAnyStorageCapability = never> = IStorag
 export type IKeyValueApi = Omit<
   IKeyValueStore,
   'backend' | 'capabilities' | 'dispose' | typeof Symbol.asyncDispose
->
+> & {
+  /** Reads one native text snapshot, retaining input order, duplicates and undefined missing rows. */
+  getMany(
+    keys: readonly IStorageKey[],
+    ctx?: IOperationContext
+  ): Promise<readonly (string | undefined)[]>
+  /** Atomically writes a batch in one native operation; canonical duplicate keys reject before I/O. */
+  setMany(
+    entries: readonly {
+      readonly key: IStorageKey
+      readonly value: string
+      readonly ttlMs?: number
+    }[],
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<void>
+  /** Atomically removes distinct canonical text keys and returns the actual deleted count. */
+  removeMany(
+    keys: readonly IStorageKey[],
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<number>
+  /** Removes only matching text keys using the canonical prefix range in the current organization. */
+  removeByPrefix(
+    prefix: IStorageKey,
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<number>
+}
 
 /**
  * Standard record entry reuses the implemented query core; writes retain the native backend
@@ -82,7 +120,7 @@ export type IRecordsApi<
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
   TCaps,
-  typeof kv | typeof records
+  typeof kv | typeof records | typeof ttl | typeof counter
 >
 
 /** Projects the standard transaction API without creating or admitting a transaction scope. */
@@ -90,7 +128,11 @@ export type ITransactionCapabilityApi<TCap extends IAnyStorageCapability> = TCap
   ? ITransactionKeyValueApi
   : TCap extends typeof records
     ? ITransactionRecordsApi
-    : never
+    : TCap extends typeof ttl
+      ? ITransactionTtlApi
+      : TCap extends typeof counter
+        ? ITransactionCounterApi
+        : never
 
 /** Optional contravariant proof permits complete external scopes without private symbol access. */
 export type ITransactionCapabilityView<
@@ -234,8 +276,6 @@ export type ICapabilityInstallPort = {
   prepare(implementations: readonly ICapabilityImpl[]): ICapabilityPublication
 }
 
-/** Authentic token identities; no global name-to-token lookup exists. */
-const tokens = new WeakSet<object>()
 /** Transaction binding stays private until the original transaction owner asks for its projection. */
 type IImplementationRecord = {
   readonly implementation: ICapabilityImpl
@@ -252,38 +292,6 @@ const stores = new WeakMap<object, ICapabilityStoreRecord>()
 type ICapabilityStoreRecord = {
   readonly table: Map<IAnyStorageCapability, IInstalledCapability>
   readonly backend: IStorageBase['backend']
-}
-
-/** Creates a frozen identity token for one API contract; duplicate names remain distinct tokens. */
-export function defineStorageCapability<TApi>(): <const TName extends string>(
-  name: TName
-) => IStorageCapability<TName, TApi> {
-  return <const TName extends string>(name: TName): IStorageCapability<TName, TApi> => {
-    if (typeof name !== 'string' || name.length === 0) throw invalidCapability()
-    /** Only this captured object identity is later admitted as the token. */
-    const token = Object.freeze({ name }) as IStorageCapability<TName, TApi>
-    tokens.add(token)
-    return token
-  }
-}
-
-/** Standard text key-value API token; its implementation still belongs to the backend. */
-export const kv = defineStorageCapability<IKeyValueApi>()('kv')
-/** Standard records token grants only an authentic provided record API, never a legacy support flag. */
-export const records = defineStorageCapability<IRecordsApi>()('records')
-
-/** Builds the canonical argument error, preserving a reflected provider failure when available. */
-function invalidCapability(cause?: unknown): StorageContractError {
-  return new StorageContractError(
-    StorageContractErrorCode.invalidArgument,
-    { cause },
-    StorageContractErrorText.capabilityArgument
-  )
-}
-
-/** Tests private token identity without consulting a name, user getter, or public brand. */
-function isToken(value: unknown): value is IAnyStorageCapability {
-  return typeof value === 'object' && value !== null && tokens.has(value)
 }
 
 /** Shared token membership path for store methods and read-only root access, with no user reads. */
@@ -310,7 +318,7 @@ function useCapability(
   }
   throw new StorageContractError(
     StorageContractErrorCode.unsupported,
-    { backend },
+    { backend, capability: capability.name },
     StorageContractErrorText.capabilityMissing(capability.name, backend)
   )
 }
@@ -349,17 +357,22 @@ export function useStorageCapability<
 export function readTransactionImplementation(
   store: IStorageBase,
   capability: IAnyStorageCapability
-): IImplementationRecord & { readonly forTransaction: (scope: ITransactionScope) => unknown } {
+): IImplementationRecord & {
+  readonly forTransaction: (scope: ITransactionScope) => unknown
+} {
   /** Root membership and forged-token diagnostics use the exact canonical lookup first. */
   const record = stores.get(store)
   const descriptor = useCapability(store, record, capability)
   /** Published implementation identity remains the authority for transaction binding. */
   const binding = implementations.get(descriptor)!
   /** Only the implemented finite standard projections can be requested from this owner. */
-  if ((capability !== kv && capability !== records) || binding.forTransaction === undefined)
+  if (
+    readCapabilityTokenFacts(capability)?.transaction === undefined ||
+    binding.forTransaction === undefined
+  )
     throw new StorageContractError(
       StorageContractErrorCode.unsupported,
-      { backend: record!.backend },
+      { backend: record!.backend, capability: capability.name },
       StorageContractErrorText.capabilityTransactionMissing(capability.name, record!.backend)
     )
   return binding as IImplementationRecord & {
@@ -378,6 +391,8 @@ export function implement<
   }
 ): ICapabilityImpl<TCap, TApi> {
   if (!isToken(capability)) throw invalidCapability()
+  /** Standard eligibility belongs to this exact token, never its diagnostic name. */
+  const transaction = readCapabilityTokenFacts(capability)?.transaction
   /** Capture the binder without executing it or exposing root API authority to a transaction. */
   let forTransaction: ((scope: ITransactionScope) => unknown) | undefined
   try {
@@ -389,7 +404,7 @@ export function implement<
     forTransaction = options?.forTransaction
     if (
       forTransaction !== undefined &&
-      ((capability !== kv && capability !== records) || typeof forTransaction !== 'function')
+      (transaction === undefined || typeof forTransaction !== 'function')
     )
       throw invalidCapability()
   } catch (cause) {
@@ -425,42 +440,12 @@ function admitImplementations(
         : undefined
     if (!descriptor || seen.has(descriptor.capability) || table.has(descriptor.capability))
       throw invalidCapability()
-    if (descriptor.capability === kv) {
-      /** KV is the only standard API installed by this foundation; backends own all operations. */
-      const api = descriptor.api as Record<string, unknown> | undefined
-      if (
-        !api ||
-        typeof api !== 'object' ||
-        STORAGE_KEY_VALUE_METHODS.some((name) => typeof api[name] !== 'function')
-      )
-        throw invalidCapability()
-      if (
-        api.sync !== undefined &&
-        (typeof api.sync !== 'object' ||
-          api.sync === null ||
-          SYNC_KEY_VALUE_METHODS.some(
-            (name) => typeof (api.sync as Record<string, unknown>)[name] !== 'function'
-          ))
-      )
-        throw invalidCapability()
-    }
-    if (descriptor.capability === records) {
-      /**
-       * Native records and Feature records share the same callable admission without running a
-       * query.
-       */
-      const api = descriptor.api as IRecordsApi | undefined
-      if (
-        typeof api !== 'object' ||
-        api === null ||
-        typeof api.query !== 'function' ||
-        typeof api.removeByPrefix !== 'function'
-      )
-        throw invalidCapability()
-    }
+    /** Only this authentic token's standard facts are loaded and validated. */
+    const facts = readCapabilityTokenFacts(descriptor.capability)
+    facts?.validate(descriptor.api)
     if (
       transactions &&
-      (descriptor.capability === kv || descriptor.capability === records) &&
+      facts?.transaction !== undefined &&
       implementations.get(descriptor)?.forTransaction === undefined
     )
       throw invalidCapability()
@@ -532,7 +517,9 @@ export function provideCapabilities<
     /** No caller or base mutation occurs while descriptors and duplicates are checked. */
     const captured = admitImplementations(entries, table, baseAdmission.capabilities.transactions)
     /** Capture original KV method receivers before replacing the overlapping has entry. */
-    const kvDescriptor = captured.find((entry) => entry.capability === kv)
+    const kvDescriptor = captured.find(
+      (entry) => readCapabilityTokenFacts(entry.capability)?.flatKeyValue === true
+    )
     /** Definitions are staged locally so ordinary descriptor failures cannot partially install. */
     const definitions: PropertyDescriptorMap = {}
     /** Original KV has is never recovered by reading the modified base, preventing recursion. */
@@ -572,7 +559,9 @@ export function provideCapabilities<
             baseAdmission.capabilities.transactions
           )
           /** A Feature can add the same standard KV API that a native backend provides. */
-          const keyValue = additions.find((entry) => entry.capability === kv)
+          const keyValue = additions.find(
+            (entry) => readCapabilityTokenFacts(entry.capability)?.flatKeyValue === true
+          )
           /** Stage optional flat KV methods before reserving any descriptor. */
           const flat = keyValue ? captureKeyValue(keyValue.api as IKeyValueApi) : undefined
           /** Original descriptors are restored if this publication later rolls back. */

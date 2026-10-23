@@ -976,6 +976,15 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     return this.#extensions
   }
 
+  /** Project original Feature API objects from only the atomically published backend snapshot. */
+  get api(): IStorageHost<P>['api'] {
+    this.#assertOpen()
+    /** This detached namespace grants no installation authority or new method lifetime. */
+    const api = Object.create(null) as Record<string, unknown>
+    for (const [id, store] of this.#registry) api[id] = 'api' in store ? store.api : undefined
+    return Object.freeze(api) as IStorageHost<P>['api']
+  }
+
   /** Looks up an exact store from the last atomically published registry snapshot. */
   backend<TId extends keyof IPluginStoreMap<P> & string>(id: TId): IPluginStoreMap<P>[TId] {
     this.#assertOpen()

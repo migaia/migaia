@@ -20,6 +20,8 @@ console.log(host.extensions.label('draft'))
 
 `core.execution.run/runSync` 转发同一原 middleware owner。宿主固定 async 模式；存在异步阶段时，同步操作在阶段与终点执行前拒绝 `ASYNC_STAGE_IN_SYNC_ENTRY`。阶段截断且未调用终点时，操作报 storage-contract 已有的 `ABORTED`。零阶段保留原值或原 Promise 身份。
 
+`host.api[id]` 直接取用该已发布后端的原 `store.api`，两个实例可保留同名方法。每次读取返回冻结的后端 id 快照，旧快照不随 `use` 批次变动；失败批次不发布新 id。方法仍受原 Feature 有效期保护，关闭后提取的方法也会拒绝。
+
 `host.backend(id)` 返回准入的原对象；`host.backends()` 返回脱离内部状态的 Map。`host.use(...)` 整批成功后发布；重叠批次拒绝 `STORAGE_HOST_BUSY`。宿主错误 source 为 `@migaia/storage-host`，原错误保留在 cause 链。
 
 显式 `dispose()` 保留清理失败，重复调用返回同一个 Promise。资源语法使用另一个缓存 Promise，报告清理失败后成功完成，避免覆盖外层主错误。两个入口只执行一次实际清理。宿主释放自己的登记与准入 store，不关闭调用方借来的原生客户端。
@@ -76,6 +78,8 @@ await memory.transaction(async (tx) => {
 })
 console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())
 ```
+
+memory 的根 `getMany`、`setMany`、`removeMany` 与 `removeByPrefix` 也可从 `use(kv)` 取用。批量结构键与原文本通道共享身份；字符串写入可由单点与 sync 方法读取。非空写批量在原事务草稿里一次提交，失败不留下先前项；重复写键在事务前拒绝，重复删除只计一次。每次高层调用只进入一次 pipeline 和一组操作观察，空批不进入 pipeline 或新事务；前缀删除沿原 radix 范围定位。
 
 记录查询的 where/select/all 复用 contract 查询核心；当前内存 source 如实声明客户端执行。tx 文本批量方法支持规范结构键与 prefix；显式 ttlMs 当前以 UNSUPPORTED_CAPABILITY 拒绝。事务失败丢弃草稿，提交前检查键修订和 clear epoch，实际提交后发布批量变化。根资源关闭会取消本实例排队锁准入，并等待已接纳的事务真实结算。
 

@@ -18,6 +18,8 @@ Backend Features use `defineFeature(kind, factory, dependencies?)`. Their synchr
 
 `core.execution.run` and `runSync` forward operations to the same original middleware owner. Storage fixes the host mode to async. An async stage makes a synchronous operation reject with `ASYNC_STAGE_IN_SYNC_ENTRY` before the stage or terminal runs. A stage that intercepts an operation without reaching its terminal produces the existing storage-contract `ABORTED` error. With no stages, the backend's actual value or Promise stays unchanged.
 
+`host.api[id]` exposes that published backend's original `store.api`; different instances may use the same method names. Each read returns a frozen backend-id snapshot, so later `use` batches do not change a saved snapshot and failed batches publish no ids. Methods retain the original Feature lifetime guard, including extracted methods after disposal.
+
 `host.backend(id)` returns the admitted object. `host.backends()` returns a detached map. `host.use(...)` publishes one complete batch; overlapping batches reject with `STORAGE_HOST_BUSY`. Host failures carry source `@migaia/storage-host` and retain their original causes.
 
 Call `dispose()` to observe cleanup failure. Repeated explicit calls share one Promise. Resource syntax uses a separate cached Promise that reports cleanup failure and resolves, so cleanup cannot replace an outer failure. Both entries perform one actual cleanup. The host closes its own registrations and admitted stores, not externally borrowed clients.
@@ -74,6 +76,8 @@ await memory.transaction(async (tx) => {
 })
 console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())
 ```
+
+Memory root `getMany`, `setMany`, `removeMany` and `removeByPrefix` are also available through `use(kv)`. Batch structural keys share the original text-channel identity; string writes remain readable through single-key and sync methods. Nonempty write batches commit once through the original transaction draft, and failure leaves no earlier items behind. Duplicate write keys reject before opening the transaction; repeated removals count once. Each high-level call enters one pipeline and one operation observation pair. Empty batches enter neither a pipeline nor a new transaction; prefix deletion uses the existing radix range.
 
 Record where/select/all reuse the contract query core; this memory source honestly declares client execution. Transaction text batches support canonical structural keys and prefixes; explicit ttlMs currently rejects with UNSUPPORTED_CAPABILITY. Failure discards the draft, while commit checks key revisions and clear epochs before publishing committed batches. Closing the resource cancels this instance queued lock admission and drains accepted native transactions through actual settlement.
 

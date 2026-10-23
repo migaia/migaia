@@ -12,6 +12,8 @@ export const STORAGE_CONTRACT_SOURCE = '@migaia/storage-contract'
 export type IStorageContractErrorDetails = {
   /** Optional provider family for diagnostics. */
   readonly backend?: IBackendKind
+  /** Optional missing capability name retained by the original frozen diagnostic constructor. */
+  readonly capability?: string
   /** Optional offending or affected key; retained by reference rather than copied. */
   readonly key?: string | IStorageKey
   /** Original failure retained through the standard Error cause property. */
@@ -38,6 +40,8 @@ export class StorageContractError extends Error {
   readonly code: IStorageContractErrorCode
   /** Provider family supplied in details, or undefined. */
   readonly backend?: IBackendKind
+  /** Missing capability supplied in details, without granting authority by its name. */
+  readonly capability?: string
   /** Key supplied in details, or undefined. */
   readonly key?: string | IStorageKey
   /** Detached lock identities present on lock rejection and timeout errors. */
@@ -64,6 +68,7 @@ export class StorageContractError extends Error {
     this.source = STORAGE_CONTRACT_SOURCE
     this.code = code
     this.backend = details.backend
+    if (details.capability !== undefined) this.capability = details.capability
     this.key = details.key
     if (details.keys !== undefined) this.keys = details.keys
     if (Object.hasOwn(details, 'holder')) this.holder = details.holder

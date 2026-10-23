@@ -8,6 +8,8 @@ import {
   implement,
   kv,
   records,
+  ttl,
+  counter,
   defineStorageCapability,
   createRecordQuery,
   type IStorageBase,
@@ -19,7 +21,10 @@ import {
   type IRecordsApi,
   type IStorageKey,
   type IQueryResult,
-  type IStorageCapabilitySet
+  type IStorageCapabilitySet,
+  type ICapabilityInstallPort,
+  type ITransactionTtlApi,
+  type ITransactionCounterApi
 } from '../src/index.js'
 
 /** Concrete rows and full externally constructible scopes require no private symbol or cast. */
@@ -189,7 +194,15 @@ function setup() {
         return count
       })
   }))
+  /** Transaction batch tests must never fall back to a root endpoint. */
+  const rootBatch = async (): Promise<never> => {
+    throw new Error('root batch must not be used')
+  }
   const rootKv: IKeyValueApi = {
+    getMany: rootBatch,
+    setMany: rootBatch,
+    removeMany: rootBatch,
+    removeByPrefix: rootBatch,
     get: async (key) => rootText.get(key) ?? null,
     set: async (key, value) => {
       rootText.set(key, value)
@@ -218,17 +231,98 @@ function setup() {
       throw new Error('root deletion must not be used')
     }
   }
-  const store = provideCapabilities(base, [
-    implement(kv, rootKv, { forTransaction: bindKv }),
-    implement(records, rootRecords, { forTransaction: bindRecords })
-  ])
+  /** Feature publication uses the original provider window, without fabricating a second store. */
+  let installer!: ICapabilityInstallPort
+  const store = provideCapabilities(
+    base,
+    [
+      implement(kv, rootKv, { forTransaction: bindKv }),
+      implement(records, rootRecords, { forTransaction: bindRecords })
+    ],
+    {
+      onInstaller: (port) => {
+        installer = port
+      }
+    }
+  )
   const scope = createScope()
   const onFailure = vi.fn()
   const controller = owner.register(scope, { createScope, onFailure })
-  return { store, scope, controller, bindKv, bindRecords, text, rows, rootText, native, onFailure }
+  return {
+    store,
+    scope,
+    controller,
+    bindKv,
+    bindRecords,
+    text,
+    rows,
+    rootText,
+    native,
+    onFailure,
+    installer
+  }
 }
 
 describe('original transaction capability projections', () => {
+  it('binds scalar capabilities to fresh original views without invoking their root API', async () => {
+    const fixture = setup()
+    /** Native scalar adapters validate the same supplied original operation scope. */
+    const bindTtl = vi.fn((scope: ITransactionScope): ITransactionTtlApi => {
+      assertTransactionOwner(fixture.store, scope)
+      return {
+        expire: async () => true,
+        remaining: async () => 3,
+        persist: async () => false
+      }
+    })
+    const bindCounter = vi.fn((scope: ITransactionScope): ITransactionCounterApi => {
+      assertTransactionOwner(fixture.store, scope)
+      return { increment: async () => 7 }
+    })
+    /** Root endpoints must never become transaction fallbacks. */
+    const root = vi.fn(async (): Promise<never> => {
+      throw new Error('root scalar must not run')
+    })
+    fixture.installer
+      .prepare([
+        implement(
+          ttl,
+          { expire: root, remaining: root, persist: root },
+          { forTransaction: bindTtl }
+        ),
+        implement(counter, { increment: root }, { forTransaction: bindCounter })
+      ])
+      .publish()
+    /** The same authentic object now carries the capabilities actually published by its provider. */
+    const scope = fixture.scope as ITransactionScope<
+      IRow,
+      typeof records | typeof ttl | typeof counter
+    >
+    const expiration = scope.use(ttl)
+    const increments = scope.use(counter)
+    expectTypeOf(expiration).toEqualTypeOf<ITransactionTtlApi>()
+    expectTypeOf(increments).toEqualTypeOf<ITransactionCounterApi>()
+    expect(scope.use(ttl)).toBe(expiration)
+    expect(bindTtl).not.toHaveBeenCalled()
+    expect(bindCounter).not.toHaveBeenCalled()
+    await expect(expiration.expire({ channel: 'text', key: 'x' }, 0.5)).resolves.toBe(true)
+    await expect(expiration.remaining({ channel: 'record', key: ['x'] })).resolves.toBe(3)
+    await expect(expiration.persist({ channel: 'bytes', key: 'x' })).resolves.toBe(false)
+    await expect(increments.increment('count', 2)).resolves.toBe(7)
+    expect(
+      new Set([...bindTtl.mock.calls, ...bindCounter.mock.calls].map(([scope]) => scope)).size
+    ).toBe(4)
+    expect(root).not.toHaveBeenCalled()
+    fixture.controller.stopAdmission()
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    await expect(increments.increment('count')).rejects.toMatchObject({
+      code: 'TRANSACTION_FAILED'
+    })
+    await expect(expiration.expire({ channel: 'text', key: 'x' }, -1)).rejects.toMatchObject({
+      code: 'TRANSACTION_FAILED'
+    })
+  })
   it('keeps pure cached lookup separate from native binding and executes every KV method on fresh views', async () => {
     const fixture = setup()
     const descriptors = Object.getOwnPropertyDescriptors(fixture.scope)
@@ -255,6 +349,12 @@ describe('original transaction capability projections', () => {
     expect(fixture.native).toHaveBeenCalledTimes(8)
     expect(new Set(fixture.bindKv.mock.calls.map(([scope]) => scope))).toHaveProperty('size', 8)
     expect(fixture.bindKv.mock.calls.every(([scope]) => scope !== fixture.scope)).toBe(true)
+    expect(
+      fixture.bindKv.mock.contexts.every(
+        (receiver) =>
+          Reflect.ownKeys(receiver as object).join(',') === 'implementation,forTransaction'
+      )
+    ).toBe(true)
     expect(fixture.rootText.size).toBe(0)
     expect(Object.getOwnPropertyDescriptors(fixture.scope)).toEqual(descriptors)
     const saved = api.get
@@ -310,6 +410,54 @@ describe('original transaction capability projections', () => {
     await expect(fixture.controller.runFinalizers()).rejects.toBe(original)
     expect(fixture.onFailure).toHaveBeenCalledWith(original)
     fixture.controller.close()
+  })
+
+  it('records terminal admission and post-cleanup failures before a caught query can escape', async () => {
+    for (const selected of [false, true]) {
+      for (const terminal of [
+        (query: IQueryResult<IRow, undefined>) => query.chunk(0, () => undefined),
+        (query: IQueryResult<IRow, undefined>) => query.requirePushdown().count(),
+        (query: IQueryResult<IRow, undefined>) => query.firstOrThrow()
+      ]) {
+        const fixture = setup()
+        fixture.rows.clear()
+        const query = fixture.scope.use(records).query()
+        const result = terminal(selected ? query.select((row) => row) : query)
+        const failure = await result.catch((error: unknown) => error)
+        expect(failure).toBeInstanceOf(Error)
+        expect(fixture.onFailure).toHaveBeenCalledWith(failure)
+        fixture.controller.stopAdmission()
+        await expect(fixture.controller.runFinalizers()).rejects.toBe(failure)
+        fixture.controller.close()
+      }
+    }
+  })
+
+  it('admits every escaped read terminal before its own argument or empty-result validation', async () => {
+    const fixture = setup()
+    const query = fixture.scope.use(records).query()
+    const selected = query.select((row) => row)
+    fixture.controller.stopAdmission()
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    for (const escaped of [query, selected]) {
+      for (const terminal of [
+        () => escaped.all(),
+        () => escaped.first(),
+        () => escaped.maybe(),
+        () => escaped.firstOrThrow(),
+        () => escaped.pluck('value'),
+        () => escaped.exists(),
+        () => escaped.count(),
+        () => escaped.each(() => undefined),
+        () => escaped.chunk(0, () => undefined),
+        () => escaped.min('value'),
+        () => escaped.max('value'),
+        () => escaped.sum('value'),
+        () => escaped.avg('value')
+      ])
+        await expect(terminal()).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    }
   })
 
   it('refuses forged, missing, custom and expired scope authority without binding native data', () => {

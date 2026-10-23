@@ -1,6 +1,8 @@
 import { snapshotStorageKey } from './key.js'
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
+import { StorageContractError, StorageContractErrorCode } from './errors.js'
+import { StorageContractErrorText } from './error-text.js'
 
 /** Tags preserve the canonical cross-type order; zero terminates a variable-length component. */
 const OrderedKeyTag = { number: 1, date: 2, string: 3, bytes: 4, array: 5 } as const
@@ -82,6 +84,76 @@ export function encodeOrderedStorageKey(
   backend: IBackendKind | undefined
 ): Uint8Array {
   return encodeKeySnapshot(snapshotStorageKey(key, backend), false)
+}
+/** Converts already canonical bytes without another logical-key traversal or representation. */
+export function storageKeyBytesIdentity(encoded: Uint8Array): string {
+  return Array.from(encoded, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+/** One detached position retains the canonical identity and its first equivalent input position. */
+export type IStorageBatchKey = {
+  readonly key: IStorageKey
+  readonly identity: string
+  readonly firstIndex: number
+}
+/**
+ * Captures a native batch before I/O. Reads preserve duplicates; native removals use firstIndex,
+ * while atomic writes reject equivalent keys when rejectDuplicates is requested.
+ */
+export function snapshotStorageBatchKeys(
+  keys: readonly IStorageKey[],
+  backend: IBackendKind | undefined,
+  options?: { readonly rejectDuplicates?: boolean }
+): readonly IStorageBatchKey[] {
+  try {
+    if (
+      !Array.isArray(keys) ||
+      (options !== undefined &&
+        (typeof options !== 'object' || options === null || Array.isArray(options)))
+    )
+      throw new StorageContractError(
+        StorageContractErrorCode.invalidArgument,
+        { backend },
+        StorageContractErrorText.batchKeys
+      )
+    /** Options and array length are captured once before any input key is traversed. */
+    const rejectDuplicates = options?.rejectDuplicates
+    if (rejectDuplicates !== undefined && typeof rejectDuplicates !== 'boolean')
+      throw new StorageContractError(
+        StorageContractErrorCode.invalidArgument,
+        { backend },
+        StorageContractErrorText.batchKeys
+      )
+    /** Only this pure call owns the temporary equality index; no backend state is retained. */
+    const firstPositions = new Map<string, number>()
+    /** Each returned position owns the detached snapshot used to derive its exact identity. */
+    const result: IStorageBatchKey[] = []
+    /** Caller mutation cannot extend the admitted operation while a key getter is evaluated. */
+    const length = keys.length
+    for (let index = 0; index < length; index++) {
+      /** The original key owner validates and snapshots each input position exactly once. */
+      const key = snapshotStorageKey(keys[index], backend)
+      /** The same private writer consumes only the detached snapshot. */
+      const identity = storageKeyBytesIdentity(encodeKeySnapshot(key, false))
+      /** Equal signed zero, dates, buffers and tuples share the original canonical identity. */
+      const firstIndex = firstPositions.get(identity)
+      if (firstIndex !== undefined && rejectDuplicates)
+        throw new StorageContractError(
+          StorageContractErrorCode.invalidArgument,
+          { backend },
+          StorageContractErrorText.batchDuplicate
+        )
+      if (firstIndex === undefined) firstPositions.set(identity, index)
+      result.push(Object.freeze({ key, identity, firstIndex: firstIndex ?? index }))
+    }
+    return Object.freeze(result)
+  } catch (cause) {
+    if (cause instanceof StorageContractError) throw cause
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { backend, cause },
+      StorageContractErrorText.batchKeys
+    )
+  }
 }
 /** Pure prefix projection supports native lower-bound cursors and canonical encoded range lookup. */
 export type IStorageKeyPrefix = {

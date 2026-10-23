@@ -787,6 +787,31 @@ describe('record query Feature methods', () => {
 })
 
 describe('record query terminals', () => {
+  it('preserves all cancellation checkpoints through native EOF without another terminal read', async () => {
+    /** The live signal getter exposes each original checkpoint without aborting the operation. */
+    const aborted = vi.fn(() => false)
+    /** Only the signal remains live after the operation context is captured. */
+    const signal = {
+      get aborted() {
+        return aborted()
+      },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined
+    }
+    /** An empty original cursor distinguishes EOF completion from user callback boundaries. */
+    const query = createRecordQuery({ pushdown: noPushdown, execute: () => ownedRows([]) })
+    await expect(query.all({ signal })).resolves.toEqual([])
+    expect(aborted).toHaveBeenCalledTimes(6)
+    /** The final partial chunk still observes cancellation after its user callback settles. */
+    const controller = new AbortController()
+    const partial = createRecordQuery({ pushdown: noPushdown, execute: () => ownedRows([1]) })
+    await expect(
+      partial.chunk(2, async () => controller.abort('chunk cancelled'), {
+        signal: controller.signal
+      })
+    ).rejects.toMatchObject({ code: 'ABORTED', cause: 'chunk cancelled' })
+  })
+
   it('retains terminal declarations for root, transaction and selected record shapes', () => {
     /** The three existing fluent contexts expose each new terminal without widening tx context. */
     function declarations(

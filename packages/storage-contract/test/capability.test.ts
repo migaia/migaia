@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   defineStorageCapability,
+  snapshotKeyValueStoreDetailed,
   implement,
   provideCapabilities,
   hasStorageCapability,
@@ -70,6 +71,10 @@ describe('capability identity and provider ownership', () => {
       keys: async () => [],
       clearValues: async () => undefined,
       clearAll: async () => undefined,
+      getMany: async () => [],
+      setMany: async () => undefined,
+      removeMany: async () => 0,
+      removeByPrefix: async () => 0,
       sync
     }
     const store = provideCapabilities(createBase(), [implement(kv, api)])
@@ -169,7 +174,11 @@ describe('capability identity and provider ownership', () => {
       has: keyHas,
       keys: async () => [],
       clearValues: async () => undefined,
-      clearAll: async () => undefined
+      clearAll: async () => undefined,
+      getMany: async () => [],
+      setMany: async () => undefined,
+      removeMany: async () => 0,
+      removeByPrefix: async () => 0
     }
     const kvStore = provideCapabilities(createBase(), [implement(kv, kvApi)])
     await expect(kvStore.has('present')).resolves.toBe(true)
@@ -365,6 +374,45 @@ describe('capability publication', () => {
 })
 
 describe('standard KV capability forwarding', () => {
+  it('does not grant standard validation or transaction eligibility to a same-name custom token', () => {
+    /** Custom names never copy the private facts owned by the exact standard token identity. */
+    const namedKv = defineStorageCapability<{ read(): number }>()('kv')
+    const api = { read: () => 7 }
+    const base = createBase()
+    const store = provideCapabilities(base, [implement(namedKv, api)])
+    expect(store.use(namedKv)).toBe(api)
+    expect(store.has(kv)).toBe(false)
+    expect(Object.hasOwn(store, 'get')).toBe(false)
+    expect(() => implement(namedKv, api, { forTransaction: (() => ({})) as never })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+  it('retains ordinary raw KV admission without claiming missing native batch capability', async () => {
+    /** An existing raw backend may reliably provide just the original seven methods. */
+    const pending = Promise.resolve('raw-value')
+    const raw = Object.freeze({
+      ...createBase(),
+      get: () => pending,
+      set: async () => undefined,
+      remove: async () => undefined,
+      has: async () => true,
+      keys: async () => ['saved'],
+      clearValues: async () => undefined,
+      clearAll: async () => undefined
+    })
+    /** Resource/KV admission must not reject a supported ordinary call for absent batch methods. */
+    expect(snapshotKeyValueStoreDetailed(raw)).toMatchObject({ valid: true, store: raw })
+    expect(raw.get()).toBe(pending)
+    await expect(raw.get()).resolves.toBe('raw-value')
+    expect(Object.hasOwn(raw, 'getMany')).toBe(false)
+    /** Publishing the standard token still requires its complete eleven-method contract. */
+    const base = createBase()
+    expect(() => provideCapabilities(base, [implement(kv, raw as never)])).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(Object.hasOwn(base, 'use')).toBe(false)
+    expect(base.dispose).not.toHaveBeenCalled()
+  })
   it('captures a transaction binder privately without executing it during provider admission', () => {
     /** Root API remains independent of the transaction-owned projection callback. */
     const api: IKeyValueApi = {
@@ -374,7 +422,11 @@ describe('standard KV capability forwarding', () => {
       has: async () => false,
       keys: async () => [],
       clearValues: async () => undefined,
-      clearAll: async () => undefined
+      clearAll: async () => undefined,
+      getMany: async () => [],
+      setMany: async () => undefined,
+      removeMany: async () => 0,
+      removeByPrefix: async () => 0
     }
     /** Only the original transaction owner may invoke this binder after scope admission. */
     const forTransaction = vi.fn(() => ({
@@ -412,7 +464,11 @@ describe('standard KV capability forwarding', () => {
       has: async (key) => key === 'saved',
       keys: async () => ['saved'],
       clearValues: async () => undefined,
-      clearAll: async () => undefined
+      clearAll: async () => undefined,
+      getMany: async () => [],
+      setMany: async () => undefined,
+      removeMany: async () => 0,
+      removeByPrefix: async () => 0
     }
     /** Preparation is invisible; the original publication point makes both views available. */
     const publication = installer.prepare([implement(kv, api)])
@@ -429,6 +485,10 @@ describe('standard KV capability forwarding', () => {
   it('preserves method receivers, Promise identity and both has domains', async () => {
     /** One Promise makes accidental async wrappers observable. */
     const pending = Promise.resolve('value')
+    /** Batch forwarding must retain the native result Promises and original input objects too. */
+    const many = Promise.resolve<readonly (string | undefined)[]>(['value', undefined])
+    const written = Promise.resolve()
+    const removed = Promise.resolve(1)
     /** Capture contexts and receiver identity at the backend operation boundary. */
     const calls: unknown[] = []
     /** Complete standard KV surface remains owned by this API object. */
@@ -446,7 +506,23 @@ describe('standard KV capability forwarding', () => {
       },
       keys: async () => ['saved'],
       clearValues: async () => undefined,
-      clearAll: async () => undefined
+      clearAll: async () => undefined,
+      getMany(keys, context) {
+        calls.push([this.tag, keys, context])
+        return many
+      },
+      setMany(entries, context) {
+        calls.push([this.tag, entries, context])
+        return written
+      },
+      removeMany(keys, context) {
+        calls.push([this.tag, keys, context])
+        return removed
+      },
+      removeByPrefix(prefix, context) {
+        calls.push([this.tag, prefix, context])
+        return removed
+      }
     }
     /** Provider flattens only the real standard KV implementation. */
     const store = provideCapabilities(createBase(), [implement(kv, api)])
@@ -460,6 +536,28 @@ describe('standard KV capability forwarding', () => {
       ['original receiver', 'saved', context],
       ['original receiver', 'saved', context]
     ])
+    /** Structured batch keys stay in the same text domain without provider-side re-encoding. */
+    const keys = ['saved', ['group', 1]]
+    const entries = [{ key: ['group', 1], value: 'value', ttlMs: 10 }]
+    expect(store.getMany(keys, context)).toBe(many)
+    expect(store.setMany(entries, context)).toBe(written)
+    expect(store.removeMany(keys, context)).toBe(removed)
+    expect(store.removeByPrefix(['group'], context)).toBe(removed)
+    expect(calls.slice(2)).toEqual([
+      [api.tag, keys, context],
+      [api.tag, entries, context],
+      [api.tag, keys, context],
+      [api.tag, ['group'], context]
+    ])
+    for (const method of ['getMany', 'setMany', 'removeMany', 'removeByPrefix']) {
+      /** A missing batch endpoint cannot leave a partially published standard capability. */
+      const invalid = createBase()
+      expect(() =>
+        provideCapabilities(invalid, [implement(kv, { ...api, [method]: undefined } as never)])
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+      expect(Object.hasOwn(invalid, 'use')).toBe(false)
+      expect(invalid.dispose).not.toHaveBeenCalled()
+    }
     expectTypeOf(store.use(kv).tag).toEqualTypeOf<string>()
   })
 

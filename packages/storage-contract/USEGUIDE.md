@@ -503,6 +503,8 @@ function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string
 
 这是后端内部的装配函数，实际 store 仍由宿主安装与释放。`store.use(catalog)` 返回原实现对象；真实但未登记的令牌抛带后端名与能力名的 `UNSUPPORTED_CAPABILITY`，伪造令牌抛 `INVALID_ARGUMENT`。`store.has(token)` 同步返回布尔值。标准 `kv` 令牌同时提供原有平铺方法，`has(key, ctx)` 保留异步键查询。
 
+原 `IKeyValueStore` 与 raw KV 准入保留七个普通方法，不承诺缺失的原生批量入口。已发布的标准 `kv` API 及其平铺投影要求 `getMany`、`setMany`、`removeMany` 和 `removeByPrefix`。批量键接受 `IStorageKey`，单点与同步入口仍只接受字符串；同一字符串在两类入口共享值、锁、修订和期限。getMany 保持输入顺序与重复位置，缺失为 undefined；setMany 的规范重复键在 I/O 前拒绝，removeMany 去重后返回实际删除数。批写由后端在一次原生事务中执行，空批不打开事务或发观察事件；ttlMs 需要已登记 ttl 能力，否则在 I/O 前拒绝。provider 只转发原方法一次，保留输入、ctx、receiver 和 Promise。
+
 宿主通过 `onInstaller` 捕获本 store 唯一的安装口。`prepare` 先验证整批真实记录并保留令牌，`publish` 才使能力可见，`release` 幂等撤回该批。失败不调用基础对象的 `dispose`；资源回滚仍由创建它的后端拥有。事务与查询链的实际执行由其既有拥有者实现，类型投影不会创建事务或获得连接。
 
 ### fromValueCodec
@@ -737,6 +739,8 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
 
 ## 规范键前缀
 
+`snapshotStorageBatchKeys(keys, backend, { rejectDuplicates? })` 单次捕获每个输入位置，按调用方顺序返回冻结的 `{ key, identity, firstIndex }` 行。`key` 为独立快照，`identity` 使用规范有序字节；读取保留重复位置，原生删除只处理当前位置等于 `firstIndex` 的行，原子写入传 `rejectDuplicates: true`，规范重复键在 I/O 前报 `INVALID_ARGUMENT`。非法逻辑键保留 `INVALID_KEY`。此函数不创建 store、事务或资源 owner。
+
 `snapshotStorageKeyPrefix(prefix, backend)` 从原键域制作一次独立快照，返回 `{ key, lower, upper, matches }`。string 按 UTF-16 内容前缀匹配，ArrayBuffer 按字节前缀匹配；array 按完整的领先子键序列匹配，不把末尾子键也当成部分前缀；number 与 Date 只匹配精确规范身份，-0 与 0 相同。空 string/buffer 合法，空 array 仍由原键域拒绝。
 
 原 encoder 的同一 writer 仅省略最外层变长键的终止符，保留子键全部边界与类型 tag。lower 为包含端，upper 是必有的严格字节后继、不包含端；完整 encodeOrderedStorageKey 输出不变。有序原生结构按这个范围定位；逻辑键 IndexedDB cursor 可从 key 做 lowerBound，遇第一个 matches=false 即停止，最多多读一条边界。文本 Web 的 origin 枚举例外也复用同一 prepared matches。函数不创建索引、不扫描存量；返回 key/bounds 的修改不影响捕获的私有 matcher，调用方应保持其用于查询的边界值不变。
@@ -749,3 +753,7 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 // included === true; excluded === false
 // Native ordered stores use prefix.lower <= encodedKey < prefix.upper.
 ```
+
+`ttl` 与 `counter` 是标准能力身份。后端发布完整原生 API；支持事务的 provider 同时提供 `forTransaction`。`store.use(ttl)` 对物理文本、字节或记录目标提供 `expire/remaining/persist`。期限为有限非负毫秒，含小数与零；缺失/已过期目标的写返回 false，缺失/无限期目标的 remaining 返回 undefined；对已无限期目标 persist 返回 false。事务投影使用原 draft 与预算。
+
+`store.use(counter).increment(key, by?)` 原子修改规范十进制安全整数文本；缺失文本从零起算，省略 `by` 为一。空白、指数、前导零、负零、不安全增量和结果溢出均报 `INVALID_ARGUMENT`，不执行写入。后端作者在 I/O 前调用 `snapshotStorageCounterIncrement(by, backend)`，再在既有原子操作内部对当前文本应用其纯计算。`snapshotStorageTtlTarget` 复用原物理键 validator，`assertStorageTtlDuration` 接纳有限非负期限；这些 helper 不创建 store、期限状态或操作预算。
