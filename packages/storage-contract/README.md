@@ -243,6 +243,8 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 `ITransactionScope.isRecordIndexReady?(handle)` 是可选的同事务只读查询：缺失、待就绪或失效索引返回 false；只有当前原生快照中的完整元数据与句柄 generation、fingerprint 都一致才返回 true。它不建立或刷新索引，也不另开事务；未提供该方法的既有 scope 仍合法。`ISecondaryIndexTransactionScope` 仍只要求原来的索引读写方法。
 
+`deriveTransactionIterator(iterator, read, close?)` 只从原 owner 已登记的实际 iterator 派生资源；未登记源返回 undefined，不调用 read 或 close。read 的参数依次是原推进函数、原首错传播函数和该次真实 next 的 `currentScope`，旧的两参数回调仍有效；当前视图只在本次完整推进结算前有效。可选 close 用于释放读取期间惰性创建的附属真实游标；原资源生命周期先等已准入推进真正结束，再按逆序先关闭附属源、后关闭原 source，两者都尝试。首个失败立即沿原 state 锁定，后续清理失败沿同一 cleanupFailure 聚合并保留 cause；无附属 close 时直接复用原 cleanup。该接点不授予自由构造视图、登记或关闭 store 的权限，不新增登记表或生命周期。
+
 普通与索引记录迭代统一返回 IStorageIterator，IKeyValueStore 继承唯一 IStorageResource 声明。拥有者只登记真实迭代器，以当前有效视图推进每次 next，等已接纳推进结束，再按创建的相反顺序关闭剩余资源。dispose 返回缓存的拒绝主 Promise，固定符号方法返回独立缓存、报告后成功的 Promise；return 与自然结束使用同一次真实清理。缺少原生符号时由外层传入规范 asyncDisposeKey，契约不创建后备键。伪造、错 store 或过期 scope 的绑定同步抛 INVALID_ARGUMENT；过期数据方法拒绝预存的后端 TRANSACTION_FAILED，不再调用工厂或数据回调。
 
 本包拥有中立事务协调，真实提交、隔离、取消与重试仍归后端。IndexedDB 严守原生活跃窗口：外部数据应先取再开事务，await 定时器后可能不能继续请求；memory 与 SQLite 自行管理活跃期。assertTransactionCallback 在分配后端资源前校验可调用性。声明与包内假后端验证不能替代真实后端原子持久化验收。

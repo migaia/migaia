@@ -1227,6 +1227,37 @@ const control = owner.register(scope, { createScope, onFailure })`
       example: `const context = readTransactionOperationContext(operationScope)
 await codec.encode(value, context)`
     },
+    deriveTransactionIterator: {
+      role: 'operation',
+      purpose: t(
+        'Project an actual registered iterator through its original owner, including the current next operation view and reverse cleanup of an optional additional cursor.',
+        '沿原 owner 派生真实已登记迭代器，提供当前 next 操作视图，并逆序清理可选附属游标。'
+      ),
+      params: {
+        iterator: t(
+          'Actual source iterator registered by the original owner.',
+          '原 owner 已登记的真实源迭代器。'
+        ),
+        read: t(
+          'Receives next, fail and the actual currentScope. The scope expires with this complete advance; existing two-argument callbacks remain valid.',
+          '接收 next、fail 与真实 currentScope；视图在本次完整推进结束时失效，旧两参数回调保持有效。'
+        ),
+        close: t(
+          'Optional cleanup for an actual lazily created additional source. Runs before original source cleanup; both are attempted and original first-failure aggregation applies.',
+          '可选实际惰性附属源清理，先于原 source 清理运行；两者都尝试，并沿原首错聚合。'
+        )
+      },
+      returns: t(
+        'A resource iterator owned by the same registration, or undefined for an unregistered source without invoking callbacks. No free scope construction, registration or store-close authority.',
+        '同一登记拥有的资源迭代器；未登记源返回 undefined 且不调用回调，不授予自由构造视图、登记或关闭 store 的权限。'
+      ),
+      example: `const projected = deriveTransactionIterator(cursor, async (next, _fail, currentScope) => {
+  const context = readTransactionOperationContext(currentScope)
+  const row = await next()
+  if (row.done) return row
+  return { done: false, value: await decode(row.value, context) }
+})`
+    },
     runTransactionOperation: {
       role: 'operation',
       purpose: t(

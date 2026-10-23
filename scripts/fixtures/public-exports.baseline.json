@@ -1052,6 +1052,7 @@
         "createTransactionOwner",
         "defineConcurrencyPolicy",
         "defineStorageCapability",
+        "deriveTransactionIterator",
         "encodeOrderedStorageKey",
         "fromValueCodec",
         "hasStorageCapability",
