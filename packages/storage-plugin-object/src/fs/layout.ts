@@ -3,11 +3,11 @@ import { join, basename } from 'node:path'
 import {
   StorageContractError,
   StorageContractErrorCode,
+  createStorageBlobBodyReader,
   orderStorageKeysByBytes,
   type IBlobInfo,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { isUint8Array } from '@migaia/utils/bytes'
 import {
   subscribeToAbort,
   throwIfAborted,
@@ -201,22 +201,16 @@ export async function openFileObjects(
         let size = 0
         let committed = false
         let dispatched = false
-        const source = isUint8Array(body)
-          ? new ReadableStream<Uint8Array>({
-              start(controller) {
-                controller.enqueue(body)
-                controller.close()
-              }
-            })
-          : body
-        const reader = source.getReader()
-        let ended = false
+        const reader = createStorageBlobBodyReader(body, {
+          backend: ObjectNames.backend,
+          report: context.report,
+          normalizeFailure: normalizeObjectError
+        })
         const unsubscribe = subscribeToAbort(
           options.ctx?.signal,
           () => {
-            void reader
-              .cancel(readAbortReason(options.ctx?.signal))
-              .catch((error) => context.report(normalizeObjectError(error)))
+            // The original resource owner observes cleanup once in the final symbolic disposal.
+            void reader.return?.(readAbortReason(options.ctx?.signal))
           },
           context.report
         )
@@ -224,22 +218,12 @@ export async function openFileObjects(
           {
             async pull(controller) {
               throwIfAborted(options.ctx?.signal)
-              let next: ReadableStreamReadResult<Uint8Array>
-              try {
-                next = await reader.read()
-              } catch (error) {
-                /** A rejected read is terminal; cancelling it would report the same failure twice. */
-                ended = true
-                throw error
-              }
+              const next = await reader.next()
               throwIfAborted(options.ctx?.signal)
               if (next.done) {
-                ended = true
                 controller.close()
                 return
               }
-              if (!isUint8Array(next.value))
-                throw invalidArgument(new TypeError(ObjectErrorText.chunk))
               hash.update(next.value)
               size += next.value.byteLength
               controller.enqueue(next.value)
@@ -280,13 +264,7 @@ export async function openFileObjects(
           throw normalizeObjectError(error)
         } finally {
           unsubscribe()
-          if (!ended)
-            try {
-              await reader.cancel()
-            } catch (error) {
-              context.report(normalizeObjectError(error))
-            }
-          reader.releaseLock()
+          await reader[Symbol.asyncDispose]()
           if (!committed && !dispatched)
             for (const file of [
               temporary,
