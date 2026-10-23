@@ -525,14 +525,27 @@ type IConcurrencyBudget = {
   logicalWaitedMs: number
   conflicts: number
 }
-/** Attempt contexts connect inner store calls to the original budget without granting authority. */
+/**
+ * Captured options share canonical lock metadata and an optional running budget without granting
+ * authority.
+ */
 const concurrencyAttemptBudgets = new WeakMap<
-  IConcurrencyAttemptContext,
+  ITransactionOptions,
   {
-    readonly budget: IConcurrencyBudget
+    readonly budget?: IConcurrencyBudget
     readonly locks: readonly INormalizedLockKey[] | undefined
   }
 >()
+/**
+ * Builder-only metadata shares the existing options table and creates no timing or transaction
+ * owner.
+ */
+export function associateNormalizedLockKeys(
+  options: ITransactionOptions,
+  locks: readonly INormalizedLockKey[]
+): void {
+  concurrencyAttemptBudgets.set(options, { locks })
+}
 /** Internal managed waits distinguish logical policy budgets from physical database scheduling. */
 const ConcurrencyWaitKind = { logical: 'logical', physical: 'physical' } as const
 /** An observation failure never replaces an operation result, even if the configured reporter fails. */
@@ -783,7 +796,7 @@ export async function runWithConcurrency<TResult>(
   }
   if (capturedOverride !== undefined) assertConcurrencyPolicy(capturedOverride)
   /** The exact outer attempt context carries the one shared budget and encoded lock set. */
-  const inherited = concurrencyAttemptBudgets.get(request.options as IConcurrencyAttemptContext)
+  const inherited = concurrencyAttemptBudgets.get(request.options)
   /** The original logical identities are encoded/sorted once, not again on nested entries or retry. */
   const locks = inherited
     ? inherited.locks
@@ -796,11 +809,11 @@ export async function runWithConcurrency<TResult>(
   const extensions = snapshotConcurrencyExtensions(request.options)
   /** Only the original operation creates a diagnostic deadline reason and utils signal owner. */
   const deadlineFailure =
-    inherited?.budget.deadlineFailure ??
+    inherited?.budget?.deadlineFailure ??
     new StorageContractError(StorageContractErrorCode.aborted, { backend })
   /** The existing reporter contains cleanup and late-rejection failures without changing outcomes. */
   const report: IUtilsReporter =
-    inherited?.budget.report ?? ((error) => reportConcurrencyFailure(stages, error))
+    inherited?.budget?.report ?? ((error) => reportConcurrencyFailure(stages, error))
   /** Remaining overall time includes admission work and is never reset by nested attempts. */
   const budget: IConcurrencyBudget = inherited?.budget ?? {
     cancellation: createAbortTimeoutSignal({
@@ -984,6 +997,6 @@ export async function runWithConcurrency<TResult>(
       }
     }
   } finally {
-    if (!inherited) budget.cancellation.dispose()
+    if (!inherited?.budget) budget.cancellation.dispose()
   }
 }

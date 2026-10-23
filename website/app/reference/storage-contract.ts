@@ -686,6 +686,29 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    createTransactionBuilder: {
+      role: 'factory',
+      purpose: t(
+        'Create an immutable builder that preserves the actual native transaction scope and options without starting work.',
+        '创建保留真实原生事务 scope 与 options 的不可变 builder，不启动工作。'
+      ),
+      params: {
+        store: t(
+          'Original registered storage resource with a real transaction method; full callback scope and options are inferred.',
+          '具有真实 transaction 方法的原登记存储资源；推断完整回调 scope 与 options。'
+        ),
+        options: t(
+          'Optional native transaction options excluding lock. Capture fields once; each derivation shares them without copying accumulated lock history.',
+          '不含 lock 的可选原生事务选项；字段只捕获一次，各派生共享选项，不复制累计锁历史。'
+        )
+      },
+      returns: t(
+        'Unlocked ITransactionBuilder with no run method. lock creates a locked builder; run normalizes once, invokes the original transaction once and preserves its Promise identity.',
+        '没有 run 方法的未锁定 ITransactionBuilder；lock 创建已锁定 builder；run 只规范化一次、调用原 transaction 一次并保留 Promise 身份。'
+      ),
+      example: storageContractCases.createTransactionBuilder![0]!.example,
+      cases: storageContractCases.createTransactionBuilder
+    },
     runWithConcurrency: {
       role: 'operation',
       purpose: t(
