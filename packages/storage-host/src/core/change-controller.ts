@@ -65,9 +65,9 @@ export type IBackendValueCommit = (
 type IBackendRegistration = {
   controller?: IBackendChangeController
   valueCommit?: IBackendValueCommit
-  envelope?: (
-    operation: Readonly<{ operation: string; targetVersion: number }>
-  ) => IStorageEnvelopeStages
+  envelopes?: Array<
+    (operation: Readonly<{ operation: string; targetVersion: number }>) => IStorageEnvelopeStages
+  >
 }
 
 /** One private exact-store registry; observation also supports admitted stores without a controller. */
@@ -257,7 +257,7 @@ export const registerBackendChangeController = (
   return () => {
     if (controllerRegistry.get(store) !== row || row.controller !== controller) return
     delete row.controller
-    if (row.envelope === undefined && row.valueCommit === undefined)
+    if (row.envelopes === undefined && row.valueCommit === undefined)
       controllerRegistry.delete(store)
   }
 }
@@ -273,25 +273,65 @@ export const getBackendChangeController = (
 /** Bind original host observation at resource admission without changing or patching the store. */
 export const registerBackendEnvelopeStages = (
   store: IStorageBase,
-  factory: NonNullable<IBackendRegistration['envelope']>
+  factory: NonNullable<IBackendRegistration['envelopes']>[number]
 ): (() => void) => {
-  /** The same row remains the sole owner of optional controller and envelope references. */
+  /** A shared raw object may belong to more than one host; each original scope retains its binding. */
   const row = controllerRegistry.get(store) ?? {}
-  row.envelope = factory
+  ;(row.envelopes ??= []).push(factory)
   controllerRegistry.set(store, row)
   return () => {
-    if (controllerRegistry.get(store) !== row || row.envelope !== factory) return
-    delete row.envelope
-    if (row.controller === undefined && row.valueCommit === undefined)
+    if (controllerRegistry.get(store) !== row) return
+    /** Remove only this registration; other live hosts still observe the shared original store. */
+    const index = row.envelopes?.indexOf(factory) ?? -1
+    if (index < 0) return
+    row.envelopes!.splice(index, 1)
+    if (row.envelopes!.length === 0) delete row.envelopes
+    if (
+      row.controller === undefined &&
+      row.envelopes === undefined &&
+      row.valueCommit === undefined
+    )
       controllerRegistry.delete(store)
   }
 }
 
-/** Entity operations borrow the admitted host observer without gaining construction authority. */
+/** Entity borrows original host observers without gaining construction authority or store wrappers. */
 export const getBackendEnvelopeStages = (
   store: IStorageBase,
   operation: Readonly<{ operation: string; targetVersion: number }>
-): IStorageEnvelopeStages | undefined => controllerRegistry.get(store)?.envelope?.(operation)
+): IStorageEnvelopeStages | undefined => {
+  /** The ordinary single-host path returns its original bound observer directly. */
+  const factories = controllerRegistry.get(store)?.envelopes
+  if (factories === undefined) return undefined
+  if (factories.length === 1) return factories[0]!(operation)
+  /** Shared raw identity cannot identify a caller host, so all original active bindings observe it. */
+  const stages = factories.map((factory) => factory(operation))
+  return {
+    beforeEnvelopeCheck: () => {
+      for (const stage of stages) stage.beforeEnvelopeCheck()
+    },
+    afterEnvelopeCheck: (version) => {
+      for (const stage of stages) stage.afterEnvelopeCheck(version)
+    },
+    onVersionRejected: (version, code) => {
+      for (const stage of stages) stage.onVersionRejected(version, code)
+    },
+    afterMigrate: (version, mode, count, elapsed) => {
+      for (const stage of stages) stage.afterMigrate(version, mode, count, elapsed)
+    },
+    observe: {
+      beforeStep: (context) => {
+        for (const stage of stages) stage.observe.beforeStep?.(context)
+      },
+      afterStep: (context) => {
+        for (const stage of stages) stage.observe.afterStep?.(context)
+      },
+      report: (cause) => {
+        for (const stage of stages) stage.observe.report?.(cause)
+      }
+    }
+  }
+}
 
 /** Install one original native compare-and-write terminal on the exact admitted store row. */
 export const registerBackendValueCommit = (
@@ -307,7 +347,8 @@ export const registerBackendValueCommit = (
   return () => {
     if (controllerRegistry.get(store) !== row || row.valueCommit !== commit) return
     delete row.valueCommit
-    if (row.controller === undefined && row.envelope === undefined) controllerRegistry.delete(store)
+    if (row.controller === undefined && row.envelopes === undefined)
+      controllerRegistry.delete(store)
   }
 }
 
