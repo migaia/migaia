@@ -662,3 +662,13 @@ test('真实浏览器 orderBy comparator 返回非法类型时拒绝静默排序
   expect(result.rangeSnapshotReads).toBe(1)
   expect(result.listOptionReads).toBe(4)
 })
+
+test('native IndexedDB TTL keeps expiry, rollback and reopened deadlines', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.evaluate(() => window.runIndexedDbNativeTtlScenario())).resolves.toEqual({
+    expired: true,
+    rolledBack: true,
+    reopened: true,
+    remaining: true
+  })
+})
