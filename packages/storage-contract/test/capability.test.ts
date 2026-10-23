@@ -374,6 +374,19 @@ describe('capability publication', () => {
 })
 
 describe('standard KV capability forwarding', () => {
+  it('does not grant standard validation or transaction eligibility to a same-name custom token', () => {
+    /** Custom names never copy the private facts owned by the exact standard token identity. */
+    const namedKv = defineStorageCapability<{ read(): number }>()('kv')
+    const api = { read: () => 7 }
+    const base = createBase()
+    const store = provideCapabilities(base, [implement(namedKv, api)])
+    expect(store.use(namedKv)).toBe(api)
+    expect(store.has(kv)).toBe(false)
+    expect(Object.hasOwn(store, 'get')).toBe(false)
+    expect(() => implement(namedKv, api, { forTransaction: (() => ({})) as never })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
   it('retains ordinary raw KV admission without claiming missing native batch capability', async () => {
     /** An existing raw backend may reliably provide just the original seven methods. */
     const pending = Promise.resolve('raw-value')

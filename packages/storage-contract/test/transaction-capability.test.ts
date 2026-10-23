@@ -263,6 +263,12 @@ describe('original transaction capability projections', () => {
     expect(fixture.native).toHaveBeenCalledTimes(8)
     expect(new Set(fixture.bindKv.mock.calls.map(([scope]) => scope))).toHaveProperty('size', 8)
     expect(fixture.bindKv.mock.calls.every(([scope]) => scope !== fixture.scope)).toBe(true)
+    expect(
+      fixture.bindKv.mock.contexts.every(
+        (receiver) =>
+          Reflect.ownKeys(receiver as object).join(',') === 'implementation,forTransaction'
+      )
+    ).toBe(true)
     expect(fixture.rootText.size).toBe(0)
     expect(Object.getOwnPropertyDescriptors(fixture.scope)).toEqual(descriptors)
     const saved = api.get
