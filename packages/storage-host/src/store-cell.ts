@@ -14,6 +14,8 @@ import type { IStorageJournalBackendBinding } from './journal/types.js'
 import { snapshotStorageJournalBinding } from './journal/binding.js'
 /** One registration binds one construction identity and publishes it only after admission. */
 export type IStorageStoreCell = {
+  /** A read-only original registration identity grants no methods or resource authority. */
+  readonly journalIdentity: object
   bind(store: IStorageBase): void
   set(store: IStorageBase): void
   get(): IStorageBase
@@ -70,6 +72,7 @@ export function createStorageStoreCell(): IStorageStoreCell {
   /** Exact aliases are released by the registration's existing resource scope. */
   const orgReleases: Array<() => void | Promise<void>> = []
   return {
+    journalIdentity: Object.freeze({}),
     retainJournalResource: (resource) => {
       if (journalResources.has(resource)) return () => undefined
       let dispose: IStorageResource['dispose']

@@ -1187,6 +1187,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     context.assertExecution()
     const binding = context.storeCell.journalForOrg(orgId)
     return Object.freeze({
+      registration: context.storeCell.journalIdentity,
       orgId,
       backendInstanceId: context.id,
       binding,

@@ -205,6 +205,8 @@ memory 的 `readImage`、`writeImage`、`readRevision` 只接受该固定组织�
 
 memory 的 `changes(scope)` 首次调用须在该真实 attempt 的首项业务写前，之后原 `stageDraft` 在修改前检查可记录性，并保留 text/bytes/record/vector/RDF 与 deadline 的实际顺序。返回值冻结，反映每键最终修订；先新增再删除且最终没有物理变更的身份不生成变更。迟到首次调用报 `UNSUPPORTED_CAPABILITY`，普通未开启事务不分配镜像。`writeCommitMarker` 只接受原认证事务 id，marker 与业务同提交/回滚，使用原私有 namespace Map 的不可公开 symbol 分区；同名用户 prefix、业务 clear 与其它 org 均不能触及。`hasCommitMarker`/`removeCommitMarker` 沿原 native 事务读取或回收。根快速写路径、capacity victim、blob 和全局桥仍未由这些作者方法自动接管。
 
+包内 native journal 提交桥已用真实 logger 的 binlog/undoLog 与两份 storageLogStore 验证：ready 在业务 native scope 前完成，head 锁交回原第一次规范取锁，按序 storage.commit 与按原身份合并的 undo 镜像在同一事务追加。binlogValues 默认不含值，undo 始终保留完整编码镜像与 afterRevision；rollback 不推进两个日志的已提交索引。原 storeCell 的冻结空身份仅用于私有精确 registration 比较；另一个宿主即使 backend id/org 相同，也不能选其日志。logger 自己继续检查实际载体身份。该提交桥尚为包内显式调用，未声明全局自动配置、外置 WAL、自动 undo 执行或根写路径已经完成。
+
 ### 私有日志资源
 
 `storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding 与可靠独占，打开先完成恢复。同组织与 prefix 同时只允许一个日志句柄；不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。

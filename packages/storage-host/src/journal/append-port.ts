@@ -6,6 +6,7 @@ import {
   type ITransactionScope
 } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
+import type { IStorageJournalBackendAccess } from './binding.js'
 
 /**
  * Only the original log object carries this internal fixed-target closure; no authority table
@@ -14,6 +15,7 @@ import { isStorageErrorFamily } from '../core/error-family.js'
 export const storageLogNativeAccess = Symbol()
 /** A native consumer can join one authentic attempt, never obtain a raw backend or installer. */
 export type IStorageLogNativeAccess = {
+  matches(access: IStorageJournalBackendAccess): boolean
   readonly orgId: string
   readonly backendInstanceId: string
   readonly headLock: ILockKey
