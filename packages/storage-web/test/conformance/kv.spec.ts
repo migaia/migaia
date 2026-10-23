@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
+import { defineEntity } from '@migaia/storage-host/entity'
 import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
 import {
   kv,
@@ -15,7 +16,7 @@ import {
   createLocalTestStore,
   createSessionTestStore,
   createCookieTestStore,
-  createIndexedDbTestStore,
+  createIndexedDbBackfillTestStore,
   createMemoryTestStore
 } from '../helpers/installed-backends.js'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
@@ -56,6 +57,8 @@ runConformance(harness, {
   create: () =>
     createCookieTestStore({ namespace: 'conformance-cookie', document: fakeCookieDocument() })
 })
+/** The original runner executes fresh fixtures serially and cleanup closes each original owner. */
+let indexFixture: Awaited<ReturnType<typeof createIndexedDbBackfillTestStore>>
 runConformance(harness, {
   name: 'indexedDbHost',
   capabilities: [kv, records, ttl],
@@ -69,12 +72,39 @@ runConformance(harness, {
     secondaryIndexes: true,
     maxValueBytes: undefined
   },
-  create: () =>
-    createIndexedDbTestStore({
+  create: async () => {
+    indexFixture = await createIndexedDbBackfillTestStore({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: 'conformance-indexed-db'
     })
+    return indexFixture.store
+  },
+  prepareSecondaryIndexes: async (store, handle) => {
+    expect(store).toBe(indexFixture.store)
+    const session = await indexFixture.capability.openBackfillSession(handle, {
+      range: { lower: '', upper: '\uffff' },
+      allowComplete: true
+    })
+    try {
+      const batch = await session.readBatch()
+      expect(batch.candidates).toEqual([])
+      await session.commitBatch({
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: undefined,
+        nextCheckpoint: undefined,
+        endOfScan: true,
+        projections: []
+      })
+    } finally {
+      await session.release()
+    }
+    const repository = defineEntity<{ id: string }>({ name: handle.scope, key: 'id' }).connect(
+      store
+    )
+    return (key: string) => repository.lockKey(key).key
+  }
 })
 runConformance(harness, {
   name: 'memory',
