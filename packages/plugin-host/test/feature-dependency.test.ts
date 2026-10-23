@@ -68,4 +68,68 @@ describe('feature dependencies', () => {
     })
     expect(installs).toBe(0)
   })
+
+  it('builds a shared Feature diamond once with dependency-first installation', async () => {
+    /** One provider output must be shared by both branches. */
+    const output = { value: 7 }
+    /** Installation order witnesses the static dependency schedule through the consumer API. */
+    const order: string[] = []
+    /** The sole root creates the provider output consumed by both branches. */
+    const root = definePlugin({
+      name: 'root',
+      features: { value: defineFeature(() => output) },
+      install: () => {
+        order.push('root')
+        return {}
+      }
+    })
+    /** One branch retains the exact root output through a Feature reference. */
+    const left = definePlugin({
+      name: 'left',
+      features: {
+        value: defineFeature((_core, dependencies) => ({ read: () => dependencies.root }), {
+          root: root.getFeature('value')
+        })
+      },
+      install: () => {
+        order.push('left')
+        return {}
+      }
+    })
+    /** The second branch shares the same root without constructing a replacement. */
+    const right = definePlugin({
+      name: 'right',
+      features: {
+        value: defineFeature((_core, dependencies) => ({ read: () => dependencies.root }), {
+          root: root.getFeature('value')
+        })
+      },
+      install: () => {
+        order.push('right')
+        return {}
+      }
+    })
+    /** The leaf joins both dependency branches in the host-owned graph. */
+    const leaf = definePlugin({
+      name: 'leaf',
+      features: {
+        value: defineFeature(
+          (_core, dependencies) => ({
+            read: () => [dependencies.left.read(), dependencies.right.read()]
+          }),
+          { left: left.getFeature('value'), right: right.getFeature('value') }
+        )
+      },
+      install: () => {
+        order.push('leaf')
+        return {}
+      }
+    })
+    /** Canonical consumer host validates dependency scheduling through public installation. */
+    const host = createHost()
+    const [handle] = await host.use(leaf, right, left, root)
+    expect(order).toEqual(['root', 'right', 'left', 'leaf'])
+    expect(handle.getFeature('value').read()).toEqual([output, output])
+    await host.dispose()
+  })
 })
