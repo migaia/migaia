@@ -1,6 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { records } from '@migaia/storage-contract'
+import { assertTransactionOwner, records, type ITransactionScope } from '@migaia/storage-contract'
+import { createMemoryBackend } from '../src/backends/memory.js'
+import type { IStoragePluginCore } from '../src/index.js'
 import {
   createStorageHost,
   defineFeature,
@@ -220,5 +222,47 @@ describe('Feature transaction methods on original native views', () => {
         })
       ])
     )
+  })
+
+  it('rejects another real backend scope before running any Feature intervention', async () => {
+    const features = { scoped: scopedFeature() }
+    let project!: (scope: object) => object | undefined
+    let stages = 0
+    const factory = (core: IStoragePluginCore<typeof features>) => {
+      let construction!: ReturnType<typeof createMemoryBackend>
+      project = core.createTransactionApi
+      return {
+        kind: memoryBackendKind,
+        capabilityInstaller: (_store: typeof construction.store) => construction.installer,
+        featureExpose: () => ({
+          getClient: () => undefined,
+          getTransactionClient: (scope: ITransactionScope<unknown, typeof records>) => {
+            assertTransactionOwner(construction.store, scope)
+            return undefined
+          }
+        }),
+        install: () => {
+          construction = createMemoryBackend(core, {})
+          core.registerStore(construction.store)
+          core.registerChangeController(construction.store, construction.controller)
+          core.usePipeline((input, next) => {
+            if (input.operation === 'identity') stages++
+            return next(input)
+          })
+          return {}
+        }
+      }
+    }
+    await using host = await createStorageHost({
+      plugins: [definePlugin('left', factory, features), memoryBackendPlugin({ id: 'right' })]
+    })
+    await expect(
+      host.backend('right').transaction(async (scope) => {
+        const api = project(scope)!
+        const identity = Reflect.get(api, 'identity') as () => Promise<unknown>
+        await identity()
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(stages).toBe(0)
   })
 })

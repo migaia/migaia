@@ -195,14 +195,17 @@ export function installStorageFeatures(input: {
             return Reflect.apply(value, { store, client, scope: undefined }, captured)
           })
         /** Original scope admission owns expiry/first-failure semantics before any host/client work. */
-        return runTransactionOperation(scope, (current) =>
-          input.execution.run({ operation: path, input: args, scope: current }, (captured) => {
-            assertTransactionOwner(input.store, current)
-            /** Client projection is lazy and uses this operation's exact current registered view. */
-            const client = input.expose.getTransactionClient!(current)
-            return Reflect.apply(value, { store: current, client, scope: current }, captured)
-          })
-        )
+        return runTransactionOperation(scope, (current) => {
+          assertTransactionOwner(input.store, current)
+          return input.execution.run(
+            { operation: path, input: args, scope: current },
+            (captured) => {
+              /** Client projection is lazy and uses this operation's exact current registered view. */
+              const client = input.expose.getTransactionClient!(current)
+              return Reflect.apply(value, { store: current, client, scope: current }, captured)
+            }
+          )
+        })
       }
     /** Freeze a nested API group while its leaves retain registration guards. */
     const group = Object.create(null) as Record<string, unknown>
