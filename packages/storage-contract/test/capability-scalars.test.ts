@@ -8,6 +8,8 @@ import {
   snapshotStorageTtlTarget,
   assertStorageTtlDuration,
   snapshotStorageCounterIncrement,
+  lockKey,
+  term,
   type IStorageBase
 } from '../src/index.js'
 
@@ -71,6 +73,22 @@ describe('standard scalar capability contracts', () => {
     date.setTime(9)
     expect(captured).toEqual({ channel: 'record', key: ['x', new Date(3)] })
     expect(Object.isFrozen(captured)).toBe(true)
+    expect(snapshotStorageTtlTarget(lockKey.vector('catalog', 'one'), 'memory')).toEqual({
+      channel: 'vector',
+      collection: 'catalog',
+      id: 'one'
+    })
+    expect(() =>
+      snapshotStorageTtlTarget(
+        lockKey.rdf({
+          subject: term.iri('urn:s'),
+          predicate: term.iri('urn:p'),
+          object: term.iri('urn:o'),
+          graph: term.defaultGraph
+        }) as never,
+        'memory'
+      )
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
     for (const ms of [0, -0, 0.5, Number.MAX_VALUE])
       expect(() => assertStorageTtlDuration(ms, 'memory')).not.toThrow()
     for (const ms of [-1, NaN, Infinity, '1'])

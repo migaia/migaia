@@ -14,6 +14,7 @@ import { snapshotOperationContext } from './operation-context.js'
 import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageKey, assertStringStorageKey } from './key.js'
+import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot, type IQuad } from './capabilities/rdf.js'
 import {
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix,
@@ -31,6 +32,8 @@ export type ILockKey =
   | { readonly channel: 'text'; readonly key: IStorageKey }
   | { readonly channel: 'bytes'; readonly key: string }
   | { readonly channel: 'record'; readonly key: IStorageKey }
+  | { readonly channel: 'vector'; readonly collection: string; readonly id: string }
+  | { readonly channel: 'rdf'; readonly quad: IQuad }
 
 /** Public policy metadata; these fields do not grant runtime policy authority. */
 export type IConcurrencyPolicy = {
@@ -295,9 +298,15 @@ export const ConcurrencyPolicy = Object.freeze({
 })
 
 /** Existing physical channel order precedes the canonical key encoding, never its own key tags. */
-const LockChannel = { text: 'text', bytes: 'bytes', record: 'record' } as const
+const LockChannel = {
+  text: 'text',
+  bytes: 'bytes',
+  record: 'record',
+  vector: 'vector',
+  rdf: 'rdf'
+} as const
 /** Disjoint channel markers prevent equal user keys in different channels from colliding. */
-const LockChannelRank = { text: 1, bytes: 2, record: 3 } as const
+const LockChannelRank = { text: 1, bytes: 2, record: 3, vector: 4, rdf: 5 } as const
 /** Internal snapshots retain independently owned canonical bytes across all actual attempts. */
 export type INormalizedLockKey = { readonly key: ILockKey; readonly encoded: Uint8Array }
 /** Explicit stack frames visit only still-shared suffixes rather than maximum-length padding. */
@@ -322,14 +331,31 @@ export function snapshotLockKey(value: unknown, backend: IBackendKind | undefine
     throw invalidLockArgument(backend)
   /** Channel and key accessors are borrowed once before validation or copying. */
   let channel: unknown
-  /** Key failures remain distinct from malformed lock-container failures. */
+  /** Original key fields retain their existing getter and error order. */
   let key: unknown
+  /** Vector locks capture only their exact collection and point fields. */
+  let collection: unknown
+  /** Strings retain spelling without adding a backend-specific identifier policy. */
+  let id: unknown
+  /** RDF locks borrow one quad before the canonical term owner detaches it. */
+  let quad: IQuad | undefined
   try {
     channel = (value as { channel?: unknown }).channel
-    key = (value as { key?: unknown }).key
+    if (channel === LockChannel.vector) {
+      collection = (value as { collection?: unknown }).collection
+      id = (value as { id?: unknown }).id
+    } else if (channel === LockChannel.rdf) quad = (value as { quad: IQuad }).quad
+    else key = (value as { key?: unknown }).key
   } catch (cause) {
     throw invalidLockArgument(backend, cause)
   }
+  if (channel === LockChannel.vector) {
+    assertStringStorageKey(collection, backend)
+    assertStringStorageKey(id, backend)
+    return Object.freeze({ channel, collection, id })
+  }
+  if (channel === LockChannel.rdf)
+    return Object.freeze({ channel, quad: snapshotStorageRdfQuad(quad!, backend) })
   if (channel === LockChannel.bytes) {
     assertStringStorageKey(key, backend)
     return Object.freeze({ channel, key })
@@ -360,13 +386,36 @@ export const lockKey = Object.freeze({
       ILockKey,
       { readonly channel: 'record' }
     >
+  },
+  /** Vector locks share one exact collection/point identity with native writes and TTL. */
+  vector(collection: string, id: string): Extract<ILockKey, { readonly channel: 'vector' }> {
+    return snapshotLockKey({ channel: LockChannel.vector, collection, id }, undefined) as Extract<
+      ILockKey,
+      { readonly channel: 'vector' }
+    >
+  },
+  /** RDF locks detach a complete ground quad through its canonical term owner. */
+  rdf(quad: IQuad): Extract<ILockKey, { readonly channel: 'rdf' }> {
+    return snapshotLockKey({ channel: LockChannel.rdf, quad }, undefined) as Extract<
+      ILockKey,
+      { readonly channel: 'rdf' }
+    >
   }
 })
+/** Encodes only canonical channel content for both native identity and unchanged diagnostics. */
+function encodeLockContent(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
+  return key.channel === LockChannel.rdf
+    ? encodeRdfQuadSnapshot(key.quad)
+    : encodeOrderedStorageKey(
+        key.channel === LockChannel.vector ? [key.collection, key.id] : key.key,
+        backend
+      )
+}
 /** Adds only channel identity around the sole canonical ordered-key encoder. */
 function encodeLockIdentity(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
-  /** Key-order owns every key tag and self-delimiting scalar/array representation. */
-  const ordered = encodeOrderedStorageKey(key.key, backend)
-  /** One channel marker keeps the original text < bytes < record order. */
+  /** Key-order and RDF own all self-delimiting content bytes. */
+  const ordered = encodeLockContent(key, backend)
+  /** New vector/RDF markers follow the unchanged text < bytes < record order. */
   const encoded = new Uint8Array(ordered.length + 1)
   encoded[0] = LockChannelRank[key.channel]
   encoded.set(ordered, 1)
@@ -551,7 +600,9 @@ export function snapshotConcurrencyLockRange(
   if (
     channel !== LockChannel.text &&
     channel !== LockChannel.bytes &&
-    channel !== LockChannel.record
+    channel !== LockChannel.record &&
+    channel !== LockChannel.vector &&
+    channel !== LockChannel.rdf
   )
     throw invalidLockArgument(backend)
   /** Only the original channel owner supplies its finite physical ordering. */
@@ -561,6 +612,8 @@ export function snapshotConcurrencyLockRange(
       lower: storageKeyBytesIdentity(new Uint8Array([rank])),
       upper: storageKeyBytesIdentity(new Uint8Array([rank + 1]))
     })
+  if (channel === LockChannel.vector || channel === LockChannel.rdf)
+    throw invalidLockArgument(backend)
   if (channel === LockChannel.bytes) assertStringStorageKey(prefix, backend)
   /** The original prefix writer owns all type tags, variable terminators and strict successors. */
   const bounds = snapshotStorageKeyPrefix(prefix, backend)
@@ -736,7 +789,7 @@ function concurrencyLockFailure(
       : JSON.stringify(
           snapshot.map((key) => ({
             ...key,
-            encoded: storageKeyBytesIdentity(encodeOrderedStorageKey(key.key, backend))
+            encoded: storageKeyBytesIdentity(encodeLockContent(key, backend))
           }))
         )
   /** Handoff is a real identity gap, never a substituted old label. */

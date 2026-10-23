@@ -33,7 +33,15 @@ export function snapshotStorageTtlTarget(
   target: ITtlTarget,
   backend: IBackendKind | undefined
 ): ITtlTarget {
-  return snapshotLockKey(target, backend)
+  /** RDF has no TTL target even when untyped callers supply a structurally valid lock. */
+  const captured = snapshotLockKey(target, backend)
+  if (captured.channel === 'rdf')
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { backend },
+      StorageContractErrorText.lockArgument
+    )
+  return captured
 }
 /** Finite nonnegative durations include fractional milliseconds and immediate expiry at zero. */
 export function assertStorageTtlDuration(ms: number, backend: IBackendKind | undefined): void {
