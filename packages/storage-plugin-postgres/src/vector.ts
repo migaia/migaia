@@ -5,12 +5,13 @@ import {
   snapshotStorageVector,
   snapshotStorageVectorUpsert,
   snapshotStorageVectorSearch,
+  snapshotStorageVectorIds,
+  snapshotStorageDeleteCountMode,
   snapshotStorageWhere,
   createVectorQuery,
   createStorageIteratorLifetime,
   assertStorageTtlDuration,
   lockKey,
-  DeleteCountMode,
   type IVectorApi,
   type IVectorCollection,
   type IStorageVectorConfiguration,
@@ -475,14 +476,10 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
         },
         recommend(examples) {
           const { positive, negative = [] } = examples
-          const positives = [...positive]
-          const negatives = [...negative]
-          if (
-            positives.length === 0 ||
-            [...positives, ...negatives].some((id) => typeof id !== 'string') ||
-            new Set([...positives, ...negatives]).size !== positives.length + negatives.length
-          )
-            throw invalidArgument()
+          const positives = snapshotStorageVectorIds(positive, PgNames.backend, true)
+          const negatives = snapshotStorageVectorIds(negative, PgNames.backend, true)
+          if (positives.length === 0) throw invalidArgument()
+          snapshotStorageVectorIds([...positives, ...negatives], PgNames.backend, true)
           return build(
             async (state) => {
               const good = await sample(state, name, captured.options, positives)
@@ -552,8 +549,7 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
           })
         },
         async delete(ids, ctx) {
-          const prepared = [...ids]
-          if (prepared.some((id) => typeof id !== 'string')) throw invalidArgument()
+          const prepared = snapshotStorageVectorIds(ids, PgNames.backend)
           if (prepared.length === 0) return
           await runtime.run('vector.delete', ctx, async (state) => {
             await remove(state, name, await collection(state, name, captured.options), prepared)
@@ -562,9 +558,8 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
         async deleteWhere(where, ctx) {
           if (typeof where === 'function') throw unsupported()
           const condition = snapshotStorageWhere(where)
-          const { count = DeleteCountMode.precount, ...options } = ctx ?? {}
-          if (count !== DeleteCountMode.precount && count !== DeleteCountMode.scroll)
-            throw invalidArgument()
+          const { count, ...options } = ctx ?? {}
+          snapshotStorageDeleteCountMode(count, PgNames.backend)
           if (pgVectorCondition(condition, []) === undefined) throw unsupported()
           return runtime.run('vector.deleteWhere', options, async (state) => {
             const config = await collection(state, name, captured.options)
