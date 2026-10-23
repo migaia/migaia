@@ -5,6 +5,34 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  runWithConcurrency: [
+    {
+      title: t(
+        'Compose a real backend with the original policy owner',
+        '把真实后端接到原策略 owner'
+      ),
+      problem: t(
+        'Backend and persist composition must not add a second retry loop or restart operation deadlines.',
+        '后端与 persist 组合不能另建重试循环或重开操作期限。'
+      ),
+      example: t(
+        `import { resolveConcurrencyPolicy, runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
+async function execute(store: IStorageBase, capturedOptions: ITransactionOptions, port: IConcurrencyPort<boolean>) {
+  const policy = resolveConcurrencyPolicy(store, capturedOptions.concurrency)
+  return runWithConcurrency({ store, options: capturedOptions, policy }, port)
+}`,
+        `import { resolveConcurrencyPolicy, runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
+async function execute(store: IStorageBase, capturedOptions: ITransactionOptions, port: IConcurrencyPort<boolean>) {
+  const policy = resolveConcurrencyPolicy(store, capturedOptions.concurrency)
+  return runWithConcurrency({ store, options: capturedOptions, policy }, port)
+}`
+      ),
+      result: t(
+        'The function returns the real port’s committed boolean. The caller supplies a registered original store and captured options; no fictional backend is created by this example.',
+        '函数返回真实 port 的提交布尔值。调用方提供原登记 store 与已捕获选项；示例不构造虚拟后端。'
+      )
+    }
+  ],
   prefixStorageOrgKey: [
     {
       title: t('Preserve tuple keys inside an organization segment', '在组织段内保留元组键'),

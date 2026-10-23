@@ -635,6 +635,18 @@ const keyValidationParams = {
 
 /** Error fields stay on the frozen native error; the original cause remains independently reachable. */
 const errorMembers: Readonly<Record<string, IMemberDoc>> = {
+  keys: {
+    summary: t(
+      'Detached read-only lock identities on LOCK_REJECTED and LOCK_TIMEOUT; physical timeout carries declared keys.',
+      'LOCK_REJECTED 与 LOCK_TIMEOUT 的独立只读锁身份，物理超时携声明键。'
+    )
+  },
+  holder: {
+    summary: t(
+      'Confirmed lock holder or undefined when genuinely unknown; handoff never borrows the previous owner.',
+      '已确认的锁持有者，确实未知时 undefined；交接不借用前任身份。'
+    )
+  },
   source: {
     summary: t(
       'Fixed `STORAGE_CONTRACT_SOURCE` marker identifying this package’s contract errors.',
@@ -674,6 +686,51 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    runWithConcurrency: {
+      role: 'operation',
+      purpose: t(
+        'Run the sole logical policy loop while awaiting every accepted native attempt through cleanup.',
+        '运行唯一逻辑策略循环，并等待每次接纳的原生尝试完成清理。'
+      ),
+      params: {
+        request: t(
+          'Authentic registered store, plain captured ITransactionOptions, and already resolved genuine policy. Read borrowed getters once before resolving overrides.',
+          '真实登记 store、普通已捕获 ITransactionOptions 与已解析真实策略；resolve 覆盖值前只读一次借用 getter。'
+        ),
+        port: t(
+          'Real backend attempt port. Return committed or conflict only after native completion and cleanup; use context.wait for logical admission and waitPhysical for physical scheduling.',
+          '真实后端 attempt 接点；原生终态与清理后才返回 committed/conflict；逻辑准入用 context.wait，物理调度用 waitPhysical。'
+        )
+      },
+      returns: t(
+        'Promise of the awaited committed value. Conflict errors preserve backend cause; cancellation awaits real attempt termination. Exact nested attempt contexts reuse the original budget.',
+        '完成提交值的 Promise；冲突保留后端 cause，取消仍等待真实尝试结束；相同嵌套 attempt context 复用原预算。'
+      ),
+      example: storageContractCases.runWithConcurrency![0]!.example,
+      cases: storageContractCases.runWithConcurrency
+    },
+    resolveConcurrencyPolicy: {
+      role: 'operation',
+      purpose: t(
+        'Resolve an authentic override or captured default from the original transaction owner.',
+        '从原事务 owner 解析真实覆盖策略或已捕获默认策略。'
+      ),
+      params: {
+        store: t(
+          'Original store registered by createTransactionOwner.',
+          'createTransactionOwner 登记的原 store。'
+        ),
+        override: t(
+          'Optional genuine policy; omission reuses the original registered default.',
+          '可选真实策略，省略时复用原登记默认值。'
+        )
+      },
+      returns: t(
+        'The exact selected IConcurrencyPolicy identity; forged policies or stores throw INVALID_ARGUMENT.',
+        '所选 IConcurrencyPolicy 的精确身份；伪造策略或 store 抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.runWithConcurrency![0]!.example
+    },
     prefixStorageOrgKey: {
       role: 'operation',
       purpose: t(
@@ -1683,6 +1740,100 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IConcurrencyAttempt: {
+      summary: t(
+        'A fully completed native attempt, either committed with a value or conflicted after rollback/cleanup.',
+        '已完整结束的原生尝试：提交值，或回滚/清理后的冲突。'
+      ),
+      members: {
+        status: {
+          summary: t(
+            'Committed or conflict, after all owned native resources have terminated.',
+            '所有持有原生资源结束后的 committed 或 conflict。'
+          )
+        },
+        value: {
+          summary: t('Committed result, awaited by the outer loop.', '由外层循环等待的提交结果。')
+        },
+        phase: {
+          summary: t(
+            'Acquire or commit conflict; policy wait is valid only for acquire.',
+            'acquire 或 commit 冲突；策略 wait 仅适用于 acquire。'
+          )
+        },
+        keys: {
+          summary: t(
+            'Actual conflicting identities; policy receives detached snapshots.',
+            '真实冲突身份；策略接收独立快照。'
+          )
+        },
+        holder: {
+          summary: t(
+            'Actual holder metadata or undefined when unknown.',
+            '真实持有者信息，未知时 undefined。'
+          )
+        },
+        cause: {
+          summary: t(
+            'Original completed-attempt failure retained on final conflict.',
+            '最终冲突保留的已结束尝试原错。'
+          )
+        }
+      }
+    },
+    IConcurrencyAttemptContext: {
+      summary: t(
+        'Captured operation intent and shared admission budget for one genuine backend attempt.',
+        '一次真实后端尝试的已捕获操作意图与共享准入预算。'
+      ),
+      members: {
+        ...operationMembers,
+        admission: {
+          summary: t(
+            'Try first; wait only after an acquire conflict decision.',
+            '先 try，仅 acquire 冲突决策后 wait。'
+          )
+        },
+        locking: {
+          summary: t(
+            'The authentic effective policy locking mode.',
+            '真实生效策略的 locking 模式。'
+          )
+        },
+        waitTimeoutMs: {
+          summary: t(
+            'Remaining logical budget; physical scheduling does not consume it.',
+            '剩余逻辑预算，物理调度不消耗它。'
+          )
+        },
+        wait: {
+          summary: t(
+            'Wait for logical admission, counting only its blocking interval.',
+            '等待逻辑准入，仅统计阻塞区间。'
+          )
+        },
+        waitPhysical: {
+          summary: t(
+            'Wait for physical admission under the original operation deadline; expiry is LOCK_TIMEOUT.',
+            '在原操作期限内等待物理准入，到期为 LOCK_TIMEOUT。'
+          )
+        }
+      }
+    },
+    IConcurrencyPort: {
+      summary: t(
+        'Backend-owned attempt lifecycle consumed by the sole policy loop.',
+        '由唯一策略循环消费的后端 attempt 生命周期。'
+      ),
+      members: {
+        attempt: {
+          summary: t(
+            'Settle only after real native commit/rollback and cleanup; never treat a signal as release.',
+            '仅在真实原生提交/回滚和清理后结算；signal 不等于释放。'
+          )
+        }
+      }
+    },
     lockKey: {
       summary: t(
         'Factories preserve the exact physical channel while detaching caller-owned key components.',
@@ -3142,10 +3293,12 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
     },
     IStorageContractErrorDetails: {
       summary: t(
-        'Producer-authored neutral error details containing optional backend, original key and causal failure.',
-        '生产者编写的中立错误详情，包含可选后端、原始键和原因失败。'
+        'Producer-authored neutral error details containing optional backend, original key, lock identities, holder and causal failure.',
+        '生产者编写的中立错误详情，包含可选后端、原始键、锁身份、持有者和原因失败。'
       ),
       members: {
+        keys: errorMembers.keys!,
+        holder: errorMembers.holder!,
         backend: {
           ...errorMembers.backend!,
           default: t('Omitted: no backend label is attached.', '省略时不附加后端标签。')
@@ -3274,6 +3427,26 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
         '涵盖无效输入、键、能力缺失、释放和取消的稳定契约失败码。'
       ),
       values: {
+        concurrencyPolicyFailed: t(
+          'A policy threw or returned an invalid decision; inspect its original cause.',
+          '策略抛错或返回非法决策，检查原始 cause。'
+        ),
+        lockTimeout: t(
+          'Logical admission budget or physical deadline expired after cleanup.',
+          '清理后报告逻辑准入预算或物理期限到期。'
+        ),
+        lockRejected: t(
+          'Policy rejected an actual acquisition conflict.',
+          '策略拒绝了真实准入冲突。'
+        ),
+        writeConflict: t(
+          'Policy rejected a commit conflict after completed rollback.',
+          '回滚完成后策略拒绝提交冲突。'
+        ),
+        lockLost: t(
+          'A backend proved its own expired lease was replaced.',
+          '后端确认自身过期租约已被替换。'
+        ),
         invalidArgument: t(
           'A public descriptor, context, synchronous write option or callback shape is invalid; correct the input before retrying.',
           '公开描述器、上下文、同步写选项或回调形状无效，重试前应修正输入。'

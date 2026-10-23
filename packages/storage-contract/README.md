@@ -199,7 +199,7 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 `snapshotOperationContext(ctx)` 接受上下文或 undefined。undefined 原样返回；合法对象的 signal、timeoutMs、pageSize、conflictPolicy、orgId 各读一次，返回冻结快照。再次传入本函数产物会返回同一个对象，不重复读取原 getter。非法对象、字段、信号结构或 getter 失败抛 INVALID_ARGUMENT，原始原因通过 cause 保留。`assertOperationContext(ctx)` 调用相同校验，只丢弃返回值。
 
-冻结的是上下文字段，不是信号状态。已经 aborted 的有效信号也能通过形状校验；本包不等待操作、不启动计时器、不创建取消引擎。取消感知后端用 ABORTED 结束等待，不保证原生 AbortError；已经进入原子提交的写应报告真实提交结果，不伪报回滚。
+冻结的是上下文字段，不是信号状态。已经 aborted 的有效信号也能通过形状校验；这些上下文工具不等待操作、不启动计时器、不创建取消引擎。取消感知后端用 ABORTED 结束等待，不保证原生 AbortError；已经进入原子提交的写应报告真实提交结果，不伪报回滚。
 
 `ISyncWriteOptions` 只允许可选 conflictPolicy。`snapshotSyncWriteOptions(options)` 接受对象或 undefined，读取 signal、timeoutMs、conflictPolicy，拒绝非 undefined 的 signal/timeoutMs；显式的 undefined 字段合法。额外 pageSize 不读取，也不提供同步分页。返回新对象 { conflictPolicy }，不冻结，省略策略仍为 undefined；`assertSyncWriteOptions(options)` 只校验、不返回快照。非法结构、字段或 getter 失败均为 INVALID_ARGUMENT。
 
@@ -418,7 +418,7 @@ console.log(wait.name, fail.name, optimistic.locking, custom.name)
 
 工厂只读取一次定义字段，冻结公开的 name/locking 元数据，私下保存原决策回调。复制或结构伪造的策略会被拒绝。允许零预算；时长与重试次数必须为非负安全整数。定义或选项 getter 失败以 INVALID_ARGUMENT 保留精确 cause。创建策略不执行决策回调、事务或取锁。
 
-原事务 owner 只捕获一次 defaultPolicy 与 concurrencyStages；省略策略时只创建一次 wait 缺省值，真实显式覆盖值优先。缺省解析只使用同一私有 owner 登记，不读公开 store 字段，不建立另一套 store registry。wait 缺省逻辑准入预算为 30,000 ms，optimistic 缺省对三个冲突按 20 ms 退避。决策循环与后端真实锁是另行接入的执行边界；仅有策略元数据不能证明锁或重试行为。
+原事务 owner 只捕获一次 defaultPolicy 与 concurrencyStages；省略策略时只创建一次 wait 缺省值，真实显式覆盖值优先。缺省解析只使用同一私有 owner 登记，不读公开 store 字段，不建立另一套 store registry。wait 缺省逻辑准入预算为 30,000 ms，optimistic 缺省对三个冲突按 20 ms 退避。下文的决策循环仍须接入后端真实锁；策略元数据本身不能证明原生锁行为。
 
 ### 规范锁键
 
@@ -441,3 +441,15 @@ lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.byt
 `IOperationContext.orgId` 可选，接收规范小写、36 字符 UUID（包括全零 UUID）。`assertOperationContext({ orgId })` 复用同一准入；`snapshotOperationContext` 单次读取并捕获身份，省略或显式 undefined 均不新增 orgId 属性。默认组织与 UUID 生成由外层 host 负责。
 
 `prefixStorageOrgKey(orgId, key)` 返回独立快照 `['$o', orgId, key]`，数组逻辑键保持嵌套在第三项。`unprefixStorageOrgKey(orgId, key)` 只接纳相同组织的精确三项封装，返回独立逻辑键快照。错误组织、大小写错误或无效封装为 INVALID_ARGUMENT；内部无效逻辑键仍为 INVALID_KEY。外层封装不占用逻辑键的深度与节点预算。这些纯函数不创建存储、不选择 namespace，也不执行跨组织 I/O。
+
+### 并发执行
+
+后端与 persist 作者先调用 `resolveConcurrencyPolicy(store, capturedOptions.concurrency)`，再把策略交给 `runWithConcurrency({ store, options: capturedOptions, policy }, port)`。原 store 必须已登记事务 owner。借用的选项 getter 先只捕获一次；resolve 后把同一个普通捕获对象传入循环。循环在操作上下文字段之前读取 lock/concurrency，并只规范化一次锁身份。后端扩展选项仍由原后端准入。
+
+`IConcurrencyPort.attempt(context)` 必须真正结束原生事务、回滚和清理后，才返回冲突或抛错。循环先 try，只对真实冲突决策；仅 acquire 可 wait，旧尝试结束后才能 retry。拒绝准入为 LOCK_REJECTED；拒绝提交冲突为 WRITE_CONFLICT，并保留精确后端 cause。非法决策或策略抛错为 CONCURRENCY_POLICY_FAILED。后端确认自身租约被替换时使用 LOCK_LOST。
+
+`context.wait(pendingAdmission)` 统计逻辑准入等待并消耗策略预算；`context.waitPhysical(pendingPhysical)` 统计物理调度，不消耗逻辑预算。回调与清理时间均不计入等待。整体期限从入口开始，到期为 ABORTED，但物理等待期间到期为 LOCK_TIMEOUT。外部取消把原 reason 保留在 cause。零逻辑预算仍允许物理调度，省略整体期限不添加物理缺省上限。超时仅结束等待；port 仍负责取消/移除队列项，并等待已接纳工作真正结束后再结算。
+
+内层 store 接收同一个 attempt context 时复用外层预算与组合 signal，仅最外层释放 signal。循环观察失败只报告，不改变结果。后端在真实生命周期边界发 acquired/released/lost；循环发准入入口、冲突、决策、等待和重试观察。包内测试通过不代表原生后端整体验收通过。
+
+LOCK_REJECTED 与 LOCK_TIMEOUT 携只读 keys、holder。已确认身份时消息含逻辑/规范键身份与真实 label；交接窗口明确写 handing-off，不借用前任身份。物理调度无法提供身份时，物理超时仍携声明键，holder 为 undefined。
