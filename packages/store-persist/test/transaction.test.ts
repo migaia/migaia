@@ -19,6 +19,11 @@ import {
   type ITransactionOptions
 } from '@migaia/storage-contract'
 import { persistTransaction, persistUnit, type IPersistUnit } from '../src/index.js'
+import { createMemoryTestStore } from './helpers/memory.js'
+import {
+  runPersistCrossTaskCodecScenario,
+  runPersistNativeConsumerScenario
+} from './helpers/native-transaction.js'
 
 /** Local recording failures use one declared family; production backends retain their own errors. */
 type IRecordingFailure = Error & { readonly source: string; readonly code: string }
@@ -422,5 +427,64 @@ describe('persistence transaction local ports', () => {
     } finally {
       await handle.disposeAsync()
     }
+  })
+})
+
+describe('persistence transactions through actual memory ownership', () => {
+  it('commits entity and snapshot together, rolls both back, and restores ordinary mirroring', async () => {
+    /**
+     * The production host registration supplies the native scope and its original transaction
+     * owner.
+     */
+    const storage = await createMemoryTestStore()
+    /** This exact business workflow is also consumed by the original native browser fixture. */
+    const result = await runPersistNativeConsumerScenario(storage)
+    expect(result.committed).toEqual({
+      result: 'committed',
+      envelope: { version: 0, state: { count: 1 } },
+      entity: { id: 'committed', email: 'one' },
+      business: 'committed'
+    })
+    expect(result.rolledBack).toEqual({
+      primaryReachable: true,
+      envelope: { version: 0, state: { count: 1 } },
+      entity: undefined,
+      business: null,
+      memory: 2,
+      writeErrorSame: true
+    })
+    expect(result.mirrored).toEqual({ version: 0, state: { count: 2 } })
+    expect(result.unique).toEqual({
+      code: 'INDEX_UNIQUE_CONFLICT',
+      envelope: { version: 0, state: { count: 2 } },
+      entity: undefined,
+      memory: 3
+    })
+    expect(result.cancelled).toEqual({
+      reasonReachable: true,
+      envelope: { version: 0, state: { count: 3 } },
+      entity: undefined,
+      memory: 4
+    })
+    expect(result.restored).toEqual({
+      primaryReachable: true,
+      envelope: { version: 0, state: { count: 4 } },
+      entity: undefined,
+      memory: 4
+    })
+  })
+
+  it('awaits a real asynchronous codec when the native memory backend supports it', async () => {
+    /** Memory, unlike browser IndexedDB, permits conversion after the timer task boundary. */
+    const storage = await createMemoryTestStore()
+    expect(await runPersistCrossTaskCodecScenario(storage)).toEqual({
+      failed: false,
+      code: undefined,
+      causeName: undefined,
+      operationAndOuterSame: false,
+      envelope: { version: 0, state: { count: 1 } },
+      business: 'during',
+      memory: 1
+    })
   })
 })
