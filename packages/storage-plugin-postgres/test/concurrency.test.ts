@@ -6,9 +6,17 @@ import { ConcurrencyPolicy, lockKey, type IConcurrencyPolicy } from '@migaia/sto
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { deferred } from '@migaia/utils/promise'
+import type { IPgResult } from '../src/index.js'
 
 /** Native fixtures change only their own transaction isolation, never caller-wide settings. */
-async function installed(serializable = false) {
+async function installed(
+  serializable = false,
+  observation?: {
+    sent?(text: string): void
+    committed?(pending: Promise<IPgResult>): Promise<IPgResult>
+    beforeWork?(): Promise<void>
+  }
+) {
   const connectionString = process.env.MIGAIA_PG_URL
   if (!connectionString)
     throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
@@ -29,10 +37,20 @@ async function installed(serializable = false) {
     ...native,
     connect: async (...args: Parameters<typeof native.connect>) => {
       const client = await native.connect(...args)
+      let work = false
       return {
         ...client,
         query: async (...query: Parameters<typeof client.query>) => {
-          const result = await client.query(...query)
+          const pending = client.query(...query)
+          observation?.sent?.(query[0])
+          const result =
+            work && query[0] === 'COMMIT' && observation?.committed !== undefined
+              ? await observation.committed(pending)
+              : await pending
+          if (query[0] === 'BEGIN ISOLATION LEVEL READ COMMITTED') {
+            work = true
+            await observation?.beforeWork?.()
+          }
           if (serializable && query[0] === 'BEGIN ISOLATION LEVEL READ COMMITTED')
             await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE', [])
           return result
@@ -224,4 +242,80 @@ it('commits one hundred optimistic read/increment/write transactions across two 
   }
   await Promise.all([worker(), worker()])
   expect(await store.get('total')).toBe('100')
+})
+
+/** Cancellation waits for the original native query and rollback before returning its connection. */
+it('drains an accepted native query and rolls back cancellation before COMMIT', async () => {
+  const sent = deferred<void>()
+  const cancellation = new AbortController()
+  const { store, pool } = await installed(false, {
+    sent: (text) => {
+      if (text.includes('pg_sleep')) sent.resolve()
+    }
+  })
+  const original = new Error('cancel-before-commit')
+  const pending = store.transaction(
+    async (scope) => {
+      await scope.set('cancelled', 'draft')
+      await scope.sql`SELECT pg_sleep(0.02)`.get()
+    },
+    { signal: cancellation.signal }
+  )
+  await sent.promise
+  cancellation.abort(original)
+  await expect(pending).rejects.toMatchObject({ code: 'ABORTED', cause: original })
+  expect(await store.get('cancelled')).toBeNull()
+  expect((await pool.query('SELECT 1::int4 AS alive')).rows[0]).toEqual({ alive: 1 })
+})
+
+/** After native COMMIT is sent, cancellation cannot turn a real commit into rollback or replay. */
+it('waits for actual COMMIT settlement after cancellation', async () => {
+  const sent = deferred<void>()
+  const release = deferred<void>()
+  const cancellation = new AbortController()
+  let attempts = 0
+  const { store } = await installed(false, {
+    committed: async (pending) => {
+      sent.resolve()
+      await release.promise
+      return pending
+    }
+  })
+  const pending = store.transaction(
+    async (scope) => {
+      attempts += 1
+      await scope.set('committed', 'yes')
+      return 'committed'
+    },
+    { signal: cancellation.signal }
+  )
+  await sent.promise
+  cancellation.abort(new Error('cancel-after-send'))
+  release.resolve()
+  await expect(pending).resolves.toBe('committed')
+  expect(attempts).toBe(1)
+  expect(await store.get('committed')).toBe('yes')
+})
+
+/**
+ * The original lease identity is checked before user work and late release cannot delete a
+ * successor.
+ */
+it('rejects a changed native lock owner before invoking user work', async () => {
+  let replace = async () => {}
+  const { store, pool, prefix } = await installed(false, { beforeWork: () => replace() })
+  replace = async () => {
+    await pool.query('UPDATE ' + prefix + '_locks SET owner=$1', ['replacement-owner'])
+  }
+  let called = false
+  await expect(
+    store.transaction(
+      () => {
+        called = true
+      },
+      { lock: [lockKey.text('protected')], concurrency: ConcurrencyPolicy.wait() }
+    )
+  ).rejects.toMatchObject({ code: 'LOCK_LOST' })
+  expect(called).toBe(false)
+  expect((await store.inspectLocks())[0]?.holder.owner).toBe('replacement-owner')
 })
