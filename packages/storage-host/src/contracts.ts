@@ -216,6 +216,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStageBindings(): IBackendStageBindings
   getStorageHooks(): IStorageHooks
   readonly emit: IStorageHookEmitter
+  readonly registerDetect: IStoragePluginCore['registerDetect']
 }
 /** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
 export const definePlugin: IStorageDefinePlugin = ((
@@ -258,6 +259,7 @@ export const definePlugin: IStorageDefinePlugin = ((
           return nativeCore.getStageBindings()
         },
         emit: nativeCore.emit,
+        registerDetect: nativeCore.registerDetect,
         registerStore: (store: IStorageBase) => {
           if (transferred)
             throw createStorageTypeError(
@@ -392,7 +394,8 @@ export const definePlugin: IStorageDefinePlugin = ((
               getLifecycle: () => nativeCore.lifecycle,
               onDispose: nativeCore.onDispose,
               getScheduler: () => nativeCore.getScheduler(),
-              emit: nativeCore.emit
+              emit: nativeCore.emit,
+              registerDetect: nativeCore.registerDetect
             },
             true
           ) as never

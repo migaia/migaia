@@ -1,5 +1,9 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Environment checks must be callable before their original installation resource is acquired. */
+  invalidDetectCheck: 'storage environment check must be a function',
+  /** Detection mode is a boolean captured before backend construction. */
+  invalidAutoDetect: 'autoDetect must be a boolean',
   /** Constructor hooks must be a keyed listener record before installation starts. */
   invalidHooks: 'storage hooks must be an object',
   /** Hook listeners must be callable before acquiring a subscriber registration. */

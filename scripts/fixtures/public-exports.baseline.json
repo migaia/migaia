@@ -1737,6 +1737,7 @@
         "StorageErrorText",
         "StorageHostFacade",
         "assertStorageBackendId",
+        "createOrgId",
         "createStorageHost",
         "defineFeature",
         "definePlugin",

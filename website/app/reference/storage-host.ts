@@ -30,6 +30,21 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    createOrgId: {
+      role: 'factory',
+      purpose: t(
+        'Generate a lowercase UUID using the host native crypto.randomUUID capability.',
+        '通过宿主原生crypto.randomUUID能力生成小写UUID。'
+      ),
+      returns: t(
+        'A canonical UUID string. Missing native UUID support rejects with UNSUPPORTED_CAPABILITY and preserves the original cause.',
+        '规范UUID字符串。缺少原生UUID能力时以UNSUPPORTED_CAPABILITY拒绝，并保留原cause。'
+      ),
+      example: `import { createOrgId } from '@migaia/storage-host'
+
+console.log(createOrgId())`,
+      cases: storageHostCases.createOrgId
+    },
     repositoryMigrationKey: {
       role: 'operation',
       purpose: t(
@@ -64,8 +79,8 @@ console.log(repositoryMigrationKey('users'))`,
         '建立复用原PluginHost的存储生命周期，并原子安装初始插件元组。后端查找保留准入的原对象。'
       ),
       returns: t(
-        'A Promise of the exact installed host; a failed initial batch is cleaned up before rejection.',
-        '精确宿主的Promise；初始批次失败后完成清理再拒绝。'
+        'A Promise of the exact installed host after default environment detection; a failed install or check is cleaned up before rejection. Set autoDetect:false for explicit host.detect().',
+        '完成默认环境检查后返回精确宿主的Promise；安装或检查失败后完成清理再拒绝。autoDetect:false改为显式host.detect()。'
       ),
       example: `import { createStorageHost, definePlugin } from '@migaia/storage-host'
 

@@ -14,7 +14,8 @@ export const STORAGE_RESERVED_EXPOSE = [
   'getLifecycle',
   'onDispose',
   'getScheduler',
-  'emit'
+  'emit',
+  'registerDetect'
 ] as const
 /** Public backend ids are encoded into PluginHost's stricter registration namespace. */
 export const STORAGE_PLUGIN_NAME_PREFIX = 'storage-backend:'

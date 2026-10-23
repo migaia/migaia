@@ -21,9 +21,14 @@ import {
 } from '@migaia/plugin-host'
 import { createAbortController, snapshotScheduler, mergeCleanupResults } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
+import {
+  snapshotStorageBaseDetailed,
+  assertOperationContext,
+  StorageContractError,
+  StorageContractErrorCode
+} from '@migaia/storage-contract'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { withTimeout } from '@migaia/utils/promise'
+import { withTimeout, type INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createStorageTypeError,
   createStorageAggregateError,
@@ -43,7 +48,8 @@ import type {
   IPluginStoreMap,
   IRejectInstalledOrDuplicateIds,
   IStoragePipelineInput,
-  IStorageBackendKind
+  IStorageBackendKind,
+  IStoragePluginCore
 } from './types.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
@@ -52,13 +58,24 @@ type IStorageHostCore = object
 /** Narrow lifecycle core required by a backend materializer. */
 type IStorageInstallCore = Pick<
   IPluginHostCore<IStoragePipelineInput>,
-  'onDispose' | 'operation' | 'config'
+  'onDispose' | 'operation' | 'config' | 'lifecycle'
 >
+
+/** A check retains only its original callback and currently running work for lifecycle draining. */
+type IStorageDetectCheck = {
+  readonly check: (signal: INativeAbortSignal) => Promise<void>
+  pending?: Promise<void>
+}
 
 /** One native registration's single-assignment store bridge into its PluginHost core. */
 type IStorageNativeRegistrationContext = {
   readonly id: string
   readonly assertCurrent: () => void
+  readonly assertExecution: () => void
+  readonly registerDetect: IStoragePluginCore['registerDetect']
+  readonly runDetect: () => Promise<void>
+  readonly completeDetect: () => void
+  readonly isDetected: () => boolean
   readonly setRegistrationCore: (core: IStorageInstallCore) => void
   readonly getStageBindings: () => IBackendStageBindings
   readonly getObservers: (store: IStorageBase) => IStorageObserverSet
@@ -114,6 +131,7 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         getBackendId: () => context.id,
         getScheduler: () => context.scheduler,
         getStageBindings: context.getStageBindings,
+        registerDetect: context.registerDetect,
         getStorageHooks: () =>
           ({
             on(name, handler) {
@@ -133,14 +151,10 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           context.emit(name, payload)
         }) satisfies IStorageHookEmitter,
         setStorageKind: context.setKind,
-        execution: forwardStorageExecution(
-          host,
-          () => {
-            if (registrationCore !== undefined)
-              getPluginRuntimeIntegration(registrationCore).assertCurrent()
-          },
-          () => ({ backendId: context.id, backend: context.getKind()?.name ?? context.id })
-        ),
+        execution: forwardStorageExecution(host, context.assertExecution, () => ({
+          backendId: context.id,
+          backend: context.getKind()?.name ?? context.id
+        })),
         runStorageInstall: context.runInstall,
         isStorageInstallExpired: context.isInstallExpired,
         registerStore: (store: IStorageBase) => {
@@ -195,6 +209,8 @@ type IStorageBatchToken = {
 }
 
 type IStorageHostOptionsSnapshot = {
+  readonly org: IStorageHostOptions['org']
+  readonly autoDetect: IStorageHostOptions['autoDetect']
   readonly installTimeoutMs: number | undefined
   readonly scheduler: IStorageHostOptions['scheduler']
   readonly report: IStorageHostOptions['report']
@@ -217,6 +233,8 @@ const snapshotStorageHostCreateOptions = (
   try {
     return {
       hostOptions: {
+        org: options?.org,
+        autoDetect: options?.autoDetect,
         installTimeoutMs: options?.installTimeoutMs,
         scheduler: options?.scheduler,
         report: options?.report,
@@ -263,6 +281,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   readonly #publicHooks: IStorageHooks
   /** A non-owning reverse index resolves only committed exact stores to their existing context. */
   readonly #storeContexts = new WeakMap<object, IStorageNativeRegistrationContext>()
+  /** Installation order is retained by original contexts, without another lifecycle registry. */
+  readonly #detectContexts = new Set<IStorageNativeRegistrationContext>()
+  /** A successful result and every concurrent caller share the same exact detection Promise. */
+  #detectPromise: Promise<void> | undefined
+  /** New publications invalidate a settled cache while the running pass consumes appended entries. */
+  #detectRunning = false
+  /** Default organization is captured once and never stored in a shared current-call slot. */
+  readonly #orgId: string
 
   /** Creates the shell and snapshots lifecycle/deadline inputs before any plugin runs. */
   constructor(options: IStorageHostOptions = {}) {
@@ -272,8 +298,17 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       installTimeoutMs: installTimeoutOption,
       scheduler: schedulerOption,
       report,
-      hooks
+      hooks,
+      org,
+      autoDetect
     } = optionsSnapshot.hostOptions
+    this.#orgId = org === undefined ? STORAGE_DEFAULT_ORG : org
+    assertOperationContext({ orgId: this.#orgId })
+    if (autoDetect !== undefined && typeof autoDetect !== 'boolean')
+      throw createStorageTypeError(
+        StorageErrorCode.invalidConfig,
+        StorageErrorText.invalidAutoDetect
+      )
     this.#scheduler =
       schedulerOption === undefined
         ? systemScheduler
@@ -432,6 +467,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         let registrationCore: IStorageInstallCore | undefined
         /** Construction bindings are allocated only when a backend actually requests them. */
         let stageBindings: IBackendStageBindings | undefined
+        /** Checks belong to this original registration and retain registration order. */
+        const checks = new Set<IStorageDetectCheck>()
+        /** A successful complete host pass admits this registration's real execution endpoints. */
+        let detected = false
         /** The original owners validate both unpublished candidates and committed registrations. */
         const assertRegistration = (): void => {
           /**
@@ -446,7 +485,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           identity: () => ({
             backendId: native.id,
             backend: kind?.name ?? native.id,
-            orgId: STORAGE_DEFAULT_ORG
+            orgId: this.#orgId
           }),
           assertCurrent: assertRegistration,
           emit: this.#events.emit,
@@ -463,6 +502,65 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         const context: IStorageNativeRegistrationContext = {
           id: native.id,
           assertCurrent: assertRegistration,
+          assertExecution: () => {
+            assertRegistration()
+            if (!batchToken.active && !detected)
+              throw new StorageContractError(StorageContractErrorCode.unsupported)
+          },
+          isDetected: () => detected,
+          completeDetect: () => {
+            detected = true
+          },
+          registerDetect: (check) => {
+            if (typeof check !== 'function')
+              throw createStorageTypeError(
+                StorageErrorCode.invalidConfig,
+                StorageErrorText.invalidDetectCheck
+              )
+            /** Original onDispose admission enforces exactly the existing installation window. */
+            const entry: IStorageDetectCheck = { check }
+            registrationCore!.onDispose(() => {
+              checks.delete(entry)
+            })
+            checks.add(entry)
+          },
+          runDetect: async () => {
+            assertRegistration()
+            /** Timings describe one backend's real checks without adding a check deadline. */
+            const startedAt = this.#scheduler.now()
+            /** Read the original registration signal, which seals with the resource owner. */
+            const signal = registrationCore!.lifecycle.signal
+            /** Only checks actually invoked contribute to the fixed observation payload. */
+            let checkCount = 0
+            this.#events.emit(Hook.beforeDetect, observerBinding.identity)
+            try {
+              for (const entry of checks) {
+                this.#assertOpen()
+                assertRegistration()
+                checkCount += 1
+                entry.pending = Promise.resolve().then(() => entry.check(signal))
+                try {
+                  await entry.pending
+                } finally {
+                  entry.pending = undefined
+                }
+              }
+              this.#assertOpen()
+              if (this.#events.hasListeners(Hook.afterDetect))
+                this.#events.emit(Hook.afterDetect, () => ({
+                  ...observerBinding.identity(),
+                  checkCount,
+                  elapsedMs: Math.max(0, this.#scheduler.now() - startedAt)
+                }))
+            } catch (error) {
+              if (this.#events.hasListeners(Hook.onDetectError))
+                this.#events.emit(Hook.onDetectError, () => ({
+                  ...observerBinding.identity(),
+                  code: readStorageHookFailureCode(error, this.#report)
+                }))
+              throw error
+            }
+          },
           setRegistrationCore: (core) => {
             registrationCore = core
           },
@@ -512,6 +610,13 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                 scheduler: this.#scheduler,
                 report: (error) => this.#report(error),
                 zeroTimeoutBehavior: 'skip'
+              })
+              /**
+               * Register last in the original install window so accepted checks drain before any
+               * resource they may inspect, even when a Feature registered them before the store.
+               */
+              registrationCore!.onDispose(async () => {
+                for (const entry of checks) await entry.pending?.catch(this.#report)
               })
               if (kind !== undefined) {
                 this.#events.emit(Hook.afterBackendPluginInstall, observerBinding.identity)
@@ -616,6 +721,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       for (const [index] of plugins.entries()) {
         /** Retain only this entry original trusted definition metadata. */
         const native = nativeContexts.get(index)
+        this.#detectContexts.add(native!)
         if (native!.getKind() !== undefined) {
           nextRegistry.set(native!.id, entries[index]!.storeCell.get())
           this.#storeContexts.set(entries[index]!.storeCell.get(), native!)
@@ -623,6 +729,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       }
       this.#registry = new Map(nextRegistry)
       this.#extensions = Object.freeze(nextExtensions)
+      if (!this.#detectRunning) this.#detectPromise = undefined
     })
     this.#installing = batch
     /** Only the current batch may reopen admission and return the narrowed host. */
@@ -670,6 +777,36 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   get hooks(): IStorageHooks {
     this.#assertOpen()
     return this.#publicHooks
+  }
+
+  /** Execute original checks in installation order; failure retains no result from this pass. */
+  detect(): Promise<void> {
+    try {
+      this.#assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (this.#detectPromise !== undefined) return this.#detectPromise
+    this.#detectRunning = true
+    /** Only a complete pass admits its previously unchecked registrations. */
+    const completed: IStorageNativeRegistrationContext[] = []
+    this.#detectPromise = Promise.resolve().then(async () => {
+      try {
+        for (const context of this.#detectContexts) {
+          if (context.isDetected()) continue
+          await context.runDetect()
+          completed.push(context)
+        }
+        this.#assertOpen()
+        for (const context of completed) context.completeDetect()
+        this.#detectRunning = false
+      } catch (error) {
+        this.#detectRunning = false
+        this.#detectPromise = undefined
+        throw error
+      }
+    })
+    return this.#detectPromise
   }
 
   /** Resolve only an exact published store from this host, never an id-shaped foreign object. */
@@ -781,6 +918,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     if (this.#installing !== undefined) this.#installing = undefined
     this.#registry = new Map()
+    this.#detectContexts.clear()
     this.#extensions = Object.freeze({})
     void mergeCleanupResults([this.#inner.dispose()])
       .then(({ cleanupErrors }) => {
@@ -853,21 +991,20 @@ export const createStorageHost = async <
   const facade = new StorageHostFacade(optionsSnapshot.hostOptions)
   /** Capture the literal initial tuple before installation can begin. */
   const plugins = optionsSnapshot.plugins
-  if (plugins !== undefined && plugins.length > 0) {
+  try {
+    if (plugins !== undefined && plugins.length > 0) await facade.use(...(plugins as TPlugins))
+    if (optionsSnapshot.hostOptions.autoDetect !== false) await facade.detect()
+    return facade as unknown as IStorageHost<TPlugins>
+  } catch (error) {
     try {
-      return (await facade.use(...(plugins as TPlugins))) as IStorageHost<TPlugins>
-    } catch (error) {
-      try {
-        await facade.dispose()
-      } catch (cleanupError) {
-        throw createStorageAggregateError(
-          StorageErrorCode.backendInstallFailed,
-          StorageErrorText.backendInstallFailed,
-          [error, cleanupError]
-        )
-      }
-      throw error
+      await facade.dispose()
+    } catch (cleanupError) {
+      throw createStorageAggregateError(
+        StorageErrorCode.backendInstallFailed,
+        StorageErrorText.backendInstallFailed,
+        [error, cleanupError]
+      )
     }
+    throw error
   }
-  return facade as unknown as IStorageHost<TPlugins>
 }
