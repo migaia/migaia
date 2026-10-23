@@ -68,6 +68,10 @@ SQL 只接受单条语句及可选末尾分号；事务控制、journal_mode 修
 提交与回滚通过 `transaction`；含内部语句列表的完整 trigger body 不在此入口范围。
 行类型是调用方声明，不验证列名、不转换 Date。
 
+标准 `sql` 令牌通过 `storage.use(sql).sql` 复用同一个原生标签；
+事务内 `tx.use(sql).sql` 沿原事务拥有者绑定当前短效视图。原生结果、
+精确行类型和 SQLite 的必有 lastInsertRowid 保持不变，不增加预算或编译器。
+
 安全整数归一为 number，其余整数保持精确 bigint。boolean 输入绑定为 0/1；BLOB
 返回独立 Uint8Array。run 的 changes 与 lastInsertRowid 均为 number | bigint。
 每实例 statement LRU 最多 64 项；Node 淘汰引用不代表立即 finalize 原生 statement。

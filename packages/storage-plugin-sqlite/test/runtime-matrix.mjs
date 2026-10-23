@@ -5,7 +5,7 @@ import { defineEntity } from '@migaia/storage-host/entity'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
-import { kv, lockKey, records } from '@migaia/storage-contract'
+import { kv, lockKey, records, sql } from '@migaia/storage-contract'
 
 /** Each invocation performs exactly one real process phase against its runtime-owned test file. */
 const [mode, path] = process.argv.slice(2)
@@ -122,7 +122,10 @@ try {
     })
     await assert.rejects(expired.get('committed'), (error) => error.code === 'TRANSACTION_FAILED')
     await storage.sql`CREATE TABLE exact_integer(id INTEGER PRIMARY KEY,value INTEGER)`.run()
-    await storage.sql`INSERT INTO exact_integer VALUES(${1},${9007199254740993n})`.run()
+    assert.equal(storage.use(sql).sql, storage.sql)
+    await storage.transaction((tx) =>
+      tx.use(sql).sql`INSERT INTO exact_integer VALUES(${1},${9007199254740993n})`.run()
+    )
     await storage.sql`CREATE VIRTUAL TABLE search USING fts5(body)`.run()
     await storage.sql`INSERT INTO search(body) VALUES(${'quoted search phrase'})`.run()
     assert.equal(
