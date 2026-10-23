@@ -34,7 +34,8 @@ export type IBackendKeyLockPort = IStorageResource & {
       readonly channel: ILockKey['channel']
       readonly lower: string
       readonly upper: string
-    }[]
+    }[],
+    additionalIdentities?: () => readonly string[]
   ): Promise<IConcurrencyAttempt<R>>
   /** Probe canonical identities directly; ranges scan only this original active lock table. */
   probe(
@@ -58,7 +59,8 @@ export type IBackendKeyLockPort = IStorageResource & {
       readonly lower: string
       readonly upper: string
     }[],
-    admit?: (commit: () => IConcurrencyAttempt<R>) => Promise<IConcurrencyAttempt<R>>
+    admit?: (commit: () => IConcurrencyAttempt<R>) => Promise<IConcurrencyAttempt<R>>,
+    additionalIdentities?: () => readonly string[]
   ): Promise<IConcurrencyAttempt<R>>
   inspectLocks(): readonly ILockHolding[]
 }
@@ -212,7 +214,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       readonly channel: ILockKey['channel']
       readonly lower: string
       readonly upper: string
-    }[]
+    }[],
+    additionalIdentities?: () => readonly string[]
   ): Promise<IKeyLease | undefined> => {
     /** This bridge cancels only queued admission when the original ctx.wait budget ends. */
     const admission = createAbortController()
@@ -236,7 +239,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
               throwIfAborted(admission.signal)
               assertOpen()
               /** Each wake-up rechecks the same canonical table before any native operation starts. */
-              const held = conflict(identities, ranges)
+              const additional = additionalIdentities?.() ?? []
+              const held = conflict(identities, ranges) ?? conflict(additional)
               if (held === undefined)
                 return ctx.locking === 'pessimistic' && identities.length > 0
                   ? acquire(ctx, identities, holder, stages)
@@ -303,7 +307,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       readonly upper: string
     }[] = [],
     admit?: (commit: () => IConcurrencyAttempt<R>) => Promise<IConcurrencyAttempt<R>>,
-    protectHeld = write !== undefined
+    protectHeld = write !== undefined,
+    additionalIdentities?: () => readonly string[]
   ): Promise<IConcurrencyAttempt<R>> => {
     assertOpen()
     /** Only an authentic active original context can supply canonical identities. */
@@ -317,10 +322,11 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       throwIfAborted(admissionSignal)
       if (
         (ctx.locking === 'pessimistic' || protectHeld) &&
-        (identities.length !== 0 || ranges.length !== 0)
+        (identities.length !== 0 || ranges.length !== 0 || additionalIdentities !== undefined)
       ) {
         /** Empty tables admit immediately without scheduling through the limiter. */
-        const held = conflict(identities, ranges)
+        const additional = additionalIdentities?.() ?? []
+        const held = conflict(identities, ranges) ?? conflict(additional)
         if (held === undefined) {
           if (ctx.locking === 'pessimistic' && identities.length > 0)
             lease = acquire(ctx, identities, holder, stages)
@@ -331,7 +337,16 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
             keys: protectHeld ? [held.key] : (ctx.lock ?? []),
             holder: held.holder
           }
-        else lease = await waitForKeys(ctx, identities, holder, stages, admissionSignal, ranges)
+        else
+          lease = await waitForKeys(
+            ctx,
+            identities,
+            holder,
+            stages,
+            admissionSignal,
+            ranges,
+            additionalIdentities
+          )
       }
       /** A member may close after acquisition but before the native terminal is entered. */
       throwIfAborted(admissionSignal)
@@ -345,7 +360,9 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
           if (invoked) throw new StorageContractError(StorageContractErrorCode.invalidArgument)
           invoked = true
           /** Waiting, acquisition observation or physical admission may expose a new holder. */
-          const held = conflict(identities, ranges, lease?.context)
+          const additional = additionalIdentities?.() ?? []
+          const held =
+            conflict(identities, ranges, lease?.context) ?? conflict(additional, [], lease?.context)
           if (held !== undefined)
             return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
           /** Both original operation cancellation and member closure are live after physical waits. */
@@ -358,7 +375,9 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       }
       if (protectHeld) {
         /** Async root writes use the same admission table before entering their actual native port. */
-        const held = conflict(identities, ranges, lease?.context)
+        const additional = additionalIdentities?.() ?? []
+        const held =
+          conflict(identities, ranges, lease?.context) ?? conflict(additional, [], lease?.context)
         if (held !== undefined)
           return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
         throwIfAborted(ctx.signal)
@@ -384,7 +403,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   }
 
   return {
-    attempt: (ctx, holder, native, stages, admissionSignal, ranges) =>
+    attempt: (ctx, holder, native, stages, admissionSignal, ranges, additionalIdentities) =>
       runAttempt(
         ctx,
         holder,
@@ -394,10 +413,31 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
         undefined,
         ranges,
         undefined,
-        ranges !== undefined
+        ranges !== undefined || additionalIdentities !== undefined,
+        additionalIdentities
       ),
-    attemptWrite: (ctx, holder, write, stages, admissionSignal, ranges, admit) =>
-      runAttempt(ctx, holder, undefined, stages, admissionSignal, write, ranges, admit),
+    attemptWrite: (
+      ctx,
+      holder,
+      write,
+      stages,
+      admissionSignal,
+      ranges,
+      admit,
+      additionalIdentities
+    ) =>
+      runAttempt(
+        ctx,
+        holder,
+        undefined,
+        stages,
+        admissionSignal,
+        write,
+        ranges,
+        admit,
+        true,
+        additionalIdentities
+      ),
     probe: (identities, ranges, current) => {
       assertOpen()
       /** Only the original live attempt can identify its own lease; key lists grant no exemption. */
