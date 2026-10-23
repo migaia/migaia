@@ -152,3 +152,5 @@ memory 原生提供 `vector`：`store.use(vector).collection('docs', { dimension
 `maxBytes` 使用实际 canonical 编码长度：文本为 UTF-8，bytes 为 byteLength，record 与 vector payload 为 serialize 的 collections-json 编码，vector 另计每分量 8 字节；键、容量索引和 TTL 元数据不重复计入。单条超限也按相同策略驱逐，不保证仍保留。原 memory record 的 structuredClone 域更宽；仅显式 maxBytes 下，现有 codec 无法编码的值（如 Date、循环、undefined与非有限数）在任何修改前报 `UNSUPPORTED_CAPABILITY`，原错经 cause 可达。默认无上限及仅 maxEntries 保留原值域；Map、Set 和 codec 可编码的 Uint8Array 继续可用。
 
 这是 canonical 编码预算，不是 JavaScript 堆占用估算。原 codec 的 own-field 投影同样适用：raw record 中的 ArrayBuffer 按 `{}` 编码计费，原生读取仍保留其真实 structured-clone 值。
+
+所选 Feature API 与查询族保留原生 optimistic 事务 builder 的实际 scope 和原有 builder 方法。run 仍可直接调用，key lock 仍不存在，concurrency 只接纳 optimistic 策略。宿主发布原生 tx 方法，不创建替代 builder。

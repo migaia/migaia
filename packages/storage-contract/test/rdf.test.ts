@@ -5,9 +5,62 @@ import {
   snapshotStorageRdfPattern,
   snapshotStorageRdfQuad,
   encodeStorageRdfQuad,
+  encodeStorageRdfTerm,
   type IQuad,
   type IRdfLiteral
 } from '../src/index.js'
+
+describe('native RDF term index identity', () => {
+  it('reuses canonical raw term admission and self-delimiting identity without changing blank scope', () => {
+    const values = [term.iri('urn:a'), term.blank('a'), term.literal('a'), term.defaultGraph]
+    const encoded = values.map((value) => encodeStorageRdfTerm(value, 'memory'))
+    expect(new Set(encoded.map((value) => value.join(','))).size).toBe(values.length)
+    expect(encodeStorageRdfTerm(term.literal('a', { language: 'EN' }), undefined)).toEqual(
+      encodeStorageRdfTerm(term.literal('a', { language: 'en' }), undefined)
+    )
+    expect(encodeStorageRdfTerm(term.literal('a', { datatype: 'urn:b:c' }), undefined)).not.toEqual(
+      encodeStorageRdfTerm(term.literal('a:urn:b', { datatype: 'urn:c' }), undefined)
+    )
+    encoded[0]!.fill(0)
+    expect(encodeStorageRdfTerm(values[0]!, 'memory').some((value) => value !== 0)).toBe(true)
+    let reads = 0
+    expect(
+      encodeStorageRdfTerm(
+        {
+          termType: 'NamedNode',
+          get value() {
+            reads += 1
+            return 'urn:a'
+          }
+        },
+        'memory'
+      )
+    ).toEqual(encodeStorageRdfTerm(term.iri('urn:a'), 'memory'))
+    expect(reads).toBe(1)
+    const original = new Error('native RDF term getter')
+    expect(() =>
+      encodeStorageRdfTerm(
+        {
+          get termType(): never {
+            throw original
+          }
+        } as never,
+        'memory'
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        source: '@migaia/storage-contract',
+        code: 'INVALID_ARGUMENT',
+        cause: original
+      })
+    )
+  })
+
+  it('keeps legal literal bytes outside the public binary-key size budget', () => {
+    const value = term.literal('x'.repeat(1_048_577))
+    expect(encodeStorageRdfTerm(value, undefined).byteLength).toBeGreaterThan(1_048_576)
+  })
+})
 
 /** All cases enter the public neutral term/quad owner without a fake RDF backend. */
 describe('canonical RDF terms and ground quad identity', () => {

@@ -23,6 +23,7 @@ import {
   type ITransactionBuilder,
   type IOptimisticTransactionBuilder,
   type ITransactionRdfApi,
+  type IRdfApi,
   type ISparqlInput,
   type ISparqlTagTools,
   type ITransactionCapabilityView,
@@ -579,6 +580,14 @@ describe('standard KV capability forwarding', () => {
 })
 
 describe('capability type boundaries', () => {
+  it('admits the implemented standard token through the original binder scope use', () => {
+    /** A real RDF binder delegates the existing scope use without casting or inventing KV data. */
+    function bindOriginal(api: IRdfApi): void {
+      implement(rdf, api, { forTransaction: (scope) => scope.use(rdf) })
+    }
+    void bindOriginal
+  })
+
   it('preserves actual non-KV native scope overloads through provider and optimistic builder projection', () => {
     /** These are the SPARQL consumer's actual native overloads, without fabricated KV members. */
     type IRdfDraft = ITransactionRdfApi & { expect(): void; expectAbsent(): void }

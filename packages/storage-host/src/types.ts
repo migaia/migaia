@@ -34,6 +34,7 @@ import type {
   IAnyStorageCapability,
   ICapabilityApi,
   ITransactionBuilder,
+  IOptimisticTransactionBuilder,
   ICapabilityInstallPort,
   IBackendStageBindings,
   ICodecStageObserver,
@@ -459,14 +460,21 @@ type IApiTransactionMembers<S, F extends IStorageFeatureRecord> = [
           run: (scope: IScopeApi<T, F, IScopeQueryMethods<S>, IScopeRdfMethods<S>>) => R,
           options?: O
         ): Promise<Awaited<R>>
-      } & (S extends { tx(): ITransactionBuilder<infer T, infer A> }
+      } & (S extends { tx(): IOptimisticTransactionBuilder<infer T, infer A> }
         ? {
-            tx(): ITransactionBuilder<
+            tx(): IOptimisticTransactionBuilder<
               IScopeApi<T, F, IScopeQueryMethods<S>, IScopeRdfMethods<S>>,
               A
             >
           }
-        : {})
+        : S extends { tx(): ITransactionBuilder<infer T, infer A> }
+          ? {
+              tx(): ITransactionBuilder<
+                IScopeApi<T, F, IScopeQueryMethods<S>, IScopeRdfMethods<S>>,
+                A
+              >
+            }
+          : {})
     : {}
 export type IStorageStoreWithFeatures<
   S extends IStorageBase,
