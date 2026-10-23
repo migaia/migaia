@@ -143,6 +143,50 @@ function bindNative(
       )
     }
   ],
+  snapshotConcurrencyLockKeys: [
+    {
+      title: t('Use one canonical identity snapshot', '使用一份规范身份快照'),
+      problem: t(
+        'A synchronous key probe must not copy channel ranks or encode a second key domain.',
+        '同步键探测不能复制通道顺序或再编码另一键域。'
+      ),
+      example: t(
+        `import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
+const snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')
+console.log(snapshot.keys.length, snapshot.identities.length)`,
+        `import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
+const snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')
+console.log(snapshot.keys.length, snapshot.identities.length)`
+      ),
+      result: t(
+        'Both counts are 1; paired frozen identity data grants no acquisition authority.',
+        '两个计数均为 1；配对冻结身份数据不授予取锁权限。'
+      )
+    }
+  ],
+  snapshotConcurrencyLockRange: [
+    {
+      title: t('Bound one channel prefix', '界定一个通道前缀'),
+      problem: t(
+        'Native range checks need the exact canonical lock bounds without scanning or duplicating encoding.',
+        '原生范围检查需要精确规范锁边界，不能扫描或复制编码。'
+      ),
+      example: t(
+        `import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-contract'
+const bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')
+const id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!
+console.log(bounds.lower <= id && id < bounds.upper)`,
+        `import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-contract'
+const bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')
+const id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!
+console.log(bounds.lower <= id && id < bounds.upper)`
+      ),
+      result: t(
+        'true; the half-open range includes the text prefix and excludes other channels.',
+        'true；半开范围包含该 text 前缀，排除其它通道。'
+      )
+    }
+  ],
   snapshotConcurrencyLockHoldings: [
     {
       title: t('Inspect detached holdings in canonical order', '按规范顺序检查独立持锁快照'),

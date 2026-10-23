@@ -1,4 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IWriteConcurrencyOptions } from './concurrency.js'
 
 /**
  * Optional final argument for asynchronous storage operations. The contract validates its shape;
@@ -38,13 +39,14 @@ export const ConflictPolicy = Object.freeze({
 export type IConflictPolicy = (typeof ConflictPolicy)[keyof typeof ConflictPolicy]
 
 /** Asynchronous operation context plus an optional write-conflict choice. */
-export type IWriteOptions = IOperationContext & {
-  /**
-   * Optional conflict or replace policy. Context snapshots preserve omission; the provider applies
-   * defaults.
-   */
-  readonly conflictPolicy?: IConflictPolicy
-}
+export type IWriteOptions = IOperationContext &
+  IWriteConcurrencyOptions & {
+    /**
+     * Optional conflict or replace policy. Context snapshots preserve omission; the provider
+     * applies defaults.
+     */
+    readonly conflictPolicy?: IConflictPolicy
+  }
 
 /** Synchronous writes cannot honor cancellation or timeout fields. */
 export type ISyncWriteOptions = {

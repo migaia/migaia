@@ -1078,6 +1078,8 @@
         "runWithConcurrency",
         "snapshotCodec",
         "snapshotConcurrencyLockHoldings",
+        "snapshotConcurrencyLockKeys",
+        "snapshotConcurrencyLockRange",
         "snapshotKeyValueStore",
         "snapshotKeyValueStoreDetailed",
         "snapshotOperationContext",
@@ -1763,7 +1765,9 @@
         "createStorageHost",
         "defineFeature",
         "definePlugin",
-        "defineStorageBackendKind"
+        "defineStorageBackendKind",
+        "memoryBackendKind",
+        "memoryBackendPlugin"
       ],
       "./authoring/backend": [
         "assertKeyRange",

@@ -553,6 +553,10 @@ async function paidTotals(store: IStorageBase) {
 
 `snapshotConcurrencyLockHoldings(rows)` 对当前检查行制作独立快照，复用同一通道与键字节顺序稳定排序，保留每行的 holder、expired 与 expiresAt。相同键的行不会合并；返回值不关联内部锁表或授予锁权限。
 
+`snapshotConcurrencyLockKeys(keys, backend)` 一次规范化、排序去重并返回配对的冻结 `{keys, identities}`；键为独立快照，identity 是原通道编码的十六进制字符串，不授予取锁权限。`snapshotConcurrencyLockRange({channel,prefix?}, backend)` 返回同一 identity 域的半开 `{lower,upper}`；省略 prefix 选整个通道，有值时复用原 typed 前缀规则，bytes 前缀仅接受字符串（含空串）。
+
+`runWithConcurrency` 的可选 `request.lock(captured)` 在原固定上下文字段完成一次捕获后调用一次；返回的隐式锁与显式 options.lock 合并、排序去重，保留显式锁。嵌套调用只规范化新增键，复用原锁编码与同一预算；重试不重新调用派生函数。派生 getter、raw 回调失败沿 INVALID_ARGUMENT 保留 cause，已有 coded 回调错误保持原身份。`IWriteOptions` 以及根 remove/clear 各数据通道上下文包含 `IWriteConcurrencyOptions`，省略 concurrency 使用原 owner 默认策略。
+
 `IConcurrencyAttemptContext.attempt` 等于原共用冲突计数加一；后端把此只读序号转发给观察，不自行计数，嵌套尝试沿同一预算来源。
 
 ## SQL 片段与后端绑定

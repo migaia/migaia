@@ -12,3 +12,6 @@ export { StorageError, StorageErrorCode, STORAGE_HOST_SOURCE } from './errors.js
 export type { IStorageErrorCode, IStorageErrorDetails } from './errors.js'
 export { StorageErrorText } from './error-text.js'
 export type * from './hook-types.js'
+
+export { memoryBackendKind, memoryBackendPlugin } from './backends/memory-plugin.js'
+export type { IMemoryOptions, IMemoryBackendStore } from './backends/memory.js'

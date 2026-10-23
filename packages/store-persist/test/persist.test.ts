@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { createStore } from '@migaia/store-light'
 import { persist } from '../src/light-index'
 
 describe('persist（store-light）', () => {
-  it('snapshots accessor-backed options exactly once', () => {
+  it('snapshots accessor-backed options exactly once', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     let reads = 0
     const options = { storage } as { key: string; storage: typeof storage }
     Object.defineProperty(options, 'key', {
@@ -24,9 +24,9 @@ describe('persist（store-light）', () => {
     store.$dispose()
   })
 
-  it('rejects invalid version and debounce values before creating a persistence unit', () => {
+  it('rejects invalid version and debounce values before creating a persistence unit', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     for (const version of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => persist(store, { key: `version-${String(version)}`, storage, version })).toThrow(
         'version must be a safe, non-negative integer'
@@ -44,17 +44,17 @@ describe('persist（store-light）', () => {
     expect(() => persist(store, null as never)).toThrow('[store] persist options must be an object')
     store.$dispose()
   })
-  it('rejects non-string storage keys before creating a persistence unit', () => {
+  it('rejects non-string storage keys before creating a persistence unit', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     expect(() => persist(store, { key: undefined as never, storage })).toThrow(
       '[store] persist key must be a string'
     )
     store.$dispose()
   })
-  it('rejects invalid persistence callbacks and codecs before subscription', () => {
+  it('rejects invalid persistence callbacks and codecs before subscription', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     for (const [name, value] of [['partialize', null]] as const) {
       expect(() => persist(store, { key: name, storage, [name]: value } as never)).toThrow(
         `[store] persist "${name}" ${name} must be a function`
@@ -108,7 +108,7 @@ describe('persist（store-light）', () => {
   })
   it('hydrate 未命中时立即可用，写入后 flush 落盘', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const handle = persist(store, { key: 'count', storage })
     store.count = 2
     await handle.flush()
@@ -119,7 +119,7 @@ describe('persist（store-light）', () => {
   })
 
   it('hydration failure blocks writes until a fresh successful retryHydrate', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const failure = new Error('temporary read failure')
     let reads = 0
     let writes = 0
@@ -149,7 +149,7 @@ describe('persist（store-light）', () => {
   })
 
   it('hydrate 命中时把持久化值写回 store', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('settings', JSON.stringify({ version: 0, state: { theme: 'dark' } }))
     const store = createStore({ theme: 'light' })
     const handle = persist(store, { key: 'settings', storage })
@@ -160,7 +160,7 @@ describe('persist（store-light）', () => {
   })
 
   it('hydrate 与启动期 mutation 竞争时保留双方对象字段', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('race', JSON.stringify({ version: 0, state: { persisted: true } }))
     const originalGet = storage.get
     let release!: () => void
@@ -181,7 +181,7 @@ describe('persist（store-light）', () => {
   })
 
   it('hydrate 与启动期同字段 mutation 竞争时保留本地新值并写回', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('same-field-race', JSON.stringify({ version: 0, state: { count: 10 } }))
     const originalGet = storage.get
     let release!: () => void
@@ -203,7 +203,7 @@ describe('persist（store-light）', () => {
   })
 
   it('flush observes a failing write already in flight', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
     storage.set = async () => {
@@ -223,7 +223,7 @@ describe('persist（store-light）', () => {
   })
 
   it('preserves a storage failure when it settles before dispose', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
     const failure = new Error('storage failed before dispose')
@@ -244,7 +244,7 @@ describe('persist（store-light）', () => {
   })
 
   it('retains a late storage failure as AbortError cause when dispose wins the race', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
     let started!: () => void
@@ -276,7 +276,7 @@ describe('persist（store-light）', () => {
 
   it('partialize 只持久化裁剪后的字段', async () => {
     const store = createStore({ theme: 'light', session: 'secret' })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const handle = persist(store, {
       key: 'partial',
       storage,
@@ -294,7 +294,7 @@ describe('persist（store-light）', () => {
   })
 
   it('rejects archives outside the configured migration range', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('versioned', JSON.stringify({ version: 5, state: { count: 1 } }))
     const store = createStore({ count: 0 })
     const handle = persist(store, { key: 'versioned', storage, version: 1 })
@@ -308,7 +308,7 @@ describe('persist（store-light）', () => {
   })
 
   it('upgrades an old archive through the shared plan', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('migratable', JSON.stringify({ version: 1, state: { legacyCount: 3 } }))
     const store = createStore({ count: 0 })
     const handle = persist(store, {
@@ -326,7 +326,7 @@ describe('persist（store-light）', () => {
   })
 
   it('合法的 falsy 持久化值（0/false/空字符串）不会被误判成"未命中"', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('falsy', JSON.stringify({ version: 0, state: { count: 0, active: false } }))
     const store = createStore({ count: 99, active: true })
     const handle = persist(store, { key: 'falsy', storage })
@@ -339,7 +339,7 @@ describe('persist（store-light）', () => {
 
   it('dispose 在 hydrate 还没落地时调用，settled/ready 都能收敛，不遗留挂起状态', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const handle = persist(store, { key: 'dispose-during-hydrate', storage })
     handle.dispose() // 没有 await handle.ready，立刻 dispose
     await handle.settled
@@ -349,7 +349,7 @@ describe('persist（store-light）', () => {
 
   it('dispose 后 flush/clear 立即以 AbortError 结束', async () => {
     const store = createStore({ count: 0 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const handle = persist(store, { key: 'disposed', storage })
     await handle.ready
     handle.dispose()
@@ -369,7 +369,7 @@ describe('persist（store-light）', () => {
   it('disposeAsync writes a change admitted without debounce before the write started', async () => {
     /** Explicit runtime delivers the store notification before dispose runs. */
     const runtime = createRuntime()
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const store = createStore({ count: 0 }, { runtime })
     const handle = persist(store, { key: 'admitted-before-dispose', storage })
     await handle.ready
@@ -384,7 +384,7 @@ describe('persist（store-light）', () => {
 
   it('dispose aborts an in-flight write and then writes the latest snapshot after it', async () => {
     const runtime = createRuntime()
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Values each storage write delivered, in completion order. */
     const written: unknown[] = []
     let release!: () => void
@@ -422,7 +422,7 @@ describe('persist（store-light）', () => {
 
   it('clear() 删除存档但不重置 store 字段', async () => {
     const store = createStore({ count: 1 })
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     const handle = persist(store, { key: 'clearable', storage })
     store.count = 9
     await handle.flush()

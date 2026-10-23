@@ -296,9 +296,9 @@ importers:
       '@migaia/resource':
         specifier: workspace:^
         version: link:../resource
-      '@migaia/storage-web':
+      '@migaia/storage-host':
         specifier: workspace:^
-        version: link:../storage-web
+        version: link:../storage-host
       mitt:
         specifier: 3.0.1
         version: 3.0.1
@@ -1015,9 +1015,6 @@ importers:
       '@migaia/storage-host':
         specifier: workspace:^
         version: link:../storage-host
-      '@migaia/storage-web':
-        specifier: workspace:^
-        version: link:../storage-web
       '@migaia/store-indexed':
         specifier: workspace:^
         version: link:../store-indexed
