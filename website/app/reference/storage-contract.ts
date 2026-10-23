@@ -775,6 +775,22 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    createStorageBatchKeyCapture: {
+      role: 'operation',
+      purpose: t(
+        'Capture native batch keys in the backend’s existing per-entry getter and failure order.',
+        '按后端既有逐项 getter 与失败次序捕获原生批键。'
+      ),
+      params: {
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'One pure IStorageBatchKeyCapture for this batch. Each call snapshots only the supplied key and returns canonical identity/firstIndex. The backend rejects duplicates at its original point; values and TTL remain backend-owned.',
+        '本批次独立的纯 IStorageBatchKeyCapture。每次调用只快照给定键，返回规范身份/firstIndex；后端于原校验点拒绝重复，value 与 TTL 仍归后端。'
+      ),
+      example: storageContractCases.createStorageBatchKeyCapture![0]!.example,
+      cases: storageContractCases.createStorageBatchKeyCapture
+    },
     ttl: {
       role: 'constant',
       purpose: t(
@@ -2315,6 +2331,13 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IStorageBatchKeyCapture: {
+      summary: t(
+        'Pure per-batch function from one logical key to IStorageBatchKey; it owns only a temporary equality map and input position, without resource authority.',
+        '从一个逻辑键得到 IStorageBatchKey 的每批纯函数；仅持暂态相等 Map 与输入位置，不具资源权限。'
+      ),
+      members: {}
+    },
     ITtlTarget: {
       summary: t(
         'The existing expiring physical lock-key channels, with the same logical key domain.',

@@ -3,6 +3,7 @@ import {
   compareStorageKeys,
   encodeOrderedStorageKey,
   snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
   snapshotStorageKeyPrefix,
   snapshotStorageKey,
   type IStorageKey
@@ -51,6 +52,24 @@ const keys: readonly IStorageKey[] = [
 ]
 
 describe('ordered storage key encoding', () => {
+  it('captures native entries at their original per-item validation boundary', () => {
+    /** The original native owner decides when to inspect values or reject canonical duplicates. */
+    const capture = createStorageBatchKeyCapture('memory')
+    /** Capturing a position does not inspect the caller's next entry or any value/TTL field. */
+    const first = capture(['x', new Date(3)])
+    const second = capture(['x', new Date(3)])
+    expect(first.firstIndex).toBe(0)
+    expect(second.firstIndex).toBe(0)
+    expect(second.identity).toBe(first.identity)
+    expect(capture('next').firstIndex).toBe(2)
+    /** A failed logical key cannot consume a successful input position. */
+    expect(() => capture(NaN)).toThrowError(expect.objectContaining({ code: 'INVALID_KEY' }))
+    expect(capture('last').firstIndex).toBe(3)
+    /** The eager array entry remains exactly the same snapshots and identities. */
+    const direct = createStorageBatchKeyCapture('memory')
+    expect(['x', 'x', 'y'].map(direct)).toEqual(snapshotStorageBatchKeys(['x', 'x', 'y'], 'memory'))
+  })
+
   it('captures each batch position once and retains typed equality without changing native order', () => {
     /** Both container and nested key getters expose accidental recapture or encoding of raw input. */
     let reads = 0

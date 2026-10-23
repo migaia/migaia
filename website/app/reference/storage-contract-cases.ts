@@ -79,6 +79,25 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
   assertStorageTtlDuration: [ttlCase],
   counter: [counterCase],
   snapshotStorageCounterIncrement: [counterCase],
+  createStorageBatchKeyCapture: [
+    {
+      title: t('Retain the native entry capture order', '保留原生条目捕获次序'),
+      problem: t(
+        'Existing backends validate key, duplicate, value and TTL at different original points.',
+        '已有后端在各自原校验点处理 key、重复、value 与 TTL。'
+      ),
+      example: `import { createStorageBatchKeyCapture } from '@migaia/storage-contract'
+const capture = createStorageBatchKeyCapture('memory')
+const first = capture(['users', 1])
+// Capture this entry’s original value/TTL fields at the backend’s original point.
+const second = capture(['users', 1])
+// second.firstIndex is 0; native authors reject at their original duplicate check.`,
+      result: t(
+        'Each call captures one key and retains the shared canonical identity. No later entry, value, TTL or consumer callback is read by the helper.',
+        '每次调用捕获一个键并保留共享规范身份；helper 不读取后项、value、TTL 或消费者回调。'
+      )
+    }
+  ],
   snapshotStorageBatchKeys: [
     {
       title: t('Prepare one canonical native batch', '准备一个规范原生批次'),

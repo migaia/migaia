@@ -739,6 +739,8 @@ A base/Feature declaring transactions must provide real forTransaction bindings 
 
 ## Canonical key prefixes
 
+`createStorageBatchKeyCapture(backend)` returns one pure per-batch `capture(key)` function with the same `{ key, identity, firstIndex }` facts. Native authors call it in their existing per-entry getter order, then reject `firstIndex !== inputIndex` at their original duplicate-validation point. It reads no value/TTL field, catches no consumer callback, and creates no resource or operation owner. The array helper reuses this same temporary equality index.
+
 `snapshotStorageBatchKeys(keys, backend, { rejectDuplicates? })` captures each input position once and returns frozen `{ key, identity, firstIndex }` rows in caller order. `key` is detached and `identity` uses the canonical ordered bytes. Reads retain duplicate positions; native removals use only positions equal to `firstIndex`; atomic writes pass `rejectDuplicates: true` and reject canonical duplicates with `INVALID_ARGUMENT` before I/O. Invalid logical keys retain `INVALID_KEY`. The helper creates no store, transaction or resource owner.
 
 `snapshotStorageKeyPrefix(prefix, backend)` captures the original key domain once and returns `{ key, lower, upper, matches }`. Strings match UTF-16 content prefixes and ArrayBuffers match byte prefixes. Arrays match complete leading child-key sequences, without treating their final child as a partial prefix. Numbers and Dates match exact canonical identities; -0 equals 0. Empty strings/buffers remain valid, while the original key domain still rejects empty arrays.
