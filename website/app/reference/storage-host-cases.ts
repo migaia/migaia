@@ -3,6 +3,25 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  recommendStorageVector: [
+    {
+      title: t('Synthesize a native recommendation direction', '合成原生推荐方向'),
+      problem: t(
+        'Backends need the same mean rule before native retrieval.',
+        '后端在原生检索前需要同一均值规则。'
+      ),
+      example: `import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
+console.log(recommendStorageVector([[2, 0], [0, 2]], [[1, 0]]))
+console.log(recommendStorageVector([[2, 4]], []))
+console.log(recommendStorageVector([[2, 4]]))
+// [0, 1], [2, 4], [2, 4]`,
+      result: t(
+        'Returns detached readonly vectors. Native engines retain search and collection ownership.',
+        '返回独立只读向量；检索与 collection 仍由原生引擎拥有。'
+      )
+    }
+  ],
+
   observeStorageBatch: [
     {
       title: t('Share one batch observation pair', '共享一对批量操作观察事件'),

@@ -1,5 +1,7 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Standard recommendation requires nonempty positive samples with common finite dimensions. */
+  vectorRecommendation: 'storage vector recommendation samples are invalid',
   /** Aggregate organization deletion retains successful targets and every original failed target. */
   orgDeleteFailed: 'storage organization deletion failed',
   /** Entity definitions capture a complete own upgrade graph before connecting to a backend. */

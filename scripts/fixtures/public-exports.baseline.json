@@ -1777,6 +1777,9 @@
         "throwIfAborted",
         "withAbort"
       ],
+      "./authoring/vector": [
+        "recommendStorageVector"
+      ],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",
         "RecordIndexBackfillPhase",
