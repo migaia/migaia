@@ -1,3 +1,4 @@
+/** Stable error identity for the native RDF and SPARQL backend domain. */
 export const ERROR_SOURCE = 'storage.backend.sparql'
 /** Semantic identities distinguish definite protocol rejection from an unknown modification. */
 export const SparqlErrorCode = {

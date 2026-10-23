@@ -24,6 +24,14 @@
     "./oxigraph": {
       "types": "./dist/oxigraph.d.ts",
       "default": "./dist/oxigraph.js"
+    },
+    "./features/graph-store": {
+      "types": "./dist/features/graph-store.d.ts",
+      "default": "./dist/features/graph-store.js"
+    },
+    "./features/ontology": {
+      "types": "./dist/features/ontology.d.ts",
+      "default": "./dist/features/ontology.js"
     }
   },
   "scripts": {
@@ -35,6 +43,7 @@
     "test": "pnpm run build && vitest run"
   },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^",
     "@rdfjs/types": "2.0.1",

@@ -1805,9 +1805,11 @@
       ]
     },
     "@migaia/storage-plugin-sparql": {
-      ".": ["ERROR_SOURCE", "SparqlErrorCode"],
+      ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],
       "./http": ["httpEndpoint"],
-      "./oxigraph": ["oxigraphEndpoint"]
+      "./oxigraph": ["oxigraphEndpoint"],
+      "./features/graph-store": ["graphStoreFeature"],
+      "./features/ontology": ["ontologyFeature"]
     },
     "@migaia/storage-plugin-object": {
       ".": [

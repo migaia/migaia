@@ -816,6 +816,9 @@ importers:
 
   packages/storage-plugin-sparql:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
