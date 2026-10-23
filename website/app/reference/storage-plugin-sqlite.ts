@@ -179,8 +179,8 @@ export const storagePluginSqliteReference: ILibraryReference = {
     },
     ISqliteDriver: {
       summary: t(
-        'The synchronous trusted driver surface borrowed by a backend. It carries no connection disposal authority.',
-        '后端借用的同步可信 driver 表面，不授予连接释放权。'
+        'The synchronous trusted driver surface borrowed by a backend. Selected Features receive the same frozen exec/prepare view for store and transaction calls, without connection disposal authority.',
+        '后端借用的同步可信 driver 表面。选中的 Feature 在根与事务调用中得到同一个冻结 exec/prepare 视图，不授予连接释放权。'
       ),
       members: {
         exec: {
@@ -267,8 +267,8 @@ export const storagePluginSqliteReference: ILibraryReference = {
     },
     ISqliteTransactionScope: {
       summary: t(
-        'An authentic short transaction view with complete shared transaction operations and native SQL on the same connection. A caught operation failure still rolls back the whole transaction.',
-        '具有共同完整事务操作及同连接原生 SQL 的真实短事务视图。即使捕获操作失败，整个事务仍会回滚。'
+        'An authentic short transaction view with complete shared transaction operations, selected Feature API and native SQL on the same connection. Derived record queries retain selected chain methods. A caught operation failure still rolls back the whole transaction.',
+        '具有共同完整事务操作、选中 Feature API 及同连接原生 SQL 的真实短事务视图。派生记录查询保留所选链方法。即使捕获操作失败，整个事务仍会回滚。'
       ),
       members: {}
     },

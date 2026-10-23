@@ -101,6 +101,13 @@ final checks receive their own original-owner views. Caught or unawaited data
 failures still force rollback. `tx.sql` and KV always use the same native
 transaction. User SQL does not infer logical keys from SQL text.
 
+Selected Features use the same transaction and query creators. `tx.api` is bound before
+its original short view is frozen. Its SQL and KV operations commit or roll back together;
+caught and unawaited failures still belong to the original transaction owner. Feature
+`query` and `tx` methods remain on actual derived chains. The borrowed native client is
+one frozen `exec`/`prepare` view of the same connection, without `dispose` or symbolic
+cleanup methods. The creating caller retains connection ownership.
+
 Every managed table starts with `org_id` in its primary key. Native root SQL is
 caller-owned schema access; callers must supply their own organization filters
 for custom SQL tables and must not modify internal tables.

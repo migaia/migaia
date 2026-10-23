@@ -151,6 +151,7 @@ export type ISqliteRuntime = { readonly core: IStoragePluginCore; readonly orgId
 /** Construction returns only exact provider/controller handles needed for original host admission. */
 export type ISqliteConstruction<TValue> = {
   readonly store: ISqliteStore<TValue>
+  readonly client: ISqliteDriver
   readonly controller: IBackendChangeController
   readonly installer: ICapabilityInstallPort
   getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver
@@ -197,6 +198,11 @@ export function createSqliteStore<TValue>(
   const report = createStorageOperationReporter()
   /** A single bounded statement Map belongs to this store and is cleared at release. */
   const statements = createSqliteStatements(driver)
+  /** Feature authors borrow native operations without acquiring the creating caller's close handles. */
+  const client: ISqliteDriver = Object.freeze({
+    exec: (text) => driver.exec(text),
+    prepare: (text) => driver.prepare(text)
+  })
   /** Physical table names are quoted only after their complete suffix has been assembled. */
   const tables = {
     text: quoteSqliteIdentifier(`${table}_${SqliteNames.text}`),
@@ -1164,7 +1170,10 @@ export function createSqliteStore<TValue>(
         statements
       )
     }
-    return scope
+    /** Bind selected methods to this exact native view before the original owner admits it. */
+    const api = core.createTransactionApi(scope)
+    if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
+    return Object.freeze(scope)
   }
   /** SQL statistics use the shared compile output and retain native result shape and error cause. */
   const executeSql = <R>(
@@ -2117,7 +2126,7 @@ export function createSqliteStore<TValue>(
       })),
     iterateRecords: iterator,
     transaction: (run, options) => transact(run, options),
-    tx: () => createTransactionBuilder(store),
+    tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
     metadata: {
       get: (key, ctx) => {
         textInput(key)
@@ -2244,15 +2253,18 @@ export function createSqliteStore<TValue>(
   /** Query source delegates iteration to the exact root or original transaction owner. */
   const recordApi: IRecordsApi<TValue> = {
     query: <R = TValue>() =>
-      createRecordQuery<R>({
-        pushdown: {
-          operators: [],
-          operations: [],
-          source: SqliteNames.backend,
-          index: `${table}_${SqliteNames.record}`
+      createRecordQuery<R>(
+        {
+          pushdown: {
+            operators: [],
+            operations: [],
+            source: SqliteNames.backend,
+            index: `${table}_${SqliteNames.record}`
+          },
+          execute: ({ ctx }) => iterator(undefined, ctx)
         },
-        execute: ({ ctx }) => iterator(undefined, ctx)
-      }),
+        core.getChainMethods('query')
+      ),
     removeByPrefix: (prefix, ctx) => {
       const captured = snapshotStorageKey(prefix, SqliteNames.backend)
       return rootWrite(SqliteOperation.removeByPrefix, { prefix: captured }, ctx, (input) => {
@@ -2269,15 +2281,19 @@ export function createSqliteStore<TValue>(
     forTransaction: (scope) =>
       ({
         query: <R = TValue>() =>
-          createRecordQuery<R, undefined>({
-            pushdown: {
-              operators: [],
-              operations: [],
-              source: SqliteNames.backend,
-              index: `${table}_${SqliteNames.record}`
+          createRecordQuery<R, undefined>(
+            {
+              pushdown: {
+                operators: [],
+                operations: [],
+                source: SqliteNames.backend,
+                index: `${table}_${SqliteNames.record}`
+              },
+              execute: () =>
+                transactionIterator(scope as ISqliteTransactionScope<TValue>, undefined)
             },
-            execute: () => transactionIterator(scope as ISqliteTransactionScope<TValue>, undefined)
-          }),
+            core.getChainMethods('query')
+          ),
         removeByPrefix: (prefix) =>
           scoped(scope, SqliteOperation.removeByPrefix, { prefix }, (state) =>
             removePrefix('record', prefix, state)
@@ -2303,11 +2319,12 @@ export function createSqliteStore<TValue>(
     )
     return {
       store,
+      client,
       controller,
       installer,
       getTransactionClient: (scope) => {
         nativeFor(scope)
-        return driver
+        return client
       }
     }
   } catch (error) {
