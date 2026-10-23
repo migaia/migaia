@@ -119,6 +119,19 @@ export type IStoragePluginCallContext = {
   readonly orgId: string
   backend<S extends IStorageBorrowedBackend>(borrowed: S): S
 }
+/** Native organization projection remains owned by the exact installed backend registration. */
+export type IStorageOrgBinding = {
+  backend(orgId: string): IStorageBase
+  drop(orgId: string): Promise<void>
+}
+/** Read-only invocation ports retain one immutable organization without installation authority. */
+export type IStorageBackendOrgContext = {
+  readonly orgId: string
+  readonly execution: IStorageExecutionPort
+  readonly stageBindings: IBackendStageBindings
+  readonly callContext: IStoragePluginCallContext
+  createTransactionApi(scope: object): object | undefined
+}
 type ITargetKind<T extends IStorageFeatureTarget> = T extends readonly IStorageBackendKind[]
   ? T[number]
   : T extends IStorageBackendKind
@@ -320,6 +333,10 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
     registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
     registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void
+    /** Register immutable physical-org lookup and deletion only for this exact admitted store. */
+    registerOrgBinding(store: IStorageBase, binding: IStorageOrgBinding): void
+    /** Read original execution and observation ports without registration or lifecycle authority. */
+    getOrgContext(orgId: string): IStorageBackendOrgContext
     registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
     registerStore<S extends IStorageBase>(store: S): void
     getStore(): IStorageBase
@@ -356,8 +373,11 @@ type IStoragePluginExtensionCarrier<P> = P extends {
     ? IPlugin<object, E>
     : IPlugin<object, {}>
   : never
-export type IStoragePluginExtensions<P> = IMergePluginExts<[IStoragePluginExtensionCarrier<P>]> &
-  object
+export type IStoragePluginExtensions<P> = {
+  [K in keyof IMergePluginExts<[IStoragePluginExtensionCarrier<P>]>]: OmitThisParameter<
+    IMergePluginExts<[IStoragePluginExtensionCarrier<P>]>[K]
+  >
+} & object
 type IDescriptorStore<D extends IStorageNativePluginDescriptor> =
   D['capabilityInstaller'] extends infer P
     ? NonNullable<P> extends (store: infer S extends IStorageBase) => unknown
@@ -525,15 +545,25 @@ export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
   import('@migaia/storage-contract').IStorageResource & {
     readonly hooks: IStorageHooks
     detect(): Promise<void>
-    codecStages(store: IStorageBase): ICodecStageObserver
-    queryStages(store: IStorageBase): IQueryStageObserver
-    transactionStages(store: IStorageBase): ITransactionStageObserver
-    concurrencyStages(store: IStorageBase): IConcurrencyStageObserver
-    backendStages(store: IStorageBase): IBackendStageObserver
-    sqlStages(store: IStorageBase): ISqlStageObserver
-    operationStages(store: IStorageBase): IStorageOperationStageObserver
+    org(orgId: string): IStorageOrgView<P>
+    dropOrg(orgId: string): Promise<void>
+    codecStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): ICodecStageObserver
+    queryStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): IQueryStageObserver
+    transactionStages(
+      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+    ): ITransactionStageObserver
+    concurrencyStages(
+      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+    ): IConcurrencyStageObserver
+    backendStages(
+      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+    ): IBackendStageObserver
+    sqlStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): ISqlStageObserver
+    operationStages(
+      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+    ): IStorageOperationStageObserver
     envelopeStages(
-      store: IStorageBase,
+      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>,
       operation: Readonly<{ operation: string; targetVersion: number }>
     ): IStorageEnvelopeStages
     readonly extensions: Readonly<IStoragePluginExtensions<P[number]>>
@@ -554,6 +584,22 @@ export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
       IPluginStoreMap<P>[keyof IPluginStoreMap<P>]
     >
   }
+
+/** A business view retains inference while lifecycle and installation stay with its root host. */
+export type IStorageOrgView<P extends readonly IStorageBackendPluginHandle[]> = Omit<
+  IStorageHost<P>,
+  'use' | 'dropOrg' | 'dispose' | typeof Symbol.asyncDispose | 'backend' | 'backends' | 'org'
+> & {
+  readonly orgId: string
+  org(orgId: string): IStorageOrgView<P>
+  backend<N extends keyof IPluginStoreMap<P> & string>(
+    id: N
+  ): IStorageBorrowedBackend<IPluginStoreMap<P>[N]>
+  backends(): ReadonlyMap<
+    keyof IPluginStoreMap<P> & string,
+    IStorageBorrowedBackend<IPluginStoreMap<P>[keyof IPluginStoreMap<P>]>
+  >
+}
 
 /** Keeps higher-order factory inference in the defining module. */
 export type IStorageDefinePlugin = {

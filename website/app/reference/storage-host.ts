@@ -361,6 +361,169 @@ console.log(host.extensions.label('draft'))`,
       ),
       members: {}
     },
+    IStorageOrgView: {
+      summary: t(
+        'Immutable business access to one organization under the root host lifecycle. Native backends retain their own data and transaction owners.',
+        '在根宿主生命周期内固定访问单个组织；原生后端保留自己的数据与事务owner。'
+      ),
+      example: storageHostCases.storageOrganizations?.[0]?.example,
+      members: {
+        orgId: {
+          summary: t(
+            'Canonical UUID captured when the view is created.',
+            '创建视图时捕获的规范UUID。'
+          )
+        },
+        org: {
+          summary: t(
+            'Create another immutable business view with the same plugin inference.',
+            '创建保留相同插件推断的另一个不可变业务视图。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID from createOrgId or the application default configuration.',
+              '由createOrgId生成或应用缺省配置提供的规范UUID。'
+            )
+          },
+          returns: t(
+            'Another business view without installation or close authority.',
+            '返回没有安装与关闭权的业务视图。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        backend: {
+          summary: t(
+            'Resolve this organization through the installed native registration and remove close ownership.',
+            '通过已安装原生registration解析本组织后端，并移除关闭所有权。'
+          ),
+          params: {
+            id: t(
+              'Literal id of a plugin installed on the root host.',
+              '根宿主已安装插件的字面量id。'
+            )
+          },
+          returns: t(
+            'Precisely typed borrowed backend; extracted methods retain this organization.',
+            '精确类型的借用后端；提取的方法保持本组织。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        backends: {
+          summary: t(
+            'Return a detached map of this organization business backends.',
+            '返回本组织业务后端的脱离Map。'
+          ),
+          returns: t(
+            'A readonly map whose mutation cannot change the host registry.',
+            '返回readonly Map，修改副本不会影响宿主registry。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        api: {
+          summary: t(
+            'Selected Feature APIs bound to the immutable organization and original native scope.',
+            '绑定不可变组织与原生scope的已选Feature API。'
+          )
+        },
+        extensions: {
+          summary: t(
+            'Original extension definitions with immutable organization call contexts and captured dependencies.',
+            '拥有不可变组织调用上下文与已捕获依赖的原扩展定义。'
+          )
+        },
+        hooks: {
+          summary: t(
+            'Original host observations filtered by this organization identity.',
+            '按本组织身份过滤的原宿主观察。'
+          )
+        }
+      }
+    },
+    IStorageOrgBinding: {
+      summary: t(
+        'Installation-only native target and deletion callbacks owned by the exact store cell. No second registry or lifecycle is introduced.',
+        '由精确storeCell拥有的安装期原生目标与删除回调，不建立第二registry或生命周期。'
+      ),
+      members: {
+        backend: {
+          summary: t(
+            'Resolve a canonical organization to its existing native physical target.',
+            '将规范组织解析到既有原生物理目标。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID validated by the host organization boundary.',
+              '已由宿主组织边界校验的规范UUID。'
+            )
+          },
+          returns: t(
+            'Original native provider store for that organization.',
+            '该组织的原生provider store。'
+          )
+        },
+        drop: {
+          summary: t(
+            'Delete only the requested physical organization without changing other targets.',
+            '只删除请求的物理组织，不改变其它目标。'
+          ),
+          params: {
+            orgId: t('Canonical UUID supplied to host.dropOrg.', '传给host.dropOrg的规范UUID。')
+          },
+          returns: t(
+            'Completion of that native target deletion; failures retain the original error.',
+            '返回该原生目标删除的完成结果，失败保留原错误。'
+          )
+        }
+      }
+    },
+    IStorageBackendOrgContext: {
+      summary: t(
+        'Read-only immutable invocation ports from the original registration. The context grants no store registration, provider installation or close authority.',
+        '来自原registration的只读不可变调用接点；不授予store登记、provider安装或关闭权。'
+      ),
+      members: {
+        orgId: {
+          summary: t(
+            'Canonical organization fixed for every derived invocation.',
+            '固定用于所有派生调用的规范组织身份。'
+          )
+        },
+        execution: {
+          summary: t(
+            'Original shared sync and async runners with original registration admission.',
+            '保留原registration准入的共享同步与异步runner。'
+          )
+        },
+        stageBindings: {
+          summary: t(
+            'Original observation factories emitting the captured organization identity.',
+            '发出已捕获组织身份的原观察工厂。'
+          )
+        },
+        callContext: {
+          summary: t(
+            'Immutable orgId and projection of installation-captured borrowed dependencies.',
+            '不可变orgId与安装时已捕获借用依赖的投影。'
+          )
+        },
+        createTransactionApi: {
+          summary: t(
+            'Bind selected API methods to one authentic native scope before freeze.',
+            '在冻结前将已选API方法绑定到真实原生scope。'
+          ),
+          params: {
+            scope: t(
+              'Fresh scope created and registered by the native transaction owner.',
+              '由原生事务owner构造并登记的新scope。'
+            )
+          },
+          returns: t(
+            'Original Feature transaction projection or undefined when absent.',
+            '返回原Feature事务投影，未选时返回undefined。'
+          )
+        }
+      }
+    },
     IStorageHooks: {
       summary: t(
         'One synchronous registry shared by constructor hooks, host listeners and original plugin installation scopes.',
@@ -408,6 +571,19 @@ off()`
       }
     }
   },
-  enums: {},
+  enums: {
+    StorageErrorCode: {
+      summary: t(
+        'Stable host errors retain native types and original causes.',
+        '宿主稳定错误保留原生类型与原错误cause。'
+      ),
+      values: {
+        orgDeleteFailed: t(
+          'At least one organization target failed after every backend was attempted. Inspect all original errors and retry without rolling back successful deletions.',
+          '尝试全部后端后仍有组织目标删除失败；检查所有原错误并重试，不回滚已成功删除。'
+        )
+      }
+    }
+  },
   enhancers: {}
 }

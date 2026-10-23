@@ -14,7 +14,11 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import { createStorageTypeError, StorageErrorCode } from './errors.js'
 import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.js'
 import { pluginNameFromBackendId } from './names.js'
-import { STORAGE_DESCRIPTOR_METADATA, STORAGE_RESERVED_EXPOSE } from './state-constants.js'
+import {
+  STORAGE_DESCRIPTOR_METADATA,
+  STORAGE_DESCRIPTOR_HOOKS,
+  STORAGE_RESERVED_EXPOSE
+} from './state-constants.js'
 import { StorageErrorText } from './error-text.js'
 import type {
   IStorageBackendKind,
@@ -44,7 +48,8 @@ type IStorageNativeProjectionFields = Readonly<Record<PropertyKey, unknown>>
 const createNativeDataProjection = (
   value: unknown,
   fields: IStorageNativeProjectionFields,
-  preserveMethodReceiver = false
+  preserveMethodReceiver = false,
+  projectValue?: (key: PropertyKey, value: unknown, receiver: object) => unknown
 ): unknown => {
   if (value === null || typeof value !== 'object') return value
   /** Empty target keeps Proxy invariants independent of frozen caller-owned output. */
@@ -67,6 +72,16 @@ const createNativeDataProjection = (
        */
       const descriptor = Object.getOwnPropertyDescriptor(value, key)
       if (descriptor !== undefined) {
+        /**
+         * Native's original descriptor read also captures immutable organization method
+         * definitions.
+         */
+        if (projectValue !== undefined && 'value' in descriptor)
+          return {
+            ...descriptor,
+            value: projectValue(key, descriptor.value, value),
+            configurable: true
+          }
         if (
           preserveMethodReceiver &&
           key !== 'then' &&
@@ -95,6 +110,7 @@ type IStorageDescriptorHook = (() => unknown) | undefined
 type IStorageDescriptorHooks = Readonly<{
   readonly install: (hook: IStorageDescriptorHook) => () => unknown
   readonly featureExpose: (hook: IStorageDescriptorHook) => () => unknown
+  readonly expose: (hook: IStorageDescriptorHook) => () => unknown
 }>
 
 /**
@@ -109,7 +125,7 @@ const createNativeDescriptorProjection = (
   /** Empty target permits projection of frozen or non-configurable caller descriptors. */
   const target = Object.create(null)
   /** These are the only descriptor hooks Storage bridges into its existing registration closure. */
-  const hookNames = new Set<string>(['install', 'featureExpose'])
+  const hookNames = new Set<string>(STORAGE_DESCRIPTOR_HOOKS)
   return new Proxy(target, {
     getPrototypeOf: () => Object.getPrototypeOf(value),
     get: (_target, key) => {
@@ -125,7 +141,7 @@ const createNativeDescriptorProjection = (
         ...Reflect.ownKeys(value).filter(
           (key) => !STORAGE_DESCRIPTOR_METADATA.some((field) => field === key)
         ),
-        ...hookNames
+        ...[...hookNames].filter((key) => key !== 'expose')
       ])
     ],
     getOwnPropertyDescriptor: (_target, key) => {
@@ -134,6 +150,7 @@ const createNativeDescriptorProjection = (
       if (
         typeof key === 'string' &&
         hookNames.has(key) &&
+        (key !== 'expose' || descriptor !== undefined) &&
         (descriptor === undefined ||
           ('value' in descriptor && typeof descriptor.value === 'function'))
       ) {
@@ -229,6 +246,9 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
   readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
+  readonly registerOrgBinding: IStoragePluginCore['registerOrgBinding']
+  readonly getOrgContext: IStoragePluginCore['getOrgContext']
+  captureStorageExtension(key: PropertyKey, value: unknown, receiver: object): unknown
 }
 /** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
 export const definePlugin: IStorageDefinePlugin = ((
@@ -281,6 +301,8 @@ export const definePlugin: IStorageDefinePlugin = ((
         createChangeController: nativeCore.createChangeController,
         registerChangeController: nativeCore.registerChangeController,
         registerValueCommit: nativeCore.registerValueCommit,
+        registerOrgBinding: nativeCore.registerOrgBinding,
+        getOrgContext: nativeCore.getOrgContext,
         getPublishedBackend: nativeCore.getPublishedBackend,
         registerDetect: nativeCore.registerDetect,
         registerStore: (store: IStorageBase) => {
@@ -377,7 +399,8 @@ export const definePlugin: IStorageDefinePlugin = ((
                       : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
                   execution: nativeCore.execution,
                   expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
-                  onDispose: nativeCore.onDispose
+                  onDispose: nativeCore.onDispose,
+                  callContext: nativeCore.getOrgContext(nativeCore.defaultOrgId).callContext
                 })
                 if (projection !== undefined) {
                   /** Original registration cleanup drops only its own selected Feature projection. */
@@ -395,11 +418,24 @@ export const definePlugin: IStorageDefinePlugin = ((
               const output = Object.create(null)
               Object.setPrototypeOf(output, Object.getPrototypeOf(extensions))
               Object.defineProperties(output, Object.getOwnPropertyDescriptors(extensions))
-              return output
+              return createNativeDataProjection(
+                output,
+                {},
+                false,
+                nativeCore.captureStorageExtension
+              )
             })
           } finally {
             transferActive = false
           }
+        },
+        expose: (hook) => () => {
+          /**
+           * Original extension publication remains native; only raw callable definitions are
+           * retained.
+           */
+          const value = hook === undefined ? {} : hook()
+          return createNativeDataProjection(value, {}, false, nativeCore.captureStorageExtension)
         },
         featureExpose: (hook) => () => {
           /** Keep native getters lazy until actual execution after store admission. */

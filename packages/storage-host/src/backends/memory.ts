@@ -1,4 +1,7 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
+import { createBackendRevisionPort } from './revisions.js'
+import { createBackendKeyLockPort } from './key-locks.js'
+import type { IBackendChangeController } from '../core/change-controller.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -12,6 +15,7 @@ import {
   snapshotSyncWriteOptions,
   encodeOrderedStorageKey,
   createTransactionOwner,
+  assertTransactionOwner,
   runTransactionOperation,
   useTransactionCapability,
   snapshotStorageKeyPrefix,
@@ -174,49 +178,109 @@ export function createMemoryBackend<T = unknown>(
     core.defaultOrgId,
     core.defaultOrgId
   )
-  /** All three physical channels retain their original independent membership. */
+  /** Every namespace belongs to this installed physical backend and its one lifecycle controller. */
+  const namespaces = new Map<string, ReturnType<typeof createMemoryNamespace<T>>>()
+  /** One controller owns admission, event sequence and final cleanup for all native namespaces. */
+  const controller = core.createChangeController({
+    backend: STORAGE_MEMORY_BACKEND,
+    options: { namespace },
+    finalize: async () => {
+      for (const physical of namespaces.values()) await physical.finalize()
+      namespaces.clear()
+    }
+  })
+  /** Native projections allocate data only on demand, without DDL, registry writes or new lifetimes. */
+  const forOrg = (orgId: string) => {
+    controller.assertLive()
+    const target = resolveStorageNamespace(namespace, orgId, core.defaultOrgId)
+    const existing = namespaces.get(target)
+    if (existing !== undefined) return existing
+    const ports = core.getOrgContext(orgId)
+    const physical = createMemoryNamespace<T>(
+      { ...core, ...ports },
+      options,
+      controller,
+      orgId,
+      orgId === core.defaultOrgId
+    )
+    namespaces.set(target, physical)
+    return physical
+  }
+  /** Default host calls and explicit default-org views resolve the exact same physical namespace. */
+  const physical = forOrg(core.defaultOrgId)
+  return {
+    ...physical,
+    controller,
+    orgBinding: {
+      backend: (orgId: string) => forOrg(orgId).store,
+      drop: async (orgId: string) => {
+        await forOrg(orgId).store.clearAll()
+      }
+    },
+    assertScope: (scope: ITransactionScope) => {
+      for (const physical of namespaces.values()) {
+        try {
+          assertTransactionOwner(physical.store, scope)
+          return
+        } catch (error) {
+          if (
+            !(error instanceof StorageContractError) ||
+            error.code !== StorageContractErrorCode.invalidArgument
+          )
+            throw error
+        }
+      }
+      assertTransactionOwner(physical.store, scope)
+    }
+  }
+}
+
+/** Build native operations over one namespace while borrowing its registration's original lifetime. */
+function createMemoryNamespace<T>(
+  core: IStoragePluginCore,
+  options: IMemoryOptions,
+  controller: IBackendChangeController,
+  orgId: string,
+  root: boolean
+) {
+  /** Physical membership, ordered ranges, deadline facts and lock admission share this namespace. */
   const data = {
     value: new Map<string, IMemoryEntry>(),
     bytes: new Map<string, IMemoryEntry>(),
     record: new Map<string, IMemoryEntry>()
   }
-  /** Only expiring physical identities own metadata; no timer or expiry history is retained. */
+  /** Only live expiring identities retain deadline metadata. */
   const deadlines = new Map<string, number>()
-  /** Hash point reads and ordered ranges refer to the same physical entries in each channel. */
+  /** Ordered leaves index the same native data entries. */
   const ordered = {
     value: createOrderedRecordIndex<IMemoryEntry>(),
     bytes: createOrderedRecordIndex<IMemoryEntry>(),
     record: createOrderedRecordIndex<IMemoryEntry>()
   }
-  /** One revision owner covers writes, deletes and tombstones across the three channels. */
-  const revisions = core.createRevisionPort()
-  /** The physical instance owns this one provider; no other memory instance shares its locks. */
-  const locks = core.createKeyLockPort()
-  /** Original cleanup diagnostics never alter the committed data result. */
+  /** These original internal algorithms own only physical facts, without installation authority. */
+  const revisions = createBackendRevisionPort()
+  /** Each namespace has independent canonical locks under the one parent lifecycle. */
+  const locks = createBackendKeyLockPort()
+  /** Existing cleanup diagnostics retain their original reporter. */
   const report = createStorageOperationReporter()
-  /** Native deadlines and operation durations share the scheduler already captured by this host. */
+  /** Native deadlines use the original captured scheduler. */
   const scheduler = core.featureExpose.getScheduler()
-  /** Symbol cleanup retains its own cached derivative of the controller's primary Promise. */
+  /** Symbol cleanup retains its cached reporting derivative. */
   let symbolic: Promise<void> | undefined
-  /** Capabilities are published on the original mutable base, with one captured installer. */
+  /** Feature publication borrows this native provider's original installer. */
   let installer!: ICapabilityInstallPort
-  /** The sole original transaction owner is initialized after the complete base exists. */
+  /** Native transaction views share this namespace's original canonical owner. */
   let owner!: ReturnType<typeof createTransactionOwner<T>>
-  /** Original controller supplies lifecycle leases and committed local change notifications. */
-  const controller = core.createChangeController({
-    backend: STORAGE_MEMORY_BACKEND,
-    options: { namespace },
-    finalize: async () => {
-      await locks.dispose()
-      for (const channel of MemoryState.channels) {
-        data[channel].clear()
-        ordered[channel].clear()
-      }
-      for (const channel of MemoryState.channels)
-        revisions.clear(channel === 'value' ? 'text' : channel)
-      deadlines.clear()
+  /** Root lifecycle finalization releases each namespace's physical facts exactly once. */
+  const finalize = async () => {
+    await locks.dispose()
+    for (const channel of MemoryState.channels) {
+      data[channel].clear()
+      ordered[channel].clear()
+      revisions.clear(channel === 'value' ? 'text' : channel)
     }
-  })
+    deadlines.clear()
+  }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
   const normalize = (cause: unknown, expiredScope?: true) =>
     isStorageErrorFamily(cause)
@@ -311,7 +375,7 @@ export function createMemoryBackend<T = unknown>(
     kind: IStorageChange['kind'],
     keys?: readonly IStorageKey[]
   ): void => {
-    controller.publish({ channel, kind, ...(keys === undefined ? {} : { keys }) })
+    controller.publish({ channel, kind, orgId, ...(keys === undefined ? {} : { keys }) })
   }
   /** Every physical access shares one deadline check and the original removal/revision path. */
   const liveEntry = (channel: IStorageChannel, encoded: string): IMemoryEntry | undefined => {
@@ -520,7 +584,7 @@ export function createMemoryBackend<T = unknown>(
       revisions.clear(channel === 'value' ? 'text' : channel)
     }
     deadlines.clear()
-    if (changed) controller.publish({ channel: 'all', kind: 'clear' })
+    if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
   const clearEntry = (
@@ -824,7 +888,9 @@ export function createMemoryBackend<T = unknown>(
       }),
     subscribeChanges: (listener) => {
       controller.assertLive()
-      return controller.subscribe(listener)
+      return controller.subscribe((change) => {
+        if (root || change.orgId === orgId) listener(change)
+      })
     },
     dispose: () => controller.dispose(),
     [asyncDisposeKey]: () =>
@@ -1819,7 +1885,7 @@ export function createMemoryBackend<T = unknown>(
     defaultPolicy: options.concurrency,
     concurrencyStages: core.stageBindings.concurrencyStages(store)
   })
-  return { store, controller, installer }
+  return { store, controller, installer, finalize }
 }
 
 /** Precise native store shape is retained by the first-party plugin factory. */

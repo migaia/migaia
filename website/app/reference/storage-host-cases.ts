@@ -101,6 +101,31 @@ console.log(resolveStorageNamespace('cache', org, defaultOrg))`,
       )
     }
   ],
+  storageOrganizations: [
+    {
+      title: t(
+        'Keep captured business methods inside one organization',
+        '让提取的业务方法保持组织隔离'
+      ),
+      problem: t(
+        'Two organizations share one host while writing the same logical key.',
+        '两个组织共用宿主并写入相同逻辑键。'
+      ),
+      example: `import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin({ namespace: 'prefs' })] })
+const left = host.org(createOrgId()).backend('memory')
+const right = host.org(createOrgId()).backend('memory')
+const writeLeft = left.set
+await right.set('theme', 'light')
+await writeLeft('theme', 'dark')
+console.log(await left.get('theme'), await right.get('theme'))`,
+      result: t(
+        'Prints dark and light. The captured method retains its native namespace.',
+        '输出dark和light，提取的方法保持原生namespace。'
+      )
+    }
+  ],
   createOrgId: [
     {
       title: t('Generate native organization identity', '生成原生组织身份'),
