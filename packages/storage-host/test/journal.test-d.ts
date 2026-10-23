@@ -4,7 +4,10 @@ import type {
   IStorageJournalNamespaceView,
   IStorageJournalImage,
   IStorageJournalTarget,
-  IStorageJournalChange
+  IStorageJournalChange,
+  IStorageJournalOptions,
+  IStorageJournalConfiguration,
+  IStorageJournalExecutionPort
 } from '@migaia/storage-host'
 import type { ITransactionScope } from '@migaia/storage-contract'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
@@ -66,4 +69,38 @@ export function compileJournalChange(target: IStorageJournalTarget): IStorageJou
   const before: IStorageJournalImage = { present: false }
   const after: IStorageJournalImage = { present: true, value: 'encoded null' }
   return { target, before, after, afterRevision: { generation: 1 } }
+}
+
+/** Global configuration borrows the logger and exposes only fixed-org preparation to backends. */
+export function compileJournalOptions(
+  logger: import('@migaia/logger').ILoggerCore,
+  levelLogger: import('@migaia/logger').ILoggerCore &
+    import('@migaia/logger/plugins').ILevelPluginExt,
+  port: IStorageJournalExecutionPort
+): void {
+  const ordinary: IStorageJournalOptions<typeof logger> = {
+    logger,
+    namespace: 'app',
+    telemetry: false
+  }
+  const telemetry: IStorageJournalOptions<typeof levelLogger> = {
+    logger: levelLogger,
+    namespace: 'app',
+    telemetry: true
+  }
+  const invalid: IStorageJournalOptions<typeof logger> = {
+    logger,
+    namespace: 'app',
+    // @ts-expect-error telemetry=true requires the actual level plugin's public methods.
+    telemetry: true
+  }
+  const configuration: IStorageJournalConfiguration = async ({ orgId, storageLogStore }) => {
+    const store = await storageLogStore('data', { prefix: orgId })
+    return { logger, namespace: 'app', atomicBinlog: { data: store } }
+  }
+  const prepared: Promise<void> = port.prepare()
+  const active: boolean = port.active()
+  // @ts-expect-error Native preparation grants no store installer or lifecycle handle.
+  void port.registerStore
+  void [ordinary, telemetry, invalid, configuration, prepared, active]
 }

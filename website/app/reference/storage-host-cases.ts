@@ -3,6 +3,21 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  IStorageFeatureClientResolver: [
+    {
+      title: t('Declare a finite native client resolver', '声明有限原生客户端选择'),
+      problem: t(
+        'Backend authors need an explicit client selection shape without another capability or resource registry.',
+        '后端作者需要显式客户端选择形状，不另建能力或资源登记表。'
+      ),
+      example:
+        "import type { IStorageFeatureClientResolver } from '@migaia/storage-host'\nconst resolver: IStorageFeatureClientResolver<undefined, undefined> = {\n  getClient: (_orgId) => undefined,\n  getTransactionClient: (_scope, _orgId) => undefined\n}\nconsole.log(await resolver.getClient('00000000-0000-0000-0000-000000000000'))",
+      result: t(
+        'Prints undefined for a backend with no native client. Real native backends return their original client and already-open transaction; only their installation may register this resolver.',
+        '无原生客户端的后端输出undefined。真实原生后端返回原客户端及已打开事务，仅原安装窗口能登记resolver。'
+      )
+    }
+  ],
   asyncDisposeKey: [
     {
       title: t('Use the original disposal key', '使用原释放键'),
@@ -392,6 +407,36 @@ console.log(await jsonCodec.decode(encoded))`,
     }
   ],
   createStorageHost: [
+    {
+      title: t('Record a real native memory commit', '记录真实 native memory 提交'),
+      problem: t(
+        'Build the same-registration private carrier before borrowing its logger.',
+        '先建立同 registration 私有载体，再借用其 logger。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { binlog } from '@migaia/logger/plugins/durable'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+const borrowed: Array<{ shutdown(reason: 'manual'): Promise<void> }> = []
+await using host = await createStorageHost({
+  plugins: [memoryBackendPlugin()],
+  journal: async ({storageLogStore}) => {
+    const records = await storageLogStore('memory', { prefix: 'commits' })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [binlog({ store: records })]
+    })
+    borrowed.push(logger)
+    return { logger, namespace: 'orders', atomicBinlog: { memory: records } }
+  }
+})
+try { await host.backend('memory').set('status', 'ready') }
+finally { for (const logger of borrowed) await logger.shutdown('manual') }`,
+      result: t(
+        'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. Clear/blob capture, automatic undo, WAL and redo remain unfinished.',
+        '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。clear/blob 捕获、自动 undo、WAL 与 redo 尚未完成。'
+      )
+    },
+
     {
       title: t('Run environment checks explicitly', '显式执行环境检查'),
       problem: t(

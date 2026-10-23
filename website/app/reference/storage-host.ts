@@ -365,6 +365,52 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IStorageJournalOptions: {
+      summary: t(
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin; selected unimplemented guarantees reject.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件，未实现的已选保证明确拒绝。'
+      ),
+      members: {}
+    },
+    IStorageJournalInitializerContext: {
+      summary: t(
+        'Fixed orgId and original private storageLogStore helper for one-time organization preparation; no raw backend or host mutation rights.',
+        '一次性组织准备所用的固定 orgId 与原私有 storageLogStore helper，不返回 raw 后端或宿主修改权。'
+      ),
+      members: {}
+    },
+    IStorageJournalConfiguration: {
+      summary: t(
+        'Direct borrowed options or an async initializer. The default org prepares in the final original install batch, and later orgs share one preparation Promise before supported asynchronous endpoints.',
+        '直接借用配置或异步 initializer；缺省组织在原安装批次末尾准备，后续组织在受支持异步终点前共享一次准备 Promise。'
+      ),
+      members: {}
+    },
+    IStorageJournalAttempt: {
+      summary: t(
+        'Original authenticated txId and pre-commit record(scope) only; no new transaction or terminal authority.',
+        '仅含原认证 txId 与提交前 record(scope)，不授予新事务或终态权。'
+      ),
+      members: {}
+    },
+    IStorageJournalExecutionPort: {
+      summary: t(
+        'Fixed-org preparation plus original first-acquisition head locks, active fact, and native-scope capture. Backends keep their original concurrency, draft, commit and lifecycle owners.',
+        '固定组织准备、原第一次取锁的 head 锁、active 事实与 native scope 捕获；后端保留原并发、draft、提交和生命周期拥有者。'
+      ),
+      members: {}
+    },
+    IStorageHostOptions: {
+      summary: t('Captured host construction options.', '单次捕获的宿主构造选项。'),
+      members: {
+        journal: {
+          summary: t(
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, clear/blob capture and other-backend routing are not completed by the current memory unit.',
+            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、clear/blob 捕获或其它后端路由已完成。'
+          )
+        }
+      }
+    },
     IBackendKeyLockPort: {
       summary: t(
         'Installation-issued canonical key locks shared by native backends.',
@@ -392,6 +438,12 @@ console.log(host.extensions.label('draft'))`,
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
       members: {
+        assertLive: {
+          summary: t(
+            'Optional original generation check, captured once by storageLogStore and reused before cached reads and native ports. Memory drop invalidates old handles; it never silently reuses deleted indexes.',
+            '可选原 generation 检查，由 storageLogStore 单次捕获，在缓存读取及 native port 前复用；memory drop 使旧句柄失效，不静默复用已删除索引。'
+          )
+        },
         runCommitted: {
           summary: t(
             'Optionally publish an ordinary result inside the original actual commit terminal, before its head lease ends. Native append composition requires this port; ordinary logs do not.',
@@ -696,6 +748,27 @@ console.log(host.extensions.label('draft'))`,
         }
       }
     },
+    IStorageFeatureClientResolver: {
+      summary: t(
+        'Explicit backend-owned native client selection registered through core.registerFeatureClientResolver only during the original exact-store installation. No selection preserves original getters; async preparation retains admission, and transaction selection is synchronous on the authentic scope.',
+        '后端仅在精确store原安装窗口通过core.registerFeatureClientResolver登记原生客户端选择；未登记保持原getter，异步准备后仍检查原准入，事务选择同步使用认证scope。'
+      ),
+      example: storageHostCases.IStorageFeatureClientResolver![0]!.example,
+      members: {
+        getClient: {
+          summary: t(
+            'Prepare and return the original native client for this immutable organization.',
+            '为本不可变组织准备并返回原生客户端。'
+          )
+        },
+        getTransactionClient: {
+          summary: t(
+            'Return the already-active original native transaction synchronously; never open or await another transaction.',
+            '同步返回已活跃的原生事务，不另开或等待事务。'
+          )
+        }
+      }
+    },
     IStorageOrgAuthoringPort: {
       summary: t(
         'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
@@ -734,6 +807,12 @@ console.log(host.extensions.label('draft'))`,
         '来自原registration的只读不可变调用接点；不授予store登记、provider安装或关闭权。'
       ),
       members: {
+        journal: {
+          summary: t(
+            'Optional fixed-org journal execution port.',
+            '可选的固定组织 journal 执行接点。'
+          )
+        },
         orgId: {
           summary: t(
             'Canonical organization fixed for every derived invocation.',

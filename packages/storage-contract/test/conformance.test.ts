@@ -33,7 +33,9 @@ import {
   type ITtlTarget,
   type ISqlExecutor,
   type IOperationContext,
-  type IStorageChange
+  type IStorageChange,
+  type IDurableChangeFeedApi,
+  type IDurableStorageChange
 } from '@migaia/storage-contract'
 import {
   createStorageIteratorLifetime,
@@ -768,6 +770,55 @@ describe('public consumer-owned conformance', () => {
       .find((item) => item.name.startsWith('changeFeed ·'))!
       .run()
     expect(stopped).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reuse an old replay cursor after a native tail confirms its newer slot', async () => {
+    const item = fixture(),
+      set = item.api.set
+    let confirmed = false,
+      listener: ((change: IDurableStorageChange) => void | PromiseLike<void>) | undefined
+    const changes: IDurableStorageChange[] = []
+    const read = vi.fn<IDurableChangeFeedApi['readChanges']>(async (options) => {
+      if (confirmed && options?.after === 'initial')
+        throw new StorageContractError(StorageContractErrorCode.changeCursorExpired)
+      return { changes: [...changes], cursor: changes.at(-1)?.cursor ?? 'initial' }
+    })
+    item.api = {
+      ...item.api,
+      set: async (key, value, ctx) => {
+        await set(key, value, ctx)
+        const change: IDurableStorageChange = {
+          cursor: key,
+          sequence: changes.length + 1,
+          origin: 'fixture',
+          channel: 'value',
+          kind: 'put',
+          keys: [key]
+        }
+        changes.push(change)
+        if (listener) {
+          await listener(change)
+          confirmed = true
+        }
+      }
+    }
+    const feed: IDurableChangeFeedApi = {
+      readChanges: read,
+      tailChanges: async (options) => {
+        listener = options.onChange
+        return fixture().base
+      }
+    }
+    const store = provideCapabilities(item.base, [
+      implement(kv, item.api),
+      implement(durableChangeFeed, feed)
+    ])
+    await cases(() => store, [kv, durableChangeFeed])
+      .find((entry) => entry.name.startsWith('durableChangeFeed ·'))!
+      .run()
+    expect(confirmed).toBe(true)
+    expect(read.mock.calls[1]?.[0]).toEqual({ after: 'initial' })
+    expect(read.mock.calls.at(-1)?.[0]).toEqual({ limit: 1 })
   })
 
   it('rejects a callable durable feed that omits a committed native write', async () => {
