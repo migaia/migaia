@@ -1,6 +1,6 @@
 import type { IOperationContext } from '../context.js'
 import type { IWriteConcurrencyOptions } from '../concurrency.js'
-import type { IRdfQuery } from '../query-chain.js'
+import type { IRdfQuery, IQueryWatch } from '../query-chain.js'
 import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
 import { STORAGE_RDF_METHODS, STORAGE_RDF_WRITE_METHODS } from '../capability-constants.js'
 import type { IBackendKind } from '../capabilities.js'
@@ -342,12 +342,17 @@ export const term = /* @__PURE__ */ Object.freeze({
 
 /** Ground RDF writes and queries share canonical term identity and the backend's original owner. */
 export type IRdfApi<
-  _TChangeFeed extends boolean = false,
+  TChangeFeed extends boolean = false,
   TAugmentMethods extends object = Record<never, never>
 > = {
   add(quads: readonly IQuad[], ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   delete(quads: readonly IQuad[], ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
-  match(pattern: Partial<IQuad>): IRdfQuery<IOperationContext, TAugmentMethods>
+  match(
+    pattern: Partial<IQuad>
+  ): IRdfQuery<
+    IOperationContext,
+    TAugmentMethods & (TChangeFeed extends true ? IQueryWatch : Record<never, never>)
+  >
 }
 /** Generic RDF transactions expose only actual draft writes and zero-context queries. */
 export type ITransactionRdfApi<TAugmentMethods extends object = Record<never, never>> = {

@@ -706,3 +706,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 查询写终点复用同一 planner、reader 与资源清理：记录支持 `delete(ctx?)`、`update(patch,ctx?)`，有界向量仅 `topK(...).delete(ctx?)`，RDF 支持 `delete(ctx?)`、`replace(oldQuad,newQuad,ctx?)`；select/groupBy 后只有读取终点。作者源的可选 `mutate(request,run)` 必须在原宿主 pipeline、事务与锁路径中调用 run，提供该事务的 `execute` 和 `accept(key,row)`；没有接点在 I/O 前报 `UNSUPPORTED_CAPABILITY`。request.ctx 保留原上下文快照身份，request.concurrency 单独交原并发 owner，不能另建重试循环。共享核流式去重，只有 accept 返回 true 才计数；记录按规范键、向量按实际引擎 hit id、RDF 按规范 ground quad 身份去重。RDF replace 仅处理 query 真正选中的 oldQuad，new 已存在是否接纳由原 draft 决定；根终点必须等待真实提交确认，unknown 拒绝且不重放。事务内只返回已接纳 draft 数，不能据此声称提交；事务写不接受独立操作上下文。
 
 `implement(capability,api,{ forTransaction })` 的原绑定回调接收 `ITransactionScope<ICodecValue,TCap>`，因此标准 RDF 绑定器可合法使用原 `scope.use(rdf)`。原 KV 成员、显式旧回调类型、token/owner 校验及原登记表保持原样。
+
+原生查询 `watch(ctx?)` 仅由真实 source.watch 提供，返回原 `IStorageIterator<IStorageChange>`，保留原 iterator、dispose 与符号清理身份。它复用同一 planner 和原生输入编译器，完整条件、投影、遍历等均能下推才订阅；JS 谓词、mapper、客户端 follow 等在订阅前报 `QUERY_NOT_PUSHABLE`。构建与 explain 不订阅、不打开数据游标，不创建共享事件队列或重订阅器。标准 records/RDF/vector 的 changeFeed=true 类型包含 `IQueryWatch`；向量仅 topK 后可调用，事务 API 不授予 watch。

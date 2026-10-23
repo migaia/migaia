@@ -21,6 +21,7 @@ import {
 } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import type { IOperationContext, IStorageKey } from './context.js'
+import type { IStorageChange } from './change-feed.js'
 import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
@@ -508,6 +509,10 @@ export type IQueryShape<TValue = unknown> = { all(ctx?: never): Promise<TValue> 
 /** Extracts the complete all result without erasing its row or augmentation inference. */
 export type IQueryResultOf<TQuery extends IQueryShape> =
   TQuery extends IQueryShape<infer TValue> ? TValue : never
+/** Only a complete query shape can request its original native change-feed iterator. */
+export type IQueryWatch<TContext extends IOperationContext | undefined = IOperationContext> = {
+  watch<TQuery extends IQueryShape>(this: TQuery, ctx?: TContext): IStorageIterator<IStorageChange>
+}
 /** A selected result cannot select again or apply conditions to an already projected shape. */
 export type IQueryResult<
   R,
@@ -732,7 +737,8 @@ export const RecordQueryMethod = Object.freeze({
   after: 'after',
   page: 'page',
   delete: 'delete',
-  update: 'update'
+  update: 'update',
+  watch: 'watch'
 } as const)
 /** Vector Feature admission reserves the same shared terminals plus its family refinements. */
 export const VectorQueryMethod = Object.freeze({
@@ -789,6 +795,7 @@ export type IRecordQuerySource = {
   readonly reduce?: IQueryReducer<IRecordQueryInput>
   /** The original write pipeline/transaction provides a scoped source and accepts actual rows. */
   readonly mutate?: IQueryMutator<IRecordQueryInput, unknown, IRecordQueryMutation>
+  readonly watch?: IQueryWatcher<IRecordQueryInput>
   readonly execute: (input: IRecordQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
 /** The existing record execute shape is also used verbatim by its native reduction port. */
@@ -837,6 +844,8 @@ export type IQueryMutator<
   request: TMutation,
   run: (port: IQueryMutationPort<TInput, TValue>) => Promise<number>
 ) => Promise<number>
+/** Native subscriptions retain their original iterator and complete lifetime without a new queue. */
+export type IQueryWatcher<TInput> = (input: TInput) => IStorageIterator<IStorageChange>
 /** Native scalar requests contain no JavaScript callbacks or secondary execution state. */
 export type IQueryReduction =
   | { readonly operation: typeof QueryOperation.count }
@@ -893,6 +902,7 @@ export type IVectorQuerySource<TPayload, TGroupable extends boolean = false> = {
   /** Native scalar terminals keep the same native query and original cursor owner. */
   readonly reduce?: IQueryReducer<IVectorQueryInput>
   readonly mutate?: IQueryMutator<IVectorQueryInput, IVectorHit<TPayload, boolean>, IQueryDelete>
+  readonly watch?: IQueryWatcher<IVectorQueryInput>
   readonly execute: (
     input: IVectorQueryInput
   ) => IStorageIterator<readonly [IStorageKey, IVectorHit<TPayload, boolean>]>
@@ -925,6 +935,7 @@ export type IRdfQuerySource<TOperationScope extends object = object> = {
   /** Native scalar terminals keep the same native query and original cursor owner. */
   readonly reduce?: IQueryReducer<IRdfQueryInput<TOperationScope>>
   readonly mutate?: IQueryMutator<IRdfQueryInput<TOperationScope>, IQuad, IRdfQueryMutation>
+  readonly watch?: IQueryWatcher<IRdfQueryInput<TOperationScope>>
   readonly execute: (
     input: IRdfQueryInput<TOperationScope>
   ) => IStorageIterator<readonly [IStorageKey, unknown]>
@@ -978,6 +989,7 @@ type IQuerySourceSnapshot = {
   readonly execute: IRecordQuerySource['execute']
   readonly reduce: IRecordQuerySource['reduce']
   readonly mutate: IRecordQuerySource['mutate']
+  readonly watch: IRecordQuerySource['watch']
   readonly receiver: object
   readonly nativeSteps: boolean
   readonly cursorSource: object
@@ -1122,11 +1134,16 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
     const mutate = source.mutate
     if (mutate !== undefined && typeof mutate !== 'function')
       throw new TypeError(StorageContractErrorText.queryArgument)
+    /** A declared native watcher supplies its own original subscription resource and timing owner. */
+    const watch = source.watch
+    if (watch !== undefined && typeof watch !== 'function')
+      throw new TypeError(StorageContractErrorText.queryArgument)
     return {
       receiver: source,
       execute,
       reduce,
       mutate,
+      watch,
       pushdown: capturedPushdown,
       tieBreakByKey,
       nativeSteps: nativeSteps === true,
@@ -2228,6 +2245,49 @@ type INativeQueryReduction = {
   readonly request: IQueryReduction
   readonly plan: IRecordExecutionPlan
 }
+/** One native input compiler serves original read, mutation and subscription callbacks. */
+function querySourceInput(
+  source: IQuerySourceSnapshot,
+  plan: IRecordExecutionPlan,
+  captured: IOperationContext | undefined
+): IVectorQueryInput | IRdfQueryInput | IRecordQueryInput {
+  /** Conditions retain the original safe-prefix AST without resnapshotting or another parser. */
+  const conditions = Object.freeze(
+    plan.pushed.flatMap((step) => (step.operation === QueryOperation.where ? [step.condition] : []))
+  )
+  /** Output projection remains part of the same native plan. */
+  const fields = plan.pushed.find((step) => step.operation === QueryOperation.select)?.fields
+  /** Each family calls its original native engine inside this same accepted source operation. */
+  let input: IVectorQueryInput | IRdfQueryInput | Parameters<IRecordQuerySource['execute']>[0]
+  if (source.vector !== undefined) {
+    /** The last immutable refinement supplies the one final engine ranking bound/threshold. */
+    const bounds = plan.pushed.filter((step) => step.operation === QueryOperation.topK)
+    /** Score threshold is also a final query option rather than a second client filter. */
+    const scores = plan.pushed.filter((step) => step.operation === QueryOperation.minScore)
+    input = {
+      conditions,
+      topK: bounds.at(-1)!.count,
+      minScore: scores.at(-1)?.score,
+      withVector: source.vector.withVector,
+      ctx: captured
+    }
+  } else if (source.rdf !== undefined) {
+    input = {
+      pattern: source.rdf.pattern,
+      steps: nativeQuerySteps(source, plan.pushed),
+      ctx: captured
+    }
+  } else
+    input = {
+      conditions,
+      fields,
+      ctx: captured,
+      ...(source.nativeSteps
+        ? { steps: nativeQuerySteps(source, plan.pushed) as readonly IQueryNativeStep[] }
+        : {})
+    }
+  return input
+}
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
 function openRecordQuery(
   source: IQuerySourceSnapshot,
@@ -2254,12 +2314,6 @@ function openRecordQuery(
   /** An original write owner can reuse pre-I/O admission without re-reading context getters. */
   const captured =
     prepared === undefined ? prepareQueryExecution(source, plan, strict, ctx) : prepared.ctx
-  /** Native execution receives exactly the safe prefix represented by explain. */
-  const conditions = Object.freeze(
-    plan.pushed.flatMap((step) => (step.operation === QueryOperation.where ? [step.condition] : []))
-  )
-  /** Only a fully native prefix can project source rows. */
-  const fields = plan.pushed.find((step) => step.operation === QueryOperation.select)?.fields
   /** Node compilation creates no source I/O and retains no materialized row array. */
   const mapper =
     pageSize === undefined
@@ -2284,35 +2338,8 @@ function openRecordQuery(
     source
   )
   try {
-    /** Each family calls its original native engine inside this same accepted source operation. */
-    let input: IVectorQueryInput | IRdfQueryInput | Parameters<IRecordQuerySource['execute']>[0]
-    if (source.vector !== undefined) {
-      /** The last immutable refinement supplies the one final engine ranking bound/threshold. */
-      const bounds = plan.pushed.filter((step) => step.operation === QueryOperation.topK)
-      /** Score threshold is also a final query option rather than a second client filter. */
-      const scores = plan.pushed.filter((step) => step.operation === QueryOperation.minScore)
-      input = {
-        conditions,
-        topK: bounds.at(-1)!.count,
-        minScore: scores.at(-1)?.score,
-        withVector: source.vector.withVector,
-        ctx: captured
-      }
-    } else if (source.rdf !== undefined) {
-      input = {
-        pattern: source.rdf.pattern,
-        steps: nativeQuerySteps(source, plan.pushed),
-        ctx: captured
-      }
-    } else
-      input = {
-        conditions,
-        fields,
-        ctx: captured,
-        ...(source.nativeSteps
-          ? { steps: nativeQuerySteps(source, plan.pushed) as readonly IQueryNativeStep[] }
-          : {})
-      }
+    /** The same native compiler is shared with direct native subscriptions. */
+    const input = querySourceInput(source, plan, captured)
     return {
       iterator:
         reduction === undefined
@@ -2912,6 +2939,28 @@ function snapshotQueryFields(fields: readonly unknown[]): readonly string[] {
     throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
   return Object.freeze(fields as string[])
 }
+/** Native subscriptions accept only the complete original pushed plan and return the same resource. */
+function queryWatch(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined
+): Partial<IQueryWatch> {
+  if (source.watch === undefined) return {}
+  return {
+    watch(ctx?: IOperationContext): IStorageIterator<IStorageChange> {
+      /** No client filtering, remapping or resubscription platform is introduced for native feeds. */
+      const plan = planRecordQuery(source, node)
+      /** Strict native admission rejects opaque callbacks and client traversal before subscribing. */
+      const captured = prepareQueryExecution(source, plan, true, ctx)
+      try {
+        return Reflect.apply(source.watch!, source.receiver, [
+          querySourceInput(source, plan, captured)
+        ])
+      } catch (cause) {
+        throw queryExecutionFailure(cause)
+      }
+    }
+  }
+}
 /** Creates selected terminals without falsely advertising another select or unsupported terminals. */
 function selectedRecordQuery<
   R,
@@ -2926,6 +2975,7 @@ function selectedRecordQuery<
   return Object.freeze({
     ...methods,
     ...familyQueryReads<R, TContext>(source, node, strict),
+    ...queryWatch(source, node),
     requirePushdown: () =>
       selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
   }) as IQueryResult<R, TContext, true, TAugmentMethods>
@@ -3114,6 +3164,7 @@ function recordQuery<
         ...queryWriteContext(ctx)
       }),
     ...recordQueryReads<T, TContext>(source, node, strict),
+    ...queryWatch(source, node),
     requirePushdown: () =>
       recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods, ordering)
   }) as unknown as IRecordQuery<T, TContext, TAugmentMethods>
@@ -3126,6 +3177,25 @@ function recordQuery<
  * disposal on success or failure. The original source owns operation timing and transaction
  * lifetime.
  */
+export function createRecordQuery<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  source: IRecordQuerySource & { readonly watch: IQueryWatcher<IRecordQueryInput> },
+  methods?: TAugmentMethods
+): IRecordQuery<
+  T,
+  TContext,
+  TAugmentMethods & (TContext extends undefined ? Record<never, never> : IQueryWatch<TContext>)
+>
+/** Sources without a declared native feed preserve their original read/write family shape. */
+export function createRecordQuery<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+>(source: IRecordQuerySource, methods?: TAugmentMethods): IRecordQuery<T, TContext, TAugmentMethods>
+/** Captures original source support without subscribing or constructing another lifetime owner. */
 export function createRecordQuery<
   T,
   TContext extends IOperationContext | undefined = IOperationContext,
@@ -3202,6 +3272,7 @@ function familyQuery(
       ...(bounded
         ? {
             ...familyQueryReads(source, node, strict),
+            ...queryWatch(source, node),
             delete: (ctx?: IOperationContext & IWriteConcurrencyOptions) =>
               mutateRecordQuery(source, node, strict, {
                 operation: RecordQueryMethod.delete,
@@ -3244,6 +3315,7 @@ function familyQuery(
   return Object.freeze({
     ...shared,
     ...familyQueryReads(source, node, strict),
+    ...queryWatch(source, node),
     delete: (ctx?: IOperationContext & IWriteConcurrencyOptions) =>
       mutateRecordQuery(source, node, strict, {
         operation: RecordQueryMethod.delete,
@@ -3315,6 +3387,26 @@ export function createVectorQuery<
   TGroupable extends boolean = false,
   TAugmentMethods extends object = Record<never, never>
 >(
+  source: IVectorQuerySource<TPayload, TGroupable> & {
+    readonly watch: IQueryWatcher<IVectorQueryInput>
+  },
+  methods?: TAugmentMethods
+): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods & IQueryWatch>
+/** No native source watcher means the original pre-topK builder has no watch projection. */
+export function createVectorQuery<
+  TPayload,
+  TGroupable extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  source: IVectorQuerySource<TPayload, TGroupable>,
+  methods?: TAugmentMethods
+): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods>
+/** Captures one native vector source and no subscription or client ranking platform. */
+export function createVectorQuery<
+  TPayload,
+  TGroupable extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+>(
   source: IVectorQuerySource<TPayload, TGroupable>,
   methods?: TAugmentMethods
 ): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods> {
@@ -3347,6 +3439,31 @@ export function createVectorQuery<
 }
 
 /** Creates a ground RDF match using the same immutable query and original native resource owner. */
+export function createRdfQuery<
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>,
+  TOperationScope extends object = object
+>(
+  source: IRdfQuerySource<TOperationScope> & {
+    readonly watch: IQueryWatcher<IRdfQueryInput<TOperationScope>>
+  },
+  pattern: Partial<IQuad>,
+  methods?: TAugmentMethods
+): IRdfQuery<
+  TContext,
+  TAugmentMethods & (TContext extends undefined ? Record<never, never> : IQueryWatch<TContext>)
+>
+/** Transaction and non-feed callers preserve their original exact RDF family shape. */
+export function createRdfQuery<
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>,
+  TOperationScope extends object = object
+>(
+  source: IRdfQuerySource<TOperationScope>,
+  pattern: Partial<IQuad>,
+  methods?: TAugmentMethods
+): IRdfQuery<TContext, TAugmentMethods>
+/** Captures one ground native source without creating a subscription or lifecycle owner. */
 export function createRdfQuery<
   TContext extends IOperationContext | undefined = IOperationContext,
   TAugmentMethods extends object = Record<never, never>,

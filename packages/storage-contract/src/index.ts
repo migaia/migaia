@@ -242,6 +242,8 @@ export type {
   IQueryStatistics,
   IQueryShape,
   IQueryResultOf,
+  IQueryWatch,
+  IQueryWatcher,
   IQueryResult,
   IQueryChain,
   IRecordQuerySource,
