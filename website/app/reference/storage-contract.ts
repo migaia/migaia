@@ -3410,6 +3410,12 @@ console.log(candidate.name, candidate.output)`
         '原生排名回调与捕获的支持、资源事实。'
       ),
       members: {
+        reduce: {
+          summary: t(
+            'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
+            '可选原生单行标量游标，兑现声明的 count/exists/aggregate，复用原资源 owner。'
+          )
+        },
         pushdown: {
           summary: t('Original native operation/operator support.', '原生操作及操作符支持。')
         },
@@ -3520,6 +3526,12 @@ console.log(candidate.name, candidate.output)`
         '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
+        reduce: {
+          summary: t(
+            'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
+            '可选原生单行标量游标，兑现声明的 count/exists/aggregate，复用原资源 owner。'
+          )
+        },
         cursorSource: {
           summary: t(
             'Optional single-read private collection identity, reused by equivalent query descriptors; never exposed by a cursor.',
@@ -3575,6 +3587,54 @@ console.log(candidate.name, candidate.output)`
           )
         }
       }
+    },
+    IRecordQueryInput: {
+      summary: t(
+        'The unchanged record execute argument shared by native scalar reductions.',
+        '原记录 execute 参数，与原生标量统计共享。'
+      ),
+      members: {
+        conditions: { summary: t('Canonical safe-prefix AST nodes.', '安全前缀的规范 AST 节点。') },
+        fields: { summary: t('Optional native field projection.', '可选原生字段投影。') },
+        ctx: { summary: t('Single captured operation intent.', '单次捕获的 operation 意图。') },
+        steps: {
+          summary: t('Opted-in authoritative native step order.', '显式选择的原生步骤顺序。')
+        }
+      }
+    },
+    IQueryReduction: {
+      summary: t(
+        'Finite native count/exists or numeric aggregate request without JavaScript callbacks.',
+        '有限原生 count/exists 或数值 aggregate 请求，不含 JavaScript 回调。'
+      ),
+      members: {
+        operation: {
+          summary: t(
+            'Declared count, exists or aggregate operation.',
+            '声明的 count、exists 或 aggregate。'
+          )
+        },
+        aggregate: {
+          summary: t('min, max, sum or avg for aggregate.', 'aggregate 的 min、max、sum 或 avg。')
+        },
+        field: {
+          summary: t('Numeric field in the current result domain.', '当前结果域的数值字段。')
+        }
+      }
+    },
+    IQueryReductionResult: {
+      summary: t(
+        'Number, boolean or the existing Maybe<number> returned in one native scalar row.',
+        '原生单行标量携带的 number、boolean 或既有 Maybe<number>。'
+      ),
+      members: {}
+    },
+    IQueryReducer: {
+      summary: t(
+        'Family-typed optional native scalar cursor callback; no independent runner or lifetime.',
+        '按家族精确类型的可选原生标量游标回调，不另建 runner 或生命周期。'
+      ),
+      members: {}
     },
     IQueryNativeStep: {
       summary: t(
@@ -3730,6 +3790,12 @@ console.log(candidate.name, candidate.output)`
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        reduce: {
+          summary: t(
+            'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
+            '可选原生单行标量游标，兑现声明的 count/exists/aggregate，复用原资源 owner。'
+          )
+        },
         cursorSource: {
           summary: t(
             'Optional single-read private collection identity, reused by equivalent query descriptors; never exposed by a cursor.',

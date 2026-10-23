@@ -757,13 +757,37 @@ export type IRecordQuerySource = {
   readonly nativeSteps?: true
   /** Optional stable identity for the same backend collection, organization and physical index. */
   readonly cursorSource?: object
-  readonly execute: (input: {
-    readonly conditions: readonly IQueryCondition[]
-    readonly fields: readonly string[] | undefined
-    readonly ctx: IOperationContext | undefined
-    readonly steps?: readonly IQueryNativeStep[]
-  }) => IStorageIterator<readonly [IStorageKey, unknown]>
+  /** A real native scalar cursor uses the original resource lifetime and declared terminal support. */
+  readonly reduce?: IQueryReducer<IRecordQueryInput>
+  readonly execute: (input: IRecordQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
+/** The existing record execute shape is also used verbatim by its native reduction port. */
+export type IRecordQueryInput = {
+  readonly conditions: readonly IQueryCondition[]
+  readonly fields: readonly string[] | undefined
+  readonly ctx: IOperationContext | undefined
+  readonly steps?: readonly IQueryNativeStep[]
+}
+/** Native scalar requests contain no JavaScript callbacks or secondary execution state. */
+export type IQueryReduction =
+  | { readonly operation: typeof QueryOperation.count }
+  | { readonly operation: typeof QueryOperation.exists }
+  | {
+      readonly operation: typeof QueryOperation.aggregate
+      readonly aggregate:
+        | typeof RecordQueryMethod.min
+        | typeof RecordQueryMethod.max
+        | typeof RecordQueryMethod.sum
+        | typeof RecordQueryMethod.avg
+      readonly field: string
+    }
+/** Each native reduction returns exactly one scalar row in its original backend cursor. */
+export type IQueryReductionResult = number | boolean | IMaybe<number>
+/** A finite optional author callback retains the family's precise original query input. */
+export type IQueryReducer<TInput> = (
+  input: TInput & { readonly reduction: IQueryReduction }
+) => IStorageIterator<readonly [IStorageKey, IQueryReductionResult]>
+
 /** Serializable safe native steps never contain or attempt to translate JavaScript functions. */
 export type IQueryNativeStep =
   | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition }
@@ -797,6 +821,8 @@ export type IVectorQuerySource<TPayload, TGroupable extends boolean = false> = {
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   readonly exact?: boolean
   readonly groupBy?: TGroupable
+  /** Native scalar terminals keep the same native query and original cursor owner. */
+  readonly reduce?: IQueryReducer<IVectorQueryInput>
   readonly execute: (
     input: IVectorQueryInput
   ) => IStorageIterator<readonly [IStorageKey, IVectorHit<TPayload, boolean>]>
@@ -824,6 +850,8 @@ export type IRdfQuerySource = {
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   readonly nativeSteps?: true
   readonly cursorSource?: object
+  /** Native scalar terminals keep the same native query and original cursor owner. */
+  readonly reduce?: IQueryReducer<IRdfQueryInput>
   readonly execute: (input: IRdfQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
 /** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
@@ -873,6 +901,7 @@ type IQuerySourceSnapshot = {
   readonly asyncDisposeKey: typeof Symbol.asyncDispose | undefined
   readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   readonly execute: IRecordQuerySource['execute']
+  readonly reduce: IRecordQuerySource['reduce']
   readonly receiver: IRecordQuerySource
   readonly nativeSteps: boolean
   readonly cursorSource: object
@@ -1009,9 +1038,14 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
         (typeof cursorSource !== 'object' && typeof cursorSource !== 'function'))
     )
       throw new TypeError(StorageContractErrorText.queryArgument)
+    /** Optional native terminal support captures one callable rather than inferring another runner. */
+    const reduce = source.reduce
+    if (reduce !== undefined && typeof reduce !== 'function')
+      throw new TypeError(StorageContractErrorText.queryArgument)
     return {
       receiver: source,
       execute,
+      reduce,
       pushdown: capturedPushdown,
       tieBreakByKey,
       nativeSteps: nativeSteps === true,
@@ -1224,7 +1258,7 @@ function queryConditionReason(
 function planRecordQuery(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
-  countOnly = false,
+  countOnly: boolean | typeof QueryOperation.aggregate = false,
   pageSize?: number
 ): IRecordExecutionPlan {
   /** One reverse traversal avoids repeated prefix allocation during fluent construction. */
@@ -1311,7 +1345,7 @@ function planRecordQuery(
   const hasAfter = steps.some((step) => step.operation === QueryOperation.after)
   if (countOrders !== undefined) {
     /** A later value-sensitive step observes which row a bound or distinct operation retained. */
-    let observesIdentity = false
+    let observesIdentity = countOnly === QueryOperation.aggregate
     /** Once selection can affect cardinality, preceding selector orders must remain in the reader. */
     let selectionMatters = false
     for (let index = steps.length - 1; index >= 0; index--) {
@@ -1319,6 +1353,12 @@ function planRecordQuery(
       const step = steps[index]!
       if (step.operation === QueryOperation.order && (selectionMatters || hasAfter))
         countOrders.add(step)
+      /** Numeric output callbacks can depend on prior row order even without a finite bound. */
+      if (
+        countOnly === QueryOperation.aggregate &&
+        (step.operation === QueryOperation.mapper || step.operation === QueryOperation.predicate)
+      )
+        selectionMatters = true
       if (
         observesIdentity &&
         (step.operation === QueryOperation.limit ||
@@ -1340,10 +1380,10 @@ function planRecordQuery(
     /** Cardinality keeps conditions and page controls without evaluating output-only callbacks. */
     if (
       countOnly &&
-      ((step.operation === QueryOperation.comparator && !hasAfter) ||
+      ((step.operation === QueryOperation.comparator && countOnly === true && !hasAfter) ||
         (step.operation === QueryOperation.order && !countOrders!.has(step)) ||
-        step.operation === QueryOperation.select ||
-        step.operation === QueryOperation.mapper)
+        (countOnly === true &&
+          (step.operation === QueryOperation.select || step.operation === QueryOperation.mapper)))
     )
       continue
     /** Vector filters/ranking cross payload callbacks; record/RDF retain their safe prefix. */
@@ -1921,14 +1961,20 @@ function nativeQuerySteps(
     })
   )
 }
+/** A terminal's already compiled native plan is consumed by the original resource runner. */
+type INativeQueryReduction = {
+  readonly request: IQueryReduction
+  readonly plan: IRecordExecutionPlan
+}
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
 function openRecordQuery(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
   ctx: IOperationContext | undefined,
-  countOnly = false,
-  pageSize?: number
+  countOnly: boolean | typeof QueryOperation.aggregate = false,
+  pageSize?: number,
+  reduction?: INativeQueryReduction
 ): {
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
@@ -1937,7 +1983,7 @@ function openRecordQuery(
   readonly mapper: ((row: unknown) => unknown) | undefined
 } {
   /** Strictness and missing comparator bounds reject before a source can open. */
-  const plan = planRecordQuery(source, node, countOnly, pageSize)
+  const plan = reduction?.plan ?? planRecordQuery(source, node, countOnly, pageSize)
   /** Cursor mismatch rejects before native I/O without changing existing no-cursor getter order. */
   const after = [...plan.pushed, ...plan.client].filter(
     (step) => step.operation === QueryOperation.after
@@ -1985,9 +2031,9 @@ function openRecordQuery(
     (step) => step.operation === QueryOperation.comparator
   )?.compare
   const read = compileRecordQueryReader(
-    client,
+    reduction === undefined ? client : [],
     captured,
-    source.tieBreakByKey,
+    reduction === undefined ? source.tieBreakByKey : undefined,
     source.vector !== undefined,
     pageSize !== undefined,
     comparator
@@ -2023,7 +2069,12 @@ function openRecordQuery(
           : {})
       }
     return {
-      iterator: Reflect.apply(source.execute, source.receiver, [input]),
+      iterator:
+        reduction === undefined
+          ? Reflect.apply(source.execute, source.receiver, [input])
+          : Reflect.apply(source.reduce!, source.receiver, [
+              { ...input, reduction: reduction.request }
+            ]),
       read,
       ctx: captured,
       signature: plan.signature,
@@ -2066,8 +2117,9 @@ async function consumeRecordQuery<R, TResult>(
         }
       | undefined
   ) => Promise<TResult>,
-  countOnly = false,
-  pageSize?: number
+  countOnly: boolean | typeof QueryOperation.aggregate = false,
+  pageSize?: number,
+  reduction?: INativeQueryReduction
 ): Promise<TResult> {
   /** Opening synchronously admits the complete terminal to the original transaction owner. */
   const {
@@ -2076,7 +2128,7 @@ async function consumeRecordQuery<R, TResult>(
     ctx: captured,
     signature,
     mapper
-  } = openRecordQuery(source, node, strict, ctx, countOnly, pageSize)
+  } = openRecordQuery(source, node, strict, ctx, countOnly, pageSize, reduction)
   return runTransactionIteratorOperation(iterator, async (advance, fail) => {
     /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
     let result: TResult
@@ -2110,7 +2162,7 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
   node: IQueryNode | undefined,
   strict: boolean
 ): IQueryRead<R, TContext> & IQueryStatistics<R, TContext> & IQueryPages<R, TContext> {
-  /** These new terminal reductions have no native author callback in the current source shape. */
+  /** A fallback terminal with client callbacks cannot claim fully native execution in strict mode. */
   function assertClientTerminal(): void {
     if (strict)
       throw new StorageContractError(
@@ -2118,6 +2170,64 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
         {},
         StorageContractErrorText.queryNotPushable([StorageContractErrorText.queryUnsupported])
       )
+  }
+  /** Selects a real native scalar cursor only when the complete required plan is supported. */
+  function nativeReduction(
+    request: IQueryReduction,
+    ctx: TContext | undefined
+  ): Promise<IQueryReductionResult> | undefined {
+    if (source.reduce === undefined || !source.pushdown.operations.includes(request.operation))
+      return undefined
+    /** The original planner drops only irrelevant output/order nodes for the requested reduction. */
+    const countOnly =
+      request.operation === QueryOperation.aggregate
+        ? QueryOperation.aggregate
+        : request.operation === QueryOperation.count
+    const plan = planRecordQuery(source, node, countOnly)
+    if (plan.client.length > 0) return undefined
+    return consumeRecordQuery<IQueryReductionResult, IQueryReductionResult>(
+      source,
+      node,
+      strict,
+      ctx,
+      async (read) => {
+        /**
+         * A native scalar result remains inside its original accepted cursor operation until
+         * cleanup.
+         */
+        const next = await read()
+        if (next.done)
+          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+        /** Read the finite result once; no backend rows are materialized by a scalar terminal. */
+        const value = next.value
+        if (
+          request.operation === QueryOperation.count ||
+          (request.operation === QueryOperation.aggregate &&
+            request.aggregate === RecordQueryMethod.sum)
+        ) {
+          if (typeof value !== 'number')
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
+          return value
+        }
+        if (request.operation === QueryOperation.exists) {
+          if (typeof value !== 'boolean')
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+          return value
+        }
+        if (typeof value !== 'object' || value === null)
+          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+        /** Native Maybe results use the same presence discriminator as client reductions. */
+        const some = value.some
+        if (some === false) return { some: false }
+        const sample = some === true ? value.value : undefined
+        if (some !== true || typeof sample !== 'number')
+          throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
+        return { some: true, value: sample }
+      },
+      countOnly,
+      undefined,
+      { request, plan }
+    )
   }
   /** Only comparator.first supplies the documented implicit one-row retained bound. */
   const firstNode: IQueryNode | undefined =
@@ -2138,6 +2248,11 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
     ctx?: TContext
   ): Promise<number | IMaybe<number>> {
     assertQueryField(field)
+    const native = nativeReduction(
+      { operation: QueryOperation.aggregate, aggregate: operation, field },
+      ctx
+    )
+    if (native !== undefined) return native as Promise<number | IMaybe<number>>
     assertClientTerminal()
     return consumeRecordQuery<R, number | IMaybe<number>>(
       source,
@@ -2169,7 +2284,8 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
         return count === 0
           ? { some: false }
           : { some: true, value: operation === RecordQueryMethod.avg ? value / count : value }
-      }
+      },
+      QueryOperation.aggregate
     )
   }
   return {
@@ -2248,8 +2364,13 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
         )
       return next.value
     },
-    exists: async (ctx) => !(await first(ctx)).done,
+    exists: async (ctx) => {
+      const native = nativeReduction({ operation: QueryOperation.exists }, ctx)
+      return native === undefined ? !(await first(ctx)).done : ((await native) as boolean)
+    },
     count: async (ctx) => {
+      const native = nativeReduction({ operation: QueryOperation.count }, ctx)
+      if (native !== undefined) return native as Promise<number>
       assertClientTerminal()
       return consumeRecordQuery<R, number>(
         source,

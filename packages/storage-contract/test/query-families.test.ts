@@ -11,6 +11,7 @@ import {
   type IStorageIterator,
   type IStorageKey,
   type IVectorHit,
+  type IVectorQuerySource,
   type IVectorQueryInput
 } from '../src/index.js'
 import { createStorageIteratorLifetime } from '../src/resource.js'
@@ -44,6 +45,37 @@ function rows<T>(
 }
 
 describe('shared vector query family', () => {
+  it('reduces each native family through its original typed input and scalar cursor', async () => {
+    const execute = vi.fn(() => rows([]))
+    const close = vi.fn()
+    const vector: IVectorQuerySource<{ enabled: boolean }> = {
+      pushdown: { source: 'vector-native-count', operators: [], operations: ['topK', 'count'] },
+      execute,
+      reduce(input) {
+        expect(input.topK).toBe(2)
+        expect(input.reduction).toEqual({ operation: 'count' })
+        return rows([2], close)
+      }
+    }
+    expect(await createVectorQuery(vector).topK(2).requirePushdown().count()).toBe(2)
+    const rdf: IRdfQuerySource = {
+      pushdown: { source: 'rdf-native-exists', operators: [], operations: ['exists'] },
+      execute,
+      reduce(input) {
+        expect(input.pattern).toEqual({ subject: term.iri('urn:a') })
+        expect(input.reduction).toEqual({ operation: 'exists' })
+        return rows([true], close)
+      }
+    }
+    expect(
+      await createRdfQuery(rdf, { subject: term.iri('urn:a') })
+        .requirePushdown()
+        .exists()
+    ).toBe(true)
+    expect(execute).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledTimes(2)
+  })
+
   it('pushes declarative filters across callbacks before native ranking and never refills topK', async () => {
     /** Fixture scores are already ordered by the native engine's score/id contract. */
     const points = [
