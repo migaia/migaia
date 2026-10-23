@@ -239,7 +239,7 @@ const SqlWord = {
 /** Eight tokens cover EXPLAIN QUERY PLAN PRAGMA schema . journal_mode and its assignment opener. */
 const SQL_PREFIX_TOKENS = 8
 /** The lexical guard retains only the bounded command prefix, never a parsed SQL execution plan. */
-type ISqlToken = { readonly text: string; readonly word: boolean; readonly identifier: boolean }
+type ISqlToken = { readonly text: string; readonly word: boolean; readonly pragmaName: boolean }
 /** Explicit traversal frames retain one child position per depth rather than copying old prefixes. */
 type ISqlFrame = { readonly node: ISqlNode; index: number }
 
@@ -317,7 +317,10 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
       character === '"' ||
       (dialect === SqlDialect.sqlite && (character === '`' || character === '['))
     ) {
-      /** Quoted identifiers are decoded only for the journal_mode ownership guard. */
+      /**
+       * Quoted pragma names, including SQLite single-quoted names, are decoded for the ownership
+       * guard.
+       */
       const identifier = character !== "'"
       /** Square-bracket quoting has a distinct terminator and no doubled-close escape in SQLite. */
       const closer = character === '[' ? ']' : character
@@ -339,7 +342,7 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
         }
         if (text[index] === closer) {
           if (character !== '[' && text[index + 1] === closer) {
-            if (identifier) parts.push(closer)
+            if (identifier || dialect === SqlDialect.sqlite) parts.push(closer)
             index += 2
             continue
           }
@@ -347,11 +350,15 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
           closed = true
           break
         }
-        if (identifier) parts.push(text[index]!)
+        if (identifier || dialect === SqlDialect.sqlite) parts.push(text[index]!)
         index++
       }
       if (!closed) throw invalidSqlStatement()
-      token({ text: identifier ? parts.join('') : '', word: false, identifier })
+      token({
+        text: parts.join(''),
+        word: false,
+        pragmaName: identifier || dialect === SqlDialect.sqlite
+      })
       continue
     }
     if (dialect === SqlDialect.postgres && character === '$') {
@@ -368,7 +375,7 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
         const close = text.indexOf(delimiter, end + 1)
         if (close < 0) throw invalidSqlStatement()
         index = close + delimiter.length
-        token({ text: '', word: false, identifier: false })
+        token({ text: '', word: false, pragmaName: false })
         continue
       }
     }
@@ -376,10 +383,10 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
       /** Each unquoted token is consumed as one unit; command matching uses ASCII keywords only. */
       const start = index++
       while (isSqlIdentifierPart(text[index])) index++
-      token({ text: text.slice(start, index), word: true, identifier: true })
+      token({ text: text.slice(start, index), word: true, pragmaName: true })
       continue
     }
-    token({ text: character, word: false, identifier: false })
+    token({ text: character, word: false, pragmaName: false })
     index++
   }
   if (!hasContent) throw invalidSqlStatement()
@@ -429,9 +436,9 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
     if (dialect === SqlDialect.sqlite && word === SqlWord.pragma) {
       /** Native pragma names optionally have one quoted or unquoted schema qualifier. */
       let name = command + 1
-      if (prefix[name]?.identifier && prefix[name + 1]?.text === '.') name += 2
+      if (prefix[name]?.pragmaName && prefix[name + 1]?.text === '.') name += 2
       if (
-        prefix[name]?.identifier &&
+        prefix[name]?.pragmaName &&
         prefix[name]!.text.toUpperCase() === SqlWord.journalMode &&
         (prefix[name + 1]?.text === '=' || prefix[name + 1]?.text === '(')
       )

@@ -177,6 +177,8 @@ describe('shared SQL composition and original execution', () => {
     `SELECT ';', 'it''s;fine', "semi;colon", \`semi;colon\`, [semi;colon]; -- trailing`,
     `/* leading */ SELECT 1 /* ; BEGIN */; /* tail */`,
     `PRAGMA journal_mode;`,
+    `PRAGMA 'journal_mode';`,
+    `PRAGMA 'main'.'journal_mode';`,
     `EXPLAIN QUERY PLAN PRAGMA "main"."journal_mode"`,
     `SELECT "BEGIN", 'COMMIT'`
   ])('accepts SQLite quote/comment boundaries %s', async (text) => {
@@ -209,6 +211,11 @@ describe('shared SQL composition and original execution', () => {
     'SELECT 1 /* unclosed',
     'CREATE TRIGGER t AFTER INSERT ON x BEGIN SELECT 1; SELECT 2; END',
     'PRAGMA journal_mode=WAL',
+    `PRAGMA 'journal_mode'=OFF`,
+    `PRAGMA 'main'.'journal_mode'(OFF)`,
+    `PRAGMA main.'journal_mode'=OFF`,
+    `EXPLAIN PRAGMA 'journal_mode'=OFF`,
+    `EXPLAIN QUERY PLAN PRAGMA 'main'.'journal_mode'(OFF)`,
     'PRAGMA journal_mode(WAL)',
     'PRAGMA main.journal_mode = WAL',
     'PRAGMA [main].[journal_mode](WAL)',
