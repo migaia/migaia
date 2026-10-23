@@ -35,6 +35,12 @@ export const MemoryOperation = {
   rdfAdd: 'rdf.add',
   rdfDelete: 'rdf.delete',
   rdfMatch: 'rdf.match',
+  blobPut: 'blob.put',
+  blobGet: 'blob.get',
+  blobHead: 'blob.head',
+  blobRemove: 'blob.remove',
+  blobList: 'blob.list',
+  blobRemoveByPrefix: 'blob.removeByPrefix',
   vectorSearch: 'vector.search',
   vectorUpsert: 'vector.upsert',
   vectorDelete: 'vector.delete',
@@ -45,8 +51,10 @@ export const MemoryOperation = {
 export const MemoryState = {
   defaultNamespace: 'default',
   querySource: 'memory',
+  /** Cursor tag binds native object pages without creating a token registry. */
+  blobCursor: 'memory.blob',
   channels: ['value', 'bytes', 'record'] as const,
-  identity: (channel: IStorageChannel | 'vector' | 'rdf', encoded: string): string =>
+  identity: (channel: IStorageChannel | 'vector' | 'rdf' | 'blob', encoded: string): string =>
     `${channel}:${encoded}`,
   ownerLabel: (runtime: string | undefined, pid: number | undefined): string =>
     runtime === undefined ? 'browser' : `${runtime}:${pid}`

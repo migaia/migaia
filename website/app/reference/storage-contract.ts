@@ -957,7 +957,10 @@ export const storageContractReference: ILibraryReference = {
           'Readonly points; every input is checked and duplicate IDs keep the last value.',
           '只读点；全部输入逐项校验，重复 ID 保留末值。'
         ),
-        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        configuration: t(
+          'Optional existing dimensions and metric. Omission captures finite components and portable payloads only; validate the detached vectors against the actual native schema before writing.',
+          '可选已有维度与 metric。省略时仅捕获有限分量与便携 payload；写入前再按真实原生 schema 校验脱离的向量。'
+        ),
         backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
       },
       returns: t(
@@ -1002,7 +1005,10 @@ export const storageContractReference: ILibraryReference = {
           'Nonnegative safe k, optional filter/withPayload/exact; booleans default false.',
           '非负安全 k、可选 filter/withPayload/exact；布尔缺省 false。'
         ),
-        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        configuration: t(
+          'Optional existing schema. Omission snapshots the complete finite query/options/filter; validate the detached query against actual native dimensions and metric before searching.',
+          '可选已有 schema。省略时完整捕获有限 query/options/filter；检索前按真实原生维度与 metric 校验脱离的 query。'
+        ),
         backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
       },
       returns: t(

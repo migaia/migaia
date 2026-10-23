@@ -162,3 +162,16 @@ RDF patterns are native access paths. Where, follow, inverse, ordering and page/
 Memory's real text `watch(key, ctx?)` and existing `subscribeChanges` share the original controller. Root watch stays on the default organization and an org view stays on its own organization; existing root subscribeChanges still observes all organizations. Watch delivers post-commit invalidation hints. One unconsumed slot coalesces matching events to the latest sequence with channel `all` and no keys/scope; it provides no per-event history or replay. The original native generator serializes advances and the iterator owner retains distinct cached main/symbolic cleanup promises. Disposal, abort and root closure wake accepted next calls before draining and unsubscribing, retaining original cancellation reasons. After genuine change-feed admission, records, native RDF patterns and bounded vector queries expose watch. Queries requiring client predicates or traversal reject before subscribing.
 
 Backend authors can reuse `createBackendChangeIterator(controller, { orgId, channel, key?, ctx?, execute? })`. It borrows only the original controller subscription and closing signal, fixes organization/channel/optional text key, coalesces hints in one slot, and reuses resource, context and diagnostic owners. Optional execute receives the original advance and the once-captured context to preserve the backend's existing per-next pipeline. It introduces no controller, event queue, registry or retry platform.
+
+Memory natively provides `blob`, independently of KV/record entries with the same key. `put` uses shared byte/metadata snapshots and checks conditions before taking reader ownership. After complete upload and successful cleanup, the original synchronous commit rechecks etag/nonexistence conditions and applies capacity changes. Cancellation, closure or stream failure writes no partial object. `get` returns the metadata/content snapshot captured at read time; range end is inclusive. Stream and bytes share one consumption right and the original shared resource owner. `list` pages the original compressed radix in UTF-16 key order with cursors bound to org and prefix; `removeByPrefix` removes only matching objects in that org. Blob has no transaction projection or text lock. Capacity counts one entry and body byteLength per object, without counting metadata/indexes again. Notifications broadly invalidate all without exposing physical org keys.
+
+```ts
+import { blob } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const objects = host.backend('memory').use(blob)
+await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: true })
+await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
+console.log((await object.bytes())[0]) // 2
+```

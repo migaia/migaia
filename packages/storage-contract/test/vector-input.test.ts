@@ -107,9 +107,7 @@ describe('vector native input snapshots', () => {
         configuration
       )
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(() => contract.snapshotStorageVectorUpsert([], undefined as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
-    )
+    expect(contract.snapshotStorageVectorUpsert([])).toEqual([])
     const cause = new Error('payload getter')
     expect(() =>
       contract.snapshotStorageVectorUpsert(
@@ -127,6 +125,38 @@ describe('vector native input snapshots', () => {
         configuration
       )
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }))
+  })
+
+  it('captures a whole batch before native schema lookup without inferring dimensions or metric', () => {
+    let reads = 0
+    const input = [0]
+    const points = contract.snapshotStorageVectorUpsert([
+      {
+        get id() {
+          reads += 1
+          return 'point'
+        },
+        get vector() {
+          reads += 1
+          return input
+        },
+        get payload() {
+          reads += 1
+          return { label: 'captured' }
+        }
+      }
+    ])
+    input[0] = 9
+    expect(reads).toBe(3)
+    expect(points).toEqual([{ id: 'point', vector: [0], payload: { label: 'captured' } }])
+    expect(Object.isFrozen(points[0]!.vector)).toBe(true)
+    expect(() =>
+      contract.snapshotStorageVector(points[0]!.vector, { dimensions: 1, metric: 'cosine' })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    expect(() => contract.snapshotStorageVectorUpsert([{ id: 'bad', vector: [NaN] }])).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(reads).toBe(3)
   })
 
   it('detaches the closed filter AST and rejects mixed operators, invalid ranges and cycles', () => {
@@ -157,6 +187,44 @@ describe('vector native input snapshots', () => {
       expect(() => contract.snapshotStorageVectorFilter(invalid as never)).toThrowError(
         expect.objectContaining({ code: 'INVALID_ARGUMENT' })
       )
+  })
+
+  it('captures search query, options and filter before native schema lookup', () => {
+    let reads = 0
+    const query = [0]
+    const allowed = ['one']
+    const captured = contract.snapshotStorageVectorSearch(query, {
+      get k() {
+        reads += 1
+        return 1
+      },
+      get filter() {
+        reads += 1
+        return { field: 'category', in: allowed }
+      },
+      get withPayload() {
+        reads += 1
+        return true
+      },
+      get exact() {
+        reads += 1
+        return true
+      }
+    })
+    query[0] = 9
+    allowed.push('two')
+    expect(reads).toBe(4)
+    expect(captured).toEqual({
+      query: [0],
+      options: { k: 1, filter: { field: 'category', in: ['one'] }, withPayload: true, exact: true }
+    })
+    expect(() =>
+      contract.snapshotStorageVector(captured.query, { dimensions: 1, metric: 'cosine' })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    expect(() => contract.snapshotStorageVectorSearch([NaN], { k: 0 })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(reads).toBe(4)
   })
 
   it('snapshots search once and validates k=0 without suppressing invalid input', () => {

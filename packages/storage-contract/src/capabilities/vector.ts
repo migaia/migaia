@@ -230,14 +230,17 @@ export function snapshotStorageVector(
  */
 export function snapshotStorageVectorUpsert<TPayload>(
   points: readonly IStorageVectorPoint<TPayload>[],
-  configuration: IStorageVectorConfiguration,
+  configuration?: IStorageVectorConfiguration,
   backend?: IBackendKind
 ): readonly IStorageVectorPoint<TPayload>[] {
   return vectorInput(backend, () => {
-    /** Required native configuration is never replaced with inferred dimensions. */
-    assertVectorObject(configuration, backend)
-    /** Validate one detached configuration without resolving or creating a native collection. */
-    const config = snapshotStorageVectorCollection('', configuration, backend).options!
+    /** Omission captures the batch only; a native schema is never inferred from caller values. */
+    let config: IStorageVectorConfiguration | undefined
+    if (configuration !== undefined) {
+      /** Explicit configuration keeps the original validation and getter order. */
+      assertVectorObject(configuration, backend)
+      config = snapshotStorageVectorCollection('', configuration, backend).options!
+    }
     if (!Array.isArray(points)) invalidVector(backend)
     /** A dense batch is visited completely before any write plan is exposed. */
     const length = points.length
@@ -366,7 +369,7 @@ export function snapshotStorageVectorFilter(
 export function snapshotStorageVectorSearch(
   query: readonly number[],
   options: Parameters<IVectorCollection<unknown>['search']>[1],
-  configuration: IStorageVectorConfiguration,
+  configuration?: IStorageVectorConfiguration,
   backend?: IBackendKind
 ): Readonly<{
   query: readonly number[]
@@ -378,10 +381,13 @@ export function snapshotStorageVectorSearch(
   }>
 }> {
   return vectorInput(backend, () => {
-    /** Required native configuration is never replaced with inferred dimensions. */
-    assertVectorObject(configuration, backend)
-    /** Validate one detached configuration without resolving or creating a native collection. */
-    const config = snapshotStorageVectorCollection('', configuration, backend).options!
+    /** Omission snapshots query/options only, without guessing a native dimension or metric. */
+    let config: IStorageVectorConfiguration | undefined
+    if (configuration !== undefined) {
+      /** Explicit configuration keeps its original checks before any option getter is read. */
+      assertVectorObject(configuration, backend)
+      config = snapshotStorageVectorCollection('', configuration, backend).options!
+    }
     assertVectorObject(options, backend)
     const { k, filter, withPayload, exact } = options
     if (
