@@ -180,6 +180,47 @@ export function decodeOrderedStorageKey(
   if (offset !== encoded.byteLength) invalid()
   return snapshotStorageKey(key, backend)
 }
+
+/** Encode the original organization envelope without charging it to the logical key's budget. */
+export function encodeStorageOrgKey(
+  orgId: string,
+  key: IStorageKey,
+  backend: IBackendKind | undefined
+): Uint8Array {
+  return encodeKeySnapshot(prefixStorageOrgKey(orgId, key, backend), false)
+}
+
+/**
+ * Check the original envelope's canonical bytes, then give only its logical component to the
+ * original bounded reader. No second key format or parser is introduced.
+ */
+export function decodeStorageOrgKey(
+  orgId: string,
+  encoded: Uint8Array,
+  backend: IBackendKind | undefined
+): IStorageKey {
+  /** The original writer supplies the exact marker and UUID header without duplicating its tags. */
+  const emptyEnvelope = encodeStorageOrgKey(orgId, '', backend)
+  /** Remove the known empty logical component and the enclosing tuple's single terminator. */
+  const header = emptyEnvelope.subarray(0, emptyEnvelope.byteLength - measureKey('') - 1)
+  /** Invalid/foreign envelope boundaries keep the original organization error family. */
+  const invalid = (): never => {
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+      backend,
+      cause: new TypeError(StorageContractErrorText.orgKeyEnvelope)
+    })
+  }
+  if (
+    !isUint8Array(encoded) ||
+    encoded.byteLength <= header.byteLength + 1 ||
+    encoded[encoded.byteLength - 1] !== 0
+  )
+    invalid()
+  for (let index = 0; index < header.byteLength; index++)
+    if (encoded[index] !== header[index]) invalid()
+  return decodeOrderedStorageKey(encoded.subarray(header.byteLength, -1), backend)
+}
+
 /** Converts already canonical bytes without another logical-key traversal or representation. */
 export function storageKeyBytesIdentity(encoded: Uint8Array): string {
   return Array.from(encoded, (byte) => byte.toString(16).padStart(2, '0')).join('')
