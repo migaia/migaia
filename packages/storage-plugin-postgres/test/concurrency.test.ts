@@ -6,6 +6,7 @@ import { ConcurrencyPolicy, lockKey, type IConcurrencyPolicy } from '@migaia/sto
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { deferred } from '@migaia/utils/promise'
+import { walkErrorCauses } from '@migaia/utils/error'
 import type { IPgResult } from '../src/index.js'
 
 /** Native fixtures change only their own transaction isolation, never caller-wide settings. */
@@ -15,6 +16,7 @@ async function installed(
     sent?(text: string): void
     committed?(pending: Promise<IPgResult>): Promise<IPgResult>
     beforeWork?(): Promise<void>
+    markerRead?(): void
   }
 ) {
   const connectionString = process.env.MIGAIA_PG_URL
@@ -35,6 +37,11 @@ async function installed(
   }))
   const driver = {
     ...native,
+    query: (...args: Parameters<typeof native.query>) => {
+      if (args[0].startsWith('SELECT value FROM ') && args[0].includes('_commit_markers'))
+        observation?.markerRead?.()
+      return native.query(...args)
+    },
     connect: async (...args: Parameters<typeof native.connect>) => {
       const client = await native.connect(...args)
       let work = false
@@ -318,4 +325,63 @@ it('rejects a changed native lock owner before invoking user work', async () => 
   ).rejects.toMatchObject({ code: 'LOCK_LOST' })
   expect(called).toBe(false)
   expect((await store.inspectLocks())[0]?.holder.owner).toBe('replacement-owner')
+})
+
+/** A positively visible original marker proves that a lost COMMIT acknowledgement was committed. */
+it('recovers a lost COMMIT acknowledgement from its same-transaction marker without replay', async () => {
+  const original = new Error('lost-commit-acknowledgement')
+  let attempts = 0
+  let lose = true
+  const { store, pool, prefix } = await installed(false, {
+    committed: async (pending) => {
+      const value = await pending
+      if (lose) {
+        lose = false
+        throw original
+      }
+      return value
+    }
+  })
+  await expect(
+    store.transaction(async (scope) => {
+      attempts += 1
+      await scope.set('proved', 'committed')
+      return 'accepted'
+    })
+  ).resolves.toBe('accepted')
+  expect(attempts).toBe(1)
+  expect(await store.get('proved')).toBe('committed')
+  expect((await pool.query('SELECT * FROM ' + prefix + '_commit_markers')).rows).toHaveLength(0)
+})
+
+/** Without readable native evidence the original backend seals; it never reports zero writes. */
+it('seals its original controller when COMMIT recovery cannot establish the actual outcome', async () => {
+  const original = new Error('lost-commit-acknowledgement')
+  const unavailable = new Error('commit-marker-unavailable')
+  let attempts = 0
+  const { store, pool, prefix } = await installed(false, {
+    committed: async (pending) => {
+      await pending
+      throw original
+    },
+    markerRead: () => {
+      throw unavailable
+    }
+  })
+  const failure = await store
+    .transaction(async (scope) => {
+      attempts += 1
+      await scope.set('unknown', 'actually-committed')
+    })
+    .then(
+      () => undefined,
+      (cause: unknown) => cause
+    )
+  expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED' })
+  expect(walkErrorCauses(failure)).toContain(original)
+  expect(walkErrorCauses(failure)).toContain(unavailable)
+  expect(attempts).toBe(1)
+  await expect(store.get('unknown')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+  expect((await pool.query('SELECT * FROM ' + prefix + '_kv')).rows).toHaveLength(1)
+  expect((await pool.query('SELECT * FROM ' + prefix + '_commit_markers')).rows).toHaveLength(1)
 })

@@ -144,6 +144,23 @@ export function createPgTransactions<TScope extends object>(input: {
       let primary: unknown
       let failed = false
       let retry = false
+      /** Callback results survive only a commit proved by its original native marker. */
+      let value: Awaited<R> | undefined
+      /** The original contract transaction identity names this physical commit evidence. */
+      let marker: string | undefined
+      /** Recovery returns the same native borrow before consulting the original driver. */
+      let borrowReturned = false
+      /** Publication follows actual native settlement, including a positively recovered COMMIT. */
+      const committed = (): IConcurrencyAttempt<Awaited<R>> => {
+        begun = false
+        observePg(
+          terminal!,
+          'afterCommit',
+          [...state.changed.values()].reduce((count, keys) => count + keys.size, 0)
+        )
+        publish(state)
+        return { status: 'committed', value: value as Awaited<R> }
+      }
       const settled = await (async (): Promise<IConcurrencyAttempt<Awaited<R>> | undefined> => {
         try {
           await client.query('BEGIN ISOLATION LEVEL READ COMMITTED', [], context)
@@ -170,7 +187,7 @@ export function createPgTransactions<TScope extends object>(input: {
           })
           terminal = transactionStages.forTransaction(scope)
           observePg(terminal, 'onTransactionStart')
-          let value: Awaited<R> | undefined
+          marker = assertTransactionOwner(store, scope).id
           try {
             value = await callback(scope)
           } catch (cause) {
@@ -190,19 +207,50 @@ export function createPgTransactions<TScope extends object>(input: {
             return { status: 'conflict', phase: 'commit', keys: conflict, holder: undefined }
           }
           throwIfAborted(context.signal)
+          await client.query(
+            'INSERT INTO ' + tables.markers + ' (org_id,key,value) VALUES($1,$2,$3)',
+            [runtime.orgId, marker, PgNames.markerValue],
+            context
+          )
+          throwIfAborted(context.signal)
           commitSent = true
           await client.query('COMMIT', [])
-          begun = false
-          observePg(
-            terminal,
-            'afterCommit',
-            [...state.changed.values()].reduce((count, keys) => count + keys.size, 0)
-          )
-          publish(state)
-          return { status: 'committed', value: value as Awaited<R> }
+          return committed()
         } catch (cause) {
           primary = cause
           failed = true
+          // A server-issued serialization/deadlock rejection proves this COMMIT did not commit.
+          if (commitSent && physicalPgFailure(cause)) commitSent = false
+          if (commitSent) {
+            try {
+              // Return the original borrow before a marker query can need the same pool slot.
+              await client.dispose()
+              borrowReturned = true
+              const row = (
+                await configuration.driver.query(
+                  'SELECT value FROM ' + tables.markers + ' WHERE org_id=$1 AND key=$2',
+                  [runtime.orgId, marker!]
+                )
+              ).rows[0]
+              if (row?.value === PgNames.markerValue) {
+                reportCleanupError(createStorageOperationReporter(), cause)
+                failed = false
+                return committed()
+              }
+            } catch (secondary) {
+              if (secondary !== primary)
+                primary = new AggregateError(
+                  [primary, secondary],
+                  PostgresErrorText.transactionFailed
+                )
+            }
+            // An absent/unreadable marker is not proof of zero writes. Seal only this original
+            // physical controller; disposal drains this accepted attempt after its lease releases.
+            void controller
+              .dispose()
+              .catch((secondary) => reportCleanupError(createStorageOperationReporter(), secondary))
+            throw normalize(primary)
+          }
           try {
             registration?.stopAdmission()
             await registration?.closeIterators()
@@ -252,6 +300,16 @@ export function createPgTransactions<TScope extends object>(input: {
         (value) => ({ failed: false as const, value }),
         (cause) => ({ failed: true as const, cause })
       )
+      if (!settled.failed && settled.value?.status === 'committed' && marker !== undefined) {
+        try {
+          await (borrowReturned ? configuration.driver : client).query(
+            'DELETE FROM ' + tables.markers + ' WHERE org_id=$1 AND key=$2',
+            [runtime.orgId, marker]
+          )
+        } catch (cause) {
+          reportCleanupError(createStorageOperationReporter(), cause)
+        }
+      }
       registration?.close()
       if (terminal) observePg(terminal, 'onTransactionClose')
       try {

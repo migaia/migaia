@@ -11,6 +11,8 @@ export const PgNames = {
   locks: 'locks',
   journal: 'journal',
   markers: 'commit_markers',
+  /** Private evidence is written beside business data before the same actual COMMIT. */
+  markerValue: '1',
   vectorConfiguration: 'vector_config',
   /** Global physical collection schema is not a business org and cannot be deleted by dropOrg. */
   vectorConfigurationOwner: '00000000-0000-0000-0000-000000000000',
