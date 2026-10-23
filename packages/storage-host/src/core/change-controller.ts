@@ -61,13 +61,19 @@ export type IBackendValueCommit = (
   ctx?: IWriteOptions
 ) => Promise<void>
 
-/** Original exact-store row shares optional change and envelope observation bindings. */
+/** Each original host supplies observation and optional selected query methods on its own binding. */
+type IBackendEntityBinding = {
+  readonly envelope: (
+    operation: Readonly<{ operation: string; targetVersion: number }>
+  ) => IStorageEnvelopeStages
+  readonly queryMethods?: () => object | undefined
+}
+
+/** Original exact-store row shares optional controller, entity observation and native endpoints. */
 type IBackendRegistration = {
   controller?: IBackendChangeController
   valueCommit?: IBackendValueCommit
-  envelopes?: Array<
-    (operation: Readonly<{ operation: string; targetVersion: number }>) => IStorageEnvelopeStages
-  >
+  envelopes?: IBackendEntityBinding[]
 }
 
 /** One private exact-store registry; observation also supports admitted stores without a controller. */
@@ -273,16 +279,18 @@ export const getBackendChangeController = (
 /** Bind original host observation at resource admission without changing or patching the store. */
 export const registerBackendEnvelopeStages = (
   store: IStorageBase,
-  factory: NonNullable<IBackendRegistration['envelopes']>[number]
+  factory: IBackendEntityBinding['envelope'],
+  queryMethods?: IBackendEntityBinding['queryMethods']
 ): (() => void) => {
   /** A shared raw object may belong to more than one host; each original scope retains its binding. */
   const row = controllerRegistry.get(store) ?? {}
-  ;(row.envelopes ??= []).push(factory)
+  const binding: IBackendEntityBinding = { envelope: factory, queryMethods }
+  ;(row.envelopes ??= []).push(binding)
   controllerRegistry.set(store, row)
   return () => {
     if (controllerRegistry.get(store) !== row) return
     /** Remove only this registration; other live hosts still observe the shared original store. */
-    const index = row.envelopes?.indexOf(factory) ?? -1
+    const index = row.envelopes?.indexOf(binding) ?? -1
     if (index < 0) return
     row.envelopes!.splice(index, 1)
     if (row.envelopes!.length === 0) delete row.envelopes
@@ -303,9 +311,9 @@ export const getBackendEnvelopeStages = (
   /** The ordinary single-host path returns its original bound observer directly. */
   const factories = controllerRegistry.get(store)?.envelopes
   if (factories === undefined) return undefined
-  if (factories.length === 1) return factories[0]!(operation)
+  if (factories.length === 1) return factories[0]!.envelope(operation)
   /** Shared raw identity cannot identify a caller host, so all original active bindings observe it. */
-  const stages = factories.map((factory) => factory(operation))
+  const stages = factories.map((binding) => binding.envelope(operation))
   return {
     beforeEnvelopeCheck: () => {
       for (const stage of stages) stage.beforeEnvelopeCheck()
@@ -355,3 +363,18 @@ export const registerBackendValueCommit = (
 /** Entity borrows the captured native endpoint without exposing its registration authority. */
 export const getBackendValueCommit = (store: IStorageBase): IBackendValueCommit | undefined =>
   controllerRegistry.get(store)?.valueCommit
+
+/** Read selected methods from the original storage cell without duplicating its Feature table. */
+export const getBackendEntityQueryMethods = (store: IStorageBase): object | undefined => {
+  /** Shared raw stores have no implicit host router; distinct control-plane bindings are ambiguous. */
+  let methods: object | undefined
+  let selectedBinding = false
+  for (const binding of controllerRegistry.get(store)?.envelopes ?? []) {
+    const selected = binding.queryMethods?.()
+    if (selectedBinding && methods !== selected)
+      throw new StorageError(StorageErrorCode.invalidConfig)
+    methods = selected
+    selectedBinding = true
+  }
+  return methods
+}

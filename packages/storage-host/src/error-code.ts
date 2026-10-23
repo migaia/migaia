@@ -54,6 +54,12 @@ export const StorageErrorCode = {
   duplicateKey: 'DUPLICATE_KEY',
   /** A projected unique index key belongs to a different record; repair the proposed commit. */
   indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT',
+  /** Backfill and persisting its failed readiness both failed; inspect every original cause. */
+  indexBackfillFailed: 'INDEX_BACKFILL_FAILED',
+  /** An entity migration step failed; retry only after correcting the original application cause. */
+  migrationFailed: 'MIGRATION_FAILED',
+  /** Stored entity data is newer than this definition; use a definition that understands it. */
+  versionUnsupported: 'VERSION_UNSUPPORTED',
   /** A native memory transaction failed; inspect its original cause before retrying. */
   transactionFailed: 'TRANSACTION_FAILED',
   /** A user extension failed; inspect its original cause and operation context before retrying. */

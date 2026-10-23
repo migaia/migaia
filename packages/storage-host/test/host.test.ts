@@ -32,6 +32,27 @@ function plugin<const N extends string>(name: N, value: string) {
   return { plugin: definePlugin(name, descriptor), state: () => state }
 }
 describe('neutral storage installation', () => {
+  it('rejects concurrent facade batches and allows explicit retry after settlement', async () => {
+    await using host = await createStorageHost()
+    const first = plugin('batch-first', 'first')
+    const second = plugin('batch-second', 'second')
+    const pending = host.use(first.plugin)
+    expect(() => host.use(second.plugin)).toThrowError('storage host is busy installing plugins')
+    await pending
+    await host.use(second.plugin)
+    expect([...host.backends().keys()]).toEqual(['batch-first', 'batch-second'])
+  })
+
+  it('rejects a pending use batch when disposal wins before preflight', async () => {
+    const host = await createStorageHost()
+    const next = plugin('late-preflight', 'unused')
+    const installing = host.use(next.plugin)
+    const disposing = host.dispose()
+    await expect(installing).rejects.toMatchObject({ code: 'STORAGE_HOST_DISPOSED' })
+    await disposing
+    expect(host.dispose()).toBe(disposing)
+  })
+
   it('keeps exact stores, isolated clients, extensions and detached registry snapshots', async () => {
     const left = plugin('left', 'one')
     const right = plugin('right', 'two')

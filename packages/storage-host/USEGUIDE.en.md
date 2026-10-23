@@ -85,3 +85,40 @@ The /entity registerRecordIndexBackfillStore entry registers only the backfill p
 The original backend scope factory calls `core.createTransactionApi(scope)` before freezing that same view; no selected transaction methods returns undefined. Selected methods enter original `runTransactionOperation` admission, draining and first-failure handling before execution and the lazy client getter for its current scope. Expired methods preserve the original backend transaction error. `core.getChainMethods(family)` supplies selected methods to the original query/builder creators; derived branches retain the same method references and original this. Pure fluent configuration stays synchronous and does not enter intervention; actual I/O terminals enter the original runner. Built-in and duplicate names reject before capability publication.
 
 Memory root operations wrap the complete pipeline inside the original concurrency budget. Intervention fixes input once and its terminal invokes the sole original loop, so `await next()` still observes actual mutation and failure. Stage waits count toward the same deadline; cancellation starts neither derived locks nor native writes. Transaction loops remain outside the pipeline and reenter it for each actual attempt, including callback replay after commit conflicts.
+
+`defineEntity` is available from `@migaia/storage-host/entity`. Record repositories compose through the original `repo.in(scope)` view and `repo.batch` uses one native transaction. Schema, codec and migration work borrows that transaction's original signal. Unique constraints validate the final draft; swaps and delete/reuse remain atomic. A cached index handle is used only after the current native scope confirms readiness; otherwise the same scope scans without building indexes.
+
+Entity archives use `{version, state}` and the shared immutable migration plan. Invalid archives and invalid encoded states keep host `DESERIALIZE_FAILED`/`SERIALIZE_FAILED`, with contract `ENVELOPE_INVALID` as first cause. Unsupported versions and failed migration steps keep the host code with the original contract failure on cause. Legacy `{__v,data}` is not accepted. Comparators require a finite limit and use the shared bounded heap; streams expose the actual disposable iterator.
+
+Entity queries use the shared immutable core: `repo.query().index(name, keyOrRange).where(...).select(...).all()` replaces `findManyBy`; use `.stream()` in place of `streamBy`. Root and transaction queries preserve installed query Feature methods. Object and field conditions execute on the client for this source; explicit indexed queries retain native index preparation or the authoritative fallback. Comparator queries require a finite bound and retain only the selected candidates in the original heap. Transaction queries inherit the original signal and deadline; their terminals accept no separate context.
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const memory = host.backend('memory')
+const orders = defineEntity<{ id: string; state: string; total: number }>()({
+  name: 'orders',
+  key: 'id',
+  indexes: { byState: { path: 'state' } }
+}).connect(memory)
+const paid = await orders
+  .query()
+  .index('byState', 'paid')
+  .where('total', 'gt', 100)
+  .orderByComparator((left, right) => right.total - left.total)
+  .limit(20)
+  .select('id', 'total')
+  .all()
+await using stream = orders.query().limit(20).stream()
+for await (const order of stream) console.log(order)
+await memory.transaction(async (tx) => {
+  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })
+  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())
+})
+```
+
+`connect(store, {codecStages, queryStages})` accepts the corresponding original host stage ports. Codec observations surround each actual conversion. Each query `all` and each stream `next` observes the actual operation; stream counts accumulate, and pauses between advances do not count toward elapsed execution time. Observers never delay or veto storage work; synchronous failures and late rejections go to the existing reporter.
+
+Unique writes on a custom value-only backend require record transactions or an atomic value commit endpoint; a sync channel alone does not provide that atomic endpoint. Without either, only that unique-write combination rejects `UNSUPPORTED_CAPABILITY` before modification; ordinary KV writes continue to work. During the original backend installation, call `core.registerStore(store)` before `core.registerValueCommit(store, commit)`. The `IBackendValueCommit` type is exported from `@migaia/storage-host/authoring/backend`: `commit({prefix, expected, key, value}, ctx?)` returns `Promise<void>`. `expected` is the captured array of raw `[key,value]` pairs under `prefix`. After all asynchronous schema and codec preparation, the backend must atomically compare that exact prefix snapshot and write `key/value`, with no await gap between comparison and mutation; changed snapshots reject `WRITE_CONFLICT` without modifying data. The endpoint borrows the original native store and adds no resource or close authority.

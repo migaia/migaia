@@ -1,5 +1,11 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Entity definitions capture a complete own upgrade graph before connecting to a backend. */
+  entityMigrationGraphIncomplete: 'entity migration graph must contain every version step',
+  /** A prepared value-only unique write must reject stale raw inputs before changing data. */
+  entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit',
+  /** Preserve the existing entity extension diagnostic when a comparator returns an invalid value. */
+  entityComparatorInvalid: 'entity orderBy comparator must return a number',
   /** Backfill registration attaches only to an actual backend object captured by its native factory. */
   backfillBackendObject: 'record index backfill backend must be an object',
   /** Only the original coded native contention error can be marked for safe scan fallback. */
@@ -101,3 +107,7 @@ export const StorageErrorText = {
   codecBinaryFallback: (name: string) =>
     `[storage-web] codec "${name}" falls back to base64 on a text-only backend (+33% size)`
 } as const
+
+/** Preserve aggregate backfill diagnostics while both original failures remain reachable. */
+export const indexBackfillFailureText = (entityName: string): string =>
+  `entity "${entityName}" index backfill and failure persistence both failed`
