@@ -227,18 +227,20 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
     writeFileSync(
       join(consumer, 'bundle-entry.js'),
       [
-        "import { indexedDbHost } from '@migaia/storage-web/indexed-db'",
+        "import { createStorageHost } from '@migaia/storage-web/host'",
+        "import { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'",
         "import { defineEntity } from '@migaia/storage-web/entity'",
         '/** Read the same active user names using the fixed original public API.',
         ' * @param {import("@migaia/storage-web/indexed-db").IIndexedDbOptions} options Native ports/layout.',
         ' * @returns {Promise<{name:string}[]>} Names after native query completion.',
         ' */',
         'export async function loadActiveUsers(options) {',
-        '  const store = indexedDbHost(options)',
+        '  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })',
         '  try {',
+        "    const store = host.backend('indexed-db')",
         "    const users = defineEntity({ name: 'users', key: 'id' }).connect(store)",
-        '    return (await users.list()).filter((user) => user.active).map((user) => ({ name: user.name }))',
-        '  } finally { await store.dispose() }',
+        '    return (await users.list()).filter((user) => user.active === true).map((user) => ({ name: user.name }))',
+        '  } finally { await host.dispose() }',
         '}'
       ].join('\n'),
       'utf8'
