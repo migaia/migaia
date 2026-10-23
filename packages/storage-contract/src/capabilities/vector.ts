@@ -5,7 +5,7 @@ import { StorageContractError, StorageContractErrorCode } from '../errors.js'
 import { StorageContractErrorText } from '../error-text.js'
 import type { IOperationContext } from '../context.js'
 import type { IWriteConcurrencyOptions } from '../concurrency.js'
-import type { IVectorQueryBuilder, IWhere } from '../query-chain.js'
+import type { IVectorQueryBuilder, IWhere, IQueryWatch } from '../query-chain.js'
 import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
 import { STORAGE_VECTOR_METHODS } from '../capability-constants.js'
 
@@ -35,18 +35,35 @@ export type IVectorFilter =
 export type IVectorCollection<
   TPayload,
   TGroupable extends boolean = false,
-  _TChangeFeed extends boolean = false,
+  TChangeFeed extends boolean = false,
   TAugmentMethods extends object = Record<never, never>
 > = {
   near(
     query: readonly number[],
     options?: { readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly exact?: boolean }
-  ): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods>
-  similarTo(id: string): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods>
+  ): IVectorQueryBuilder<
+    TPayload,
+    TGroupable,
+    false,
+    TAugmentMethods & (TChangeFeed extends true ? IQueryWatch : Record<never, never>)
+  >
+  similarTo(
+    id: string
+  ): IVectorQueryBuilder<
+    TPayload,
+    TGroupable,
+    false,
+    TAugmentMethods & (TChangeFeed extends true ? IQueryWatch : Record<never, never>)
+  >
   recommend(examples: {
     readonly positive: readonly [string, ...string[]]
     readonly negative?: readonly string[]
-  }): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods>
+  }): IVectorQueryBuilder<
+    TPayload,
+    TGroupable,
+    false,
+    TAugmentMethods & (TChangeFeed extends true ? IQueryWatch : Record<never, never>)
+  >
   upsert(
     points: readonly {
       readonly id: string
@@ -73,6 +90,10 @@ export type IVectorCollection<
     readonly { readonly id: string; readonly score: number; readonly payload?: TPayload }[]
   >
 }
+/** The original payload constraint and collection options also serve root Feature projections. */
+export type IVectorCollectionOptions<TPayload> = [TPayload] extends [IVectorPayloadShape<TPayload>]
+  ? [options?: { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid' }]
+  : [options: never]
 /** Real backends provide collection metadata and native query sources through one shared API. */
 export type IVectorApi<
   TGroupable extends boolean = false,
@@ -81,9 +102,7 @@ export type IVectorApi<
 > = {
   collection<TPayload = ICodecValue>(
     name: string,
-    ...options: [TPayload] extends [IVectorPayloadShape<TPayload>]
-      ? [options?: { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid' }]
-      : [options: never]
+    ...options: IVectorCollectionOptions<TPayload>
   ): IVectorCollection<TPayload, TGroupable, TChangeFeed, TAugmentMethods>
 }
 /** Vector collections keep native execution and have no generic transaction projection. */

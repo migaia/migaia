@@ -163,7 +163,7 @@ describe('storage-contract audit boundary regressions', () => {
           throw original
         }
       })
-      expect(() => contract[name](store)).toThrowError(
+      expect(() => Reflect.apply(contract[name], contract, [store])).toThrowError(
         expect.objectContaining({
           source: contract.STORAGE_CONTRACT_SOURCE,
           code: contract.StorageContractErrorCode.unsupported,
@@ -175,7 +175,8 @@ describe('storage-contract audit boundary regressions', () => {
 
   it.each([
     ['asSecondaryIndexRecordStore', 'ensureRecordIndexes'],
-    ['asChangeFeedStore', 'subscribeChanges']
+    ['asChangeFeedStore', 'subscribeChanges'],
+    ['asChangeFeedStore', 'watch']
   ] as const)('%s preserves its extension-method getter failure', (name, method) => {
     /** Extension inspection must retain failures after successful base admission. */
     const original = new Error('extension accessor failed')
@@ -186,7 +187,7 @@ describe('storage-contract audit boundary regressions', () => {
         throw original
       }
     })
-    expect(() => contract[name](store)).toThrowError(
+    expect(() => Reflect.apply(contract[name], contract, [store])).toThrowError(
       expect.objectContaining({
         code: contract.StorageContractErrorCode.unsupported,
         cause: original

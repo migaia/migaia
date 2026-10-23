@@ -1805,6 +1805,25 @@
         "structuredCodec"
       ]
     },
+    "@migaia/storage-plugin-sparql": {
+      ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],
+      "./http": ["httpEndpoint"],
+      "./oxigraph": ["oxigraphEndpoint"],
+      "./features/graph-store": ["graphStoreFeature"],
+      "./features/ontology": ["ontologyFeature"]
+    },
+    "@migaia/storage-plugin-object": {
+      ".": [
+        "ERROR_SOURCE",
+        "ObjectDriverKind",
+        "ObjectErrorCode",
+        "objectBackendKind",
+        "objectBackendPlugin"
+      ],
+      "./fs": ["fsObjectDriver"],
+      "./s3": ["s3ObjectDriver"],
+      "./features/presign": ["objectPresignFeature"]
+    },
     "@migaia/storage-plugin-sqlite": {
       ".": [
         "SqliteErrorCode",

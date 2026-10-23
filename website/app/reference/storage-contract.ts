@@ -887,6 +887,23 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.encodeStorageRdfQuad![0]!.example,
       cases: storageContractCases.encodeStorageRdfQuad
     },
+    decodeOrderedStorageKey: {
+      role: 'operation',
+      purpose: t('Read the original ordered physical key wire format.', '读取原保序物理键格式。'),
+      params: {
+        encoded: t(
+          'Complete canonical key bytes from encodeOrderedStorageKey.',
+          'encodeOrderedStorageKey 返回的完整规范键字节。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端标签或 undefined。')
+      },
+      returns: t(
+        'Detached IStorageKey; incomplete, noncanonical or out-of-domain bytes throw INVALID_KEY.',
+        '独立 IStorageKey；不完整、非规范或超域字节抛 INVALID_KEY。'
+      ),
+      example: storageContractCases.decodeOrderedStorageKey![0]!.example,
+      cases: storageContractCases.decodeOrderedStorageKey
+    },
     snapshotStorageVectorCollection: {
       role: 'operation',
       purpose: t(
@@ -994,23 +1011,6 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: storageContractCases.snapshotStorageVectorSearch![0]!.example,
       cases: storageContractCases.snapshotStorageVectorSearch
-    },
-    decodeOrderedStorageKey: {
-      role: 'operation',
-      purpose: t('Read the original ordered physical key wire format.', '读取原保序物理键格式。'),
-      params: {
-        encoded: t(
-          'Complete canonical key bytes from encodeOrderedStorageKey.',
-          'encodeOrderedStorageKey 返回的完整规范键字节。'
-        ),
-        backend: t('Actual backend diagnostic or undefined.', '真实后端标签或 undefined。')
-      },
-      returns: t(
-        'Detached IStorageKey; incomplete, noncanonical or out-of-domain bytes throw INVALID_KEY.',
-        '独立 IStorageKey；不完整、非规范或超域字节抛 INVALID_KEY。'
-      ),
-      example: storageContractCases.decodeOrderedStorageKey![0]!.example,
-      cases: storageContractCases.decodeOrderedStorageKey
     },
     snapshotStorageBlobPut: {
       role: 'operation',
@@ -1703,8 +1703,8 @@ export const storageContractReference: ILibraryReference = {
         methods: t('Optional original pure Feature functions.', '可选的原 Feature 纯函数。')
       },
       returns: t(
-        'IRdfQuery with common reads, projections, keyset pages and native/client ground follow/inverse. Write terminals remain a subsequent unit.',
-        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；写入仍待后续单元；支持共享键集分页与客户端 ground 遍历。'
+        'IRdfQuery with common reads, projections, keyset pages, native/client ground follow/inverse, delete and replace through the original mutation owner.',
+        '返回 IRdfQuery，支持共享读取、投影、键集分页、原生/客户端 ground 遍历，以及通过原 mutation owner 执行的 delete/replace。'
       ),
       example: storageContractCases.createRdfQuery![0]!.example,
       cases: storageContractCases.createRdfQuery
@@ -2258,6 +2258,10 @@ await codec.encode(value, context)`
         api: t(
           'Backend-owned API satisfying the token contract; its exact type is retained.',
           '满足令牌契约的后端 API，保留具体类型。'
+        ),
+        options: t(
+          'Optional forTransaction(scope) sees ITransactionScope<ICodecValue,TCap>, so the actual implemented standard token is available through the original use. Existing KV members and original callback declarations remain compatible; no native API is cast or fabricated.',
+          '可选 forTransaction(scope) 接收 ITransactionScope<ICodecValue,TCap>，可经原 use 使用实际实现的标准令牌；既有 KV 成员及原回调声明保持兼容，不强转或虚构原生 API。'
         )
       },
       returns: t(
@@ -2457,8 +2461,8 @@ console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { prev
         )
       },
       returns: t(
-        'The exact store as `IChangeFeedStore`; incomplete feed capability throws `UNSUPPORTED_CAPABILITY`. Original reflection or accessor failures remain reachable through `cause`.',
-        '同一个存储收窄为 `IChangeFeedStore`；变更流能力不完整时抛 `UNSUPPORTED_CAPABILITY`，原始反射或访问器失败沿 `cause` 可达。'
+        'Original known store with full capability/native/sync/transaction/Feature precision plus native text watch; missing either callable rejects with UNSUPPORTED_CAPABILITY and preserves getter cause.',
+        '原已知 store，保留完整能力、原生、同步、事务与 Feature 类型并提供文本 watch；缺少任一方法时报 UNSUPPORTED_CAPABILITY，getter cause 保留。'
       ),
       example: `const feed = asChangeFeedStore(store)
 const unsubscribe = feed.subscribeChanges((change) => console.log(change.channel, change.kind))
@@ -2532,8 +2536,8 @@ unsubscribe()`
         )
       },
       returns: t(
-        'A boolean narrowing to `IChangeFeedStore`; access failures return false.',
-        '收窄到 `IChangeFeedStore` 的布尔值；访问失败返回假值。'
+        'Boolean after real KV/flag/two-callable admission; known stores retain full precision, while unknown inputs narrow only to the original KV/text feed shape.',
+        '真实 KV/flag/双 callable 准入后的布尔值；已知 store 保留完整类型，未知输入只缩窄到原 KV/text feed 形状。'
       ),
       example: `if (isChangeFeedStore(candidate)) {
   const unsubscribe = candidate.subscribeChanges((change) => console.log(change.sequence))
@@ -3556,6 +3560,18 @@ console.log(candidate.name, candidate.output)`
         '原生排名回调与捕获的支持、资源事实。'
       ),
       members: {
+        watch: {
+          summary: t(
+            'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
+            '可选原生订阅回调，接收同一完整原生输入并返回原 change iterator；客户端步骤在订阅前拒绝，不新增共享事件队列或生命周期包装。'
+          )
+        },
+        mutate: {
+          summary: t(
+            'Optional original write pipeline/transaction callback. Supply transaction-bound execute and accept(key,row); only unique selected rows accepted with true count. Root completion must await native commit; ctx is the original snapshot and concurrency is separate original policy metadata.',
+            '可选原写 pipeline/事务回调，提供事务内 execute 与 accept(key,row)；仅去重选中且返回 true 的行计数，根终点等待原生提交；ctx 为原快照，concurrency 为独立原策略元数据。'
+          )
+        },
         reduce: {
           summary: t(
             'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
@@ -3678,6 +3694,18 @@ console.log(candidate.name, candidate.output)`
         '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
+        watch: {
+          summary: t(
+            'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
+            '可选原生订阅回调，接收同一完整原生输入并返回原 change iterator；客户端步骤在订阅前拒绝，不新增共享事件队列或生命周期包装。'
+          )
+        },
+        mutate: {
+          summary: t(
+            'Optional original write pipeline/transaction callback. Supply transaction-bound execute and accept(key,row); only unique selected rows accepted with true count. Root completion must await native commit; ctx is the original snapshot and concurrency is separate original policy metadata.',
+            '可选原写 pipeline/事务回调，提供事务内 execute 与 accept(key,row)；仅去重选中且返回 true 的行计数，根终点等待原生提交；ctx 为原快照，concurrency 为独立原策略元数据。'
+          )
+        },
         reduce: {
           summary: t(
             'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
@@ -3757,6 +3785,62 @@ console.log(candidate.name, candidate.output)`
           summary: t('Opted-in authoritative native step order.', '显式选择的原生步骤顺序。')
         }
       }
+    },
+    IQueryWatch: {
+      summary: t(
+        'Native watch terminal constrained by this:IQueryShape; a pre-topK vector builder cannot call it. Declared change-feed APIs expose it, while transaction APIs do not.',
+        '以 this:IQueryShape 约束的原生 watch 终点，topK 前向量 builder 不能调用；声明 changeFeed 的 API 才提供，事务 API 不提供。'
+      ),
+      members: {}
+    },
+    IQueryWatcher: {
+      summary: t(
+        'Backend author callback from the same native query input to the original IStorageIterator<IStorageChange>.',
+        '后端作者回调，从同一原生查询输入返回原 IStorageIterator<IStorageChange>。'
+      ),
+      members: {}
+    },
+    IQueryWriteContext: {
+      summary: t(
+        'Conditional write context: transaction chains accept only undefined; root chains accept operation context and the original concurrency policy.',
+        '条件写上下文：事务链仅接受 undefined，根链接受操作上下文和原并发策略。'
+      ),
+      members: {}
+    },
+    IQueryDelete: {
+      summary: t(
+        'Deletion request with the original operation snapshot and separate optional concurrency policy.',
+        '删除请求，包含原操作快照和独立可选并发策略。'
+      ),
+      members: {}
+    },
+    IRecordQueryMutation: {
+      summary: t(
+        'Record delete/update request with one detached patch for update; the original backend codec validates its value domain.',
+        '记录 delete/update 请求，update 包含一份已分离的 patch，值域由原后端 codec 验证。'
+      ),
+      members: {}
+    },
+    IRdfQueryMutation: {
+      summary: t(
+        'Ground delete/replace request; replacement applies only to the canonical old quad actually selected.',
+        'ground delete/replace 请求；替换仅应用于实际选中的规范 old quad。'
+      ),
+      members: {}
+    },
+    IQueryMutationPort: {
+      summary: t(
+        'Original transaction-bound execute and accept callbacks; no independent writer, lock or lifecycle authority.',
+        '原事务内 execute/accept 回调，不具有独立写入、锁或生命周期权限。'
+      ),
+      members: {}
+    },
+    IQueryMutator: {
+      summary: t(
+        'Original pipeline/transaction callback returning accepted draft count after root commit confirmation.',
+        '原 pipeline/事务回调；根提交确认后返回已接纳 draft 数。'
+      ),
+      members: {}
     },
     IQueryReduction: {
       summary: t(
@@ -3946,6 +4030,18 @@ console.log(candidate.name, candidate.output)`
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        watch: {
+          summary: t(
+            'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
+            '可选原生订阅回调，接收同一完整原生输入并返回原 change iterator；客户端步骤在订阅前拒绝，不新增共享事件队列或生命周期包装。'
+          )
+        },
+        mutate: {
+          summary: t(
+            'Optional original write pipeline/transaction callback. Supply transaction-bound execute and accept(key,row); only unique selected rows accepted with true count. Root completion must await native commit; ctx is the original snapshot and concurrency is separate original policy metadata.',
+            '可选原写 pipeline/事务回调，提供事务内 execute 与 accept(key,row)；仅去重选中且返回 true 的行计数，根终点等待原生提交；ctx 为原快照，concurrency 为独立原策略元数据。'
+          )
+        },
         reduce: {
           summary: t(
             'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
@@ -4986,6 +5082,10 @@ console.log(candidate.name, candidate.output)`
         'Preserves original builder scope and augmentation while projecting host method groups.',
         '投影宿主方法分组时保留原构建器视图与增强。'
       ),
+      example: t(
+        'Root records, vector and RDF lookups retain native API/collection methods, generic payload constraints, original and selected methods, and actual feed/grouping availability. Only the corresponding Feature group is added.',
+        '根 records/vector/RDF lookup 保留原生 API/collection 方法、generic payload 约束、原方法与 select 后方法，以及真实 feed/groupBy 能力；仅加入对应 Feature 组。'
+      ),
       members: {}
     },
     ILockKey: {
@@ -5271,10 +5371,31 @@ if (sync) {
       example: storeExample,
       members: recordMembers
     },
+    ITextWatchApi: {
+      summary: t(
+        'Native text-key invalidation stream through watch(key,ctx?), returning the original resource iterator.',
+        'watch(key,ctx?) 提供的原生文本键失效流，返回原资源迭代器。'
+      ),
+      members: {}
+    },
+    ITextChangeFeedApi: {
+      summary: t(
+        'Native watch and post-commit subscribeChanges methods sharing the original provider owner.',
+        '原生 watch 与提交后 subscribeChanges，共用原 provider owner。'
+      ),
+      members: {}
+    },
+    IWithChangeFeedCapabilities: {
+      summary: t(
+        'Known-store type refinement retaining native, sync, metadata, transaction and Feature types; only existing records/vector/RDF APIs gain the declared feed.',
+        '已知 store 类型细化，保留原生、同步、元数据、事务与 Feature；仅既有 records/vector/RDF API 获得 feed 声明。'
+      ),
+      members: {}
+    },
     IChangeFeedStore: {
       summary: t(
-        'Existing key-value store with a post-commit invalidation subscription, admitted through the change-feed capability guard.',
-        '具有提交后失效通知订阅的既有键值存储，通过变更流能力守卫接纳。'
+        'Existing key-value store with real subscribeChanges and watch(key,ctx?) functions; native invalidation does not promise reliable replay.',
+        '同时具有真实 subscribeChanges 与 watch(key,ctx?) 的既有键值存储；原生失效通知不承诺可靠重放。'
       ),
       scenarios: [
         t(

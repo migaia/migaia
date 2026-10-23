@@ -993,6 +993,25 @@ function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefine
       )
   return reads as Pick<IQueryResult<R, undefined>, (typeof methods)[number][0]>
 }
+/** Actual family writes enter the same original operation before validation or draft access. */
+function transactionQueryWrites(scope: object, query: object): Record<string, unknown> {
+  /** Only actual family write methods are wrapped; selected read results never enter this helper. */
+  const writes: Record<string, unknown> = {}
+  for (const [name, argumentCount] of [
+    [RecordQueryMethod.delete, 0],
+    [RecordQueryMethod.update, 1],
+    [RdfQueryMethod.replace, 2]
+  ] as const) {
+    /** The original method and receiver remain fixed across the borrowed transaction view. */
+    const method = Reflect.get(query, name)
+    if (typeof method === 'function')
+      writes[name] = (...args: readonly unknown[]) =>
+        runTransactionOperation(scope, () =>
+          Reflect.apply(method, query, args.slice(0, argumentCount))
+        )
+  }
+  return writes
+}
 /** Adds original-owner admission to the actual selected chain without copying its nodes or plan. */
 function transactionQueryResult<R>(
   scope: object,
@@ -1065,6 +1084,7 @@ function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>
     ...query,
     ...transactionQueryReads(scope, query),
     ...branches,
+    ...transactionQueryWrites(scope, query),
     select: (...args: readonly unknown[]) =>
       transactionQueryResult(scope, Reflect.apply(select, query, args)),
     explain: () => query.explain(),
@@ -1077,6 +1097,7 @@ function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQu
   return Object.freeze({
     ...query,
     ...transactionQueryReads(scope, query),
+    ...transactionQueryWrites(scope, query),
     ...transactionQueryBranches(
       query,
       [...transactionQueryBranchMethods, RdfQueryMethod.follow, RdfQueryMethod.inverse],

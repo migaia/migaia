@@ -707,6 +707,18 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 
 能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。
 
+查询写终点复用同一 planner、reader 与资源清理：记录支持 `delete(ctx?)`、`update(patch,ctx?)`，有界向量仅 `topK(...).delete(ctx?)`，RDF 支持 `delete(ctx?)`、`replace(oldQuad,newQuad,ctx?)`；select/groupBy 后只有读取终点。作者源的可选 `mutate(request,run)` 必须在原宿主 pipeline、事务与锁路径中调用 run，提供该事务的 `execute` 和 `accept(key,row)`；没有接点在 I/O 前报 `UNSUPPORTED_CAPABILITY`。request.ctx 保留原上下文快照身份，request.concurrency 单独交原并发 owner，不能另建重试循环。共享核流式去重，只有 accept 返回 true 才计数；记录按规范键、向量按实际引擎 hit id、RDF 按规范 ground quad 身份去重。RDF replace 仅处理 query 真正选中的 oldQuad，new 已存在是否接纳由原 draft 决定；根终点必须等待真实提交确认，unknown 拒绝且不重放。事务内只返回已接纳 draft 数，不能据此声称提交；事务写不接受独立操作上下文。
+
 `encodeStorageRdfTerm(term, backend)` 经原快照 owner 校验一个 raw RDF term，返回独立、自定界的有序身份字节。原生索引排列可直接拼接这些分量；不能把输出重新送进公开 binary-key 域，否则会把其 1 MiB 输入限制错误施加到合法 RDF literal。IRI 拼写与 datatype/language 身份沿同一规范 term 规则；编码 raw blank 标签不会使它成为可移植的重复写身份。
+
+`implement(capability,api,{ forTransaction })` 的原绑定回调接收 `ITransactionScope<ICodecValue,TCap>`，因此标准 RDF 绑定器可合法使用原 `scope.use(rdf)`。原 KV 成员、显式旧回调类型、token/owner 校验及原登记表保持原样。
+
+原生查询 `watch(ctx?)` 仅由真实 source.watch 提供，返回原 `IStorageIterator<IStorageChange>`，保留原 iterator、dispose 与符号清理身份。它复用同一 planner 和原生输入编译器，完整条件、投影、遍历等均能下推才订阅；JS 谓词、mapper、客户端 follow 等在订阅前报 `QUERY_NOT_PUSHABLE`。构建与 explain 不订阅、不打开数据游标，不创建共享事件队列或重订阅器。标准 records/RDF/vector 的 changeFeed=true 类型包含 `IQueryWatch`；向量仅 topK 后可调用，事务 API 不授予 watch。
+
+记录 update 的 patch 只经原 `immutableSnapshot` 分离一次，不额外套用便携值 profile；Date、Map 等 generic record 字段由原后端 codec 验证。事务操作仍先准入再读取 patch，访问器只在原快照过程中读取一次。
+
+根能力查询的 Feature 类型分别投影 records 的 query、向量的 vector 与 RDF 的 rdf 组；仅安装 rdf/vector 组也会生效。原生 API 方法、collection 附加成员、generic payload、原方法、select 后方法、changeFeed 和 groupBy 的真实有无保持。标准 token 缺省不声明 feed/group；仅内部实现准入类型允许真实 boolean 支持域，并保留实际 API，不能把 false 源扩大成 true。
+
+文本变更接口为 `ITextWatchApi.watch(key,ctx?)` 与 `ITextChangeFeedApi.subscribeChanges(listener)`，流返回原 `IStorageIterator<IStorageChange>`。as/isChangeFeedStore 只有在原 KV 准入、changeFeed=true、两个真实方法均可调用时才成功；仅有 subscriber 的旧形状拒绝，getter 错误保留为 cause，检查不订阅。as 返回原对象，=== 不变。已知 store 的同步、元数据、原生 API、能力集合、事务和 Feature 类型全部保留；既有 records/vector/RDF 查询得到 feed 声明，不添加不存在的能力。未知输入仍仅经原 KV/text guard 准入。该声明不实现 controller、订阅器、可靠重放或查询结果流。
 
 `createStorageBlobBodyReader(body, { report, backend?, normalizeFailure? })` 是有限上传作者入口：调用方先完成原生条件检查，再把已捕获 body 交给原 iterator 生命周期读取；每次 next 返回独立 Uint8Array chunk，不预取，不拥有原生 sink、分段缓冲或调度。EOF 或 read 失败不重复 cancel；提前 return(reason)/dispose 先取消未完成 read，再沿原 owner 排空并 release 一次。取消失败保持主错，后续 release 失败仅报告；主与符号清理仍为独立缓存 Promise。调用方保留原 signal/timeout 与 sink 清理，read 失败后也须释放 reader。

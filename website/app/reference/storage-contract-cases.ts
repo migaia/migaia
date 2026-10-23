@@ -376,11 +376,6 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
   encodeStorageRdfQuad: [rdfTermCase],
   encodeStorageRdfTerm: [rdfTermCase],
   ttl: [ttlCase],
-  snapshotStorageVectorCollection: [vectorInputCase],
-  snapshotStorageVector: [vectorInputCase],
-  snapshotStorageVectorUpsert: [vectorInputCase],
-  snapshotStorageVectorFilter: [vectorInputCase],
-  snapshotStorageVectorSearch: [vectorInputCase],
   decodeOrderedStorageKey: [
     {
       title: t('Read an enumerated physical key', '读取枚举的物理键'),
@@ -398,6 +393,11 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
       )
     }
   ],
+  snapshotStorageVectorCollection: [vectorInputCase],
+  snapshotStorageVector: [vectorInputCase],
+  snapshotStorageVectorUpsert: [vectorInputCase],
+  snapshotStorageVectorFilter: [vectorInputCase],
+  snapshotStorageVectorSearch: [vectorInputCase],
   snapshotStorageBlobPut: [
     {
       title: t('snapshotStorageBlobPut', 'snapshotStorageBlobPut'),

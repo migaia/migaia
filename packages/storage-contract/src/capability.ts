@@ -10,7 +10,7 @@ import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concu
 import type { IWriteConcurrencyOptions } from './concurrency.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IOperationContext, IStorageKey } from './context.js'
-import type { IRecordQuery } from './query-chain.js'
+import type { IRecordQuery, IQueryWatch } from './query-chain.js'
 import type {
   ITransactionScope,
   ITransactionKeyValueApi,
@@ -32,7 +32,8 @@ import type { records } from './capabilities/records.js'
 import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
 import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
 import type { sql } from './capabilities/sql.js'
-import type { rdf, ITransactionRdfApi } from './capabilities/rdf.js'
+import type { rdf, IRdfApi, ITransactionRdfApi } from './capabilities/rdf.js'
+import type { vector, IVectorApi } from './capabilities/vector.js'
 import type { ISqlExecutor } from './sql.js'
 export { defineStorageCapability } from './capability-token.js'
 export { kv } from './capabilities/kv.js'
@@ -111,10 +112,14 @@ export type IKeyValueApi = Omit<
  */
 export type IRecordsApi<
   TValue = ICodecValue,
-  _TChangeFeed extends boolean = false,
+  TChangeFeed extends boolean = false,
   TAugmentMethods extends object = Record<never, never>
 > = {
-  query<R = TValue>(): IRecordQuery<R, IOperationContext, TAugmentMethods>
+  query<R = TValue>(): IRecordQuery<
+    R,
+    IOperationContext,
+    TAugmentMethods & (TChangeFeed extends true ? IQueryWatch : Record<never, never>)
+  >
   removeByPrefix(
     prefix: IStorageKey,
     ctx?: IOperationContext & IWriteConcurrencyOptions
@@ -227,10 +232,20 @@ type IAddScopedCapabilities<
   : TScope extends { use: (...args: never[]) => unknown }
     ? TScope
     : TScope & ITransactionCapabilityView<TCaps, IScopeRecordValue<TScope>>
+/** Native support flags refine implementations while each token retains its original default API. */
+type ICapabilityImplementationApi<TCap extends IAnyStorageCapability> =
+  | ICapabilityApi<TCap>
+  | (TCap extends typeof records
+      ? IRecordsApi<ICodecValue, boolean, object>
+      : TCap extends typeof rdf
+        ? IRdfApi<boolean, object>
+        : TCap extends typeof vector
+          ? IVectorApi<boolean, boolean, object>
+          : never)
 /** Frozen implementation descriptor; the API object keeps its backend-owned lifetime. */
 export type ICapabilityImpl<
   TCap extends IAnyStorageCapability = IAnyStorageCapability,
-  TApi extends ICapabilityApi<TCap> = ICapabilityApi<TCap>
+  TApi extends ICapabilityImplementationApi<TCap> = ICapabilityApi<TCap>
 > = {
   readonly [capabilityImplementation]: true
   readonly capability: TCap
@@ -337,7 +352,8 @@ export type ICapabilityInstallPort = {
 /** Transaction binding stays private until the original transaction owner asks for its projection. */
 type IImplementationRecord = {
   readonly implementation: ICapabilityImpl
-  readonly forTransaction?: (scope: ITransactionScope) => unknown
+  /** Private storage erases the scope type; only the original token/owner can invoke the binder. */
+  readonly forTransaction?: (scope: never) => unknown
 }
 /** Authentic immutable descriptors; public symbols and lookalike fields do not authorize them. */
 const implementations = new WeakMap<object, IImplementationRecord>()
@@ -440,19 +456,24 @@ export function readTransactionImplementation(
 /** Creates a frozen authentic implementation descriptor without taking ownership of its API. */
 export function implement<
   TCap extends IAnyStorageCapability,
-  TApi extends ICapabilityApi<NoInfer<TCap>> = ICapabilityApi<TCap>
+  TApi extends ICapabilityImplementationApi<NoInfer<TCap>> = ICapabilityApi<TCap>
 >(
   capability: TCap,
   api: TApi,
   options?: {
-    readonly forTransaction?: (scope: ITransactionScope) => NoInfer<ITransactionCapabilityApi<TCap>>
+    readonly forTransaction?: (
+      scope: ITransactionScope<ICodecValue, TCap>
+    ) => NoInfer<ITransactionCapabilityApi<TCap>>
   }
 ): ICapabilityImpl<TCap, TApi> {
   if (!isToken(capability)) throw invalidCapability()
   /** Standard eligibility belongs to this exact token, never its diagnostic name. */
   const transaction = readCapabilityTokenFacts(capability)?.transaction
-  /** Capture the binder without executing it or exposing root API authority to a transaction. */
-  let forTransaction: ((scope: ITransactionScope) => unknown) | undefined
+  /**
+   * Capture its exact function identity with an erased private domain; original owner validates
+   * use.
+   */
+  let forTransaction: ((scope: never) => unknown) | undefined
   try {
     if (
       options !== undefined &&

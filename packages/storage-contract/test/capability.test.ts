@@ -10,6 +10,7 @@ import {
   records,
   rdf,
   sparql,
+  vector,
   StorageContractErrorCode,
   type ICapabilityInstallPort,
   type IStorageBase,
@@ -23,6 +24,16 @@ import {
   type ITransactionBuilder,
   type IOptimisticTransactionBuilder,
   type ITransactionRdfApi,
+  type IRdfApi,
+  type IVectorCollection,
+  type IVectorApi,
+  type IKeyValueStore,
+  type ISyncKeyValueStore,
+  type ITransactionScope,
+  asChangeFeedStore,
+  isChangeFeedStore,
+  type IStorageIterator,
+  type IStorageChange,
   type ISparqlInput,
   type ISparqlTagTools,
   type ITransactionCapabilityView,
@@ -30,6 +41,8 @@ import {
   type IStorageKey,
   type IWithChainMethods
 } from '../src/index.js'
+import type { ICodecValue } from '@migaia/serialize/codec'
+import type { IVectorCollectionOptions } from '../src/capabilities/vector.js'
 
 /** Builds a resource-backed base without assuming any KV or transaction behavior. */
 function createBase() {
@@ -579,6 +592,14 @@ describe('standard KV capability forwarding', () => {
 })
 
 describe('capability type boundaries', () => {
+  it('admits the implemented standard token through the original binder scope use', () => {
+    /** A real RDF binder delegates the existing scope use without casting or inventing KV data. */
+    function bindOriginal(api: IRdfApi): void {
+      implement(rdf, api, { forTransaction: (scope) => scope.use(rdf) })
+    }
+    void bindOriginal
+  })
+
   it('preserves actual non-KV native scope overloads through provider and optimistic builder projection', () => {
     /** These are the SPARQL consumer's actual native overloads, without fabricated KV members. */
     type IRdfDraft = ITransactionRdfApi & { expect(): void; expectAbsent(): void }
@@ -761,6 +782,190 @@ describe('record query Feature type projection', () => {
 })
 
 describe('transaction query Feature type projection', () => {
+  it('retains known store APIs, sync metadata, transactions and family methods through text-feed refinement', () => {
+    /** Native scope and option fields remain owned by the original KV transaction entry. */
+    type IScope = ITransactionScope<ICodecValue, typeof records | typeof rdf> & {
+      nativeTx(): 'native'
+    }
+    type IBase = IKeyValueStore & {
+      readonly sync: ISyncKeyValueStore
+      readonly metadata: 'kept'
+      transaction<T>(run: (scope: IScope) => T, options?: { native: true }): Promise<Awaited<T>>
+      tx(): ITransactionBuilder<IScope, { originalBuilder(): 'kept' }>
+    }
+    /** The real original implementation tuple retains all four standard capability identities. */
+    type IStore = IWithChainMethods<
+      ICapabilityStore<
+        IBase,
+        typeof kv | typeof records | typeof rdf | typeof vector,
+        readonly [
+          ICapabilityImpl<typeof kv>,
+          ICapabilityImpl<typeof records>,
+          ICapabilityImpl<typeof rdf>,
+          ICapabilityImpl<typeof vector>
+        ]
+      >,
+      {
+        query: { recordLabel(): 'record' }
+        rdf: { rdfLabel(): 'rdf' }
+        vector: { vectorLabel(): 'vector' }
+        tx: { txLabel(): 'tx' }
+      }
+    >
+    function validTypes(store: IStore): void {
+      const fed = asChangeFeedStore(store)
+      expectTypeOf(fed.metadata).toEqualTypeOf<'kept'>()
+      expectTypeOf(fed.sync.get('key')).toEqualTypeOf<string | null>()
+      expectTypeOf(
+        fed.use(records).query<{ id: string }>().select('id').recordLabel()
+      ).toEqualTypeOf<'record'>()
+      fed.use(records).query().watch()
+      fed.use(rdf).match({}).select('subject').rdfLabel()
+      fed.use(rdf).match({}).watch()
+      fed.use(vector).collection<{ label: string }>('points').near([1]).topK(2).vectorLabel()
+      fed.use(vector).collection('points').near([1]).topK(2).watch()
+      // @ts-expect-error Text-feed refinement cannot add absent native vector grouping.
+      fed.use(vector).collection('points').near([1]).topK(2).groupBy('x', { perGroup: 1 })
+      fed.transaction((scope) => scope.nativeTx(), { native: true })
+      fed.tx().originalBuilder()
+      fed.tx().txLabel()
+      fed
+        .tx()
+        .lock({ channel: 'text', key: 'key' })
+        .run((scope) => scope.nativeTx())
+      if (isChangeFeedStore(store)) {
+        store.use(records).query().watch()
+        store.use(rdf).match({}).watch()
+        expectTypeOf(store.metadata).toEqualTypeOf<'kept'>()
+      }
+    }
+    void validTypes
+  })
+
+  it('projects records, vector and RDF root families independently with their original APIs and states', () => {
+    /** Native collection metadata and original methods survive the generic standard projection. */
+    type IVectorNativeApi = {
+      collection<TPayload = ICodecValue>(
+        name: string,
+        ...options: IVectorCollectionOptions<TPayload>
+      ): IVectorCollection<TPayload, true, true, { originalVector(): 'old-vector' }> & {
+        nativeCollection(): number
+      }
+      nativeRoot(): number
+    }
+    /** Original root capability APIs can already carry chain additions and native API methods. */
+    type IStore = ICapabilityStore<
+      IStorageBase,
+      typeof records | typeof rdf | typeof vector,
+      readonly [
+        ICapabilityImpl<
+          typeof records,
+          IRecordsApi<ICodecValue, true, { originalRecord(): 'old-record' }>
+        >,
+        ICapabilityImpl<
+          typeof rdf,
+          IRdfApi<true, { originalRdf(): 'old-rdf' }> & { nativeRdf(): number }
+        >,
+        ICapabilityImpl<typeof vector, IVectorNativeApi>
+      ]
+    >
+    /** Only the selected family receives its newly installed group; prior groups remain available. */
+    type IEnhanced = IWithChainMethods<
+      IStore,
+      {
+        query: { queryOnly(): 'query' }
+        rdf: { rdfOnly(): 'rdf' }
+        vector: { vectorOnly(): 'vector' }
+      }
+    >
+    /** A single RDF or vector Feature must project even when no record group exists. */
+    type IRdfOnly = IWithChainMethods<IStore, { rdf: { label(): 'native' } }>
+    type IVectorOnly = IWithChainMethods<IStore, { vector: { label(): 'native' } }>
+    /** A false source declaration cannot gain watch or grouping from a pure vector Feature. */
+    type IQuietVector = IWithChainMethods<
+      ICapabilityStore<
+        IStorageBase,
+        typeof vector,
+        readonly [ICapabilityImpl<typeof vector, IVectorApi>]
+      >,
+      { vector: { label(): 'native' } }
+    >
+    function quietTypes(store: IQuietVector): void {
+      const query = store.use(vector).collection('quiet').near([1]).topK(2)
+      query.label()
+      // @ts-expect-error A pure Feature does not grant an absent native feed.
+      query.watch()
+      // @ts-expect-error A pure Feature does not grant absent native grouping.
+      query.groupBy('id', { perGroup: 1 })
+    }
+    void quietTypes
+    /** Actual implement inference keeps native feed refinements without changing default tokens. */
+    function publish(base: IStorageBase, api: IRdfApi<true>): void {
+      const store = provideCapabilities(base, [implement(rdf, api)])
+      expectTypeOf(store.use(rdf)).toEqualTypeOf<IRdfApi<true>>()
+    }
+    void publish
+    function validTypes(
+      store: IEnhanced & IKeyValueStore,
+      rdfOnly: IRdfOnly,
+      vectorOnly: IVectorOnly
+    ): void {
+      const fed = asChangeFeedStore(store)
+      fed.use(records).query<{ id: string }>().select('id').originalRecord()
+      fed.use(rdf).match({}).select('object').originalRdf()
+      fed.use(vector).collection('native').nativeCollection()
+      fed.use(vector).collection('native').near([1]).topK(2).select('id').originalVector()
+      fed.use(vector).collection('native').near([1]).topK(2).watch()
+      fed
+        .use(vector)
+        .collection<{ id: string }>('native')
+        .near([1])
+        .topK(2)
+        .groupBy('id', { perGroup: 1 })
+      const record = store.use(records).query<{ id: string; value: number }>()
+      record.select('id').queryOnly()
+      record.select('value').originalRecord()
+      expectTypeOf(record.watch()).toEqualTypeOf<IStorageIterator<IStorageChange>>()
+      // @ts-expect-error Root record chains cannot gain RDF methods.
+      record.rdfOnly()
+      const rdfQuery = store.use(rdf).match({})
+      rdfQuery.follow({ termType: 'NamedNode', value: 'urn:knows' }).select('subject').rdfOnly()
+      rdfQuery.select('object').originalRdf()
+      expectTypeOf(rdfQuery.watch()).toEqualTypeOf<IStorageIterator<IStorageChange>>()
+      store.use(rdf).nativeRdf()
+      // @ts-expect-error Root RDF chains cannot gain record methods.
+      rdfQuery.queryOnly()
+      const collection = store.use(vector).collection<{ category: string }>('points')
+      collection.nativeCollection()
+      store.use(vector).nativeRoot()
+      const hits = collection.near([1]).topK(2)
+      hits.select('id').vectorOnly()
+      hits.select('score').originalVector()
+      expectTypeOf(hits.watch()).toEqualTypeOf<IStorageIterator<IStorageChange>>()
+      hits.groupBy('category', { perGroup: 1 }).vectorOnly()
+      hits
+        .where((payload) => payload.category === 'one')
+        .withVector()
+        .select('vector')
+        .vectorOnly()
+      // @ts-expect-error Root vector chains cannot gain RDF methods.
+      hits.rdfOnly()
+      // @ts-expect-error Generic collection payload constraints remain the vector owner's domain.
+      store.use(vector).collection<{ invalid: () => void }>('bad')
+      expectTypeOf(rdfOnly.use(rdf).match({}).select('subject').label()).toEqualTypeOf<'native'>()
+      expectTypeOf(
+        vectorOnly
+          .use(vector)
+          .collection<{ count: number }>('items')
+          .similarTo('one')
+          .topK(2)
+          .select('id')
+          .label()
+      ).toEqualTypeOf<'native'>()
+    }
+    void validTypes
+  })
+
   it('keeps record and RDF Feature groups separate through both scope and builder projection', () => {
     /** Both standard lookups borrow the same native transaction scope without mixing method groups. */
     type IScope = ITransactionCapabilityView<typeof records | typeof rdf> & {

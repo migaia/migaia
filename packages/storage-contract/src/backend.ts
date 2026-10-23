@@ -4,9 +4,21 @@ import type {
   IStorageCapabilitySet,
   IStorageCapabilityApiOf,
   IWithTransactionQueryMethods,
+  IRecordsApi,
+  ICapabilityImpl,
+  ICapabilityStore,
+  IAnyStorageCapability,
   records
 } from './capability.js'
-import type { IRecordQuery } from './query-chain.js'
+import type { rdf, IRdfApi } from './capabilities/rdf.js'
+import type {
+  vector,
+  IVectorApi,
+  IVectorCollection,
+  IVectorCollectionOptions
+} from './capabilities/vector.js'
+import type { IKeyValueStore } from './store.js'
+import type { IRecordQuery, IRdfQuery, IVectorQueryBuilder, IQueryWatch } from './query-chain.js'
 import type { IStorageKey, IOperationContext } from './context.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { ICodecStageObserver } from './codec.js'
@@ -102,29 +114,94 @@ type IRecordValueOf<TStore> = TStore extends {
   ? TValue
   : ICodecValue
 /** Replaces only the common query controls, preserving native API and chain refinements. */
-type IWithRecordQueryMethods<TApi, TValue, TMethods extends IChainMethods> = TApi extends {
+type IWithRecordQueryMethods<
+  TApi,
+  TValue,
+  TMethods extends IChainMethods,
+  TExtra extends object = Record<never, never>
+> = TApi extends {
   query(): infer TQuery
 }
   ? Omit<TApi, 'query'> & {
       query<R = TValue>(): Omit<TQuery, keyof IRecordQuery<unknown>> &
-        IRecordQuery<R, IOperationContext, IChainPart<TMethods, 'query'>> &
+        IRecordQuery<
+          R,
+          IOperationContext,
+          Omit<TQuery, keyof IRecordQuery<unknown>> & IChainPart<TMethods, 'query'> & TExtra
+        > &
         IChainPart<TMethods, 'query'>
     }
   : TApi
-/** Capability lookup keeps the original implementation API for every token outside records. */
-type IWithQueryMethods<TStore, TMethods extends IChainMethods> = 'query' extends keyof TMethods
-  ? {
-      use<TCap extends IStorageCapabilitySet<TStore>>(
-        capability: TCap
-      ): TCap extends typeof records
-        ? IWithRecordQueryMethods<
-            IStorageCapabilityApiOf<TStore, TCap>,
-            IRecordValueOf<TStore>,
-            TMethods
-          >
-        : IStorageCapabilityApiOf<TStore, TCap>
+/** Native RDF members and previous query additions survive the standard match projection. */
+type IWithRdfQueryMethods<
+  TApi,
+  TMethods extends IChainMethods,
+  TExtra extends object = Record<never, never>
+> = TApi extends {
+  match(...args: infer TArguments): infer TQuery
+}
+  ? Omit<TApi, 'match'> & {
+      match(
+        ...args: TArguments
+      ): IRdfQuery<
+        IOperationContext,
+        Omit<TQuery, keyof IRdfQuery> & IChainPart<TMethods, 'rdf'> & TExtra
+      >
     }
-  : Pick<TStore, Extract<keyof TStore, 'use'>>
+  : TApi
+/** Existing collection builders declare their original pure methods and native watch presence. */
+type IVectorBuilderOf<TCollection> = TCollection extends { near(...args: never[]): infer TBuilder }
+  ? TBuilder
+  : never
+/** Grouping is inferred from actual bounded method presence, never widened from an absent flag. */
+type IVectorGroupingOf<TCollection> =
+  IVectorBuilderOf<TCollection> extends { topK(count: number): infer TQuery }
+    ? TQuery extends { groupBy(...args: never[]): unknown }
+      ? true
+      : false
+    : false
+/** Generic payload options use the original vector owner; native collection members remain exact. */
+type IWithVectorQueryMethods<
+  TApi,
+  TMethods extends IChainMethods,
+  TExtra extends object = Record<never, never>
+> = TApi extends {
+  collection(...args: never[]): infer TCollection
+}
+  ? Omit<TApi, 'collection'> & {
+      collection<TPayload = ICodecValue>(
+        name: string,
+        ...options: IVectorCollectionOptions<TPayload>
+      ): Omit<TCollection, keyof IVectorCollection<unknown>> &
+        IVectorCollection<
+          TPayload,
+          IVectorGroupingOf<TCollection>,
+          false,
+          Omit<IVectorBuilderOf<TCollection>, keyof IVectorQueryBuilder<unknown>> &
+            IChainPart<TMethods, 'vector'> &
+            TExtra
+        >
+    }
+  : TApi
+/** Each actual root family receives only its own methods; all other native APIs remain untouched. */
+type IWithQueryMethods<TStore, TMethods extends IChainMethods> =
+  Extract<'query' | 'vector' | 'rdf', keyof TMethods> extends never
+    ? Pick<TStore, Extract<keyof TStore, 'use'>>
+    : {
+        use<TCap extends IStorageCapabilitySet<TStore>>(
+          capability: TCap
+        ): TCap extends typeof records
+          ? IWithRecordQueryMethods<
+              IStorageCapabilityApiOf<TStore, TCap>,
+              IRecordValueOf<TStore>,
+              TMethods
+            >
+          : TCap extends typeof rdf
+            ? IWithRdfQueryMethods<IStorageCapabilityApiOf<TStore, TCap>, TMethods>
+            : TCap extends typeof vector
+              ? IWithVectorQueryMethods<IStorageCapabilityApiOf<TStore, TCap>, TMethods>
+              : IStorageCapabilityApiOf<TStore, TCap>
+      }
 
 /** Pure authoring projection; actual methods are installed by the owning host and chain owners. */
 export type IWithChainMethods<TStore, TMethods extends IChainMethods> = keyof TMethods extends never
@@ -133,6 +210,33 @@ export type IWithChainMethods<TStore, TMethods extends IChainMethods> = keyof TM
       readonly [installedChainMethods]?: TMethods
     } & IWithTransactionMethods<TStore, TMethods> &
       IWithQueryMethods<TStore, TMethods>
+/** A truthful store-wide feed refines only the three standard query APIs and keeps native members. */
+type IWithChangeFeedApi<TApi> =
+  TApi extends IRecordsApi<infer TValue, infer _TFeed, infer TMethods>
+    ? IWithRecordQueryMethods<TApi, TValue, { query: TMethods }, IQueryWatch>
+    : TApi extends IVectorApi<infer _TGroupable, infer _TFeed, infer TMethods>
+      ? IWithVectorQueryMethods<TApi, { vector: TMethods }, IQueryWatch>
+      : TApi extends IRdfApi<infer _TFeed, infer TMethods>
+        ? IWithRdfQueryMethods<TApi, { rdf: TMethods }, IQueryWatch>
+        : TApi
+/** Rebuilds the original implementation tuple from existing metadata without a capability registry. */
+type IChangeFeedImplementation<S, C extends IAnyStorageCapability> = C extends unknown
+  ? Omit<ICapabilityImpl<C>, 'api'> & {
+      readonly api: IWithChangeFeedApi<IStorageCapabilityApiOf<S, C>>
+    }
+  : never
+/** Known-store refinement preserves native, sync, metadata, transaction and Feature method domains. */
+export type IWithChangeFeedCapabilities<S extends Omit<IKeyValueStore, 'use'>> = ([
+  IStorageCapabilitySet<S>
+] extends [never]
+  ? S
+  : ICapabilityStore<
+        S,
+        IStorageCapabilitySet<S>,
+        readonly IChangeFeedImplementation<S, IStorageCapabilitySet<S>>[]
+      > extends infer T
+    ? IWithChainMethods<T, IChainMethodsOf<S>>
+    : never) & { readonly capabilities: S['capabilities'] & { readonly changeFeed: true } }
 
 /** Backend observations carry no client or payload authority. */
 export type IBackendStageObserver = Readonly<{
