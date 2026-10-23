@@ -42,3 +42,5 @@ export type {
 } from '../core/operation-reporter.js'
 
 export type { IBackendKeyLockPort } from '../backends/key-locks.js'
+
+export type { IBackendRevisionPort } from '../backends/revisions.js'

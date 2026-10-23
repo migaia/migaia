@@ -1,3 +1,4 @@
+import type { IBackendRevisionPort } from './backends/revisions.js'
 import type { IBackendKeyLockPort } from './backends/key-locks.js'
 import type { IStorageHooks, IStorageHookMap } from './hook-types.js'
 import type { IStorageHookEmitter } from './hooks.js'
@@ -301,10 +302,13 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'
 > &
   IStorageBorrowPort & {
+    readonly defaultOrgId: string
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
     readonly stageBindings: IBackendStageBindings
     createKeyLockPort(): IBackendKeyLockPort
+    /** Construct revision facts for one physical data universe during this installation window. */
+    createRevisionPort(): IBackendRevisionPort
     createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
     registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
     registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
@@ -554,6 +558,7 @@ export type IStorageDefinePlugin = {
         | 'usePipeline'
         | 'useAsyncPipeline'
         | 'execution'
+        | 'defaultOrgId'
         | 'hooks'
         | 'emit'
         | 'registerDetect'

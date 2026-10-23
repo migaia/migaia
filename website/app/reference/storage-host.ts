@@ -116,8 +116,8 @@ console.log(host.extensions.label('draft'))`,
     definePlugin: {
       role: 'factory',
       purpose: t(
-        'Capture a named descriptor factory and selected Features without opening a backend. Named generic descriptor factories retain the actual store and extension types.',
-        '捕获具名descriptor工厂与选中的Feature，不提前打开后端。具名泛型工厂保留实际store和扩展类型。'
+        'Capture a named descriptor factory and selected Features without opening a backend. Named generic descriptor factories retain the actual store and extension types. The original core reads the captured defaultOrgId and creates revision facts for a physical backend through createRevisionPort().',
+        '捕获具名descriptor工厂与选中的Feature，不提前打开后端。具名泛型工厂保留实际store和扩展类型。原core读取已捕获的defaultOrgId，并经createRevisionPort()创建物理后端修订事实。'
       ),
       returns: t(
         'An opaque literal-id plugin handle consumed by createStorageHost or host.use.',
