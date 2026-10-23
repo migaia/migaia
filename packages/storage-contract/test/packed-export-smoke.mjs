@@ -81,6 +81,7 @@ function main() {
       join(consumerDirectory, 'identity.mjs'),
       `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+import * as conformance from '@migaia/storage-contract/conformance'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
 const createBase = () => ({
@@ -89,6 +90,8 @@ const createBase = () => ({
   dispose: async () => undefined,
   [Symbol.asyncDispose]: async () => undefined
 })
+/** The isolated consumer loads the public subpath without installing any test runner peer. */
+if (Object.keys(conformance).join(',') !== 'runConformance' || typeof conformance.runConformance !== 'function') throw new Error('packed conformance entry mismatch')
 /** Authentic root exports retain the same original API after normal package extraction. */
 const token = defineStorageCapability()('packed-read')
 /** API identity proves both lookup paths share the original provider installation. */

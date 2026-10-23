@@ -1,20 +1,7 @@
-import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTestStore } from '../helpers/installed-backends.js'
-import { createLocalTestStore, createIndexedDbTestStore } from '../helpers/installed-backends.js'
-import { asRecordStore } from '../../src/types'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage'
-import { recordConformance } from './suite'
-
-recordConformance('memory', async () => await createMemoryTestStore())
-
-recordConformance('indexedDbHost', async () =>
-  createIndexedDbTestStore({
-    factory: new IDBFactory(),
-    keyRange: IDBKeyRange,
-    dbName: `test-${Math.random().toString(36).slice(2)}`
-  })
-)
+import { createLocalTestStore } from '../helpers/installed-backends.js'
+import { asRecordStore } from '@migaia/storage-contract'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
 
 describe('L0-only 后端上的 L1 能力', () => {
   it('localStorageHost 在能力探测上声明 records: false', async () => {

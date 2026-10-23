@@ -335,6 +335,29 @@ async function deleteDrafts(store: IStorageStore<typeof vector>) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  runConformance: [
+    {
+      title: t('Verify a backend with its existing runner', '用现有 runner 验证后端'),
+      problem: t(
+        'A backend must prove its declared capabilities without importing another backend or runner into the contract.',
+        '后端须证明所声明的能力，契约不能依赖另一后端或 runner。'
+      ),
+      example: `import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
+import { kv, type IStorageStore, type IStorageCapabilities } from '@migaia/storage-contract'
+
+export function verifyKvBackend(
+  harness: IConformanceHarness,
+  create: () => IStorageStore<typeof kv> | PromiseLike<IStorageStore<typeof kv>>,
+  features: IStorageCapabilities
+) {
+  runConformance(harness, { name: 'my-backend', create, capabilities: [kv], features })
+}`,
+      result: t(
+        'The consumer runner executes the registered cases. Each creates a fresh fixture, verifies the complete manifest, and finally disposes that store; extra declared tokens belong in capabilities.',
+        '消费者 runner 执行登记的用例。每例新建 fixture、核对完整清单并 finally 释放 store；其它已声明 token 也必须列入 capabilities。'
+      )
+    }
+  ],
   createStorageBlobBodyReader: [
     {
       title: t('Read an admitted upload body', '读取已准入的上传内容'),

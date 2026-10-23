@@ -723,6 +723,12 @@ Text changes use `ITextWatchApi.watch(key,ctx?)` and `ITextChangeFeedApi.subscri
 
 `createStorageBlobBodyReader(body, { report, backend?, normalizeFailure? })` is a finite upload-author entry. Check native conditions first, then submit the captured body to the original iterator lifetime. Each next returns an independent Uint8Array chunk without prefetching; the native sink, part buffers and scheduling remain with the backend. EOF and rejected reads are not cancelled again. Early return(reason)/dispose cancels before draining accepted reads and releases once. Cancellation failure remains primary and a later release failure is reported. Main and symbolic cleanup retain distinct cached promises. The caller retains its original signal/timeout and sink cleanup, and must also dispose the reader after a read failure.
 
+## Conformance suite
+
+Backend tests import `runConformance` and `IConformanceHarness` from `@migaia/storage-contract/conformance`. Pass the existing runner's describe/it/expect, an independent create factory, the complete token list and Boolean features. Each fixture checks all ten standard tokens against actual has in both directions, then exercises the declared KV, sync, bytes, records, indexes, iteration, transactions and post-commit notifications. Pure vector and SQL subjects need no KV facade.
+
+Each case creates and finally disposes its original store; body and cleanup failures remain reachable. Notification cases use only the consumer runner's case timeout. opaqueEntries and approximate maxValueBytes are declaration checks, not proof about hidden keys or exact quotas. The production subpath imports no Vitest, Web, host or driver.
+
 Native backends can call package-root `snapshotStorageWhere(where)` to capture the original query owner’s frozen `IQueryCondition`. Native translation and `compileStorageQueryCondition` share that AST and the existing single-read validation and `INVALID_ARGUMENT` cause; no new parser, encoder or executor is created.
 
 Native backends may provide optional pure `IQueryPushdown.canPushCondition(condition)` using their original translator to check the canonical AST’s exact native value domain. Existing operator and object-identity rules run first. false retains client steps and makes `requirePushdown` reject before I/O; omission preserves prior semantics. The original function and receiver are captured once without another query executor.
