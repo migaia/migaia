@@ -4,6 +4,7 @@ import {
   StorageContractErrorCode,
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockHoldings,
+  snapshotStorageKey,
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext,
   type IConcurrencyHolder,
@@ -29,6 +30,28 @@ export type IBackendKeyLockPort = IStorageResource & {
     stages?: IConcurrencyStageObserver,
     admissionSignal?: IAbortSignal
   ): Promise<IConcurrencyAttempt<R>>
+  /** Probe canonical identities directly; ranges scan only this original active lock table. */
+  probe(
+    identities: readonly string[],
+    ranges?: readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[]
+  ): ILockHolding | undefined
+  /** Final conflict admission and this synchronous native mutation share one uninterrupted turn. */
+  attemptWrite<R>(
+    ctx: IConcurrencyAttemptContext,
+    holder: IConcurrencyHolder,
+    write: () => R,
+    stages?: IConcurrencyStageObserver,
+    admissionSignal?: IAbortSignal,
+    ranges?: readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[]
+  ): Promise<IConcurrencyAttempt<R>>
   inspectLocks(): readonly ILockHolding[]
 }
 
@@ -46,7 +69,11 @@ type IKeyEntry = {
 /** Construct only through the backend core's original installation window. */
 export function createBackendKeyLockPort(): IBackendKeyLockPort {
   /** This is the sole logical lock table, shared by the physical backend's existing closure. */
-  const entries = new Map<string, IKeyEntry>()
+  const entries = {
+    text: new Map<string, IKeyEntry>(),
+    bytes: new Map<string, IKeyEntry>(),
+    record: new Map<string, IKeyEntry>()
+  }
   /** Only contended waiting admissions enter the existing utility FIFO. */
   const limiter = createConcurrencyLimiter({ concurrency: 1 })
   /** The original lifecycle tracker seals and drains complete attempts, including native cleanup. */
@@ -87,13 +114,30 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     }
   }
 
+  /** Fixed finite channel buckets retain each physical entry once without interpreting its bytes. */
+  const readEntry = (identity: string): IKeyEntry | undefined =>
+    entries.text.get(identity) ?? entries.bytes.get(identity) ?? entries.record.get(identity)
+
   /** Canonical input order determines the first actual conflicting holder. */
-  const conflict = (identities: readonly string[]): IKeyEntry | undefined => {
+  const conflict = (
+    identities: readonly string[],
+    ranges: readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[] = [],
+    ownLease?: IKeyLease
+  ): IKeyEntry | undefined => {
     for (const identity of identities) {
       /** Lookup never re-encodes or sorts the logical key. */
-      const held = entries.get(identity)
-      if (held !== undefined) return held
+      const held = readEntry(identity)
+      if (held !== undefined && held.lease !== ownLease) return held
     }
+    /** At most the affected physical channels are inspected; no range index or range lock exists. */
+    for (const range of ranges)
+      for (const [identity, held] of entries[range.channel])
+        if (held.lease !== ownLease && range.lower <= identity && identity < range.upper)
+          return held
     return undefined
   }
 
@@ -115,8 +159,11 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     /** One synchronous release removes only entries still bearing this exact lease. */
     const dispose = (): Promise<void> => {
       if (disposal !== undefined) return disposal
-      for (const identity of identities)
-        if (entries.get(identity)?.lease === lease) entries.delete(identity)
+      for (const identity of identities) {
+        /** The canonical identity locates at most one entry across the fixed channel buckets. */
+        const held = readEntry(identity)
+        if (held?.lease === lease) entries[held.key.channel].delete(identity)
+      }
       released.resolve()
       observe(stages, 'onLockReleased', ctx.attempt, identities.length)
       return (disposal = Promise.resolve())
@@ -128,8 +175,11 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       [Symbol.asyncDispose]: () =>
         (symbolic ??= dispose().catch((error) => reportCleanupError(report, error)))
     }
-    for (const [index, identity] of identities.entries())
-      entries.set(identity, { key: ctx.lock![index]!, holder: capturedHolder, lease })
+    for (const [index, identity] of identities.entries()) {
+      /** Authentic context keys and identities were paired by the same original normalization. */
+      const key = ctx.lock![index]!
+      entries[key.channel].set(identity, { key, holder: capturedHolder, lease })
+    }
     observe(stages, 'onLockAcquired', ctx.attempt, identities.length)
     return lease
   }
@@ -140,8 +190,13 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     identities: readonly string[],
     holder: IConcurrencyHolder,
     stages: IConcurrencyStageObserver | undefined,
-    admissionSignal: IAbortSignal | undefined
-  ): Promise<IKeyLease> => {
+    admissionSignal: IAbortSignal | undefined,
+    ranges: readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[]
+  ): Promise<IKeyLease | undefined> => {
     /** This bridge cancels only queued admission when the original ctx.wait budget ends. */
     const admission = createAbortController()
     /** Member closure cancels only this not-yet-native admission on the existing bridge. */
@@ -164,8 +219,11 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
               throwIfAborted(admission.signal)
               assertOpen()
               /** Each wake-up rechecks the same canonical table before any native operation starts. */
-              const held = conflict(identities)
-              if (held === undefined) return acquire(ctx, identities, holder, stages)
+              const held = conflict(identities, ranges)
+              if (held === undefined)
+                return ctx.locking === 'pessimistic' && identities.length > 0
+                  ? acquire(ctx, identities, holder, stages)
+                  : undefined
               await raceWithAbort(() => held.lease.released, {
                 signal: admission.signal,
                 cleanupPolicy: 'report',
@@ -199,7 +257,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       try {
         /** A lease that won just before the budget must be released before returning the failure. */
         const late = await pending
-        await late.dispose()
+        await late?.dispose()
       } catch (secondary) {
         if (
           secondary !== reason &&
@@ -215,12 +273,18 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   }
 
   /** The backend's complete native attempt remains inside the acquired resource interval. */
-  const attempt = async <R>(
+  const runAttempt = async <R>(
     ctx: IConcurrencyAttemptContext,
     holder: IConcurrencyHolder,
-    native: IConcurrencyPort<R>,
+    native: IConcurrencyPort<R> | undefined,
     stages?: IConcurrencyStageObserver,
-    admissionSignal?: IAbortSignal
+    admissionSignal?: IAbortSignal,
+    write?: () => R,
+    ranges: readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[] = []
   ): Promise<IConcurrencyAttempt<R>> => {
     assertOpen()
     /** Only an authentic active original context can supply canonical identities. */
@@ -232,22 +296,37 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     try {
       throwIfAborted(ctx.signal)
       throwIfAborted(admissionSignal)
-      if (ctx.locking === 'pessimistic' && identities.length !== 0) {
+      if (
+        (ctx.locking === 'pessimistic' || write !== undefined) &&
+        (identities.length !== 0 || ranges.length !== 0)
+      ) {
         /** Empty tables admit immediately without scheduling through the limiter. */
-        const held = conflict(identities)
-        if (held === undefined) lease = acquire(ctx, identities, holder, stages)
-        else if (ctx.admission === 'try')
+        const held = conflict(identities, ranges)
+        if (held === undefined) {
+          if (ctx.locking === 'pessimistic' && identities.length > 0)
+            lease = acquire(ctx, identities, holder, stages)
+        } else if (ctx.admission === 'try')
           return {
             status: 'conflict',
             phase: 'acquire',
-            keys: ctx.lock ?? [],
+            keys: write === undefined ? (ctx.lock ?? []) : [held.key],
             holder: held.holder
           }
-        else lease = await waitForKeys(ctx, identities, holder, stages, admissionSignal)
+        else lease = await waitForKeys(ctx, identities, holder, stages, admissionSignal, ranges)
       }
       /** A member may close after acquisition but before the native terminal is entered. */
       throwIfAborted(admissionSignal)
-      return await native.attempt(ctx)
+      if (write !== undefined) {
+        /** A waiting continuation or observation may have admitted a new intersecting holder. */
+        const held = conflict(identities, ranges, lease)
+        if (held !== undefined)
+          return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
+        /** An acquisition observer may have cancelled the original operation synchronously. */
+        throwIfAborted(ctx.signal)
+        /** No await separates final cancellation/active-table checks from native mutation. */
+        return { status: 'committed', value: write() }
+      }
+      return await native!.attempt(ctx)
     } finally {
       await lease?.dispose()
       finish()
@@ -268,15 +347,37 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   }
 
   return {
-    attempt,
+    attempt: (ctx, holder, native, stages, admissionSignal) =>
+      runAttempt(ctx, holder, native, stages, admissionSignal),
+    attemptWrite: (ctx, holder, write, stages, admissionSignal, ranges) =>
+      runAttempt(ctx, holder, undefined, stages, admissionSignal, write, ranges),
+    probe: (identities, ranges) => {
+      assertOpen()
+      /** Only the first actual holder is copied; point probing never sorts or scans other keys. */
+      const held = conflict(identities, ranges)
+      if (held === undefined) return undefined
+      return Object.freeze({
+        key:
+          held.key.channel === 'bytes'
+            ? held.key
+            : Object.freeze({
+                channel: held.key.channel,
+                key: snapshotStorageKey(held.key.key, undefined)
+              }),
+        holder: held.holder,
+        expired: false
+      })
+    },
     inspectLocks: () => {
       assertOpen()
       return snapshotConcurrencyLockHoldings(
-        [...entries.values()].map((entry) => ({
-          key: entry.key,
-          holder: entry.holder,
-          expired: false
-        }))
+        Object.values(entries)
+          .flatMap((channel) => [...channel.values()])
+          .map((entry) => ({
+            key: entry.key,
+            holder: entry.holder,
+            expired: false
+          }))
       )
     },
     dispose,

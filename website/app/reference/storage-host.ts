@@ -7,7 +7,7 @@ export const storageHostReference: ILibraryReference = {
   modules: {
     'authoring/backend': {
       summary: t(
-        'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller and local key-lock construction stay on the original core; only their types are public through this entry. Features retain only controller lookup. The controller closing signal cancels its own pending lock admission without closing the shared provider.',
+        'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller and local key-lock construction stay on the original core; only their types are public through this entry. Features retain only controller lookup. The controller closing signal cancels its own pending lock admission without closing the shared provider. Its key-lock port probes canonical point identities directly, scans only selected channel buckets for ranges, and runs synchronous root writes after a final conflict recheck in the original attempt/FIFO.',
         '通过有限后端函数共享通道、唯一索引、错误和取消规则。controller和本地键锁构造归原core，本入口只公开其类型；Feature只保留controller读取。controller关闭信号只取消自身尚未启动的锁准入，不关闭共享provider。'
       ),
       example: `import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/authoring/backend'
@@ -42,14 +42,26 @@ console.log(host.extensions.label('draft'))`
   symbols: {
     memoryBackendPlugin: {
       role: 'factory',
-      purpose: t('Define an isolated memory backend without acquiring data before installation. Native transactions share the original owner and local lock/revision facts.', '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'),
-      returns: t('A literal-id memory plugin retaining selected Features. The default id is memory; where/select/all run through the shared records query core.', '保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'),
+      purpose: t(
+        'Define an isolated memory backend without acquiring data before installation. Native transactions share the original owner and local lock/revision facts.',
+        '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'
+      ),
+      returns: t(
+        'A literal-id memory plugin retaining selected Features. The default id is memory; where/select/all run through the shared records query core.',
+        '保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
+      ),
       cases: storageHostCases.memoryBackendPlugin
     },
     memoryBackendKind: {
       role: 'constant',
-      purpose: t('Target memory Features using exact backend kind identity.', '以准确后端种类身份绑定memory Feature。'),
-      returns: t('The authentic memory kind; its client is undefined and its transaction client checks the original scope and returns undefined.', '真实memory种类；client为undefined，事务client校验原scope后返回undefined。')
+      purpose: t(
+        'Target memory Features using exact backend kind identity.',
+        '以准确后端种类身份绑定memory Feature。'
+      ),
+      returns: t(
+        'The authentic memory kind; its client is undefined and its transaction client checks the original scope and returns undefined.',
+        '真实memory种类；client为undefined，事务client校验原scope后返回undefined。'
+      )
     },
     resolveStorageNamespace: {
       role: 'operation',
