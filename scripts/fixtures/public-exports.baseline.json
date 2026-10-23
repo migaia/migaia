@@ -1752,6 +1752,11 @@
         "definePlugin",
         "defineStorageBackendKind"
       ],
+      "./authoring/backend": [
+        "createStorageOperationReporter",
+        "createStorageOperationRuntime",
+        "reportCleanupError"
+      ],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",
         "binaryCodec",

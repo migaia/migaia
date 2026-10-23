@@ -8,6 +8,15 @@ const baseline = JSON.parse(
   )
 ) as { packages: Record<string, Record<string, string[]>> }
 describe('storage host package exports', () => {
+  it('loads only finite backend functions from the dedicated authoring entry', async () => {
+    /** Real package resolution proves controller authority remains on the original core. */
+    const runtime = await import('@migaia/storage-host/authoring/backend')
+    expect(Object.keys(runtime).sort()).toEqual(
+      baseline.packages['@migaia/storage-host']!['./authoring/backend']
+    )
+    expect(runtime).not.toHaveProperty('createBackendChangeController')
+    expect(runtime).not.toHaveProperty('getBackendChangeController')
+  })
   it('loads the actual neutral package root with the declared public runtime surface', async () => {
     /** Dynamic self-import exercises the built package entry rather than an internal source alias. */
     const runtime = await import('@migaia/storage-host')

@@ -21,6 +21,7 @@ import type {
   IStorageDefinePlugin,
   IStorageDefineFeature,
   IStoragePluginCore,
+  IStorageFeatureExpose,
   IStorageExecutionPort,
   IStoragePipelineInput,
   IStorageNativePluginDescriptor
@@ -216,6 +217,9 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStageBindings(): IBackendStageBindings
   getStorageHooks(): IStorageHooks
   readonly emit: IStorageHookEmitter
+  readonly createChangeController: IStoragePluginCore['createChangeController']
+  readonly registerChangeController: IStoragePluginCore['registerChangeController']
+  readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
   readonly registerDetect: IStoragePluginCore['registerDetect']
 }
 /** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
@@ -259,6 +263,8 @@ export const definePlugin: IStorageDefinePlugin = ((
           return nativeCore.getStageBindings()
         },
         emit: nativeCore.emit,
+        createChangeController: nativeCore.createChangeController,
+        registerChangeController: nativeCore.registerChangeController,
         registerDetect: nativeCore.registerDetect,
         registerStore: (store: IStorageBase) => {
           if (transferred)
@@ -389,6 +395,7 @@ export const definePlugin: IStorageDefinePlugin = ((
             expose,
             {
               getKind: () => kind,
+              getChangeController: nativeCore.getChangeController,
               getStore: () => nativeCore.getStore(),
               getBackendId: () => nativeCore.getBackendId(),
               getLifecycle: () => nativeCore.lifecycle,

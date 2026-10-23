@@ -6,6 +6,12 @@ import {
 import type { IStorageHooks } from './hook-types.js'
 import { createStorageObservers, type IStorageObserverSet } from './stages.js'
 import { createStorageEnvelopeStages } from './envelope-stages.js'
+import {
+  createBackendChangeController,
+  registerBackendChangeController,
+  getBackendChangeController,
+  type IBackendChangeController
+} from './core/change-controller.js'
 import { StorageHookName as Hook } from './hook-names.js'
 import { STORAGE_DEFAULT_ORG } from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
@@ -136,6 +142,28 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         getBackendId: () => context.id,
         getScheduler: () => context.scheduler,
         getStageBindings: context.getStageBindings,
+        createChangeController: ((options) => {
+          /** Original resource admission owns partial-construction cleanup and the install window. */
+          let controller: IBackendChangeController | undefined
+          registrationCore!.onDispose(() => controller?.dispose())
+          controller = createBackendChangeController(options)
+          return controller
+        }) satisfies IStoragePluginCore['createChangeController'],
+        registerChangeController: ((store, controller) => {
+          /** Exact registry release is attached to the same original registration scope. */
+          let release: (() => void) | undefined
+          registrationCore!.onDispose(() => release?.())
+          if (context.storeCell.get() !== store)
+            throw createStorageTypeError(
+              StorageErrorCode.backendPluginInvalid,
+              StorageErrorText.backendPluginInvalid
+            )
+          release = registerBackendChangeController(store, controller)
+        }) satisfies IStoragePluginCore['registerChangeController'],
+        getChangeController: () => {
+          context.assertCurrent()
+          return getBackendChangeController(context.storeCell.get())
+        },
         registerDetect: context.registerDetect,
         getStorageHooks: () =>
           ({

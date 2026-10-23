@@ -13,7 +13,11 @@ export default defineConfig({
   build: {
     target: 'es2020',
     lib: {
-      entry: { index: 'src/index.ts', entity: 'src/entity.ts' },
+      entry: {
+        index: 'src/index.ts',
+        entity: 'src/entity.ts',
+        'authoring/backend': 'src/authoring/backend.ts'
+      },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`
     },

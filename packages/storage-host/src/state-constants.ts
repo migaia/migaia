@@ -9,6 +9,7 @@ export const STORAGE_DESCRIPTOR_METADATA = [
 /** Host-injected expose methods cannot be replaced by a backend author. */
 export const STORAGE_RESERVED_EXPOSE = [
   'getKind',
+  'getChangeController',
   'getStore',
   'getBackendId',
   'getLifecycle',

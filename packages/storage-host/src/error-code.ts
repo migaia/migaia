@@ -36,8 +36,8 @@ export const StorageErrorCode = {
    */
   storageHostDisposed: 'STORAGE_HOST_DISPOSED',
   /**
-   * Host cleanup collected one or more failures. Callers must treat the host as terminal while
-   * inspecting the aggregate errors for cleanup diagnostics.
+   * Host cleanup collected failures or a controlled backend finalizer rejected without a semantic
+   * identity. Callers inspect the original cleanup cause and treat that resource as terminal.
    */
   storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED',
   /** A backend token does not match the installed store or selected Feature. */

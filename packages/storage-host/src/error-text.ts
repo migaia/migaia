@@ -1,5 +1,7 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Preserve the original final backend cleanup diagnostic when its neutral implementation moves. */
+  operationCleanupFailed: '[storage-web] operation cleanup failed',
   /** Environment checks must be callable before their original installation resource is acquired. */
   invalidDetectCheck: 'storage environment check must be a function',
   /** Detection mode is a boolean captured before backend construction. */
