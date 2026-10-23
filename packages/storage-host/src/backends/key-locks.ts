@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createAbortController, createQuiescenceTracker } from '@migaia/lifecycle'
 import {
   StorageContractError,
@@ -182,7 +183,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       context: ctx,
       released: released.promise,
       dispose,
-      [Symbol.asyncDispose]: () =>
+      [asyncDisposeKey]: () =>
         (symbolic ??= dispose().catch((error) => reportCleanupError(report, error)))
     }
     for (const [index, identity] of identities.entries()) {
@@ -423,7 +424,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       )
     },
     dispose,
-    [Symbol.asyncDispose]: () =>
+    [asyncDisposeKey]: () =>
       (symbolic ??= dispose().catch((error) => reportCleanupError(report, error)))
   }
 }

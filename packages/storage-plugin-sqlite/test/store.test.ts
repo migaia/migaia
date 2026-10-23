@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, it, expect, onTestFinished } from 'vitest'
+import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -33,6 +33,21 @@ async function installed(options: { wal?: boolean; memory?: boolean } = {}) {
 }
 
 describe('native SQLite installation', () => {
+  it('rejects null root write contexts before native admission', async () => {
+    /** The real installed backend retains its original native and mutation owners. */
+    const { store, host, connection } = await installed({ memory: true })
+    /** Invalid context capture must finish before the first native statement is prepared. */
+    const native = vi.spyOn(connection, 'prepare')
+    await expect(store.set('null-context', 'must-not-write', null as never)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT'
+    })
+    expect(native).not.toHaveBeenCalled()
+    expect(await store.get('null-context')).toBeNull()
+    await store.set('null-context', 'valid')
+    expect(await store.get('null-context')).toBe('valid')
+    await host.dispose()
+  })
+
   it('uses the actual host, three channels, sync and metadata with atomic replacement', async () => {
     const { store } = await installed()
     await store.set('text', 'a\u0000\ud800')

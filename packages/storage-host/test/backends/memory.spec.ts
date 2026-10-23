@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   kv,
   isChangeFeedStore,
@@ -48,8 +49,24 @@ describe('memory backend', () => {
       native.mockRestore()
     }
   })
-  it('在无冲突写入路径也拒绝非法 conflictPolicy', async () => {
+  it('在无冲突写入路径也拒绝非法 context 与 conflictPolicy', async () => {
     const store = await memoryBackend()
+    /** Invalid JS contexts must fail before either native mutation or a transaction callback. */
+    const callback = vi.fn()
+    const changes: IStorageChange[] = []
+    const stop = store.subscribeChanges((change) => changes.push(change))
+    for (const context of [null, [], 'context', 1]) {
+      await expect(store.set('key', 'value', context as never)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
+      })
+      await expect(store.transaction(callback, context as never)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
+      })
+    }
+    expect(callback).not.toHaveBeenCalled()
+    expect(await store.get('key')).toBeNull()
+    expect(changes).toEqual([])
+    stop()
     await expect(
       store.set('key', 'value', { conflictPolicy: 'invalid' as never })
     ).rejects.toMatchObject({
@@ -224,7 +241,11 @@ describe('memory backend', () => {
   })
   it('dispose 后 sync 方法也拒绝', async () => {
     const store = await memoryBackend()
-    await store.dispose()
+    const disposal = store.dispose()
+    const symbolic = store[asyncDisposeKey]()
+    expect(store[asyncDisposeKey]()).toBe(symbolic)
+    expect(symbolic).not.toBe(disposal)
+    await Promise.all([disposal, symbolic])
     expect(() => store.sync!.get('k')).toThrow(expect.objectContaining({ code: 'STORE_DISPOSED' }))
   })
   it('iterate 按 range 的 lower/upper 边界过滤', async () => {
@@ -254,6 +275,10 @@ describe('memory backend', () => {
     await expect(iterator.next()).resolves.toMatchObject({ value: [['tenant', 2], { value: 2 }] })
     await expect(iterator.next()).resolves.toMatchObject({ value: [['tenant', 3], { value: 3 }] })
     await expect(iterator.next()).resolves.toMatchObject({ done: true })
+    const symbolic = iterator[asyncDisposeKey]()
+    expect(iterator[asyncDisposeKey]()).toBe(symbolic)
+    expect(symbolic).not.toBe(iterator.dispose())
+    await symbolic
   })
   it('自动生成 key 在 crypto.randomUUID 不可用时回退', async () => {
     const original = crypto.randomUUID

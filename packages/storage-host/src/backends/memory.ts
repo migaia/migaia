@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -169,11 +170,12 @@ export function createMemoryBackend<T = unknown>(
     }
   })
   /** Unknown backend callback failures gain their original memory transaction boundary. */
-  const normalize = (cause: unknown) =>
+  const normalize = (cause: unknown, expiredScope?: true) =>
     isStorageErrorFamily(cause)
       ? cause
       : new StorageError(StorageErrorCode.transactionFailed, {
           backend: STORAGE_MEMORY_BACKEND,
+          ...(expiredScope ? { operation: MemoryOperation.transactionScope } : {}),
           cause
         })
   /** The existing token helper retains one opaque owner identity for the physical store. */
@@ -403,7 +405,7 @@ export function createMemoryBackend<T = unknown>(
     return runWithConcurrency(
       {
         store: base,
-        options: ctx ?? {},
+        options: ctx === undefined ? {} : ctx,
         execute: (context, invoke) =>
           core.execution.run({ operation, input, ctx: context }, (captured) => {
             controller.assertLive()
@@ -622,7 +624,7 @@ export function createMemoryBackend<T = unknown>(
       return runWithConcurrency<Awaited<R>>(
         {
           store: base,
-          options: ctx ?? {},
+          options: ctx === undefined ? {} : ctx,
           executeAttempt: (context, invoke) =>
             core.execution.run(
               {
@@ -662,7 +664,7 @@ export function createMemoryBackend<T = unknown>(
       return controller.subscribe(listener)
     },
     dispose: () => controller.dispose(),
-    [Symbol.asyncDispose]: () =>
+    [asyncDisposeKey]: () =>
       (symbolic ??= controller.dispose().catch((error) => reportCleanupError(report, error)))
   }
 
@@ -745,7 +747,7 @@ export function createMemoryBackend<T = unknown>(
         ),
       return: (value) => (returned ??= dispose().then(() => ({ done: true, value }))),
       dispose,
-      [Symbol.asyncDispose]: () =>
+      [asyncDisposeKey]: () =>
         (symbolic ??= dispose().catch((error) => reportCleanupError(report, error))),
       [Symbol.asyncIterator]() {
         return this
@@ -1341,6 +1343,7 @@ export function createMemoryBackend<T = unknown>(
     }
   )
   owner = createTransactionOwner<T>(store, normalize, {
+    asyncDisposeKey,
     defaultPolicy: options.concurrency,
     concurrencyStages: core.stageBindings.concurrencyStages(store)
   })

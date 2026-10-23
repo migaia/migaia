@@ -792,7 +792,7 @@ export function createSqliteStore<TValue>(
     return runWithConcurrency<Awaited<R>>(
       {
         store,
-        options: ctx ?? {},
+        options: ctx === undefined ? {} : ctx,
         execute: (context, proceed) =>
           operation(name, input, context, undefined, (captured) => {
             capturedInput = captured
