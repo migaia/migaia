@@ -15,12 +15,7 @@ import {
 } from './admission-runtime.js'
 import { PluginHostInstallRuntime, type IInstallBatchContext } from './install-runtime.js'
 import { PluginHostErrorCode } from './error-code.js'
-import {
-  buildManagedPort,
-  registerManagedHost,
-  isManagedHost,
-  openComposition
-} from './composition.js'
+import { registerManagedHost, matchesManagedHost } from './composition.js'
 import { PluginHostState } from './host-state.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
@@ -85,7 +80,7 @@ import {
 import { PluginHostCoreRuntime } from './core-runtime.js'
 import { PluginHostConfigRuntime } from './config-runtime.js'
 import { PluginHostDisposalRuntime } from './host-disposal-runtime.js'
-import { PluginHostCompositionRuntime } from './composition-runtime.js'
+import type { IPluginHostCompositionRuntimePort } from './composition-runtime.js'
 import {
   PluginHostEnablementRuntime,
   createPluginHostEnablementFacade
@@ -115,7 +110,6 @@ import type {
   IPluginDependencyPlan,
   IPluginRemoval,
   IPluginHostCompositionSnapshot,
-  IPluginHostCompositionIntegration,
   IPluginHostOptions,
   IPluginEnablement
 } from './typing.js'
@@ -255,7 +249,6 @@ export class PluginHost<
   #pipelineDepth = 0
   #configRuntime: PluginHostConfigRuntime<TDomainCore, TValue, TInstalled>
   #hostDisposalRuntime: PluginHostDisposalRuntime<IRegistration<TDomainCore, TValue>>
-  #compositionRuntime: PluginHostCompositionRuntime<TDomainCore, TValue>
   #enablementRuntime: PluginHostEnablementRuntime<TDomainCore, TValue>
   /** Readonly enablement facade over the same runtime that owns this Host's registrations. */
   readonly plugin: IPluginEnablement<this, TInstalled, TDomainCore, TValue>
@@ -550,8 +543,7 @@ export class PluginHost<
         return Object.freeze({
           identity: this.identity,
           nodeId: readHostNodeId(this),
-          matchesHost: (host: object) =>
-            isManagedHost(host) && openComposition(host) === openComposition(this),
+          matchesHost: (host: object) => matchesManagedHost(host, this),
           assertCurrent,
           readSharedExtension: (key: PropertyKey) => {
             this.#assertActive()
@@ -701,7 +693,8 @@ export class PluginHost<
       state: this.#state,
       removal: this.#removalRuntime
     })
-    this.#compositionRuntime = new PluginHostCompositionRuntime({
+    /** Composition captures the original ports now and creates its facade only on public demand. */
+    const compositionPort = {
       host: this,
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
@@ -716,7 +709,7 @@ export class PluginHost<
       diagnostic: this.#diagnostic,
       installation: this.#installRuntime,
       removal: this.#removalRuntime
-    })
+    } satisfies IPluginHostCompositionRuntimePort<TDomainCore, TValue>
     this.#pipelineDrainTimeoutMs = pipelineDrainTimeoutMs
     this.#queueAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
     this.#queue = createMutationQueue({
@@ -735,14 +728,12 @@ export class PluginHost<
     // 八个它永远不该调用的方法。登记发生在构造函数末尾，此时 Host 已完整。
     registerManagedHost(
       this,
-      buildManagedPort(
-        this.#compositionRuntime as unknown as IPluginHostCompositionIntegration<object>,
-        () => this.revision,
-        () => {
-          this.#assertActive()
-          return this.#createView()
-        }
-      )
+      compositionPort,
+      () => this.revision,
+      () => {
+        this.#assertActive()
+        return this.#createView()
+      }
     )
   }
 
