@@ -116,6 +116,7 @@ import { resolveStorageNamespace } from '../core/namespace.js'
 import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { observeStorageBatch } from '../core/batch-observation.js'
+import { createBackendChangeIterator } from '../core/change-iterator.js'
 import { StorageHookName } from '../hook-names.js'
 import {
   snapshotMemoryCapacity,
@@ -875,6 +876,22 @@ function createMemoryNamespace<T>(
       withAbort(ctx, async () => run(captured))
     )
 
+  /** Native feeds share one original subscription bridge and the backend's per-next pipeline. */
+  function watchChanges(
+    channel: IStorageChange['channel'],
+    ctx: IOperationContext | undefined,
+    key?: string
+  ): IStorageIterator<IStorageChange> {
+    return createBackendChangeIterator(controller, {
+      orgId,
+      channel,
+      key,
+      ctx,
+      execute: (advance, context) =>
+        core.execution.run({ operation: MemoryOperation.watch, input: key, ctx: context }, advance)
+    })
+  }
+
   /** New root batch admission keeps borrowed accessor failures on the contract error chain. */
   const captureBatch = <R>(capture: () => R): R => {
     try {
@@ -1175,6 +1192,11 @@ function createMemoryNamespace<T>(
         controller.assertLive()
         return locks.inspectLocks()
       }),
+    watch: (key, ctx) => {
+      controller.assertLive()
+      assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+      return watchChanges('value', ctx, key)
+    },
     subscribeChanges: (listener) => {
       controller.assertLive()
       return controller.subscribe((change) => {
@@ -1284,6 +1306,7 @@ function createMemoryNamespace<T>(
       {
         asyncDisposeKey,
         cursorSource: store,
+        watch: ({ ctx }) => watchChanges('all', ctx),
         pushdown: {
           source: MemoryState.querySource,
           index: rdfIndex.select(physicalRdfPattern(captured)).name,
@@ -2538,6 +2561,7 @@ function createMemoryNamespace<T>(
           {
             asyncDisposeKey,
             exact: true,
+            watch: ({ ctx }) => watchChanges('all', ctx),
             pushdown: {
               source: MemoryState.querySource,
               operations: [QueryOperation.where, QueryOperation.topK, QueryOperation.minScore],
@@ -2868,6 +2892,7 @@ function createMemoryNamespace<T>(
             createRecordQuery<R>(
               {
                 asyncDisposeKey,
+                watch: ({ ctx }) => watchChanges('record', ctx),
                 pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
                 execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
               },

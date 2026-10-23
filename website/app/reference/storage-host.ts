@@ -70,6 +70,29 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.recommendStorageVector![0]!.example,
       cases: storageHostCases.recommendStorageVector
     },
+    createBackendChangeIterator: {
+      role: 'operation',
+      purpose: t(
+        'Bridge the installed controller to its original iterator lifetime with one pending invalidation slot.',
+        '把已安装 controller 接到原 iterator 生命周期，仅保留一个待消费失效提示。'
+      ),
+      params: {
+        controller: t(
+          'The exact installed controller borrowed through the original core or Feature port.',
+          '沿原 core 或 Feature 接点借用的准确已安装 controller。'
+        ),
+        options: t(
+          'Fixed orgId/channel, optional text key/context, and optional original per-next execute callback. Context is captured once and supplied to execute.',
+          '固定 orgId/channel，可选文本 key/context 与原逐 next execute 回调；context 单次捕获并传给 execute。'
+        )
+      },
+      returns: t(
+        'The native IStorageIterator<IStorageChange>. Multiple unconsumed matches coalesce to the latest sequence with channel all and no keys/scope. Disposal wakes pending reads before draining and unsubscribes once.',
+        '原生 IStorageIterator<IStorageChange>；多个未消费匹配提示合并为最新 sequence 的 all，省略 keys/scope。释放先唤醒 pending read 再排空，只取消订阅一次。'
+      ),
+      example: storageHostCases.createBackendChangeIterator![0]!.example,
+      cases: storageHostCases.createBackendChangeIterator
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(
@@ -165,6 +188,7 @@ console.log(host.extensions.label('draft'))`
       ),
       cases: [
         ...(storageHostCases.memoryBackendPlugin ?? []),
+        ...storageHostCases.createBackendChangeIterator!,
         ...storageHostCases.memoryNativeVector!
       ]
     },
