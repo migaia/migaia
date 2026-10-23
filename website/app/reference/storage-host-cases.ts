@@ -3,6 +3,23 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  jsonCodec: [
+    {
+      title: t('Encode a portable record', '编码portable记录'),
+      problem: t(
+        'A text backend needs explicit rejection of values JSON would silently change.',
+        '文本后端需要明确拒绝JSON会静默修改的值。'
+      ),
+      example: `import { jsonCodec } from '@migaia/storage-host/entity'
+
+const encoded = await jsonCodec.encode({ active: true })
+console.log(await jsonCodec.decode(encoded))`,
+      result: t(
+        'The record round-trips. Undefined and nonfinite numbers reject with SERIALIZE_FAILED before storage writes.',
+        '记录往返保持值；undefined和非有限数字在写入前拒绝并携带SERIALIZE_FAILED。'
+      )
+    }
+  ],
   createStorageHost: [
     {
       title: t(

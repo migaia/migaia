@@ -41,7 +41,15 @@ export const StorageErrorCode = {
    */
   storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED',
   /** A backend token does not match the installed store or selected Feature. */
-  backendKindMismatch: 'BACKEND_KIND_MISMATCH'
+  backendKindMismatch: 'BACKEND_KIND_MISMATCH',
+  /** Schema or codec configuration is malformed; repair its descriptor before retrying. */
+  invalidConfig: 'INVALID_CONFIG',
+  /** A schema rejects a value or returns invalid output; inspect the original validation cause. */
+  validationFailed: 'VALIDATION_FAILED',
+  /** Encoding rejects the value before backend I/O; inspect the codec failure on cause. */
+  serializeFailed: 'SERIALIZE_FAILED',
+  /** Decoding rejects a stored representation; retain the original data and inspect cause. */
+  deserializeFailed: 'DESERIALIZE_FAILED'
 } as const
 
 export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode]

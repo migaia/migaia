@@ -1,8 +1,8 @@
 import type { IOperationContext, IKeyRange, IStorageKey } from '../types/context.js'
 import type { IKeyValueStore } from '../types/storage.js'
-import type { ISchemaAdapter } from '../schema/types.js'
+import type { ISchemaAdapter } from '@migaia/storage-host/entity'
 import type { IMigration } from '../schema/migrate.js'
-import type { ICodec } from '../serialize/types.js'
+import type { ICodec } from '@migaia/storage-host/entity'
 import type { IStorageInvalidRecordAction, IStorageRecordStage } from '../constants.js'
 import type { IObjectPathInput, IObjectPathValue } from '@migaia/utils/object'
 

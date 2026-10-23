@@ -18,9 +18,9 @@ import {
 } from '../types/errors.js'
 import { indexBackfillFailureText, StorageErrorText } from '../error-text.js'
 import { runMigrationsWithRuntime } from '../schema/migrate.js'
-import { selectCodec } from '../serialize/registry.js'
-import { jsonCodec } from '../serialize/json.js'
-import { structuredCodec } from '../serialize/structured.js'
+import { selectCodec } from '@migaia/storage-host/entity'
+import { jsonCodec } from '@migaia/storage-host/entity'
+import { structuredCodec } from '@migaia/storage-host/entity'
 import {
   composeFlatKey,
   composeRepositoryKey,
@@ -47,10 +47,10 @@ import {
 import { snapshotOperationContext, withAbort } from '../core/operation.js'
 import type { IOperationContext, IStorageKey } from '../types/context.js'
 import type { IRecordStore, IKeyValueStore } from '../types/storage.js'
-import type { ISchemaAdapter } from '../schema/types.js'
+import type { ISchemaAdapter } from '@migaia/storage-host/entity'
 import type { IMigration } from '../schema/migrate.js'
-import type { ICodec } from '../serialize/types.js'
-import type { ISelectedCodec } from '../serialize/registry.js'
+import type { ICodec } from '@migaia/storage-host/entity'
+import type { ISelectedCodec } from '@migaia/storage-host/entity'
 import type {
   IEntityTransactionScope,
   IIndexedListOptions,

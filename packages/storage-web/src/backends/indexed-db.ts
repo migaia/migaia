@@ -5,7 +5,7 @@ import {
   type IChangeFeedStore,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { isStorageErrorFamily } from '../core/error-family.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from '../core/error-family.js'
 import {
   createStorageOperationReporter,
   createStorageOperationRuntime,
@@ -332,7 +332,7 @@ const assertBackfillProjectionLimits = (
 }
 
 /** Preserve contract cancellation identity when `withTimeout` reports through its utils error. */
-const normalizeIndexedDbOperationError = (error: unknown): StorageContractError | StorageError => {
+const normalizeIndexedDbOperationError = (error: unknown): IStorageErrorFamily => {
   if (error instanceof UtilsAbortError)
     return new StorageContractError(StorageContractErrorCode.aborted, {
       backend: StorageBackend.indexedDb,

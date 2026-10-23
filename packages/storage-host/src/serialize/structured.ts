@@ -1,5 +1,5 @@
 import type { ICodec } from './types.js'
-import { StorageCodecOutput } from '../constants.js'
+import { StorageCodecOutput, EntityAdapterName } from '../adapter-constants.js'
 
 /**
  * Passes serialization to the backend's structured cloning, such as IndexedDB. Supports `Blob`,
@@ -8,7 +8,7 @@ import { StorageCodecOutput } from '../constants.js'
  * `registry.ts`.
  */
 export const structuredCodec: ICodec<unknown, unknown> = Object.freeze({
-  name: 'structured',
+  name: EntityAdapterName.structured,
   output: StorageCodecOutput.structured,
   encode: async (value) => value,
   decode: async (raw) => raw

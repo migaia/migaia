@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { selectCodec, jsonCodec, structuredCodec, binaryCodec } from '../../src/serialize'
-import { assertCodec } from '../../src/serialize/registry'
-import type { IStorageCapabilities } from '../../src/types'
+import { selectCodec, jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.js'
+import { assertCodec } from '@migaia/storage-contract'
+import type { IStorageCapabilities } from '@migaia/storage-contract'
 
 const textOnlyCapabilities: IStorageCapabilities = {
   syncRead: true,
@@ -53,7 +53,7 @@ describe('selectCodec 选路规则', () => {
     expect(() => {
       ;(binaryCodec as unknown as { name: string }).name = 'changed'
     }).toThrow(TypeError)
-    expect(jsonCodec.name).toBe('json')
+    expect(jsonCodec.name).toBe('json@1')
     expect(structuredCodec.name).toBe('structured')
     expect(binaryCodec.name).toBe('binary')
   })

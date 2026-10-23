@@ -1121,17 +1121,6 @@
       "./entity": [
         "defineEntity"
       ],
-      "./schema": [
-        "fromStandardSchema",
-        "passthrough",
-        "runMigrations"
-      ],
-      "./serialize": [
-        "binaryCodec",
-        "jsonCodec",
-        "selectCodec",
-        "structuredCodec"
-      ],
       "./reactive-adapter": [
         "defineReactiveAdapterFeature"
       ],
@@ -1749,6 +1738,14 @@
         "defineFeature",
         "definePlugin",
         "defineStorageBackendKind"
+      ],
+      "./entity": [
+        "binaryCodec",
+        "fromStandardSchema",
+        "jsonCodec",
+        "passthrough",
+        "selectCodec",
+        "structuredCodec"
       ]
     }
   }

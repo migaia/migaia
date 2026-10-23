@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { StorageError, StorageErrorCode, lengthPrefixedNamespaceCodec } from '../src/index.js'
 import { defineEntity } from '../src/entity.js'
-import { fromStandardSchema } from '../src/schema.js'
+import { fromStandardSchema } from '@migaia/storage-host/entity'
 import { memoryStorageHost } from '../src/memory.js'
 import { localStorageHost } from '../src/local-storage.js'
 import { fakeWebStorage } from '../src/testing/fake-web-storage.js'
@@ -90,7 +90,7 @@ describe('storage-web audit medium severity regressions', () => {
       }
     })
     await expect(schema.validate('input')).rejects.toMatchObject({
-      source: '@migaia/storage-web',
+      source: '@migaia/storage-host',
       code: 'VALIDATION_FAILED',
       cause: primary
     })

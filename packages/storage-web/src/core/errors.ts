@@ -6,7 +6,7 @@ import {
 } from '@migaia/storage-contract'
 import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
 import { UtilsErrorCode } from '@migaia/utils/error'
-import { isStorageErrorFamily } from './error-family.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from './error-family.js'
 import type { IStorageOperationRuntime } from './operation-reporter.js'
 import type { IBackendKind } from '../types/capabilities.js'
 import {
@@ -24,7 +24,7 @@ export const normalizeError = (
   code: IStorageErrorCode = StorageErrorCode.transactionFailed,
   operation?: string,
   extensionStage?: IExtensionStage
-): StorageError | StorageContractError => {
+): IStorageErrorFamily => {
   if (isStorageErrorFamily(error)) return error
   return new StorageError(code, { backend, cause: error, operation, extensionStage })
 }

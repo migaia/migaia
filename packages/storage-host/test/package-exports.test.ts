@@ -16,4 +16,13 @@ describe('storage host package exports', () => {
     await using host = await runtime.createStorageHost()
     expect(host.backends().size).toBe(0)
   })
+  it('loads schema and codec adapters through the actual neutral entity entry', async () => {
+    /** Package resolution proves adapters do not require a browser or Web package entry. */
+    const runtime = await import('@migaia/storage-host/entity')
+    expect(Object.keys(runtime).sort()).toEqual(
+      baseline.packages['@migaia/storage-host']!['./entity']
+    )
+    expect(runtime.jsonCodec.name).toBe('json@1')
+    await expect(runtime.jsonCodec.encode({ ready: true })).resolves.toBe('{"ready":true}')
+  })
 })

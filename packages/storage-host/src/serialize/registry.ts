@@ -1,33 +1,33 @@
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode } from '../errors.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
   snapshotCodec,
-  assertCodec,
   type ICodec,
   type IOperationContext
 } from '@migaia/storage-contract'
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
-import { snapshotStorageCapabilities, type IStorageCapabilities } from '../types/capabilities.js'
-import { isUint8Array } from '../core/bytes.js'
-import { reportCleanupError } from '../core/operation-reporter.js'
+import { snapshotStorageCapabilities, type IStorageCapabilities } from '@migaia/storage-contract'
+import { isUint8Array } from '@migaia/utils/bytes'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
+import { StorageErrorText } from '../error-text.js'
 
-// Codec descriptor guards belong to `@migaia/storage-contract`. Re-exports preserve existing import paths.
-export { snapshotCodec, assertCodec }
-
+/** Snapshot a binary codec result before wrapping it as text. */
 const toBinaryBytes = (value: unknown): Uint8Array => {
   if (!isUint8Array(value))
     throw new StorageError(StorageErrorCode.serializeFailed, {
-      cause: new TypeError('binary codec must return a Uint8Array')
+      cause: new TypeError(StorageErrorText.binaryCodecResult)
     })
+  /** Preserve the original view bounds while isolating its bytes. */
   const view = value as Uint8Array
   return new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice()
 }
 
+/** Restore the explicit binary fallback carrier or retain its native decoding cause. */
 const fromBase64 = (value: unknown): Uint8Array => {
   if (typeof value !== 'string')
     throw new StorageError(StorageErrorCode.deserializeFailed, {
-      cause: new TypeError('binary fallback expects a base64 string')
+      cause: new TypeError(StorageErrorText.binaryFallbackInput)
     })
   try {
     return base64ToBytes(value)
@@ -67,33 +67,45 @@ export const selectCodec = (
   capabilities: IStorageCapabilities,
   onDiagnostic?: (message: string) => void
 ): ISelectedCodec => {
+  /** One descriptor snapshot fixes the selected codec callbacks. */
   const normalizedCodec = snapshotCodec(codec)
+  /** Capability admission runs once before choosing a storage carrier. */
   const normalizedCapabilities = snapshotStorageCapabilities(capabilities)
   if (!normalizedCapabilities)
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause: new TypeError('capabilities must be a complete storage descriptor')
+      cause: new TypeError(StorageErrorText.codecCapabilities)
     })
   if (onDiagnostic !== undefined && typeof onDiagnostic !== 'function')
     throw new StorageError(StorageErrorCode.invalidConfig, {
-      cause: new TypeError('onDiagnostic must be a function')
+      cause: new TypeError(StorageErrorText.codecDiagnostic)
     })
   if (normalizedCodec.output === 'structured') {
     if (!normalizedCapabilities.records)
       throw new StorageContractError(StorageContractErrorCode.unsupported, {
-        cause: new Error(
-          `codec "${normalizedCodec.name}" produces structured output but the backend only supports text`
-        )
+        cause: new Error(StorageErrorText.structuredCodecUnsupported(normalizedCodec.name))
       })
     return normalizedCodec
   }
 
   if (normalizedCodec.output === 'binary') {
     if (normalizedCapabilities.binary) return normalizedCodec
-    if (onDiagnostic)
-      reportCleanupError(
-        (error) => onDiagnostic(String(error)),
-        `[storage-web] codec "${normalizedCodec.name}" falls back to base64 on a text-only backend (+33% size)`
-      )
+    if (onDiagnostic) {
+      /** Diagnostic failures are contained through the shared thenable observer. */
+      const reportFailure = (error: unknown): void => {
+        /** Console is a host diagnostic facility, not a DOM or Node type dependency. */
+        const host = globalThis as typeof globalThis & {
+          console: { error(message: string, error: unknown): void }
+        }
+        host.console.error(StorageErrorText.codecDiagnosticFailure, error)
+      }
+      try {
+        /** Observe callback rejection without changing the selected codec route. */
+        const result = onDiagnostic(StorageErrorText.codecBinaryFallback(normalizedCodec.name))
+        observeThenableRejection(result, inspectThenable(result), reportFailure)
+      } catch (cause) {
+        observeThenableRejection(undefined, { error: cause }, reportFailure)
+      }
+    }
     return {
       encode: async (value, ctx) =>
         bytesToBase64(toBinaryBytes(await normalizedCodec.encode(value, ctx))),

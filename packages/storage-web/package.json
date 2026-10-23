@@ -70,14 +70,6 @@
       "types": "./dist/entity.d.ts",
       "default": "./dist/entity.js"
     },
-    "./schema": {
-      "types": "./dist/schema.d.ts",
-      "default": "./dist/schema.js"
-    },
-    "./serialize": {
-      "types": "./dist/serialize.d.ts",
-      "default": "./dist/serialize.js"
-    },
     "./reactive-adapter": {
       "types": "./dist/reactive-adapter.d.ts",
       "default": "./dist/reactive-adapter.js"
@@ -139,5 +131,8 @@
     "@vitest/coverage-v8": "4.1.10",
     "fake-indexeddb": "6.2.5",
     "jsdom": "29.1.1"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^"
   }
 }

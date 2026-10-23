@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { passthrough } from '../../src/schema/passthrough'
+import { passthrough } from '../../src/entity.js'
 
 describe('passthrough', () => {
   it('validate 恒等透传', async () => {

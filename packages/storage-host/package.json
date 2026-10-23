@@ -21,6 +21,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./entity": {
+      "types": "./dist/entity.d.ts",
+      "default": "./dist/entity.js"
     }
   },
   "publishConfig": {
@@ -41,6 +45,7 @@
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

@@ -5,6 +5,16 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    entity: {
+      summary: t(
+        'Use neutral schema adapters and strict portable codecs through one entity entry.',
+        '通过同一个实体入口使用中立schema适配与严格portable codec。'
+      ),
+      example: `import { jsonCodec } from '@migaia/storage-host/entity'
+
+const encoded = await jsonCodec.encode({ active: true })
+console.log(await jsonCodec.decode(encoded))`
+    },
     index: {
       summary: t(
         'Install exact backend plugins and application extensions with one runtime-neutral host. Browser adapters and native clients remain in their owning packages.',
@@ -20,6 +30,18 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    jsonCodec: {
+      role: 'operation',
+      purpose: t(
+        'Encode portable values with the original version-one JSON codec. Unsupported values reject before backend I/O.',
+        '使用原version-one JSON codec编码portable值。不支持的值在后端I/O前拒绝。'
+      ),
+      returns: t(
+        'An asynchronous json@1 text codec whose errors retain the contract and original codec causes.',
+        '异步json@1文本codec，错误cause保留contract与原codec错误。'
+      ),
+      cases: storageHostCases.jsonCodec
+    },
     createStorageHost: {
       role: 'factory',
       purpose: t(

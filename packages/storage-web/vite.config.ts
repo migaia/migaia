@@ -10,6 +10,7 @@ const runtimeExternals = [
   '@migaia/reactive',
   '@migaia/resource',
   '@migaia/storage-contract',
+  '@migaia/storage-host',
   '@migaia/utils'
 ] as const
 
@@ -47,9 +48,7 @@ export default defineConfig({
         'plugins/reactive/session-storage': 'src/plugins/reactive/session-storage.ts',
         'plugins/reactive/cookies': 'src/plugins/reactive/cookies.ts',
         'plugins/reactive/indexed-db': 'src/plugins/reactive/indexed-db.ts',
-        entity: 'src/entity.ts',
-        schema: 'src/schema.ts',
-        serialize: 'src/serialize.ts',
+        entity: 'src/entity.ts'
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`

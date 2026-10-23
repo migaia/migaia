@@ -1,6 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { isStorageErrorFamily } from '../core/error-family.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from '../core/error-family.js'
 import type { IStorageOperationRuntime } from '../core/operation-reporter.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { normalizeStorageException } from './quota.js'
@@ -30,7 +30,7 @@ const normalizeTransactionAbort = (error: unknown): StorageError | StorageContra
   })
 }
 
-export const normalizeIdbRequestFailure = (error: unknown): StorageError | StorageContractError => {
+export const normalizeIdbRequestFailure = (error: unknown): IStorageErrorFamily => {
   if (isStorageErrorFamily(error)) return error
   const normalized = normalizeStorageException(error, StorageBackend.indexedDb)
   return normalized.code === StorageErrorCode.quotaExceeded
