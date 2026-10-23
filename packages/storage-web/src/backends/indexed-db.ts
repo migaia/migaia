@@ -2846,6 +2846,15 @@ export const indexedDbHost = <TValue = unknown>(
                     fromIdbRequest(make(), { signal }, operationRuntime).catch((cause) => {
                       throw attemptFailure ?? cause
                     })
+                  /** Erase only the caller's existing sidecar rows through this attempt's requests. */
+                  const eraseRecordSidecarRows = async (
+                    sidecar: IDBObjectStore,
+                    key: () => IDBValidKey
+                  ): Promise<void> => {
+                    /** Key reflection stays after the native index lookup, as in both callers. */
+                    const rows = await request(() => sidecar.index('record').getAllKeys(key()))
+                    for (const row of rows) await request(() => sidecar.delete(row))
+                  }
                   /**
                    * Revisions and record invalidation retain their existing physical keys and
                    * firewall.
@@ -2890,12 +2899,11 @@ export const indexedDbHost = <TValue = unknown>(
                       if (handle === undefined) continue
                       /** The record index locates only this record's existing projected rows. */
                       const sidecar = native.objectStore(INDEX_RECORDS_STORE_NAME)
-                      const rows = await request(() =>
-                        sidecar
-                          .index('record')
-                          .getAllKeys([scope, handle.generation, toIdbKey(key)])
-                      )
-                      for (const row of rows) await request(() => sidecar.delete(row))
+                      await eraseRecordSidecarRows(sidecar, () => [
+                        scope,
+                        handle.generation,
+                        toIdbKey(key)
+                      ])
                       indexedScopes.add(scope)
                     }
                     return true
@@ -3498,12 +3506,11 @@ export const indexedDbHost = <TValue = unknown>(
                                 }
                               )
                             const sidecar = native.objectStore(INDEX_RECORDS_STORE_NAME)
-                            const rows = await request(() =>
-                              sidecar
-                                .index('record')
-                                .getAllKeys([handle.scope, handle.generation, toIdbKey(snapshot)])
-                            )
-                            for (const row of rows) await request(() => sidecar.delete(row))
+                            await eraseRecordSidecarRows(sidecar, () => [
+                              handle.scope,
+                              handle.generation,
+                              toIdbKey(snapshot)
+                            ])
                             await write('record', snapshot, copy, conflictPolicy, true)
                             for (const [indexName, entry] of Object.entries(projected)) {
                               if (entry === undefined) continue
