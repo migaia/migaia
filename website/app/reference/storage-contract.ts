@@ -3242,8 +3242,8 @@ console.log(candidate.name, candidate.output)`
     },
     IRdfQuerySource: {
       summary: t(
-        'Original native RDF iterator callback and support/resource facts.',
-        '原生 RDF 原迭代器回调与支持、资源事实。'
+        'Original native RDF iterator callback with unknown projected rows and support/resource facts.',
+        '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
         pushdown: {

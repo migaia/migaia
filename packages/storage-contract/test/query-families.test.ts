@@ -7,6 +7,7 @@ import {
   term,
   type IQuad,
   type IRdfQueryInput,
+  type IRdfQuerySource,
   type IStorageIterator,
   type IStorageKey,
   type IVectorHit,
@@ -160,6 +161,20 @@ describe('shared vector query family', () => {
 })
 
 describe('shared RDF query family', () => {
+  it('admits native field projection without claiming projected rows are complete quads', async () => {
+    /** The engine returns its actual selected shape, rather than an unsafe complete-quad cast. */
+    const source: IRdfQuerySource = {
+      pushdown: { source: 'rdf', operators: [], operations: ['select'] },
+      execute: (input) => {
+        expect(input.steps).toEqual([{ operation: 'select', fields: ['subject'] }])
+        return rows([{ subject: term.iri('urn:selected') }])
+      }
+    }
+    expect(await createRdfQuery(source, {}).select('subject').requirePushdown().all()).toEqual([
+      { subject: term.iri('urn:selected') }
+    ])
+  })
+
   it('snapshots ground patterns and passes ordered native traversal/projection without opening I/O', async () => {
     /** The fixture's native traversal returns the next ground quad in the same graph. */
     const quad: IQuad = {
