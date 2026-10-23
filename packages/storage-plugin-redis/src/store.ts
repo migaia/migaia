@@ -366,6 +366,9 @@ export function createRedisStore(
           throwIfAborted(context.signal)
           for (;;) {
             await locks.verify()
+            // EXEC null clears every WATCH, including the guards from the original draft writes.
+            for (const entry of draft.entries.values())
+              if (entry.changed) await locks.guard(entry.channel, entry.key)
             throwIfAborted(context.signal)
             const commands = draft.commands(),
               changed = [...draft.entries.values()].filter((entry) => entry.changed)
@@ -628,7 +631,7 @@ export function createRedisStore(
       readonly done: boolean
     }> => {
       if (draft) await draft.watchRange(channel)
-      const members = await send([
+      const nativeMembers = await send([
         RedisCommand.zrangebylex,
         layout.index(channel),
         lower,
@@ -637,9 +640,31 @@ export function createRedisStore(
         '0',
         String(size)
       ])
-      if (!Array.isArray(members) || members.some((member) => typeof member !== 'string'))
-        throw redisError(RedisErrorCode.decodeFailed, members)
-      if (members.length === 0) return { rows: [], done: true }
+      if (
+        !Array.isArray(nativeMembers) ||
+        nativeMembers.some((member) => typeof member !== 'string')
+      )
+        throw redisError(RedisErrorCode.decodeFailed, nativeMembers)
+      // Hex preserves the original ordered writer's bytes and matches native ZSET member order.
+      const candidates = draft
+        ? [
+            ...new Set([
+              ...(nativeMembers as string[]),
+              ...[...draft.entries.values()]
+                .filter((entry) => entry.channel === channel && entry.value !== undefined)
+                .map((entry) => entry.encoded)
+            ])
+          ]
+            .filter(
+              (encoded) =>
+                (lower[0] === '[' ? encoded >= lower.slice(1) : encoded > lower.slice(1)) &&
+                (upper[0] === '[' ? encoded <= upper.slice(1) : encoded < upper.slice(1))
+            )
+            .sort()
+        : (nativeMembers as string[])
+      const members = candidates.slice(0, size),
+        done = nativeMembers.length < size && candidates.length <= size
+      if (members.length === 0) return { rows: [], done }
       const keys = (members as string[]).map((member) => layout.decode(member)),
         rows: [IStorageKey, unknown][] = [],
         stale: { member: string; physical: string }[] = []
@@ -680,7 +705,7 @@ export function createRedisStore(
             ])
           )
       }
-      return { rows, last: members.at(-1), done: members.length < size }
+      return { rows, last: members.at(-1), done }
     }
     /** Iteration resources and their accepted advances remain in the original shared lifetime. */
     const iterator = (
@@ -1468,7 +1493,7 @@ export function createRedisStore(
       subscribeChanges: (listener) => {
         controller.assertLive()
         return controller.subscribe((change) => {
-          if (orgId === core.defaultOrgId || change.orgId === orgId) listener(change)
+          if (orgId === core.defaultOrgId || change.orgId === orgId) return listener(change)
         })
       },
       watch: (input, ctx) =>

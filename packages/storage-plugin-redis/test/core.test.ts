@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
 import { counter, kv, records, ttl } from '@migaia/storage-contract'
@@ -48,6 +48,18 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
           await scope.set('tx', 'committed')
           await scope.putRecord({ value: 4 }, ['record', 2])
           expect(await scope.get('tx')).toBe('committed')
+          await scope.putRecord({ group: 'draft', rank: 2 }, ['new', 2])
+          await scope.putRecord({ group: 'draft', rank: 1 }, ['new', 1])
+          expect(
+            await scope.use(records).query<{ group: string }>().where({ group: 'draft' }).count()
+          ).toBe(2)
+          expect(
+            await scope.use(records).query<{ group: string }>().where({ group: 'draft' }).delete()
+          ).toBe(2)
+          await scope.set('draft:a', 'one')
+          await scope.set('draft:b', 'two')
+          expect(await scope.removeByPrefix('draft:')).toBe(2)
+          expect(await scope.get('draft:a')).toBeNull()
         })
         expect(await store.get('tx')).toBe('committed')
         const failure = new RangeError('fixture callback')
@@ -70,6 +82,21 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
         await peer.clearAll()
         expect(await peer.get('text')).toBeNull()
         expect(await store.get('text')).toBe('\0\ud800')
+        const rejection = new RangeError('fixture late listener'),
+          diagnostic = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        const off = store.subscribeChanges(async () => {
+          await Promise.resolve()
+          throw rejection
+        })
+        try {
+          await store.set('observed', 'committed')
+          await new Promise<void>((resolve) => setImmediate(resolve))
+          expect(await store.get('observed')).toBe('committed')
+          expect(diagnostic.mock.calls.filter((args) => args.includes(rejection))).toHaveLength(1)
+        } finally {
+          off()
+          diagnostic.mockRestore()
+        }
       } finally {
         await store.clearAll()
         await host.dispose()

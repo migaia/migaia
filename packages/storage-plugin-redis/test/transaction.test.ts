@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { Redis } from 'ioredis'
 import { createClientPool } from 'redis'
-import { createStorageHost } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
+import { deferred } from '@migaia/utils/promise'
 import { ConcurrencyPolicy } from '@migaia/storage-contract'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
@@ -64,6 +65,72 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
       } finally {
         await first.backend('redis').clearAll()
         await Promise.all([first.dispose(), second.dispose()])
+      }
+    })
+    it('rechecks implicit native locks after an unrelated genuine WATCH abort', async () => {
+      const original = nodeRedisDriver(pool),
+        prefix = crypto.randomUUID(),
+        org = createOrgId(),
+        layout = createRedisLayout(prefix, org),
+        acquired = deferred<void>(),
+        release = deferred<void>()
+      let holder: Promise<void> | undefined,
+        executions = 0,
+        nulls = 0
+      const other = await createStorageHost({
+        org,
+        plugins: [redisBackendPlugin({ driver: original, prefix })] as const
+      })
+      const guarded: IRedisDriver = {
+        ...original,
+        withConnection: (run) =>
+          original.withConnection((connection) =>
+            run({
+              ...connection,
+              async exec(commands) {
+                executions++
+                if (executions === 1)
+                  await original.command(['HSET', layout.revisions, 'fixture-unrelated', '1'])
+                const result = await connection.exec(commands)
+                if (result === null) {
+                  nulls++
+                  holder = other
+                    .backend('redis')
+                    .tx()
+                    .lock({ channel: 'text', key: 'guarded' })
+                    .run(async () => {
+                      acquired.resolve()
+                      await release.promise
+                    })
+                  await acquired.promise
+                }
+                return result
+              }
+            })
+          )
+      }
+      const host = await createStorageHost({
+        org,
+        plugins: [
+          redisBackendPlugin({
+            driver: guarded,
+            prefix,
+            concurrency: ConcurrencyPolicy.optimistic({ retries: 0 })
+          })
+        ] as const
+      })
+      try {
+        await expect(host.backend('redis').set('guarded', 'must not pass')).rejects.toMatchObject({
+          code: 'LOCK_REJECTED'
+        })
+        expect(nulls).toBe(1)
+        expect(executions).toBe(1)
+        expect(await other.backend('redis').get('guarded')).toBeNull()
+      } finally {
+        release.resolve()
+        await holder
+        await other.backend('redis').clearAll()
+        await Promise.all([host.dispose(), other.dispose()])
       }
     })
     it('drains an executed but unconfirmed reply, seals further writes and preserves reads', async () => {
