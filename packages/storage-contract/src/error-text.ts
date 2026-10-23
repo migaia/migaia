@@ -24,6 +24,8 @@ export const StorageContractErrorText = {
   counterIncrement: 'storage counter increment must be a safe integer',
   /** Counter text and arithmetic must preserve canonical decimal safe-integer values. */
   counterValue: 'storage counter value or result is not a canonical safe integer',
+  /** Vector shape and finite values must be valid before a native collection call. */
+  vectorArgument: 'storage vector collection, point, filter or search argument is invalid',
   /** RDF terms and ground quad positions must be portable before native writes or query binding. */
   rdfArgument: 'RDF term, literal annotation or ground quad is invalid',
   /**

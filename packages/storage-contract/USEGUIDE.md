@@ -801,3 +801,5 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 `distinct(field)` 保留当前顺序中的首行，用 Set 的 SameValueZero 字段身份单遍去重：0/-0 同值，NaN 同值，缺失与 undefined 同值，对象（含 Date）按原身份区分。`skip(count)` 接受非负安全整数，客户端显式逐行推进并在 explain 标出 O(n)，下游 limit 达到后不再读取。记录与 RDF 共用这些节点及 reader；向量仅提供保持排名的 distinct。
 
 原生数据源显式提供 `nativeSteps:true` 后，原 execute 才接收有序 `IQueryNativeStep`（where/select/limit/skip/distinct），并按原声明顺序执行其真实支持的前缀；steps 是执行顺序的依据，兼容保留的 conditions/fields 不可再次乱序应用。未选择此端口的旧源保持原 execute 三字段参数及原客户端 limit 行为。原生 distinct 声明须兑现相同字段身份语义，不能把结构等值冒充对象身份。RDF 也显式选择扩展原生控制，原有遍历 steps 形状不变。事务的这些派生分支沿原包装投影，仍复用完整终端的同一 operation 准入。
+
+向量后端在原生调用前复用 `snapshotStorageVectorCollection`、`snapshotStorageVector`、`snapshotStorageVectorUpsert`、`snapshotStorageVectorFilter` 与 `snapshotStorageVectorSearch`。它们捕获配置、有限分量、全批点及便携 payload、过滤 AST 和搜索选项，非法输入报 `INVALID_ARGUMENT` 并保留原 cause。省略 collection 配置不创建缺省维度；同名配置解析、策略、上下文、检索和关闭仍由实际后端负责。upsert 重复 ID 采用最后一项；payload 经 serialize 投影自有可枚举字段。`k: 0` 也先验证输入；评分、过滤执行和排名不属于这些 helper。

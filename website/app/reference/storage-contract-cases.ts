@@ -31,6 +31,21 @@ async function readGreeting(store: IStorageBase) {
   )
 }
 
+/** Native authors share admission without acquiring any connection or search runner. */
+const vectorInputCase: ICaseDoc = {
+  title: t('Capture native vector arguments', '捕获原生向量参数'),
+  problem: t(
+    'Native backends need one input contract before performing their own I/O.',
+    '原生后端在自己的 I/O 前需要同一输入契约。'
+  ),
+  example:
+    "import { snapshotStorageVectorCollection, snapshotStorageVector, snapshotStorageVectorUpsert, snapshotStorageVectorFilter, snapshotStorageVectorSearch } from '@migaia/storage-contract'\nconst configuration = snapshotStorageVectorCollection('docs', { dimensions: 2, metric: 'cosine' }).options!\nconst query = snapshotStorageVector([1, 0], configuration)\nconst points = snapshotStorageVectorUpsert([{ id: 'a', vector: [1, 0], payload: { tag: 'docs' } }], configuration)\nconst filter = snapshotStorageVectorFilter({ field: 'tag', in: ['docs'] })\nconst search = snapshotStorageVectorSearch(query, { k: 0, filter }, configuration)\nconsole.log(points[0]?.id, search.options.k, search.options.withPayload)\n// a 0 false",
+  result: t(
+    'Prints a 0 false. Capture creates no collection or operation and validates zero-result searches.',
+    '输出 a 0 false；捕获不创建 collection 或操作，零结果搜索也先校验。'
+  )
+}
+
 /** TTL callers use their actual provided backend; the helper owns only target/duration admission. */
 const ttlCase: ICaseDoc = {
   title: t('Expire an existing physical entry', '为已有物理条目设置期限'),
@@ -316,6 +331,11 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
       )
     }
   ],
+  snapshotStorageVectorCollection: [vectorInputCase],
+  snapshotStorageVector: [vectorInputCase],
+  snapshotStorageVectorUpsert: [vectorInputCase],
+  snapshotStorageVectorFilter: [vectorInputCase],
+  snapshotStorageVectorSearch: [vectorInputCase],
   snapshotStorageBlobPut: [
     {
       title: t('snapshotStorageBlobPut', 'snapshotStorageBlobPut'),
