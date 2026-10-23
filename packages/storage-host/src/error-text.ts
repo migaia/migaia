@@ -1,5 +1,19 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Memory plugin construction captures a structural options record before resource acquisition. */
+  memoryOptions: 'memory options must be an object',
+  /** Native holder labels are optional stable strings captured once per physical memory instance. */
+  memoryOwner: 'memory owner must contain an optional string label',
+  /** Memory scalar writes preserve the original value-domain diagnostic. */
+  memoryTextValue: 'storage value must be a string',
+  /** Memory binary writes preserve the original supported carrier diagnostic. */
+  memoryBytesValue: 'bytes value must be a Uint8Array',
+  /** Revision changes reject the isolated native attempt before any draft is committed. */
+  memoryRevisionChanged: (expected: number, actual: number) =>
+    `record revision changed from ${expected} to ${actual}`,
+  /** Clear changes invalidate a previously established native memory snapshot. */
+  memoryEpochChanged: 'record epoch changed',
+
   /** Unique-index conflicts preserve the original public constraint diagnostic. */
   indexUniqueConflict: (indexName: string) =>
     `indexed record conflicts with unique index "${indexName}"`,

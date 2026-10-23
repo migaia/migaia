@@ -54,6 +54,8 @@ export const StorageErrorCode = {
   duplicateKey: 'DUPLICATE_KEY',
   /** A projected unique index key belongs to a different record; repair the proposed commit. */
   indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT',
+  /** A native memory transaction failed; inspect its original cause before retrying. */
+  transactionFailed: 'TRANSACTION_FAILED',
   /** A user extension failed; inspect its original cause and operation context before retrying. */
   extensionFailed: 'EXTENSION_FAILED'
 } as const

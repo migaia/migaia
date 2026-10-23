@@ -3,6 +3,25 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  memoryBackendPlugin: [
+    {
+      title: t('Commit three native memory channels', '提交内存的三个原生通道'),
+      problem: t('One isolated backend needs text, bytes and queried records within the original transaction owner.', '一个隔离后端需要沿原事务owner提交文本、字节与可查询记录。'),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { records } from '@migaia/storage-contract'
+
+type Order = { state: string; total: number }
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const memory = host.backend('memory')
+await memory.transaction(async (tx) => {
+  await tx.set('status', 'ready')
+  await tx.setBytes('receipt', new Uint8Array([1, 2]))
+  await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')
+})
+console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())`,
+      result: t('Prints [{ total: 20 }] after the native transaction commits.', '原生事务提交后输出[{ total: 20 }]。')
+    }
+  ],
   resolveStorageNamespace: [
     {
       title: t('Retain per-instance organization prefixes', '保留各实例组织前缀'),
