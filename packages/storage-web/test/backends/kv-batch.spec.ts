@@ -135,8 +135,8 @@ describe('standard native KV batches', () => {
       await expect(
         api.setMany([{ key: 'invalid', value: 1 as unknown as string }])
       ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-      await expect(api.setMany([{ key: 'ttl', value: 'value', ttlMs: 1 }])).rejects.toMatchObject({
-        code: 'UNSUPPORTED_CAPABILITY'
+      await expect(api.setMany([{ key: 'ttl', value: 'value', ttlMs: -1 }])).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
       })
       expect(transaction).not.toHaveBeenCalled()
       expect(operations).toEqual([])

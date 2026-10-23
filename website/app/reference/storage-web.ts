@@ -279,8 +279,8 @@ const backendSymbols: Readonly<Record<string, ISymbolDoc>> = Object.fromEntries(
         role: 'enhancer',
         options,
         purpose: t(
-          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.`,
-          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。`
+          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' Native ttl covers text, bytes and records within the same transaction.' : ''}`,
+          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '原生 ttl 在同一事务支持文本、字节与记录期限。' : ''}`
         ),
         params: {
           options: t(
