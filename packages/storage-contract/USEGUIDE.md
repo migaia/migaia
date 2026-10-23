@@ -835,3 +835,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。
 
 `encodeStorageRdfTerm(term, backend)` 经原快照 owner 校验一个 raw RDF term，返回独立、自定界的有序身份字节。原生索引排列可直接拼接这些分量；不能把输出重新送进公开 binary-key 域，否则会把其 1 MiB 输入限制错误施加到合法 RDF literal。IRI 拼写与 datatype/language 身份沿同一规范 term 规则；编码 raw blank 标签不会使它成为可移植的重复写身份。
+
+`createStorageBlobBodyReader(body, { report, backend?, normalizeFailure? })` 是有限上传作者入口：调用方先完成原生条件检查，再把已捕获 body 交给原 iterator 生命周期读取；每次 next 返回独立 Uint8Array chunk，不预取，不拥有原生 sink、分段缓冲或调度。EOF 或 read 失败不重复 cancel；提前 return(reason)/dispose 先取消未完成 read，再沿原 owner 排空并 release 一次。取消失败保持主错，后续 release 失败仅报告；主与符号清理仍为独立缓存 Promise。调用方保留原 signal/timeout 与 sink 清理，read 失败后也须释放 reader。

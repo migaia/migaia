@@ -335,6 +335,23 @@ async function deleteDrafts(store: IStorageStore<typeof vector>) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  createStorageBlobBodyReader: [
+    {
+      title: t('Read an admitted upload body', '读取已准入的上传内容'),
+      problem: t(
+        'Native sinks need detached chunks while retaining their own buffering and backpressure.',
+        '原生 sink 需要独立 chunk，同时保留自己的缓冲与 backpressure。'
+      ),
+      example: t(
+        "import { createStorageBlobBodyReader } from '@migaia/storage-contract'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), { report: error => console.error(error) })\nconsole.log(Array.from((await body.next()).value ?? []))",
+        "import { createStorageBlobBodyReader } from '@migaia/storage-contract'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), { report: error => console.error(error) })\nconsole.log(Array.from((await body.next()).value ?? []))"
+      ),
+      result: t(
+        'Prints [1, 2]; disposal cancels unfinished input and releases the one original reader.',
+        '输出 [1, 2]；释放取消未完成输入，并释放唯一原 reader。'
+      )
+    }
+  ],
   getStorageOrgGraphPrefix: [orgGraphCase],
   prefixStorageOrgGraph: [orgGraphCase],
   unprefixStorageOrgGraph: [orgGraphCase],
