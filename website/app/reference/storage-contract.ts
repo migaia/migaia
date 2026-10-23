@@ -769,6 +769,37 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    snapshotStorageBatchKeys: {
+      role: 'operation',
+      purpose: t(
+        'Capture detached native batch keys and canonical identities once before I/O.',
+        '在 I/O 前单次捕获独立的原生批键与规范身份。'
+      ),
+      params: {
+        keys: t(
+          'The native batch logical keys in caller order.',
+          '按调用方顺序排列的原生批次逻辑键。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。'),
+        options: t('Optional duplicate-write admission policy.', '可选的重复写键接纳策略。')
+      },
+      optionDocs: {
+        rejectDuplicates: {
+          summary: t(
+            'Reject equivalent canonical keys before native writes; false preserves every position.',
+            '在原生写入前拒绝相同规范键；false 保留每个位置。'
+          ),
+          default: t('Omitted: preserve duplicates.', '省略时保留重复位置。'),
+          example: `snapshotStorageBatchKeys(keys, 'memory', { rejectDuplicates: true })`
+        }
+      },
+      returns: t(
+        'Frozen readonly IStorageBatchKey rows with detached key, canonical byte identity and firstIndex. Invalid lists/options or duplicate writes throw INVALID_ARGUMENT; invalid keys retain INVALID_KEY. No I/O or resource authority.',
+        '冻结的只读 IStorageBatchKey 行，包含独立 key、规范字节身份和 firstIndex。非法列表/选项或重复写键抛 INVALID_ARGUMENT；非法键保留 INVALID_KEY；不创建 I/O 或资源权限。'
+      ),
+      example: storageContractCases.snapshotStorageBatchKeys![0]!.example,
+      cases: storageContractCases.snapshotStorageBatchKeys
+    },
     snapshotStorageKeyPrefix: {
       role: 'operation',
       purpose: t(
@@ -2200,6 +2231,24 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IStorageBatchKey: {
+      summary: t(
+        'One captured position in a native typed-key batch.',
+        '原生 typed 键批次中一个已捕获位置。'
+      ),
+      members: {
+        key: { summary: t('Detached canonical logical key.', '独立的规范逻辑键。') },
+        identity: {
+          summary: t('Hex identity of the canonical ordered bytes.', '规范有序字节的十六进制身份。')
+        },
+        firstIndex: {
+          summary: t(
+            'First equivalent input position; use only that position for distinct native deletion.',
+            '首次出现相同规范键的输入位置；原生去重删除只使用该位置。'
+          )
+        }
+      }
+    },
     IRecordsApi: {
       summary: t(
         'Standard record query and prefix deletion boundary; exact native row defaults are preserved by provided implementations.',

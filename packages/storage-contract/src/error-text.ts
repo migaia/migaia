@@ -4,6 +4,10 @@ export const StorageContractErrorText = {
   sqlArgument: 'SQL fragment input is invalid',
   /** The shared lexer rejects empty/multiple statements and transaction-owned user commands. */
   sqlStatement: 'SQL must contain one permitted statement',
+  /** Batch keys and duplicate policy are captured before native requests or mutations can start. */
+  batchKeys: 'storage batch keys or options are invalid',
+  /** Atomic batches cannot write the same canonical typed key more than once. */
+  batchDuplicate: 'storage batch contains duplicate keys',
   /**
    * Declarative query admission rejects malformed boolean, field, path and operator inputs before
    * reading candidates.

@@ -14,7 +14,11 @@ import { snapshotOperationContext } from './operation-context.js'
 import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageKey, assertStringStorageKey } from './key.js'
-import { encodeOrderedStorageKey, snapshotStorageKeyPrefix } from './key-order.js'
+import {
+  encodeOrderedStorageKey,
+  snapshotStorageKeyPrefix,
+  storageKeyBytesIdentity
+} from './key-order.js'
 import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
@@ -554,8 +558,8 @@ export function snapshotConcurrencyLockRange(
   const rank = LockChannelRank[channel]
   if (prefix === undefined)
     return Object.freeze({
-      lower: lockBytesIdentity(new Uint8Array([rank])),
-      upper: lockBytesIdentity(new Uint8Array([rank + 1]))
+      lower: storageKeyBytesIdentity(new Uint8Array([rank])),
+      upper: storageKeyBytesIdentity(new Uint8Array([rank + 1]))
     })
   if (channel === LockChannel.bytes) assertStringStorageKey(prefix, backend)
   /** The original prefix writer owns all type tags, variable terminators and strict successors. */
@@ -566,7 +570,7 @@ export function snapshotConcurrencyLockRange(
     const encoded = new Uint8Array(bytes.length + 1)
     encoded[0] = rank
     encoded.set(bytes, 1)
-    return lockBytesIdentity(encoded)
+    return storageKeyBytesIdentity(encoded)
   }
   return Object.freeze({ lower: withChannel(bounds.lower), upper: withChannel(bounds.upper) })
 }
@@ -659,15 +663,11 @@ export function associateNormalizedLockKeys(
 ): void {
   concurrencyAttemptBudgets.set(options, { locks, identities: snapshotLockIdentities(locks) })
 }
-/** Converts already canonical bytes once; neither policy loops nor consumers re-encode logical keys. */
-function lockBytesIdentity(encoded: Uint8Array): string {
-  return Array.from(encoded, (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
 /** One immutable ordered string list is retained with the original normalized option metadata. */
 function snapshotLockIdentities(
   locks: readonly INormalizedLockKey[] | undefined
 ): readonly string[] {
-  return Object.freeze(locks?.map((entry) => lockBytesIdentity(entry.encoded)) ?? [])
+  return Object.freeze(locks?.map((entry) => storageKeyBytesIdentity(entry.encoded)) ?? [])
 }
 /**
  * Reads the same active attempt's normalized, sorted and deduplicated lock identities. Repeated
@@ -736,7 +736,7 @@ function concurrencyLockFailure(
       : JSON.stringify(
           snapshot.map((key) => ({
             ...key,
-            encoded: lockBytesIdentity(encodeOrderedStorageKey(key.key, backend))
+            encoded: storageKeyBytesIdentity(encodeOrderedStorageKey(key.key, backend))
           }))
         )
   /** Handoff is a real identity gap, never a substituted old label. */
