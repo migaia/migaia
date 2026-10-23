@@ -574,10 +574,14 @@ export function createMemoryBackend<T = unknown>(
     operation: string,
     input: (context: IOperationContextSnapshot) => I,
     ctx: ITransactionOptions | undefined,
-    prepare: (captured: I) => IMemoryAtomicWork<T, R>
+    prepare: (captured: I, admit: () => void) => IMemoryAtomicWork<T, R>
   ): Promise<Awaited<R>> => {
     /** One accepted lifetime spans every real attempt and all original pipeline settlement. */
     let release: (() => void) | undefined
+    /** The existing lease admits once, including the original callback-capture boundary. */
+    const admit = (): void => {
+      release ??= controller.beginMutation()
+    }
     /** Each pipeline fixes this attempt's original callback or detached native batch. */
     let work: IMemoryAtomicWork<T, R>
     return runWithConcurrency<Awaited<R>>(
@@ -587,8 +591,8 @@ export function createMemoryBackend<T = unknown>(
         executeAttempt: (context, invoke) =>
           core.execution.run({ operation, input: input(context), ctx: context }, (captured) => {
             controller.assertLive()
-            work = prepare(captured)
-            release ??= controller.beginMutation()
+            work = prepare(captured, admit)
+            admit()
             return invoke()
           }),
         lock: () => work.keys ?? []
@@ -755,9 +759,15 @@ export function createMemoryBackend<T = unknown>(
         MemoryOperation.transaction,
         (context) => ({ run, ctx: context }),
         ctx,
-        (input) => {
+        (input, admit) => {
           assertTransactionCallback(input.run, STORAGE_MEMORY_BACKEND)
-          return { invoke: (scope) => input.run(scope) }
+          admit()
+          /**
+           * Keep the original second read before waiting, with no receiver or private draft
+           * argument.
+           */
+          const callback = input.run
+          return { invoke: (scope) => callback(scope) }
         }
       ),
     tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
