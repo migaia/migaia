@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
 import { StorageError, StorageErrorCode } from '../../src/errors.js'
@@ -1086,11 +1087,18 @@ describe('版本迁移', () => {
       migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) }
     })
     const repo = v2.connect(store)
+    /** Normal and authentic transaction reads recover exactly the same persisted envelope. */
+    const normal = await repo.get('u1')
     let seen: { id: string; displayName: string } | undefined
     await repo.batch(async (tx) => {
       seen = await tx.get('u1')
     })
+    expect(seen).toEqual(normal)
     expect(seen).toEqual({ id: 'u1', displayName: 'Ada' })
+    expect(await store.getRecord(composeRepositoryKey('people4', 'u1'))).toEqual({
+      version: 1,
+      state: { id: 'u1', name: 'Ada' }
+    })
   })
 })
 
@@ -1136,13 +1144,17 @@ describe('batch', () => {
   it('结构化后端上 batch 内抛错时整批回滚', async () => {
     const repo = users.connect(await memoryBackend())
     await repo.put({ id: 'existing', name: 'Old', email: 'old@x.y' })
-    await expect(
-      repo.batch(async (tx) => {
+    /** The actual callback error must remain reachable through the transaction boundary. */
+    const original = new Error('boom')
+    const failure = await repo
+      .batch(async (tx) => {
         await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
         await tx.remove('existing')
-        throw new Error('boom')
+        throw original
       })
-    ).rejects.toThrow()
+      .catch((cause) => cause)
+    expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED' })
+    expect(walkErrorCauses(failure)).toContain(original)
     await expect(repo.get('u1')).resolves.toBeUndefined()
     await expect(repo.get('existing')).resolves.toEqual({
       id: 'existing',
