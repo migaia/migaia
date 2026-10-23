@@ -1,3 +1,6 @@
+import type { IBackendStageBindings } from '@migaia/storage-contract'
+import type { IStorageHooks } from './hook-types.js'
+import type { IStorageHookEmitter } from './hooks.js'
 import { assimilateCapturedThen } from '@migaia/utils/function'
 import {
   defineFeature as defineNativeFeature,
@@ -210,6 +213,9 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly features: Readonly<Record<string, object>>
   readonly featureExpose: object
   readonly execution: IStorageExecutionPort
+  getStageBindings(): IBackendStageBindings
+  getStorageHooks(): IStorageHooks
+  readonly emit: IStorageHookEmitter
 }
 /** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
 export const definePlugin: IStorageDefinePlugin = ((
@@ -245,6 +251,13 @@ export const definePlugin: IStorageDefinePlugin = ((
         usePipeline: nativeCore.usePipeline,
         useAsyncPipeline: nativeCore.useAsyncPipeline,
         execution: nativeCore.execution,
+        get hooks() {
+          return nativeCore.getStorageHooks()
+        },
+        get stageBindings() {
+          return nativeCore.getStageBindings()
+        },
+        emit: nativeCore.emit,
         registerStore: (store: IStorageBase) => {
           if (transferred)
             throw createStorageTypeError(
@@ -319,34 +332,39 @@ export const definePlugin: IStorageDefinePlugin = ((
         install: (install) => async () => {
           transferActive = true
           try {
-            /** Capture the actual install result before native extension publication. */
-            const extensions =
-              install === undefined ? {} : await nativeCore.runStorageInstall(async () => install())
-            if (kind !== undefined && !transferred)
-              throw createStorageTypeError(
-                StorageErrorCode.backendPluginInvalid,
-                StorageErrorText.backendPluginInvalid
+            return await nativeCore.runStorageInstall(async () => {
+              /** Capture the actual install result before native extension publication. */
+              const extensions = install === undefined ? {} : await install()
+              if (kind !== undefined && !transferred)
+                throw createStorageTypeError(
+                  StorageErrorCode.backendPluginInvalid,
+                  StorageErrorText.backendPluginInvalid
+                )
+              if (kind !== undefined && features !== undefined)
+                installStorageFeatures({
+                  name,
+                  store: nativeCore.getStore(),
+                  features: nativeCore.features,
+                  installer:
+                    capabilityInstaller === undefined
+                      ? undefined
+                      : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
+                  execution: nativeCore.execution,
+                  expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
+                  onDispose: nativeCore.onDispose
+                })
+              if (
+                extensions === null ||
+                typeof extensions !== 'object' ||
+                Array.isArray(extensions)
               )
-            if (kind !== undefined && features !== undefined)
-              installStorageFeatures({
-                name,
-                store: nativeCore.getStore(),
-                features: nativeCore.features,
-                installer:
-                  capabilityInstaller === undefined
-                    ? undefined
-                    : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
-                execution: nativeCore.execution,
-                expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
-                onDispose: nativeCore.onDispose
-              })
-            if (extensions === null || typeof extensions !== 'object' || Array.isArray(extensions))
-              return extensions as never
-            /** Preserve caller extension descriptors rather than spreading away their behavior. */
-            const output = Object.create(null)
-            Object.setPrototypeOf(output, Object.getPrototypeOf(extensions))
-            Object.defineProperties(output, Object.getOwnPropertyDescriptors(extensions))
-            return output
+                return extensions as never
+              /** Preserve caller extension descriptors rather than spreading away their behavior. */
+              const output = Object.create(null)
+              Object.setPrototypeOf(output, Object.getPrototypeOf(extensions))
+              Object.defineProperties(output, Object.getOwnPropertyDescriptors(extensions))
+              return output
+            })
           } finally {
             transferActive = false
           }
@@ -373,7 +391,8 @@ export const definePlugin: IStorageDefinePlugin = ((
               getBackendId: () => nativeCore.getBackendId(),
               getLifecycle: () => nativeCore.lifecycle,
               onDispose: nativeCore.onDispose,
-              getScheduler: () => nativeCore.getScheduler()
+              getScheduler: () => nativeCore.getScheduler(),
+              emit: nativeCore.emit
             },
             true
           ) as never

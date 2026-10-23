@@ -38,6 +38,23 @@ console.log(await jsonCodec.decode(encoded))`,
   ],
   createStorageHost: [
     {
+      title: t('Observe one host lifetime', '观察同一个宿主生命周期'),
+      problem: t(
+        'A caller needs cleanup counts without replacing cleanup or awaiting listeners.',
+        '调用方需要清理数量，保留原清理流程且不等待监听器。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+
+await using host = await createStorageHost()
+const off = host.hooks.on('beforeHostClose', ({ backendCount }) => console.log(backendCount))
+await host.dispose()
+off()`,
+      result: t(
+        'Prints 0 once. Cleanup retains its original owner; the returned unsubscribe handle is idempotent.',
+        '输出一次0。清理由原owner执行，返回的取消句柄幂等。'
+      )
+    },
+    {
       title: t(
         'Install an application extension with owned cleanup',
         '安装由宿主负责清理的业务扩展'
