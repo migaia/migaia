@@ -191,6 +191,10 @@ type IIteratorRegistration = {
   readonly info: ITransactionInfo
   readonly advance: (scope: object) => Promise<IteratorResult<unknown>>
   readonly cleanup: () => Promise<void>
+  readonly compose: <TResult>(
+    run: (scope: object | undefined) => Promise<TResult>
+  ) => Promise<TResult>
+  readonly fail: (error: unknown) => unknown
 }
 /** Only active work and resources are retained; completed history is removed at settlement. */
 type ITransactionState = {
@@ -643,7 +647,20 @@ export function createTransactionOwner<
           void advancement.then(undefined, () => undefined)
           return advancement
         }
-        resource = { kind: RegistrationKind.iterator, info: state.info, advance, cleanup }
+        resource = {
+          kind: RegistrationKind.iterator,
+          info: state.info,
+          advance,
+          cleanup,
+          /** A complete query borrows its own real operation view rather than the expired user view. */
+          compose: (run) =>
+            originalScope ? runTransactionOperation(originalScope, run) : run(undefined),
+          /** Primary query failure reaches the original owner before cursor cleanup can fail. */
+          fail: (error) =>
+            iteratorState
+              ? (iteratorState.firstFailure ?? failTransaction(iteratorState, error))
+              : error
+        }
         /** Only this actual object is registered; copying its methods grants no new identity. */
         const iterator: IStorageIterator<T> = {
           next: () =>
@@ -677,6 +694,36 @@ export function createTransactionOwner<
     if (cause instanceof StorageContractError) throw cause
     throw invalidTransaction(cause)
   }
+}
+
+/**
+ * Internal query composition borrows the actual iterator's original owner. The entire terminal is
+ * synchronously admitted before its first next; its scoped advances remain valid after the user
+ * callback ends. Failure is recorded before cleanup so cleanup cannot become the primary error.
+ * Non-transaction iterators keep their original direct advance/cleanup owner. This helper is not
+ * exported from the package root and grants no registration, lifecycle or backend author
+ * authority.
+ */
+export function runTransactionIteratorOperation<T, TResult>(
+  iterator: IStorageIterator<T>,
+  run: (
+    next: () => Promise<IteratorResult<T>>,
+    fail: (error: unknown) => unknown
+  ) => Promise<TResult>
+): Promise<TResult> {
+  /** Only the existing actual iterator record can provide original transaction authority. */
+  const resource = transactionRegistrations.get(iterator)
+  if (resource?.kind !== RegistrationKind.iterator)
+    return run(
+      () => iterator.next(),
+      (error) => error
+    )
+  return resource.compose((scope) =>
+    run(
+      scope === undefined ? () => iterator.next() : () => nextTransactionIterator(scope, iterator),
+      resource.fail
+    )
+  )
 }
 
 /** Returns authentic live identity without granting registration, reads or future validity. */

@@ -21,6 +21,7 @@ import { StorageContractErrorText } from './error-text.js'
 import type { IOperationContext, IStorageKey } from './context.js'
 import type { IStorageIterator } from './resource.js'
 import { snapshotOperationContext } from './operation-context.js'
+import { runTransactionIteratorOperation } from './transaction.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({
@@ -700,63 +701,71 @@ async function executeRecordQuery<R>(
       ? { ...step, predicate: compileQueryCondition<unknown>(step.condition) }
       : step
   )
-  /** The result retains output rows only; candidates are processed one at a time. */
-  const rows: R[] = []
-  /** The original iterator remains the sole resource; finally awaits its real cleanup Promise. */
-  let iterator: IStorageIterator<readonly [IStorageKey, unknown]> | undefined
-  /** The first normalized failure survives cleanup failure and remains first in an aggregate. */
-  let primary: Error | undefined
+  /** The source creates its actual iterator before the complete terminal is admitted to that owner. */
+  let iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   try {
     iterator = Reflect.apply(source.execute, source.receiver, [
       { conditions, fields, ctx: captured }
     ])
-    while (true) {
-      assertQueryActive(captured)
-      /** Native next is always awaited to settlement before any cleanup is requested. */
-      const next = await iterator.next()
-      assertQueryActive(captured)
-      if (next.done) break
-      /** Mapping is local to this row and never mutates a backend-owned candidate. */
-      let value = next.value[1]
-      /** Short-circuit filtering preserves callback order and avoids unnecessary mapping. */
-      let accepted = true
-      for (const step of client) {
-        if (
-          step.operation === QueryOperation.where ||
-          step.operation === QueryOperation.predicate
-        ) {
-          if (!step.predicate(value)) {
-            accepted = false
-            break
-          }
-        } else if (step.operation === QueryOperation.mapper) value = await step.mapper(value)
-        else {
-          /** Projection copies only requested own fields and cannot trigger prototype mutation. */
-          const selected: Record<string, unknown> = {}
-          for (const field of step.fields)
-            Object.defineProperty(selected, field, {
-              enumerable: true,
-              configurable: true,
-              writable: true,
-              value:
-                value === null || value === undefined
-                  ? undefined
-                  : Reflect.get(Object(value), field)
-            })
-          value = selected
-        }
-        assertQueryActive(captured)
-      }
-      if (accepted) rows.push(value as R)
-    }
   } catch (cause) {
-    primary = queryExecutionFailure(cause)
-  } finally {
-    if (iterator !== undefined) {
+    throw queryExecutionFailure(cause)
+  }
+  /**
+   * The whole terminal, including mapping and cleanup, remains one accepted original-owner
+   * operation.
+   */
+  return runTransactionIteratorOperation(iterator, async (advance, fail) => {
+    /** Only accepted output is retained; every native candidate is consumed once. */
+    const rows: R[] = []
+    /** The original primary is recorded before cleanup can fail or expire the operation view. */
+    let primary: Error | undefined
+    try {
+      while (true) {
+        assertQueryActive(captured)
+        /** Native next is always awaited to settlement before any cleanup is requested. */
+        const next = await advance()
+        assertQueryActive(captured)
+        if (next.done) break
+        /** Mapping is local to this row and never mutates a backend-owned candidate. */
+        let value = next.value[1]
+        /** Short-circuit filtering preserves callback order and avoids unnecessary mapping. */
+        let accepted = true
+        for (const step of client) {
+          if (
+            step.operation === QueryOperation.where ||
+            step.operation === QueryOperation.predicate
+          ) {
+            if (!step.predicate(value)) {
+              accepted = false
+              break
+            }
+          } else if (step.operation === QueryOperation.mapper) value = await step.mapper(value)
+          else {
+            /** Projection copies only requested own fields and cannot trigger prototype mutation. */
+            const selected: Record<string, unknown> = {}
+            for (const field of step.fields)
+              Object.defineProperty(selected, field, {
+                enumerable: true,
+                configurable: true,
+                writable: true,
+                value:
+                  value === null || value === undefined
+                    ? undefined
+                    : Reflect.get(Object(value), field)
+              })
+            value = selected
+          }
+          assertQueryActive(captured)
+        }
+        if (accepted) rows.push(value as R)
+      }
+    } catch (cause) {
+      primary = queryExecutionFailure(fail(queryExecutionFailure(cause)))
+    } finally {
       try {
         await iterator.dispose()
       } catch (cause) {
-        /** Cleanup cannot hide an earlier mapper, predicate or native read failure. */
+        /** Cleanup remains reachable after the original first error rather than replacing it. */
         const cleanup = queryExecutionFailure(cause)
         primary =
           primary === undefined
@@ -764,10 +773,11 @@ async function executeRecordQuery<R>(
             : queryExecutionFailure(attachSecondaryErrors(primary, [cleanup]))
       }
     }
-  }
-  if (primary !== undefined) throw primary
-  return rows
+    if (primary !== undefined) throw primary
+    return rows
+  })
 }
+
 /** Captures an immutable string projection before creating another chain node. */
 function snapshotQueryFields(fields: readonly unknown[]): readonly string[] {
   if (fields.length === 0 || fields.some((field) => typeof field !== 'string'))

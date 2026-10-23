@@ -745,8 +745,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'IQueryChain<T,TContext> with three where forms, one select, all, explain and requirePushdown. This slice does not advertise other terminals. all awaits the original iterator disposal and retains the first failure through cleanup.',
-        '返回 IQueryChain<T,TContext>，具有三种 where、一次 select、all、explain 与 requirePushdown；本切片不声明其他终点，all 等待原迭代器释放，清理失败不覆盖首错。'
+        'IQueryChain<T,TContext> with three where forms, one select, all, explain and requirePushdown. This slice does not advertise other terminals. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
+        '返回 IQueryChain<T,TContext>，具有三种 where、一次 select、all、explain 与 requirePushdown；本切片不声明其他终点，all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
       ),
       example: storageContractCases.createRecordQuery![0]!.example,
       cases: storageContractCases.createRecordQuery
