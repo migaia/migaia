@@ -161,6 +161,30 @@ describe('shared vector query family', () => {
 })
 
 describe('shared RDF query family', () => {
+  it('shares selector ordering and offset controls with records without exposing key metadata', async () => {
+    /** Each quad retains its original native key while only real quad fields leave the reader. */
+    const quads = ['c', 'a', 'b'].map((id): IQuad => ({
+      subject: term.iri('urn:' + id),
+      predicate: term.iri('urn:p'),
+      object: term.literal(id),
+      graph: term.defaultGraph
+    }))
+    const query = createRdfQuery(
+      {
+        pushdown: { source: 'rdf', operators: [], operations: [] },
+        execute: () => rows(quads)
+      },
+      {}
+    )
+      .orderBy((quad) => quad.subject.value)
+      .skip(1)
+      .limit(1)
+    expect(await query.select('subject').all()).toEqual([{ subject: term.iri('urn:b') }])
+    const stream = query.stream()
+    expect(Object.keys(await stream.next())).toEqual(['done', 'value'])
+    await stream.dispose()
+  })
+
   it('admits native field projection without claiming projected rows are complete quads', async () => {
     /** The engine returns its actual selected shape, rather than an unsafe complete-quad cast. */
     const source: IRdfQuerySource = {

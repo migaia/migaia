@@ -1502,8 +1502,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'IRecordQuery<T,TContext,TAugmentMethods> with three where forms, one select, all, real stream, explain, requirePushdown, limit and orderByComparator(compare).limit(k). Missing comparator bounds and invalid limits reject before source execution. Limit and comparator are client steps in this slice. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
-        '返回 IRecordQuery<T,TContext,TAugmentMethods>，具有三种 where、一次 select、all、真实 stream、explain、requirePushdown、limit 与 orderByComparator(compare).limit(k)；缺少比较器上限或 limit 无效时在源执行前拒绝，本切片 limit 与比较器为客户端步骤。all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
+        'IRecordQuery<T,TContext,TAugmentMethods> with three where forms, one select, all, real stream, explain, requirePushdown, limit and orderByComparator(compare).limit(k). Missing comparator bounds and invalid limits reject before source execution. Selector ordering, distinct and skip share the same reader. Extended native controls require explicit nativeSteps:true; legacy limit/comparator behavior stays client-side. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
+        '返回 IRecordQuery<T,TContext,TAugmentMethods>，具有三种 where、一次 select、all、真实 stream、explain、requirePushdown、limit 与 orderByComparator(compare).limit(k)；缺少比较器上限或 limit 无效时在源执行前拒绝，selector 排序、distinct 与 skip 共用同一 reader；扩展原生控制需显式 nativeSteps:true，旧源 limit/comparator 仍在客户端。all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
       ),
       example: storageContractCases.createRecordQuery![0]!.example,
       cases: storageContractCases.createRecordQuery
@@ -3307,6 +3307,18 @@ console.log(candidate.name, candidate.output)`
         'ground quad 读取、一次投影、limit 与原生遍历。'
       ),
       members: {
+        orderBy: {
+          summary: t(
+            'Reuse canonical selector key ordering over ground quad rows.',
+            '在 ground quad 行上复用规范 selector 键排序。'
+          )
+        },
+        skip: {
+          summary: t(
+            'Advance explicit row offsets without another cursor owner.',
+            '显式推进记录 offset，不建立另一游标 owner。'
+          )
+        },
         where: { summary: t('Append shared quad binding conditions.', '追加共享 quad 绑定条件。') },
         select: { summary: t('Project quad bindings once.', '一次投影 quad 绑定。') },
         limit: {
@@ -3381,6 +3393,12 @@ console.log(candidate.name, candidate.output)`
         '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
+        nativeSteps: {
+          summary: t(
+            'Explicitly opt into extended native row controls while retaining ordered traversal steps.',
+            '显式选择扩展原生行控制，保留有序遍历步骤。'
+          )
+        },
         pushdown: {
           summary: t('Original native traversal/operator support.', '原生遍历及操作符支持。')
         },
@@ -3400,6 +3418,101 @@ console.log(candidate.name, candidate.output)`
           summary: t(
             'Select only the matching token family methods; keep native scope members and undefined operation context.',
             '仅选择对应令牌家族的方法，保留原生 scope 成员与 undefined 操作上下文。'
+          )
+        }
+      }
+    },
+    IQueryNativeStep: {
+      summary: t(
+        'Ordered serializable native where/select/limit/skip/distinct steps; no JavaScript callback translation.',
+        '有序可序列化原生 where/select/limit/skip/distinct 步骤，不翻译 JavaScript 回调。'
+      ),
+      members: {
+        operation: {
+          summary: t(
+            'Canonical operation from the declared native subset.',
+            '声明的原生子集中的规范操作。'
+          )
+        },
+        condition: {
+          summary: t('Captured canonical AST for a where step.', 'where 步骤捕获的规范 AST。')
+        },
+        fields: {
+          summary: t('Captured field names for a select step.', 'select 步骤捕获的字段名。')
+        },
+        count: { summary: t('Nonnegative safe limit/skip bound.', '非负安全 limit/skip 上限。') },
+        field: {
+          summary: t(
+            'Distinct field with the shared SameValueZero identity contract.',
+            '按共享 SameValueZero 身份语义去重的字段。'
+          )
+        }
+      }
+    },
+    IRecordOrderedQueryCore: {
+      summary: t(
+        'Selector-ordered record controls with no comparator transition.',
+        'selector 排序的记录控制，不提供 comparator 转换。'
+      ),
+      members: {
+        orderBy: {
+          summary: t(
+            'Append a canonical selector key and optional asc/desc direction.',
+            '追加规范 selector 键与可选 asc/desc 方向。'
+          )
+        }
+      }
+    },
+    IRecordOrderedQuery: {
+      summary: t(
+        'Selector-ordered record core intersected with original Feature methods.',
+        'selector 排序的记录核心与原 Feature 方法的交集。'
+      ),
+      members: {
+        orderBy: {
+          summary: t(
+            'Preserve the exact ordered family and Feature methods after refinement.',
+            '细化后保留精确排序家族与 Feature 方法。'
+          )
+        }
+      }
+    },
+    IRecordQueryCore: {
+      summary: t(
+        'Record query entry with exclusive selector/comparator ordering transitions.',
+        '记录查询入口，selector/comparator 排序转换互斥。'
+      ),
+      members: {
+        orderBy: {
+          summary: t(
+            'Enter canonical selector ordering with primary-key ties.',
+            '按主键决胜，进入规范 selector 排序。'
+          )
+        },
+        orderByComparator: {
+          summary: t(
+            'Enter bounded opaque comparator ordering.',
+            '进入有界不透明 comparator 排序。'
+          )
+        }
+      }
+    },
+    IRecordQueryBaseCore: {
+      summary: t(
+        'Common record read, distinct, limit and offset controls.',
+        '记录共用读取、distinct、limit 与 offset 控制。'
+      ),
+      members: {
+        limit: {
+          summary: t(
+            'Retain at most a nonnegative safe number of rows.',
+            '最多保留非负安全数量的行。'
+          )
+        },
+        skip: {
+          summary: t(
+            'Advance a nonnegative safe offset with an explicit O(n) explanation.',
+            '推进非负安全 offset，明确解释 O(n) 成本。'
           )
         }
       }
@@ -3437,6 +3550,12 @@ console.log(candidate.name, candidate.output)`
         '已实现三形态 where、一次 select、all、explain 与 requirePushdown，字段与输出类型精确。'
       ),
       members: {
+        distinct: {
+          summary: t(
+            'Retain the first current-order row for each SameValueZero field identity.',
+            '每个 SameValueZero 字段身份保留当前顺序首行。'
+          )
+        },
         where: {
           summary: t(
             'Append object, typed path or function condition.',
@@ -3457,6 +3576,12 @@ console.log(candidate.name, candidate.output)`
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        nativeSteps: {
+          summary: t(
+            'Opt in to authoritative ordered native steps; omission preserves legacy execute arguments.',
+            '选择有序原生 steps 为执行依据；省略保留旧 execute 参数。'
+          )
+        },
         pushdown: { summary: t('Captured native support declaration.', '捕获的原生支持声明。') },
         asyncDisposeKey: {
           summary: t(

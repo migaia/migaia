@@ -20,6 +20,7 @@ import {
 import type { ICodecValue } from '@migaia/serialize/codec'
 import {
   RecordQueryMethod,
+  RdfQueryMethod,
   type IRecordQuery,
   type IQueryResult,
   type IRdfQuery
@@ -993,68 +994,84 @@ function transactionQueryResult<R>(
     requirePushdown: () => transactionQueryResult(scope, query.requirePushdown())
   })
 }
+/**
+ * Rewraps only real pure branch constructors. Each returned chain keeps its original method state,
+ * while the original terminal wrapper remains responsible for transaction operation admission.
+ */
+function transactionQueryBranches<TQuery extends IQueryResult<unknown, undefined>>(
+  query: TQuery,
+  names: readonly string[],
+  project: (query: TQuery) => TQuery
+): Record<string, unknown> {
+  /** The finite result contains functions only, without a query registry, plan or lifecycle state. */
+  const branches: Record<string, unknown> = {}
+  for (const name of names) {
+    /** Canonical immutable query constructors are captured once with their original receiver. */
+    const method = Reflect.get(query, name)
+    if (typeof method === 'function')
+      branches[name] = (...args: readonly unknown[]) => project(Reflect.apply(method, query, args))
+  }
+  return branches
+}
+/** Pure controls common to record and RDF queries keep their original family state after branching. */
+const transactionQueryBranchMethods = [
+  RecordQueryMethod.where,
+  RecordQueryMethod.limit,
+  RecordQueryMethod.skip,
+  RecordQueryMethod.distinct,
+  RecordQueryMethod.orderBy
+] as const
 /** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
-function transactionRecordQuery<R>(
+function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>(
   scope: object,
-  query: IRecordQuery<R, undefined>
-): IRecordQuery<R, undefined> {
-  /** Forwarding retains the original overloads, row inference and one-time condition capture. */
-  const where = ((...args: readonly unknown[]) =>
-    transactionRecordQuery(scope, Reflect.apply(query.where, query, args))) as IRecordQuery<
-    R,
-    undefined
-  >['where']
-  /** Selection remains the original shared node constructor and never gains a second executor. */
-  const select = ((...args: readonly unknown[]) =>
-    transactionQueryResult(scope, Reflect.apply(query.select, query, args))) as IRecordQuery<
-    R,
+  query: TQuery
+): TQuery {
+  /** Original selector/comparator type states are retained by projecting the exact returned chain. */
+  const branches = transactionQueryBranches(query, transactionQueryBranchMethods, (next) =>
+    transactionRecordQuery(scope, next)
+  )
+  /** Only comparator-capable states expose this original bounded transition. */
+  const comparator = Reflect.get(query, RecordQueryMethod.orderByComparator)
+  /** One actual selection constructor retains the original overloads and original query receiver. */
+  const select = Reflect.get(query, RecordQueryMethod.select) as IRecordQuery<
+    unknown,
     undefined
   >['select']
-  return Object.freeze({
-    ...query,
-    ...transactionQueryReads(scope, query),
-    where,
-    select,
-    limit: (count: number) => transactionRecordQuery(scope, query.limit(count)),
-    orderByComparator: (compare: (left: R, right: R) => number) => {
-      /** Original argument admission stays at the comparator call, before any terminal. */
-      const pending = query.orderByComparator(compare)
+  if (typeof comparator === 'function')
+    branches.orderByComparator = (compare: (left: unknown, right: unknown) => number) => {
+      /** Comparator admission remains pure and keeps its one original immediate-bound protocol. */
+      const pending = Reflect.apply(comparator, query, [compare]) as {
+        first(): Promise<unknown>
+        limit(count: number): IQueryResult<unknown, undefined>
+      }
       return {
         first: () => runTransactionOperation(scope, () => pending.first()),
-        limit: (count: number) =>
-          transactionRecordQuery(scope, pending.limit(count) as IRecordQuery<R, undefined>)
+        limit: (count: number) => transactionRecordQuery(scope, pending.limit(count))
       }
-    },
-    explain: () => query.explain(),
-    requirePushdown: () => transactionRecordQuery(scope, query.requirePushdown())
-  }) as IRecordQuery<R, undefined>
-}
-/** RDF branches reuse the same query nodes, selected-result wrapper and complete read admission. */
-function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQuery<undefined> {
-  /** Original overloads and input snapshot order stay with the family query owner. */
-  const where = ((...args: readonly unknown[]) =>
-    transactionRdfQuery(
-      scope,
-      Reflect.apply(query.where, query, args)
-    )) as IRdfQuery<undefined>['where']
-  /** Selection returns the same original result node rather than a parallel executor. */
-  const select = ((...args: readonly unknown[]) =>
-    transactionQueryResult(
-      scope,
-      Reflect.apply(query.select, query, args)
-    )) as IRdfQuery<undefined>['select']
+    }
   return Object.freeze({
     ...query,
     ...transactionQueryReads(scope, query),
-    where,
-    select,
-    limit: (count: number) => transactionRdfQuery(scope, query.limit(count)),
-    follow: (
-      predicate: Parameters<IRdfQuery['follow']>[0],
-      target?: Parameters<IRdfQuery['follow']>[1]
-    ) => transactionRdfQuery(scope, query.follow(predicate, target)),
-    inverse: (predicate: Parameters<IRdfQuery['inverse']>[0]) =>
-      transactionRdfQuery(scope, query.inverse(predicate)),
+    ...branches,
+    select: (...args: readonly unknown[]) =>
+      transactionQueryResult(scope, Reflect.apply(select, query, args)),
+    explain: () => query.explain(),
+    requirePushdown: (): IQueryResult<unknown, undefined> =>
+      transactionRecordQuery(scope, query.requirePushdown())
+  }) as TQuery
+}
+/** RDF branches reuse the same original node constructors and complete read admission table. */
+function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQuery<undefined> {
+  return Object.freeze({
+    ...query,
+    ...transactionQueryReads(scope, query),
+    ...transactionQueryBranches(
+      query,
+      [...transactionQueryBranchMethods, RdfQueryMethod.follow, RdfQueryMethod.inverse],
+      (next) => transactionRdfQuery(scope, next)
+    ),
+    select: (...args: readonly unknown[]) =>
+      transactionQueryResult(scope, Reflect.apply(query.select, query, args)),
     explain: () => query.explain(),
     requirePushdown: () => transactionRdfQuery(scope, query.requirePushdown())
   }) as IRdfQuery<undefined>

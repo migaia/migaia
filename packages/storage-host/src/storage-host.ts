@@ -62,7 +62,12 @@ import type {
   IStoragePipelineInput,
   IStorageBackendKind,
   IStoragePluginCore,
-  IStorageEnvelopeStages
+  IStorageEnvelopeStages,
+  IStorageOrgView,
+  IStorageBackendOrgContext,
+  IStoragePluginCallContext,
+  IStorageBorrowedBackend,
+  IStorageOrgBinding
 } from './types.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
@@ -93,9 +98,10 @@ type IStorageNativeRegistrationContext = {
   readonly isDetected: () => boolean
   readonly setRegistrationCore: (core: IStorageInstallCore) => void
   readonly getStageBindings: () => IBackendStageBindings
-  readonly getObservers: (store: IStorageBase) => IStorageObserverSet
+  readonly getObservers: (store: IStorageBase, orgId?: string) => IStorageObserverSet
   readonly getEnvelopeStages: (
-    operation: Readonly<{ operation: string; targetVersion: number }>
+    operation: Readonly<{ operation: string; targetVersion: number }>,
+    orgId?: string
   ) => IStorageEnvelopeStages
   readonly hooks: IStorageHooks
   readonly emit: IStorageHookEmitter
@@ -106,6 +112,7 @@ type IStorageNativeRegistrationContext = {
   readonly runInstall: <T>(operation: () => Promise<T>) => Promise<T>
   readonly isInstallExpired: () => boolean
   readonly registerStore: (store: IStorageBase, core: IStorageInstallCore) => void
+  readonly getOrgContext: (orgId: string) => IStorageBackendOrgContext
 }
 
 /**
@@ -149,6 +156,16 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         setStorageFeatureProjection: context.storeCell.setFeatureProjection,
         createTransactionApi: context.storeCell.createTransactionApi,
         getChainMethods: context.storeCell.getChainMethods,
+        getOrgContext: context.getOrgContext,
+        captureStorageExtension: (key: PropertyKey, value: unknown, receiver: object) => {
+          /** The native descriptor reader captures each original source value exactly once. */
+          context.storeCell.captureExtension(key, value, receiver)
+          return context.storeCell.projectExtension(
+            key,
+            context.getOrgContext(context.defaultOrgId).callContext,
+            context.assertCurrent
+          )
+        },
         getBackendId: () => context.id,
         defaultOrgId: context.defaultOrgId,
         getScheduler: () => context.scheduler,
@@ -192,6 +209,31 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
             )
           release = registerBackendValueCommit(store, commit)
         }) satisfies IStoragePluginCore['registerValueCommit'],
+        registerOrgBinding: ((store, binding) => {
+          /** The original window and exact store cell remain the only registration authority. */
+          registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
+          /** Capture the original callbacks once so later descriptor mutation cannot reroute an org. */
+          let backend: IStorageOrgBinding['backend']
+          let drop: IStorageOrgBinding['drop']
+          try {
+            backend = binding?.backend
+            drop = binding?.drop
+          } catch (cause) {
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+          }
+          if (
+            context.storeCell.get() !== store ||
+            typeof backend !== 'function' ||
+            typeof drop !== 'function'
+          )
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          context.storeCell.setOrgBinding(
+            Object.freeze({
+              backend: (orgId) => Reflect.apply(backend, binding, [orgId]),
+              drop: (orgId) => Reflect.apply(drop, binding, [orgId])
+            })
+          )
+        }) satisfies IStoragePluginCore['registerOrgBinding'],
         getChangeController: () => {
           context.assertCurrent()
           return getBackendChangeController(context.storeCell.get())
@@ -346,7 +388,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   /** Saved public listener ports continue to enforce the existing host admission boundary. */
   readonly #publicHooks: IStorageHooks
   /** A non-owning reverse index resolves only committed exact stores to their existing context. */
-  readonly #storeContexts = new WeakMap<object, IStorageNativeRegistrationContext>()
+  readonly #storeContexts = new WeakMap<
+    object,
+    {
+      readonly context: IStorageNativeRegistrationContext
+      readonly native: IStorageBase
+      readonly orgId?: string
+    }
+  >()
   /** Installation order is retained by original contexts, without another lifecycle registry. */
   readonly #detectContexts = new Set<IStorageNativeRegistrationContext>()
   /** A successful result and every concurrent caller share the same exact detection Promise. */
@@ -537,7 +586,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
          * The original installation owns only its captured dependency handles, never their
          * resources.
          */
-        let borrowed: Set<object> | undefined
+        let borrowed: Map<object, IStorageBase> | undefined
         /** Checks belong to this original registration and retain registration order. */
         const checks = new Set<IStorageDetectCheck>()
         /** A successful complete host pass admits this registration's real execution endpoints. */
@@ -569,10 +618,61 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           storeCell.bind(store)
           return createStorageObservers(observerBinding, () => store)
         }
+        /**
+         * Each call context closes over its organization and only installation-captured
+         * dependencies.
+         */
+        const callContext = (orgId: string): IStoragePluginCallContext =>
+          Object.freeze({
+            orgId,
+            backend: (view) => {
+              assertRegistration()
+              const source = borrowed?.get(view)
+              if (source === undefined)
+                throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+              return this.#projectBackend(source, orgId) as typeof view
+            }
+          })
         /** Bind the next domain core to its matching entry in this install batch. */
         const context: IStorageNativeRegistrationContext = {
           id: native.id,
           defaultOrgId: this.#orgId,
+          getOrgContext: (orgId) => {
+            assertRegistration()
+            assertOperationContext({ orgId })
+            /** Read-only ports point to the same original execution and observer implementations. */
+            const binding = {
+              ...observerBinding,
+              identity: () => ({ ...observerBinding.identity(), orgId })
+            }
+            const execution = forwardStorageExecution(this.#inner, context.assertExecution, () => ({
+              backendId: native.id,
+              backend: kind?.name ?? native.id
+            }))
+            const contextForOrg = callContext(orgId)
+            const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
+            return Object.freeze({
+              orgId,
+              execution,
+              callContext: contextForOrg,
+              stageBindings: {
+                backendStages: createStorageObservers(binding, storeCell.get).backend,
+                operationStages: (store) => observe(store).operation,
+                codecStages: (store) => observe(store).codec,
+                transactionStages: (store) => observe(store).transaction,
+                concurrencyStages: (store) => observe(store).concurrency,
+                sqlStages: (store) => observe(store).sql,
+                queryStages: (store) => observe(store).query
+              },
+              createTransactionApi: (scope) =>
+                storeCell.createOrgTransactionApi(
+                  scope,
+                  storeCell.forOrg(orgId, this.#orgId),
+                  contextForOrg,
+                  execution
+                )
+            })
+          },
           assertCurrent: assertRegistration,
           assertExecution: () => {
             assertRegistration()
@@ -601,9 +701,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             const source = this.#storeContexts.get(store)!
             view = borrowStorageBackend(store, () => {
               assertRegistration()
-              source.assertCurrent()
+              source.context.assertCurrent()
             })
-            ;(borrowed ??= new Set()).add(view)
+            ;(borrowed ??= new Map()).set(view, store)
             return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
           },
           registerDetect: (check) => {
@@ -661,8 +761,26 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           },
           hooks: this.#events.hooks,
           emit: this.#events.emit,
-          getObservers: (store) => createStorageObservers(observerBinding, () => store),
-          getEnvelopeStages: (operation) => createStorageEnvelopeStages(observerBinding, operation),
+          getObservers: (store, orgId) =>
+            createStorageObservers(
+              orgId === undefined
+                ? observerBinding
+                : {
+                    ...observerBinding,
+                    identity: () => ({ ...observerBinding.identity(), orgId })
+                  },
+              () => store
+            ),
+          getEnvelopeStages: (operation, orgId) =>
+            createStorageEnvelopeStages(
+              orgId === undefined
+                ? observerBinding
+                : {
+                    ...observerBinding,
+                    identity: () => ({ ...observerBinding.identity(), orgId })
+                  },
+              operation
+            ),
           getStageBindings: () =>
             (stageBindings ??= {
               backendStages: createStorageObservers(observerBinding, storeCell.get).backend,
@@ -828,7 +946,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         this.#detectContexts.add(native!)
         if (native!.getKind() !== undefined) {
           nextRegistry.set(native!.id, entries[index]!.storeCell.get())
-          this.#storeContexts.set(entries[index]!.storeCell.get(), native!)
+          this.#storeContexts.set(entries[index]!.storeCell.get(), {
+            context: native!,
+            native: entries[index]!.storeCell.get()
+          })
         }
       }
       this.#registry = new Map(nextRegistry)
@@ -914,60 +1035,62 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   }
 
   /** Resolve only an exact published store from this host, never an id-shaped foreign object. */
-  #observers(store: IStorageBase): IStorageObserverSet {
+  #observers(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): IStorageObserverSet {
     this.#assertOpen()
     /** This index points to the original context and grants no independent lifecycle authority. */
-    const context = this.#storeContexts.get(store)
-    if (context === undefined || this.#registry.get(context.id) !== store)
+    const row = this.#storeContexts.get(store)
+    const context = row?.context
+    if (context === undefined || this.#registry.get(context.id) !== context.storeCell.get())
       throw createStorageTypeError(
         StorageErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
       )
-    return context.getObservers(store)
+    return context.getObservers(row!.native, row!.orgId)
   }
   /** Bind codec observations without changing codec execution. */
-  codecStages(store: IStorageBase) {
+  codecStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).codec
   }
   /** Bind query observations without creating a query owner. */
-  queryStages(store: IStorageBase) {
+  queryStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).query
   }
   /** Bind transaction observations to the canonical transaction owner. */
-  transactionStages(store: IStorageBase) {
+  transactionStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).transaction
   }
   /** Bind lock observations without retaining locks or policy state. */
-  concurrencyStages(store: IStorageBase) {
+  concurrencyStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).concurrency
   }
   /** Bind backend observations to this exact published registration. */
-  backendStages(store: IStorageBase) {
+  backendStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).backend
   }
   /** Bind SQL observations without changing the native statement path. */
-  sqlStages(store: IStorageBase) {
+  sqlStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).sql
   }
   /** Bind ordinary operation observations without adding an execution runner. */
-  operationStages(store: IStorageBase) {
+  operationStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) {
     return this.#observers(store).operation
   }
 
   /** Observe the original envelope plan with one immutable operation and target version. */
   envelopeStages(
-    store: IStorageBase,
+    store: IStorageBase | IStorageBorrowedBackend<IStorageBase>,
     operation: Readonly<{ operation: string; targetVersion: number }>
   ): IStorageEnvelopeStages {
     this.#assertOpen()
     /** Lookup points to the original published registration and grants no additional authority. */
-    const context = this.#storeContexts.get(store)
-    if (context === undefined || this.#registry.get(context.id) !== store)
+    const row = this.#storeContexts.get(store)
+    const context = row?.context
+    if (context === undefined || this.#registry.get(context.id) !== context.storeCell.get())
       throw createStorageTypeError(
         StorageErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
       )
-    return context.getEnvelopeStages(operation)
+    return context.getEnvelopeStages(operation, row!.orgId)
   }
 
   /** Returns the current immutable extension plane after its corresponding batch has committed. */
@@ -983,6 +1106,165 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const api = Object.create(null) as Record<string, unknown>
     for (const [id, store] of this.#registry) api[id] = 'api' in store ? store.api : undefined
     return Object.freeze(api) as IStorageHost<P>['api']
+  }
+
+  /** Resolve native organization data through its original registration, then remove ownership. */
+  #projectBackend(store: IStorageBase, orgId: string): ReturnType<typeof borrowStorageBackend> {
+    this.#assertOpen()
+    const context = this.#storeContexts.get(store)?.context
+    if (context === undefined)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    context.assertExecution()
+    return context.storeCell.projectOrgBackend(orgId, () => {
+      const native = context.storeCell.forOrg(orgId, this.#orgId)
+      /** The original base admission also governs a custom backend's newly exposed physical view. */
+      const snapshot = snapshotStorageBaseDetailed(native, { asyncDisposeKey })
+      if (!snapshot.valid)
+        throw createStorageTypeError(
+          StorageErrorCode.backendPluginInvalid,
+          StorageErrorText.backendPluginInvalid,
+          snapshot.cause
+        )
+      if (snapshot.backend !== context.getKind()?.name)
+        throw createStorageTypeError(
+          StorageErrorCode.backendKindMismatch,
+          StorageErrorText.backendKindMismatch
+        )
+      const ports = context.getOrgContext(orgId)
+      const api = context.storeCell.createOrgApi(native, ports.callContext, ports.execution)
+      const view = borrowStorageBackend(
+        native,
+        () => {
+          this.#assertOpen()
+          context.assertExecution()
+        },
+        { orgId, ...(api === undefined ? {} : { api }) }
+      )
+      this.#storeContexts.set(view, { context, native, orgId })
+      /** Entity borrows the same controller, filtered through this immutable organization boundary. */
+      const controller = getBackendChangeController(store)
+      if (controller !== undefined) {
+        const projectedController: IBackendChangeController = {
+          ...controller,
+          publish: (change) => controller.publish({ ...change, orgId }),
+          subscribe: (listener) =>
+            controller.subscribe((change) => {
+              if (change.orgId === orgId) listener(change)
+            })
+        }
+        context.storeCell.retainOrgBinding(
+          registerBackendChangeController(view, projectedController)
+        )
+      }
+      context.storeCell.retainOrgBinding(
+        registerBackendEnvelopeStages(
+          view,
+          (operation) => context.getEnvelopeStages(operation, orgId),
+          () => context.storeCell.getChainMethods('query')
+        )
+      )
+      return view
+    }) as ReturnType<typeof borrowStorageBackend>
+  }
+
+  /**
+   * Create immutable business closures; no current-organization slot or installation authority
+   * exists.
+   */
+  org(orgId: string): IStorageOrgView<P> {
+    this.#assertOpen()
+    assertOperationContext({ orgId })
+    /** Every lookup observes the current original committed registry and closes over this org. */
+    const backend = (id: string) => {
+      const store = this.backend(id as keyof IPluginStoreMap<P> & string)
+      return this.#projectBackend(store, orgId)
+    }
+    /** Root hooks retain one subscriber; each view filters invocation identities at delivery. */
+    const hooks: IStorageHooks = Object.freeze({
+      on: (name, handler) => {
+        this.#assertOpen()
+        return this.#events.hooks.on(name, (payload) => {
+          if ('orgId' in payload && payload.orgId === orgId) handler(payload)
+        })
+      }
+    })
+    /** Original cells retain selected outputs while this getter retains only immutable org identity. */
+    const projectExtensions = () => {
+      this.#assertOpen()
+      const result = Object.create(null)
+      for (const context of this.#detectContexts)
+        Object.assign(
+          result,
+          context.storeCell.projectExtensions(
+            context.getOrgContext(orgId).callContext,
+            context.assertCurrent
+          )
+        )
+      return Object.freeze(result)
+    }
+    /** The view shell has no dispose, drop, installation or mutable registration methods. */
+    const view = {
+      orgId,
+      org: (next: string) => this.org(next),
+      backend,
+      hasBackend: (id: string) => this.hasBackend(id),
+      backends: () => {
+        this.#assertOpen()
+        return new Map([...this.#registry.keys()].map((id) => [id, backend(id)]))
+      },
+      detect: () => this.detect(),
+      hooks,
+      get api() {
+        const result = Object.create(null)
+        for (const [id, store] of view.backends())
+          result[id] = 'api' in store ? store.api : undefined
+        return Object.freeze(result)
+      },
+      get extensions() {
+        return projectExtensions()
+      },
+      codecStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.codecStages(store),
+      queryStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.queryStages(store),
+      transactionStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.transactionStages(store),
+      concurrencyStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.concurrencyStages(store),
+      backendStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.backendStages(store),
+      sqlStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.sqlStages(store),
+      operationStages: (store: IStorageBase | IStorageBorrowedBackend<IStorageBase>) =>
+        this.operationStages(store),
+      envelopeStages: (
+        store: IStorageBase | IStorageBorrowedBackend<IStorageBase>,
+        operation: Readonly<{ operation: string; targetVersion: number }>
+      ) => this.envelopeStages(store, operation)
+    }
+    return Object.freeze(view) as unknown as IStorageOrgView<P>
+  }
+
+  /** Attempt every native target independently and retain every original deletion failure. */
+  async dropOrg(orgId: string): Promise<void> {
+    this.#assertOpen()
+    assertOperationContext({ orgId })
+    const failures: unknown[] = []
+    for (const store of this.#registry.values()) {
+      const context = this.#storeContexts.get(store)!.context
+      try {
+        context.assertExecution()
+        await context.storeCell.dropOrg(orgId)
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    if (failures.length !== 0)
+      throw createStorageAggregateError(
+        StorageErrorCode.orgDeleteFailed,
+        StorageErrorText.orgDeleteFailed,
+        failures
+      )
   }
 
   /** Looks up an exact store from the last atomically published registry snapshot. */

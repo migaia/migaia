@@ -184,6 +184,88 @@ describe('native SQLite installation', () => {
     expect(await store.use(ttl).remaining(lockKey.text('visits'))).toBeGreaterThan(59_000)
   })
 
+  it('retains first native TTL observations and returns commit expiry to the original policy', async () => {
+    /** The deterministic local clock exercises actual native transactions without a timer. */
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    onTestFinished(() => clock.mockRestore())
+    const { store } = await installed({ memory: true })
+    await store.set('observed', 'old')
+    await store.use(ttl).expire(lockKey.text('observed'), 5)
+    await expect(
+      store.transaction(
+        async (scope) => {
+          expect(await scope.get('observed')).toBe('old')
+          now += 5
+          expect(await scope.get('observed')).toBe('old')
+          expect(await scope.use(kv).getMany(['observed'])).toEqual(['old'])
+          expect(await scope.use(ttl).remaining(lockKey.text('observed'))).toBe(0)
+          await scope.set('rollback-expiry', 'never')
+        },
+        { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
+      )
+    ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+    expect(await store.get('observed')).toBeNull()
+    expect(await store.get('rollback-expiry')).toBeNull()
+    /** First byte and record reads retain their same native snapshot until original commit check. */
+    await store.setBytes('observed-bytes', new Uint8Array([7]))
+    await store.putRecord({ value: 'old' }, 'observed-record')
+    await store.use(ttl).expire(lockKey.bytes('observed-bytes'), 5)
+    await store.use(ttl).expire(lockKey.record('observed-record'), 5)
+    await expect(
+      store.transaction(
+        async (scope) => {
+          expect(await scope.getBytes('observed-bytes')).toEqual(new Uint8Array([7]))
+          expect(await scope.use(records).query().all()).toEqual([{ value: 'old' }])
+          now += 5
+          expect(await scope.getBytes('observed-bytes')).toEqual(new Uint8Array([7]))
+          expect(await scope.getRecord('observed-record')).toEqual({ value: 'old' })
+          expect(await scope.use(records).query().all()).toEqual([{ value: 'old' }])
+        },
+        { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
+      )
+    ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+    expect(await store.getBytes('observed-bytes')).toBeNull()
+    expect(await store.getRecord('observed-record')).toBeUndefined()
+  })
+
+  it('skips unobserved expired iterator positions and counts only returned native rows', async () => {
+    /** Iteration uses the same native snapshot and existing observer in root and scoped paths. */
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const counts: number[] = []
+    const connection = nodeSqliteDriver(':memory:')
+    const host = await createStorageHost({
+      hooks: { onStorageIterationClose: ({ count }) => counts.push(count) },
+      plugins: [sqliteBackendPlugin({ driver: connection })] as const
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await connection.dispose()
+      clock.mockRestore()
+    })
+    const store = host.backend('sqlite')
+    for (const transactional of [false, true]) {
+      await store.clearRecords()
+      await store.putRecord({ id: 'a' }, 'a')
+      await store.putRecord({ id: 'b' }, 'b')
+      await store.putRecord({ id: 'z' }, 'z')
+      await store.use(ttl).expire(lockKey.record('b'), 5)
+      /** The first native open snapshots b; it expires before its first accepted next operation. */
+      const visit = async (scope?: Parameters<Parameters<typeof store.transaction>[0]>[0]) => {
+        const stream = scope ? scope.iterateRecords() : store.iterateRecords()
+        expect((await stream.next()).value).toEqual(['a', { id: 'a' }])
+        now += 5
+        expect((await stream.next()).value).toEqual(['z', { id: 'z' }])
+        expect((await stream.next()).done).toBe(true)
+        await stream.dispose()
+      }
+      if (transactional) await store.transaction((scope) => visit(scope))
+      else await visit()
+    }
+    expect(counts).toEqual([2, 2])
+  })
+
   it('runs native root and scoped batches with canonical keys and one count observation', async () => {
     /** Actual hook payloads prove that one public batch never expands into per-key operations. */
     const observations: Array<{ operation: string; count?: number }> = []

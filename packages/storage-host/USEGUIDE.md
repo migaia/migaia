@@ -37,6 +37,12 @@ Schema 与 codec 适配位于 `@migaia/storage-host/entity`：`passthrough`、`f
 
 `createOrgId()` 使用宿主原 `crypto.randomUUID()` 生成小写 UUID。`org` 选项在任何插件执行前经 contract 校验并捕获，省略时为零 UUID；观察事件使用这个不可变的默认组织身份。
 
+`host.org(orgId)` 返回不可变的业务视图，保留同一插件、Feature API 与事务推断；提取的方法仍绑定原组织。视图及其后端不暴露安装、drop 或关闭权。原生后端通过原安装窗口的 `core.registerOrgBinding(store, { backend, drop })` 提供实际组织目标；`core.getOrgContext(orgId)` 只返回同一执行器、观察、调用上下文与事务 API 投影。它不提供登记或关闭句柄。普通扩展及 Feature API 的 `this.orgId` 是固定身份，`this.backend(borrowed)` 只投影该插件安装时已经借用的依赖。
+
+memory 缺省组织和普通根后端共用配置 namespace；其它组织使用 `namespace + "/" + orgId`，每个插件实例仍独立。各 namespace 的数据、期限、修订和锁独立，关闭共用原 controller。根变更订阅接收全部组织事件；org 后端与 org hooks 仅接收本组织。`host.dropOrg(orgId)` 尝试全部已发布后端，成功目标不回滚；失败抛原生 `AggregateError`，code 为 `ORG_DELETE_FAILED`，`errors` 和首个 `cause` 保留原错误。
+
+组织后端只授予该 native namespace 自身 provider 中的能力；捕获根 store 的任意自定义 Feature capability 不会隐式复制到非缺省组织，缺少时 `has` 为 false，`use` 报 `UNSUPPORTED_CAPABILITY`。原根自定义能力保持不变。Feature 的 store/transaction API 则经上述调用上下文投影。组织原生 SQL/SPARQL 入口在驱动前拒绝；根入口保留原行为。
+
 `host.envelopeStages(store, { operation, targetVersion })` 绑定本宿主已发布的原 store，捕获本次不可变操作信息。其 `observe` 直接交给 contract 的 `migrateEnvelope` 或 `migrateEnvelopeSync`；其余回调观察原 envelope 检查与迁移完成边界。它不执行迁移，不携带 state，缺失版本保持 undefined，监听失败只报告。
 
 后端作者从 `@migaia/storage-host/authoring/backend` 消费有限共享函数与 `IBackendChangeController` 类型。`core.createChangeController(options)` 与 `core.registerChangeController(store, controller)` 只在原安装窗口调用：先构造，再 `registerStore` 准入，最后登记同一个 store 的 controller。原 scope 负责未完成构造的回滚，controller 保留原 mutation lease、事件队列和幂等清理 Promise。Feature 用注入的 `getChangeController()` 读取自身原 store 的 controller，未登记时返回 undefined；作者不能覆盖该 getter。

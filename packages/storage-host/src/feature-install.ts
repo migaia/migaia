@@ -13,7 +13,11 @@ import type {
 } from '@migaia/storage-contract'
 import { createStorageTypeError, StorageErrorCode } from './errors.js'
 import { StorageErrorText } from './error-text.js'
-import type { IStorageExecutionPort, IStorageFeatureOutput } from './types.js'
+import type {
+  IStorageExecutionPort,
+  IStorageFeatureOutput,
+  IStoragePluginCallContext
+} from './types.js'
 import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
 function invalid(cause?: unknown): never {
@@ -56,7 +60,17 @@ function entries(value: unknown): readonly (readonly [string, unknown])[] {
 }
 /** Original registration-local projections contain no transaction or fluent construction owner. */
 export type IStorageFeatureProjection = {
-  readonly createTransactionApi?: (scope: object) => object
+  readonly createTransactionApi?: (
+    scope: object,
+    store?: IStorageBase,
+    context?: IStoragePluginCallContext,
+    execution?: IStorageExecutionPort
+  ) => object
+  readonly createStoreApi?: (
+    store: IStorageBase,
+    context: IStoragePluginCallContext,
+    execution: IStorageExecutionPort
+  ) => object
   readonly chain?: IChainMethods
 }
 
@@ -72,6 +86,7 @@ export function installStorageFeatures(input: {
   readonly execution: IStorageExecutionPort
   readonly expose: Readonly<Record<string, Function>>
   readonly onDispose: (release: () => void) => void
+  readonly callContext: IStoragePluginCallContext
 }): IStorageFeatureProjection | undefined {
   /** Publish selected root outputs without implicitly publishing dependencies. */
   const roots = Object.values(input.features)
@@ -80,6 +95,8 @@ export function installStorageFeatures(input: {
   const implementations: ICapabilityImpl[] = []
   /** API names are scoped to this one backend instance and this install lifetime. */
   const storeApi = Object.create(null) as Record<string, unknown>
+  /** Original raw definitions are shared by immutable organization projections. */
+  const storeApiDefinitions = Object.create(null) as Record<string, unknown>
   /** Absent groups retain no method table or scope projection callback. */
   let transactionApi: Record<string, unknown> | undefined
   /** Only selected root families contribute methods to the original fluent creators. */
@@ -104,6 +121,7 @@ export function installStorageFeatures(input: {
     const api = Object.fromEntries(groups)
     for (const [key, value] of entries(api.store)) {
       if (Object.hasOwn(storeApi, key)) duplicate(input.name, key)
+      storeApiDefinitions[key] = snapshotApi(value)
       storeApi[key] = bindApi(value, key)
     }
     for (const [key, value] of entries(api.transaction)) {
@@ -154,14 +172,26 @@ export function installStorageFeatures(input: {
   })
 
   return {
+    createStoreApi: (store, context, execution) => {
+      /** Organization methods reuse the captured selected roots without rerunning Feature factories. */
+      const api = Object.create(null) as Record<string, unknown>
+      for (const [key, value] of Object.entries(storeApiDefinitions))
+        api[key] = bindApi(value, key, undefined, store, context, execution)
+      return Object.freeze(api)
+    },
     ...(transactionApi === undefined
       ? {}
       : {
-          createTransactionApi: (scope: object): object => {
+          createTransactionApi: (
+            scope: object,
+            store = input.store,
+            context = input.callContext,
+            execution = input.execution
+          ): object => {
             /** Each actual original view receives its own bound API before the backend freezes it. */
             const api = Object.create(null) as Record<string, unknown>
             for (const [key, value] of Object.entries(transactionApi))
-              api[key] = bindApi(value, key, scope)
+              api[key] = bindApi(value, key, scope, store, context, execution)
             return Object.freeze(api)
           }
         }),
@@ -178,34 +208,42 @@ export function installStorageFeatures(input: {
   }
 
   /** Every nested API leaf performs canonical registration admission before touching a client. */
-  function bindApi(value: unknown, path: string, scope?: object): unknown {
+  function bindApi(
+    value: unknown,
+    path: string,
+    scope?: object,
+    store = input.store,
+    context = input.callContext,
+    execution = input.execution
+  ): unknown {
     if (typeof value === 'function')
       return (...args: unknown[]) => {
         if (scope === undefined)
-          return input.execution.run({ operation: path, input: args }, (captured) => {
+          return execution.run({ operation: path, input: args }, (captured) => {
             /** Use the original admitted backend object instead of creating a replacement. */
-            const store = input.expose.getStore!()
+            input.expose.getStore!()
             /** Fetch the lazy native client only at its actual execution endpoint. */
             const client = input.expose.getClient?.()
-            return Reflect.apply(value, { store, client, scope: undefined }, captured)
+            return Reflect.apply(value, { ...context, store, client, scope: undefined }, captured)
           })
         /** Original scope admission owns expiry/first-failure semantics before any host/client work. */
         return runTransactionOperation(scope, (current) => {
-          assertTransactionOwner(input.store, current)
-          return input.execution.run(
-            { operation: path, input: args, scope: current },
-            (captured) => {
-              /** Client projection is lazy and uses this operation's exact current registered view. */
-              const client = input.expose.getTransactionClient!(current)
-              return Reflect.apply(value, { store: current, client, scope: current }, captured)
-            }
-          )
+          assertTransactionOwner(store, current)
+          return execution.run({ operation: path, input: args, scope: current }, (captured) => {
+            /** Client projection is lazy and uses this operation's exact current registered view. */
+            const client = input.expose.getTransactionClient!(current)
+            return Reflect.apply(
+              value,
+              { ...context, store: current, client, scope: current },
+              captured
+            )
+          })
         })
       }
     /** Freeze a nested API group while its leaves retain registration guards. */
     const group = Object.create(null) as Record<string, unknown>
     for (const [key, member] of entries(value))
-      group[key] = bindApi(member, `${path}.${key}`, scope)
+      group[key] = bindApi(member, `${path}.${key}`, scope, store, context, execution)
     return Object.freeze(group)
   }
 }
