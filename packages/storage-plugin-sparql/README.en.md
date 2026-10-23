@@ -1,9 +1,50 @@
-# SPARQL native endpoints
+# SPARQL storage backend
 
-`@migaia/storage-plugin-sparql/http` creates a caller-owned SPARQL 1.1 Protocol endpoint. Pass queryUrl and updateUrl, optionally graphStoreUrl and Basic or Bearer credentials. The factory performs no I/O. Generic HTTP supplies no atomicUpdate promise. Authentication is used only in native request headers.
+Install `sparqlBackendPlugin({ endpoint }, features?)` in `createStorageHost`. The default id is `sparql`; an explicit `id` stays exact in `host.backend(id)`. `sparqlBackendKind` authenticates Features. The backend exposes the shared `rdf` and `sparql` capabilities, native optimistic transactions, and no KV, records, vector, SQL or key-lock API.
 
-`@migaia/storage-plugin-sparql/oxigraph` adapts a caller-owned oxigraph.Store. The adapter never closes it. Its atomicUpdate executes exactly one native Store.update. Graph replacement parses with n3 and performs one complete native Update; merge uses native transactional load. Oxigraph 0.4.11 is the supported peer, with n3 1.26.0 and real RDF/JS declarations.
+```ts
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf, sparql, term } from '@migaia/storage-contract'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'
+import { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'
 
-SELECT/ASK use the SPARQL JSON format. CONSTRUCT and RDF documents use the actual n3 parser/writer, preserving RDF 1.1 literals and response-local blank nodes. Turtle and N-Triples are the supported graph formats. Every document parse uses a fresh blank prefix. RDF-star and variables are outside the supported document domain.
+const native = new Store()
+await using host = await createStorageHost({
+  plugins: [
+    sparqlBackendPlugin(
+      { endpoint: oxigraphEndpoint(native) },
+      {
+        graphs: graphStoreFeature(),
+        ontology: ontologyFeature()
+      }
+    )
+  ] as const
+})
+const store = host.backend('sparql')
+const quad = {
+  subject: term.iri('https://example/alice'),
+  predicate: term.iri('https://example/name'),
+  object: term.literal('Alice', { language: 'en' }),
+  graph: term.defaultGraph
+}
+await store.use(rdf).add([quad])
+console.log(await store.use(rdf).match({ subject: quad.subject }).count()) // 1
+await store.transaction(async (scope) => {
+  scope.use(rdf).expect([quad])
+  await scope.use(rdf).delete([quad])
+  await scope.use(rdf).add([{ ...quad, object: term.literal('Ada') }])
+})
+```
 
-HTTP HEAD404 means a missing graph; GET404 rejects. Other 4xx failures carry SPARQL_REQUEST_FAILED, read 5xx/transport failures carry SPARQL_UNAVAILABLE. A sent modification whose result is uncertain carries SPARQL_COMMIT_UNKNOWN and is never replayed. Errors retain original status/body/cause without copying authentication configuration. Parsing failures carry SPARQL_RESPONSE_INVALID. Local invalid inputs use the shared INVALID_ARGUMENT family.
+The caller creates and owns the endpoint and any Oxigraph Store. Disposal never closes them. `dispose()` returns one cached rejecting main Promise; `Symbol.asyncDispose` returns one cached reporting Promise and shares the cleanup. Closing rejects new calls, cancels active reads and drains already-sent commits.
+
+Public entries are the package root, `/http` (`httpEndpoint`), `/oxigraph` (`oxigraphEndpoint`), `/features/graph-store` (`graphStoreFeature`) and `/features/ontology` (`ontologyFeature`). The root does not load the native Oxigraph runtime. Install the real peers `@migaia/storage-host`, `n3` and `oxigraph`; tested native peers are n3 1.26.0 and Oxigraph 0.4.11. RDF/JS declarations are real dependencies; no substitute Store type or optional-peer fallback is used.
+
+Standard RDF accepts ground named subjects/predicates, named or literal objects, and default/named graphs. Language, datatype, escaping and canonical quad identity use the shared contract. Raw SELECT/CONSTRUCT and ontology documents also support blank nodes. Blank identifiers are local to one response/document; separate imports remain distinct. RDF-star, variables in documents, and blank standard quads reject. This is an intentional ground RDF boundary, not a full OWL reasoning engine.
+
+`ERROR_SOURCE` is `storage.backend.sparql`. `SPARQL_REQUEST_FAILED` retains explicit native HTTP refusal status/body/cause. `SPARQL_UNAVAILABLE` reports read transport/5xx failures. `SPARQL_RESPONSE_INVALID` reports invalid results/documents. `SPARQL_COMMIT_UNKNOWN` means a sent write lacks confirmation: it is not replayed, and later writes on this installed backend reject. Inspect the native dataset, then create a new backend. Local invalid input and unsupported capabilities use the original shared error family. Native error types and original causes/stacks remain reachable; authentication headers/configuration are not copied into hooks or error data.
+
+See [USEGUIDE.en.md](./USEGUIDE.en.md) for HTTP deployment requirements, transactions, query writes, Graph Store, ontology, costs and marker cleanup.

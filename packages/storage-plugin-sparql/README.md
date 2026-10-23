@@ -1,9 +1,50 @@
-# SPARQL 原生端点
+# SPARQL 存储后端
 
-`@migaia/storage-plugin-sparql/http` 创建调用方拥有的 SPARQL 1.1 Protocol 端点。配置 queryUrl、updateUrl，可选 graphStoreUrl 与 Basic/Bearer 凭据。工厂不执行 I/O。通用 HTTP 不声明 atomicUpdate；认证只进入原生请求头。
+在 `createStorageHost` 中安装 `sparqlBackendPlugin({ endpoint }, features?)`。缺省 id 为 `sparql`，显式 `id` 在 `host.backend(id)` 中保持精确类型；`sparqlBackendKind` 校验 Feature。后端提供共享 `rdf`、`sparql` 与原生乐观事务，不提供 KV、record、vector、SQL 或键锁。
 
-`@migaia/storage-plugin-sparql/oxigraph` 借入调用方的 oxigraph.Store，从不关闭它。atomicUpdate 只执行一次原生 Store.update。图替换经 n3 解析后在一个完整原生 Update 中完成；合并使用原生事务 load。本包支持 oxigraph 0.4.11、n3 1.26.0 与真实 RDF/JS 声明。
+```ts
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf, sparql, term } from '@migaia/storage-contract'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'
+import { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'
 
-SELECT/ASK 使用同一个 SPARQL JSON parser。CONSTRUCT 和 RDF 文档使用真实 n3 parser/writer，保留 RDF 1.1 字面量与单响应内的 blank 身份。图格式仅支持 Turtle 与 N-Triples；每次文档解析产生独立 blank 前缀。不支持 RDF-star 或变量文档。
+const native = new Store()
+await using host = await createStorageHost({
+  plugins: [
+    sparqlBackendPlugin(
+      { endpoint: oxigraphEndpoint(native) },
+      {
+        graphs: graphStoreFeature(),
+        ontology: ontologyFeature()
+      }
+    )
+  ] as const
+})
+const store = host.backend('sparql')
+const quad = {
+  subject: term.iri('https://example/alice'),
+  predicate: term.iri('https://example/name'),
+  object: term.literal('Alice', { language: 'en' }),
+  graph: term.defaultGraph
+}
+await store.use(rdf).add([quad])
+console.log(await store.use(rdf).match({ subject: quad.subject }).count()) // 1
+await store.transaction(async (scope) => {
+  scope.use(rdf).expect([quad])
+  await scope.use(rdf).delete([quad])
+  await scope.use(rdf).add([{ ...quad, object: term.literal('Ada') }])
+})
+```
 
-HTTP HEAD404 返回不存在，GET404 拒绝。其它 4xx 为 SPARQL_REQUEST_FAILED，读取的 5xx/网络错误为 SPARQL_UNAVAILABLE。已发送修改的结果不确定时为 SPARQL_COMMIT_UNKNOWN，不重放。原 status、正文、cause 保持可达，不复制认证配置。解析失败为 SPARQL_RESPONSE_INVALID，本地非法参数沿共享 INVALID_ARGUMENT。
+endpoint 与 Oxigraph Store 均由调用方创建并拥有，后端不关闭它们。`dispose()` 返回缓存的主 Promise，失败时拒绝；`Symbol.asyncDispose` 返回另一个缓存的派生 Promise，只上报失败并成功，两者共用清理。关闭拒绝新调用、取消活动读取，并等待已发送提交结束。
+
+公开入口为根、`/http` 的 `httpEndpoint`、`/oxigraph` 的 `oxigraphEndpoint`、`/features/graph-store` 的 `graphStoreFeature`、`/features/ontology` 的 `ontologyFeature`。根不加载 Oxigraph 原生运行代码。安装真实 peer `@migaia/storage-host`、`n3`、`oxigraph`；已验证原生版本为 n3 1.26.0 与 Oxigraph 0.4.11，RDF/JS 声明来自真实依赖，不使用替代 Store 类型或 optional peer 降级。
+
+标准 RDF 仅接受 ground quad：主语/谓语为命名节点，宾语为命名节点或字面量，图为缺省图或命名图。语言、datatype、转义与规范身份归共享契约。raw SELECT/CONSTRUCT 和 ontology 文档另支持 blank；blank 标识局限于同一响应/文档，跨次导入不会混同。RDF-star、文档变量与标准 blank quad 拒绝，这是明确的 ground RDF 边界；推理由数据库承担。
+
+`ERROR_SOURCE` 为 `storage.backend.sparql`。`SPARQL_REQUEST_FAILED` 保留原生 HTTP 明确拒绝的 status/body/cause；`SPARQL_UNAVAILABLE` 表示读取 transport/5xx 失败；`SPARQL_RESPONSE_INVALID` 表示结果或文档非法；`SPARQL_COMMIT_UNKNOWN` 表示已发送写缺少确认，不自动重放，当前后端后续写入拒绝。先核实原生 dataset，再创建新后端。本地非法输入与能力不支持沿原共享错误族。原生错误类型、原 cause/stack 可达，认证头与配置不进入错误数据或 hooks。
+
+HTTP 部署要求、事务、查询写入、Graph Store、ontology、成本与 marker 清理见 [USEGUIDE.md](./USEGUIDE.md)。
