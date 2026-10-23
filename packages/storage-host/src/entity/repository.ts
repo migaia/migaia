@@ -1,6 +1,7 @@
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isPlainObject } from '@migaia/utils/object'
 import { systemScheduler } from '@migaia/utils/scheduler'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   getBackendEnvelopeStages,
   getBackendValueCommit,
@@ -151,7 +152,7 @@ function entityIterator<T>(
     (closing ??= generator.return(undefined).then(() => undefined))
   return Object.assign(generator, {
     dispose,
-    [Symbol.asyncDispose]: () =>
+    [asyncDisposeKey]: () =>
       (symbolic ??= dispose().catch((cause) => reportCleanupError(runtime.reporter, cause)))
   })
 }
@@ -1107,6 +1108,7 @@ export const createRepository = <
         cause: new TypeError(EntityText.comparatorLimit)
       })
     const source = createRecordQuery<TDomain>({
+      asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
       execute: () =>
         entityIterator(
@@ -1455,6 +1457,7 @@ export const createRepository = <
         cause: new TypeError(EntityText.comparatorLimit)
       })
     const source = createRecordQuery<IMatch>({
+      asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
       execute: () => indexRows(snapshot, ctx, readView, comparator === undefined, onRead)
     })
@@ -1733,7 +1736,7 @@ export const createRepository = <
       next: () => advance(() => iterator.next()),
       return: iterator.return === undefined ? undefined : (value) => iterator.return!(value),
       dispose: iterator.dispose,
-      [Symbol.asyncDispose]: iterator[Symbol.asyncDispose],
+      [asyncDisposeKey]: iterator[asyncDisposeKey],
       [Symbol.asyncIterator]() {
         return this
       }
@@ -1863,6 +1866,7 @@ export const createRepository = <
         return { index, range: snapshot.range }
       },
       source: (selectedSource): IRecordQuerySource => ({
+        asyncDisposeKey,
         tieBreakByKey:
           selectedSource.index === undefined ? undefined : { direction: 'next', parts: true },
         pushdown: { source: EntityState.querySource, operations: [], operators: [] },
@@ -2143,6 +2147,7 @@ export const createRepository = <
       const runtime = createStorageOperationRuntime()
       /** One source scan caps its diagnostic count while the original heap retains one result. */
       const source = createRecordQuery<IMatch>({
+        asyncDisposeKey,
         pushdown: { source: EntityState.querySource, operations: [], operators: [] },
         execute: () =>
           entityIterator(
