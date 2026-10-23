@@ -1736,6 +1736,7 @@
         "isStorageKeyInRange",
         "mergeSignals",
         "normalizeError",
+        "observeStorageBatch",
         "planChannelWrite",
         "readAbortReason",
         "reportCleanupError",

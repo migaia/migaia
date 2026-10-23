@@ -3,6 +3,33 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  observeStorageBatch: [
+    {
+      title: t('Share one batch observation pair', '共享一对批量操作观察事件'),
+      problem: t(
+        'A backend needs batch counts without a second runner or transaction owner.',
+        '后端需要批量计数，同时复用原runner与事务owner。'
+      ),
+      example: `import { observeStorageBatch } from '@migaia/storage-host/authoring/backend'
+import { StorageStageKind, type IStorageOperationStageObserver } from '@migaia/storage-contract'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+const events: string[] = []
+const stages: IStorageOperationStageObserver = {
+  kind: StorageStageKind.operation,
+  forTransaction: () => stages,
+  beforeStorageOperation: (operation, count) => { events.push(operation + ':' + count) },
+  afterStorageOperation: (_operation, _elapsed, count) => { events.push('removed:' + count) },
+  report: () => undefined
+}
+console.log(await observeStorageBatch(stages, systemScheduler, 'removeMany', 3, () => 2))
+console.log(events)`,
+      result: t(
+        'Prints 2 and ["removeMany:3", "removed:2"]. Real authors supply the original admitted store stages.',
+        '输出2和["removeMany:3", "removed:2"]。真实后端传入原store已准入的观察接点。'
+      )
+    }
+  ],
   defineEntity: [
     {
       title: t('Commit entities beside native values', '实体与原生键值一起提交'),
