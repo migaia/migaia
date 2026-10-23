@@ -1,7 +1,18 @@
 import { expectTypeOf, it } from 'vitest'
-import type { IKeyValueStore, IRecordStore, IStorageCapabilities } from '@migaia/storage-contract'
+import type {
+  IKeyValueStore,
+  IRecordStore,
+  IStorageCapabilities,
+  ITransactionScope,
+  IOperationContext
+} from '@migaia/storage-contract'
 import type { IPersistStorage, IPersistByteStorage } from '../src/core/types.js'
-import { persistUnit } from '../src/index.js'
+import {
+  persistUnit,
+  persistTransaction,
+  type ITransactionScopeOf,
+  type IPersistHandle
+} from '../src/index.js'
 import { persist, type IPersistableStore } from '../src/light-index.js'
 import { persistCollection, type IPersistableCollection } from '../src/indexed-index.js'
 import type { IPersistUnit } from '../src/index.js'
@@ -91,6 +102,47 @@ it('infers state and synchronous migration callbacks at all attachment entries',
       migrations: { 1: () => ({ then: () => {} }) }
       /* oxlint-enable unicorn/no-thenable */
     })
+  }
+  expectTypeOf(check).toBeFunction()
+})
+
+it('retains concrete transaction scopes, backend options and Awaited callback results', () => {
+  /** Backend-specific members stay on the original scope rather than a generic replacement. */
+  type ISpecialScope = ITransactionScope & { sql: (text: string) => Promise<number> }
+  /** Only the transaction method specializes the otherwise canonical record store. */
+  type ISpecialStore = Omit<IRecordStore, 'transaction'> & {
+    transaction<TResult>(
+      run: (scope: ISpecialScope) => TResult,
+      options?: IOperationContext & { readonly nativeTag?: string }
+    ): Promise<Awaited<TResult>>
+  }
+  expectTypeOf<ITransactionScopeOf<ISpecialStore>>().toEqualTypeOf<ISpecialScope>()
+  /** Compile-only calls verify inference without allocating backend resources. */
+  const check = (storage: ISpecialStore, handle: IPersistHandle): void => {
+    const synchronous = persistTransaction(
+      storage,
+      [handle],
+      (tx) => {
+        expectTypeOf(tx).toEqualTypeOf<ISpecialScope>()
+        return 7 as const
+      },
+      { nativeTag: 'caller-option' }
+    )
+    expectTypeOf(synchronous).toEqualTypeOf<Promise<7>>()
+    const asynchronous = persistTransaction(storage, [handle], async (tx) => {
+      await tx.sql('select 1')
+      await handle.flush(tx)
+      return 'saved' as const
+    })
+    expectTypeOf(asynchronous).toEqualTypeOf<Promise<'saved'>>()
+    const thenable: PromiseLike<number> = Promise.resolve(9)
+    expectTypeOf(persistTransaction(storage, [handle], () => thenable)).toEqualTypeOf<
+      Promise<number>
+    >()
+    // @ts-expect-error backend options retain their original shape.
+    persistTransaction(storage, [handle], () => undefined, { nativeTag: 1 })
+    // @ts-expect-error a text-only projection cannot promise atomic persistence.
+    persistTransaction({} as IPersistStorage, [handle], () => undefined)
   }
   expectTypeOf(check).toBeFunction()
 })

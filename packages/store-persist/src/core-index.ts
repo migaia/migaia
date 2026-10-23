@@ -1,3 +1,4 @@
+export { persistTransaction, type ITransactionScopeOf } from './core/persist-transaction.js'
 export { persistUnit } from './core/persist-unit.js'
 export type {
   IPersistUnit,

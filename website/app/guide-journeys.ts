@@ -16289,7 +16289,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               },
               {
                 type: 'code',
@@ -16408,7 +16408,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               },
               {
                 type: 'code',
@@ -16497,7 +16497,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               }
             ]
           },
@@ -16627,7 +16627,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['入口或字段', '说明'],
                 rows: [
-                  ['`memoryStorageHost()`', '每次创建一个独立后端，只在当前进程中保存数据。'],
+                  ['`memoryBackendPlugin()`', '每次创建一个独立后端，只在当前进程中保存数据。'],
                   [
                     '`localStorageHost()` / `indexedDbHost()`',
                     '在浏览器中接入 Web Storage 或 IndexedDB。创建方式见 [storage-web 指南](/zh/docs/storage-web/getting-started)。'
@@ -16673,7 +16673,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               }
             ]
           },
@@ -16813,7 +16813,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Entry or field', 'Behavior'],
                 rows: [
                   [
-                    '`memoryStorageHost()`',
+                    '`memoryBackendPlugin()`',
                     'Creates an isolated backend that retains data only in this process.'
                   ],
                   [
@@ -16884,7 +16884,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '只安装使用的状态包。下面的集合示例还需要 pnpm add @migaia/store-indexed @migaia/storage-web；Light 示例需要 @migaia/store-light，Keyed 示例需要 @migaia/store-keyed。'
+                text: '只安装使用的状态包。下面的集合示例还需要 pnpm add @migaia/store-indexed @migaia/storage-host；Light 示例需要 @migaia/store-light，Keyed 示例需要 @migaia/store-keyed。'
               }
             ]
           },
@@ -17073,7 +17073,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'The collection example needs `pnpm add @migaia/store-indexed @migaia/storage-web`.'
+                text: 'The collection example needs `pnpm add @migaia/store-indexed @migaia/storage-host`.'
               },
               {
                 type: 'paragraph',
@@ -17259,7 +17259,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17268,7 +17268,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('恢复后的标题:', store.title)\nconsole.log('恢复后的数量:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('恢复后的标题:', store.title)\nconsole.log('恢复后的数量:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -17281,7 +17281,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '这里使用真实的 `memoryStorageHost()` 后端。它适合服务端内存保存，不会跨进程或页面刷新保存数据。`$runtime.flush()` 执行待处理的 Store 订阅，使编辑在恢复完成前被观察到。'
+                text: '这里使用真实的 `memoryBackendPlugin()` 后端。它适合服务端内存保存，不会跨进程或页面刷新保存数据。`$runtime.flush()` 执行待处理的 Store 订阅，使编辑在恢复完成前被观察到。'
               },
               {
                 type: 'table',
@@ -17370,7 +17370,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17379,7 +17379,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('Restored title:', store.title)\nconsole.log('Restored count:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('Restored title:', store.title)\nconsole.log('Restored count:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -17717,6 +17717,21 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       document: {
         sections: [
           {
+            id: 'atomic-save',
+            heading: '快照与其他写入共同提交',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'persistTransaction 先暂停并排空真实句柄，再借用原 store 的事务；flush(tx) 读取调用瞬间的状态并启动编码，只等待请求，外层成功才表示提交。失败不撤销内存，普通 debounce 镜像随后恢复。参与期间直接 flush/clear/retryHydrate 拒绝；dispose 请求中止且不发最终旁路写入。IndexedDB 必须先取外部数据，再开始事务，不能在回调中等待 fetch、定时器或跨任务 codec。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}"
+              }
+            ]
+          },
+          {
             id: 'operations',
             heading: '离开编辑页前保存草稿',
             blocks: [
@@ -17731,7 +17746,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17740,7 +17755,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { storage, store } from './settings.ts'\n\nexport { storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { host, storage, store } from './settings.ts'\n\nexport { host, storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
               },
               {
                 type: 'paragraph',
@@ -17749,7 +17764,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('导航前保存:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('导航前保存:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17823,7 +17838,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('关闭后提交:', await storage.get('draft'))\nconsole.log('持久化状态:', handle.status.value)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('关闭后提交:', await storage.get('draft'))\nconsole.log('持久化状态:', handle.status.value)\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17885,6 +17900,21 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       document: {
         sections: [
           {
+            id: 'atomic-save',
+            heading: 'Commit snapshots with other writes',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'persistTransaction pauses and drains authentic handles before borrowing the original store transaction. flush(tx) reads state and starts encoding at invocation; it waits for its request, and outer success means commit. Failure does not undo memory; ordinary debounce mirroring resumes. Direct flush/clear/retryHydrate reject during participation. Disposal requests abort without a final side write. Load external data before an IndexedDB transaction; do not await fetch, timers or a codec spanning tasks inside it.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}"
+              }
+            ]
+          },
+          {
             id: 'operations',
             heading: 'Save a draft before navigation',
             blocks: [
@@ -17899,7 +17929,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17908,7 +17938,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { storage, store } from './settings.ts'\n\nexport { storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { host, storage, store } from './settings.ts'\n\nexport { host, storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
               },
               {
                 type: 'paragraph',
@@ -17917,7 +17947,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('Saved before navigation:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('Saved before navigation:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17991,7 +18021,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('Committed after close:', await storage.get('draft'))\nconsole.log('Persistence status:', handle.status.value)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('Committed after close:', await storage.get('draft'))\nconsole.log('Persistence status:', handle.status.value)\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18425,7 +18455,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const storage = memoryStorageHost()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')"
               },
               {
                 type: 'paragraph',
@@ -18588,7 +18618,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const storage = memoryStorageHost()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')"
               },
               {
                 type: 'paragraph',
@@ -18753,7 +18783,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -18762,7 +18792,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('首次读取:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('修复后的草稿:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('首次 ready 的错误:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('首次读取:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('修复后的草稿:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('首次 ready 的错误:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -18828,7 +18858,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('关闭后保存的错误:', error.name, error.code)\n})\nconsole.log('仍可读取的草稿:', store.title)\nawait store.$dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('关闭后保存的错误:', error.name, error.code)\n})\nconsole.log('仍可读取的草稿:', store.title)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -18957,7 +18987,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -18966,7 +18996,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('Initial read:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('Repaired draft:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('Original ready error:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('Initial read:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('Repaired draft:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('Original ready error:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -19032,7 +19062,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('Save after close error:', error.name, error.code)\n})\nconsole.log('Draft remains readable:', store.title)\nawait store.$dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('Save after close error:', error.name, error.code)\n})\nconsole.log('Draft remains readable:', store.title)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',

@@ -41,7 +41,7 @@ const ctx = t(
 )
 /** Core example injects an ordinary Store through the minimal unit contract. */
 const coreExample =
-  "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit } from '@migaia/store-persist'\nconst store = createStore({ count: 0 })\nconst handle = persistUnit({\n  snapshot: () => store.$plain(),\n  restore: state => store.$hydrate(state),\n  subscribe: onChange => store.$subscribe(onChange, { fireImmediately: false })\n}, { key: 'counter', runtime: store.$runtime, storage: memoryStorageHost() })\nawait handle.ready\nstore.count = 1\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
+  "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit } from '@migaia/store-persist'\nconst store = createStore({ count: 0 })\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst handle = persistUnit({\n  snapshot: () => store.$plain(),\n  restore: state => store.$hydrate(state),\n  subscribe: onChange => store.$subscribe(onChange, { fireImmediately: false })\n}, { key: 'counter', runtime: store.$runtime, storage })\nawait handle.ready\nstore.count = 1\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
 /** Light adapter example owns both the subscription and original Store. */
 const lightExample = storePersistCases.persist![0]!.example
 /** Collection example releases persistence before its source collection. */
@@ -334,6 +334,14 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     example:
       "const handle = persist(state, { key: 'state', storage, codecStages: host.codecStages(storage) })"
   },
+  transactionStages: {
+    summary: t(
+      'Optional host.transactionStages(storage) observer. Emits before/afterPersistFlush using the actual operation view; after means request completion, and observer failures only report.',
+      '可选的 host.transactionStages(storage) 观察接点，绑定实际操作视图。只发出 before/afterPersistFlush；after 表示请求完成，观察失败只报告。'
+    ),
+    example:
+      "const handle = persist(state, { key: 'state', storage, transactionStages: host.transactionStages(storage) })"
+  },
   version: {
     summary: t(
       'Application schema version, a safe nonnegative integer compared with each saved envelope version.',
@@ -562,12 +570,17 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     'try { await handle.ready } catch { await handle.retryHydrate() }'
   ),
   flush: method(
-    'Cancels the debounce window, waits for initial hydration and the actual pending write drain, then requests a strict immediate serialized write. Concurrent callers observe the same original drain failure; the scheduling recovery chain never replaces its result.',
-    '取消防抖窗口，等待初次水合及实际待完成写入，再请求严格的立即串行写入。并发调用者均观察同一写入的原始失败，调度恢复链不会替代实际结果。',
-    {},
+    'Without tx, drains and writes the current snapshot. With an enlisted authentic tx, captures and starts encoding at invocation, then writes through that operation view in call order. Only outer persistTransaction success means commit.',
+    '不传 tx 时排空并保存当前快照；传入已登记的真实 tx 时，在调用瞬间读取并启动编码，经此次操作视图按次序写入。只有外层 persistTransaction 成功才表示提交。',
+    {
+      tx: t(
+        "Optional active view from this handle's persistTransaction.",
+        '可选的、本句柄所属 persistTransaction 的活动视图。'
+      )
+    },
     t(
-      'Promise resolving after the write; hydration/write failures reject, and disposal during the wait produces AbortError.',
-      '写入完成后 Promise 兑现；恢复或写入失败会拒绝，等待期间释放产生 `AbortError`。'
+      'Promise of this encoding and request. Direct flush rejects during participation; memory does not roll back with storage.',
+      '此次编码与请求的 Promise；参与期间直接 flush 拒绝，内存不随存储回滚。'
     ),
     'await handle.ready\nawait handle.flush()'
   ),
@@ -790,6 +803,34 @@ export const storePersistReference: ILibraryReference = {
     }
   },
   symbols: {
+    persistTransaction: {
+      role: 'operation',
+      purpose: t(
+        'Drains authentic handles attached to the same complete store, then borrows one original transaction. Snapshot, entity, text and byte writes commit together; memory remains caller-owned and ordinary mirroring resumes after settlement.',
+        '排空绑定同一完整 store 的真实句柄，再借用一个原始事务。快照、实体、文本和字节共同提交；内存由调用方持有，结算后恢复普通镜像写入。'
+      ),
+      params: {
+        store: t(
+          'Original complete record store supporting transactions.',
+          '支持事务的原始完整记录 store。'
+        ),
+        handles: t(
+          'Nonempty array of active handles attached to that exact store; duplicates enlist once.',
+          '绑定该 store 的活动句柄非空数组；重复项只参与一次。'
+        ),
+        run: t(
+          'Callback retaining the concrete backend scope and Awaited result.',
+          '保留具体后端 scope 与 Awaited 结果的回调。'
+        ),
+        ctx: t('Optional original backend transaction options.', '可选的原后端事务选项。')
+      },
+      returns: t(
+        'Resolves only after native commit; failure preserves storage errors and does not undo memory. IndexedDB external data must be read before starting.',
+        '原生提交后才兑现；失败保留存储错误且不撤销内存。IndexedDB 的外部数据须先读取再开始事务。'
+      ),
+      example:
+        "await persistTransaction(storage, [handle], async (tx) => {\n  state.count = 1\n  await handle.flush(tx)\n  await tx.set('source', 'user', { conflictPolicy: 'replace' })\n})"
+    },
     persistUnit: adapter(
       'Connects a caller-provided synchronous state unit to asynchronous hydration and serialized writes. Automatic writes stay gated after hydration failure until successful retry.',
       '将调用方提供的同步状态单元连接到异步水合与串行写入；水合失败后自动写入保持关闭，直到重试成功。',
@@ -815,8 +856,8 @@ export const storePersistReference: ILibraryReference = {
       lightExample,
       {
         exampleIntro: {
-          en: "Run these examples with Node 24 and install @migaia/store-light and @migaia/storage-web directly alongside this package. createStore(shape, options?) receives the shown initial fields; omitted options use defaultRuntime, debugName 'Store', warnAsyncActions false and no mutationPolicy. Scalar fields use Object.is for equality.\n\nmemoryStorageHost() takes no arguments and creates an isolated in-memory backend; it does not survive process exit. The codec encodes the complete { version, state } envelope; version is a nonnegative safe integer and state must be present and non-null. Decode its string result before inspecting state. Persistence options and callback arguments are listed below; dispose persistence first, then release the Store and backend separately.",
-          zh: "在 Node 24 运行示例；除本包外，直接安装 `@migaia/store-light` 和 `@migaia/storage-web`。`createStore(shape, options?)` 接收代码中的初始字段；省略选项时使用 `defaultRuntime`、`debugName: 'Store'`、`warnAsyncActions: false`，不设置 `mutationPolicy`，标量字段按 `Object.is` 判断相等。\n\n`memoryStorageHost()` 无参数，每次创建独立的内存后端，进程退出后数据不保留。编解码器处理完整的 `{ version, state }` 存档：版本是安全非负整数，状态必须存在且不为 `null` 或 `undefined`；检查状态前先解码字符串。下表列出持久化选项与回调参数；先停止持久化，再分别释放 Store 和后端。"
+          en: "Run these examples with Node 24 and install @migaia/store-light and @migaia/storage-host directly alongside this package. createStore(shape, options?) receives the shown initial fields; omitted options use defaultRuntime, debugName 'Store', warnAsyncActions false and no mutationPolicy. Scalar fields use Object.is for equality.\n\nmemoryBackendPlugin() takes no arguments and creates an isolated in-memory backend; it does not survive process exit. The codec encodes the complete { version, state } envelope; version is a nonnegative safe integer and state must be present and non-null. Decode its string result before inspecting state. Persistence options and callback arguments are listed below; dispose persistence first, then release the Store and backend separately.",
+          zh: "在 Node 24 运行示例；除本包外，直接安装 `@migaia/store-light` 和 `@migaia/storage-host`。`createStore(shape, options?)` 接收代码中的初始字段；省略选项时使用 `defaultRuntime`、`debugName: 'Store'`、`warnAsyncActions: false`，不设置 `mutationPolicy`，标量字段按 `Object.is` 判断相等。\n\n`memoryBackendPlugin()` 无参数，每次创建独立的内存后端，进程退出后数据不保留。编解码器处理完整的 `{ version, state }` 存档：版本是安全非负整数，状态必须存在且不为 `null` 或 `undefined`；检查状态前先解码字符串。下表列出持久化选项与回调参数；先停止持久化，再分别释放 Store 和后端。"
         },
         cases: storePersistCases.persist
       }
@@ -834,8 +875,8 @@ export const storePersistReference: ILibraryReference = {
       indexedExample,
       {
         exampleIntro: {
-          en: "Install @migaia/store-indexed and @migaia/storage-web directly for this Node 24 example. new ObservableMap(entries = [], runtime = defaultRuntime, options = {}) accepts iterable key/value pairs. Omitted options leave mutationGuard undefined and use debugName 'ObservableMap'; the collection borrows its Runtime.\n\nmemoryStorageHost() takes no arguments and creates isolated memory storage. The first handle writes an envelope with version 0 and the Map snapshot; the second restores it into a collection initially containing stale. No custom codec or merge is supplied. Persistence owns only its subscription and status; release both collections and the backend separately.",
-          zh: "此 Node 24 示例需直接安装 `@migaia/store-indexed` 与 `@migaia/storage-web`。`new ObservableMap(entries = [], runtime = defaultRuntime, options = {})` 接收键值对可迭代对象；省略选项时 `mutationGuard` 为 `undefined`，`debugName` 为 `'ObservableMap'`，集合借用运行时。\n\n`memoryStorageHost()` 无参数，创建独立内存后端。首个句柄保存版本 `0` 和 `Map` 快照，第二个句柄将其恢复到原本含 `stale` 的集合；未提供自定义编解码器或合并函数。持久化只持有订阅与状态，两个集合和后端仍需分别释放。"
+          en: "Install @migaia/store-indexed and @migaia/storage-host directly for this Node 24 example. new ObservableMap(entries = [], runtime = defaultRuntime, options = {}) accepts iterable key/value pairs. Omitted options leave mutationGuard undefined and use debugName 'ObservableMap'; the collection borrows its Runtime.\n\nmemoryBackendPlugin() takes no arguments and creates isolated memory storage. The first handle writes an envelope with version 0 and the Map snapshot; the second restores it into a collection initially containing stale. No custom codec or merge is supplied. Persistence owns only its subscription and status; release both collections and the backend separately.",
+          zh: "此 Node 24 示例需直接安装 `@migaia/store-indexed` 与 `@migaia/storage-host`。`new ObservableMap(entries = [], runtime = defaultRuntime, options = {})` 接收键值对可迭代对象；省略选项时 `mutationGuard` 为 `undefined`，`debugName` 为 `'ObservableMap'`，集合借用运行时。\n\n`memoryBackendPlugin()` 无参数，创建独立内存后端。首个句柄保存版本 `0` 和 `Map` 快照，第二个句柄将其恢复到原本含 `stale` 的集合；未提供自定义编解码器或合并函数。持久化只持有订阅与状态，两个集合和后端仍需分别释放。"
         },
         cases: storePersistCases.persistCollection
       }
@@ -861,8 +902,8 @@ export const storePersistReference: ILibraryReference = {
       keyedExample,
       {
         exampleIntro: {
-          en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-web directly. createAtomStore(runtime) requires a real Runtime; createRuntime() uses the host adapter and its default microtask scheduler. familyDef(initial, options = {}) calls initial(key) for new definitions; options default to maxSize 4096 and debugLabel 'family'.\n\nThe shown initial callback creates a name record; the namespace and explicit id select namespace:id in storage, independently of the definition cache. memoryStorageHost() has no arguments and owns isolated memory storage. version and debounceMs default to 0; migrations is not an option on this adapter. value is an initial snapshot; use atoms.peek(def) for the current value. Dispose every persistence handle before AtomStore and storage.",
-          zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-web`。`createAtomStore(runtime)` 必须接收真实运行时，`createRuntime()` 使用宿主适配器及其默认微任务调度；`familyDef(initial, options = {})` 为新定义调用 `initial(key)`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例初始回调返回含 `name` 的记录；命名空间与显式标识决定 `namespace:id` 存储键，不从定义缓存推导。`memoryStorageHost()` 无参数并持有独立内存数据；`version`、`debounceMs` 默认 `0`，此适配器不提供 `migrations` 选项。`value` 是初始快照，当前值用 `atoms.peek(def)` 读取；先逐个释放持久化句柄，再释放原子存储和后端。"
+          en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-host directly. createAtomStore(runtime) requires a real Runtime; createRuntime() uses the host adapter and its default microtask scheduler. familyDef(initial, options = {}) calls initial(key) for new definitions; options default to maxSize 4096 and debugLabel 'family'.\n\nThe shown initial callback creates a name record; the namespace and explicit id select namespace:id in storage, independently of the definition cache. memoryBackendPlugin() has no arguments and owns isolated memory storage. version and debounceMs default to 0; migrations is not an option on this adapter. value is an initial snapshot; use atoms.peek(def) for the current value. Dispose every persistence handle before AtomStore and storage.",
+          zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-host`。`createAtomStore(runtime)` 必须接收真实运行时，`createRuntime()` 使用宿主适配器及其默认微任务调度；`familyDef(initial, options = {})` 为新定义调用 `initial(key)`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例初始回调返回含 `name` 的记录；命名空间与显式标识决定 `namespace:id` 存储键，不从定义缓存推导。`memoryBackendPlugin()` 无参数并持有独立内存数据；`version`、`debounceMs` 默认 `0`，此适配器不提供 `migrations` 选项。`value` 是初始快照，当前值用 `atoms.peek(def)` 读取；先逐个释放持久化句柄，再释放原子存储和后端。"
         },
         cases: storePersistCases.persistKeyed
       }
@@ -885,8 +926,8 @@ export const storePersistReference: ILibraryReference = {
         '全部移除成功后返回匹配记录数；后端失败会拒绝，先前已移除记录保持生效。'
       ),
       exampleIntro: {
-        en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-web directly. createAtomStore requires the Runtime created here; createRuntime() keeps the host's default microtask scheduling. familyDef(initial, options = {}) uses the shown initial value 0, default maxSize 4096 and debugLabel 'family'.\n\nThe example first writes through a real persistKeyed handle with required namespace 'users' and id 'u1'; version and debounceMs are both omitted and default to 0. memoryStorageHost() takes no arguments. clearFamily receives that same backend and the exact namespace, without a colon; it adds the colon when matching keys. It neither stops persistence nor disposes the borrowed AtomStore or backend.",
-        zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-web`。`createAtomStore` 使用本例创建的运行时，`createRuntime()` 保留宿主默认的微任务调度；`familyDef(initial, options = {})` 的初始回调返回 `0`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例先用真实 `persistKeyed` 句柄写入，必填命名空间为 `'users'`，标识为 `'u1'`；未提供的 `version` 与 `debounceMs` 均默认 `0`。`memoryStorageHost()` 无参数；`clearFamily` 接收同一后端与不含尾部冒号的命名空间，匹配时自行追加冒号。它不停止持久化，也不释放借用的原子存储与后端。"
+        en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-host directly. createAtomStore requires the Runtime created here; createRuntime() keeps the host's default microtask scheduling. familyDef(initial, options = {}) uses the shown initial value 0, default maxSize 4096 and debugLabel 'family'.\n\nThe example first writes through a real persistKeyed handle with required namespace 'users' and id 'u1'; version and debounceMs are both omitted and default to 0. memoryBackendPlugin() takes no arguments. clearFamily receives that same backend and the exact namespace, without a colon; it adds the colon when matching keys. It neither stops persistence nor disposes the borrowed AtomStore or backend.",
+        zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-host`。`createAtomStore` 使用本例创建的运行时，`createRuntime()` 保留宿主默认的微任务调度；`familyDef(initial, options = {})` 的初始回调返回 `0`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例先用真实 `persistKeyed` 句柄写入，必填命名空间为 `'users'`，标识为 `'u1'`；未提供的 `version` 与 `debounceMs` 均默认 `0`。`memoryBackendPlugin()` 无参数；`clearFamily` 接收同一后端与不含尾部冒号的命名空间，匹配时自行追加冒号。它不停止持久化，也不释放借用的原子存储与后端。"
       },
       cases: storePersistCases.clearFamily,
       example: storePersistCases.clearFamily![0]!.example
@@ -1029,6 +1070,14 @@ export const storePersistReference: ILibraryReference = {
     }
   },
   types: {
+    ITransactionScopeOf: {
+      summary: t(
+        'Extracts the original transaction callback scope, preserving concrete backend extensions such as sql.',
+        '提取原事务回调 scope，保留 sql 等具体后端扩展。'
+      ),
+      example: 'type IScope = ITransactionScopeOf<typeof storage>',
+      members: {}
+    },
     IPersistUnitOptions: {
       optionCases: persistOptionCases.IPersistUnitOptions!,
       summary: t(
