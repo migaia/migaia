@@ -62,7 +62,7 @@ async function installed(options: { wal?: boolean; memory?: boolean; native?: st
 
 describe('native SQLite installation', () => {
   it('keeps native TTL with values, reclaims expiry, and rolls back the same three channels', async () => {
-    /** D9 fixes this backend to the local wall clock; no scheduler timer performs cleanup. */
+    /** This backend uses the local wall clock; no scheduler timer performs cleanup. */
     let now = Date.now()
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
     onTestFinished(() => clock.mockRestore())

@@ -2797,7 +2797,7 @@ export function createSqliteStore<TValue>(
       forTransaction: (scope) => ({ sql: (scope as ISqliteTransactionScope<TValue>).sql })
     }
   )
-  /** Standard TTL uses the original native tables and local Date.now clock required by D9. */
+  /** Standard TTL uses the original native tables and the backend's local wall clock. */
   const timeToLive: ITtlApi = {
     expire: async (target, ms, ctx) => {
       controller.assertLive()
