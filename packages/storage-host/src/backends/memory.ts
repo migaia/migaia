@@ -374,6 +374,7 @@ export function createMemoryBackend<T = unknown>(
     journalBinding: (() => {
       /** The descriptor owns one projector; every result closes over one existing physical org. */
       const binding = (orgId: string): IStorageJournalBackendBinding => ({
+        externalWal: true,
         forOrg: binding,
         openNamespace: (prefix) => forOrg(orgId).journal.open(prefix),
         changes: (scope) => forOrg(orgId).journalImages.changes(scope),

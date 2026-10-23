@@ -405,8 +405,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, blob capture and other-backend routing are not completed by the current memory unit.',
-            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、blob 捕获或其它后端路由已完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Automatic undo execution, redo, blob capture and other-backend routing remain unfinished.',
+            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；自动 undo、redo、blob 捕获和其它后端路由尚未完成。'
           )
         }
       }
@@ -470,6 +470,12 @@ console.log(host.extensions.label('draft'))`,
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
       members: {
+        externalWal: {
+          summary: t(
+            'Optional true fact from the original backend owner permits external waits after final images, together with its existing native commit-marker ports. It does not change nativeAtomic or certify cached-index exclusivity.',
+            '原后端拥有者可选的 true 事实，配合原 native marker 接点允许最终镜像后等待外部 I/O；不改变 nativeAtomic，也不证明缓存索引独占。'
+          )
+        },
         changes: {
           summary: t(
             'Memory enables ordered draft capture on the first call before business writes. Later reads return immutable images with final per-key revisions; late activation rejects instead of inventing history.',
