@@ -154,3 +154,15 @@ export type { ISqlStageObserver } from './sql.js'
 export type { IQueryStageObserver } from './query.js'
 
 export { encodeOrderedStorageKey } from './key-order.js'
+
+export {
+  TransactionActivityMode,
+  TransactionBeforeStage,
+  TransactionObservedStage,
+  createTransactionOwner,
+  assertTransactionOwner,
+  runTransactionOperation,
+  registerTransactionFinalizer,
+  nextTransactionIterator
+} from './transaction.js'
+export type { ITransactionInfo } from './transaction.js'

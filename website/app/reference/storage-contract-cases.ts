@@ -32,6 +32,31 @@ console.log(result.valid, !result.valid && result.cause === original)
       )
     }
   ],
+  runTransactionOperation: [
+    {
+      title: t('Reject a forged transaction before work starts', '在工作前拒绝伪造事务'),
+      problem: t(
+        'Copied method names are not transaction authority. A composed operation must be admitted by its original private owner.',
+        '复制方法名不是事务权限；组合操作必须由原私有拥有者接纳。'
+      ),
+      example: t(
+        `import { runTransactionOperation, StorageContractError } from '@migaia/storage-contract'
+let calls = 0
+try { runTransactionOperation({}, () => { calls += 1 }) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }
+// INVALID_ARGUMENT 0`,
+        `import { runTransactionOperation, StorageContractError } from '@migaia/storage-contract'
+let calls = 0
+try { runTransactionOperation({}, () => { calls += 1 }) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }
+// INVALID_ARGUMENT 0`
+      ),
+      result: t(
+        'Prints INVALID_ARGUMENT 0; the callback never starts.',
+        '输出 INVALID_ARGUMENT 0；回调没有开始。'
+      )
+    }
+  ],
   defineStorageCapability: [
     {
       title: t('Keep equal capability names independent', '同名能力仍保持独立身份'),

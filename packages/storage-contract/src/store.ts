@@ -13,7 +13,7 @@ import type {
 } from './context.js'
 import type { ITransactionScope } from './transaction.js'
 import { isBackendKind } from './backend.js'
-import type { IStorageResource } from './resource.js'
+import type { IStorageResource, IStorageIterator } from './resource.js'
 
 /** Runtime-neutral resource identity and facts; specialized stores need no KV methods. */
 export type IStorageBase = IStorageResource & {
@@ -114,12 +114,7 @@ export type ISyncKeyValueStore = {
 }
 
 /** Defines the L0 string key-value channel implemented by every backend. */
-export type IKeyValueStore = {
-  /** Provider family label, used for diagnostics rather than extension admission. */
-  readonly backend: IBackendKind
-  /** Declared support facts. Runtime guards verify this descriptor and required methods together. */
-  readonly capabilities: IStorageCapabilities
-
+export type IKeyValueStore = IStorageBase & {
   /** Reads the string-value channel; a missing key resolves to null. The provider interprets ctx. */
   get(key: string, ctx?: IOperationContext): Promise<string | null>
   /** Writes a string value with optional operation timing and conflict options. */
@@ -134,8 +129,6 @@ export type IKeyValueStore = {
   clearValues(ctx?: IOperationContext): Promise<void>
   /** Clears this store's public value channels; structured extensions also clear bytes and records. */
   clearAll(ctx?: IOperationContext): Promise<void>
-  /** Releases the provider-owned store lifetime; later operations follow STORE_DISPOSED semantics. */
-  dispose(): Promise<void>
 
   /**
    * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose
@@ -198,15 +191,15 @@ export type IRecordStore<TValue = unknown> = IKeyValueStore & {
   iterateRecords(
     range?: IKeyRange,
     ctx?: IOperationContext
-  ): AsyncIterableIterator<[IStorageKey, TValue]>
+  ): IStorageIterator<[IStorageKey, TValue]>
   /**
    * Executes work with a provider-owned transaction scope and returns its result; isolation is
    * implementation-defined.
    */
-  transaction<T>(
-    run: (tx: ITransactionScope<TValue>) => Promise<T>,
+  transaction<TResult>(
+    run: (tx: ITransactionScope<TValue>) => TResult,
     ctx?: IOperationContext
-  ): Promise<T>
+  ): Promise<Awaited<TResult>>
 }
 
 type IStoreShapeInspection = {
@@ -247,7 +240,7 @@ export type IKeyValueStoreAdmission =
 /** Internal admission owner shared by record extensions; retain reflection and getter failures. */
 export const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspection => {
   /** Original KV admission shares one base-field owner before inspecting its callable API. */
-  const base = inspectStorageBase(store, undefined)
+  const base = inspectStorageBase(store, Symbol.asyncDispose)
   if (!base.valid)
     return {
       valid: false,

@@ -29,6 +29,7 @@ const makeStore = (): contract.IRecordStore => ({
   async clearValues() {},
   async clearAll() {},
   async dispose() {},
+  async [Symbol.asyncDispose]() {},
   async getBytes() {
     return null
   },
@@ -43,16 +44,32 @@ const makeStore = (): contract.IRecordStore => ({
   },
   async deleteRecord() {},
   async clearRecords() {},
-  async *iterateRecords() {},
-  async transaction(run) {
-    return run({
-      async get() {
-        return undefined
-      },
-      async put(_value, key = 'generated') {
-        return key
-      },
-      async delete() {}
+  iterateRecords() {
+    /** This admission fixture has no cursor; explicit and symbolic cleanup share no external work. */
+    const cursor = (async function* () {})()
+    /** Both resource surfaces return native Promises around this fixture cursor. */
+    const dispose = async (): Promise<void> => {
+      await cursor.return()
+    }
+    return Object.assign(cursor, { dispose, [Symbol.asyncDispose]: dispose })
+  },
+  async transaction<TResult>(
+    run: (scope: contract.ITransactionScope) => TResult
+  ): Promise<Awaited<TResult>> {
+    /** Fixture exercises the complete public shape without executing backend storage. */
+    const store = makeStore()
+    return await run({
+      get: store.get,
+      set: store.set,
+      remove: store.remove,
+      has: store.has,
+      getBytes: store.getBytes,
+      setBytes: store.setBytes,
+      removeBytes: store.removeBytes,
+      getRecord: store.getRecord,
+      putRecord: store.putRecord,
+      deleteRecord: store.deleteRecord,
+      iterateRecords: store.iterateRecords
     })
   }
 })
