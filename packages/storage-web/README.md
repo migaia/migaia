@@ -45,6 +45,12 @@ try {
 
 实体唯一约束写入需要真实 record 事务或后端原生原子 value 提交端点；内置浏览器后端均提供。自定义纯 value 后端未登记 `core.registerValueCommit` 时，唯一写入在 schema 执行和修改前报 `UNSUPPORTED_CAPABILITY`，普通 KV 不受影响。作者契约见 host 实体使用指南。
 
+## 批量 KV
+
+`store.use(kv)` 提供 `getMany`、`setMany`、`removeMany` 与 `removeByPrefix`。IndexedDB 批量在同一个原生事务中执行，支持字符串、数字、日期、字节和元组键；字符串仍与原单键方法共享数据。读取结果保留输入顺序与重复位置，缺失项为 `undefined`，删除返回实际数量；写批中的规范重复键在 I/O 前报 `INVALID_ARGUMENT`。空批不进入管线或原生事务。
+
+localStorage、sessionStorage 与 Cookie 可批量读取；多键写需要 WAL，未配置时在修改前报 `UNSUPPORTED_CAPABILITY`。默认 namespace codec 保留字符串的 `sw1` 格式，结构键使用独立 `sw2` 格式；`keys()` 仍只列字符串，命名空间清理覆盖两种格式。自定义 codec 需成对提供 `encodeStorageKey` 与 `decodeStorageKey` 才能读取非字符串批量键，缺少时在原生 I/O 前报 `UNSUPPORTED_CAPABILITY`。
+
 ## IndexedDB 事务
 
 ```ts

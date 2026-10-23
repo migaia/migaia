@@ -1,12 +1,14 @@
 import { bindBrowserExecution } from './execution.js'
-import { implement, kv, type IStorageChange } from '@migaia/storage-contract'
+import { createTextBatchApi } from './batch.js'
+import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
 import { snapshotOperationContext, snapshotSyncWriteOptions } from '@migaia/storage-contract'
 import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
+  namespacedStorageKey,
   snapshotNamespaceCodec,
-  stripNamespace
+  stripStorageNamespace
 } from '../utils/key.js'
 import type { INamespaceCodec } from '../utils/key.js'
 import {
@@ -27,7 +29,7 @@ import type {
   ISyncCookieStore
 } from '../types/cookie.js'
 import type { IStorageCapabilities } from '../types/capabilities.js'
-import type { IOperationContext } from '../types/context.js'
+import type { IOperationContext, IStorageKey } from '../types/context.js'
 import type { ISyncCapableStore } from '../types/storage.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
@@ -275,7 +277,7 @@ export const cookiesHost = (
   }
 
   /** Read the live cookie jar while preserving host failures in the storage error protocol. */
-  const readCookie = (operation: string, key?: string): string => {
+  const readCookie = (operation: string, key?: IStorageKey): string => {
     try {
       const value: unknown = doc.cookie
       if (typeof value !== 'string')
@@ -295,7 +297,7 @@ export const cookiesHost = (
   }
 
   /** Write the live cookie jar while preserving host failures in the storage error protocol. */
-  const writeCookie = (value: string, operation: string, key?: string): void => {
+  const writeCookie = (value: string, operation: string, key?: IStorageKey): void => {
     try {
       doc.cookie = value
     } catch (cause) {
@@ -316,13 +318,18 @@ export const cookiesHost = (
     operation = 'cookie.keys'
   ): Array<{
     readonly physicalKey: string
-    readonly logicalKey: string
+    readonly logicalKey: IStorageKey
   }> => {
-    const collected: Array<{ readonly physicalKey: string; readonly logicalKey: string }> = []
+    const collected: ReturnType<typeof namespacedEntries> = []
     /** Repeated visible names prove that document.cookie cannot identify their scopes. */
     const seenPhysicalKeys = new Set<string>()
     for (const [rawKey] of parseCookieEntries(readCookie(operation))) {
-      const stripped = stripNamespace(namespace, rawKey, namespaceCodec, StorageBackend.cookie)
+      const stripped = stripStorageNamespace(
+        namespace,
+        rawKey,
+        namespaceCodec,
+        StorageBackend.cookie
+      )
       if (stripped === undefined) continue
       if (seenPhysicalKeys.has(rawKey))
         throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
@@ -341,7 +348,7 @@ export const cookiesHost = (
   const readVisibleCookie = (
     physicalKey: string,
     operation: string,
-    logicalKey: string
+    logicalKey: IStorageKey
   ): string | undefined => {
     let visible: string | undefined
     let matches = 0
@@ -493,7 +500,9 @@ export const cookiesHost = (
     },
     keys: () => {
       assertLive()
-      return namespacedEntries().map((entry) => entry.logicalKey)
+      return namespacedEntries().flatMap((entry) =>
+        typeof entry.logicalKey === 'string' ? [entry.logicalKey] : []
+      )
     },
     clearValues: () => {
       assertLive()
@@ -516,16 +525,21 @@ export const cookiesHost = (
                  * Snapshot verification and the original private native write share one synchronous
                  * turn.
                  */
-                const actual = namespacedEntries(StorageOperation.entityUniqueWrite)
-                  .filter((entry) => entry.logicalKey.startsWith(captured.prefix))
-                  .flatMap((entry) => {
+                const actual = namespacedEntries(StorageOperation.entityUniqueWrite).flatMap(
+                  (entry) => {
+                    if (
+                      typeof entry.logicalKey !== 'string' ||
+                      !entry.logicalKey.startsWith(captured.prefix)
+                    )
+                      return []
                     const value = readVisibleCookie(
                       entry.physicalKey,
                       StorageOperation.entityUniqueWrite,
                       entry.logicalKey
                     )
                     return value === undefined ? [] : [[entry.logicalKey, value] as const]
-                  })
+                  }
+                )
                 assertValueSnapshot(actual, captured.expected, StorageBackend.cookie)
                 sync.set(captured.key, captured.value)
               },
@@ -578,7 +592,53 @@ export const cookiesHost = (
   }
   const construction = provideBackendConstruction(
     bindBrowserExecution(store, runtime),
-    [implement(kv, browserKeyValueApi(store))],
+    [
+      implement(
+        kv,
+        browserKeyValueApi(
+          store,
+          createTextBatchApi(
+            StorageBackend.cookie,
+            runtime,
+            (): IStorageStore<never> => construction.store,
+            assertLive,
+            (keys, operation) => {
+              assertLive()
+              /** Typed codec admission completes before reading the visible cookie snapshot. */
+              const physical = keys.map(({ key }) =>
+                namespacedStorageKey(namespace, key, namespaceCodec, StorageBackend.cookie)
+              )
+              /** One header snapshot supplies all requested results without per-key public reads. */
+              const visible = new Map<string, string>()
+              /** Duplicate visible names retain the original fixed-scope ambiguity failure. */
+              const ambiguous = new Set<string>()
+              for (const [key, value] of parseCookieEntries(readCookie(operation))) {
+                if (visible.has(key)) ambiguous.add(key)
+                visible.set(key, value)
+              }
+              /** Canonical duplicate positions reuse the first result from this one header. */
+              const values: (string | undefined)[] = []
+              for (let index = 0; index < keys.length; index += 1) {
+                const entry = keys[index]!
+                if (entry.firstIndex !== index) {
+                  values.push(values[entry.firstIndex])
+                  continue
+                }
+                const key = physical[index]!
+                if (ambiguous.has(key))
+                  throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+                    backend: StorageBackend.cookie,
+                    key: entry.key,
+                    operation
+                  })
+                values.push(visible.get(key))
+              }
+              return values
+            }
+          )
+        )
+      )
+    ],
     controller,
     () => doc
   )
