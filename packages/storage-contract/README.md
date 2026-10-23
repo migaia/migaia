@@ -723,6 +723,12 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 
 `createStorageBlobBodyReader(body, { report, backend?, normalizeFailure? })` 是有限上传作者入口：调用方先完成原生条件检查，再把已捕获 body 交给原 iterator 生命周期读取；每次 next 返回独立 Uint8Array chunk，不预取，不拥有原生 sink、分段缓冲或调度。EOF 或 read 失败不重复 cancel；提前 return(reason)/dispose 先取消未完成 read，再沿原 owner 排空并 release 一次。取消失败保持主错，后续 release 失败仅报告；主与符号清理仍为独立缓存 Promise。调用方保留原 signal/timeout 与 sink 清理，read 失败后也须释放 reader。
 
+## 一致性套件
+
+后端测试从 `@migaia/storage-contract/conformance` 导入 `runConformance` 与 `IConformanceHarness`，传入现有 runner 的 describe/it/expect、独立 create 工厂、完整 token 清单及布尔 features。套件核对十个标准 token 的实际 has 与清单双向一致，再执行所声明的 KV、同步、字节、记录、索引、迭代、事务与提交后通知行为；纯 vector 或 SQL subject 无需伪造 KV。
+
+每个 case 单独创建并在 finally 释放原 store。主体和清理失败都可追踪。通知仅沿消费者 runner 的 case 超时，不增加统一通知时限；opaqueEntries 与近似 maxValueBytes 只检查声明，不能当作隐藏键或精确配额的证明。生产子路径没有 Vitest、Web、host 或 driver 依赖。
+
 原生后端可从包根调用 `snapshotStorageWhere(where)`，取得原查询 owner 的冻结 `IQueryCondition`；翻译或交 `compileStorageQueryCondition` 使用同一 AST。它复用既有字段单读、校验与 `INVALID_ARGUMENT` 原 cause，不另建 parser、编码器或执行器。
 
 原生后端可在既有 `IQueryPushdown` 上提供可选纯 `canPushCondition(condition)`，用同一原生翻译器判定规范 AST 的实际值域是否可忠实下推。原操作符与对象身份规则先执行；false 保留客户端步骤并使 `requirePushdown` 在 I/O 前拒绝，省略保持既有语义。函数和原 receiver 单次捕获，不增加查询执行器。

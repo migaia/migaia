@@ -766,6 +766,13 @@ const errorMembers: Readonly<Record<string, IMemberDoc>> = {
 /** Complete bilingual contract reference; implementations remain external consumers. */
 export const storageContractReference: ILibraryReference = {
   modules: {
+    conformance: {
+      summary: t(
+        'Consumer-run storage conformance. Import runConformance and pass the existing runner plus a fresh fixture factory and complete capability manifest.',
+        '由消费者 runner 执行的存储一致性套件。导入 runConformance，传入现有 runner、新 fixture 工厂与完整能力清单。'
+      ),
+      example: storageContractCases.runConformance![0]!.example
+    },
     index: {
       summary: t(
         'Runtime-neutral storage shapes, capability narrowing, key validation, codecs, operation contexts and errors. Start with `IKeyValueStore` for an injected backend, use `asRecordStore()` when structured storage is required, or `snapshotCodec()` at a codec admission boundary. This package opens no database.',
@@ -775,6 +782,25 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    runConformance: {
+      role: 'operation',
+      purpose: t(
+        'Register all declared standard-token and Boolean behavior groups without acquiring a runner, host or driver dependency. Every case validates the complete manifest and finally disposes its original fixture; primary and cleanup failures remain reachable.',
+        '登记声明的标准 token 与布尔行为组，不依赖 runner、host 或 driver。每例核对完整清单并 finally 释放原 fixture，主体与清理错误均可追踪。'
+      ),
+      params: {
+        harness: t(
+          'Original describe/it/expect registration and matchers. Notification waiting uses only this runner’s case timeout.',
+          '原 describe/it/expect 与 matcher；通知等待仅沿该 runner 的 case 超时。'
+        ),
+        subject: t(
+          'Name, independent create factory, complete authentic capability list and full features snapshot. KV is selected by kv token; pure vector/SQL subjects need none.',
+          '名称、独立 create 工厂、完整真实 token 清单与全量 features 快照。KV 由 kv token 选择；纯 vector/SQL 无需 KV。'
+        )
+      },
+      example: storageContractCases.runConformance![0]!.example,
+      cases: storageContractCases.runConformance
+    },
     term: {
       role: 'constant',
       purpose: t(
@@ -5401,6 +5427,58 @@ if (sync) {
       ],
       example: storeExample,
       members: recordMembers
+    },
+    IConformanceHarness: {
+      summary: t(
+        'Existing consumer runner adapter; the contract owns no execution scheduler or notification deadline.',
+        '现有消费者 runner 接点；契约不拥有执行调度或通知期限。'
+      ),
+      members: {
+        describe: { summary: t('Register a named case group.', '登记具名用例组。') },
+        it: {
+          summary: t(
+            'Register one independently created and disposed case.',
+            '登记一个独立创建与释放的用例。'
+          )
+        },
+        expect: {
+          summary: t(
+            'Return the supplied synchronous and async assertion vocabulary.',
+            '返回消费者的同步与异步断言。'
+          )
+        }
+      }
+    },
+    IConformanceMatchers: {
+      summary: t(
+        'Required consumer assertions; assertion failures retain their runner identity.',
+        '必需的消费者断言；失败保留 runner 原错误身份。'
+      ),
+      members: {
+        toBe: {
+          summary: t('Assert exact identity or primitive equality.', '断言精确身份或原始值相等。')
+        },
+        toEqual: { summary: t('Assert structural equality.', '断言结构相等。') },
+        toBeNull: { summary: t('Assert null.', '断言 null。') },
+        toBeUndefined: { summary: t('Assert undefined.', '断言 undefined。') },
+        toBeDefined: { summary: t('Assert a defined value.', '断言值已定义。') },
+        toThrow: {
+          summary: t(
+            'Assert a callable fails, optionally matching its text.',
+            '断言函数失败，可匹配错误文本。'
+          )
+        },
+        toMatchObject: {
+          summary: t('Assert the expected observable fields.', '断言预期可观察字段。')
+        }
+      }
+    },
+    IConformanceAsyncMatchers: {
+      summary: t(
+        'The same matcher arguments with Promise<void> results for resolves/rejects.',
+        '与同步 matcher 参数相同，resolves/rejects 返回 Promise<void>。'
+      ),
+      members: {}
     },
     ITextWatchApi: {
       summary: t(
