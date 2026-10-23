@@ -618,6 +618,138 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    IVersionedEnvelope: {
+      purpose: t(
+        'Own safe version and caller-owned non-null state container.',
+        '自有安全版本与调用方拥有的非空状态容器。'
+      )
+    },
+    IMigrationStepContext: {
+      purpose: t(
+        'One source/target version transition with an optional borrowed cancellation signal.',
+        '一次来源/目标版本转换及可选借用取消信号。'
+      )
+    },
+    IMigrationStep: {
+      purpose: t(
+        'Unknown historical state conversion; return type inference decides synchronous admission.',
+        '转换未知历史状态；返回类型推断决定同步准入。'
+      )
+    },
+    IMigrationReset: {
+      purpose: t(
+        'Zero-argument fresh-state factory for resetting older archives once.',
+        '对旧存档仅调用一次的零参数新状态工厂。'
+      )
+    },
+    ISyncMigrationSteps: {
+      purpose: t(
+        'Retains callback inference while excluding known Promise and callable-then return types.',
+        '保留回调推断，排除已知 Promise 与可调用 then 返回类型。'
+      )
+    },
+    IMigrationPlan: {
+      purpose: t(
+        'Frozen current/base versions and captured step functions, with optional reset.',
+        '冻结的当前/最低版本及步骤快照，可选 reset。'
+      )
+    },
+    IMigrationStepObserver: {
+      purpose: t(
+        'Nonblocking before/after observers with a synchronous failure reporter.',
+        '不阻塞的步骤前后观察器及同步失败报告。'
+      )
+    },
+    IMigrationRunOptions: {
+      purpose: t(
+        'Borrowed cancellation, utility reporter and step observation configuration.',
+        '借用的取消、工具报告器与步骤观察配置。'
+      )
+    },
+    assertVersionedEnvelope: {
+      role: 'operation',
+      purpose: t(
+        'Validate a plain archive with own safe version and non-null state fields, reading each once without copying state.',
+        '校验普通存档的自有安全版本与非空状态，每字段读取一次，不复制状态。'
+      ),
+      params: {
+        value: t('Known envelope or unknown archive input.', '已知 envelope 或未知存档输入。')
+      },
+      returns: t(
+        'A fresh envelope retaining state identity and known state type; invalid input throws ENVELOPE_INVALID.',
+        '返回新 envelope，保留状态引用与已知类型；无效输入抛 ENVELOPE_INVALID。'
+      ),
+      example: `const state = { name: 'Ada' }
+const archive = assertVersionedEnvelope({ version: 1, state })
+console.log(archive.state === state) // true`
+    },
+    createMigrationPlan: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot and freeze canonical continuous version steps, or a constant-space reset callback.',
+        '快照并冻结规范连续版本步骤，或常数空间的重置回调。'
+      ),
+      params: {
+        options: t(
+          'Current nonnegative safe version plus optional steps, or an exclusive reset callback.',
+          '当前非负安全版本，加可选 steps 或互斥的 reset 回调。'
+        )
+      },
+      returns: t(
+        'An immutable plan; gaps throw MIGRATION_GAP and malformed options throw INVALID_ARGUMENT.',
+        '返回不可变计划；断档抛 MIGRATION_GAP，配置形态错误抛 INVALID_ARGUMENT。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 2, steps: { 2: value => ({ previous: value }) } })
+console.log(plan.baseVersion, Object.isFrozen(plan.steps)) // 1 true`
+    },
+    migrateEnvelopeSync: {
+      role: 'operation',
+      purpose: t(
+        'Run synchronous steps in target-version order. Refuse newer archives and preserve original errors as cause.',
+        '按目标版本顺序执行同步步骤；拒绝未来存档，将原始错误保留在 cause。'
+      ),
+      params: {
+        plan: t(
+          'Immutable plan from createMigrationPlan.',
+          'createMigrationPlan 创建的不可变计划。'
+        ),
+        envelope: t('Validated version/state archive.', '已校验的版本/状态存档。'),
+        options: t(
+          'Optional observation-only beforeStep, afterStep and synchronous report callbacks.',
+          '可选的只观察 beforeStep、afterStep 与同步 report 回调。'
+        )
+      },
+      returns: t(
+        'Current state reference or migration result. Thenables fail with MIGRATION_FAILED; observer promises are not awaited.',
+        '返回当前状态引用或迁移结果；thenable 导致 MIGRATION_FAILED，观察 Promise 不等待。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: value => ({ previous: value }) } })
+console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+    },
+    migrateEnvelope: {
+      role: 'operation',
+      purpose: t(
+        'Run asynchronous migrations with shared cancellation and late-rejection reporting, including cancellation before unchanged-version returns.',
+        '借用共享取消与迟到拒绝报告执行异步迁移，同版返回前仍检查取消。'
+      ),
+      params: {
+        plan: t('Immutable migration plan.', '不可变迁移计划。'),
+        envelope: t(
+          'Validated archive; user state mutations are not rolled back.',
+          '已校验存档；用户对状态的修改不会回滚。'
+        ),
+        options: t(
+          'Optional signal, utils reporter and observation-only step callbacks.',
+          '可选 signal、utils reporter 和只观察的步骤回调。'
+        )
+      },
+      returns: t(
+        'Promise for current or migrated state; cancellation rejects ABORTED with the signal reason as cause.',
+        '返回当前或升级后状态的 Promise；取消以 ABORTED 拒绝，cause 为信号原因。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: async value => ({ previous: value }) } })
+console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+    },
     asRecordStore: {
       role: 'operation',
       purpose: t(
@@ -2201,6 +2333,19 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
         disposed: t(
           'A caller uses a backend after its disposal; create or obtain a new store.',
           '调用方在后端释放后继续使用，应创建或取得新存储。'
+        ),
+        envelopeInvalid: t('Archive envelope shape is invalid.', '存档 envelope 形态无效。'),
+        versionUnsupported: t(
+          'Archive version is outside the supported plan range.',
+          '存档版本不在计划支持范围。'
+        ),
+        migrationGap: t(
+          'Migration target versions contain a gap or noncanonical key.',
+          '迁移目标版本存在断档或非规范键。'
+        ),
+        migrationFailed: t(
+          'A migration step failed; the original error remains on cause.',
+          '迁移步骤失败；原始错误保留在 cause。'
         ),
         aborted: t(
           'A signal or timeout cancels waiting; writes already in atomic commit report the actual commit outcome.',

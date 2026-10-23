@@ -58,9 +58,18 @@ export const StorageContractErrorCode = Object.freeze({
    * The caller handles the result as cancellation. A write that has entered atomic commit reports
    * the actual commit result rather than claiming rollback.
    */
-  aborted: 'ABORTED'
+  aborted: 'ABORTED',
+
+  /** Saved data is not an own-property version/state envelope; correct the archive or writer. */
+  envelopeInvalid: 'ENVELOPE_INVALID',
+  /** The archive is newer than this code or older than its migration range; update the plan. */
+  versionUnsupported: 'VERSION_UNSUPPORTED',
+  /** Migration target keys contain a gap, alias, or out-of-range version; correct the steps. */
+  migrationGap: 'MIGRATION_GAP',
+  /** A migration step failed or returned a thenable to the sync entry; inspect the original cause. */
+  migrationFailed: 'MIGRATION_FAILED'
 } as const)
 
-/** Union of this package's five stable semantic error codes. */
+/** Union of this package's stable semantic error codes. */
 export type IStorageContractErrorCode =
   (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode]

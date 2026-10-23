@@ -418,3 +418,51 @@ pnpm run typecheck
 pnpm run typecheck:test
 pnpm run test
 ```
+
+## Versioned envelopes and chained migrations
+
+`assertVersionedEnvelope` validates own `version` and non-null `state` properties on a plain object. It reads each property once and retains the state reference. A plan snapshots and freezes a continuous version range at creation. These converters own no connections, perform no storage writes, and do not dispose borrowed resources.
+
+```ts
+import {
+  assertVersionedEnvelope,
+  createMigrationPlan,
+  migrateEnvelopeSync,
+  StorageContractError
+} from '@migaia/storage-contract'
+
+try {
+  createMigrationPlan({ version: 3, steps: { 1: (value) => value, 3: (value) => value } })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // MIGRATION_GAP
+}
+
+const plan = createMigrationPlan({ version: 2, steps: { 2: (value) => ({ previous: value }) } })
+try {
+  migrateEnvelopeSync(plan, assertVersionedEnvelope({ version: 3, state: {} }))
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // VERSION_UNSUPPORTED
+}
+
+const originalError = new Error('upgrade failed')
+const failing = createMigrationPlan({
+  version: 1,
+  steps: {
+    1: () => {
+      throw originalError
+    }
+  }
+})
+try {
+  migrateEnvelopeSync(failing, { version: 0, state: {} })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
+}
+```
+
+`migrateEnvelope` accepts asynchronous steps and cancellation. Cancellation is checked even when the archive already has the current version. The synchronous entry rejects known asynchronous steps statically and rejects runtime thenables while consuming their late rejection. A `{ version, reset: () => ({}) }` plan resets an older archive once, preserves current-version state identity, and rejects newer archives. User mutations of state and external side effects are not rolled back.
+
+`observe.beforeStep` and `observe.afterStep` only observe; their return values are not awaited. Failures go to synchronous `observe.report` without changing migration results, or to the existing utils host report when omitted. Resource cleanup, host pipelines, and archive writes remain with their existing owners.
