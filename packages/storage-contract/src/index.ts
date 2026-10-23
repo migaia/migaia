@@ -56,7 +56,11 @@ export { asSecondaryIndexRecordStore, isSecondaryIndexRecordStore } from './seco
 export type { IStorageChange, IChangeFeedStore } from './change-feed.js'
 export { asChangeFeedStore, isChangeFeedStore } from './change-feed.js'
 
-export type { ITransactionScope, ITransactionWriteOptions } from './transaction.js'
+export type {
+  ITransactionScope,
+  ITransactionWriteOptions,
+  ITransactionKeyValueApi
+} from './transaction.js'
 export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
 
 export {
@@ -78,6 +82,43 @@ export {
 } from './operation-context.js'
 
 export { intrinsicConstructorName } from './bytes.js'
+
+export type { IStorageResource, IStorageIterator } from './resource.js'
+export {
+  BACKEND_KIND_PATTERN,
+  isBackendKind,
+  type IChainMethods,
+  type IChainMethodsOf,
+  type IWithChainMethods
+} from './backend.js'
+export type {
+  ILockKey,
+  IConcurrencyPolicy,
+  ITransactionOptions,
+  IWriteConcurrencyOptions,
+  ITransactionBuilder,
+  ILockedTransactionBuilder
+} from './concurrency.js'
+export {
+  defineStorageCapability,
+  implement,
+  provideCapabilities,
+  kv,
+  type IStorageCapability,
+  type IAnyStorageCapability,
+  type ICapabilityApi,
+  type IStorageBase,
+  type IStorageStore,
+  type IKeyValueApi,
+  type ITransactionalCapability,
+  type ITransactionCapabilityApi,
+  type ICapabilityImpl,
+  type ICapabilityStore,
+  type IStorageCapabilitySet,
+  type IStorageImplementationsOf,
+  type ICapabilityPublication,
+  type ICapabilityInstallPort
+} from './capability.js'
 
 export {
   assertVersionedEnvelope,

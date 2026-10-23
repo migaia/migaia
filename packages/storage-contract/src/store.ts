@@ -12,6 +12,7 @@ import type {
   IWriteOptions
 } from './context.js'
 import type { ITransactionScope } from './transaction.js'
+import { isBackendKind } from './backend.js'
 
 /**
  * Exposes the synchronous channel only on synchronous backends. The backend drives it directly, and
@@ -128,8 +129,6 @@ export type IRecordStore<TValue = unknown> = IKeyValueStore & {
   ): Promise<T>
 }
 
-const BACKEND_KINDS = new Set<IBackendKind>(['memory', 'local', 'session', 'cookie', 'indexeddb'])
-
 type IStoreShapeInspection = {
   readonly valid: boolean
   readonly backend: IBackendKind | undefined
@@ -212,9 +211,7 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
       cause
     }
   }
-  const normalizedBackend = BACKEND_KINDS.has(backend as IBackendKind)
-    ? (backend as IBackendKind)
-    : undefined
+  const normalizedBackend = isBackendKind(backend) ? backend : undefined
   const capabilitiesInspection = snapshotStorageCapabilitiesDetailed(capabilitiesValue)
   const capabilities = capabilitiesInspection.value
   const validCapabilities =
@@ -238,8 +235,8 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
 
 /**
  * Inspects a provider once before a lifecycle owner accepts it. Required methods must be callable,
- * backend must be known, and capabilities must be valid. No storage or dispose method is invoked.
- * Success returns original store/receiver plus captured facts; failure returns valid false with the
+ * backend syntax and capabilities must be valid. No storage or dispose method is invoked. Success
+ * returns original store/receiver plus captured facts; failure returns valid false with the
  * original getter/reflection cause when present. The result record is not frozen.
  */
 export const snapshotKeyValueStoreDetailed = (store: unknown): IKeyValueStoreAdmission => {
@@ -309,8 +306,8 @@ export const snapshotRecordStore = <T = unknown>(
 }
 
 /**
- * Tests a complete base key-value shape without running provider operations. Unknown backend
- * labels, invalid capability descriptors, missing methods, and throwing accessors return false.
+ * Tests a complete base key-value shape without running provider operations. Invalid backend
+ * syntax, invalid capability descriptors, missing methods, and throwing accessors return false.
  * This proves structural admission, not that promises, persistence, or backend semantics work.
  */
 export const isKeyValueStore = (store: unknown): store is IKeyValueStore =>

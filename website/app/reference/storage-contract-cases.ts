@@ -5,6 +5,35 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  defineStorageCapability: [
+    {
+      title: t('Keep equal capability names independent', '同名能力仍保持独立身份'),
+      problem: t(
+        'Two backend authors may choose the same diagnostic name. A name cannot grant runtime access to the other author’s API; only the authentic token identity can select an implementation.',
+        '两个后端作者可能选择同一诊断名称。名称不能授予另一个作者 API 的运行权限；只有真实令牌身份才能选择实现。'
+      ),
+      example: t(
+        `import { defineStorageCapability, implement } from '@migaia/storage-contract'
+const first = defineStorageCapability<{ read(): string }>()('catalog')
+const second = defineStorageCapability<{ read(): string }>()('catalog')
+const api = { read: () => 'value' }
+const descriptor = implement(first, api)
+console.log(first !== second, Object.isFrozen(first), Object.isFrozen(descriptor), descriptor.api === api)
+// true true true true`,
+        `import { defineStorageCapability, implement } from '@migaia/storage-contract'
+const first = defineStorageCapability<{ read(): string }>()('catalog')
+const second = defineStorageCapability<{ read(): string }>()('catalog')
+const api = { read: () => 'value' }
+const descriptor = implement(first, api)
+console.log(first !== second, Object.isFrozen(first), Object.isFrozen(descriptor), descriptor.api === api)
+// true true true true`
+      ),
+      result: t(
+        'Prints true true true true. No backend is opened and the implementation API is retained by identity.',
+        '输出 true true true true。不打开后端，并保留实现 API 引用。'
+      )
+    }
+  ],
   createMigrationPlan: [
     {
       title: t(

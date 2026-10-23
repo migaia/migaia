@@ -618,6 +618,251 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    ITransactionKeyValueApi: {
+      purpose: t(
+        'Standard transaction text API bound to one original owner, without root operation contexts.',
+        '绑定原拥有者的标准事务文本 API，不接受根操作上下文。'
+      )
+    },
+    ITransactionalCapability: {
+      purpose: t(
+        'Select only standard tokens with declared transaction projections.',
+        '仅选择声明了事务投影的标准令牌。'
+      )
+    },
+    ITransactionCapabilityApi: {
+      purpose: t(
+        'Project a standard token to its transaction-owned API.',
+        '将标准令牌投影为事务拥有者 API。'
+      )
+    },
+    IStorageResource: {
+      purpose: t(
+        'One owned resource with explicit rejecting cleanup and separately cached report-only symbolic cleanup.',
+        '自有资源的显式拒绝清理与独立缓存的只报告符号清理。'
+      )
+    },
+    IStorageIterator: {
+      purpose: t(
+        'Asynchronous iterator and owned cleanup resource.',
+        '异步迭代器及其自有清理资源。'
+      )
+    },
+    IStorageBase: {
+      purpose: t(
+        'Runtime-neutral resource, backend name and support facts without a KV requirement.',
+        '不强制 KV 的中立资源、后端名与能力事实。'
+      )
+    },
+    IStorageStore: {
+      purpose: t(
+        'Resource base with an exact contravariant capability set and token use/has.',
+        '保留精确反变能力集合及令牌 use/has 的资源基础对象。'
+      )
+    },
+    IStorageCapability: {
+      purpose: t(
+        'Opaque API token; its name does not grant runtime authority.',
+        '不透明 API 令牌；名称不授予运行权限。'
+      )
+    },
+    IAnyStorageCapability: {
+      purpose: t(
+        'Shared upper bound for capability identity tokens.',
+        '能力身份令牌的共同类型上界。'
+      )
+    },
+    ICapabilityApi: {
+      purpose: t(
+        'Type projection of the API associated with one token.',
+        '一个令牌所关联 API 的类型投影。'
+      )
+    },
+    IKeyValueApi: {
+      purpose: t(
+        'Public KV methods projected from the canonical store contract.',
+        '由唯一 store 契约投影的公开 KV 方法。'
+      )
+    },
+    ICapabilityImpl: {
+      purpose: t(
+        'Authentic frozen pairing of one token and its precise backend API.',
+        '一个令牌与精确后端 API 的真实冻结配对。'
+      )
+    },
+    ICapabilityStore: {
+      purpose: t(
+        'Original base refined with exact APIs, full transaction scope and builder augmentation.',
+        '保留具体 API、完整事务视图与构建器增强的基础对象投影。'
+      )
+    },
+    IStorageCapabilitySet: {
+      purpose: t(
+        'Type-only capability union from an already provided store.',
+        '已装配 store 的纯类型能力联合投影。'
+      )
+    },
+    IStorageImplementationsOf: {
+      purpose: t('Exact original provider implementation tuple.', '提供方原始实现元组的精确投影。')
+    },
+    ICapabilityPublication: {
+      purpose: t(
+        'Idempotent publish and release of one prepared capability batch.',
+        '一批已准备能力的幂等发布与释放。'
+      )
+    },
+    ICapabilityInstallPort: {
+      purpose: t(
+        'One store’s opaque prepare/publish/release installation authority.',
+        '一个 store 的不透明 prepare/publish/release 安装权限。'
+      )
+    },
+    IChainMethods: {
+      purpose: t(
+        'Finite query, transaction, vector and RDF chain method groups.',
+        '有限的 query、事务、vector 与 RDF 链方法分组。'
+      )
+    },
+    IChainMethodsOf: {
+      purpose: t('Pure projection of existing chain method groups.', '已有链方法分组的纯投影。')
+    },
+    IWithChainMethods: {
+      purpose: t(
+        'Preserves original builder scope and augmentation while projecting host method groups.',
+        '投影宿主方法分组时保留原构建器视图与增强。'
+      )
+    },
+    ILockKey: {
+      purpose: t(
+        'Physical text, bytes or record channel and key identity.',
+        'text、bytes 或 record 物理通道及键身份。'
+      )
+    },
+    IConcurrencyPolicy: {
+      purpose: t(
+        'Public policy name and locking mode; runtime authority remains private.',
+        '公开策略名与加锁模式；运行权限仍由私有拥有者掌握。'
+      )
+    },
+    ITransactionOptions: {
+      purpose: t(
+        'Operation timing, declared locks and a selected concurrency policy.',
+        '操作时间选项、声明锁及选定并发策略。'
+      )
+    },
+    IWriteConcurrencyOptions: {
+      purpose: t('Per-write concurrency policy override.', '单次写入的并发策略覆盖。')
+    },
+    ITransactionBuilder: {
+      purpose: t(
+        'Immutable unlocked chain type retaining its original second augmentation generic.',
+        '保留原第二增强泛型的不可变未加锁链类型。'
+      )
+    },
+    ILockedTransactionBuilder: {
+      purpose: t(
+        'Locked chain type exposes run and retains full scope and method augmentation.',
+        '加锁链类型公开 run，并保留完整视图与方法增强。'
+      )
+    },
+    defineStorageCapability: {
+      role: 'operation',
+      purpose: t(
+        'Define a frozen identity token for an API contract without supplying an implementation or global name registry.',
+        '定义 API 契约的冻结身份令牌，不提供实现，也不建立全局名称注册表。'
+      ),
+      params: {
+        name: t(
+          'Nonempty diagnostic name, chosen after the API type.',
+          'API 类型之后指定的非空诊断名称。'
+        )
+      },
+      returns: t(
+        'A distinct authentic token; equal names never grant shared runtime authority.',
+        '返回独立真实令牌；同名不会授予共享运行权限。'
+      ),
+      example: `const catalog = defineStorageCapability<{ read(): string }>()('catalog')`
+    },
+    implement: {
+      role: 'operation',
+      purpose: t(
+        'Capture one authentic token/API pairing as a frozen descriptor; an optional standard forTransaction binder remains private and unexecuted.',
+        '将真实令牌与 API 配对为冻结记录；可选的标准 forTransaction 绑定器私有保存，不在装配时执行。'
+      ),
+      params: {
+        capability: t(
+          'Authentic token from defineStorageCapability.',
+          'defineStorageCapability 创建的真实令牌。'
+        ),
+        api: t(
+          'Backend-owned API satisfying the token contract; its exact type is retained.',
+          '满足令牌契约的后端 API，保留具体类型。'
+        )
+      },
+      returns: t(
+        'An authentic immutable descriptor; forged tokens throw INVALID_ARGUMENT.',
+        '返回真实不可变记录；伪造令牌抛 INVALID_ARGUMENT。'
+      ),
+      example: `const implementation = implement(catalog, { read: () => 'value' })`
+    },
+    provideCapabilities: {
+      role: 'operation',
+      purpose: t(
+        'Admit a complete implementation batch and modify the same resource-backed base, preserving its public class and hidden members.',
+        '准入整批实现并改装同一资源基础对象，保留类公开方法与非枚举成员。'
+      ),
+      params: {
+        base: t(
+          'Unprovided resource base with valid backend, support facts and both cleanup entries.',
+          '尚未装配能力且具有有效后端名、能力事实与两个清理入口的资源基础对象。'
+        ),
+        implementations: t(
+          'Authentic implementation records with no duplicate tokens.',
+          '没有重复令牌的真实实现记录。'
+        ),
+        options: t(
+          'Optional onInstaller receives this store’s unique prepare/publish/release port.',
+          '可选 onInstaller 接收本 store 唯一的 prepare/publish/release 安装口。'
+        )
+      },
+      returns: t(
+        'The exact original base refined with use/has and precise implementation types. Failure does not dispose the base.',
+        '返回原基础对象并增强 use/has 与精确实现类型；失败不释放基础对象。'
+      ),
+      example: `function attachCatalog(base: IStorageBase) {
+  return provideCapabilities(base, [implement(catalog, { read: () => 'value' })])
+}`
+    },
+    kv: {
+      role: 'operation',
+      purpose: t(
+        'Standard text key-value contract token; the backend still owns every operation and its lifecycle.',
+        '标准文本键值契约令牌；每个操作及生命周期仍由后端拥有。'
+      ),
+      example: `const api = store.use(kv)
+console.log(api === store.use(kv)) // true`
+    },
+    isBackendKind: {
+      role: 'operation',
+      purpose: t(
+        'Validate an open backend name without admitting a store or granting capability authority.',
+        '校验开放后端名称，不准入 store，也不授予能力权限。'
+      ),
+      params: { value: t('Unknown backend label.', '未知后端标签。') },
+      returns: t(
+        'True for lowercase letter followed by lowercase letters, digits or hyphens, at most 64 characters.',
+        '小写字母开头，后接小写字母、数字或连字符，总长不超过 64 时为真。'
+      ),
+      example: `console.log(isBackendKind('example-catalog'), isBackendKind('Invalid Name')) // true false`
+    },
+    BACKEND_KIND_PATTERN: {
+      role: 'operation',
+      purpose: t(
+        'Canonical backend label pattern used by all contract admission checks.',
+        '全部契约准入检查共用的规范后端名模式。'
+      ),
+      example: `console.log(BACKEND_KIND_PATTERN.test('example-catalog')) // true`
+    },
     IVersionedEnvelope: {
       purpose: t(
         'Own safe version and caller-owned non-null state container.',
@@ -1254,8 +1499,8 @@ console.log(candidate.name, candidate.output)`
       ),
       params: {
         code: t(
-          'Required semantic value from `StorageContractErrorCode`: `INVALID_ARGUMENT`, `INVALID_KEY`, `UNSUPPORTED_CAPABILITY`, `STORE_DISPOSED` or `ABORTED`. The producer chooses the code matching the failed contract.',
-          '必填的 `StorageContractErrorCode` 语义值：`INVALID_ARGUMENT`、`INVALID_KEY`、`UNSUPPORTED_CAPABILITY`、`STORE_DISPOSED` 或 `ABORTED`。生产者按失败契约选择。'
+          'Required semantic value from `StorageContractErrorCode`: input, key, capability, resource, cancellation, envelope and migration failures. The producer chooses the code matching the failed contract.',
+          '必填的 `StorageContractErrorCode` 语义值：输入、键、能力、资源、取消、envelope 与迁移错误。生产者按失败契约选择。'
         ),
         details: t(
           'Optional producer-authored details, default `{}`. Optional `backend` is `local`, `session`, `cookie`, `indexeddb` or `memory`; optional `key` is a string or `IStorageKey`; optional `cause` is any original thrown value. All fields default to `undefined`; key and cause are retained by reference without validation or copying.',
@@ -2196,8 +2441,8 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
     },
     IBackendKind: {
       summary: t(
-        'Implementation-family label union for local, session, cookie, indexeddb or memory backends; it does not substitute for capability flags.',
-        '本地、会话、小型网页存储、索引数据库或内存的实现家族标签联合，不能替代能力标志。'
+        'Open backend label string validated by BACKEND_KIND_PATTERN; a name does not grant capability authority.',
+        '由 BACKEND_KIND_PATTERN 校验的开放后端名称字符串；名称不授予能力权限。'
       ),
       members: {}
     },
