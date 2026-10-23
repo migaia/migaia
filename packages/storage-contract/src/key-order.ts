@@ -18,19 +18,12 @@ function measureKey(key: IStorageKey): number {
   return 2 + (key as ArrayBuffer).byteLength * 2
 }
 
-/**
- * Snapshots the existing key domain and writes an independent order-preserving byte sequence.
- * UTF-16 code units, byte prefixes, nested keys and normalized signed zero retain comparator
- * order.
- */
-export function encodeOrderedStorageKey(
-  key: unknown,
-  backend: IBackendKind | undefined
-): Uint8Array {
-  /** Existing key ownership handles validation, domain limits and mutable components. */
-  const snapshot = snapshotStorageKey(key, backend)
+/** Writes an already admitted canonical snapshot; only the root variable terminator may be omitted. */
+function encodeKeySnapshot(snapshot: IStorageKey, prefix: boolean): Uint8Array {
+  /** Fixed-width numeric/date identities stay exact; variable roots can describe extensions. */
+  const omitRootEnd = prefix && typeof snapshot !== 'number' && !(snapshot instanceof Date)
   /** One allocation holds the complete encoded tree. */
-  const output = new Uint8Array(measureKey(snapshot))
+  const output = new Uint8Array(measureKey(snapshot) - (omitRootEnd ? 1 : 0))
   /** The numeric writer targets the same allocation and performs only constant-width writes. */
   const view = new DataView(output.buffer)
   /** One monotonic cursor is shared by every nested component. */
@@ -44,7 +37,7 @@ export function encodeOrderedStorageKey(
     offset += 8
   }
   /** Appends a complete scalar or array in one depth-first traversal. */
-  const write = (value: IStorageKey): void => {
+  const write = (value: IStorageKey, omitEnd = false): void => {
     if (typeof value === 'number') {
       output[offset++] = OrderedKeyTag.number
       writeNumber(value)
@@ -74,8 +67,61 @@ export function encodeOrderedStorageKey(
         output[offset++] = byte
       }
     }
-    output[offset++] = 0
+    if (!omitEnd) output[offset++] = 0
   }
-  write(snapshot)
+  write(snapshot, omitRootEnd)
   return output
+}
+
+/**
+ * Snapshots the existing key domain and writes its complete independent order-preserving bytes.
+ * UTF-16, binary prefixes, nested keys and normalized signed zero retain canonical comparison.
+ */
+export function encodeOrderedStorageKey(
+  key: unknown,
+  backend: IBackendKind | undefined
+): Uint8Array {
+  return encodeKeySnapshot(snapshotStorageKey(key, backend), false)
+}
+/** Pure prefix projection supports native lower-bound cursors and canonical encoded range lookup. */
+export type IStorageKeyPrefix = {
+  readonly key: IStorageKey
+  readonly lower: Uint8Array
+  readonly upper: Uint8Array
+  matches(key: IStorageKey): boolean
+}
+/**
+ * Snapshots one typed prefix. Strings/buffers match content prefixes, arrays match complete leading
+ * child keys, and numbers/Dates match exact normalized identities. The existing domain still
+ * rejects empty arrays. Exposed bytes/key are independent of the private matcher; no index or store
+ * permission is created, and only this input's bytes determine the exclusive upper bound.
+ */
+export function snapshotStorageKeyPrefix(
+  prefix: unknown,
+  backend: IBackendKind | undefined
+): IStorageKeyPrefix {
+  /** The original key owner admits and detaches all mutable logical segments exactly once. */
+  const key = snapshotStorageKey(prefix, backend)
+  /** The original writer deliberately omits only the root variable terminator, never a child end. */
+  const encoded = encodeKeySnapshot(key, true)
+  /** A shortest strict byte successor bounds every encoding that begins with this typed prefix. */
+  let end = encoded.length
+  while (end > 0 && encoded[end - 1] === 255) end--
+  /** The canonical non-255 type tag guarantees a finite strict successor for every valid key. */
+  const upper = encoded.slice(0, end)
+  upper[end - 1]++
+  return Object.freeze({
+    key,
+    lower: encoded.slice(),
+    upper,
+    /** Candidate validation/encoding stays with the same owner and never rereads the caller prefix. */
+    matches(candidate: IStorageKey): boolean {
+      /** Complete candidate bytes retain type identity and cannot cross prefix channels. */
+      const bytes = encodeOrderedStorageKey(candidate, backend)
+      if (bytes.length < encoded.length) return false
+      for (let index = 0; index < encoded.length; index++)
+        if (bytes[index] !== encoded[index]) return false
+      return true
+    }
+  })
 }
