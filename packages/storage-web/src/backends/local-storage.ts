@@ -6,6 +6,11 @@ import {
 import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageBackend } from '../constants.js'
+import type {
+  IBackendConstruction,
+  IBackendRuntime,
+  IKeyValueBackendStore
+} from './construction.js'
 
 /** Namespace and optional borrowed Storage port for a local-storage backend. */
 export type ILocalStorageOptions = IWebStorageOptions & {
@@ -20,8 +25,12 @@ export type ILocalStorageOptions = IWebStorageOptions & {
  * Dispose releases this store's listeners without clearing the borrowed Storage data.
  */
 export const localStorageHost = (
-  options: ILocalStorageOptions = {}
-): ISyncCapableStore<IKeyValueStore> => {
+  options: ILocalStorageOptions,
+  runtime: IBackendRuntime
+): IBackendConstruction<
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
+  IWebStorageLike
+> => {
   /** Capture namespace configuration before admitting either an injected or ambient port. */
   const optionsSnapshot = snapshotWebStorageOptions(options, StorageBackend.local)
   /** Keep option-getter failure distinct from the host refusing access to its default port. */
@@ -42,9 +51,5 @@ export const localStorageHost = (
       cause
     })
   }
-  return createWebStorageBackend(
-    StorageBackend.local,
-    storage,
-    optionsSnapshot
-  ) as ISyncCapableStore<IKeyValueStore>
+  return createWebStorageBackend(StorageBackend.local, storage, optionsSnapshot, runtime)
 }

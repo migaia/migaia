@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": ".",
+    "rootDir": "..",
     "types": ["vite/client", "@playwright/test"],
     "paths": {
       "@migaia/utils": ["../utils/dist/index.d.ts"],

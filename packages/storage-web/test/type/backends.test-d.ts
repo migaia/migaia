@@ -1,19 +1,16 @@
 import { expectTypeOf } from 'vitest'
-import {
-  localStorageHost,
-  sessionStorageHost,
-  cookiesHost,
-  indexedDbHost,
-  memoryStorageHost
-} from '../../src/backends'
+import type { IMemoryBackendStore } from '@migaia/storage-host'
+import type { ILocalStorageBackendStore } from '../../src/local-storage.js'
+import type { ISessionStorageBackendStore } from '../../src/session-storage.js'
+import type { ICookieBackendStore } from '../../src/cookies.js'
+import type { IIndexedDbBackendStore } from '../../src/indexed-db.js'
 import type { ISyncKeyValueStore, ISyncCookieStore } from '../../src/types'
 
-// 同步后端的 sync 是非 optional（编译期就知道有）。
-expectTypeOf(localStorageHost().sync).toEqualTypeOf<ISyncKeyValueStore>()
-expectTypeOf(sessionStorageHost().sync).toEqualTypeOf<ISyncKeyValueStore>()
-expectTypeOf(memoryStorageHost().sync).toEqualTypeOf<ISyncKeyValueStore>()
-expectTypeOf(cookiesHost().sync).toEqualTypeOf<ISyncCookieStore>()
+// Public plugin store types retain their native synchronous projection after installation.
+expectTypeOf<ILocalStorageBackendStore['sync']>().toEqualTypeOf<ISyncKeyValueStore>()
+expectTypeOf<ISessionStorageBackendStore['sync']>().toEqualTypeOf<ISyncKeyValueStore>()
+expectTypeOf<IMemoryBackendStore['sync']>().toEqualTypeOf<ISyncKeyValueStore>()
+expectTypeOf<ICookieBackendStore['sync']>().toEqualTypeOf<ISyncCookieStore>()
 
-// IndexedDB 无同步 API：sync 类型上仍是 optional（未做反向收紧），
-// 但运行时恒为 undefined，由 backends/indexed-db.test.ts 的运行时断言钉住。
-expectTypeOf(indexedDbHost().sync).toEqualTypeOf<ISyncKeyValueStore | undefined>()
+// IndexedDB's existing optional type does not imply a synchronous native implementation.
+expectTypeOf<IIndexedDbBackendStore['sync']>().toEqualTypeOf<ISyncKeyValueStore | undefined>()

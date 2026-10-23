@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
-import {
-  assertOperationContext,
-  mergeSignals,
-  throwIfAborted,
-  withAbort
-} from '../../src/core/operation'
+import { assertOperationContext } from '@migaia/storage-contract'
+import { mergeSignals, throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 
 const noopReporter = (): void => {}
 

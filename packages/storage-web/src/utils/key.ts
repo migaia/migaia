@@ -1,7 +1,7 @@
 import type { IBackendKind } from '../types/capabilities.js'
 import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import { normalizeError } from '../core/errors.js'
+import { normalizeError } from '../backends/errors.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
 /** Namespace/key codec boundary. Custom codecs own migration and collision safety. */

@@ -1,39 +1,69 @@
 /** Round-2 hardening regressions. Permanent. */
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
+import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { describe, expect, it } from 'vitest'
-import { cookiesHost, indexedDbHost, localStorageHost } from '../src/backends'
-import { fakeCookieDocument } from '../src/testing/fake-cookie-document'
+import {
+  createCookieTestStore,
+  createIndexedDbTestStore,
+  createLocalTestStore
+} from './helpers/installed-backends.js'
+import { fakeCookieDocument } from '../src/testing/fake-cookie-document.js'
+import { STORAGE_WEB_SOURCE } from '../src/index.js'
+
+/** A failed real installation must expose the browser failure without selecting a memory fallback. */
+const expectUnavailableInstallation = async (
+  pending: Promise<unknown>,
+  original: unknown
+): Promise<void> => {
+  /** Preserve the actual host rejection while inspecting its canonical cause traversal. */
+  const failure: unknown = await pending.then(
+    () => undefined,
+    (cause: unknown) => cause
+  )
+  expect(failure).toMatchObject({ source: STORAGE_HOST_SOURCE, code: 'BACKEND_INSTALL_FAILED' })
+  expect(walkErrorCauses(failure)).toContainEqual(
+    expect.objectContaining({ source: STORAGE_WEB_SOURCE, code: 'BACKEND_UNAVAILABLE' })
+  )
+  expect(walkErrorCauses(failure)).toContain(original)
+}
 
 describe('#11 Web Storage 不隐式降级 memory', () => {
-  it('探测失败时抛 BACKEND_UNAVAILABLE', () => {
+  it('探测失败时抛 BACKEND_UNAVAILABLE', async () => {
+    /** The original denied write remains reachable through host and plugin installation wrappers. */
+    const original = new DOMException('nope', 'QuotaExceededError')
     const broken = {
       length: 0,
       getItem: () => null,
       setItem: () => {
-        throw new DOMException('nope', 'QuotaExceededError')
+        throw original
       },
       removeItem: () => {},
       clear: () => {},
       key: () => null
     }
-    expect(() => localStorageHost({ storage: broken, namespace: 'ns' })).toThrow(
-      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+    await expectUnavailableInstallation(
+      createLocalTestStore({ storage: broken, namespace: 'ns' }),
+      original
     )
   })
 
   it('memory 必须由调用方显式选择', async () => {
+    /** Denied persistence is a failure; the real host must not substitute a different backend. */
+    const original = new DOMException('nope', 'QuotaExceededError')
     const broken = () => ({
       length: 0,
       getItem: () => null,
       setItem: () => {
-        throw new DOMException('nope', 'QuotaExceededError')
+        throw original
       },
       removeItem: () => {},
       clear: () => {},
       key: () => null
     })
-    expect(() => localStorageHost({ storage: broken(), namespace: 'same' })).toThrow(
-      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+    await expectUnavailableInstallation(
+      createLocalTestStore({ storage: broken(), namespace: 'same' }),
+      original
     )
   })
 })
@@ -41,7 +71,7 @@ describe('#11 Web Storage 不隐式降级 memory', () => {
 describe('#12 cookie 4096 上限包含 name、value 与属性', () => {
   it('name+value 远超 4096 抛 VALUE_TOO_LARGE', async () => {
     const doc = fakeCookieDocument()
-    const store = cookiesHost({ namespace: 'n'.repeat(2000), document: doc })
+    const store = await createCookieTestStore({ namespace: 'n'.repeat(2000), document: doc })
     await expect(store.set('k', 'v'.repeat(4090))).rejects.toMatchObject({
       code: 'VALUE_TOO_LARGE'
     })
@@ -50,7 +80,7 @@ describe('#12 cookie 4096 上限包含 name、value 与属性', () => {
 
 describe('#13 iterate 早退后游标仍把整表读进内存', () => {
   it('只取第一条也会读完全部记录', async () => {
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: `adv2-${Math.random().toString(36).slice(2)}`
@@ -72,7 +102,7 @@ describe('#13 iterate 早退后游标仍把整表读进内存', () => {
 
 describe('#14 主键类型入口统一校验', () => {
   it('boolean 主键在 indexedDbHost 上抛稳定 StorageError', async () => {
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: `adv2-${Math.random().toString(36).slice(2)}`
@@ -80,7 +110,7 @@ describe('#14 主键类型入口统一校验', () => {
     await expect(store.putRecord({ v: 1 }, true as unknown as string)).rejects.toMatchObject({
       name: 'StorageContractError',
       code: 'INVALID_KEY',
-      backend: 'indexeddb'
+      backend: 'indexed-db'
     })
   })
 })

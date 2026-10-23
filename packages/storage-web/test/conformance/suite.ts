@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { IRecordStore, IKeyValueStore } from '../../src/types'
-import type { ITransactionScope } from '../../src/core/transaction'
+import type { ITransactionScope } from '@migaia/storage-contract'
 
 /** 后端契约一致性套件。与后端无关的用例工厂，供每个后端各跑一遍。 能力缺失时不允许跳过，只允许按 capabilities 分支断言为预期抛错。 */
 export const kvConformance = (
@@ -220,7 +220,7 @@ export const recordConformance = (
     it('transaction 内的写入在成功后持久化', async () => {
       const store = await create()
       await store.transaction(async (tx) => {
-        await tx.put({ v: 1 }, 'tx-key')
+        await tx.putRecord({ v: 1 }, 'tx-key')
       })
       await expect(store.getRecord('tx-key')).resolves.toEqual({ v: 1 })
     })
@@ -237,13 +237,13 @@ export const recordConformance = (
       const store = await create()
       for (const options of [null, [], 'options', 1, { conflictPolicy: 'invalid' }])
         await expect(
-          store.transaction((tx) => tx.put({ v: 1 }, 'invalid-options', options as never))
+          store.transaction((tx) => tx.putRecord({ v: 1 }, 'invalid-options', options as never))
         ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
       await expect(store.getRecord('invalid-options')).resolves.toBeUndefined()
       let reads = 0
       await expect(
         store.transaction((tx) =>
-          tx.put({ v: 2 }, 'policy-snapshot', {
+          tx.putRecord({ v: 2 }, 'policy-snapshot', {
             get conflictPolicy() {
               reads += 1
               if (reads > 1) throw new Error('policy read twice')
@@ -260,18 +260,18 @@ export const recordConformance = (
       let escaped: ITransactionScope<unknown> | undefined
       await store.transaction(async (tx) => {
         escaped = tx
-        await tx.put({ v: 1 }, 'inside')
+        await tx.putRecord({ v: 1 }, 'inside')
       })
 
-      await expect(escaped!.get('inside')).rejects.toMatchObject({
+      await expect(escaped!.getRecord('inside')).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
         operation: 'transaction.scope'
       })
-      await expect(escaped!.put({ v: 2 }, 'outside')).rejects.toMatchObject({
+      await expect(escaped!.putRecord({ v: 2 }, 'outside')).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
         operation: 'transaction.scope'
       })
-      await expect(escaped!.delete('inside')).rejects.toMatchObject({
+      await expect(escaped!.deleteRecord('inside')).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
         operation: 'transaction.scope'
       })
@@ -281,11 +281,15 @@ export const recordConformance = (
     it('transaction record 写入遵守跨通道 conflict/replace', async () => {
       const store = await create()
       await store.set('shared-tx', 'value')
-      await expect(store.transaction((tx) => tx.put({ v: 1 }, 'shared-tx'))).rejects.toMatchObject({
+      await expect(
+        store.transaction((tx) => tx.putRecord({ v: 1 }, 'shared-tx'))
+      ).rejects.toMatchObject({
         code: 'DUPLICATE_KEY'
       })
       await expect(
-        store.transaction((tx) => tx.put({ v: 2 }, 'shared-tx', { conflictPolicy: 'replace' }))
+        store.transaction((tx) =>
+          tx.putRecord({ v: 2 }, 'shared-tx', { conflictPolicy: 'replace' })
+        )
       ).resolves.toBe('shared-tx')
       await expect(store.get('shared-tx')).resolves.toBeNull()
       await expect(store.getRecord('shared-tx')).resolves.toEqual({ v: 2 })
@@ -296,8 +300,8 @@ export const recordConformance = (
       await store.putRecord({ v: 'before' }, 'existing')
       await expect(
         store.transaction(async (tx) => {
-          await tx.put({ v: 'new' }, 'tx-key')
-          await tx.delete('existing')
+          await tx.putRecord({ v: 'new' }, 'tx-key')
+          await tx.deleteRecord('existing')
           throw new Error('boom')
         })
       ).rejects.toThrow()
@@ -311,7 +315,7 @@ export const recordConformance = (
       await expect(
         store.transaction(
           async (tx) => {
-            await tx.put({ value: 'must-not-commit' }, 'abort-transaction')
+            await tx.putRecord({ value: 'must-not-commit' }, 'abort-transaction')
             controller.abort()
           },
           { signal: controller.signal }
@@ -320,69 +324,119 @@ export const recordConformance = (
       await expect(store.getRecord('abort-transaction')).resolves.toBeUndefined()
     })
 
-    it('transaction 检测 await 期间的 record revision 冲突', async () => {
+    it('transaction 对实际并发写采用后端隔离语义', async () => {
       const store = await create()
       await store.putRecord({ value: 0 }, 'revision-conflict')
+      if (store.backend === 'indexed-db') {
+        const first = store.transaction(async (tx) => {
+          await tx.getRecord('revision-conflict')
+          await Promise.resolve()
+          await tx.putRecord({ value: 1 }, 'revision-conflict')
+        })
+        const concurrent = store.putRecord({ value: 2 }, 'revision-conflict', {
+          conflictPolicy: 'replace'
+        })
+        await first
+        await concurrent
+        await expect(store.getRecord('revision-conflict')).resolves.toEqual({ value: 2 })
+        return
+      }
       let release: (() => void) | undefined
       const paused = new Promise<void>((resolve) => {
         release = resolve
       })
       const first = store.transaction(async (tx) => {
-        await tx.get('revision-conflict')
+        await tx.getRecord('revision-conflict')
         await paused
-        await tx.put({ value: 1 }, 'revision-conflict')
+        await tx.putRecord({ value: 1 }, 'revision-conflict')
       })
       await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
       await store.putRecord({ value: 2 }, 'revision-conflict', { conflictPolicy: 'replace' })
       release!()
       await expect(first).rejects.toMatchObject({
-        code: 'TRANSACTION_CONFLICT',
-        operation: 'transaction.commit'
+        code: 'WRITE_CONFLICT'
       })
       await expect(store.getRecord('revision-conflict')).resolves.toEqual({ value: 2 })
     })
 
-    it('transaction 在外部写入后仍返回 repeatable snapshot，并拒绝只读提交', async () => {
+    it('transaction 保持 repeatable snapshot，按后端原生或乐观规则提交', async () => {
       const store = await create()
       await store.putRecord({ value: 0 }, 'repeatable-read')
+      if (store.backend === 'indexed-db') {
+        const first = store.transaction(async (tx) => {
+          await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
+          await Promise.resolve()
+          await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
+        })
+        const concurrent = store.putRecord({ value: 1 }, 'repeatable-read', {
+          conflictPolicy: 'replace'
+        })
+        await first
+        await concurrent
+        await expect(store.getRecord('repeatable-read')).resolves.toEqual({ value: 1 })
+        return
+      }
       let release: (() => void) | undefined
       const paused = new Promise<void>((resolve) => {
         release = resolve
       })
       const first = store.transaction(async (tx) => {
-        await expect(tx.get('repeatable-read')).resolves.toEqual({ value: 0 })
+        await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
         await paused
-        await expect(tx.get('repeatable-read')).resolves.toEqual({ value: 0 })
+        await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
       })
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       await store.putRecord({ value: 1 }, 'repeatable-read', { conflictPolicy: 'replace' })
       release!()
-      await expect(first).rejects.toMatchObject({ code: 'TRANSACTION_CONFLICT' })
+      await expect(first).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
     })
 
-    it('clear 后重建 record 不会通过旧 transaction 的 ABA 检查', async () => {
+    it('clear 后重建 record 遵守原生串行或乐观 ABA 检查', async () => {
       const store = await create()
       await store.putRecord({ value: 0 }, 'aba-record')
+      if (store.backend === 'indexed-db') {
+        const first = store.transaction(async (tx) => {
+          await tx.getRecord('aba-record')
+          await Promise.resolve()
+          await tx.putRecord({ value: 2 }, 'aba-record')
+        })
+        const clearing = store.clearRecords()
+        await first
+        await clearing
+        await store.putRecord({ value: 1 }, 'aba-record')
+        await expect(store.getRecord('aba-record')).resolves.toEqual({ value: 1 })
+        return
+      }
       let release: (() => void) | undefined
       const paused = new Promise<void>((resolve) => {
         release = resolve
       })
       const first = store.transaction(async (tx) => {
-        await tx.get('aba-record')
+        await tx.getRecord('aba-record')
         await paused
-        await tx.put({ value: 2 }, 'aba-record')
+        await tx.putRecord({ value: 2 }, 'aba-record')
       })
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       await store.clearRecords()
       await store.putRecord({ value: 1 }, 'aba-record')
       release!()
-      await expect(first).rejects.toMatchObject({ code: 'TRANSACTION_CONFLICT' })
+      await expect(first).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
       await expect(store.getRecord('aba-record')).resolves.toEqual({ value: 1 })
     })
 
     it('空事务（无读写）与并发 clearRecords 不误报冲突（memory 与 indexed-db 一致）', async () => {
       const store = await create()
       await store.putRecord({ value: 0 }, 'empty-epoch')
+      if (store.backend === 'indexed-db') {
+        const first = store.transaction(async () => {
+          await Promise.resolve()
+        })
+        const clearing = store.clearRecords()
+        await expect(first).resolves.toBeUndefined()
+        await clearing
+        await expect(store.getRecord('empty-epoch')).resolves.toBeUndefined()
+        return
+      }
       let release: (() => void) | undefined
       const paused = new Promise<void>((resolve) => {
         release = resolve
@@ -402,7 +456,7 @@ export const recordConformance = (
       const store = await create()
       await store.putRecord({ v: 1 }, 'delete-key')
       await store.transaction(async (tx) => {
-        await tx.delete('delete-key')
+        await tx.deleteRecord('delete-key')
       })
       await expect(store.getRecord('delete-key')).resolves.toBeUndefined()
     })
@@ -432,8 +486,11 @@ export const recordConformance = (
       await expect(store.putRecord({ v: 1 }, [])).rejects.toMatchObject({
         code: 'INVALID_KEY'
       })
-      await expect(store.iterateRecords({ lower: 'z', upper: 'a' }).next()).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+      await expect(async () => {
+        await store.iterateRecords({ lower: 'z', upper: 'a' }).next()
+      }).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT',
+        cause: expect.any(RangeError)
       })
     })
   })

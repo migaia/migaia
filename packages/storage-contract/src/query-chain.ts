@@ -549,6 +549,8 @@ function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T
 /** Native execution consumes only the shared AST and optional top-level projection from its plan. */
 export type IRecordQuerySource = {
   readonly pushdown: IQueryPushdown
+  /** The original source resource key is borrowed from its host without creating a fallback. */
+  readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   /** Optional source-key tail order; parts marks an author container of independently valid keys. */
   readonly tieBreakByKey?: Readonly<{ direction: 'next' | 'prev'; parts?: true }>
   readonly execute: (input: {
@@ -580,6 +582,7 @@ type IQueryNode = {
 /** Captured author facts and methods remain independent of later source getter mutation. */
 type IQuerySourceSnapshot = {
   readonly pushdown: IQueryPushdown
+  readonly asyncDisposeKey: typeof Symbol.asyncDispose | undefined
   readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   readonly execute: IRecordQuerySource['execute']
   readonly receiver: IRecordQuerySource
@@ -674,7 +677,17 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
         throw new TypeError(StorageContractErrorText.queryArgument)
       tieBreakByKey = Object.freeze({ direction, ...(parts === undefined ? {} : { parts }) })
     }
-    return { receiver: source, execute, pushdown: capturedPushdown, tieBreakByKey }
+    /** The source key is captured once; omission retains the native symbol's existing semantics. */
+    const configuredAsyncDisposeKey = source.asyncDisposeKey
+    if (configuredAsyncDisposeKey !== undefined && typeof configuredAsyncDisposeKey !== 'symbol')
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    return {
+      receiver: source,
+      execute,
+      pushdown: capturedPushdown,
+      tieBreakByKey,
+      asyncDisposeKey: configuredAsyncDisposeKey ?? Symbol.asyncDispose
+    }
   } catch (cause) {
     throw new StorageContractError(
       StorageContractErrorCode.invalidArgument,
@@ -1108,11 +1121,13 @@ function streamRecordQuery<R>(
     }
   })
   if (derived) return derived
+  /** The mapped root and its diagnostic forwarding use the same original source resource key. */
+  const asyncDisposeKey: typeof Symbol.asyncDispose = source.asyncDisposeKey!
   /** Root mapped reads share the canonical accepted-advance drain with transaction resources. */
   const lifetime = createStorageIteratorLifetime<R>({
     close: () => iterator.dispose(),
     // The original source owns cleanup diagnostics and its cached report-and-resolve Promise.
-    report: () => iterator[Symbol.asyncDispose]()
+    report: () => iterator[asyncDisposeKey]()
   })
   return {
     next: () =>
@@ -1128,7 +1143,7 @@ function streamRecordQuery<R>(
       ),
     return: lifetime.returned,
     dispose: lifetime.dispose,
-    [Symbol.asyncDispose]: lifetime.symbolic,
+    [asyncDisposeKey]: lifetime.symbolic,
     [Symbol.asyncIterator]() {
       return this
     }

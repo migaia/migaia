@@ -853,6 +853,9 @@ importers:
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
+      '@migaia/store-persist':
+        specifier: workspace:*
+        version: link:../store-persist
       '@vitest/coverage-v8':
         specifier: 4.1.10
         version: 4.1.10(vitest@4.1.10)
