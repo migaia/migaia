@@ -7,6 +7,7 @@ export type ICapabilityTransactionFacts = {
   readonly methods: readonly string[]
   readonly query?: true
   readonly sql?: true
+  readonly rdf?: true
 }
 /** Only authentic standard tokens carry validation and projection facts in the identity row. */
 export type ICapabilityTokenFacts = {

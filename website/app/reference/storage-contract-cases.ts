@@ -224,9 +224,67 @@ function bindNative(original: Parameters<typeof createSparqlTag>[0]) {
   )
 }
 
+/** Vector selection uses the actual native engine behind its published capability. */
+const vectorCapabilityCase: ICaseDoc = {
+  title: t('Select a native bounded vector query', '选择原生有界向量查询'),
+  problem: t(
+    'Typed payload queries must share the canonical query family and require topK.',
+    '类型化 payload 查询须共享规范 query family，并要求 topK。'
+  ),
+  example: `import { vector, type IStorageStore } from '@migaia/storage-contract'
+type IPayload = { readonly label: string }
+async function nearest(store: IStorageStore<typeof vector>) {
+  return store.use(vector).collection<IPayload>('items', { dimensions: 2, metric: 'cosine' })
+    .near([1, 0]).topK(5).all()
+}`,
+  result: t(
+    'The actual native engine returns at most five ranked hits. Vectors remain omitted until withVector is selected.',
+    '实际原生引擎返回至多五个排序命中；选择 withVector 前不返回向量。'
+  )
+}
+/** Ground RDF writes and queries share their canonical term identity. */
+const rdfCapabilityCase: ICaseDoc = {
+  title: t('Write and match a ground RDF quad', '写入并匹配 ground RDF quad'),
+  problem: t(
+    'Native backends must share exact ground-term identity.',
+    '原生后端须共享精确 ground term 身份。'
+  ),
+  example: `import { rdf, term, type IStorageStore } from '@migaia/storage-contract'
+async function writeLabel(store: IStorageStore<typeof rdf>) {
+  const subject = term.iri('urn:user:1')
+  await store.use(rdf).add([{ subject, predicate: term.iri('urn:label'), object: term.literal('Ada'), graph: term.defaultGraph }])
+  return store.use(rdf).match({ subject }).all()
+}`,
+  result: t(
+    'The native backend writes atomically and the shared RDF family reads matching ground quads.',
+    '原生后端原子写入，共享 RDF family 读取匹配 ground quad。'
+  )
+}
+
+/** Deletion strategy remains explicit without broadening the shared numeric result. */
+const vectorDeleteCountCase: ICaseDoc = {
+  title: t('Choose a native vector deletion count strategy', '选择原生向量删除计数策略'),
+  problem: t(
+    'Qdrant callers must choose the declared native counting boundary.',
+    'Qdrant 调用方须选择约定的原生计数边界。'
+  ),
+  example: `import { vector, DeleteCountMode, type IStorageStore } from '@migaia/storage-contract'
+async function deleteDrafts(store: IStorageStore<typeof vector>) {
+  return store.use(vector).collection<{ state: string }>('items')
+    .deleteWhere({ state: 'draft' }, { count: DeleteCountMode.scroll })
+}`,
+  result: t(
+    'The operation returns the strategy-defined number. Scroll counts collected IDs whose delete was submitted successfully; native affected-count engines keep their actual count.',
+    '操作返回策略约定的数值；scroll 计已收集且成功提交删除的 ID，原生 affected-count 引擎保留实际数量。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sql: [sqlCapabilityCase],
+  vector: [vectorCapabilityCase],
+  rdf: [rdfCapabilityCase],
+  DeleteCountMode: [vectorDeleteCountCase],
   sparql: [sparqlCase],
   sparqlFragment: [sparqlCase],
   createSparqlTag: [sparqlAuthorCase],

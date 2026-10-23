@@ -310,3 +310,8 @@ export type {
   ISparqlTagTools,
   ISparqlApi
 } from './capabilities/sparql.js'
+
+export { vector, DeleteCountMode } from './capabilities/vector.js'
+export type { IVectorApi, IVectorCollection, IVectorFilter } from './capabilities/vector.js'
+export { rdf } from './capabilities/rdf.js'
+export type { IRdfApi, ITransactionRdfApi } from './capabilities/rdf.js'

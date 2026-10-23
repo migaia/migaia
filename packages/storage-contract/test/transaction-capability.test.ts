@@ -10,6 +10,11 @@ import {
   records,
   ttl,
   counter,
+  rdf,
+  createRdfQuery,
+  term,
+  type IQuad,
+  type ITransactionRdfApi,
   sql,
   createSqlTag,
   sqlFragment,
@@ -255,6 +260,7 @@ function setup() {
   return {
     store,
     scope,
+    owner,
     controller,
     bindKv,
     bindRecords,
@@ -268,6 +274,107 @@ function setup() {
 }
 
 describe('original transaction capability projections', () => {
+  it('binds RDF writes to fresh native views and admits every complete read before expiry or argument failure', async () => {
+    const fixture = setup()
+    const quad: IQuad = {
+      subject: term.iri('urn:s'),
+      predicate: term.iri('urn:p'),
+      object: term.literal('text'),
+      graph: term.defaultGraph
+    }
+    const writes = vi.fn()
+    const advances = vi.fn()
+    const closed = vi.fn()
+    const bindRdf = vi.fn((scope: ITransactionScope): ITransactionRdfApi => ({
+      add: async (input) => {
+        assertTransactionOwner(fixture.store, scope)
+        writes(scope, input)
+      },
+      delete: async (input) => {
+        assertTransactionOwner(fixture.store, scope)
+        writes(scope, input)
+      },
+      match: (pattern) =>
+        createRdfQuery(
+          {
+            pushdown: { operations: [], operators: [], source: 'rdf' },
+            execute: () => {
+              const source = [quad].entries()
+              /**
+               * The real fixture factory supplies IScope; the public binder erases only its native
+               * refinement.
+               */
+              return fixture.owner.registerIterator(scope as IScope, {
+                next: async (current) => {
+                  assertTransactionOwner(fixture.store, current)
+                  advances()
+                  return source.next()
+                },
+                close: () => {
+                  closed()
+                }
+              })
+            }
+          },
+          pattern
+        )
+    }))
+    const root = vi.fn(async (): Promise<never> => {
+      throw new Error('root RDF must not execute')
+    })
+    fixture.installer
+      .prepare([
+        implement(
+          rdf,
+          {
+            add: root,
+            delete: root,
+            match: () => {
+              throw new Error('root RDF match must not execute')
+            }
+          },
+          { forTransaction: bindRdf }
+        )
+      ])
+      .publish()
+    const scope = fixture.scope as ITransactionScope<IRow, typeof records | typeof rdf>
+    const api = scope.use(rdf)
+    expectTypeOf(api).toEqualTypeOf<ITransactionRdfApi>()
+    expect(bindRdf).not.toHaveBeenCalled()
+    await api.add([quad])
+    await api.delete([quad])
+    expect(writes).toHaveBeenCalledTimes(2)
+    expect(writes.mock.calls[0]![0]).not.toBe(writes.mock.calls[1]![0])
+    const query = api.match({}).limit(1)
+    expect(await query.all()).toEqual([quad])
+    expect(await query.select('subject').all()).toEqual([{ subject: quad.subject }])
+    expect(await query.first()).toBe(quad)
+    expect(closed).toHaveBeenCalledTimes(3)
+    expect(root).not.toHaveBeenCalled()
+    const before = advances.mock.calls.length
+    fixture.controller.stopAdmission()
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    const terminals = [
+      () => query.all(),
+      () => query.first(),
+      () => query.maybe(),
+      () => query.firstOrThrow(),
+      () => query.exists(),
+      () => query.count(),
+      () => query.pluck('subject'),
+      () => query.each(undefined as never),
+      () => query.chunk(0, undefined as never),
+      () => query.min('subject' as never),
+      () => query.max('subject' as never),
+      () => query.sum('subject' as never),
+      () => query.avg('subject' as never)
+    ]
+    for (const terminal of terminals)
+      await expect(terminal()).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    expect(advances).toHaveBeenCalledTimes(before)
+  })
+
   it('keeps SQL construction pure and binds each saved terminal to a fresh original operation', async () => {
     const fixture = setup()
     const root = vi.fn(async (): Promise<never> => {

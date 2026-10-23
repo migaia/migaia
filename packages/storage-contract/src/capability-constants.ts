@@ -74,3 +74,10 @@ export const STORAGE_BLOB_METHODS = [
 ] as const
 /** Durable feeds expose replay and a separately disposable tail without a transaction projection. */
 export const STORAGE_DURABLE_CHANGE_METHODS = ['readChanges', 'tailChanges'] as const
+
+/** Collection construction stays pure and delegates actual native vector behavior to its owner. */
+export const STORAGE_VECTOR_METHODS = ['collection'] as const
+/** RDF data writes enter one fresh original operation view. */
+export const STORAGE_RDF_WRITE_METHODS = ['add', 'delete'] as const
+/** Ground query construction remains distinct from native RDF writes. */
+export const STORAGE_RDF_METHODS = [...STORAGE_RDF_WRITE_METHODS, 'match'] as const

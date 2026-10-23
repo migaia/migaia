@@ -32,6 +32,7 @@ import type { records } from './capabilities/records.js'
 import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
 import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
 import type { sql } from './capabilities/sql.js'
+import type { rdf, ITransactionRdfApi } from './capabilities/rdf.js'
 import type { ISqlExecutor } from './sql.js'
 export { defineStorageCapability } from './capability-token.js'
 export { kv } from './capabilities/kv.js'
@@ -123,7 +124,7 @@ export type IRecordsApi<
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
   TCaps,
-  typeof kv | typeof records | typeof ttl | typeof counter | typeof sql
+  typeof kv | typeof records | typeof ttl | typeof counter | typeof sql | typeof rdf
 >
 
 /** Projects the standard transaction API without creating or admitting a transaction scope. */
@@ -137,7 +138,9 @@ export type ITransactionCapabilityApi<TCap extends IAnyStorageCapability> = TCap
         ? ITransactionCounterApi
         : TCap extends typeof sql
           ? ISqlExecutor
-          : never
+          : TCap extends typeof rdf
+            ? ITransactionRdfApi
+            : never
 
 /** Optional contravariant proof permits complete external scopes without private symbol access. */
 export type ITransactionCapabilityView<
@@ -175,7 +178,9 @@ export type IWithTransactionQueryMethods<
           capability: TCap
         ): TCap extends typeof records
           ? ITransactionRecordsApi<IScopeRecordValue<TScope>, TAugmentMethods>
-          : ITransactionCapabilityApi<TCap>
+          : TCap extends typeof rdf
+            ? ITransactionRdfApi<TAugmentMethods>
+            : ITransactionCapabilityApi<TCap>
       }
     : TScope
 

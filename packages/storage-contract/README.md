@@ -658,3 +658,7 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 `createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历、分页与写终点由后续单元补齐。
 
 两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。
+
+vector 与 rdf 现发布各自精确标准原生 API。向量 collection 返回共享 IVectorQueryBuilder/IVectorHit family，保留 topK 前类型状态与可选原生分组；借用 store 生命周期，不获得通用事务投影。payload 声明支持 readonly/optional 便携字段，拒绝 Date/function schema。DeleteCountMode 为 precount 或 scroll；返回真实删除数的引擎保留该计数，Qdrant 依其明确原生策略。发布令牌本身不实现搜索引擎。
+
+RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provider 提供 forTransaction：写入绑定新原 operation view；match 保留真实 family query 与原 iterator 登记。全部完整读终端，包括选择结果、回调与数值终端，均在参数、strict 或空结果失败前进入同一事务 owner；保存查询在到期后拒绝。Feature 方法保持精确泛型投影。change-feed 类型参数先预留，直到共享 watch 契约实现；这些声明不虚称已有 watch 或持久投递。

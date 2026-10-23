@@ -8,6 +8,7 @@ import { StorageCapabilityMethod } from './capability-constants.js'
 import { readCapabilityTokenFacts } from './capability-token.js'
 import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
+import type { IQuad } from './capabilities/rdf.js'
 import {
   deriveStorageSqlQuery,
   SqlQueryMethod,
@@ -17,7 +18,12 @@ import {
   type ISqlQuery
 } from './sql.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { RecordQueryMethod, type IRecordQuery, type IQueryResult } from './query-chain.js'
+import {
+  RecordQueryMethod,
+  type IRecordQuery,
+  type IQueryResult,
+  type IRdfQuery
+} from './query-chain.js'
 import {
   ConcurrencyPolicy,
   assertConcurrencyPolicy,
@@ -949,7 +955,7 @@ function transactionSqlTag(
   ) as ISqlTag
 }
 /** Complete read terminals enter the original operation before validation, execution and cleanup. */
-function transactionRecordQueryReads<R>(scope: object, query: IQueryResult<R, undefined>) {
+function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefined>) {
   /** Only business arguments cross this zero-context projection; stream retains its iterator owner. */
   const methods = [
     [RecordQueryMethod.all, 0],
@@ -976,15 +982,15 @@ function transactionRecordQueryReads<R>(scope: object, query: IQueryResult<R, un
   return reads as Pick<IQueryResult<R, undefined>, (typeof methods)[number][0]>
 }
 /** Adds original-owner admission to the actual selected chain without copying its nodes or plan. */
-function transactionRecordQueryResult<R>(
+function transactionQueryResult<R>(
   scope: object,
   query: IQueryResult<R, undefined>
 ): IQueryResult<R, undefined> {
   return Object.freeze({
     ...query,
-    ...transactionRecordQueryReads(scope, query),
+    ...transactionQueryReads(scope, query),
     explain: () => query.explain(),
-    requirePushdown: () => transactionRecordQueryResult(scope, query.requirePushdown())
+    requirePushdown: () => transactionQueryResult(scope, query.requirePushdown())
   })
 }
 /** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
@@ -1000,13 +1006,13 @@ function transactionRecordQuery<R>(
   >['where']
   /** Selection remains the original shared node constructor and never gains a second executor. */
   const select = ((...args: readonly unknown[]) =>
-    transactionRecordQueryResult(scope, Reflect.apply(query.select, query, args))) as IRecordQuery<
+    transactionQueryResult(scope, Reflect.apply(query.select, query, args))) as IRecordQuery<
     R,
     undefined
   >['select']
   return Object.freeze({
     ...query,
-    ...transactionRecordQueryReads(scope, query),
+    ...transactionQueryReads(scope, query),
     where,
     select,
     limit: (count: number) => transactionRecordQuery(scope, query.limit(count)),
@@ -1022,6 +1028,36 @@ function transactionRecordQuery<R>(
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQuery(scope, query.requirePushdown())
   }) as IRecordQuery<R, undefined>
+}
+/** RDF branches reuse the same query nodes, selected-result wrapper and complete read admission. */
+function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQuery<undefined> {
+  /** Original overloads and input snapshot order stay with the family query owner. */
+  const where = ((...args: readonly unknown[]) =>
+    transactionRdfQuery(
+      scope,
+      Reflect.apply(query.where, query, args)
+    )) as IRdfQuery<undefined>['where']
+  /** Selection returns the same original result node rather than a parallel executor. */
+  const select = ((...args: readonly unknown[]) =>
+    transactionQueryResult(
+      scope,
+      Reflect.apply(query.select, query, args)
+    )) as IRdfQuery<undefined>['select']
+  return Object.freeze({
+    ...query,
+    ...transactionQueryReads(scope, query),
+    where,
+    select,
+    limit: (count: number) => transactionRdfQuery(scope, query.limit(count)),
+    follow: (
+      predicate: Parameters<IRdfQuery['follow']>[0],
+      target?: Parameters<IRdfQuery['follow']>[1]
+    ) => transactionRdfQuery(scope, query.follow(predicate, target)),
+    inverse: (predicate: Parameters<IRdfQuery['inverse']>[0]) =>
+      transactionRdfQuery(scope, query.inverse(predicate)),
+    explain: () => query.explain(),
+    requirePushdown: () => transactionRdfQuery(scope, query.requirePushdown())
+  }) as IRdfQuery<undefined>
 }
 /**
  * Reads the original store capability table from an authentic view. Pure lookup invokes no binder
@@ -1080,12 +1116,33 @@ export function useTransactionCapability<
         prefix
       ])
   }
+  if (transaction.rdf)
+    api.match = (pattern: Partial<IQuad>) => {
+      /** Pure construction binds the actual native scope without registering another owner. */
+      const { state, binding } = liveTransactionCapability(scope, capability)
+      try {
+        /** The backend supplies its real ground query source and original iterator registration. */
+        const bound = binding.forTransaction(scope)
+        if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
+        /** One native match lookup preserves receiver and canonical pattern capture. */
+        const match = (bound as Record<string, unknown>).match
+        if (typeof match !== 'function') throw invalidTransaction()
+        return transactionRdfQuery(scope, Reflect.apply(match, bound, [pattern]))
+      } catch (error) {
+        throw failTransaction(state, error)
+      }
+    }
   if (transaction.sql)
     api.sql = transactionSqlTag(scope, capability, binding.implementation.api as ISqlExecutor)
   /** Standard scalar methods use the original fresh-view operation path, without token imports. */
   for (const method of transaction.methods)
     api[method] = (...args: readonly unknown[]) =>
-      runTransactionCapabilityMethod(scope, capability, method, args)
+      runTransactionCapabilityMethod(
+        scope,
+        capability,
+        method,
+        transaction.rdf ? args.slice(0, 1) : args
+      )
   /** Only the projection object is frozen; the backend scope/API and original base are not patched. */
   const frozen = Object.freeze(api)
   ;(view.capabilities ??= new Map()).set(capability, {

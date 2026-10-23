@@ -964,6 +964,33 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.createSparqlTag![0]!.example,
       cases: storageContractCases.createSparqlTag
     },
+    vector: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard capability for native vector collections.',
+        '原生向量 collection 的精确标准能力。'
+      ),
+      example: storageContractCases.vector![0]!.example,
+      cases: storageContractCases.vector
+    },
+    rdf: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard ground RDF capability and original transaction projection.',
+        '精确标准 ground RDF 能力与原事务投影。'
+      ),
+      example: storageContractCases.rdf![0]!.example,
+      cases: storageContractCases.rdf
+    },
+    DeleteCountMode: {
+      role: 'constant',
+      purpose: t(
+        'Precount or scroll strategy for native shared vector deletion counts.',
+        '原生共享向量删除计数的 precount 或 scroll 策略。'
+      ),
+      example: storageContractCases.DeleteCountMode![0]!.example,
+      cases: storageContractCases.DeleteCountMode
+    },
     counter: {
       role: 'constant',
       purpose: t(
@@ -4005,6 +4032,114 @@ console.log(candidate.name, candidate.output)`
         var: { summary: t('Original pure variable tool.', '原纯变量工具。') },
         join: { summary: t('Original pure join tool.', '原纯 join 工具。') },
         empty: { summary: t('Original empty fragment.', '原空片段。') }
+      }
+    },
+    DeleteCountMode: {
+      summary: t(
+        'Shared precount/scroll strategy-name union.',
+        '共享 precount/scroll 策略名称联合。'
+      ),
+      members: {}
+    },
+    IVectorApi: {
+      summary: t(
+        'Native vector collection construction preserving payload schema and query family types.',
+        '保留 payload schema 与 query family 类型的原生向量 collection 构造。'
+      ),
+      members: {
+        collection: {
+          summary: t(
+            'Borrow a named native collection descriptor with consistent dimensions and metric.',
+            '借用具有一致维度与 metric 的命名原生 collection 描述。'
+          )
+        }
+      }
+    },
+    IVectorCollection: {
+      summary: t(
+        'Store-borrowed native point operations and shared bounded query construction.',
+        '借用 store 的原生点操作与共享有界查询构造。'
+      ),
+      members: {
+        near: {
+          summary: t('Start the shared vector query before topK.', '在 topK 前开始共享向量查询。')
+        },
+        similarTo: {
+          summary: t(
+            'Use an existing point as the native query vector.',
+            '使用已有点作为原生查询向量。'
+          )
+        },
+        recommend: {
+          summary: t('Compose standard positive/negative examples.', '组合标准正负样本。')
+        },
+        upsert: {
+          summary: t(
+            'Atomically write native points with optional TTL.',
+            '可带 TTL 原子写入原生点。'
+          )
+        },
+        deleteWhere: {
+          summary: t(
+            'Delete native matching points and return the declared numeric count.',
+            '删除原生匹配点并返回约定数值计数。'
+          )
+        },
+        delete: { summary: t('Delete named point IDs.', '按点 ID 删除。') },
+        search: {
+          summary: t('Execute the native direct search surface.', '执行原生直接搜索入口。')
+        }
+      }
+    },
+    IVectorFilter: {
+      summary: t(
+        'Own-path boolean/scalar/range native vector predicates.',
+        '按自有路径求值的布尔、标量与范围原生向量谓词。'
+      ),
+      members: {}
+    },
+    IRdfApi: {
+      summary: t(
+        'Native atomic ground RDF writes and shared query construction.',
+        '原生原子 ground RDF 写入与共享查询构造。'
+      ),
+      members: {
+        add: { summary: t('Atomically add canonical ground quads.', '原子添加规范 ground quad。') },
+        delete: {
+          summary: t('Atomically delete canonical ground quads.', '原子删除规范 ground quad。')
+        },
+        match: {
+          summary: t(
+            'Construct the shared RDF family with an optional ground pattern.',
+            '按可选 ground 模式构造共享 RDF family。'
+          )
+        }
+      }
+    },
+    ITransactionRdfApi: {
+      summary: t(
+        'Original draft RDF writes and zero-context complete read admission.',
+        '原 draft RDF 写入与无 context 完整读准入。'
+      ),
+      members: {
+        add: {
+          summary: t(
+            'Write through a fresh original operation view.',
+            '通过新的原 operation view 写入。'
+          )
+        },
+        delete: {
+          summary: t(
+            'Delete through the same native draft owner.',
+            '通过同一原生 draft owner 删除。'
+          )
+        },
+        match: {
+          summary: t(
+            'Retain actual native iterators and shared read terminals.',
+            '保留真实原生 iterator 与共享读终端。'
+          )
+        }
       }
     },
     ISqlExecutor: {
