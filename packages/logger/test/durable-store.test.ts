@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -178,4 +179,90 @@ it('codes reflection failures without admitting a record and retains the origina
   })
   expect(await store.lastSeq()).toBe(0)
   await store.dispose()
+})
+
+it('publishes disposal promises before a close observer can reenter', async () => {
+  let reentered: Promise<void> | undefined
+  const store = memoryLogStore({
+    observe: (event) => {
+      if (event.stage === 'beforeLogClose') reentered = store.dispose()
+    }
+  })
+  const completion = store.dispose()
+  expect(reentered).toBe(completion)
+  await completion
+})
+
+it('shares one failed cleanup while symbolic disposal reports once and resolves', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'logger-close-failure-'))
+  const reports: unknown[] = []
+  const store = await fileLogStore(join(directory, 'log.sqlite'), {
+    report: (error) => {
+      reports.push(error)
+    }
+  })
+  const original = new Error('native close failed after releasing connection')
+  const close = DatabaseSync.prototype.close
+  const replacement = vi
+    .spyOn(DatabaseSync.prototype, 'close')
+    .mockImplementationOnce(function (this: DatabaseSync) {
+      Reflect.apply(close, this, [])
+      throw original
+    })
+  try {
+    const explicit = store.dispose()
+    const symbolic = store[asyncDisposeKey]()
+    expect(store.dispose()).toBe(explicit)
+    expect(store[asyncDisposeKey]()).toBe(symbolic)
+    expect(symbolic).not.toBe(explicit)
+    await expect(explicit).rejects.toMatchObject({ code: 'LOG_STORE_IO_FAILED', cause: original })
+    await symbolic
+    expect(replacement).toHaveBeenCalledOnce()
+    expect(reports).toHaveLength(1)
+    expect(reports[0]).toMatchObject({ cause: original })
+  } finally {
+    replacement.mockRestore()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('stops admission after an uncertain COMMIT and reopens the actual committed result without replay', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'logger-uncertain-commit-'))
+  const path = join(directory, 'log.sqlite')
+  let store = await fileLogStore(path)
+  const original = new Error('commit acknowledged ambiguously')
+  const exec = DatabaseSync.prototype.exec
+  let armed = true
+  const replacement = vi.spyOn(DatabaseSync.prototype, 'exec').mockImplementation(function (
+    this: DatabaseSync,
+    sql: string
+  ) {
+    Reflect.apply(exec, this, [sql])
+    if (sql === 'COMMIT' && armed) {
+      armed = false
+      throw original
+    }
+  })
+  try {
+    await expect(
+      store.append([
+        { kind: 'a', payload: 1 },
+        { kind: 'b', payload: 2 }
+      ])
+    ).rejects.toMatchObject({ code: 'LOG_STORE_IO_FAILED', cause: original })
+    await expect(store.lastSeq()).rejects.toMatchObject({
+      code: 'LOG_STORE_IO_FAILED',
+      cause: original
+    })
+    await store.dispose()
+    replacement.mockRestore()
+    store = await fileLogStore(path)
+    expect(await store.lastSeq()).toBe(2)
+    expect((await store.read(1, 10)).map((record) => record.seq)).toEqual([1, 2])
+    expect(await store.append([{ kind: 'c', payload: 3 }])).toEqual([3])
+  } finally {
+    replacement.mockRestore()
+    await store.dispose()
+    await rm(directory, { recursive: true, force: true })
+  }
 })

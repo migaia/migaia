@@ -9,8 +9,13 @@ import {
   LOGGER_SOURCE
 } from '../../errors.js'
 import { snapshotPayload, snapshotRecords } from './snapshot.js'
-import { createObservation, durableReporter, observeResult } from './observation.js'
-import { LogOperation, LogRecordState, LogStage } from './state-constants.js'
+import {
+  createObservation,
+  durableReporter,
+  observeResult,
+  captureStoreOptions
+} from './observation.js'
+import { DurableKind, LogOperation, LogRecordState, LogStage } from './state-constants.js'
 import { DurableText } from './text.js'
 import type {
   ILogAppendNotice,
@@ -122,14 +127,18 @@ export function createLogStore(
     }
     return limiter.run(() => {
       if (failure) throw failure
-      observe(() => ({ stage: LogStage.beforeLogOperation, owner: 'store', operation }))
+      observe(() => ({ stage: LogStage.beforeLogOperation, owner: DurableKind.store, operation }))
       try {
         const result = task()
-        observe(() => ({ stage: LogStage.afterLogOperation, owner: 'store', operation }))
+        observe(() => ({ stage: LogStage.afterLogOperation, owner: DurableKind.store, operation }))
         return result
       } catch (error) {
         const coded = logStorageFailure(error)
-        observe(() => ({ stage: LogStage.onLogOperationError, owner: 'store', operation }))
+        observe(() => ({
+          stage: LogStage.onLogOperationError,
+          owner: DurableKind.store,
+          operation
+        }))
         throw coded
       }
     })
@@ -180,7 +189,7 @@ export function createLogStore(
         }
         observe(() => ({
           stage: LogStage.onAppend,
-          owner: 'store',
+          owner: DurableKind.store,
           operation: LogOperation.append,
           seq: last,
           count: batch.length
@@ -269,7 +278,7 @@ export function createLogStore(
       accepting = false
       observe(() => ({
         stage: LogStage.beforeLogClose,
-        owner: 'store',
+        owner: DurableKind.store,
         operation: LogOperation.close
       }))
       void (async () => {
@@ -284,13 +293,13 @@ export function createLogStore(
           persistence?.close()
           observe(() => ({
             stage: LogStage.afterLogClose,
-            owner: 'store',
+            owner: DurableKind.store,
             operation: LogOperation.close
           }))
         } catch (error) {
           observe(() => ({
             stage: LogStage.onLogCloseError,
-            owner: 'store',
+            owner: DurableKind.store,
             operation: LogOperation.close
           }))
           throw logStorageFailure(error)
@@ -314,5 +323,18 @@ export function createLogStore(
 }
 /** Creates a process-local atomic log resource; no physical durability is implied. */
 export function memoryLogStore(options: ILogStoreOptions = {}): ILogStore {
-  return createLogStore(options)
+  const captured = captureStoreOptions(options)
+  const observe = createObservation(captured, durableReporter(captured.report))
+  observe(() => ({
+    stage: LogStage.beforeLogOpen,
+    owner: DurableKind.store,
+    operation: LogOperation.open
+  }))
+  const store = createLogStore(captured)
+  observe(() => ({
+    stage: LogStage.afterLogOpen,
+    owner: DurableKind.store,
+    operation: LogOperation.open
+  }))
+  return store
 }

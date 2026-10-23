@@ -17,7 +17,9 @@ export const LogStage = {
 } as const
 export type LogStage = keyof typeof LogStage
 /** Stable plugin identities and owned undo record discriminator. */
-export const DurableKind = { binlog: 'binlog', wal: 'wal', undo: 'undo' } as const
+export const DurableKind = { store: 'store', binlog: 'binlog', wal: 'wal', undo: 'undo' } as const
+/** Plugin identity differs from the persisted undo record discriminator. */
+export const UNDO_PLUGIN_NAME = 'undoLog' as const
 /** Operation names remain metadata rather than caller-controlled record kinds. */
 export const LogOperation = {
   open: 'open',

@@ -1,15 +1,19 @@
 import { detectServerRuntime } from '@migaia/utils'
-import { createLoggerError, LoggerErrorCode } from '../../errors.js'
+import { createLoggerError, LoggerErrorCode, LOGGER_SOURCE } from '../../errors.js'
 import { createLogStore, type ILogStoreSnapshot } from './store.js'
 import { requireText, snapshotPayload } from './snapshot.js'
-import { createObservation, durableReporter } from './observation.js'
-import { LogOperation, LogRecordState, LogStage } from './state-constants.js'
+import { createObservation, durableReporter, captureStoreOptions } from './observation.js'
+import { DurableKind, LogOperation, LogRecordState, LogStage } from './state-constants.js'
 import { LogSql, LogSqliteModule } from './sql.js'
 import { DurableText } from './text.js'
 import type { ILogRecord, ILogStore, ILogStoreOptions } from './types.js'
 
 /** Minimal actual builtin SQLite surface shared by Node/Deno and Bun. */
-type IStatement = { all(...values: unknown[]): unknown[]; run(...values: unknown[]): unknown }
+type IStatement = {
+  all(...values: unknown[]): unknown[]
+  run(...values: unknown[]): unknown
+  finalize?(): void
+}
 /** Connections are created here and released exactly once by this resource. */
 type IDatabase = { exec(sql: string): void; prepare(sql: string): IStatement; close(): void }
 /** Driver failures preserve native causes while exposing durable error semantics. */
@@ -95,9 +99,14 @@ export async function fileLogStore(
   options: ILogStoreOptions = {}
 ): Promise<ILogStore> {
   requireText(path)
+  options = captureStoreOptions(options)
   const report = durableReporter(options.report)
   const observe = createObservation(options, report)
-  observe(() => ({ stage: LogStage.beforeLogOpen, owner: 'store', operation: LogOperation.open }))
+  observe(() => ({
+    stage: LogStage.beforeLogOpen,
+    owner: DurableKind.store,
+    operation: LogOperation.open
+  }))
   const runtime = detectServerRuntime()
   let database: IDatabase | undefined
   try {
@@ -118,7 +127,36 @@ export async function fileLogStore(
     const Constructor = runtime === 'bun' ? builtin.Database : builtin.DatabaseSync
     if (!Constructor)
       throw createLoggerError(LoggerErrorCode.logStoreUnavailable, DurableText.unavailable)
-    database = new Constructor(path)
+    const native = new Constructor(path)
+    /** Every builtin statement remains owned until the connection closes. */
+    const statements: IStatement[] = []
+    database = {
+      exec: (sql) => native.exec(sql),
+      prepare: (sql) => {
+        const statement = native.prepare(sql)
+        statements.push(statement)
+        return statement
+      },
+      close: () => {
+        const errors: unknown[] = []
+        for (let index = statements.length - 1; index >= 0; index--) {
+          try {
+            statements[index].finalize?.()
+          } catch (error) {
+            errors.push(error)
+          }
+        }
+        statements.length = 0
+        try {
+          native.close()
+        } catch (error) {
+          errors.push(error)
+        }
+        if (errors.length === 1) throw errors[0]
+        if (errors.length > 1)
+          throw new AggregateError(errors, DurableText.ioFailed, { cause: errors[0] })
+      }
+    }
     database.exec(LogSql.initialize)
     const snapshot = recover(database)
     const connection = database
@@ -176,12 +214,16 @@ export async function fileLogStore(
         }
       }
     })
-    observe(() => ({ stage: LogStage.afterLogOpen, owner: 'store', operation: LogOperation.open }))
+    observe(() => ({
+      stage: LogStage.afterLogOpen,
+      owner: DurableKind.store,
+      operation: LogOperation.open
+    }))
     return store
   } catch (error) {
     const coded =
       error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, 'source')?.value === '@migaia/logger'
+      Object.getOwnPropertyDescriptor(error, 'source')?.value === LOGGER_SOURCE
         ? error
         : sqliteFailure(error)
     if (database) {
@@ -193,7 +235,7 @@ export async function fileLogStore(
     }
     observe(() => ({
       stage: LogStage.onLogOpenError,
-      owner: 'store',
+      owner: DurableKind.store,
       operation: LogOperation.open
     }))
     throw coded

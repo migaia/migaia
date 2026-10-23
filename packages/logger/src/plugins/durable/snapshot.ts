@@ -1,4 +1,4 @@
-import { createLoggerTypeError, LoggerErrorCode } from '../../errors.js'
+import { createLoggerTypeError, LoggerErrorCode, LOGGER_SOURCE } from '../../errors.js'
 import { DurableText } from './text.js'
 import type { ILogPayload, ILogRecordInput } from './types.js'
 
@@ -113,7 +113,7 @@ export function snapshotPayload(input: unknown): ILogPayload {
   } catch (error) {
     if (
       error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, 'source')?.value === '@migaia/logger'
+      Object.getOwnPropertyDescriptor(error, 'source')?.value === LOGGER_SOURCE
     )
       throw error
     throw createLoggerTypeError(LoggerErrorCode.logPayloadInvalid, DurableText.payloadInvalid, {
@@ -131,7 +131,7 @@ export function snapshotRecords(
   } catch (error) {
     if (
       error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, 'source')?.value === '@migaia/logger'
+      Object.getOwnPropertyDescriptor(error, 'source')?.value === LOGGER_SOURCE
     )
       throw error
     throw createLoggerTypeError(LoggerErrorCode.logPayloadInvalid, DurableText.payloadInvalid, {
