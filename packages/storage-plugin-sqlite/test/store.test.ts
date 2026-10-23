@@ -229,6 +229,49 @@ describe('native SQLite installation', () => {
     expect(await store.getRecord('observed-record')).toBeUndefined()
   })
 
+  it('keeps observed deadlines through native TTL writes until the original commit conflict', async () => {
+    /** Every supported target shares the same real native snapshot and deterministic local clock. */
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    onTestFinished(() => clock.mockRestore())
+    const { store } = await installed({ memory: true })
+    for (const channel of ['text', 'bytes', 'record'] as const) {
+      for (const action of ['persist', 'extend'] as const) {
+        const key = `${channel}-${action}`
+        const target =
+          channel === 'text'
+            ? lockKey.text(key)
+            : channel === 'bytes'
+              ? lockKey.bytes(key)
+              : lockKey.record(key)
+        if (channel === 'text') await store.set(key, 'old')
+        else if (channel === 'bytes') await store.setBytes(key, new Uint8Array([7]))
+        else await store.putRecord({ value: 'old' }, key)
+        await store.use(ttl).expire(target, 5)
+        await expect(
+          store.transaction(
+            async (scope) => {
+              if (channel === 'text') expect(await scope.get(key)).toBe('old')
+              else if (channel === 'bytes')
+                expect(await scope.getBytes(key)).toEqual(new Uint8Array([7]))
+              else expect(await scope.getRecord(key)).toEqual({ value: 'old' })
+              now += 5
+              expect(
+                action === 'persist'
+                  ? await scope.use(ttl).persist(target)
+                  : await scope.use(ttl).expire(target, 50)
+              ).toBe(true)
+              await scope.set('rollback-ttl-write', 'never')
+            },
+            { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
+          )
+        ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+        expect(await store.get('rollback-ttl-write')).toBeNull()
+        expect(await store.use(ttl).remaining(target)).toBeUndefined()
+      }
+    }
+  })
+
   it('skips unobserved expired iterator positions and counts only returned native rows', async () => {
     /** Iteration uses the same native snapshot and existing observer in root and scoped paths. */
     let now = Date.now()
