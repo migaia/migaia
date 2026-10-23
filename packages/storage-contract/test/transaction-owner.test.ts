@@ -23,13 +23,14 @@ type IFailure = Error & { readonly source: string; readonly code: string }
 type IScope = { read(): Promise<number>; sql(text: string): Promise<string> }
 
 /** Produces an idempotent backend error without changing an original stack or cause. */
-function normalizeFailure(error: unknown): IFailure {
+function normalizeFailure(error: unknown, expiredScope?: true): IFailure {
   if (error instanceof Error && 'source' in error && 'code' in error) return error as IFailure
   /** Frozen backend errors require cleanup aggregates to preserve the primary on their cause chain. */
   const failure = new Error('fixture transaction failed', { cause: error })
   Object.defineProperties(failure, {
     source: { value: 'fixture-backend' },
-    code: { value: 'TRANSACTION_FAILED' }
+    code: { value: 'TRANSACTION_FAILED' },
+    ...(expiredScope ? { operation: { value: 'transaction.scope' } } : {})
   })
   return Object.freeze(failure) as IFailure
 }
@@ -86,6 +87,44 @@ function setup(options?: {
 }
 
 describe('canonical transaction ownership', () => {
+  it('normalizes one cached escaped-scope failure with its backend-owned operation hint', async () => {
+    /** A completed operation and all later expired views share one original expiry failure. */
+    const fixture = setup()
+    await expect(fixture.root.read()).resolves.toBe(7)
+    fixture.controller.close()
+    /** The original factory must never run again after the view has expired. */
+    const factories = fixture.createScope.mock.calls.length
+    /** Different escaped data methods reject the same backend-normalized error identity. */
+    const readFailure = await fixture.root.read().catch((error: unknown) => error)
+    expect(readFailure).toMatchObject({
+      source: 'fixture-backend',
+      code: 'TRANSACTION_FAILED',
+      operation: 'transaction.scope'
+    })
+    await expect(fixture.root.sql('escaped')).rejects.toBe(readFailure)
+    await expect(runTransactionOperation(fixture.root, () => 1)).rejects.toBe(readFailure)
+    expect(fixture.createScope).toHaveBeenCalledTimes(factories)
+    expect(fixture.normalize.mock.calls.filter(([, expired]) => expired === true)).toHaveLength(1)
+    expect((readFailure as Error).cause).toBeInstanceOf(Error)
+    expect((readFailure as Error).stack).toBeTruthy()
+    expect(((readFailure as Error).cause as Error).stack).toBeTruthy()
+  })
+
+  it('keeps non-expiry normalization on the original single-argument primary-failure path', async () => {
+    /** Real callback failures keep their original metadata and causal identity. */
+    const original = new Error('original native callback failure')
+    /** Only the private expiry cache may pass the optional diagnostic hint. */
+    const fixture = setup()
+    await expect(
+      runTransactionOperation(fixture.root, () => {
+        throw original
+      })
+    ).rejects.toMatchObject({ cause: original })
+    expect(fixture.normalize.mock.calls.find(([error]) => error === original)).toEqual([original])
+    expect(fixture.onFailure.mock.calls[0]![0]).not.toHaveProperty('operation')
+    fixture.controller.close()
+  })
+
   it('shares one captured operation context across live operation and finalizer views', async () => {
     /** The backend supplies its existing attempt signal, without another cancellation owner. */
     const abort = new AbortController()
