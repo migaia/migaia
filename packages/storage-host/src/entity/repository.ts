@@ -41,6 +41,8 @@ import {
   isStorageContractError,
   type IRecordIndexHandle,
   type IRecordIndexProjection,
+  type IRecordIndexProjectionValue,
+  type IKeyRange,
   type ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
@@ -169,6 +171,22 @@ type IStageFailure = Error & {
 }
 
 type IWriteTarget = { readonly documentKey?: IStorageKey; readonly flatKey?: string }
+/** Select the same minimum index key without invoking projection or changing its error boundary. */
+function minimumProjectedIndexKey(
+  projection: IRecordIndexProjectionValue | undefined,
+  range: IKeyRange | undefined
+): IStorageKey | undefined {
+  if (projection === undefined) return
+  /** Retain the original minimum independently of native cursor or transaction ordering. */
+  let first: IStorageKey | undefined
+  for (const key of projection.kind === 'single' ? [projection.key] : projection.keys)
+    if (
+      isStorageKeyInRange(key, range) &&
+      (first === undefined || compareStorageKeys(key, first) < 0)
+    )
+      first = key
+  return first
+}
 /** A captured read view reuses the canonical stream decoder under a snapshot or transaction. */
 type IRepositoryReadView = {
   readonly keys?: () => Promise<string[]>
@@ -1331,14 +1349,7 @@ export const createRepository = <
           const identity = encodeFlatStorageKey(id)
           if (seen.has(identity)) return
           const projection = index.project(value, store.backend)
-          if (projection === undefined) return
-          let first: IStorageKey | undefined
-          for (const key of projection.kind === 'single' ? [projection.key] : projection.keys)
-            if (
-              isStorageKeyInRange(key, snapshot.range) &&
-              (first === undefined || compareStorageKeys(key, first) < 0)
-            )
-              first = key
+          const first = minimumProjectedIndexKey(projection, snapshot.range)
           if (first === undefined) return
           seen.add(identity)
           return { id, key: first, value }
@@ -1596,17 +1607,7 @@ export const createRepository = <
                 emitDiagnostic(EntityText.invalidRecord(name, physicalId))
                 continue
               }
-              let first: IStorageKey | undefined
-              for (const key of projection === undefined
-                ? []
-                : projection.kind === 'single'
-                  ? [projection.key]
-                  : projection.keys)
-                if (
-                  isStorageKeyInRange(key, selection.range) &&
-                  (first === undefined || compareStorageKeys(key, first) < 0)
-                )
-                  first = key
+              const first = minimumProjectedIndexKey(projection, selection.range)
               if (first === undefined) continue
               ordering = [first, id]
               if (orderedSource) encodedOrdering = encodeIndexOrder(first, id)

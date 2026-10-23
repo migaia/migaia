@@ -95,13 +95,12 @@ const QueryConditionKind = { field: 'field', and: 'and', or: 'or', not: 'not' } 
 /** Range comparisons accept only one shared ordered field domain per comparison. */
 type IQueryComparable = number | bigint | string | Date
 
-/** Produces the registered admission boundary while preserving the exact reflected or native cause. */
-function invalidQueryCondition(cause?: unknown): StorageContractError {
-  return new StorageContractError(
-    StorageContractErrorCode.invalidArgument,
-    { cause },
-    StorageContractErrorText.queryCondition
-  )
+/** Produces the original admission boundary with its captured message and exact native cause. */
+function invalidQueryCondition(
+  cause?: unknown,
+  message: string = StorageContractErrorText.queryCondition
+): StorageContractError {
+  return new StorageContractError(StorageContractErrorCode.invalidArgument, { cause }, message)
 }
 /** Captures opaque portable identity operands and independently owns mutable Date comparison time. */
 function snapshotQueryOperand(value: unknown): IQueryOperandValue {
@@ -539,11 +538,7 @@ function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T
         throw new TypeError(StorageContractErrorText.queryArgument)
     return Object.freeze(captured)
   } catch (cause) {
-    throw new StorageContractError(
-      StorageContractErrorCode.invalidArgument,
-      { cause },
-      StorageContractErrorText.queryArgument
-    )
+    throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
   }
 }
 /** Native execution consumes only the shared AST and optional top-level projection from its plan. */
@@ -689,11 +684,7 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
       asyncDisposeKey: configuredAsyncDisposeKey ?? Symbol.asyncDispose
     }
   } catch (cause) {
-    throw new StorageContractError(
-      StorageContractErrorCode.invalidArgument,
-      { cause },
-      StorageContractErrorText.queryArgument
-    )
+    throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
   }
 }
 /** Object identity must stay client-side even when a backend can compare native structured values. */
@@ -742,11 +733,7 @@ function planRecordQuery(
       steps[index]!.operation === QueryOperation.comparator &&
       steps[index + 1]?.operation !== QueryOperation.limit
     )
-      throw new StorageContractError(
-        StorageContractErrorCode.invalidArgument,
-        {},
-        StorageContractErrorText.queryComparatorLimit
-      )
+      throw invalidQueryCondition(undefined, StorageContractErrorText.queryComparatorLimit)
   /** Membership lookups are compiled once per plan, never once per row. */
   const operations = new Set(source.pushdown.operations)
   /** Field support has the same lifetime as this single execution plan. */
@@ -1153,11 +1140,7 @@ function streamRecordQuery<R>(
 /** Captures an immutable string projection before creating another chain node. */
 function snapshotQueryFields(fields: readonly unknown[]): readonly string[] {
   if (fields.length === 0 || fields.some((field) => typeof field !== 'string'))
-    throw new StorageContractError(
-      StorageContractErrorCode.invalidArgument,
-      {},
-      StorageContractErrorText.queryArgument
-    )
+    throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
   return Object.freeze(fields as string[])
 }
 /** Creates selected terminals without falsely advertising another select or unsupported terminals. */
@@ -1251,11 +1234,7 @@ function recordQuery<
     /** Limit is an immutable streaming node; zero requires no candidate advance. */
     limit(count: number) {
       if (!Number.isSafeInteger(count) || count < 0)
-        throw new StorageContractError(
-          StorageContractErrorCode.invalidArgument,
-          {},
-          StorageContractErrorText.queryLimit
-        )
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryLimit)
       return recordQuery<T, TContext, TAugmentMethods>(
         source,
         { previous: node, step: { operation: QueryOperation.limit, count } },
@@ -1266,11 +1245,7 @@ function recordQuery<
     /** Comparator state cannot execute until the next node supplies its bounded heap size. */
     orderByComparator(compare: (left: T, right: T) => number) {
       if (typeof compare !== 'function')
-        throw new StorageContractError(
-          StorageContractErrorCode.invalidArgument,
-          {},
-          StorageContractErrorText.queryComparatorLimit
-        )
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryComparatorLimit)
       return recordQuery<T, TContext, TAugmentMethods>(
         source,
         {
