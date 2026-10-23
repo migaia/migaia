@@ -126,7 +126,27 @@ export const LoggerErrorCode = {
    * Node default. Enforces explicit host injection; callers must inject `fs` or use the Node
    * condition.
    */
-  fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'
+  fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE',
+  /** A record contains unsupported JSON data; correct the payload before retrying. */
+  logPayloadInvalid: 'LOG_PAYLOAD_INVALID',
+  /** Another connection retains the SQLite file lock; wait for its owner or choose another file. */
+  logStoreLocked: 'LOG_STORE_LOCKED',
+  /** The same injected store is already borrowed by another installed durable plugin. */
+  logStoreInUse: 'LOG_STORE_IN_USE',
+  /** The runtime has no supported builtin SQLite module; use Node, Deno, or Bun with SQLite. */
+  logStoreUnavailable: 'LOG_STORE_UNAVAILABLE',
+  /** Storage or cleanup failed; inspect cause and reopen after an uncertain commit outcome. */
+  logStoreIoFailed: 'LOG_STORE_IO_FAILED',
+  /** Committed metadata or undo records are inconsistent; do not guess or overwrite recovery. */
+  logStoreCorrupt: 'LOG_STORE_CORRUPT',
+  /** A sequence cannot be represented safely; move to a fresh log instead of wrapping. */
+  logSequenceExhausted: 'LOG_SEQUENCE_EXHAUSTED',
+  /** Truncation passed a subscriber cursor; restart from an explicitly retained position. */
+  logSubscriptionTruncated: 'LOG_SUBSCRIPTION_TRUNCATED',
+  /** A state transition targets a missing or terminal record; terminal records cannot reopen. */
+  walRecordInvalid: 'WAL_RECORD_INVALID',
+  /** An active undo transaction already exists; forget it explicitly or use another identity. */
+  undoRecordExists: 'UNDO_RECORD_EXISTS'
 } as const
 
 /** Stable semantic failure values, interpreted with LOGGER_SOURCE and the original cause chain. */

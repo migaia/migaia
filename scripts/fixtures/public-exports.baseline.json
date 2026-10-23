@@ -164,6 +164,17 @@
       "./plugins/file": [
         "FILE_PLUGIN_NAME",
         "file"
+      ],
+      "./plugins/durable": [
+        "LogRecordState",
+        "LogStage",
+        "binlog",
+        "memoryLogStore",
+        "undoLog",
+        "wal"
+      ],
+      "./plugins/durable/file": [
+        "fileLogStore"
       ]
     },
     "@migaia/micro-hub": {
@@ -1005,12 +1016,22 @@
     },
     "@migaia/storage-contract": {
       ".": [
-        "COLLECTIONS_JSON_CODEC_NAME",
+        "BACKEND_KIND_PATTERN",
+        "ConcurrencyHolderState",
+        "ConcurrencyPolicy",
         "ConflictPolicy",
         "KEY_DOMAIN_LIMITS",
+        "QueryOperation",
+        "QueryOperator",
+        "RecordQueryMethod",
         "STORAGE_CONTRACT_SOURCE",
         "StorageContractError",
         "StorageContractErrorCode",
+        "StorageStageKind",
+        "TransactionActivityMode",
+        "TransactionBeforeStage",
+        "TransactionBuilderMethod",
+        "TransactionObservedStage",
         "asChangeFeedStore",
         "asRecordStore",
         "asSecondaryIndexRecordStore",
@@ -1020,28 +1041,62 @@
         "assertStringStorageKey",
         "assertSyncWriteOptions",
         "assertTransactionCallback",
+        "assertTransactionOwner",
         "assertVersionedEnvelope",
-        "collectionsJsonCodec",
         "compareStorageKeys",
+        "compileStorageWhere",
         "createMigrationPlan",
+        "createRecordQuery",
+        "createSqlTag",
+        "createTransactionBuilder",
+        "createTransactionOwner",
+        "defineConcurrencyPolicy",
+        "defineStorageCapability",
+        "deriveTransactionIterator",
+        "encodeOrderedStorageKey",
+        "fromValueCodec",
+        "hasStorageCapability",
+        "implement",
         "intrinsicConstructorName",
+        "isBackendKind",
         "isChangeFeedStore",
         "isKeyValueStore",
         "isRecordStore",
         "isSecondaryIndexRecordStore",
         "isStorageCapabilities",
         "isStorageContractError",
+        "kv",
+        "lockKey",
         "migrateEnvelope",
         "migrateEnvelopeSync",
+        "nextTransactionIterator",
+        "prefixStorageOrgKey",
+        "provideCapabilities",
+        "readConcurrencyLockIdentities",
         "readTransactionConflictPolicy",
+        "readTransactionOperationContext",
+        "records",
+        "registerTransactionFinalizer",
+        "resolveConcurrencyPolicy",
+        "runTransactionOperation",
+        "runWithConcurrency",
         "snapshotCodec",
+        "snapshotConcurrencyLockHoldings",
+        "snapshotConcurrencyLockKeys",
+        "snapshotConcurrencyLockRange",
         "snapshotKeyValueStore",
         "snapshotKeyValueStoreDetailed",
         "snapshotOperationContext",
         "snapshotRecordStore",
+        "snapshotStorageBaseDetailed",
         "snapshotStorageCapabilities",
         "snapshotStorageKey",
-        "snapshotSyncWriteOptions"
+        "snapshotStorageKeyPrefix",
+        "snapshotSyncWriteOptions",
+        "sqlFragment",
+        "unprefixStorageOrgKey",
+        "useStorageCapability",
+        "useTransactionCapability"
       ]
     },
     "@migaia/storage-web": {
@@ -1052,83 +1107,15 @@
         "StorageErrorText",
         "lengthPrefixedNamespaceCodec"
       ],
-      "./memory": [
-        "memoryStorageHost"
-      ],
-      "./local-storage": [
-        "localStorageHost"
-      ],
-      "./session-storage": [
-        "sessionStorageHost"
-      ],
-      "./cookies": [
-        "cookiesHost"
-      ],
-      "./indexed-db": [
-        "indexedDbHost"
-      ],
-      "./host": [
-        "StorageHostFacade",
-        "assertStorageBackendId",
-        "createStorageHost",
-        "defineFeature",
-        "definePlugin"
-      ],
-      "./plugins/memory": [
-        "memoryBackendPlugin"
-      ],
-      "./plugins/local-storage": [
-        "localStorageBackendPlugin"
-      ],
-      "./plugins/session-storage": [
-        "sessionStorageBackendPlugin"
-      ],
-      "./plugins/cookies": [
-        "cookieBackendPlugin"
-      ],
-      "./plugins/indexed-db": [
-        "indexedDbBackendPlugin",
-        "prepareIndexedDbStore"
-      ],
-      "./entity": [
-        "defineEntity"
-      ],
-      "./schema": [
-        "fromStandardSchema",
-        "passthrough",
-        "runMigrations"
-      ],
-      "./serialize": [
-        "binaryCodec",
-        "jsonCodec",
-        "selectCodec",
-        "structuredCodec"
-      ],
-      "./reactive-adapter": [
-        "defineReactiveAdapterFeature"
-      ],
-      "./plugins/reactive": [
-        "cookiesReactive",
-        "indexedDbReactive",
-        "localStorageReactive",
-        "memoryReactive",
-        "sessionStorageReactive"
-      ],
-      "./plugins/reactive/memory": [
-        "memoryReactive"
-      ],
-      "./plugins/reactive/local-storage": [
-        "localStorageReactive"
-      ],
-      "./plugins/reactive/session-storage": [
-        "sessionStorageReactive"
-      ],
-      "./plugins/reactive/cookies": [
-        "cookiesReactive"
-      ],
-      "./plugins/reactive/indexed-db": [
-        "indexedDbReactive"
-      ]
+      "./local-storage": ["localStorageBackendKind", "localStorageBackendPlugin"],
+      "./session-storage": ["sessionStorageBackendKind", "sessionStorageBackendPlugin"],
+      "./cookies": ["cookieBackendKind", "cookieBackendPlugin"],
+      "./indexed-db": ["indexedDbBackendKind", "indexedDbBackendPlugin"],
+      "./plugins/local-storage": ["localStorageBackendPlugin"],
+      "./plugins/session-storage": ["sessionStorageBackendPlugin"],
+      "./plugins/cookies": ["cookieBackendPlugin"],
+      "./plugins/indexed-db": ["indexedDbBackendPlugin"],
+      "./features/reactive": ["reactiveFeature"]
     },
     "@migaia/store-devtools": {
       ".": [
@@ -1257,16 +1244,15 @@
     "@migaia/store-persist": {
       ".": [
         "PersistCodecOutput",
-        "PersistEnvelopeError",
         "PersistState",
         "STORE_PERSIST_SOURCE",
         "StorePersistErrorCode",
-        "assertEnvelope",
         "createStorePersistAbortError",
         "createStorePersistAggregateError",
         "createStorePersistError",
         "createStorePersistTypeError",
         "defaultJsonCodec",
+        "persistTransaction",
         "persistUnit",
         "readEnvelope",
         "removeEnvelope",
@@ -1519,16 +1505,19 @@
         "isBlankString",
         "isEmptyValue",
         "isNativeErrorValue",
+        "isNone",
         "isNullish",
         "isPlainObject",
         "isPrimitive",
         "isSafeIntegerValue",
+        "isSome",
         "isUint8Array",
         "isUrlObject",
         "isUtilsAbortError",
         "isUtilsError",
         "isUtilsTimeoutError",
         "jitter",
+        "mapMaybe",
         "noop",
         "normalizeSerializedErrorChain",
         "observeThenableRejection",
@@ -1567,8 +1556,10 @@
         "timeSliceReduce",
         "toError",
         "toPromise",
+        "toUndefined",
         "tryReadProperty",
         "tryString",
+        "unwrapOr",
         "utf8ByteLength",
         "walkErrorCauses",
         "withTimeout",
@@ -1707,6 +1698,76 @@
       ],
       "./testing": [
         "createManualScheduler"
+      ]
+    },
+    "@migaia/storage-host": {
+      ".": [
+        "STORAGE_HOST_SOURCE",
+        "StorageError",
+        "StorageErrorCode",
+        "StorageErrorText",
+        "StorageHostFacade",
+        "assertStorageBackendId",
+        "createOrgId",
+        "createStorageHost",
+        "defineFeature",
+        "definePlugin",
+        "defineStorageBackendKind",
+        "memoryBackendKind",
+        "memoryBackendPlugin"
+      ],
+      "./authoring/backend": [
+        "assertKeyRange",
+        "collectUniqueIndexOwners",
+        "createStorageOperationReporter",
+        "createStorageOperationRuntime",
+        "createStorageToken",
+        "decodeFlatStorageKey",
+        "encodeFlatStorageKey",
+        "invokeExtension",
+        "isStorageErrorFamily",
+        "isStorageKeyInRange",
+        "mergeSignals",
+        "normalizeError",
+        "planChannelWrite",
+        "readAbortReason",
+        "reportCleanupError",
+        "resolveStorageNamespace",
+        "safeJsonPayloadByteLength",
+        "snapshotKeyRange",
+        "subscribeToAbort",
+        "throwIfAborted",
+        "withAbort"
+      ],
+      "./entity": [
+        "REPOSITORY_KEY_PREFIX",
+        "RecordIndexBackfillPhase",
+        "binaryCodec",
+        "defineEntity",
+        "fromStandardSchema",
+        "jsonCodec",
+        "markRecordIndexBackfillContentionFailure",
+        "passthrough",
+        "registerRecordIndexBackfillStore",
+        "repositoryMigrationKey",
+        "selectCodec",
+        "structuredCodec"
+      ]
+    },
+    "@migaia/storage-plugin-sqlite": {
+      ".": [
+        "SqliteErrorCode",
+        "sqliteBackendKind",
+        "sqliteBackendPlugin"
+      ],
+      "./node": [
+        "nodeSqliteDriver"
+      ],
+      "./bun": [
+        "bunSqliteDriver"
+      ],
+      "./features/maintenance": [
+        "sqliteMaintenanceFeature"
       ]
     }
   }

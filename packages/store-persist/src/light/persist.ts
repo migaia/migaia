@@ -1,6 +1,11 @@
 import type { IDisposer, IRuntime } from '@migaia/reactive'
 import { persistUnit } from '../core/persist-unit.js'
-import type { ICodec } from '@migaia/storage-contract'
+import type {
+  ICodec,
+  IMigrationStep,
+  IMigrationReset,
+  ISyncMigrationSteps
+} from '@migaia/storage-contract'
 import type {
   IPersistHandle,
   IPersistStorage,
@@ -38,7 +43,7 @@ export type IPersistableStore = {
 /** Store attachment options; Runtime and restoration merge come from the Store adapter. */
 export type IPersistOptions = Pick<
   IPersistUnitOptions<Record<string, unknown>>,
-  'debounceMs' | 'maxWaitMs' | 'scheduler'
+  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages' | 'transactionStages'
 > & {
   /** Required storage key, passed unchanged; empty strings are not rejected by this adapter. */
   key: string
@@ -48,8 +53,8 @@ export type IPersistOptions = Pick<
   codec?: ICodec
   /** Nonnegative safe archive version, default 0. */
   version?: number
-  /** Synchronous version conversion; omitted means different archived versions fail hydration. */
-  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>
+  /** Contiguous upgrade steps, or an explicit reset of older archives. */
+  migrations?: Readonly<Record<number, IMigrationStep>> | IMigrationReset
   /**
    * Synchronous write projection, default identity; omitted fields remain governed by Store
    * hydration.
@@ -72,6 +77,14 @@ function toPersistUnit(store: IPersistableStore): IPersistUnit<Record<string, un
  * must finish. Admission failures throw synchronously; hydration/write failures appear on the
  * handle. Disposing the attachment leaves the Store and storage caller-owned.
  */
+export function persist<
+  const TSteps extends Readonly<Record<number, IMigrationStep>> | IMigrationReset
+>(
+  store: IPersistableStore,
+  options: Omit<IPersistOptions, 'migrations'> & {
+    readonly migrations?: TSteps & ISyncMigrationSteps<NoInfer<TSteps>>
+  }
+): IPersistHandle
 export function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle {
   const snapshot = snapshotPersistOptions(options)
   return persistUnit(toPersistUnit(store), {
@@ -80,7 +93,9 @@ export function persist(store: IPersistableStore, options: IPersistOptions): IPe
     storage: snapshot.storage,
     codec: snapshot.codec,
     version: snapshot.version,
-    migrate: snapshot.migrate,
+    migrations: snapshot.migrations,
+    codecStages: snapshot.codecStages,
+    transactionStages: snapshot.transactionStages,
     partialize: snapshot.partialize,
     debounceMs: snapshot.debounceMs,
     maxWaitMs: snapshot.maxWaitMs,

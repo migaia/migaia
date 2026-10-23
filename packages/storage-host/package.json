@@ -1,0 +1,58 @@
+{
+  "name": "@migaia/storage-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runtime-neutral storage host and typed backend authoring",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/storage-host"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./entity": {
+      "types": "./dist/entity.d.ts",
+      "default": "./dist/entity.js"
+    },
+    "./authoring/backend": {
+      "types": "./dist/authoring/backend.d.ts",
+      "default": "./dist/authoring/backend.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "pnpm run build && vitest run",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/logger": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {}
+}

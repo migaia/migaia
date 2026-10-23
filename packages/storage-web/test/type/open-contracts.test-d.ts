@@ -3,16 +3,15 @@ import type { ICookiesOptions } from '../../src/backends/cookie.js'
 import type { ICookieScope } from '../../src/types/cookie.js'
 import type { IExtensionStage } from '../../src/types/errors.js'
 import type { ISyncCapableStore } from '../../src/types/storage.js'
-import { memoryStorageHost } from '../../src/memory.js'
+import type { IMemoryBackendStore } from '@migaia/storage-host'
 
 expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()
 expectTypeOf<IExtensionStage>().toEqualTypeOf<
-  'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
+  NonNullable<import('@migaia/storage-host').IStorageErrorDetails['extensionStage']>
 >()
-type IMemoryStore = ReturnType<typeof memoryStorageHost>
-expectTypeOf(memoryStorageHost()).toMatchTypeOf<ISyncCapableStore<IMemoryStore>>()
-import type { ICodec } from '../../src/serialize/index.js'
-import type { ISchemaAdapter } from '../../src/schema/index.js'
+expectTypeOf<IMemoryBackendStore>().toMatchTypeOf<ISyncCapableStore<IMemoryBackendStore>>()
+import type { ICodec } from '@migaia/storage-contract'
+import type { ISchemaAdapter } from '@migaia/storage-host/entity'
 
 /** Schema/codec 是面向开发者的开放契约：任何手写实现（不 import 任何第三方库） 都应该能被类型系统接受，不需要绕过 as any。 */
 const customCodec: ICodec<{ n: number }, string> = {

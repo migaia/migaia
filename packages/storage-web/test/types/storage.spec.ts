@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { asRecordStore, isKeyValueStore, isRecordStore } from '../../src/types/storage'
-import { memoryStorageHost } from '../../src/backends/memory'
-import { localStorageHost } from '../../src/backends/local-storage'
+import { createMemoryTestStore } from '../helpers/installed-backends.js'
+import { createLocalTestStore } from '../helpers/installed-backends.js'
 import type { IStorageCapabilities } from '../../src/types/capabilities'
 import type { IKeyValueStore } from '../../src/types/storage'
 
@@ -27,6 +28,7 @@ const fakeStore = (capabilities: Partial<IStorageCapabilities>) => ({
   clearValues: async () => {},
   clearAll: async () => {},
   dispose: async () => {},
+  [asyncDisposeKey]: async () => {},
   getBytes: async () => null,
   setBytes: async () => {},
   removeBytes: async () => {},
@@ -80,8 +82,8 @@ describe('asRecordStore / isRecordStore', () => {
     expect(isRecordStore(store)).toBe(true)
     expect(reads).toBe(9)
   })
-  it('backend capabilities metadata 在运行时不可变', () => {
-    const store = memoryStorageHost()
+  it('backend capabilities metadata 在运行时不可变', async () => {
+    const store = await createMemoryTestStore()
     expect(() => {
       ;(store.capabilities as { records: boolean }).records = false
     }).toThrow(TypeError)
@@ -126,12 +128,12 @@ describe('asRecordStore / isRecordStore', () => {
     )
     expect(isRecordStore(store)).toBe(false)
   })
-  it('memoryStorageHost 支持 records，可被收窄', () => {
-    expect(isRecordStore(memoryStorageHost())).toBe(true)
+  it('memoryStorageHost 支持 records，可被收窄', async () => {
+    expect(isRecordStore(await createMemoryTestStore())).toBe(true)
   })
-  it('localStorageHost 不支持 records，收窄抛错', () => {
+  it('localStorageHost 不支持 records，收窄抛错', async () => {
     const values = new Map<string, string>()
-    const store = localStorageHost({
+    const store = await createLocalTestStore({
       namespace: 'test',
       storage: {
         get length() {

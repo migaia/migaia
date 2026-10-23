@@ -285,6 +285,7 @@ class LoggerCore {
       hook: (name, fn) => this.hook(name, fn),
       fireHook: (name, entry) => this.fireHook(name, entry),
       onFailure: (fn) => this.onFailure(fn),
+      reportFailure: (failure) => this.#reportFailure(failure.source, failure.error),
       defer: (task) => this.defer(task),
       onFlush: (fn) => this.onFlush(fn),
       flush: () => this.flush(),

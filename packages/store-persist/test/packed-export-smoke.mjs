@@ -1,123 +1,108 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** Package root used as the source of the store-persist publish-boundary tarball. */
+/** Package whose public adapter and real dependencies are packed for isolated consumption. */
 const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
-/** Canonical runtime dependency needed by the packed codec and error constructors. */
-const utilsDirectory = resolve(packageDirectory, '../utils')
-/** Runtime-neutral collection codec dependency needed by the packed default codec. */
-const contractDirectory = resolve(packageDirectory, '../storage-contract')
-/** Lifecycle runtime dependency needed by the packed persistence engine. */
-const lifecycleDirectory = resolve(packageDirectory, '../lifecycle')
-/** Isolated consumer proving package resolution from extracted tarballs. */
+/**
+ * The default codec and canonical disposal key require their real neutral runtime dependency
+ * closure.
+ */
+const packageDirectories = [
+  'utils',
+  'lifecycle',
+  'reactive',
+  'serialize',
+  'capability',
+  'middleware-pipeline',
+  'plugin-host',
+  'storage-contract',
+  'store-persist'
+].map((name) => resolve(packageDirectory, '..', name))
+/** Consumer resolves only extracted package tarballs, never workspace source or dist paths. */
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-store-persist-packed-'))
 
-/** Packs store-persist and its runtime dependencies, then imports the extracted package. */
+/**
+ * Packs the real dependency closure and verifies public codec composition plus the default codec
+ * through the actual dependency closure.
+ *
+ * @returns {void} Completes when the isolated Node consumer exits successfully.
+ * @throws {Error} When packing, package extraction, dependency wiring or consumer assertions fail.
+ */
 function main() {
   try {
+    /** Tarballs and extracted packages stay in a private disposable consumer workspace. */
     const packDirectory = join(smokeDirectory, 'pack')
+    /** Package extraction preserves normal package-root resolution. */
     const extractDirectory = join(smokeDirectory, 'extract')
+    /** The consumer contains only a module marker, fixture and published-package links. */
     const consumerDirectory = join(smokeDirectory, 'consumer')
     mkdirSync(packDirectory, { recursive: true })
     mkdirSync(extractDirectory, { recursive: true })
-    for (const sourceDirectory of [
-      utilsDirectory,
-      contractDirectory,
-      lifecycleDirectory,
-      packageDirectory
-    ])
+    mkdirSync(join(consumerDirectory, 'node_modules', '@migaia'), { recursive: true })
+    for (const directory of packageDirectories)
       execFileSync('pnpm', ['pack', '--pack-destination', packDirectory], {
-        cwd: sourceDirectory,
+        cwd: directory,
         stdio: 'inherit'
       })
+    /** Every input package must produce exactly one real tarball. */
     const tarballs = readdirSync(packDirectory).filter((entry) => entry.endsWith('.tgz'))
-    const utilsTarball = tarballs.find((entry) => entry.startsWith('migaia-utils-'))
-    const contractTarball = tarballs.find((entry) => entry.startsWith('migaia-storage-contract-'))
-    /** Packed lifecycle dependency resolved independently of workspace links. */
-    const lifecycleTarball = tarballs.find((entry) => entry.startsWith('migaia-lifecycle-'))
-    const packageTarball = tarballs.find((entry) => entry.startsWith('migaia-store-persist-'))
-    if (
-      utilsTarball === undefined ||
-      contractTarball === undefined ||
-      lifecycleTarball === undefined ||
-      packageTarball === undefined
-    )
-      throw new Error('packed store-persist dependency set is incomplete')
-    const utilsExtractDirectory = join(extractDirectory, 'utils')
-    const contractExtractDirectory = join(extractDirectory, 'storage-contract')
-    /** Extracted lifecycle tarball shared by the packed persistence entry points. */
-    const lifecycleExtractDirectory = join(extractDirectory, 'lifecycle')
-    const packageExtractDirectory = join(extractDirectory, 'package')
-    mkdirSync(utilsExtractDirectory, { recursive: true })
-    mkdirSync(contractExtractDirectory, { recursive: true })
-    mkdirSync(lifecycleExtractDirectory, { recursive: true })
-    mkdirSync(packageExtractDirectory, { recursive: true })
-    execFileSync('tar', ['-xzf', join(packDirectory, utilsTarball), '-C', utilsExtractDirectory])
-    execFileSync('tar', [
-      '-xzf',
-      join(packDirectory, contractTarball),
-      '-C',
-      contractExtractDirectory
-    ])
-    execFileSync('tar', [
-      '-xzf',
-      join(packDirectory, lifecycleTarball),
-      '-C',
-      lifecycleExtractDirectory
-    ])
-    execFileSync('tar', [
-      '-xzf',
-      join(packDirectory, packageTarball),
-      '-C',
-      packageExtractDirectory
-    ])
-    mkdirSync(join(packageExtractDirectory, 'package', 'node_modules', '@migaia'), {
-      recursive: true
-    })
-    symlinkSync(
-      join(utilsExtractDirectory, 'package'),
-      join(packageExtractDirectory, 'package', 'node_modules', '@migaia/utils'),
-      'dir'
-    )
-    symlinkSync(
-      join(contractExtractDirectory, 'package'),
-      join(packageExtractDirectory, 'package', 'node_modules', '@migaia/storage-contract'),
-      'dir'
-    )
-    symlinkSync(
-      join(lifecycleExtractDirectory, 'package'),
-      join(packageExtractDirectory, 'package', 'node_modules', '@migaia/lifecycle'),
-      'dir'
-    )
-    mkdirSync(join(contractExtractDirectory, 'package', 'node_modules', '@migaia'), {
-      recursive: true
-    })
-    symlinkSync(
-      join(utilsExtractDirectory, 'package'),
-      join(contractExtractDirectory, 'package', 'node_modules', '@migaia/utils'),
-      'dir'
-    )
-    mkdirSync(join(lifecycleExtractDirectory, 'package', 'node_modules', '@migaia'), {
-      recursive: true
-    })
-    symlinkSync(
-      join(utilsExtractDirectory, 'package'),
-      join(lifecycleExtractDirectory, 'package', 'node_modules', '@migaia/utils'),
-      'dir'
-    )
-    mkdirSync(consumerDirectory, { recursive: true })
+    if (tarballs.length !== packageDirectories.length)
+      throw new Error(`Expected ${packageDirectories.length} tarballs, found ${tarballs.length}`)
+    /** Extracted names are used only to wire each package's declared runtime dependencies. */
+    const extracted = new Map()
+    for (const directory of packageDirectories) {
+      /** Package identity comes from its own metadata rather than a guessed tarball version. */
+      const metadata = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+      /** Pnpm replaces the scoped slash with a hyphen in packed archive names. */
+      const prefix = metadata.name.replace('@', '').replace('/', '-') + '-'
+      /** All known names are distinct, so this lookup is bounded by the fixed closure. */
+      const tarball = tarballs.find((entry) => entry.startsWith(prefix))
+      if (!tarball) throw new Error(`Missing expected tarball for ${metadata.name}`)
+      /** Each archive gets its own normal package root. */
+      const target = join(extractDirectory, metadata.name.split('/')[1])
+      mkdirSync(target, { recursive: true })
+      execFileSync('tar', ['-xzf', join(packDirectory, tarball), '-C', target])
+      extracted.set(metadata.name, join(target, 'package'))
+    }
+    for (const [name, directory] of extracted) {
+      symlinkSync(directory, join(consumerDirectory, 'node_modules', name), 'dir')
+      /** Wire only actual declared runtime dependencies after Node resolves each package realpath. */
+      const metadata = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+      for (const dependency of Object.keys(metadata.dependencies ?? {})) {
+        /** Optional codec peers are not used by the public JSON composition being exercised. */
+        const target = extracted.get(dependency)
+        if (!target) throw new Error(`Unpacked runtime dependency ${dependency} of ${name}`)
+        mkdirSync(join(directory, 'node_modules', '@migaia'), { recursive: true })
+        symlinkSync(target, join(directory, 'node_modules', dependency), 'dir')
+      }
+    }
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
-      join(consumerDirectory, 'smoke.mjs'),
-      "import { defaultJsonCodec } from '" +
-        join(packageExtractDirectory, 'package', 'dist', 'index.js') +
-        "'\nconst raw = await defaultJsonCodec.encode({ ok: true })\nif (raw !== '{\\\"ok\\\":true}') throw new Error('packed codec mismatch')\n",
+      join(consumerDirectory, 'identity.mjs'),
+      `import * as api from '@migaia/store-persist'
+const { defaultJsonCodec } = api
+if ('assertEnvelope' in api || 'PersistEnvelopeError' in api) throw new Error('removed envelope export retained')
+const raw = await defaultJsonCodec.encode({ roles: new Map([['Ada', new Set(['read'])]]) })
+if (defaultJsonCodec.name !== 'collections-json@1' || !raw.includes('"$rpc":"map"')) throw new Error('packed codec format mismatch')
+const restored = await defaultJsonCodec.decode(raw)
+if (!(restored.roles instanceof Map) || !(restored.roles.get('Ada') instanceof Set)) throw new Error('packed collections lost')
+try { await defaultJsonCodec.encode({ count: NaN }); throw new Error('invalid value accepted') }
+catch (error) { if (error.code !== 'ENCODE_FAILED' || error.cause?.code !== 'INVALID_ARGUMENT' || error.cause.cause?.code !== 'ENCODE_FAILED') throw error }
+`,
       'utf8'
     )
-    execFileSync(process.execPath, ['smoke.mjs'], { cwd: consumerDirectory, stdio: 'inherit' })
+    execFileSync(process.execPath, ['identity.mjs'], { cwd: consumerDirectory, stdio: 'inherit' })
   } finally {
     rmSync(smokeDirectory, { recursive: true, force: true })
   }

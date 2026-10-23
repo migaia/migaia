@@ -1462,6 +1462,105 @@ isEmptyValue(0) // false`
     }
   },
   symbols: {
+    isSome: {
+      role: 'operation',
+      purpose: t(
+        'Narrow to present values without treating undefined as absence.',
+        '收窄到存在值，不把 undefined 当成缺失。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        )
+      },
+      returns: t(
+        'Boolean type predicate narrowing the discriminated union.',
+        '收窄判别联合的布尔类型谓词。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    isNone: {
+      role: 'operation',
+      purpose: t(
+        'Narrow to the absent branch without reading a payload.',
+        '收窄到缺失分支，不读取值。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        )
+      },
+      returns: t(
+        'Boolean type predicate narrowing the discriminated union.',
+        '收窄判别联合的布尔类型谓词。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    unwrapOr: {
+      role: 'operation',
+      purpose: t(
+        'Return the exact present value or a fallback in the same value domain.',
+        '返回原存在值，或同值域的缺省值。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        ),
+        fallback: t(
+          'NoInfer<T>: fallback cannot widen the original value domain.',
+          'NoInfer<T>：缺省值不能扩大原值域。'
+        )
+      },
+      returns: t(
+        'The original T payload when present, otherwise the supplied fallback.',
+        '存在时返回原 T 值，否则返回提供的缺省值。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    mapMaybe: {
+      role: 'operation',
+      purpose: t(
+        'Map one present payload synchronously and retain the exact mapped result.',
+        '同步映射一个存在值并保留结果身份。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        ),
+        mapper: t(
+          'Called once only for presence; not awaited. Existing coded failures survive; uncoded native failures receive utils INVALID_ARGUMENT, preserving identity when attachable.',
+          '仅存在值调用一次，不等待结果。原带码失败保留；未编码原生失败附 utils INVALID_ARGUMENT，可附加时保留原身份。'
+        )
+      },
+      returns: t(
+        'IMaybe<N>; missing input is reused, mapped results retain identity.',
+        'IMaybe<N>；缺失输入复用，映射结果保留身份。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example,
+      cases: utilsCases.mapMaybe
+    },
+    toUndefined: {
+      role: 'operation',
+      purpose: t(
+        'Convert an optional value when collapsing absence and present undefined is intentional.',
+        '有意合并缺失与存在的 undefined 时转换可选值。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        )
+      },
+      returns: t(
+        'T or undefined; presence of undefined is intentionally collapsed.',
+        'T 或 undefined；有意合并值为 undefined 的存在性。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
     jitter: {
       role: 'operation',
       cases: utilsCases.jitter,
@@ -2983,6 +3082,26 @@ const text = converted.threw ? '[无法显示]' : converted.value`
     }
   },
   types: {
+    IMaybe: {
+      summary: t(
+        'Presence union that distinguishes absent values from a present undefined.',
+        '区分缺失与存在 undefined 的判别联合。'
+      ),
+      members: {
+        some: {
+          summary: t(
+            'True for presence, false for absence; narrow before reading value.',
+            '存在为 true，缺失为 false；读取 value 前先收窄。'
+          )
+        },
+        value: {
+          summary: t(
+            'Exact T payload, available only on the some:true variant.',
+            '精确 T 值，仅 some:true 分支可用。'
+          )
+        }
+      }
+    },
     ...utilsFacadeTypes,
     IIdentifyErrorOptions: {
       ...utilsFacadeTypes.IIdentifyErrorOptions!,

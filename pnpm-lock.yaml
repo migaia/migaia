@@ -296,9 +296,9 @@ importers:
       '@migaia/resource':
         specifier: workspace:^
         version: link:../resource
-      '@migaia/storage-web':
+      '@migaia/storage-host':
         specifier: workspace:^
-        version: link:../storage-web
+        version: link:../storage-host
       mitt:
         specifier: 3.0.1
         version: 3.0.1
@@ -754,6 +754,9 @@ importers:
 
   packages/storage-contract:
     dependencies:
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -764,6 +767,58 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
+
+  packages/storage-host:
+    dependencies:
+      '@migaia/event-subscriber':
+        specifier: workspace:^
+        version: link:../event-subscriber
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+
+  packages/storage-plugin-sqlite:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/store-light':
+        specifier: workspace:^
+        version: link:../store-light
+      '@migaia/store-persist':
+        specifier: workspace:^
+        version: link:../store-persist
 
   packages/storage-web:
     dependencies:
@@ -788,6 +843,9 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -938,9 +996,15 @@ importers:
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
@@ -948,9 +1012,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/storage-web':
+      '@migaia/storage-host':
         specifier: workspace:^
-        version: link:../storage-web
+        version: link:../storage-host
       '@migaia/store-indexed':
         specifier: workspace:^
         version: link:../store-indexed

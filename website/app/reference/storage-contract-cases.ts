@@ -3,8 +3,589 @@ import type { ICaseDoc, IText } from './contract.js'
 /** Keeps complete bilingual cases beside their exact observable outputs. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
+/** One complete read-only lookup example is shared by the two exact public accessors. */
+const capabilityReadCase: ICaseDoc = {
+  title: t(
+    'Read a capability without acquiring provider authority',
+    '读取能力而不取得 provider 权限'
+  ),
+  problem: t(
+    'Consumers need capability access without modifying a supplied base or receiving its installation/close controls.',
+    '消费者需要访问能力，不应修改传入 base 或取得安装、关闭控制。'
+  ),
+  example: t(
+    `import { hasStorageCapability, useStorageCapability, kv, type IStorageBase } from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}`,
+    `import { hasStorageCapability, useStorageCapability, kv, type IStorageBase } from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}`
+  ),
+  result: t(
+    'A provided KV store reads its original API. A raw/frozen resource without KV returns undefined without mutation or disposal. Published Feature APIs are read through the same provider table.',
+    '已提供 KV 的 store 读取原 API；无 KV 的 raw/frozen 资源返回 undefined，不修改或释放；已发布 Feature API 从同一 provider 表读取。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  snapshotStorageKeyPrefix: [
+    {
+      title: t('Locate one typed canonical prefix', '定位一个 typed 规范前缀'),
+      problem: t(
+        'Backends need identical prefix rules and ordered bounds without copying validators or scanning unrelated data.',
+        '后端需要一致前缀规则与有序边界，不能复制验证器或扫描无关数据。'
+      ),
+      example: t(
+        `import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.`,
+        `import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.`
+      ),
+      result: t(
+        'The complete child sequence matches the extended tuple but excludes a different last child. lower/upper bound the same canonical byte range; the matcher is independent of exposed mutable copies.',
+        '完整子键序列匹配扩展 tuple，排除不同末子键；lower/upper 定位同一规范字节范围，matcher 独立于外露可变副本。'
+      )
+    }
+  ],
+  useTransactionCapability: [
+    {
+      title: t(
+        'Keep transaction capability execution in its original owner',
+        '将事务能力执行保持在原 owner'
+      ),
+      problem: t(
+        'Capability lookup must not expose root APIs, mutate frozen scopes or bypass transaction first failure and lifetime.',
+        '能力取用不能暴露根 API、修改冻结 scope 或绕过事务首错与生命周期。'
+      ),
+      example: t(
+        `import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}`,
+        `import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}`
+      ),
+      result: t(
+        'KV batches and record queries use the same native transaction. Pure repeated lookup is cached without I/O; each data call receives an original fresh operation view, and expired terminals reject before I/O.',
+        'KV 批量与记录查询使用同一原生事务；重复纯取用缓存但不 I/O；每次数据调用得到原新操作视图，过期终点在 I/O 前拒绝。'
+      )
+    }
+  ],
+  sqlFragment: [
+    {
+      title: t(
+        'Bind values while composing identifiers and fragments',
+        '组合标识符与片段，并独立绑定值'
+      ),
+      problem: t(
+        'SQL composition must preserve parameter identity without granting pure fragments a connection or copying accumulated prefixes.',
+        'SQL 组合必须保留参数身份，不能给纯片段连接权限或反复复制历史前缀。'
+      ),
+      example: t(
+        `import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
+async function readUser(executor: ISqlExecutor, id: number) {
+  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
+  return executor.sql<{ id: number; name?: string }>\`SELECT \${columns} FROM \${sqlFragment.id('users')} WHERE id = \${id}\`.get()
+}`,
+        `import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
+async function readUser(executor: ISqlExecutor, id: number) {
+  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
+  return executor.sql<{ id: number; name?: string }>\`SELECT \${columns} FROM \${sqlFragment.id('users')} WHERE id = \${id}\`.get()
+}`
+      ),
+      result: t(
+        'The original injected executor runs one statement with bound id. Pure fragments own no terminals; byte inputs are snapshotted and each prepare supplies fresh copies.',
+        '原注入 executor 执行单条语句并绑定 id；纯片段没有终点；字节输入制作快照，每次 prepare 提供独立副本。'
+      )
+    }
+  ],
+  createSqlTag: [
+    {
+      title: t('Prepare only after original operation admission', '在原操作准入后才 prepare'),
+      problem: t(
+        'Backend authors need the shared scanner and bindings without a second connection, transaction or resource owner.',
+        '后端作者需要共用 scanner 与绑定，不能新增连接、事务或资源拥有者。'
+      ),
+      example: t(
+        `import { createSqlTag } from '@migaia/storage-contract'
+function bindNative(
+  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
+) {
+  return createSqlTag({ dialect: 'postgres', ...original })
+}`,
+        `import { createSqlTag } from '@migaia/storage-contract'
+function bindNative(
+  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
+) {
+  return createSqlTag({ dialect: 'postgres', ...original })
+}`
+      ),
+      result: t(
+        'execute must own original admission and call prepare before its native driver. The factory returns each supplied callback Promise directly, adds no I/O and keeps lexical failure in the original owner.',
+        'execute 必须拥有原准入，并在原生驱动前调用 prepare；工厂直接返回各原回调 Promise，不新增 I/O，词法失败保持原 owner。'
+      )
+    }
+  ],
+  snapshotConcurrencyLockKeys: [
+    {
+      title: t('Use one canonical identity snapshot', '使用一份规范身份快照'),
+      problem: t(
+        'A synchronous key probe must not copy channel ranks or encode a second key domain.',
+        '同步键探测不能复制通道顺序或再编码另一键域。'
+      ),
+      example: t(
+        `import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
+const snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')
+console.log(snapshot.keys.length, snapshot.identities.length)`,
+        `import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
+const snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')
+console.log(snapshot.keys.length, snapshot.identities.length)`
+      ),
+      result: t(
+        'Both counts are 1; paired frozen identity data grants no acquisition authority.',
+        '两个计数均为 1；配对冻结身份数据不授予取锁权限。'
+      )
+    }
+  ],
+  snapshotConcurrencyLockRange: [
+    {
+      title: t('Bound one channel prefix', '界定一个通道前缀'),
+      problem: t(
+        'Native range checks need the exact canonical lock bounds without scanning or duplicating encoding.',
+        '原生范围检查需要精确规范锁边界，不能扫描或复制编码。'
+      ),
+      example: t(
+        `import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-contract'
+const bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')
+const id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!
+console.log(bounds.lower <= id && id < bounds.upper)`,
+        `import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-contract'
+const bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')
+const id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!
+console.log(bounds.lower <= id && id < bounds.upper)`
+      ),
+      result: t(
+        'true; the half-open range includes the text prefix and excludes other channels.',
+        'true；半开范围包含该 text 前缀，排除其它通道。'
+      )
+    }
+  ],
+  snapshotConcurrencyLockHoldings: [
+    {
+      title: t('Inspect detached holdings in canonical order', '按规范顺序检查独立持锁快照'),
+      problem: t(
+        'Native lock tables keep insertion order and must not duplicate canonical sorting.',
+        '原生锁表保留插入顺序，不能复制规范排序实现。'
+      ),
+      example: t(
+        `import { snapshotConcurrencyLockHoldings, type ILockHolding } from '@migaia/storage-contract'
+function inspect(rows: readonly ILockHolding[]) {
+  return snapshotConcurrencyLockHoldings(rows)
+}`,
+        `import { snapshotConcurrencyLockHoldings, type ILockHolding } from '@migaia/storage-contract'
+function inspect(rows: readonly ILockHolding[]) {
+  return snapshotConcurrencyLockHoldings(rows)
+}`
+      ),
+      result: t(
+        'Returns frozen independent key/holder rows in stable channel/key order, retaining expired and expiresAt and separate equal-key rows. No internal lock table or authority is exposed.',
+        '返回冻结的独立键与 holder 行，按通道与键稳定排序，保留 expired、expiresAt 和相同键的独立行；不暴露内部锁表或权限。'
+      )
+    }
+  ],
+  readConcurrencyLockIdentities: [
+    {
+      title: t(
+        'Read canonical identities without encoding another key set',
+        '读取规范身份，不重新编码键集合'
+      ),
+      problem: t(
+        'A native key-lock provider must use the same normalized identities as its original active attempt.',
+        '原生键锁 provider 必须使用与原活跃 attempt 相同的规范身份。'
+      ),
+      example: t(
+        `import { readConcurrencyLockIdentities, type IConcurrencyAttemptContext } from '@migaia/storage-contract'
+function lockIdentities(ctx: IConcurrencyAttemptContext) {
+  return readConcurrencyLockIdentities(ctx)
+}`,
+        `import { readConcurrencyLockIdentities, type IConcurrencyAttemptContext } from '@migaia/storage-contract'
+function lockIdentities(ctx: IConcurrencyAttemptContext) {
+  return readConcurrencyLockIdentities(ctx)
+}`
+      ),
+      result: t(
+        'The active original attempt supplies one frozen sorted/deduplicated hex string list, reused by nested attempts. Forged or settled contexts throw INVALID_ARGUMENT; no mutable bytes or control handles are returned.',
+        '原活跃 attempt 提供一个冻结、排序去重的十六进制字符串列表，嵌套尝试复用；伪造或已结算 context 抛 INVALID_ARGUMENT，不返回可变字节或控制句柄。'
+      )
+    }
+  ],
+  records: [
+    {
+      title: t('Use one standard record query entry', '使用唯一标准记录查询入口'),
+      problem: t(
+        'Native record backends and record Features must share the same typed query executor instead of interpreting the legacy support flag as permission.',
+        '原生记录后端与 records Feature 必须共用 typed 查询执行器，不能把旧支持标记解释成权限。'
+      ),
+      example: t(
+        `import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records).query<{ status: string; total: number }>()
+    .where({ status: 'paid' }).select('total').all()
+}`,
+        `import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records).query<{ status: string; total: number }>()
+    .where({ status: 'paid' }).select('total').all()
+}`
+      ),
+      result: t(
+        'An actual provided records API executes the shared query and returns selected paid totals. Missing tokens throw UNSUPPORTED_CAPABILITY; admission alone performs no query. Other terminals are not advertised by this slice.',
+        '真实已提供 records API 执行共用查询并返回 paid total；缺失 token 抛 UNSUPPORTED_CAPABILITY，准入本身不执行查询，本切片不声明其他终点。'
+      )
+    }
+  ],
+  hasStorageCapability: [capabilityReadCase],
+  useStorageCapability: [capabilityReadCase],
+  createRecordQuery: [
+    {
+      title: t('Share a record executor over an original cursor', '在原游标上共用记录执行器'),
+      problem: t(
+        'A backend needs declarative conditions and typed projections without another fluent chain or resource owner.',
+        '后端需要声明式条件与 typed 投影，不应另建查询链或资源 owner。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
+}`
+      ),
+      result: t(
+        'Given an original cursor over paid totals 120 and 50, totals returns [{total:120}]. all awaits its actual disposal on success or failure. The empty support declaration keeps all steps client-side.',
+        '传入 paid total 为 120、50 的原游标后，totals 返回 [{total:120}]；all 在成功或失败时都等待真实释放，空支持声明使所有步骤在客户端执行。'
+      )
+    },
+    {
+      title: t(
+        'Stream the three smallest totals with a bounded heap',
+        '用有界堆流式读取最小的三个金额'
+      ),
+      problem: t(
+        'An entity list needs comparator ordering without materializing every source row. The explicit limit bounds retained candidates.',
+        '实体列表需要比较器排序，却不应物化全部源记录；显式上限约束保留的候选数量。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function smallest(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function smallest(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()
+}`
+      ),
+      result: t(
+        'Given totals 8, 2, 5 and 1, the returned real storage iterator yields 1, 2 and 5. Equal totals retain source order; iterator cleanup stays with the original source owner.',
+        '源金额为 8、2、5、1 时，返回的真实存储迭代器依次产出 1、2、5；同金额保留源顺序，清理仍由原数据源 owner 负责。'
+      )
+    }
+  ],
+  compileStorageWhere: [
+    {
+      title: t(
+        'Compile one business condition before scanning candidates',
+        '扫描候选前编译一次业务条件'
+      ),
+      problem: t(
+        'A prefix candidate stream needs the same declarative semantics without constructing another query or rebuilding membership lists per row.',
+        '有序前缀候选流需要相同声明语义，不应另建查询或逐行重建成员列表。'
+      ),
+      example: t(
+        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1",
+        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1"
+      ),
+      result: t(
+        'Prints 1. Only the paid row with total at least 100 matches; compilation reads no storage.',
+        '输出 1；仅 total 至少 100 的 paid 记录匹配，编译不读取存储。'
+      )
+    }
+  ],
+  createTransactionBuilder: [
+    {
+      title: t('Declare locks without starting a transaction', '声明锁而不提前启动事务'),
+      problem: t(
+        'Independent builder branches must not copy old lock prefixes or start operation deadlines during configuration.',
+        '独立 builder 分支不能反复复制旧锁前缀，也不能在配置期间启动操作期限。'
+      ),
+      example: t(
+        `import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter')).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`,
+        `import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter')).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`
+      ),
+      result: t(
+        'The supplied registered store starts one transaction at run, returning its original Promise. The scope remains that store’s complete native scope.',
+        '所提供登记 store 在 run 时启动一次事务，返回原 Promise；scope 保留该 store 的完整原生结构。'
+      )
+    }
+  ],
+  runWithConcurrency: [
+    {
+      title: t(
+        'Compose a real backend with the original policy owner',
+        '把真实后端接到原策略 owner'
+      ),
+      problem: t(
+        'Backend and persist composition must retain native option fields without adding a second retry loop or restarting operation deadlines.',
+        '后端与 persist 组合须保留原生选项字段，不能另建重试循环或重开操作期限。'
+      ),
+      example: t(
+        `import { runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
+async function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {
+  return runWithConcurrency({ store, options }, port)
+}`,
+        `import { runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
+async function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {
+  return runWithConcurrency({ store, options }, port)
+}`
+      ),
+      result: t(
+        'The function returns the real port’s committed boolean. The caller supplies the registered original store and original options or exact outer attempt; the loop captures policy once.',
+        '函数返回真实 port 的提交布尔值。调用方提供原登记 store 与原选项或精确外层 attempt；循环只捕获一次策略。'
+      )
+    }
+  ],
+  prefixStorageOrgKey: [
+    {
+      title: t('Preserve tuple keys inside an organization segment', '在组织段内保留元组键'),
+      problem: t(
+        'Scalar and tuple keys must retain distinct identities when a physical backend adds organization isolation.',
+        '物理后端添加组织隔离时，标量与元组键必须保持不同身份。'
+      ),
+      example: t(
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const wrapped = prefixStorageOrgKey(orgId, ['orders', 1])
+console.log(JSON.stringify(wrapped))
+console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
+// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]
+// ["orders",1]`,
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const wrapped = prefixStorageOrgKey(orgId, ['orders', 1])
+console.log(JSON.stringify(wrapped))
+console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
+// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]
+// ["orders",1]`
+      ),
+      result: t(
+        'Prints the three-part physical envelope followed by the original tuple; no backend runs.',
+        '先输出三项物理封装，再输出原元组；不运行后端。'
+      )
+    }
+  ],
+  unprefixStorageOrgKey: [
+    {
+      title: t(
+        'Reject another organization before returning a logical key',
+        '返回逻辑键前拒绝其他组织'
+      ),
+      problem: t(
+        'Reading a physical key from another organization must not expose its logical key through this boundary.',
+        '从其他组织取得的物理键不能经此边界暴露逻辑键。'
+      ),
+      example: t(
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey, StorageContractError } from '@migaia/storage-contract'
+const first = '12345678-1234-1234-1234-123456789abc'
+const second = '12345678-1234-1234-1234-123456789abd'
+try { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }
+// INVALID_ARGUMENT`,
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey, StorageContractError } from '@migaia/storage-contract'
+const first = '12345678-1234-1234-1234-123456789abc'
+const second = '12345678-1234-1234-1234-123456789abd'
+try { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }
+// INVALID_ARGUMENT`
+      ),
+      result: t(
+        'Prints INVALID_ARGUMENT; the original envelope is not changed.',
+        '输出 INVALID_ARGUMENT；原封装不变。'
+      )
+    }
+  ],
+  snapshotStorageBaseDetailed: [
+    {
+      title: t('Keep failed base admission inspectable', '基础准入失败仍可检查原错'),
+      problem: t(
+        'A plugin getter can fail before resource ownership transfers. Admission must retain that exact failure without attempting cleanup.',
+        '插件 getter 可在资源所有权转移前失败。准入必须保留精确原错，不尝试清理。'
+      ),
+      example: t(
+        `import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
+const original = new Error('backend getter failed')
+const candidate = { get backend(): never { throw original } }
+const result = snapshotStorageBaseDetailed(candidate)
+console.log(result.valid, !result.valid && result.cause === original)
+// false true`,
+        `import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
+const original = new Error('backend getter failed')
+const candidate = { get backend(): never { throw original } }
+const result = snapshotStorageBaseDetailed(candidate)
+console.log(result.valid, !result.valid && result.cause === original)
+// false true`
+      ),
+      result: t(
+        'Prints false true; no resource method is called.',
+        '输出 false true；不调用资源方法。'
+      )
+    }
+  ],
+  runTransactionOperation: [
+    {
+      title: t('Reject a forged transaction before work starts', '在工作前拒绝伪造事务'),
+      problem: t(
+        'Copied method names are not transaction authority. A composed operation must be admitted by its original private owner.',
+        '复制方法名不是事务权限；组合操作必须由原私有拥有者接纳。'
+      ),
+      example: t(
+        `import { runTransactionOperation, StorageContractError } from '@migaia/storage-contract'
+let calls = 0
+try { runTransactionOperation({}, () => { calls += 1 }) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }
+// INVALID_ARGUMENT 0`,
+        `import { runTransactionOperation, StorageContractError } from '@migaia/storage-contract'
+let calls = 0
+try { runTransactionOperation({}, () => { calls += 1 }) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }
+// INVALID_ARGUMENT 0`
+      ),
+      result: t(
+        'Prints INVALID_ARGUMENT 0; the callback never starts.',
+        '输出 INVALID_ARGUMENT 0；回调没有开始。'
+      )
+    }
+  ],
+  lockKey: [
+    {
+      title: t(
+        'Capture mutable lock identity before the caller changes it',
+        '在调用方修改前捕获可变锁身份'
+      ),
+      problem: t(
+        'A transaction may be configured before it starts. A changed Date must not silently select a different physical lock.',
+        '事务可先配置再开始；Date 被修改后不能悄然选择另一把物理锁。'
+      ),
+      example: t(
+        `import { lockKey } from '@migaia/storage-contract'
+const original = new Date(0)
+const saved = lockKey.record(original)
+original.setTime(1_000)
+console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
+// record 0`,
+        `import { lockKey } from '@migaia/storage-contract'
+const original = new Date(0)
+const saved = lockKey.record(original)
+original.setTime(1_000)
+console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
+// record 0`
+      ),
+      result: t(
+        'Prints record 0; the original Date remains caller-owned and no lock is acquired.',
+        '输出 record 0；原 Date 仍由调用方持有，没有取得锁。'
+      )
+    }
+  ],
+  defineConcurrencyPolicy: [
+    {
+      title: t('Capture a genuine policy without executing it', '捕获真实策略而不执行'),
+      problem: t(
+        'A backend needs an immutable policy identity before opening resources; copying metadata must not copy decision authority.',
+        '后端须在打开资源前捕获不可变策略身份；复制元数据不能复制决策权限。'
+      ),
+      example: t(
+        `import { defineConcurrencyPolicy, ConcurrencyPolicy } from '@migaia/storage-contract'
+let calls = 0
+const custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })
+console.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)
+// custom true 0 optimistic`,
+        `import { defineConcurrencyPolicy, ConcurrencyPolicy } from '@migaia/storage-contract'
+let calls = 0
+const custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })
+console.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)
+// custom true 0 optimistic`
+      ),
+      result: t(
+        'Prints custom true 0 optimistic. No callback, transaction or lock is executed.',
+        '输出 custom true 0 optimistic，不执行回调、事务或锁。'
+      )
+    }
+  ],
+  defineStorageCapability: [
+    {
+      title: t('Keep equal capability names independent', '同名能力仍保持独立身份'),
+      problem: t(
+        'Two backend authors may choose the same diagnostic name. A name cannot grant runtime access to the other author’s API; only the authentic token identity can select an implementation.',
+        '两个后端作者可能选择同一诊断名称。名称不能授予另一个作者 API 的运行权限；只有真实令牌身份才能选择实现。'
+      ),
+      example: t(
+        `import { defineStorageCapability, implement } from '@migaia/storage-contract'
+const first = defineStorageCapability<{ read(): string }>()('catalog')
+const second = defineStorageCapability<{ read(): string }>()('catalog')
+const api = { read: () => 'value' }
+const descriptor = implement(first, api)
+console.log(first !== second, Object.isFrozen(first), Object.isFrozen(descriptor), descriptor.api === api)
+// true true true true`,
+        `import { defineStorageCapability, implement } from '@migaia/storage-contract'
+const first = defineStorageCapability<{ read(): string }>()('catalog')
+const second = defineStorageCapability<{ read(): string }>()('catalog')
+const api = { read: () => 'value' }
+const descriptor = implement(first, api)
+console.log(first !== second, Object.isFrozen(first), Object.isFrozen(descriptor), descriptor.api === api)
+// true true true true`
+      ),
+      result: t(
+        'Prints true true true true. No backend is opened and the implementation API is retained by identity.',
+        '输出 true true true true。不打开后端，并保留实现 API 引用。'
+      )
+    }
+  ],
   createMigrationPlan: [
     {
       title: t(
@@ -44,6 +625,27 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
       result: t(
         'The complete example prints MIGRATION_GAP, VERSION_UNSUPPORTED and MIGRATION_FAILED true. No storage writes occur; current-version state identity is preserved.',
         '完整示例依次输出 MIGRATION_GAP、VERSION_UNSUPPORTED 与 MIGRATION_FAILED true。不会写存储；同版状态保留原引用。'
+      )
+    }
+  ],
+  encodeOrderedStorageKey: [
+    {
+      title: t('Preserve nested key prefix order', '保留嵌套键前缀顺序'),
+      problem: t(
+        'Record indexes and locks must share the existing key order, including UTF-16 and nested prefixes.',
+        '记录索引与锁须共用现有键顺序，包含 UTF-16 与嵌套前缀。'
+      ),
+      example: t(
+        `import { encodeOrderedStorageKey } from '@migaia/storage-contract'
+console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
+// 5,3,0,0`,
+        `import { encodeOrderedStorageKey } from '@migaia/storage-contract'
+console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
+// 5,3,0,0`
+      ),
+      result: t(
+        'Prints 5,3,0,0; the output has its own buffer.',
+        '输出 5,3,0,0；结果持有独立缓冲区。'
       )
     }
   ],
@@ -89,8 +691,8 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
         '只读取一次操作选项，把取消执行留给后端'
       ),
       problem: t(
-        'Options supplied through getters can change between validation and use. One storage layer may validate a timeout while another later reads a different timeout or write policy.\n\nRe-reading the original object at each layer repeats those getters. Copying selected fields in several places also leaves no shared indication that admission has already captured the values.\n\nPass `snapshotOperationContext()` the original options once, then pass its result inward. It captures the four fields and freezes their record; passing that snapshot back reuses its identity. An already-aborted signal is accepted because the helper validates intent only; the backend implements cancellation and timeouts.',
-        '通过访问器提供的选项可能在校验和使用之间变化。存储的一层校验了某个超时，另一层稍后却可能读到不同的超时或写入策略。\n\n各层继续读取原对象，就会重复触发访问器。各自复制几个字段也无法共同识别这些值是否已经在接纳操作时捕获。\n\n先把原选项交给 `snapshotOperationContext()`，再向内传递返回值。它只读取一次四个字段并冻结记录，再次传入该快照会复用同一对象；已取消的信号也可接纳，因为工具只校验意图，实际取消和超时由后端执行。'
+        'Options supplied through getters can change between validation and use. One storage layer may validate a timeout while another later reads a different timeout or write policy.\n\nRe-reading the original object at each layer repeats those getters. Copying selected fields in several places also leaves no shared indication that admission has already captured the values.\n\nPass `snapshotOperationContext()` the original options once, then pass its result inward. It captures the operation fields, including optional orgId, and freezes their record; passing that snapshot back reuses its identity. An already-aborted signal is accepted because the helper validates intent only; the backend implements cancellation and timeouts.',
+        '通过访问器提供的选项可能在校验和使用之间变化。存储的一层校验了某个超时，另一层稍后却可能读到不同的超时或写入策略。\n\n各层继续读取原对象，就会重复触发访问器。各自复制几个字段也无法共同识别这些值是否已经在接纳操作时捕获。\n\n先把原选项交给 `snapshotOperationContext()`，再向内传递返回值。它只读取一次操作字段（包括可选 orgId）并冻结记录，再次传入该快照会复用同一对象；已取消的信号也可接纳，因为工具只校验意图，实际取消和超时由后端执行。'
       ),
       example: t(
         "import { snapshotOperationContext } from '@migaia/storage-contract'\n\nconst controller = new AbortController()\ncontroller.abort()\nlet reads = 0\nconst options = {\n  get signal() { reads += 1; return controller.signal },\n  get timeoutMs() { reads += 1; return 0 },\n  get pageSize() { reads += 1; return 100 },\n  get conflictPolicy() { reads += 1; return 'replace' as const }\n}\nconst snapshot = snapshotOperationContext(options)\nconsole.log('frozen:', Object.isFrozen(snapshot))\nconsole.log('same snapshot:', snapshotOperationContext(snapshot) === snapshot)\nconsole.log('field reads:', reads)\nconsole.log('signal aborted:', snapshot?.signal?.aborted)\nconsole.log('options:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)",
@@ -102,20 +704,20 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
       )
     }
   ],
-  collectionsJsonCodec: [
+  fromValueCodec: [
     {
-      title: t('Restore nested Map and Set values from text', '从文本恢复嵌套的 Map 与 Set'),
+      title: t('Adapt the shared collection codec for storage', '把共享集合 codec 适配到存储'),
       problem: t(
-        'A permissions object contains a Map of users to permission Sets. Ordinary JSON serialization writes these collections as empty objects, so loading the saved text loses the permissions.\n\nJSON does not turn Map entries or Set elements into object fields. A handwritten replacer and reviver must also agree on collection tags and handle nested collections; implementing only one side cannot restore the original types.\n\nUse `collectionsJsonCodec.encode()` and `decode()` as a pair. Both use the same versioned tuple format, preserving Map and Set inside otherwise JSON-compatible data; pass the encoded string to a storage implementation separately.',
-        '权限对象用 `Map` 保存用户，每个用户对应一个权限 `Set`。普通 JSON 序列化把集合写成空对象，重新加载保存的文本后，权限内容就丢失了。\n\nJSON 不会把 Map 条目或 Set 元素转换成对象字段。手写替换器和还原器还需要协调集合标记、处理嵌套集合，只实现一端无法恢复原类型。\n\n配对使用 `collectionsJsonCodec.encode()` 和 `decode()`。两端采用同一版本元组格式，在其余部分兼容 JSON 的数据中保留 Map 与 Set；编码得到的字符串另交给存储实现保存。'
+        'Storage must use one serialize-owned value format. The adapter maps metadata to a storage route while retaining independent encode and decode input domains.',
+        '存储应使用 serialize 唯一拥有的值格式。适配器将元数据映射到存储路由，并独立保留 encode 与 decode 的输入类型。'
       ),
       example: t(
-        "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))",
-        "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+        "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true",
+        "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true"
       ),
       result: t(
-        'Prints `output: text`, `Map: true`, `Set: true`, then `permissions: read, write`.\n\nThe codec restores both nested collection types from a string and does not store that string anywhere. Other values retain JSON limitations; cycles are unsupported. Arrays matching the codec’s exact reserved tuple format are decoded as collections, so avoid using that format as ordinary application data.',
-        '依次输出 `输出形式: text`、`Map: true`、`Set: true`、`权限: read, write`。\n\n编解码器从字符串中恢复两种嵌套集合，不负责保存字符串。其余值仍受 JSON 能力边界限制，不支持循环引用；与保留元组格式完全匹配的数组会被解码为集合，因此普通业务数据应避开该格式。'
+        'Prints collections-json@1 text true. Serialize owns Map/Set revival; adaptation adds no second parser, clone or storage write.',
+        '输出 collections-json@1 text true。Map/Set 还原由 serialize 拥有；适配不增加第二次解析、克隆或存储写入。'
       )
     }
   ],

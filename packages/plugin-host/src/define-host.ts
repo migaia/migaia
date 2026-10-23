@@ -1,7 +1,7 @@
 import { identifyPluginHostCallbackFailure } from './error-text.js'
 import { deferred } from '@migaia/utils/promise'
 import { PluginHost } from './host-runtime.js'
-import { openComposition, registerManagedHost } from './composition.js'
+import { aliasManagedHost } from './composition.js'
 import { readDefinedPluginDefinition } from './define-plugin.js'
 import type { PluginHostError } from './error-text.js'
 import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
@@ -359,6 +359,6 @@ export function defineHost<
     writable: false
   })
   Object.freeze(handleSurface)
-  registerManagedHost(handle, openComposition(runtime))
+  aliasManagedHost(handle, runtime)
   return handle as unknown as IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
 }

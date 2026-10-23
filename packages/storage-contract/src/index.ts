@@ -22,10 +22,16 @@ export { ConflictPolicy } from './context.js'
 export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
 export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js'
 
-export type { ICodec, ICodecOutput } from './codec.js'
-export { COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec } from './collections-codec.js'
+export {
+  fromValueCodec,
+  type ICodec,
+  type ICodecOutput,
+  type ICodecStageObserver
+} from './codec.js'
+export { StorageStageKind } from './stage-kind.js'
 
 export type {
+  IStorageBaseAdmission,
   IKeyValueStoreAdmission,
   IKeyValueStore,
   ISyncKeyValueStore,
@@ -37,6 +43,7 @@ export {
   asRecordStore,
   isRecordStore,
   snapshotKeyValueStore,
+  snapshotStorageBaseDetailed,
   snapshotKeyValueStoreDetailed,
   snapshotRecordStore
 } from './store.js'
@@ -56,7 +63,13 @@ export { asSecondaryIndexRecordStore, isSecondaryIndexRecordStore } from './seco
 export type { IStorageChange, IChangeFeedStore } from './change-feed.js'
 export { asChangeFeedStore, isChangeFeedStore } from './change-feed.js'
 
-export type { ITransactionScope, ITransactionWriteOptions } from './transaction.js'
+export type {
+  ITransactionScope,
+  ITransactionWriteOptions,
+  ITransactionKeyValueApi,
+  ITransactionRecordsApi,
+  ITransactionStageObserver
+} from './transaction.js'
 export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
 
 export {
@@ -79,6 +92,54 @@ export {
 
 export { intrinsicConstructorName } from './bytes.js'
 
+export type { IStorageResource, IStorageIterator } from './resource.js'
+export {
+  BACKEND_KIND_PATTERN,
+  isBackendKind,
+  type IChainMethods,
+  type IChainMethodsOf,
+  type IWithChainMethods,
+  type IBackendStageObserver,
+  type IStorageOperationStageObserver,
+  type IBackendStageBindings
+} from './backend.js'
+export type {
+  ILockKey,
+  IConcurrencyPolicy,
+  ITransactionOptions,
+  IWriteConcurrencyOptions,
+  ITransactionBuilder,
+  ILockedTransactionBuilder,
+  IConcurrencyHolder,
+  IConcurrencyDecision,
+  IConcurrencyStageObserver
+} from './concurrency.js'
+export {
+  defineStorageCapability,
+  implement,
+  provideCapabilities,
+  hasStorageCapability,
+  useStorageCapability,
+  kv,
+  records,
+  type IStorageCapability,
+  type IAnyStorageCapability,
+  type ICapabilityApi,
+  type IStorageBase,
+  type IStorageStore,
+  type IKeyValueApi,
+  type IRecordsApi,
+  type ITransactionalCapability,
+  type ITransactionCapabilityApi,
+  type ICapabilityImpl,
+  type ICapabilityStore,
+  type IStorageCapabilitySet,
+  type IStorageImplementationsOf,
+  type IStorageCapabilityApiOf,
+  type ICapabilityPublication,
+  type ICapabilityInstallPort
+} from './capability.js'
+
 export {
   assertVersionedEnvelope,
   createMigrationPlan,
@@ -93,3 +154,91 @@ export {
   type IMigrationStepObserver,
   type IMigrationRunOptions
 } from './versioned.js'
+
+export { ConcurrencyHolderState } from './concurrency.js'
+export type {
+  ISqlStageObserver,
+  ISqlValue,
+  ISqlRow,
+  ISqlRunResult,
+  ISqlFragment,
+  ISqlInput,
+  ISqlQuery,
+  ISqlTag,
+  ISqlExecutor,
+  ICompiledStorageSql
+} from './sql.js'
+export { sqlFragment, createSqlTag } from './sql.js'
+export type { IQueryStageObserver } from './query.js'
+
+export { encodeOrderedStorageKey } from './key-order.js'
+
+export {
+  TransactionActivityMode,
+  TransactionBeforeStage,
+  TransactionObservedStage,
+  createTransactionOwner,
+  deriveTransactionIterator,
+  readTransactionOperationContext,
+  assertTransactionOwner,
+  runTransactionOperation,
+  registerTransactionFinalizer,
+  nextTransactionIterator
+} from './transaction.js'
+export type { ITransactionInfo } from './transaction.js'
+
+export { defineConcurrencyPolicy, ConcurrencyPolicy } from './concurrency.js'
+export type { IConcurrencyConflict, ILockHolding } from './concurrency.js'
+
+export { lockKey } from './concurrency.js'
+
+export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'
+
+export {
+  runWithConcurrency,
+  readConcurrencyLockIdentities,
+  snapshotConcurrencyLockHoldings,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange
+} from './concurrency.js'
+export type {
+  IConcurrencyAttempt,
+  IConcurrencyAttemptContext,
+  IConcurrencyPort
+} from './concurrency.js'
+export { resolveConcurrencyPolicy } from './transaction.js'
+
+export { createTransactionBuilder, TransactionBuilderMethod } from './transaction-builder.js'
+
+export {
+  QueryOperator,
+  QueryOperation,
+  compileStorageWhere,
+  createRecordQuery,
+  RecordQueryMethod
+} from './query-chain.js'
+export type {
+  IFieldOps,
+  IWhere,
+  IQueryCondition,
+  IQueryPlanStep,
+  IQueryPlan,
+  IQueryPushdown,
+  IQueryRead,
+  IQueryShape,
+  IQueryResultOf,
+  IQueryResult,
+  IQueryChain,
+  IRecordQuerySource,
+  IRecordQuery,
+  IRecordQueryCore,
+  IRecordQueryBase,
+  IRecordQueryBaseCore,
+  IRecordQueryNeedsLimit
+} from './query-chain.js'
+
+export { useTransactionCapability } from './transaction.js'
+export type { ITransactionCapabilityView, IWithTransactionQueryMethods } from './capability.js'
+
+export { snapshotStorageKeyPrefix } from './key-order.js'
+export type { IStorageKeyPrefix } from './key-order.js'

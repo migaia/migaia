@@ -47,12 +47,14 @@
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
     "@migaia/reactive": "workspace:^",
+    "@migaia/serialize": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
-    "@migaia/storage-web": "workspace:^",
+    "@migaia/storage-host": "workspace:^",
     "@migaia/store-indexed": "workspace:^",
     "@migaia/store-keyed": "workspace:^",
     "@migaia/store-light": "workspace:^",

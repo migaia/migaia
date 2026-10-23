@@ -60,6 +60,23 @@ export const StorageContractErrorCode = Object.freeze({
    */
   aborted: 'ABORTED',
 
+  /**
+   * A strict query contains client-only steps; inspect its plan or remove strictness before
+   * reading.
+   */
+  queryNotPushable: 'QUERY_NOT_PUSHABLE',
+
+  /** A genuine policy threw or returned an invalid/inapplicable decision; correct the policy. */
+  concurrencyPolicyFailed: 'CONCURRENCY_POLICY_FAILED',
+  /** A logical admission or physical operation deadline expired; resources have finished cleanup. */
+  lockTimeout: 'LOCK_TIMEOUT',
+  /** A real acquisition conflict was rejected by policy; choose a different key or retry later. */
+  lockRejected: 'LOCK_REJECTED',
+  /** A completed rollback reported a write conflict that policy declined to retry; reload data. */
+  writeConflict: 'WRITE_CONFLICT',
+  /** A backend confirmed another attempt replaced its expired lock; retry with a fresh attempt. */
+  lockLost: 'LOCK_LOST',
+
   /** Saved data is not an own-property version/state envelope; correct the archive or writer. */
   envelopeInvalid: 'ENVELOPE_INVALID',
   /** The archive is newer than this code or older than its migration range; update the plan. */

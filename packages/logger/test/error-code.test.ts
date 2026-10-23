@@ -7,10 +7,10 @@ import { process as processPlugin } from '../src/plugins/process.js'
 import { LoggerErrorText } from '../src/error-text.js'
 
 describe('logger error-code contract', () => {
-  it('declares 17 unique codes under the package source', () => {
+  it('declares 27 unique codes under the package source', () => {
     const codes = Object.values(LoggerErrorCode)
-    expect(codes).toHaveLength(17)
-    expect(new Set(codes).size).toBe(17)
+    expect(codes).toHaveLength(27)
+    expect(new Set(codes).size).toBe(27)
     expect(LOGGER_SOURCE).toBe('@migaia/logger')
   })
 

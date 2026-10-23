@@ -26,23 +26,24 @@ export const StorePersistErrorCode = {
 
   /**
    * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires
-   * `removeBytes`, but the storage backend lacks the required operation.
+   * `removeBytes`, but the storage backend lacks the required operation. Atomic persistence also
+   * requires the original complete record store with transaction support.
    *
    * Use a record-capable backend such as memory or IndexedDB, or use a text codec.
    */
   backendCapability: 'BACKEND_CAPABILITY',
 
   /**
-   * The saved envelope is invalid or incompatible with the current store version. Its state may be
-   * missing, its version invalid, its properties inaccessible, or its version different without a
-   * migration.
+   * The default JSON codec receives a non-string payload or cannot decode the supplied JSON.
    *
-   * Check the archive and configured `version`. Provide `migrate` for a version mismatch.
+   * Inspect the payload and cause chain. Envelope structure and versions belong to
+   * storage-contract.
    */
   envelopeInvalid: 'ENVELOPE_INVALID',
 
   /**
-   * The JSON codec fails to serialize a value.
+   * The JSON codec fails to serialize a value, or an uncoded snapshot, partialize or codec failure
+   * occurs inside an admitted transactional flush.
    *
    * Check whether the value is JSON-serializable. The original exception remains in `cause`.
    */
@@ -62,12 +63,13 @@ export const StorePersistErrorCode = {
    * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`.
    *
    * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of
-   * active operations. An in-flight adapter may still complete.
+   * active operations, including an enlisted transaction. An in-flight adapter may still complete.
    */
   abortedByDispose: 'ABORTED_BY_DISPOSE',
 
   /**
-   * Persistence options are invalid, for example when `version` is not a safe non-negative integer.
+   * Persistence options or transaction participation are invalid. This includes an invalid version,
+   * a forged or mismatched handle/view, and a direct mutation during explicit participation.
    *
    * Correct the configuration before retrying. This is a permanent input error.
    */

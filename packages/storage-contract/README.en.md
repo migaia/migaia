@@ -2,7 +2,7 @@
 
 [中文](./README.md)
 
-Give features and storage implementations shared interfaces, key rules and validation boundaries, with a text codec that preserves Map/Set. Backends perform the actual storage operations.
+Give features and storage implementations shared interfaces, key rules and validation boundaries, with an adapter to the shared serialize codecs. Backends perform the actual storage operations.
 
 ## You may have run into this
 
@@ -14,7 +14,7 @@ Give features and storage implementations shared interfaces, key rules and valid
 
 ## Why choose it
 
-- **Collection types survive a text round trip.** Native JSON loses Map/Set values; the built-in codec uses one versioned tuple format at both ends and restores nested types. [Run the example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text).
+- **Collection types survive a text round trip.** Native JSON loses Map/Set values; the shared serialize collection codec owns the format at both ends, while the adapter preserves its types. [Run the example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text).
 - **Mutable key components stop sharing the caller’s objects.** A shallow array copy still shares Dates and buffers; key snapshots recursively copy and revalidate them. [Run the example](./USEGUIDE.en.md#capture-a-composite-key-before-its-owner-changes-it).
 - **Capability decisions use one admitted description.** Truthy checks can accept invalid fields, and retaining the input lets later mutation change a decision. Capability snapshots validate fields, default only two legacy flags to false and return a separate record. [Run the example](./USEGUIDE.en.md#normalize-an-older-capability-descriptor-before-choosing-a-channel).
 - **An operation has one captured option record.** Rereading getters can change intent; context snapshots read fields once, freeze the record and reuse it, leaving cancellation execution to backends. [Run the example](./USEGUIDE.en.md#read-operation-options-once-without-claiming-to-execute-cancellation).
@@ -25,15 +25,21 @@ Give features and storage implementations shared interfaces, key rules and valid
 Encode nested permissions as text, then restore actual collection instances:
 
 ```ts doc-test=run
-import { collectionsJsonCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 
-const settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }
-const raw = await collectionsJsonCodec.encode(settings)
-const restored = (await collectionsJsonCodec.decode(raw)) as typeof settings
-console.log('output:', collectionsJsonCodec.output)
-console.log('Map:', restored.roles instanceof Map)
-console.log('Set:', restored.roles.get('Ada') instanceof Set)
-console.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))
+const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
+
+const settings = new Map([['Ada', new Set(['read', 'write'])]])
+const raw = await codec.encode(settings)
+const restored = await codec.decode(raw)
+if (!(restored instanceof Map)) throw new Error('Expected Map')
+const permissions = restored.get('Ada')
+if (!(permissions instanceof Set)) throw new Error('Expected Set')
+console.log('output:', codec.output)
+console.log('Map:', restored instanceof Map)
+console.log('Set:', permissions instanceof Set)
+console.log('permissions:', [...permissions].join(', '))
 ```
 
 Output:
@@ -68,7 +74,7 @@ The codec above owns the version tags and collection revival, so callers do not 
 | Bytes, records, iteration and transactions are required | IRecordStore (L1), after asRecordStore admission       |
 | Descriptors or operation options may change             | snapshotStorageCapabilities / snapshotOperationContext |
 | Async work cannot retain the caller’s mutable key       | snapshotStorageKey                                     |
-| Text must preserve Map/Set values                       | collectionsJsonCodec                                   |
+| Text must preserve Map/Set values                       | fromValueCodec                                         |
 
 A “contract” is the input, output and error agreement between caller and implementation. A “capability” describes operations actually available on an object. “Narrowing” checks an object before using a more specific interface. A “snapshot” captures current values; its API determines copying and freezing. A “codec” translates values to and from a storage representation.
 
@@ -79,7 +85,7 @@ A “contract” is the input, output and error agreement between caller and imp
 | Capture a composite key before its owner changes it                  | `snapshotStorageKey`          | [Complete example](./USEGUIDE.en.md#capture-a-composite-key-before-its-owner-changes-it)                  |
 | Reject an object before treating it as a record key                  | `snapshotStorageKey`          | [Complete example](./USEGUIDE.en.md#reject-an-object-before-treating-it-as-a-record-key)                  |
 | Read operation options once without claiming to execute cancellation | `snapshotOperationContext`    | [Complete example](./USEGUIDE.en.md#read-operation-options-once-without-claiming-to-execute-cancellation) |
-| Restore nested Map and Set values from text                          | `collectionsJsonCodec`        | [Complete example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text)                          |
+| Restore nested Map and Set values from text                          | `fromValueCodec`              | [Complete example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text)                          |
 | Normalize an older capability descriptor before choosing a channel   | `snapshotStorageCapabilities` | [Complete example](./USEGUIDE.en.md#normalize-an-older-capability-descriptor-before-choosing-a-channel)   |
 | Keep the original failure when reporting a contract error            | `StorageContractError`        | [Complete example](./USEGUIDE.en.md#keep-the-original-failure-when-reporting-a-contract-error)            |
 
@@ -89,7 +95,7 @@ A “contract” is the input, output and error agreement between caller and imp
 pnpm add @migaia/storage-contract
 ```
 
-Inside the workspace, use `@migaia/storage-contract@workspace:^`. The runtime dependency is `@migaia/utils`. Choose an implementation package when you need an actual backend.
+Inside the workspace, use `@migaia/storage-contract@workspace:^`. Dependencies are `@migaia/utils` and `@migaia/serialize`; serialize is imported only as a type by this adapter. Choose an implementation package when you need an actual backend.
 
 ## Essential APIs
 
@@ -97,7 +103,7 @@ Inside the workspace, use `@migaia/storage-contract@workspace:^`. The runtime de
 | -------------------------------------------------- | -------------------------------------------------------------------- |
 | IKeyValueStore / IRecordStore                      | Define the L0/L1 boundary between features and implementations       |
 | asRecordStore                                      | Verify complete capabilities before calling record methods           |
-| collectionsJsonCodec                               | Round-trip Map/Set inside JSON-compatible data through text          |
+| fromValueCodec                                     | Round-trip Map/Set inside JSON-compatible data through text          |
 | snapshotStorageKey                                 | Validate and copy a key before async work                            |
 | snapshotOperationContext                           | Capture operation options once                                       |
 | snapshotStorageCapabilities / StorageContractError | Admit capability descriptions and report traceable contract failures |
@@ -106,7 +112,7 @@ Inside the workspace, use `@migaia/storage-contract@workspace:^`. The runtime de
 
 ### Entry point, ownership and boundaries
 
-The package has one root entry, `@migaia/storage-contract`, with no public subpaths. It provides storage interfaces, capability descriptions, key domains, operation contexts, codecs, transaction scopes and contract errors, plus validators, snapshot helpers and a collection JSON codec. Its runtime dependency is `@migaia/utils`; the structural `IAbortSignal` type comes from `@migaia/utils/promise`.
+The package has one root entry, `@migaia/storage-contract`, with no public subpaths. It provides storage interfaces, capability descriptions, key domains, operation contexts, codecs, transaction scopes and contract errors, plus validators, snapshot helpers and a serialize codec adapter. Its declared dependencies are `@migaia/utils` and `@migaia/serialize`; the adapter imports serialize types only; the structural `IAbortSignal` type comes from `@migaia/utils/promise`.
 
 There is no persistence backend here. It opens no database, writes no disk, and depends on neither DOM nor IndexedDB nor Node. Connections, reads, writes, commits, isolation and retry belong to implementations such as `@migaia/storage-web`. Features depend on these interfaces; implementations depend on the contract, never the reverse. Compression, encryption or Worker recoding can implement the same codec interface, but those extensions are not supplied here.
 
@@ -114,7 +120,7 @@ L0 means the string key-value channel shared by all backends. L1 adds bytes, str
 
 ### L0, synchronous access and L1
 
-`IBackendKind` accepts only `'local'`, `'session'`, `'cookie'`, `'indexeddb'` and `'memory'`. Read-only `backend` and `capabilities` identify an IKeyValueStore's backend and abilities. Keys in this table are strings. Async ctx arguments default to undefined; their fields are described below.
+`IBackendKind` is an open string type; runtime admission requires `[a-z][a-z0-9-]{0,63}`. Names describe providers and do not grant capability access. Read-only `backend` and `capabilities` identify an IKeyValueStore's backend and abilities. Keys in this table are strings. Async ctx arguments default to undefined; their fields are described below.
 
 | IKeyValueStore member   | Result and meaning                                                                                |
 | ----------------------- | ------------------------------------------------------------------------------------------------- |
@@ -144,7 +150,7 @@ L0 means the string key-value channel shared by all backends. L1 adds bytes, str
 | `clearAll(ctx?)`                                | Clears values, bytes and records together.                                                                                                                                     |
 | `metadata?`                                     | Optional backend maintenance channel. get(key, ctx?) returns unknown or undefined; set(key, value, ctx?) and delete(key, ctx?) return `Promise<void>`. set uses IWriteOptions. |
 | `iterateRecords(range?, ctx?)`                  | Async iterator of [IStorageKey, TValue] pairs.                                                                                                                                 |
-| `transaction(run, ctx?)`                        | run receives `ITransactionScope<TValue>` and returns `Promise<T>`; transaction returns `Promise<T>`.                                                                           |
+| `transaction(run, ctx?)`                        | run receives the complete scope and returns TResult; transaction returns `Promise<Awaited<TResult>>`.                                                                          |
 
 Metadata supports resumable maintenance migrations and remains separate from values, bytes and records. It is outside clearAll/clearRecords. An omitted range supplies no explicit bound; the implementation interprets queries.
 
@@ -191,9 +197,9 @@ Existing backend descriptions use approximately 4096 bytes for cookies and 5 MB 
 
 `ConflictPolicy.conflict` is `'conflict'`: fail when a value already exists. `ConflictPolicy.replace` is `'replace'`: replace it. Use this constant and IConflictPolicy instead of duplicate constants or aliases.
 
-`snapshotOperationContext(ctx)` accepts a context or undefined. Undefined stays undefined. For a valid object it reads signal, timeoutMs, pageSize and conflictPolicy once, then returns a frozen snapshot. Passing one of its own snapshots again returns that exact object without rereading original getters. Invalid objects, fields, signal shapes or getter failures throw INVALID_ARGUMENT, retaining the original cause. `assertOperationContext(ctx)` performs the same validation but discards the result.
+`snapshotOperationContext(ctx)` accepts a context or undefined. Undefined stays undefined. For a valid object it reads signal, timeoutMs, pageSize, conflictPolicy and orgId once, then returns a frozen snapshot. Passing one of its own snapshots again returns that exact object without rereading original getters. Invalid objects, fields, signal shapes or getter failures throw INVALID_ARGUMENT, retaining the original cause. `assertOperationContext(ctx)` performs the same validation but discards the result.
 
-Only context fields are frozen, not signal state. A structurally valid already-aborted signal still passes admission. This package neither waits for operations nor starts timers or a cancellation engine. Cancellation-aware backends use ABORTED to stop waiting, without promising a native AbortError. A write already inside atomic commit reports its actual commit outcome rather than claiming rollback.
+Only context fields are frozen, not signal state. A structurally valid already-aborted signal still passes admission. These context helpers neither wait for operations nor start timers or a cancellation engine. Cancellation-aware backends use ABORTED to stop waiting, without promising a native AbortError. A write already inside atomic commit reports its actual commit outcome rather than claiming rollback.
 
 `ISyncWriteOptions` permits only optional conflictPolicy. `snapshotSyncWriteOptions(options)` takes an object or undefined, reads signal, timeoutMs and conflictPolicy, and rejects non-undefined signal/timeoutMs. Explicit undefined values are accepted. Extra pageSize is not read and grants no synchronous paging. The new { conflictPolicy } object is not frozen, and omission stays undefined. `assertSyncWriteOptions(options)` validates without returning a snapshot. Invalid shapes, fields and getters produce INVALID_ARGUMENT.
 
@@ -223,15 +229,25 @@ Type ordering is number < Date < string < ArrayBuffer < array. Numbers compare b
 
 `snapshotCodec(codec)` takes unknown. It requires a non-null, non-array object, including a class instance satisfying the shape. name must be nonblank after trimming, output must be one of the three values, and encode/decode must be callable. Each of the four fields is read once. The new shallow { name, output, encode, decode } description retains function references without binding their old receiver and is not frozen. `assertCodec(codec)` checks the same shape and narrows the input type without returning a description. Bad shapes and reads produce INVALID_ARGUMENT.
 
-`collectionsJsonCodec` is the built-in frozen codec. Its name is `COLLECTIONS_JSON_CODEC_NAME`, or `'migaia-collections-json-v1'`, and output is text. Maps and Sets become three-item tuples containing that version name, a map/set kind and an array payload. Decoding interprets only the exact reserved forms. Ordinary or merely similar arrays are left alone; arrays exactly matching the reserved form are interpreted as collections, so that tuple form is unavailable as ordinary application data.
+`fromValueCodec` adapts a serialize codec without implementing another value format. Compose `defineCollectionsJsonCodec({ version: 1 })` to preserve Map/Set with the serialize-owned `$rpc` map/entries and set/values records. The adapter name is `collections-json@1`, output is text, and unsupported values are rejected by serialize.
 
 Other values retain JSON's limits: this is not lossless serialization of arbitrary object graphs. Unrepresentable roots, cycles, BigInts and other JSON encoding failures produce INVALID_ARGUMENT, as do non-string input, invalid JSON and invalid reserved collection payloads. Original failures stay on cause. Browser structured/binary codecs belong to storage-web. Custom compression, encryption and Worker codecs implement the same interface outside this package.
 
 ### Transaction scopes and conflict policies
 
-`ITransactionScope<TValue>` has only get(key): `Promise<TValue | undefined>`, put(value, key?, options?): `Promise<IStorageKey>`, and delete(key): `Promise<void>`. Keys are IStorageKey; omitted put keys are generated by the implementation. `ITransactionWriteOptions` has only optional conflictPolicy.
+`ITransactionScope<TValue>` covers text `get/set/remove/has`, bytes `getBytes/setBytes/removeBytes`, and records `getRecord/putRecord/deleteRecord/iterateRecords`. Text and bytes return null when absent; records return undefined. Records use `IStorageKey`, and omitted putRecord keys request backend generation. The old record `put/delete` names are removed; `get` now reads text. Methods inherit the transaction context and only writes accept reduced conflict options. Optional `putIndexedRecord/iterateRecordIndex` signatures are reused by `ISecondaryIndexTransactionScope` rather than redeclared.
 
-Isolation, commit timing and retry are implementation-defined. This package executes no transaction. Do not retain and use a scope after its callback resolves; its connection or snapshot may have been released. `assertTransactionCallback(run, backend)` checks that run is callable before the implementation allocates resources, otherwise throwing INVALID_ARGUMENT with backend details.
+`createTransactionOwner` registers one original store and authentic view identities. Backends hold register/createScope/onFailure and lifecycle control; features use `assertTransactionOwner`, `runTransactionOperation`, `registerTransactionFinalizer` and `nextTransactionIterator`. Operation callbacks start synchronously on a fresh complete view. stopAdmission closes only the user view; already-admitted work drains on its own view. Every check and final library beforeCommit gets a new view, runs once, drains children and releases iterators before the next check. A caught or unawaited operation failure still locks the backend-normalized first failure and notifies rollback. No new database, runner or current-scope global exists here.
+
+`register` also accepts the backend's captured `context`. It reuses `snapshotOperationContext` to capture frozen fields once and retain the original signal. `readTransactionOperationContext(scope)` returns that same snapshot only for an authentic live user, operation or check view; omitted context returns undefined, while forged or expired views throw INVALID_ARGUMENT. Terminal close releases the registration's context reference. This read-only access grants no registration, close or cancellation-controller authority and creates no second timeout budget.
+
+The optional `ITransactionScope.isRecordIndexReady?(handle)` reads only the same native transaction snapshot. Missing, pending or stale indexes return false; true requires complete metadata matching the handle generation and fingerprint. It neither builds nor refreshes an index and never opens another transaction. Existing scopes without this method remain valid; `ISecondaryIndexTransactionScope` still requires only its original indexed read and write methods.
+
+`deriveTransactionIterator(iterator, read, close?)` derives a resource only from an actual iterator registered by the original owner. Unregistered sources return undefined without invoking read or close. The read arguments are the original advance function, original first-failure propagation function and the actual current next operation view, `currentScope`; existing two-argument callbacks remain valid. That view expires when the complete advance settles. Optional close releases an actual additional cursor created lazily while reading. The original resource lifetime drains accepted advances, then closes the later-created additional source before the original source, attempting both even on failure. The first failure is locked immediately in the original state; existing cleanupFailure aggregates later failures and preserves causes. Without additional close, the original cleanup function is reused directly. This grants no free scope construction, registration or store-close authority and adds no registry or lifecycle.
+
+All ordinary and indexed record iterators return `IStorageIterator`; `IKeyValueStore` inherits the single `IStorageResource` declaration. The owner registers actual iterator objects, advances each through a current valid view, waits accepted next calls, then closes remaining resources in reverse creation order. dispose returns one cached rejecting Promise; the fixed symbolic method returns a separately cached Promise that reports and resolves. return and natural completion use that same actual cleanup. The outer host supplies its canonical asyncDisposeKey when native support is absent; the contract creates no fallback. assert on forged, wrong-store or expired scope throws INVALID_ARGUMENT, while expired data methods reject a precomputed backend TRANSACTION_FAILED without invoking factory or data callbacks.
+
+The package owns neutral transaction coordination; native commit, isolation, cancellation and retry stay with backends. IndexedDB native activity windows are strict: obtain external data before opening a transaction. A timer await can invalidate subsequent requests; memory and SQLite manage their own activity. `assertTransactionCallback` validates callability before backend allocation. Actual backend integration remains required before claiming these interfaces prove atomic persistence.
 
 `readTransactionConflictPolicy(options, backend)` takes undefined or an object. Omitted options or conflictPolicy return conflict; replace returns replace. A bare policy string, malformed object or field produces INVALID_ARGUMENT; getter failures preserve the exact cause. It only reads policy and performs no write.
 
@@ -279,7 +295,7 @@ A feature may accept only IKeyValueStore, narrowing when it actually needs recor
 
 1. Validate and retain the call's context through snapshotOperationContext(ctx).
 2. Narrow through `asRecordStore<IProfile>`(store); use its existing UNSUPPORTED_CAPABILITY failure instead of inventing a bare Error.
-3. Use tx.get/put/delete in records.transaction, passing the context snapshot to transaction.
+3. Use tx.getRecord/putRecord/deleteRecord in records.transaction, passing the context snapshot to transaction.
 4. Return the callback result. The actual backend owns connections, atomic commit and retry.
 
 For a text-only backend, the caller explicitly selects a text codec or conversion. A binary flag alone does not replace complete record-store admission. Validate custom gzip, encryption or Worker codecs with assertCodec/snapshotCodec before giving them to implementations.
@@ -339,3 +355,268 @@ try {
 `migrateEnvelope` accepts asynchronous steps and cancellation. Cancellation is checked even when the archive already has the current version. The synchronous entry rejects known asynchronous steps statically and rejects runtime thenables while consuming their late rejection. A `{ version, reset: () => ({}) }` plan resets an older archive once, preserves current-version state identity, and rejects newer archives. User mutations of state and external side effects are not rolled back.
 
 `observe.beforeStep` and `observe.afterStep` only observe; their return values are not awaited. Failures go to synchronous `observe.report` without changing migration results, or to the existing utils host report when omitted. Resource cleanup, host pipelines, and archive writes remain with their existing owners.
+
+## Capability tokens and implementations
+
+`defineStorageCapability` creates a frozen API token and supplies no storage implementation. Backend authors provide authentic records with `implement`, then `provideCapabilities` modifies the original resource-backed base. Backend and capability names are diagnostic; two tokens with the same name remain distinct. The provider retains class methods, nonenumerable members, and exact API types without cloning the base.
+
+```ts
+import {
+  defineStorageCapability,
+  implement,
+  provideCapabilities,
+  type IStorageBase
+} from '@migaia/storage-contract'
+
+const catalog = defineStorageCapability<{ read(key: string): Promise<string | null> }>()('catalog')
+function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string | null>) {
+  return provideCapabilities(base, [implement(catalog, { read })])
+}
+```
+
+This is an internal backend assembly function; the host still installs and disposes the resulting store. `store.use(catalog)` returns the exact implementation object. A real unregistered token throws `UNSUPPORTED_CAPABILITY` naming its backend and capability; a forged token throws `INVALID_ARGUMENT`. `store.has(token)` synchronously returns a boolean. The standard `kv` token also publishes the existing flat methods, while `has(key, ctx)` remains an asynchronous key lookup.
+
+The host captures this store's unique installation port through `onInstaller`. `prepare` validates the entire authentic batch and reserves tokens, `publish` makes it visible, and `release` removes that publication idempotently. Failure does not dispose the base; the backend that created it retains rollback ownership. Transaction and query execution remain with their existing owners; pure type projection creates no transaction or connection.
+
+### fromValueCodec
+
+```ts
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const codec = fromValueCodec(defineJsonCodec({ version: 2 }))
+const raw = await codec.encode({ count: 1 })
+console.log(codec.name, codec.output, await codec.decode(raw))
+// json@2 text { count: 1 }
+```
+
+The frozen adapter snapshots all five metadata/callback fields once. Text, byte and unknown carriers map to text, binary and structured storage routes. Encode and decode keep independent input types; tagged codecs therefore retain their legacy decode inputs. Both callbacks run once and are awaited. Synchronous throws and rejected Promises become contract `INVALID_ARGUMENT` with the exact source error on cause. No second parsing, value copying, hooks, resource or connection is created. `StorageStageKind` and `ICodecStageObserver` describe observation only; actual store-bound dispatch belongs to the host.
+
+### Resource-base admission and observer ports
+
+`snapshotStorageBaseDetailed(candidate, { asyncDisposeKey }?)` admits `IStorageBase` without requiring key-value methods. It reads backend, capability facts and cleanup functions once. A valid `IStorageBaseAdmission` retains the original `store`, captured `backend`, detached `capabilities`, `dispose`, `receiver` and optional `asyncDispose`. Invalid shape returns `{ valid: false, cause: undefined }`; failed reflection retains the exact thrown cause. Frozen or already-provided bases remain valid because admission neither installs methods nor takes resource ownership.
+
+The outer host may pass its fixed canonical `asyncDisposeKey`. Otherwise admission uses the native `Symbol.asyncDispose`; if native support is absent it only requires explicit disposal. The contract creates no fallback symbol and never invokes a cleanup function during admission. Provider-only extensibility and installation checks remain in `provideCapabilities`.
+
+`IBackendStageBindings` connects seven distinct observer families: backend, operation, codec, transaction, concurrency, SQL and query. Their canonical `kind` literals prevent accidental family interchange. These declarations supply no executor or second registry; the host binds observers to the original store and transaction scope. `IConcurrencyHolder` distinguishes a real holder from a remote handoff interval, and `IConcurrencyDecision` excludes incompatible wait/reject/retry fields.
+
+### Ordered key bytes
+
+`encodeOrderedStorageKey(key, backend)` first reuses `snapshotStorageKey` validation and copying, then returns independently owned `Uint8Array` bytes. Lexicographic byte order agrees with `compareStorageKeys`, including signed zero, Date, UTF-16 code units, binary prefixes and nested array prefixes. The writer measures once and appends once into one allocation; it does not sort or concatenate completed child encodings. This encoding serves record indexes and lock ordering, and does not replace persisted value codecs or existing flat storage keys.
+
+### Authentic concurrency policies
+
+```ts
+import { ConcurrencyPolicy, defineConcurrencyPolicy } from '@migaia/storage-contract'
+
+const wait = ConcurrencyPolicy.wait({ timeoutMs: 2_000 })
+const fail = ConcurrencyPolicy.fail()
+const optimistic = ConcurrencyPolicy.optimistic({ retries: 2, backoffMs: 10 })
+const custom = defineConcurrencyPolicy({
+  name: 'retry-twice',
+  locking: 'pessimistic',
+  decide: (conflict) =>
+    conflict.attempt <= 2 ? { action: 'retry', delayMs: 10 } : { action: 'reject' }
+})
+console.log(wait.name, fail.name, optimistic.locking, custom.name)
+// wait fail optimistic retry-twice
+```
+
+Factories validate and capture definition fields once, freeze only public name/locking metadata, and retain the original decision callback privately. A copied or structurally forged policy is rejected. Zero budgets are valid; durations and retry counts must be nonnegative safe integers. Definition or option getter failures retain the exact cause under INVALID_ARGUMENT. Policy creation executes no decision callback, transaction or lock acquisition.
+
+The original transaction owner captures defaultPolicy and concurrencyStages once. Without an override it creates exactly one wait policy; explicit authentic overrides take precedence. Default selection uses that same private owner registration and never a public store field or another store registry. Wait defaults to 30,000 ms of logical admission, optimistic to three conflicts with 20 ms backoff. The decision loop below still needs real backend-lock integration; policy metadata alone does not prove native locking behavior.
+
+### Canonical lock keys
+
+```ts
+import { lockKey } from '@migaia/storage-contract'
+
+const original = new Date(0)
+const saved = lockKey.record(original)
+original.setTime(1_000)
+console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
+// record 0
+```
+
+`lockKey.text` and `lockKey.record` accept the existing typed storage-key domain; `lockKey.bytes` accepts strings. Factories validate and detach Dates, ArrayBuffers and nested arrays immediately, while freezing only the channel/key container. No store exists at this point, so failures carry undefined backend diagnostics. The existing `assertStorageKey`, `snapshotStorageKey` and `assertStringStorageKey` second parameter therefore admits `IBackendKind | undefined`; their arity and supported key domain are unchanged.
+
+The original concurrency owner’s internal normalization uses the actual backend label, captures each lock field once, prefixes only the physical channel, and calls the sole ordered-key encoder. An explicit MSD suffix stack uses fixed byte/terminator buckets and one scratch array; adjacent canonical bytes deduplicate equal Dates, buffers, tuples and signed zero. Text, bytes and record channels remain distinct; typed text number 1 also remains distinct from string '1'. Work and storage follow total key bytes plus key count, without comparison sorting, longest-key padding or global identity caches. Actual locking remains the backend execution boundary.
+
+### Organization keys and contexts
+
+Optional `IOperationContext.orgId` accepts canonical lowercase, 36-character UUID syntax, including the zero UUID. `assertOperationContext({ orgId })` reuses the same admission. `snapshotOperationContext` captures identity once; omission or explicit undefined adds no orgId property. The outer host owns the default organization and UUID generation.
+
+`prefixStorageOrgKey(orgId, key)` returns a detached `['$o', orgId, key]` snapshot, keeping tuple logical keys nested in the third slot. `unprefixStorageOrgKey(orgId, key)` admits only that exact three-part envelope for the same organization and returns a detached logical-key snapshot. A foreign organization, noncanonical UUID, or malformed envelope throws INVALID_ARGUMENT; an invalid contained logical key retains INVALID_KEY. The internal envelope does not consume the logical key's depth or node budget. These pure functions open no store, select no namespace, and perform no cross-organization I/O.
+
+### Concurrency execution
+
+Backend and persist authors pass original options directly to `runWithConcurrency({ store, options }, port)`. The original store must have a transaction-owner registration. The loop captures borrowed option getters once, then resolves the captured override or the original owner default. An explicitly supplied request.policy remains the sole effective policy and retains its existing validation/errors. Passing an authentic outer attempt context preserves its exact private deadline and normalized locks; copying it is unnecessary. The loop reads lock/concurrency before operation context fields and normalizes lock identities once. Backend-specific option admission stays with that backend.
+
+`IConcurrencyPort.attempt(context)` must finish its native transaction, rollback and cleanup before returning a conflict or throwing. The loop starts with try, decides only on real conflicts, waits only for acquisition, and retries after the old attempt finishes. Rejected acquisition is LOCK_REJECTED; rejected commit conflict is WRITE_CONFLICT with the exact backend cause. Invalid or throwing decisions produce CONCURRENCY_POLICY_FAILED. Backends use LOCK_LOST when they prove their own lease was replaced.
+
+`context.wait(pendingAdmission)` counts logical admission time against the selected policy budget; `context.waitPhysical(pendingPhysical)` counts physical scheduling without consuming that logical budget. Neither counts callback or cleanup time. Overall deadlines start at entry and report ABORTED, except a deadline during physical waiting reports LOCK_TIMEOUT. External cancellation preserves its original reason on cause. Zero logical budget still permits physical scheduling, and omitting an overall deadline adds no physical default limit. A timeout ends waiting; the port still owns cancelling/removing its waiter and completing accepted work before it settles.
+
+An inner store call receiving the exact attempt context reuses the outer budget and combined signal; only the outermost call disposes that signal. Loop observations report failures without changing results. Backends emit acquired/released/lost stages at their real lifecycle boundaries; the loop emits acquisition entry, conflict, decision, waiting and retry observations. These contracts do not claim native backend integration merely because package tests pass.
+
+LOCK_REJECTED and LOCK_TIMEOUT include read-only keys and holder properties. Known holder messages include logical/canonical key identity and the confirmed label; handing-off is reported explicitly without borrowing the previous owner. Physical timeout carries declared keys and an unknown holder when physical scheduling supplies no identity.
+
+The loop also forwards captured native option fields and symbol properties to every attempt and exact-context nested call. It never drops backend extensions when applying canonical context fields, and it does not read fixed-field getters again.
+
+### Immutable transaction builder
+
+`createTransactionBuilder(store, options?)` accepts the original registered store with its actual transaction signature. The root has lock/concurrency/signal/timeout and no run method. Declaring at least one lock enables run; every derivation returns a new immutable branch. Only newly declared keys are snapshotted at each lock step. Run unfolds shared blocks with an explicit stack, normalizes once through the existing owner, and invokes the original transaction exactly once. It preserves the original transaction Promise and full native scope/options types. Configuration creates no deadline, queue or I/O.
+
+`IRecordStore.transaction` and indexed transaction options include the original `ITransactionOptions` lock/concurrency fields. Native tx()/inspectLocks methods still belong to concrete implementations. For an already installed, registered record store:
+
+```ts
+import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter'))
+    .timeout(2_000)
+    .run((tx) => tx.getRecord('counter'))
+}
+```
+
+### Declarative condition compiler
+
+`compileStorageWhere<T>(where)` captures a typed `IWhere<T>` once and returns `(value: T) => boolean`. Nested object fields and repeated constraints combine with AND; explicit and/or/not preserve short-circuit order. `QueryOperator` owns eq, ne, in, exists, gt, gte, lt, lte, between, startsWith, contains and has. Membership lists are copied and compiled to Sets once. Paths reuse the existing utils path admission.
+
+Equality and membership use SameValueZero, including 0/-0 and explicit object identity; ordinary nested object syntax instead checks its fields. Date operands capture their time point. Ordered comparisons require the same number, bigint, string or Date domain and never coerce mismatches. exists distinguishes a missing path from a present undefined. Operator values retain the portable scalar carrier, declared undefined/bigint/Date comparisons, opaque object identity and their lists. Explicit object identity comparisons require client execution when a backend offers only structural equality. Invalid conditions, paths and reflected failures produce INVALID_ARGUMENT with their exact cause before candidate reads. The compiler opens no source and creates no query owner.
+
+```ts
+import { compileStorageWhere } from '@migaia/storage-contract'
+const accepts = compileStorageWhere<{ status: string; total: number }>({
+  status: 'paid',
+  total: { gte: 100 }
+})
+const rows = [
+  { status: 'paid', total: 120 },
+  { status: 'paid', total: 50 }
+]
+console.log(rows.filter(accepts).length) // 1
+```
+
+### Read-only capability access
+
+`hasStorageCapability(store, token)` and `useStorageCapability(store, token)` read the original provider table without installing methods, publishing capabilities, acquiring ownership or returning a provider/base handle. Their token behavior is exactly the original store.has(token)/store.use(token) behavior: authentic published tokens return the same API identity; forged tokens return false from has and throw INVALID_ARGUMENT from use; authentic missing tokens throw UNSUPPORTED_CAPABILITY. Raw or frozen unprovided resources remain missing and unmodified. Provided stores use their captured backend diagnostic rather than re-reading backend getters. use retains exact native implementation refinements. Late Feature prepare/publish/release is visible through the same table. The original store.has(stringKey) KV forwarding remains intact.
+
+```ts
+import {
+  hasStorageCapability,
+  useStorageCapability,
+  kv,
+  type IStorageBase
+} from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}
+```
+
+### Shared record execution
+
+`createRecordQuery<T,TContext,TAugmentMethods>(source, methods?)` creates the shared record executor. `IRecordQuery` adds ordinary `limit(count)` and `orderByComparator(compare).limit(count)` to the common where/select/all/stream/explain/requirePushdown methods. A comparator has no typed read terminal until its explicit bound; bypassed missing bounds and invalid limits reject with INVALID_ARGUMENT before source execution. Limit accepts nonnegative safe integers. Comparator selection uses a stable bounded heap, O(c log k) time and O(k) retained candidates, then orders only the retained heap. Both controls execute on the client in this slice. Selected results remove where/select. Passing `undefined` as TContext rejects new operation contexts at compile time.
+
+`all` and the real `IStorageIterator` returned by `stream` consume the same compiled node reader over the original cursor. Ordinary limit stops advancing once its bound is reached. Registered transaction streams reuse the original iterator registration, so accepted mapped next calls drain before cleanup and buffered comparator results still require the original live scope after native exhaustion. Root and transaction streams reuse the same iterator lifetime implementation, so main and symbolic cleanup both await complete accepted mapping before releasing the original source. Mapper failures remain on the original next result; cleanup retains its own source failure policy. Optional pure Feature methods retain exact references on every derived chain; omitted methods allocate no empty method table. `IQueryShape` and `IQueryResultOf` preserve generic terminal result inference.
+
+The source captures `IQueryPushdown` and its original execute callback once. Immutable linked nodes share history; execution or explain unfolds it once. A record query sends the longest safe native prefix as canonical condition AST nodes and optional projection fields. JavaScript predicates/mappers and opaque object identity comparisons stay on the client. A client step prevents subsequent record steps from moving across it. `QueryOperation` is the shared vocabulary, not a promise that every named fluent method is implemented. explain reads no data; fullScan is conservative unless an index and native condition are declared. requirePushdown rejects with QUERY_NOT_PUSHABLE and client reasons before opening a cursor.
+
+`execute({conditions,fields,ctx})` returns the original `IStorageIterator<readonly [IStorageKey,unknown]>`; projected native rows intentionally do not claim the full T domain. all processes candidates in order and always awaits that iterator's real dispose Promise. It does not create another resource owner, timer or transaction. The original source owns operation cancellation/deadlines. For an original transaction iterator, all synchronously registers its complete consumption, mapper and cleanup interval with that same owner. A callback that omits awaiting all cannot commit before it settles; mapper failure enters the original firstFailure before cleanup. Callback failures retain coded identity; mutable uncoded native errors receive INVALID_ARGUMENT, while attachment failure preserves the original through the existing error tools. Cleanup cannot replace the first failure. Opaque identity operands, including objects containing Date/bigint, are never traversed.
+
+```ts
+import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] },
+    execute
+  })
+    .where({ status: 'paid' })
+    .where('total', 'gte', 100)
+    .select('total')
+    .all()
+}
+```
+
+The supplied cursor is a real backend resource. With paid totals 120 and 50, totals returns `[{total:120}]` and waits for cleanup. Ordering, paging, writes, statistics, watch and vector/RDF methods are not part of this implemented slice.
+
+### Standard records capability
+
+`records` is the authentic standard token for `IRecordsApi<TValue>`. Its `query<R = TValue>()` returns the implemented shared `IRecordQuery<R>` with conditions, one select, bounded comparator ordering, limit, all, stream, explain and requirePushdown. Native backends and Features supply their query through `createRecordQuery` and keep the original iterator/transaction owner; there is no second chain executor. Standard admission requires callable query and removeByPrefix methods without invoking either. A legacy capabilities.records boolean grants no token authority and does not replace an actual Feature API.
+
+`removeByPrefix(prefix, ctx?)` belongs to the supplied original write pipeline and returns its actual deletion count. Its context includes the existing IWriteConcurrencyOptions. The provider returns the exact API object and preserves native default row/API refinements; it does not wrap the deletion Promise or copy the prefix/context. Concrete backend deletion, transaction capability projection and the remaining query terminals require their later implementation slices.
+
+```ts
+import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records)
+    .query<{ status: string; total: number }>()
+    .where({ status: 'paid' })
+    .select('total')
+    .all()
+}
+```
+
+`readConcurrencyLockIdentities(ctx)` reads the live original attempt metadata and returns its immutable canonical lowercase hexadecimal identities, including channel separation, in normalized sorted/deduplicated order. The string list is created once from the existing encoded bytes and shared by repeated reads and nested attempts. It never re-encodes logical keys or exposes mutable internal bytes. Forged, settled and builder-only contexts reject with INVALID_ARGUMENT. The function grants no registration, lock acquisition or resource control.
+
+`snapshotConcurrencyLockHoldings(rows)` detaches the current inspection rows and stably sorts them by the same channel/key byte order. It preserves each holder, expired flag and expiresAt value, including separate rows for equal keys. The result has no internal lock-table reference or lock authority.
+
+`snapshotConcurrencyLockKeys(keys, backend)` normalizes, orders and deduplicates once, returning frozen paired `{keys, identities}`. Keys are detached snapshots; identities are the original channel encoding as hexadecimal strings, without acquisition authority. `snapshotConcurrencyLockRange({channel,prefix?}, backend)` returns a half-open `{lower,upper}` interval in the same identity domain. Omitted prefix selects the entire channel; a supplied prefix reuses the canonical typed prefix rules. Byte prefixes accept strings only, including the empty string.
+
+The optional `runWithConcurrency` request field `lock(captured)` runs once after the original fixed context fields are captured. Its implicit locks merge with, order and deduplicate the explicit options.lock set without dropping explicit locks. Nested calls normalize only added keys, reusing existing encodings and the same budget; retries in the default mode do not call the derivation again. Getter and raw callback failures retain their cause through INVALID_ARGUMENT; existing coded callback failures preserve identity. `IWriteOptions` and root removal/clear contexts for every data channel include `IWriteConcurrencyOptions`; omitted concurrency uses the original owner default.
+
+Backend authors may use `request.executeAttempt(captured, proceed)` instead of `execute`; supplying both is invalid. The default execute still wraps the complete logical loop once. executeAttempt surrounds each actual native commit attempt with a complete pipeline; pure acquisition conflict waits or retries remain in the current segment without transforming input again. A commit conflict must finish native rollback and cleanup before proceed rejects with its original coded cause. Missing or uncoded causes receive one WRITE_CONFLICT boundary retaining the cause. Only rethrowing that same identity after the full stage unwind allows the original loop to consult policy and open another segment; stage recovery or a different thrown identity settles directly. A stage can halt without calling proceed; duplicate calls reject INVALID_ARGUMENT. Each fresh segment derives its transformed-input locks from the initially captured explicit or inherited set, without accumulating earlier implicit locks. Original options are read once; every segment shares the same signal, overall deadline and conflict counters. No additional loop, queue or timeout owner exists.
+
+`IConcurrencyAttemptContext.attempt` is the original shared conflict count plus one. Backends forward this readonly ordinal to observations; they do not count attempts independently. Nested attempts use the same budget source.
+
+## SQL fragments and backend binding
+
+`sqlFragment` is a connection-free pure tag with id, join and empty, and no all/get/run. Interpolations accept ISqlValue or authentic fragments from the same owner. Plain objects, Date, undefined and forged fragments reject INVALID_ARGUMENT during construction. Templates require the frozen cooked/raw array shape. id quotes each identifier part and escapes double quotes; join preserves repeated child occurrences. Byte inputs are copied immediately and values never become SQL text.
+
+Immutable nodes retain references without copying accumulated SQL. First execution flattens once with an explicit stack. SQLite uses ?, while PostgreSQL numbers bindings consecutively from $1. Each prepare returns independent byte copies to the driver. There is no shared mutable parameter array or global native-statement cache.
+
+```ts
+import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
+async function readUser(executor: ISqlExecutor, id: number) {
+  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
+  return executor.sql<{
+    id: number
+    name?: string
+  }>`SELECT ${columns} FROM ${sqlFragment.id('users')} WHERE id = ${id}`.get()
+}
+```
+
+`createSqlTag({ dialect, all, get, run })` lets original backend authors bind these nodes to real execution. Each callback receives `prepare: () => ICompiledStorageSql` and the original ctx. It must enter its original operation/transaction owner before calling prepare, then invoke its native driver. The tag returns that callback's exact Promise and preserves its receiver and ctx. It creates no connection, pipeline, lease, cancellation timer or disposal owner. ICompiledStorageSql contains only text and readonly values. The first complete text is checked for one statement, quoting, comments, transaction control and SQLite journal_mode mutation. Rejection happens inside original admission before native invocation and enters the same transaction first failure. One trailing semicolon and comments are allowed; CREATE TRIGGER internal statement lists are rejected.
+
+Shared ISqlValue includes boolean, bigint and Uint8Array. ISqlRunResult promises changes only, with no insertion ID. Backends specialize ISqlTag<TValue, TResult>/ISqlExecutor<TValue, TResult> to retain native output domains and results. Explicit row types are caller declarations, not runtime verification of the SQL output schema. SQLite boolean input conversion and lastInsertRowid belong to its original adapter. PostgreSQL standard strings use supported standard_conforming_strings=on, alongside E strings, dollar quotes and nested block comments. Original backend owners retain connections, driver errors, observations and transaction cleanup.
+
+## Original transaction capability projections
+
+`useTransactionCapability(scope, token)` finds the original store through an authentic scope's transaction owner, then reads its sole provider table. Backend method factories use `use: (token) => useTransactionCapability(scope, token)`. The helper does not modify scopes, so complete frozen scopes with public type annotations need no private symbol or cast. Pure use invokes no forTransaction binder or I/O. Repeated use for the same view/implementation returns one frozen projection, whose cache is cleared when the view expires.
+
+The implemented standard transaction projections cover kv and records. KV supplies all eight get/set/remove/has/getMany/setMany/removeMany/removeByPrefix methods, retaining one real native batch. It has no root keys/clear, ordinary operation ctx or independent policy. Records supplies the real shared query and removeByPrefix; query all accepts no ordinary ctx. `IWithTransactionQueryMethods<TScope,TAugmentMethods>` carries actual selected query methods through the existing transaction records API without adding root context or changing native scope members. The canonical builder projection reuses this pure helper for its callback scope. Every data method enters the original runTransactionOperation and passes a fresh complete operation view to forTransaction. Saved query all also enters that owner before strict planning, mapping and original iterator cleanup, retaining first failure and draining. Saved data methods and query terminals reject the original backend TRANSACTION_FAILED before I/O after closure.
+
+```ts
+import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}
+```
+
+A base/Feature declaring transactions must provide real forTransaction bindings for supplied kv and records. The provider checks before publication or base mutation. Binders use the current native view and must not return root APIs. Query construction remains pure, and the backend source must register its actual iterator with that scope's original owner. The second ITransactionScope generic and ITransactionCapabilityView preserve capability-set contravariance. Provider type projection replaces transaction/tx use while retaining native extensions, options, builder augmentation and Awaited results. Other standard transaction projections and the root KV batch surface remain for later implementations.
+
+## Canonical key prefixes
+
+`snapshotStorageKeyPrefix(prefix, backend)` captures the original key domain once and returns `{ key, lower, upper, matches }`. Strings match UTF-16 content prefixes and ArrayBuffers match byte prefixes. Arrays match complete leading child-key sequences, without treating their final child as a partial prefix. Numbers and Dates match exact canonical identities; -0 equals 0. Empty strings/buffers remain valid, while the original key domain still rejects empty arrays.
+
+The original encoder's writer omits only the outer variable key terminator and retains every child boundary and type tag. lower is inclusive and upper is its guaranteed strict byte successor, exclusive. Complete encodeOrderedStorageKey output is unchanged. Native ordered structures locate that range. A logical-key IndexedDB cursor may start at key via lowerBound and stop on the first matches=false, reading at most one extra boundary row. The text Web origin-enumeration exception also reuses this prepared matcher. No index or stored-data scan is created by the helper. Mutating exposed key/bounds does not change the captured private matcher; callers should keep the boundaries they use for queries unchanged.
+
+```ts
+import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.
+```

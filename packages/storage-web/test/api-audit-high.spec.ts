@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { memoryStorageHost } from '../src/memory.js'
-import { defineEntity } from '../src/entity.js'
+import { createMemoryTestStore } from './helpers/installed-backends.js'
+import { defineEntity } from '@migaia/storage-host/entity'
 
 describe('storage-web audit high severity regressions', () => {
   it('notifies replacement observers only after the destination exists', async () => {
     /** Real memory storage owns both channels and post-commit notifications. */
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     await store.putRecord({ before: true }, 'key')
     /** Capture the read initiated synchronously inside the removal callback. */
     let observedBytes: Promise<Uint8Array | null> | undefined
-    /** An ordinary reentrant value write must see the already-committed byte owner. */
+    /** A synchronous reentrant write cannot bypass the still-held original mutation lock. */
     let rejected: unknown
     /** The public observer exercises supported synchronous reentrancy. */
     const stop = store.subscribeChanges((change) => {
@@ -24,7 +24,7 @@ describe('storage-web audit high severity regressions', () => {
     try {
       await store.setBytes('key', new Uint8Array([7]), { conflictPolicy: 'replace' })
       await expect(observedBytes).resolves.toEqual(new Uint8Array([7]))
-      expect(rejected).toMatchObject({ code: 'DUPLICATE_KEY' })
+      expect(rejected).toMatchObject({ code: 'LOCK_REJECTED' })
       expect(await store.get('key')).toBeNull()
       expect(await store.getBytes('key')).toEqual(new Uint8Array([7]))
     } finally {
@@ -35,7 +35,7 @@ describe('storage-web audit high severity regressions', () => {
 
   it('migration preserves an update committed after the scan', async () => {
     /** Real repositories share one transaction-capable backend. */
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     /** Gate only the first scanned old value through the supported asynchronous schema. */
     let releaseRead!: () => void
     /** Announce the scan before committing the competing update. */
@@ -92,7 +92,7 @@ describe('storage-web audit high severity regressions', () => {
 
   it('fallback rejects a second owner of a unique index value', async () => {
     /** A backend without a native sidecar still has declared entity write constraints. */
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     try {
       /** Both writes use the public curried index definition and ordinary repository. */
       const users = defineEntity<{ id: string; email: string }>()({
@@ -103,11 +103,13 @@ describe('storage-web audit high severity regressions', () => {
       }).connect(store)
       await users.put({ id: 'first', email: 'same' })
       await expect(users.put({ id: 'second', email: 'same' })).rejects.toMatchObject({
-        source: '@migaia/storage-web',
+        source: '@migaia/storage-host',
         code: 'INDEX_UNIQUE_CONFLICT'
       })
       expect(
-        (await users.findManyBy('byEmail', { lower: 'same', upper: 'same' })).map((row) => row.id)
+        (await users.query().index('byEmail', { lower: 'same', upper: 'same' }).all()).map(
+          (row) => row.id
+        )
       ).toEqual(['first'])
     } finally {
       await store.dispose()

@@ -13,23 +13,27 @@ import {
   asSecondaryIndexRecordStore,
   isSecondaryIndexRecordStore,
   asChangeFeedStore,
-  isChangeFeedStore,
-  COLLECTIONS_JSON_CODEC_NAME,
-  collectionsJsonCodec
+  isChangeFeedStore
 } from '../src/index.js'
 
 describe('StorageContractError 家族', () => {
   it('公开码表 + source 恒为 @migaia/storage-contract', () => {
     expect(Object.keys(StorageContractErrorCode).sort()).toEqual([
       'aborted',
+      'concurrencyPolicyFailed',
       'disposed',
       'envelopeInvalid',
       'invalidArgument',
       'invalidKey',
+      'lockLost',
+      'lockRejected',
+      'lockTimeout',
       'migrationFailed',
       'migrationGap',
+      'queryNotPushable',
       'unsupported',
-      'versionUnsupported'
+      'versionUnsupported',
+      'writeConflict'
     ])
     const error = new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new TypeError('bad')
@@ -66,46 +70,6 @@ describe('StorageContractError 家族', () => {
       configurable: false
     })
     expect(error).toBeInstanceOf(StorageContractError)
-  })
-})
-
-describe('versioned collection codec', () => {
-  it('owns the versioned identity and round-trips nested Map/Set values', async () => {
-    expect(COLLECTIONS_JSON_CODEC_NAME).toBe('migaia-collections-json-v1')
-    const value = { map: new Map([['key', new Set([1, 2])]]) }
-    const encoded = await collectionsJsonCodec.encode(value)
-    expect(encoded).toContain(COLLECTIONS_JSON_CODEC_NAME)
-    const decoded = (await collectionsJsonCodec.decode(encoded)) as typeof value
-    expect(decoded.map).toBeInstanceOf(Map)
-    expect(decoded.map.get('key')).toEqual(new Set([1, 2]))
-  })
-
-  it('uses intrinsic collection brands without per-node structuredClone work', async () => {
-    const original = Object.getOwnPropertyDescriptor(globalThis, 'structuredClone')
-    let cloneCalls = 0
-    Object.defineProperty(globalThis, 'structuredClone', {
-      configurable: true,
-      value: () => {
-        cloneCalls += 1
-        throw new Error('structuredClone must not classify codec nodes')
-      }
-    })
-    try {
-      let value: unknown = { leaf: 'ok' }
-      for (let index = 0; index < 128; index += 1) value = { next: value }
-      await expect(collectionsJsonCodec.encode(value)).resolves.toContain('"leaf":"ok"')
-      expect(cloneCalls).toBe(0)
-    } finally {
-      if (original) Object.defineProperty(globalThis, 'structuredClone', original)
-      else Reflect.deleteProperty(globalThis, 'structuredClone')
-    }
-  })
-
-  it('keeps forbidden receiver invocation helpers out of the codec delta', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/collections-codec.ts'), 'utf8')
-    const forbiddenWords = ['b'.concat('ind'), 'ap'.concat('ply'), 'c'.concat('all')]
-    for (const word of forbiddenWords) expect(source).not.toContain(word)
-    expect(source).not.toContain(['Reflect', forbiddenWords[1]].join('.'))
   })
 })
 
@@ -283,6 +247,7 @@ describe('V2 capability contracts', () => {
       clearValues: async () => undefined,
       clearAll: async () => undefined,
       dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined,
       getBytes: async () => null,
       setBytes: async () => undefined,
       removeBytes: async () => undefined,
@@ -332,6 +297,7 @@ describe('V2 capability contracts', () => {
       clearValues: async () => undefined,
       clearAll: async () => undefined,
       dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined,
       getBytes: async () => null,
       setBytes: async () => undefined,
       removeBytes: async () => undefined,
@@ -380,7 +346,8 @@ describe('V2 capability contracts', () => {
       keys: async () => [],
       clearValues: async () => undefined,
       clearAll: async () => undefined,
-      dispose: async () => undefined
+      dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined
     }
     const capabilityFailure = new Error('capability getter failed')
     const throwingCapabilities = Object.create(null) as Record<string, unknown>
@@ -442,7 +409,8 @@ describe('V2 capability contracts', () => {
       keys: async () => [],
       clearValues: async () => undefined,
       clearAll: async () => undefined,
-      dispose: async () => undefined
+      dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined
     }
     Object.defineProperty(store, 'subscribeChanges', {
       get: () => {

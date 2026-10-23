@@ -17,7 +17,7 @@ describe('defaultJsonCodec Map/Set 往返', () => {
   it('跨 realm Map 不丢内容（instanceof 会拒跨 realm 值，内部 slot 分类能识别）', async () => {
     const crossRealmMap = vm.runInNewContext('new Map([["a", 1]])') as Map<string, number>
     expect(crossRealmMap instanceof Map).toBe(false)
-    expect(Object.prototype.toString.call(crossRealmMap)).toBe('[object Map]')
+    expect(Reflect.apply(Object.prototype.toString, crossRealmMap, [])).toBe('[object Map]')
     const decoded = (await defaultJsonCodec.decode(
       await defaultJsonCodec.encode({ map: crossRealmMap })
     )) as { map: Map<string, number> }
@@ -28,7 +28,7 @@ describe('defaultJsonCodec Map/Set 往返', () => {
   it('跨 realm Set 不丢内容', async () => {
     const crossRealmSet = vm.runInNewContext('new Set([1, 2, 3])') as Set<number>
     expect(crossRealmSet instanceof Set).toBe(false)
-    expect(Object.prototype.toString.call(crossRealmSet)).toBe('[object Set]')
+    expect(Reflect.apply(Object.prototype.toString, crossRealmSet, [])).toBe('[object Set]')
     const decoded = (await defaultJsonCodec.decode(
       await defaultJsonCodec.encode({ set: crossRealmSet })
     )) as { set: Set<number> }
@@ -56,13 +56,44 @@ describe('defaultJsonCodec Map/Set 往返', () => {
     expect(executed).toBe(false)
   })
 
-  it('uses the versioned contract format and explicitly migrates legacy tags', async () => {
+  it('writes reserved records and reads old markers and tuples as ordinary data', async () => {
     const encoded = await defaultJsonCodec.encode({ map: new Map([['a', 1]]) })
-    expect(encoded).toContain('migaia-collections-json-v1')
-    const migrated = (await defaultJsonCodec.decode(
-      '{"version":0,"state":{"map":{"__migaia_persist_map__":[["a",1]]}}}'
-    )) as { state: { map: Map<string, number> } }
-    expect(migrated.state.map).toBeInstanceOf(Map)
-    expect([...migrated.state.map.entries()]).toEqual([['a', 1]])
+    expect(encoded).toBe('{"map":{"$rpc":"map","entries":[["a",1]]}}')
+    for (const value of [
+      { __migaia_persist_map__: [['a', 1]] },
+      { __migaia_persist_set__: ['a'] },
+      ['migaia-collections-json-v1', 'map', [['a', 1]]],
+      ['migaia-collections-json-v1', 'set', ['a']]
+    ]) {
+      await expect(defaultJsonCodec.decode(JSON.stringify(value))).resolves.toEqual(value)
+    }
+  })
+
+  it('preserves each owning error in invalid writes and malformed JSON', async () => {
+    for (const value of [NaN, Infinity, undefined]) {
+      await expect(defaultJsonCodec.encode(value)).rejects.toMatchObject({
+        source: '@migaia/store-persist',
+        code: 'ENCODE_FAILED',
+        cause: {
+          source: '@migaia/storage-contract',
+          code: 'INVALID_ARGUMENT',
+          cause: { source: '@migaia/serialize', code: 'ENCODE_FAILED' }
+        }
+      })
+    }
+    await expect(defaultJsonCodec.decode('{bad')).rejects.toMatchObject({
+      source: '@migaia/store-persist',
+      code: 'ENVELOPE_INVALID',
+      cause: {
+        source: '@migaia/storage-contract',
+        code: 'INVALID_ARGUMENT',
+        cause: {
+          source: '@migaia/serialize',
+          code: 'DECODE_FAILED',
+          cause: expect.any(SyntaxError)
+        }
+      }
+    })
+    await expect(defaultJsonCodec.decode(1)).rejects.toBeInstanceOf(TypeError)
   })
 })

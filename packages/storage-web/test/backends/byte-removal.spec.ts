@@ -1,23 +1,27 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 import type { IStorageChange } from '@migaia/storage-contract'
-import { memoryStorageHost } from '../../src/backends/memory.js'
-import { indexedDbHost } from '../../src/backends/indexed-db.js'
+import { createMemoryTestStore } from '../helpers/installed-backends.js'
+import { createIndexedDbTestStore } from '../helpers/installed-backends.js'
 
 /** Both exact backend factories expose the same public byte-channel deletion contract. */
 const backends = [
-  ['memory', () => memoryStorageHost()],
+  ['memory', () => createMemoryTestStore()],
   [
     'indexeddb',
     () =>
-      indexedDbHost({ factory: new IDBFactory(), keyRange: IDBKeyRange, dbName: 'byte-removal' })
+      createIndexedDbTestStore({
+        factory: new IDBFactory(),
+        keyRange: IDBKeyRange,
+        dbName: 'byte-removal'
+      })
   ]
 ] as const
 
 describe.each(backends)('%s per-key byte deletion', (_backend, createStore) => {
   it('deletes only the target bytes, preserves sibling channels, and publishes one committed removal', async () => {
     /** This store owns all independent channels exercised by the public deletion operation. */
-    const store = createStore()
+    const store = await createStore()
     /** Keep the target and its sibling distinct so accidental clearBytes routing is observable. */
     const target = 'target'
     /** Changes are recorded only after fixture setup so an absent removal has no hidden event. */
@@ -46,7 +50,7 @@ describe.each(backends)('%s per-key byte deletion', (_backend, createStore) => {
 
   it('does not remove text or records at a key with no byte entry', async () => {
     /** Missing byte membership must be checked in the byte channel, independently of other keys. */
-    const store = createStore()
+    const store = await createStore()
     /** A no-op byte removal must not advertise a mutation to observers of either channel. */
     const changes: IStorageChange[] = []
     try {
@@ -65,7 +69,7 @@ describe.each(backends)('%s per-key byte deletion', (_backend, createStore) => {
 
   it('preserves bytes and the original pre-abort cause, then rejects deletion after disposal', async () => {
     /** Lifecycle validation precedes the same public byte-only mutation on both exact backends. */
-    const store = createStore()
+    const store = await createStore()
     /** Cancellation belongs to the caller and must remain reachable without replacing its identity. */
     const reason = new Error('cancel byte deletion')
     /** An already-aborted signal must prevent both storage mutation and feed publication. */
@@ -100,7 +104,7 @@ describe.each(backends)('%s per-key byte deletion', (_backend, createStore) => {
 
 it('rolls back an in-flight IndexedDB byte deletion without publishing a removal', async () => {
   /** A fresh real IndexedDB implementation supplies the native transaction rollback semantics. */
-  const store = indexedDbHost({
+  const store = await createIndexedDbTestStore({
     factory: new IDBFactory(),
     keyRange: IDBKeyRange,
     dbName: 'byte-removal-abort'
@@ -124,31 +128,32 @@ it('rolls back an in-flight IndexedDB byte deletion without publishing a removal
   }
 })
 
-it('finishes an admitted IndexedDB byte deletion before disposal closes the database and feed', async () => {
-  /** Reopening the same native factory proves the deletion became durable before disposal finished. */
+it('cancels a byte deletion before native admission without publishing a removal', async () => {
+  /** Reopening the same native factory proves cancellation left the stored bytes unchanged. */
   const factory = new IDBFactory()
   /** Both handles address one existing physical database through the ordinary public factory. */
   const options = { factory, keyRange: IDBKeyRange, dbName: 'byte-removal-dispose' }
-  /** This store's mutation lease must outlive asynchronous connection preparation. */
-  const store = indexedDbHost(options)
-  /** Publication remains live until the already-admitted deletion commits. */
+  /** This store owns the admission lease while asynchronous native preparation is pending. */
+  const store = await createIndexedDbTestStore(options)
+  /** An uncommitted deletion must not publish a membership change. */
   const changes: IStorageChange[] = []
   try {
     await store.setBytes('target', new Uint8Array([1]))
     store.subscribeChanges((change) => changes.push(change))
     /** Attach the result observer before closing so an erroneous late rejection is still observed. */
-    const deleted = expect(store.removeBytes('target')).resolves.toBeUndefined()
-    /** Disposal must wait for that same public operation instead of revoking its admitted lease. */
+    const deleted = expect(store.removeBytes('target')).rejects.toMatchObject({
+      code: 'ABORTED',
+      cause: expect.objectContaining({ code: 'STORE_DISPOSED' })
+    })
+    /** Closing cancels this member before native admission and drains its original lease. */
     const closing = store.dispose()
     await deleted
     await closing
-    expect(changes.map(({ channel, kind, keys }) => ({ channel, kind, keys }))).toEqual([
-      { channel: 'bytes', kind: 'remove', keys: ['target'] }
-    ])
-    /** The original instance is closed, so a fresh public handle verifies the committed contents. */
-    const reopened = indexedDbHost(options)
+    expect(changes).toEqual([])
+    /** The original instance is closed, so a fresh public handle verifies the unchanged contents. */
+    const reopened = await createIndexedDbTestStore(options)
     try {
-      await expect(reopened.getBytes('target')).resolves.toBeNull()
+      await expect(reopened.getBytes('target')).resolves.toEqual(new Uint8Array([1]))
     } finally {
       await reopened.dispose()
     }
