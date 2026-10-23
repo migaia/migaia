@@ -164,6 +164,14 @@
       "./plugins/file": [
         "FILE_PLUGIN_NAME",
         "file"
+      ],
+      "./plugins/durable": [
+        "LogRecordState",
+        "LogStage",
+        "memoryLogStore"
+      ],
+      "./plugins/durable/file": [
+        "fileLogStore"
       ]
     },
     "@migaia/micro-hub": {

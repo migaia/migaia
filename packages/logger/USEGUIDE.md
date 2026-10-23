@@ -487,3 +487,20 @@ pnpm --filter @migaia/logger run test
 ```
 
 test 会先构建本包；typecheck:browser 与 test:e2e 是另外的现有入口。这里只列命令，不声称它们已经执行。
+
+## Durable log storage
+
+`memoryLogStore` from `@migaia/logger/plugins/durable` is an atomic, process-local log resource. `fileLogStore` from `@migaia/logger/plugins/durable/file` uses builtin SQLite: `node:sqlite` in Node and Deno, `bun:sqlite` in Bun. The file implementation supports local files on macOS, Linux, and Windows; network filesystems do not receive a locking or durability guarantee. A retained SQLite connection owns the exclusive writer lock until disposal. No storage package or third-party native driver is required.
+
+```ts
+import { memoryLogStore, LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using store = memoryLogStore()
+const [seq] = await store.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+await store.setState(seq, LogRecordState.done)
+console.log(await store.read(1, 100))
+```
+
+Records accept plain JSON data, capture inputs immediately, and return independent snapshots. A batch creates all records and their pending states atomically. Sequence numbers start at one and remain monotonic after prefix truncation. `onAppend` reports one frozen `{ lastSeq, count }` notice after each nonempty append commit. It never publishes state changes or truncation.
+
+Explicit `dispose()` returns a cached Promise that rejects on cleanup failure. The async disposal symbol returns a separate cached Promise that reports failure and resolves. Both share one physical cleanup. The creator owns disposal; installed plugins only borrow the original resource.
