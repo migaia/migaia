@@ -156,6 +156,137 @@ describe('memory native contract integration', () => {
     ])
   })
 
+  it('protects every root write and synchronous replacement through the original active keys', async () => {
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin({ owner: { label: 'root-owner' } })]
+    })
+    const store = host.backend('memory')
+    await store.set('shared', 'before')
+    /** The original transaction owns all affected physical channels until its actual callback ends. */
+    const entered = deferred<void>()
+    const finish = deferred<void>()
+    const first = store
+      .tx()
+      .lock(lockKey.text('shared'), lockKey.bytes('shared'), lockKey.record('shared'))
+      .run(async () => {
+        entered.resolve()
+        await finish.promise
+      })
+    await entered.promise
+    let pending: Promise<void> | undefined
+    try {
+      const rejected = {
+        code: 'LOCK_REJECTED',
+        holder: expect.objectContaining({ label: 'root-owner' })
+      }
+      expect(() => store.sync.set('shared', 'wrong', { conflictPolicy: 'replace' })).toThrowError(
+        expect.objectContaining(rejected)
+      )
+      expect(() => store.sync.remove('shared')).toThrowError(expect.objectContaining(rejected))
+      expect(() => store.sync.clearValues()).toThrowError(expect.objectContaining(rejected))
+      await expect(
+        store.set('shared', 'wrong', {
+          concurrency: ConcurrencyPolicy.fail(),
+          conflictPolicy: 'replace'
+        })
+      ).rejects.toMatchObject(rejected)
+      await expect(
+        store.remove('shared', { concurrency: ConcurrencyPolicy.fail() })
+      ).rejects.toMatchObject(rejected)
+      await expect(
+        store.setBytes('shared', new Uint8Array([9]), {
+          concurrency: ConcurrencyPolicy.fail(),
+          conflictPolicy: 'replace'
+        })
+      ).rejects.toMatchObject(rejected)
+      await expect(
+        store.removeBytes('shared', { concurrency: ConcurrencyPolicy.fail() })
+      ).rejects.toMatchObject(rejected)
+      await expect(
+        store.putRecord({ wrong: true }, 'shared', {
+          concurrency: ConcurrencyPolicy.fail(),
+          conflictPolicy: 'replace'
+        })
+      ).rejects.toMatchObject(rejected)
+      await expect(
+        store.deleteRecord('shared', { concurrency: ConcurrencyPolicy.fail() })
+      ).rejects.toMatchObject(rejected)
+      await expect(
+        store.set('shared', 'wrong', {
+          conflictPolicy: 'replace',
+          concurrency: ConcurrencyPolicy.optimistic({ retries: 0 })
+        })
+      ).rejects.toMatchObject(rejected)
+      expect(await store.get('shared')).toBe('before')
+      await store.putRecord({ independent: true }, 'other')
+      /** Default wait snapshots mutable payloads before entering the same original admission FIFO. */
+      const payload = new Uint8Array([3])
+      pending = store.setBytes('shared', payload, { conflictPolicy: 'replace' })
+      payload[0] = 99
+      expect(await store.getBytes('shared')).toBeNull()
+      finish.resolve()
+      await Promise.all([first, pending])
+      expect(await store.get('shared')).toBeNull()
+      expect(await store.getBytes('shared')).toEqual(new Uint8Array([3]))
+      expect(await store.inspectLocks()).toEqual([])
+    } finally {
+      finish.resolve()
+      await Promise.allSettled([first, ...(pending ? [pending] : [])])
+    }
+  })
+
+  it('admits clears and native prefix deletion only against their actual channel ranges', async () => {
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const store = host.backend('memory')
+    await store.set('text', 'safe')
+    await store.putRecord({ value: 1 }, ['tenant', 1])
+    await store.putRecord({ value: 2 }, ['other', 1])
+    /** The lock remains meaningful even if a future mutation deletes its physical row. */
+    const entered = deferred<void>()
+    const finish = deferred<void>()
+    const first = store
+      .tx()
+      .lock(lockKey.record(['tenant', 1]))
+      .run(async () => {
+        entered.resolve()
+        await finish.promise
+      })
+    await entered.promise
+    let pending: Promise<void> | undefined
+    try {
+      store.sync.clearValues()
+      expect(await store.get('text')).toBeNull()
+      await store.clearBytes()
+      await expect(
+        store.clearRecords({ concurrency: ConcurrencyPolicy.fail() })
+      ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      await expect(store.clearAll({ concurrency: ConcurrencyPolicy.fail() })).rejects.toMatchObject(
+        { code: 'LOCK_REJECTED' }
+      )
+      await expect(
+        store.use(records).removeByPrefix(['tenant'], { concurrency: ConcurrencyPolicy.fail() })
+      ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      expect(await store.use(records).removeByPrefix(['other'])).toBe(1)
+      /** Cancellation removes the actual queued clear and preserves both its reason and native data. */
+      const abort = new AbortController()
+      const reason = new Error('cancel root clear')
+      const cancelled = store.clearRecords({ signal: abort.signal })
+      const checked = expect(cancelled).rejects.toMatchObject({ code: 'ABORTED', cause: reason })
+      abort.abort(reason)
+      await checked
+      expect(await store.getRecord(['tenant', 1])).toEqual({ value: 1 })
+      pending = store.clearRecords()
+      expect(await store.getRecord(['tenant', 1])).toEqual({ value: 1 })
+      finish.resolve()
+      await Promise.all([first, pending])
+      expect(await store.getRecord(['tenant', 1])).toBeUndefined()
+      expect(await store.inspectLocks()).toEqual([])
+    } finally {
+      finish.resolve()
+      await Promise.allSettled([first, ...(pending ? [pending] : [])])
+    }
+  })
+
   it('shares the original lock admission with the native transaction until commit and cleanup end', async () => {
     const owner = { label: 'orders' }
     const plugin = memoryBackendPlugin({ owner })
