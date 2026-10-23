@@ -81,6 +81,12 @@ inspectLocks 返回真实持锁方与过期信息。WAL 租约 maxLockMs 缺省 
 未 await 的数据失败仍使事务回滚。tx.sql 与 KV 始终处于同一个原生事务；不会从
 用户 SQL 文本猜测逻辑键。
 
+选中的 Feature 复用同一事务和查询创建器。`tx.api` 在原事务短视图冻结前绑定；
+其 SQL 与 KV 操作一起提交或回滚，被捕获或未 await 的失败也沿原事务拥有者处理。
+Feature 的 `query` 和 `tx` 链方法保留在实际派生链上。Feature 借用的原生 client
+是同一连接的冻结 `exec`/`prepare` 视图，不含 `dispose` 或符号释放方法；连接仍由
+创建调用方释放。
+
 所有托管表以 org_id 作为主键第一列。根原生 SQL 属于调用方 schema 访问；自建表的
 组织过滤由调用方显式提供，不能直接修改内部表。
 
