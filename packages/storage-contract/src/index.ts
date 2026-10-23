@@ -172,8 +172,8 @@ export { sqlFragment, createSqlTag } from './sql.js'
 export type { IQueryStageObserver } from './query.js'
 
 export { encodeOrderedStorageKey } from './key-order.js'
-export { snapshotStorageBatchKeys } from './key-order.js'
-export type { IStorageBatchKey } from './key-order.js'
+export { snapshotStorageBatchKeys, createStorageBatchKeyCapture } from './key-order.js'
+export type { IStorageBatchKey, IStorageBatchKeyCapture } from './key-order.js'
 
 export {
   TransactionActivityMode,

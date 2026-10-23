@@ -612,6 +612,8 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
 
 ## 规范键前缀
 
+`createStorageBatchKeyCapture(backend)` 返回每批独立的纯 `capture(key)` 函数，使用相同 `{ key, identity, firstIndex }` 事实。原生作者按既有逐项 getter 次序调用，再于原重复校验点根据 `firstIndex !== inputIndex` 拒绝。此函数不读取 value/TTL 字段、不捕获消费者回调，不创建资源或操作 owner；数组 helper 复用同一暂态相等索引。
+
 `snapshotStorageBatchKeys(keys, backend, { rejectDuplicates? })` 单次捕获每个输入位置，按调用方顺序返回冻结的 `{ key, identity, firstIndex }` 行。`key` 为独立快照，`identity` 使用规范有序字节；读取保留重复位置，原生删除只处理当前位置等于 `firstIndex` 的行，原子写入传 `rejectDuplicates: true`，规范重复键在 I/O 前报 `INVALID_ARGUMENT`。非法逻辑键保留 `INVALID_KEY`。此函数不创建 store、事务或资源 owner。
 
 `snapshotStorageKeyPrefix(prefix, backend)` 从原键域制作一次独立快照，返回 `{ key, lower, upper, matches }`。string 按 UTF-16 内容前缀匹配，ArrayBuffer 按字节前缀匹配；array 按完整的领先子键序列匹配，不把末尾子键也当成部分前缀；number 与 Date 只匹配精确规范身份，-0 与 0 相同。空 string/buffer 合法，空 array 仍由原键域拒绝。

@@ -775,13 +775,30 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    createStorageBatchKeyCapture: {
+      role: 'operation',
+      purpose: t(
+        'Capture native batch keys in the backend’s existing per-entry getter and failure order.',
+        '按后端既有逐项 getter 与失败次序捕获原生批键。'
+      ),
+      params: {
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'One pure IStorageBatchKeyCapture for this batch. Each call snapshots only the supplied key and returns canonical identity/firstIndex. The backend rejects duplicates at its original point; values and TTL remain backend-owned.',
+        '本批次独立的纯 IStorageBatchKeyCapture。每次调用只快照给定键，返回规范身份/firstIndex；后端于原校验点拒绝重复，value 与 TTL 仍归后端。'
+      ),
+      example: storageContractCases.createStorageBatchKeyCapture![0]!.example,
+      cases: storageContractCases.createStorageBatchKeyCapture
+    },
     ttl: {
       role: 'constant',
       purpose: t(
         'Exact standard token for native physical-channel TTL.',
         '原生物理通道 TTL 的精确标准令牌。'
       ),
-      example: `await store.use(ttl).expire({ channel: 'text', key: 'session' }, 1000)`
+      example: storageContractCases.ttl![0]!.example,
+      cases: storageContractCases.ttl
     },
     counter: {
       role: 'constant',
@@ -789,7 +806,8 @@ export const storageContractReference: ILibraryReference = {
         'Exact standard token for atomic canonical decimal text increments.',
         '原子规范十进制文本递增的精确标准令牌。'
       ),
-      example: `await store.use(counter).increment('visits')`
+      example: storageContractCases.counter![0]!.example,
+      cases: storageContractCases.counter
     },
     snapshotStorageTtlTarget: {
       role: 'operation',
@@ -808,7 +826,8 @@ export const storageContractReference: ILibraryReference = {
         'Detached frozen ITtlTarget, with original INVALID_KEY or INVALID_ARGUMENT failures.',
         '独立冻结的 ITtlTarget，保留原 INVALID_KEY 或 INVALID_ARGUMENT 失败。'
       ),
-      example: `const target = snapshotStorageTtlTarget({ channel: 'record', key: ['users', 1] }, 'memory')`
+      example: storageContractCases.snapshotStorageTtlTarget![0]!.example,
+      cases: storageContractCases.snapshotStorageTtlTarget
     },
     assertStorageTtlDuration: {
       role: 'operation',
@@ -827,7 +846,8 @@ export const storageContractReference: ILibraryReference = {
         'Returns void; invalid duration throws INVALID_ARGUMENT before I/O.',
         '返回 void；非法期限在 I/O 前抛 INVALID_ARGUMENT。'
       ),
-      example: `assertStorageTtlDuration(0.5, 'memory')`
+      example: storageContractCases.assertStorageTtlDuration![0]!.example,
+      cases: storageContractCases.assertStorageTtlDuration
     },
     snapshotStorageCounterIncrement: {
       role: 'operation',
@@ -846,9 +866,8 @@ export const storageContractReference: ILibraryReference = {
         'Pure IStorageCounterIncrement from current text to the next safe integer. Missing text starts at zero; noncanonical text or overflow throws INVALID_ARGUMENT and never writes.',
         '从当前文本计算下一安全整数的纯 IStorageCounterIncrement。缺失文本从零起算；非规范文本或溢出抛 INVALID_ARGUMENT，不执行写入。'
       ),
-      example: `const increment = snapshotStorageCounterIncrement(undefined, 'memory')
-// Inside the original atomic native operation:
-const next = increment(currentText)`
+      example: storageContractCases.snapshotStorageCounterIncrement![0]!.example,
+      cases: storageContractCases.snapshotStorageCounterIncrement
     },
     snapshotStorageBatchKeys: {
       role: 'operation',
@@ -2312,6 +2331,13 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IStorageBatchKeyCapture: {
+      summary: t(
+        'Pure per-batch function from one logical key to IStorageBatchKey; it owns only a temporary equality map and input position, without resource authority.',
+        '从一个逻辑键得到 IStorageBatchKey 的每批纯函数；仅持暂态相等 Map 与输入位置，不具资源权限。'
+      ),
+      members: {}
+    },
     ITtlTarget: {
       summary: t(
         'The existing expiring physical lock-key channels, with the same logical key domain.',
@@ -2329,8 +2355,8 @@ console.log(candidate.name, candidate.output)`
     },
     ITtlApi: {
       summary: t(
-        'Native point TTL operations on one physical channel; deadlines use the backend scheduler.',
-        '单物理通道上的原生点 TTL；期限使用后端 scheduler。'
+        'Native point TTL operations on one physical channel; deadlines use the backend’s original clock, including database clocks and the documented Qdrant client-clock exception.',
+        '单物理通道上的原生点 TTL；期限使用后端原时钟，数据库后端沿数据库时钟，Qdrant 沿已声明的客户端时钟例外。'
       ),
       members: {
         expire: {

@@ -1050,6 +1050,7 @@
         "createMigrationPlan",
         "createRecordQuery",
         "createSqlTag",
+        "createStorageBatchKeyCapture",
         "createTransactionBuilder",
         "createTransactionOwner",
         "defineConcurrencyPolicy",
