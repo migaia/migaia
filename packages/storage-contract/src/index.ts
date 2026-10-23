@@ -186,5 +186,21 @@ export { resolveConcurrencyPolicy } from './transaction.js'
 
 export { createTransactionBuilder } from './transaction-builder.js'
 
-export { QueryOperator, compileStorageWhere } from './query-chain.js'
-export type { IFieldOps, IWhere, IQueryCondition } from './query-chain.js'
+export {
+  QueryOperator,
+  QueryOperation,
+  compileStorageWhere,
+  createRecordQuery
+} from './query-chain.js'
+export type {
+  IFieldOps,
+  IWhere,
+  IQueryCondition,
+  IQueryPlanStep,
+  IQueryPlan,
+  IQueryPushdown,
+  IQueryRead,
+  IQueryResult,
+  IQueryChain,
+  IRecordQuerySource
+} from './query-chain.js'

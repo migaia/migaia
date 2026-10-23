@@ -35,6 +35,33 @@ async function readGreeting(store: IStorageBase) {
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   hasStorageCapability: [capabilityReadCase],
   useStorageCapability: [capabilityReadCase],
+  createRecordQuery: [
+    {
+      title: t('Share a record executor over an original cursor', '在原游标上共用记录执行器'),
+      problem: t(
+        'A backend needs declarative conditions and typed projections without another fluent chain or resource owner.',
+        '后端需要声明式条件与 typed 投影，不应另建查询链或资源 owner。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
+}`
+      ),
+      result: t(
+        'Given an original cursor over paid totals 120 and 50, totals returns [{total:120}]. all awaits its actual disposal on success or failure. The empty support declaration keeps all steps client-side.',
+        '传入 paid total 为 120、50 的原游标后，totals 返回 [{total:120}]；all 在成功或失败时都等待真实释放，空支持声明使所有步骤在客户端执行。'
+      )
+    }
+  ],
   compileStorageWhere: [
     {
       title: t(

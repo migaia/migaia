@@ -732,6 +732,33 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.useStorageCapability![0]!.example,
       cases: storageContractCases.useStorageCapability
     },
+    createRecordQuery: {
+      role: 'factory',
+      purpose: t(
+        'Create the shared immutable record where/select/all executor over one original backend cursor callback.',
+        '在原后端游标回调上创建共用、不可变的记录 where/select/all 执行器。'
+      ),
+      params: {
+        source: t(
+          'IRecordQuerySource captures pushdown facts and execute once. execute receives only safe-prefix conditions, optional fields and captured operation context; projected native rows are unknown.',
+          'IRecordQuerySource 一次捕获下推事实与 execute；execute 仅接收安全前缀条件、可选字段及捕获的操作上下文，原生投影行保持 unknown。'
+        )
+      },
+      returns: t(
+        'IQueryChain<T,TContext> with three where forms, one select, all, explain and requirePushdown. This slice does not advertise other terminals. all awaits the original iterator disposal and retains the first failure through cleanup.',
+        '返回 IQueryChain<T,TContext>，具有三种 where、一次 select、all、explain 与 requirePushdown；本切片不声明其他终点，all 等待原迭代器释放，清理失败不覆盖首错。'
+      ),
+      example: storageContractCases.createRecordQuery![0]!.example,
+      cases: storageContractCases.createRecordQuery
+    },
+    QueryOperation: {
+      role: 'constant',
+      purpose: t(
+        'Canonical planner vocabulary. A backend declares its real operation subset; names alone do not install chain methods.',
+        '规范规划词汇；后端声明真实支持的子集，名称本身不安装查询方法。'
+      ),
+      example: 'console.log(QueryOperation.where, QueryOperation.select) // where select'
+    },
     compileStorageWhere: {
       role: 'operation',
       purpose: t(
@@ -1899,6 +1926,103 @@ console.log(candidate.name, candidate.output)`
           summary: t(
             'Portable codec value, undefined, bigint, Date, opaque object identity, or an operator list. Identity objects are not traversed.',
             'portable codec 值、undefined、bigint、Date、不透明对象身份或操作符列表；不遍历身份对象内容。'
+          )
+        }
+      }
+    },
+    IQueryPlanStep: {
+      summary: t(
+        'One immutable pushed/client operation with its optional reason and index.',
+        '一个不可变的下推或客户端操作，含可选原因与索引。'
+      ),
+      members: {
+        operation: { summary: t('Canonical operation name.', '规范操作名称。') },
+        reason: { summary: t('Client execution reason when present.', '存在时解释客户端原因。') },
+        index: { summary: t('Declared native index when applicable.', '适用的已声明原生索引。') }
+      }
+    },
+    IQueryPlan: {
+      summary: t(
+        'pushed/client facts, conservative fullScan and native source/index, obtained without I/O.',
+        '无需 I/O 得到 pushed/client 事实、保守 fullScan 与原生 source/index。'
+      ),
+      members: {
+        pushed: { summary: t('Safe native prefix.', '安全原生前缀。') },
+        client: { summary: t('Ordered client remainder with reasons.', '按序客户端余部与原因。') },
+        fullScan: { summary: t('Conservative scan cost signal.', '保守扫描成本标记。') },
+        source: { summary: t('Captured native source label.', '捕获的原生数据源标签。') }
+      }
+    },
+    IQueryPushdown: {
+      summary: t(
+        'Captured native operator/operation subsets and source/index identity; support is declared once.',
+        '捕获的原生操作符、操作子集与 source/index 身份，支持事实只声明一次。'
+      ),
+      members: {
+        operators: { summary: t('Supported field operators.', '支持的字段操作符。') },
+        operations: { summary: t('Supported native operations.', '支持的原生操作。') },
+        source: { summary: t('Stable source label.', '稳定数据源标签。') },
+        index: { summary: t('Optional native index label.', '可选原生索引标签。') }
+      }
+    },
+    IQueryRead: {
+      summary: t(
+        'Implemented all(ctx) and explain() terminals; all consumes and closes the original iterator.',
+        '已实现的 all(ctx) 与 explain() 终点；all 消费并关闭原迭代器。'
+      ),
+      members: {
+        all: {
+          summary: t(
+            'Collect results and await original cursor disposal.',
+            '收集结果并等待原游标释放。'
+          )
+        },
+        explain: { summary: t('Plan without reading data.', '不读取数据地规划。') }
+      }
+    },
+    IQueryResult: {
+      summary: t(
+        'Selected all/explain/requirePushdown result. select is removed after its single transition.',
+        '选择后的 all/explain/requirePushdown 结果；一次选择后移除 select。'
+      ),
+      members: {
+        all: { summary: t('Collect selected results.', '收集选择后的结果。') },
+        requirePushdown: {
+          summary: t('Reject client work before opening a source.', '打开源前拒绝客户端步骤。')
+        }
+      }
+    },
+    IQueryChain: {
+      summary: t(
+        'Implemented three-form where, one select, all, explain and requirePushdown with precise field/output types.',
+        '已实现三形态 where、一次 select、all、explain 与 requirePushdown，字段与输出类型精确。'
+      ),
+      members: {
+        where: {
+          summary: t(
+            'Append object, typed path or function condition.',
+            '追加对象、typed 路径或函数条件。'
+          )
+        },
+        select: {
+          summary: t('One field projection or awaited mapper.', '一次字段投影或等待 mapper。')
+        },
+        all: {
+          summary: t('Execute the actual plan and close the source.', '执行真实计划并关闭数据源。')
+        }
+      }
+    },
+    IRecordQuerySource: {
+      summary: t(
+        'Author seam with one execute callback returning the original unknown-row IStorageIterator; no new resource owner.',
+        '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
+      ),
+      members: {
+        pushdown: { summary: t('Captured native support declaration.', '捕获的原生支持声明。') },
+        execute: {
+          summary: t(
+            'Return the original cursor over only pushed conditions/fields.',
+            '按已下推条件与字段返回原游标。'
           )
         }
       }
@@ -3495,6 +3619,32 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
     }
   },
   enums: {
+    QueryOperation: {
+      summary: t(
+        'Shared planner vocabulary; actual native support is a declared subset.',
+        '共用规划词汇，真实原生支持由子集声明。'
+      ),
+      values: {
+        where: t('Declarative condition.', '声明式条件。'),
+        predicate: t('Client function predicate.', '客户端函数谓词。'),
+        select: t('Field projection.', '字段投影。'),
+        mapper: t('Client mapping.', '客户端映射。'),
+        order: t('Key selector ordering.', '键选择器排序。'),
+        comparator: t('Comparator ordering.', '比较器排序。'),
+        skip: t('Offset skip.', '偏移跳过。'),
+        after: t('Keyset cursor.', '键集游标。'),
+        limit: t('Result bound.', '结果上限。'),
+        distinct: t('Distinct field.', '字段去重。'),
+        count: t('Count terminal.', '计数终点。'),
+        exists: t('Existence terminal.', '存在性终点。'),
+        aggregate: t('Numeric aggregate.', '数值聚合。'),
+        topK: t('Vector result bound.', '向量结果上限。'),
+        minScore: t('Score threshold.', '分数阈值。'),
+        follow: t('RDF forward relation.', 'RDF 正向关系。'),
+        inverse: t('RDF reverse relation.', 'RDF 反向关系。'),
+        groupBy: t('Group ranked hits.', '已排名命中分组。')
+      }
+    },
     QueryOperator: {
       summary: t('Canonical declarative operators.', '规范声明式操作符。'),
       values: {
@@ -3607,6 +3757,10 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
         '涵盖无效输入、键、能力缺失、释放和取消的稳定契约失败码。'
       ),
       values: {
+        queryNotPushable: t(
+          'Strict execution includes client steps; inspect explain before reading.',
+          '严格执行包含客户端步骤；读取前检查 explain。'
+        ),
         concurrencyPolicyFailed: t(
           'A policy threw or returned an invalid decision; inspect its original cause.',
           '策略抛错或返回非法决策，检查原始 cause。'
