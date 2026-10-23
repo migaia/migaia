@@ -5,7 +5,15 @@ import {
   defineStorageBackendKind,
   type IStoragePluginCore
 } from '../../src/index.js'
-import type { ICapabilityInstallPort, IKeyValueStore } from '@migaia/storage-contract'
+import {
+  records,
+  rdf,
+  type IStorageStore,
+  type ITransactionScope,
+  type ITransactionBuilder,
+  type ICapabilityInstallPort,
+  type IKeyValueStore
+} from '@migaia/storage-contract'
 
 /** The backend kind and installer retain this native surface without lifecycle authority. */
 type IExactStore = IKeyValueStore & { readonly custom: <TValue>(value: TValue) => TValue }
@@ -100,3 +108,63 @@ const basePlugin = definePlugin('base', (core: IStoragePluginCore) => ({
 const baseHost = await createStorageHost({ plugins: [basePlugin] as const })
 // @ts-expect-error Store transfer alone cannot manufacture a custom static backend surface.
 baseHost.backend('base').custom('literal')
+
+/** The actual host projection keeps record and RDF augmentation in their own native families. */
+type IFamilyScope = ITransactionScope<unknown, typeof records | typeof rdf>
+/** A declaration-only backend retains the existing real transaction and builder shapes. */
+type IFamilyStore = IStorageStore<typeof records | typeof rdf> & {
+  transaction<R>(run: (scope: IFamilyScope) => R): Promise<Awaited<R>>
+  tx(): ITransactionBuilder<IFamilyScope>
+}
+declare const familyStore: IFamilyStore
+/** Each family carries its own literal method result, without assertions or an alternate query API. */
+const familyKind = defineStorageBackendKind<
+  IFamilyStore,
+  undefined,
+  { getTransactionClient(scope: IFamilyScope): undefined }
+>()('families')
+const familyFeature = defineFeature(familyKind, () => ({
+  capabilities: [],
+  chain: {
+    query: {
+      recordOnly(): 'record' {
+        return 'record'
+      }
+    },
+    rdf: {
+      rdfOnly(): 'rdf' {
+        return 'rdf'
+      }
+    }
+  },
+  api: { store: {}, transaction: {} }
+}))
+const familyPlugin = definePlugin(
+  'families',
+  (core: IStoragePluginCore) => ({
+    kind: familyKind,
+    featureExpose: () => ({
+      getClient: () => undefined,
+      getTransactionClient: (_scope: IFamilyScope) => undefined
+    }),
+    capabilityInstaller: (_store: IFamilyStore) => installer,
+    install: () => {
+      core.registerStore(familyStore)
+      return {}
+    }
+  }),
+  { familyFeature }
+)
+const familyHost = await createStorageHost({ plugins: [familyPlugin] })
+await familyHost.backend('families').transaction(async (scope) => {
+  const recordQuery = scope.use(records).query()
+  const rdfQuery = scope.use(rdf).match({})
+  const recordLiteral: 'record' = recordQuery.recordOnly()
+  const rdfLiteral: 'rdf' = rdfQuery.rdfOnly()
+  void recordLiteral
+  void rdfLiteral
+  // @ts-expect-error RDF augmentation cannot appear on the record query family.
+  recordQuery.rdfOnly()
+  // @ts-expect-error Record augmentation cannot appear on the RDF query family.
+  rdfQuery.recordOnly()
+})
