@@ -9,6 +9,27 @@ const t = (en: string, zh: string): IText => ({ en, zh })
  * output is quoted in `result`.
  */
 export const utilsCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  detectServerRuntime: [
+    {
+      title: t('Select a native server adapter', '选择原生服务端适配器'),
+      problem: t(
+        'A native adapter needs the runtime that started the program. Deno and Bun can also expose Node compatibility globals.',
+        '原生适配器需要识别启动程序的运行时。Deno 与 Bun 也可能暴露 Node 兼容全局。'
+      ),
+      example: {
+        en: `import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime())`,
+        zh: `import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime())`
+      },
+      result: t(
+        'Prints node on Node. Deno returns deno, Bun returns bun, and browsers return undefined.',
+        'Node 输出 node。Deno 返回 deno，Bun 返回 bun，浏览器返回 undefined。'
+      )
+    }
+  ],
   withTimeout: [
     {
       title: t('Time out a slow request and actually stop it', '给慢请求加超时，并让请求真的停下'),

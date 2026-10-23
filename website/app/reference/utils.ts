@@ -1,9 +1,9 @@
 /**
  * Reference documentation of `@migaia/utils`. Rules: `app/reference/contract.ts`. Verified against
  * `packages/utils/src` (promise.ts, scheduler.ts, error.ts, error-chain*.ts, bytes.ts, object.ts,
- * object-path.ts, config.ts, function.ts, number.ts, string.ts, value.ts, url.ts, collector.ts),
- * README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero timeout and `start`
- * still schedules a zero-delay deadline; it does not disable the deadline.
+ * object-path.ts, config.ts, function.ts, number.ts, runtime.ts, string.ts, value.ts, url.ts,
+ * collector.ts), README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero
+ * timeout and `start` still schedules a zero-delay deadline; it does not disable the deadline.
  */
 import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { utilsCases } from './utils-cases.js'
@@ -1462,6 +1462,21 @@ isEmptyValue(0) // false`
     }
   },
   symbols: {
+    detectServerRuntime: {
+      role: 'operation',
+      cases: utilsCases.detectServerRuntime,
+      purpose: t(
+        'Identifies the server runtime without importing host APIs, checking Deno before Bun before Node.',
+        '不导入宿主 API，按 Deno、Bun、Node 的优先级识别服务端运行时。'
+      ),
+      returns: t(
+        '`deno`, `bun` or `node`; `undefined` in browsers without server globals.',
+        '`deno`、`bun` 或 `node`；没有服务端全局的浏览器返回 `undefined`。'
+      ),
+      example: `import { detectServerRuntime } from '@migaia/utils'
+
+const runtime = detectServerRuntime()`
+    },
     ...utilsFacadeSymbols,
     yieldToHost: {
       ...utilsFacadeSymbols.yieldToHost!,

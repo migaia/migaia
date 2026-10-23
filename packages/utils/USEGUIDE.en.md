@@ -1777,6 +1777,16 @@ const initOnce = once(() => {
 
 ---
 
+## Identify the server runtime
+
+```ts doc-test=run
+import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime()) // 'node' in Node
+```
+
+`detectServerRuntime(): 'deno' | 'bun' | 'node' | undefined` checks `globalThis.Deno`, then `process.versions.bun`, then `process.versions.node`. Node compatibility globals in Deno and Bun do not take precedence. Browsers return `undefined`. The function imports no filesystem or other host APIs; native adapters use its result to load only their runtime module.
+
 ## `/value`, `/string` and `/number` everyday tools
 
 `isSafeIntegerValue(value)` from `/value` accepts only finite safe-integer numbers and converts no strings, bigints or boxed numbers.

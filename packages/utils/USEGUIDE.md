@@ -1866,6 +1866,16 @@ const initOnce = once(() => {
 
 ---
 
+## 识别服务端运行时
+
+```ts doc-test=run
+import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime()) // Node 中为 'node'
+```
+
+`detectServerRuntime(): 'deno' | 'bun' | 'node' | undefined` 先检查 `globalThis.Deno`，再检查 `process.versions.bun`，最后检查 `process.versions.node`。Deno 和 Bun 提供的 Node 兼容全局不会抢先匹配。浏览器返回 `undefined`。函数不导入文件系统或其它宿主 API；原生适配器根据结果只加载自己的运行时模块。
+
 ## `/value`、`/string`、`/number` 高频工具
 
 `isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。
