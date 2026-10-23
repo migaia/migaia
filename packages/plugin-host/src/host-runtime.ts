@@ -557,17 +557,18 @@ export class PluginHost<
               assertCurrent()
               return
             }
+            /** The original lifecycle owner already retains the exact active install row. */
+            const current = this.#hookRegistration
             if (
               batch &&
               !batch.committed &&
               batch.registrations.get(registration.name) === registration &&
               registration.installed &&
               !registration.lifecycleController?.signal.aborted &&
-              [...batch.registrations.values()].some(
-                (current) =>
-                  current.lifecycle === PluginHostRegistrationLifecycle.install &&
-                  this.#operationRuntime.isCurrent(current.operation)
-              )
+              current !== undefined &&
+              batch.registrations.get(current.name) === current &&
+              current.lifecycle === PluginHostRegistrationLifecycle.install &&
+              this.#operationRuntime.isCurrent(current.operation)
             ) {
               /** The original candidate handle owns installed/enabled/activation checks. */
               void this.#createHandle(registration.name, batch).extensions
