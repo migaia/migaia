@@ -90,6 +90,10 @@ export type IVectorCollection<
     readonly { readonly id: string; readonly score: number; readonly payload?: TPayload }[]
   >
 }
+/** The original payload constraint and collection options also serve root Feature projections. */
+export type IVectorCollectionOptions<TPayload> = [TPayload] extends [IVectorPayloadShape<TPayload>]
+  ? [options?: { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid' }]
+  : [options: never]
 /** Real backends provide collection metadata and native query sources through one shared API. */
 export type IVectorApi<
   TGroupable extends boolean = false,
@@ -98,9 +102,7 @@ export type IVectorApi<
 > = {
   collection<TPayload = ICodecValue>(
     name: string,
-    ...options: [TPayload] extends [IVectorPayloadShape<TPayload>]
-      ? [options?: { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid' }]
-      : [options: never]
+    ...options: IVectorCollectionOptions<TPayload>
   ): IVectorCollection<TPayload, TGroupable, TChangeFeed, TAugmentMethods>
 }
 /** Vector collections keep native execution and have no generic transaction projection. */

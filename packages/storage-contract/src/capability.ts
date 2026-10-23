@@ -32,7 +32,8 @@ import type { records } from './capabilities/records.js'
 import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
 import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
 import type { sql } from './capabilities/sql.js'
-import type { rdf, ITransactionRdfApi } from './capabilities/rdf.js'
+import type { rdf, IRdfApi, ITransactionRdfApi } from './capabilities/rdf.js'
+import type { vector, IVectorApi } from './capabilities/vector.js'
 import type { ISqlExecutor } from './sql.js'
 export { defineStorageCapability } from './capability-token.js'
 export { kv } from './capabilities/kv.js'
@@ -231,10 +232,20 @@ type IAddScopedCapabilities<
   : TScope extends { use: (...args: never[]) => unknown }
     ? TScope
     : TScope & ITransactionCapabilityView<TCaps, IScopeRecordValue<TScope>>
+/** Native support flags refine implementations while each token retains its original default API. */
+type ICapabilityImplementationApi<TCap extends IAnyStorageCapability> =
+  | ICapabilityApi<TCap>
+  | (TCap extends typeof records
+      ? IRecordsApi<ICodecValue, boolean, object>
+      : TCap extends typeof rdf
+        ? IRdfApi<boolean, object>
+        : TCap extends typeof vector
+          ? IVectorApi<boolean, boolean, object>
+          : never)
 /** Frozen implementation descriptor; the API object keeps its backend-owned lifetime. */
 export type ICapabilityImpl<
   TCap extends IAnyStorageCapability = IAnyStorageCapability,
-  TApi extends ICapabilityApi<TCap> = ICapabilityApi<TCap>
+  TApi extends ICapabilityImplementationApi<TCap> = ICapabilityApi<TCap>
 > = {
   readonly [capabilityImplementation]: true
   readonly capability: TCap
@@ -445,7 +456,7 @@ export function readTransactionImplementation(
 /** Creates a frozen authentic implementation descriptor without taking ownership of its API. */
 export function implement<
   TCap extends IAnyStorageCapability,
-  TApi extends ICapabilityApi<NoInfer<TCap>> = ICapabilityApi<TCap>
+  TApi extends ICapabilityImplementationApi<NoInfer<TCap>> = ICapabilityApi<TCap>
 >(
   capability: TCap,
   api: TApi,

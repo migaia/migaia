@@ -5059,6 +5059,10 @@ console.log(candidate.name, candidate.output)`
         'Preserves original builder scope and augmentation while projecting host method groups.',
         '投影宿主方法分组时保留原构建器视图与增强。'
       ),
+      example: t(
+        'Root records, vector and RDF lookups retain native API/collection methods, generic payload constraints, original and selected methods, and actual feed/grouping availability. Only the corresponding Feature group is added.',
+        '根 records/vector/RDF lookup 保留原生 API/collection 方法、generic payload 约束、原方法与 select 后方法，以及真实 feed/groupBy 能力；仅加入对应 Feature 组。'
+      ),
       members: {}
     },
     ILockKey: {
