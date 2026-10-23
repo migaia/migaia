@@ -1805,6 +1805,11 @@
         "structuredCodec"
       ]
     },
+    "@migaia/storage-plugin-qdrant": {
+      ".": ["ERROR_SOURCE", "QdrantErrorCode"],
+      "./http": ["fetchHttp"],
+      "./client": ["qdrantClientHttp"]
+    },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],
       "./http": ["httpEndpoint"],
