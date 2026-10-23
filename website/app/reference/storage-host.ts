@@ -411,7 +411,26 @@ console.log(host.extensions.label('draft'))`,
         'Descriptor-captured original native I/O with immutable forOrg projection, never public KV prefixes.',
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
-      members: {}
+      members: {
+        readImage: {
+          summary: t(
+            'Read a missing/present durable image from the exact authenticated org scope. Memory uses the existing versioned portable JSON codec, original bytes encoding and logical RDF identity.',
+            '从精确认证组织 scope 读取缺失或存在的持久镜像；memory 复用已有版本化 portable JSON codec、字节编码与逻辑 RDF 身份。'
+          )
+        },
+        writeImage: {
+          summary: t(
+            'Restore through the original native draft and write validators; the same transaction commits or rolls back every restored channel and deadline.',
+            '经原 native draft 与写入校验恢复；同一事务提交或回滚各恢复通道与 deadline。'
+          )
+        },
+        readRevision: {
+          summary: t(
+            'Read complete original revision facts, including clear epochs and tombstones; memory own writes predict its one final per-key commit increment.',
+            '读取含 clear epoch 与墓碑的完整原修订；memory 自有写入沿每键最终一次提交递增。'
+          )
+        }
+      }
     },
     IStorageJournalTarget: {
       summary: t(
