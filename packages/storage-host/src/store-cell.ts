@@ -1,5 +1,6 @@
-import type { IChainMethods, IStorageBase } from '@migaia/storage-contract'
-import { StorageError, StorageErrorCode } from './errors.js'
+import type { IChainMethods, IStorageBase, IStorageResource } from '@migaia/storage-contract'
+import { createErrorCollector } from '@migaia/lifecycle'
+import { StorageError, StorageErrorCode, STORAGE_HOST_SOURCE } from './errors.js'
 import { StorageErrorText } from './error-text.js'
 import type { IStorageFeatureProjection } from './feature-install.js'
 import type {
@@ -9,6 +10,8 @@ import type {
   IStorageExecutionPort
 } from './types.js'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
+import type { IStorageJournalBackendBinding } from './journal/types.js'
+import { snapshotStorageJournalBinding } from './journal/binding.js'
 /** One registration binds one construction identity and publishes it only after admission. */
 export type IStorageStoreCell = {
   bind(store: IStorageBase): void
@@ -18,6 +21,10 @@ export type IStorageStoreCell = {
   createTransactionApi(scope: object): object | undefined
   getChainMethods(family: keyof IChainMethods): object | undefined
   setOrgBinding(binding: IStorageOrgBinding): void
+  setJournalBinding(binding: IStorageJournalBackendBinding): void
+  journalForOrg(orgId: string): Omit<IStorageJournalBackendBinding, 'forOrg'>
+  retainJournalResource(resource: IStorageResource): void
+  releaseJournalResources(): Promise<void>
   forOrg(orgId: string, defaultOrgId: string): IStorageBase
   dropOrg(orgId: string): Promise<void>
   createOrgApi(
@@ -52,6 +59,10 @@ export function createStorageStoreCell(): IStorageStoreCell {
   let projection: IStorageFeatureProjection | undefined
   /** Optional native projection belongs to this same single-assignment store cell. */
   let orgBinding: IStorageOrgBinding | undefined
+  /** The descriptor's one private journal binding shares this original single-assignment cell. */
+  let journalBinding: IStorageJournalBackendBinding | undefined
+  /** Dynamic journal handles are released by the one original install-time disposal callback. */
+  const journalResources = new Map<IStorageResource, () => Promise<void>>()
   /** Only this registration's original extension methods need organization rebinding. */
   const extensions = new Map<PropertyKey, { readonly value: unknown; readonly receiver: object }>()
   /** Each organization retains one business view, avoiding per-lookup resource aliases. */
@@ -59,6 +70,44 @@ export function createStorageStoreCell(): IStorageStoreCell {
   /** Exact aliases are released by the registration's existing resource scope. */
   const orgReleases: Array<() => void> = []
   return {
+    retainJournalResource: (resource) => {
+      if (journalResources.has(resource)) return
+      let dispose: IStorageResource['dispose']
+      try {
+        dispose = resource?.dispose
+      } catch (cause) {
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+      }
+      if (typeof dispose !== 'function')
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      journalResources.set(resource, () => Reflect.apply(dispose, resource, []))
+    },
+    releaseJournalResources: async () => {
+      const releases = [...journalResources.values()]
+      journalResources.clear()
+      const errors = createErrorCollector('throw', undefined)
+      for (let index = releases.length - 1; index >= 0; index--) {
+        try {
+          await releases[index]!()
+        } catch (error) {
+          errors.add(STORAGE_HOST_SOURCE, error)
+        }
+      }
+      errors.finalize(StorageErrorText.storageHostDisposeFailed)
+    },
+    setJournalBinding: (binding) => {
+      if (journalBinding !== undefined)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      journalBinding = snapshotStorageJournalBinding(binding)
+    },
+    journalForOrg: (orgId) => {
+      if (journalBinding === undefined)
+        throw new StorageContractError(StorageContractErrorCode.unsupported)
+      const { forOrg: _forOrg, ...projected } = snapshotStorageJournalBinding(
+        journalBinding.forOrg(orgId)
+      )
+      return Object.freeze(projected)
+    },
     projectOrgBackend: (orgId, create) => {
       const existing = orgViews.get(orgId)
       if (existing !== undefined) return existing

@@ -322,6 +322,48 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IStorageJournalNamespaceView: {
+      summary: t(
+        'Six original string KV methods plus actual private keys; business bulk and TTL capabilities are absent.',
+        '原六个字符串 KV 方法与真实私有 keys，不继承业务批量和 TTL。'
+      ),
+      members: {}
+    },
+    IStorageJournalNamespace: {
+      summary: t(
+        'Private native run, actual commit/rollback callbacks and accepted-work disposal; it never closes its backend.',
+        '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
+      ),
+      members: {}
+    },
+    IStorageJournalBackendBinding: {
+      summary: t(
+        'Descriptor-captured original native I/O with immutable forOrg projection, never public KV prefixes.',
+        'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
+      ),
+      members: {}
+    },
+    IStorageJournalTarget: {
+      summary: t(
+        'Original lock identity or backend-private metadata target.',
+        '原锁身份或后端私有 metadata 目标。'
+      ),
+      members: {}
+    },
+    IStorageJournalImage: {
+      summary: t(
+        'Missing versus present encoded wire value; null never substitutes absence.',
+        '区分缺失与存在的编码值，null 不替代缺失。'
+      ),
+      members: {}
+    },
+    IStorageJournalChange: {
+      summary: t(
+        'Original transaction before/after images with complete committed revision.',
+        '原事务 before/after 镜像及完整已提交修订。'
+      ),
+      members: {}
+    },
     IRecordIndexBackfillPhase: {
       summary: t(
         'Existing canonical or legacy persisted scan phase.',

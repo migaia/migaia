@@ -70,6 +70,7 @@ import type {
   IStorageBorrowedBackend,
   IStorageOrgBinding
 } from './types.js'
+import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
 type IStorageHostCore = object
@@ -155,6 +156,13 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         },
         getStore: context.storeCell.get,
         setStorageFeatureProjection: context.storeCell.setFeatureProjection,
+        setStorageJournalBinding: (
+          binding: import('./journal/types.js').IStorageJournalBackendBinding
+        ) => {
+          /** Admission remains inside the original registration's installation window. */
+          registrationCore!.onDispose(context.storeCell.releaseJournalResources)
+          context.storeCell.setJournalBinding(binding)
+        },
         createTransactionApi: context.storeCell.createTransactionApi,
         getChainMethods: context.storeCell.getChainMethods,
         getOrgContext: context.getOrgContext,
@@ -1127,6 +1135,39 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     return Object.freeze(api) as IStorageHost<P>['api']
   }
 
+  /** Internal journal consumers resolve one admitted registration without exposing the native store. */
+  [storageJournalAccess](id: string): IStorageJournalBackendAccess {
+    return this.#journalAccess(id, this.#orgId)
+  }
+
+  /**
+   * Fixed-org access borrows only original private I/O and the registration's resource release
+   * hook.
+   */
+  #journalAccess(id: string, orgId: string): IStorageJournalBackendAccess {
+    this.#assertOpen()
+    const store = this.#registry.get(id)
+    if (store === undefined)
+      throw new StorageError(
+        StorageErrorCode.backendNotInstalled,
+        {},
+        StorageErrorText.backendNotInstalled
+      )
+    const context = this.#storeContexts.get(store)!.context
+    context.assertExecution()
+    const binding = context.storeCell.journalForOrg(orgId)
+    return Object.freeze({
+      orgId,
+      backendInstanceId: context.id,
+      binding,
+      retain: (resource: import('@migaia/storage-contract').IStorageResource) => {
+        this.#assertOpen()
+        context.assertExecution()
+        context.storeCell.retainJournalResource(resource)
+      }
+    })
+  }
+
   /** Resolve native organization data through its original registration, then remove ownership. */
   #projectBackend(store: IStorageBase, orgId: string): ReturnType<typeof borrowStorageBackend> {
     this.#assertOpen()
@@ -1229,6 +1270,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     /** The view shell has no dispose, drop, installation or mutable registration methods. */
     const view = {
+      [storageJournalAccess]: (id: string) => this.#journalAccess(id, orgId),
       orgId,
       org: (next: string) => this.org(next),
       backend,
