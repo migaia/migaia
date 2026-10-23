@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@migaia/resource": "workspace:^",
-    "@migaia/storage-web": "workspace:^",
+    "@migaia/storage-host": "workspace:^",
     "mitt": "3.0.1",
     "nanostores": "1.5.5",
     "typescript": "^7.0.2",

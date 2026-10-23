@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { StorageStageKind, type ICodecStageObserver } from '@migaia/storage-contract'
 import { persistUnit } from '../src/index.js'
@@ -10,7 +10,7 @@ import { persist } from '../src/light-index.js'
 describe('versioned persistence', () => {
   it('snapshots contiguous steps and upgrades without automatically writing the archive', async () => {
     /** The real backend remains the archive authority throughout hydration. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Reading an old archive alone must leave these bytes unchanged. */
     const original = JSON.stringify({ version: 0, state: { count: 1 } })
     await storage.set('steps', original)
@@ -41,9 +41,9 @@ describe('versioned persistence', () => {
     await storage.dispose()
   })
 
-  it('rejects gaps and mixed reset descriptors before starting storage reads', () => {
+  it('rejects gaps and mixed reset descriptors before starting storage reads', async () => {
     /** Invalid configuration must fail before the backend is called. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Calls count the existing public backend boundary. */
     let reads = 0
     storage.get = async () => {
@@ -72,7 +72,7 @@ describe('versioned persistence', () => {
 
   it('keeps a failed step on the contract cause chain and never writes', async () => {
     /** A real archived old version enters the shared migration executor. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('failure', '{"version":0,"state":{"count":1}}')
     /** The step's original native failure must survive by identity. */
     const primary = new Error('step failed')
@@ -104,7 +104,7 @@ describe('versioned persistence', () => {
 
   it('reports observer failures without waiting or changing codec success', async () => {
     /** This archive triggers one decode and the explicit flush triggers one encode. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('observed', '{"version":0,"state":{"count":2}}')
     /** Reports retain each original observer failure. */
     const reports: unknown[] = []
@@ -164,7 +164,7 @@ describe('versioned persistence', () => {
 
   it('rejects nonportable state before the backend receives a write', async () => {
     /** Storage calls provide the externally observable failure boundary. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Count actual backend writes, including unintended disposal writes. */
     let writes = 0
     storage.set = async () => {
@@ -184,7 +184,7 @@ describe('versioned persistence', () => {
 
   it('contains observer metadata and callback getter failures at their owning boundary', async () => {
     /** Both conversion directions use the actual persistence facade and archive backend. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     await storage.set('getter', '{"version":0,"state":{"count":2}}')
     /** Equal initial state avoids application writes during this observer-specific case. */
     const store = createStore({ count: 2 })
@@ -241,7 +241,7 @@ describe('versioned persistence', () => {
     /** A minimal existing unit boundary isolates attachment ownership from any state package. */
     const runtime = createRuntime()
     /** The archive backend remains borrowed and callable after cleanup. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Cleanup failure must remain on the explicit rejection and the observer report. */
     const primary = new Error('unsubscribe failed')
     /** Cleanup count proves all public entry points share the same work. */
