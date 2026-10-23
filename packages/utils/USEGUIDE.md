@@ -2137,3 +2137,20 @@ UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 U
 | `utf8ByteLength` | `@migaia/utils/bytes` | 计算 UTF-8 字节数，不分配缓冲区或迭代器。 |
 | `walkErrorCauses` | `@migaia/utils/error` | 沿 `cause` 和 `AggregateError.errors` 展开错误链，按身份去重并限制深度。 |
 | `withTimeout` | `@migaia/utils/promise` | 给惰性操作加截止时间；到点先取消操作收到的 signal，再以超时错误拒绝。 |
+
+## 可选值
+
+`IMaybe<T>` 区分 `{ some: true, value: T }` 与 `{ some: false }`，包括“存在但值为 undefined”。root 导出 `isSome`/`isNone` 用于类型收窄，`unwrapOr(m, fallback)` 接受同值域的缺省值，`mapMaybe(m, mapper)` 仅对存在值同步映射一次，`toUndefined(m)` 用于有意合并缺失与 undefined。None 原样复用且不调用 mapper；mapper 结果保留身份、不等待 Promise。typed 可选值不附加运行时验证。
+
+mapper 失败保留原有带码错误；未编码且可写的原生 Error 在原实例附 utils INVALID_ARGUMENT，保留原生类型与 stack。身份冲突时原错位于包装 cause；附加身份失败时聚合原错首位、附加失败次位。非 Error 沿原 toError/NON_ERROR_VALUE 语义。
+
+```ts
+import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'
+const present: IMaybe<number | undefined> = { some: true, value: undefined }
+const missing: IMaybe<number> = { some: false }
+const mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)
+console.log(isSome(present), isNone(missing))
+console.log(unwrapOr(mapped, 0), toUndefined(missing))
+// true true
+// 6 undefined
+```
