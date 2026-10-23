@@ -528,6 +528,13 @@ export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
       operation: Readonly<{ operation: string; targetVersion: number }>
     ): IStorageEnvelopeStages
     readonly extensions: Readonly<IStoragePluginExtensions<P[number]>>
+    readonly api: {
+      readonly [N in keyof IPluginStoreMap<P>]: IPluginStoreMap<P>[N] extends {
+        readonly api: infer A
+      }
+        ? A
+        : never
+    }
     use<const Next extends readonly IStorageBackendPluginHandle[]>(
       ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
     ): Promise<IStorageHost<readonly [...P, ...Next]>>

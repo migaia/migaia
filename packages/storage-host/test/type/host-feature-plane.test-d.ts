@@ -58,6 +58,30 @@ exactHost.extensions.custom('literal')
 // @ts-expect-error Extension methods do not become Store methods.
 exactHost.backend('exact').installed()
 
+/** Host API projection preserves each selected backend's exact names and result types. */
+const apiFeature = defineFeature(exactKind, () => ({
+  capabilities: [],
+  chain: {},
+  api: {
+    store: {
+      async literal(): Promise<'literal'> {
+        return 'literal'
+      }
+    },
+    transaction: {}
+  }
+}))
+const apiPlugin = definePlugin('with-api', exactDescriptor, { apiFeature })
+const apiHost = await createStorageHost({ plugins: [apiPlugin] as const })
+const apiLiteral: 'literal' = await apiHost.api['with-api'].literal()
+void apiLiteral
+// @ts-expect-error host APIs use exact installed singleton backend ids.
+void apiHost.api.missing
+// @ts-expect-error a method is not flattened across backend API namespaces.
+void apiHost.api.literal
+// @ts-expect-error unselected method names cannot gain authority through the host projection.
+void apiHost.api['with-api'].missing
+
 /** A descriptor without a typed installer retains the base admission contract. */
 const baseKind = defineStorageBackendKind()('base')
 const basePlugin = definePlugin('base', (core: IStoragePluginCore) => ({
