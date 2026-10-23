@@ -1641,19 +1641,20 @@ export const createRepository = <
   }
 
   /** Observation wraps the same original core for both fluent and legacy option adapters. */
-  const observeQueryAll = <R>(
-    invoke: () => Promise<R[]>,
+  const observeQueryRead = <R>(
+    invoke: () => Promise<R>,
     plan: IEntityQueryPlan,
     selection: IEntityQuerySourceSelection<TDomain>,
     current: ITransactionScope | undefined,
-    openedCounter: () => { readCount: number } | undefined
-  ): Promise<R[]> => {
+    openedCounter: () => { readCount: number } | undefined,
+    returnedCount: (value: R) => number
+  ): Promise<R> => {
     if (queryStages === undefined) return invoke()
     const stages = current === undefined ? queryStages : queryStages?.forTransaction(current)
     const started = stages === undefined ? 0 : systemScheduler.now()
     if (stages?.beforeQuery !== undefined)
       observeEntity(stages, () => stages.beforeQuery!(name, selection.index, plan))
-    let pending: Promise<R[]>
+    let pending: Promise<R>
     try {
       pending = invoke()
     } catch (cause) {
@@ -1666,7 +1667,7 @@ export const createRepository = <
           observeEntity(stages, () =>
             stages.afterQuery!(name, selection.index, {
               readCount: counter?.readCount ?? 0,
-              returnedCount: values.length,
+              returnedCount: returnedCount(values),
               elapsedMs: systemScheduler.now() - started,
               completed: true
             })
@@ -1806,14 +1807,14 @@ export const createRepository = <
       },
       methods: getBackendEntityQueryMethods(store) as TAugmentMethods | undefined,
       defaultComparator: defaultOrderBy,
-      run: (invoke, plan, selection) => {
+      run: (invoke, plan, selection, returnedCount) => {
         const collect = (current?: ITransactionScope) => {
           const previous = openingPlan
           const previousSelection = openingSelection
           openingPlan = plan
           openingSelection = selection
           try {
-            return observeQueryAll(invoke, plan, selection, current, () => opened)
+            return observeQueryRead(invoke, plan, selection, current, () => opened, returnedCount)
           } finally {
             openingPlan = previous
             openingSelection = previousSelection
@@ -2033,7 +2034,7 @@ export const createRepository = <
             indexed === undefined
               ? listQuery(normalized, context, entityRuntime(current), view, onRead)
               : createIndexQuery(indexed, context, view, onRead)
-          return observeQueryAll(
+          return observeQueryRead(
             () => query.all(context),
             {
               hasWhere: false,
@@ -2042,7 +2043,8 @@ export const createRepository = <
             },
             { index: indexed?.index },
             current,
-            () => counter
+            () => counter,
+            (values) => values.length
           )
         })
     })
@@ -2101,7 +2103,7 @@ export const createRepository = <
         indexed === undefined
           ? listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
           : createIndexQuery(indexed, context, undefined, onRead)
-      return observeQueryAll(
+      return observeQueryRead(
         () => query.all(context),
         {
           hasWhere: false,
@@ -2110,7 +2112,8 @@ export const createRepository = <
         },
         { index: indexed?.index },
         undefined,
-        () => counter
+        () => counter,
+        (values) => values.length
       )
     },
     stream: (options, ctx) => {
