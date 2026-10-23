@@ -36,6 +36,11 @@ describe('finite backend authoring functions', () => {
     }
   })
   it('retains configured namespace targets and rejects only a slash UUID suffix', () => {
+    expect(resolveStorageNamespace('prefs')).toBe('prefs')
+    expect(resolveStorageNamespace(otherOrg)).toBe(otherOrg)
+    expect(() => resolveStorageNamespace(`prefs/${otherOrg}`)).toThrowError(
+      expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+    )
     expect(resolveStorageNamespace('prefs', defaultOrg, defaultOrg)).toBe('prefs')
     expect(resolveStorageNamespace('prefs', otherOrg, defaultOrg)).toBe(`prefs/${otherOrg}`)
     expect(resolveStorageNamespace('cache', otherOrg, defaultOrg)).toBe(`cache/${otherOrg}`)
