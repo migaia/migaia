@@ -60,7 +60,13 @@ export type {
 } from './secondary-index.js'
 export { asSecondaryIndexRecordStore, isSecondaryIndexRecordStore } from './secondary-index.js'
 
-export type { IStorageChange, IChangeFeedStore } from './change-feed.js'
+export type {
+  IStorageChange,
+  IChangeFeedStore,
+  ITextWatchApi,
+  ITextChangeFeedApi
+} from './change-feed.js'
+export type { IWithChangeFeedCapabilities } from './backend.js'
 export { asChangeFeedStore, isChangeFeedStore } from './change-feed.js'
 
 export type {

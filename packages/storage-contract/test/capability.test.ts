@@ -27,6 +27,11 @@ import {
   type IRdfApi,
   type IVectorCollection,
   type IVectorApi,
+  type IKeyValueStore,
+  type ISyncKeyValueStore,
+  type ITransactionScope,
+  asChangeFeedStore,
+  isChangeFeedStore,
   type IStorageIterator,
   type IStorageChange,
   type ISparqlInput,
@@ -777,6 +782,66 @@ describe('record query Feature type projection', () => {
 })
 
 describe('transaction query Feature type projection', () => {
+  it('retains known store APIs, sync metadata, transactions and family methods through text-feed refinement', () => {
+    /** Native scope and option fields remain owned by the original KV transaction entry. */
+    type IScope = ITransactionScope<ICodecValue, typeof records | typeof rdf> & {
+      nativeTx(): 'native'
+    }
+    type IBase = IKeyValueStore & {
+      readonly sync: ISyncKeyValueStore
+      readonly metadata: 'kept'
+      transaction<T>(run: (scope: IScope) => T, options?: { native: true }): Promise<Awaited<T>>
+      tx(): ITransactionBuilder<IScope, { originalBuilder(): 'kept' }>
+    }
+    /** The real original implementation tuple retains all four standard capability identities. */
+    type IStore = IWithChainMethods<
+      ICapabilityStore<
+        IBase,
+        typeof kv | typeof records | typeof rdf | typeof vector,
+        readonly [
+          ICapabilityImpl<typeof kv>,
+          ICapabilityImpl<typeof records>,
+          ICapabilityImpl<typeof rdf>,
+          ICapabilityImpl<typeof vector>
+        ]
+      >,
+      {
+        query: { recordLabel(): 'record' }
+        rdf: { rdfLabel(): 'rdf' }
+        vector: { vectorLabel(): 'vector' }
+        tx: { txLabel(): 'tx' }
+      }
+    >
+    function validTypes(store: IStore): void {
+      const fed = asChangeFeedStore(store)
+      expectTypeOf(fed.metadata).toEqualTypeOf<'kept'>()
+      expectTypeOf(fed.sync.get('key')).toEqualTypeOf<string | null>()
+      expectTypeOf(
+        fed.use(records).query<{ id: string }>().select('id').recordLabel()
+      ).toEqualTypeOf<'record'>()
+      fed.use(records).query().watch()
+      fed.use(rdf).match({}).select('subject').rdfLabel()
+      fed.use(rdf).match({}).watch()
+      fed.use(vector).collection<{ label: string }>('points').near([1]).topK(2).vectorLabel()
+      fed.use(vector).collection('points').near([1]).topK(2).watch()
+      // @ts-expect-error Text-feed refinement cannot add absent native vector grouping.
+      fed.use(vector).collection('points').near([1]).topK(2).groupBy('x', { perGroup: 1 })
+      fed.transaction((scope) => scope.nativeTx(), { native: true })
+      fed.tx().originalBuilder()
+      fed.tx().txLabel()
+      fed
+        .tx()
+        .lock({ channel: 'text', key: 'key' })
+        .run((scope) => scope.nativeTx())
+      if (isChangeFeedStore(store)) {
+        store.use(records).query().watch()
+        store.use(rdf).match({}).watch()
+        expectTypeOf(store.metadata).toEqualTypeOf<'kept'>()
+      }
+    }
+    void validTypes
+  })
+
   it('projects records, vector and RDF root families independently with their original APIs and states', () => {
     /** Native collection metadata and original methods survive the generic standard projection. */
     type IVectorNativeApi = {
@@ -840,7 +905,23 @@ describe('transaction query Feature type projection', () => {
       expectTypeOf(store.use(rdf)).toEqualTypeOf<IRdfApi<true>>()
     }
     void publish
-    function validTypes(store: IEnhanced, rdfOnly: IRdfOnly, vectorOnly: IVectorOnly): void {
+    function validTypes(
+      store: IEnhanced & IKeyValueStore,
+      rdfOnly: IRdfOnly,
+      vectorOnly: IVectorOnly
+    ): void {
+      const fed = asChangeFeedStore(store)
+      fed.use(records).query<{ id: string }>().select('id').originalRecord()
+      fed.use(rdf).match({}).select('object').originalRdf()
+      fed.use(vector).collection('native').nativeCollection()
+      fed.use(vector).collection('native').near([1]).topK(2).select('id').originalVector()
+      fed.use(vector).collection('native').near([1]).topK(2).watch()
+      fed
+        .use(vector)
+        .collection<{ id: string }>('native')
+        .near([1])
+        .topK(2)
+        .groupBy('id', { perGroup: 1 })
       const record = store.use(records).query<{ id: string; value: number }>()
       record.select('id').queryOnly()
       record.select('value').originalRecord()

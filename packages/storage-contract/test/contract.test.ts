@@ -323,7 +323,10 @@ describe('V2 capability contracts', () => {
       putIndexedRecord: async () => 'key',
       iterateRecordIndex: function* () {},
       transactionIndexed: async () => undefined,
-      subscribeChanges: () => () => undefined
+      subscribeChanges: () => () => undefined,
+      watch: () => {
+        throw new Error('watch must not run during admission')
+      }
     }
     let capabilityReads = 0
     let changeMethodReads = 0
@@ -344,6 +347,11 @@ describe('V2 capability contracts', () => {
     expect(asChangeFeedStore(store)).toBe(store)
     expect(capabilityReads).toBe(3)
     expect(changeMethodReads).toBe(2)
+    /** A native feed needs both real functions; a capability flag or one method is insufficient. */
+    expect(isChangeFeedStore({ ...store, watch: undefined })).toBe(false)
+    expect(isChangeFeedStore({ ...store, watch: 1 })).toBe(false)
+    expect(isChangeFeedStore({ ...store, subscribeChanges: undefined })).toBe(false)
+    expect(isChangeFeedStore({ ...store, subscribeChanges: 1 })).toBe(false)
   })
 
   it('rejects throwing and alternating capability accessors without escaping', () => {
@@ -377,6 +385,9 @@ describe('V2 capability contracts', () => {
     let subscribeReads = 0
     const alternating = {
       ...base,
+      watch: () => {
+        throw new Error('watch must not run during admission')
+      },
       capabilities: {
         syncRead: false,
         binary: false,
