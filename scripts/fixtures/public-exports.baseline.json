@@ -1798,6 +1798,22 @@
         "selectCodec",
         "structuredCodec"
       ]
+    },
+    "@migaia/storage-plugin-sqlite": {
+      ".": [
+        "SqliteErrorCode",
+        "sqliteBackendKind",
+        "sqliteBackendPlugin"
+      ],
+      "./node": [
+        "nodeSqliteDriver"
+      ],
+      "./bun": [
+        "bunSqliteDriver"
+      ],
+      "./features/maintenance": [
+        "sqliteMaintenanceFeature"
+      ]
     }
   }
 }
