@@ -395,35 +395,47 @@ export function createMemoryBackend<T = unknown>(
     input: I,
     ctx: IWriteOptions | undefined,
     prepareMutation: (captured: I, context: IOperationContextSnapshot) => IMemoryRootMutation<R>
-  ): Promise<R> =>
-    core.execution.run({ operation, input, ctx }, (captured) => {
-      controller.assertLive()
-      /** Direct closure retains accepted work until its queued/native admission truly finishes. */
-      const release = controller.beginMutation()
-      /** The sole derivation captures inputs and affected keys once, before any native attempt. */
-      let mutation!: IMemoryRootMutation<R>
-      return runWithConcurrency(
-        {
-          store: base,
-          options: ctx ?? {},
-          lock: (context) => {
-            mutation = prepareMutation(captured, context)
-            return mutation.keys
-          }
-        },
-        {
-          attempt: (attempt) =>
-            locks.attemptWrite(
-              attempt,
-              holding(),
-              mutation.run,
-              core.stageBindings.concurrencyStages(store),
-              controller.closingSignal,
-              mutation.ranges
-            )
+  ): Promise<R> => {
+    /** Pipeline intervention fixes this input before the original loop derives affected keys. */
+    let capturedInput = input
+    /** The sole derivation captures inputs and affected keys once, before any native attempt. */
+    let mutation!: IMemoryRootMutation<R>
+    return runWithConcurrency(
+      {
+        store: base,
+        options: ctx ?? {},
+        execute: (context, invoke) =>
+          core.execution.run({ operation, input, ctx: context }, (captured) => {
+            controller.assertLive()
+            /** Direct closure retains accepted work until queued/native admission truly finishes. */
+            const release = controller.beginMutation()
+            capturedInput = captured
+            try {
+              return invoke().finally(release)
+            } catch (cause) {
+              /** Input/implicit-lock admission can reject before the loop returns its Promise. */
+              release()
+              throw cause
+            }
+          }),
+        lock: (context) => {
+          mutation = prepareMutation(capturedInput, context)
+          return mutation.keys
         }
-      ).finally(release)
-    })
+      },
+      {
+        attempt: (attempt) =>
+          locks.attemptWrite(
+            attempt,
+            holding(),
+            mutation.run,
+            core.stageBindings.concurrencyStages(store),
+            controller.closingSignal,
+            mutation.ranges
+          )
+      }
+    )
+  }
   /** All-channel clearing retains its original one coarse event after one synchronous merge. */
   const clearAll = (): void => {
     controller.assertLive()
@@ -599,29 +611,35 @@ export function createMemoryBackend<T = unknown>(
       }),
     clearRecords: (ctx) => clearEntry(MemoryOperation.clearRecords, 'record', ctx),
     iterateRecords: (range, ctx) => rootIterator(range, ctx),
-    transaction: (run, ctx) =>
-      core.execution.run(
-        { operation: MemoryOperation.transaction, input: { run, ctx }, ctx },
-        (captured) => {
-          controller.assertLive()
-          assertTransactionCallback(captured.run, STORAGE_MEMORY_BACKEND)
-          /** Accepted transactions retain their original controller lease through native cleanup. */
-          const release = controller.beginMutation()
-          return runWithConcurrency(
-            { store: base, options: captured.ctx ?? {} },
-            {
-              attempt: (attempt) =>
-                locks.attempt(
+    transaction: (run, ctx) => {
+      /** One accepted lifetime spans every actual attempt and all original pipeline settlement. */
+      let release: (() => void) | undefined
+      return runWithConcurrency(
+        { store: base, options: ctx ?? {} },
+        {
+          attempt: (attempt) =>
+            core.execution.run(
+              {
+                operation: MemoryOperation.transaction,
+                input: { run, ctx: attempt },
+                ctx: attempt
+              },
+              (captured) => {
+                controller.assertLive()
+                assertTransactionCallback(captured.run, STORAGE_MEMORY_BACKEND)
+                release ??= controller.beginMutation()
+                return locks.attempt(
                   attempt,
                   holding(),
                   { attempt: () => transact(captured.run, attempt) },
                   core.stageBindings.concurrencyStages(store),
                   controller.closingSignal
                 )
-            }
-          ).finally(release)
+              }
+            )
         }
-      ),
+      ).finally(() => release?.())
+    },
     tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
     inspectLocks: (ctx) =>
       asyncEntry(MemoryOperation.inspectLocks, undefined, ctx, () => {
