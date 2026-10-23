@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   resolveStorageNamespace,
   safeJsonPayloadByteLength,
@@ -12,6 +12,29 @@ const defaultOrg = '00000000-0000-0000-0000-000000000000'
 const otherOrg = '10000000-0000-0000-0000-000000000000'
 
 describe('finite backend authoring functions', () => {
+  it('preserves the native UUID receiver and cause when entropy fails', () => {
+    /** Native UUID failure must retain its identity behind the existing capability boundary. */
+    const original = new Error('native UUID failed')
+    /** The original supported native crypto function is the only replaced test dependency. */
+    const native = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockImplementation(function (this: typeof globalThis.crypto) {
+        expect(this).toBe(globalThis.crypto)
+        throw original
+      })
+    try {
+      expect(() => createStorageToken()).toThrowError(
+        expect.objectContaining({
+          source: '@migaia/storage-contract',
+          code: 'UNSUPPORTED_CAPABILITY',
+          cause: original
+        })
+      )
+      expect(native).toHaveBeenCalledTimes(1)
+    } finally {
+      native.mockRestore()
+    }
+  })
   it('retains configured namespace targets and rejects only a slash UUID suffix', () => {
     expect(resolveStorageNamespace('prefs', defaultOrg, defaultOrg)).toBe('prefs')
     expect(resolveStorageNamespace('prefs', otherOrg, defaultOrg)).toBe(`prefs/${otherOrg}`)

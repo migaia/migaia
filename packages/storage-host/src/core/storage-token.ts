@@ -7,12 +7,22 @@ let storageTokenSequence = 0
  * callers must treat the result as an opaque same-realm uniqueness token.
  */
 export const createStorageToken = (): string => {
-  /** Borrow native UUID entropy where present and preserve the original opaque fallback format. */
-  const tokenHost = globalThis as unknown as { crypto?: { randomUUID?: () => string } }
-  const entropy =
-    typeof tokenHost.crypto?.randomUUID === 'function'
-      ? tokenHost.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  storageTokenSequence += 1
-  return `${entropy}-${storageTokenSequence.toString(36)}`
+  try {
+    /** Borrow the native receiver once while preserving the original conditional fallback. */
+    const tokenHost = globalThis as unknown as { crypto?: { randomUUID?: () => string } }
+    /** Retain the actual crypto receiver without repeating its public getter. */
+    const crypto = tokenHost.crypto
+    /** Capture the native UUID function once before invoking it with its original receiver. */
+    const randomUUID = crypto?.randomUUID
+    /** The monotonic suffix and fallback entropy format remain unchanged. */
+    const entropy =
+      typeof randomUUID === 'function'
+        ? Reflect.apply(randomUUID, crypto, [])
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    storageTokenSequence += 1
+    return `${entropy}-${storageTokenSequence.toString(36)}`
+  } catch (cause) {
+    throw new StorageContractError(StorageContractErrorCode.unsupported, { cause })
+  }
 }
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
