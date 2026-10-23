@@ -1,3 +1,25 @@
+/** Tagged codec framing is distinct from registry chunks and owns all reserved header fields. */
+export const TaggedCodecFormat = {
+  /** Descriptor identity for the format-router codec itself. */
+  id: 'tagged',
+  /** Revision of this framing, independent of the selected inner codec revision. */
+  version: 1,
+  /** Exact reserved text prefix; an apparent prefix never falls back after a framing error. */
+  textPrefix: 'mgt1:',
+  /** Text header delimiter separating the format tag from untouched encoded payload. */
+  textSeparator: ';',
+  /** Separates the admitted format identity and canonical positive version spelling. */
+  tagSeparator: '@',
+  /** Binary magic precedes a framing-version byte and a big-endian two-byte tag length. */
+  binaryMagic: [0x00, 0x4d, 0x47, 0x54] as const,
+  /** Binary payload starts after four magic bytes, one revision byte and two length bytes. */
+  binaryHeaderLength: 7,
+  /** Own string marker identifying an unknown-carrier wrapper record. */
+  marker: '$migaia.codec',
+  /** Own payload field in the unknown-carrier wrapper; its value is not frozen or copied. */
+  value: 'value'
+} as const
+
 /** Canonical serialized chunk kinds. */
 export const SerializeChunkKind = {
   /** Complete in-memory payload; registry encoding permits it only as the sole chunk. */

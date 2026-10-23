@@ -76,7 +76,14 @@ export const SerializeErrorCode = {
    * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the
    * original capability failure when one exists; absent capability needs no synthetic cause.
    */
-  envUnsupported: 'ENV_UNSUPPORTED'
+  envUnsupported: 'ENV_UNSUPPORTED',
+
+  /** Untagged input has no configured fallback; supply one or pass tagged data. */
+  tagMissing: 'TAG_MISSING',
+  /** A reserved tagged header is truncated or malformed; reject the damaged input. */
+  tagInvalid: 'TAG_INVALID',
+  /** A valid format tag is not registered; supply the corresponding codec revision. */
+  tagUnknown: 'TAG_UNKNOWN'
 } as const
 
 /** Stable serialization failure values; diagnostic kind and parser type are separate domains. */

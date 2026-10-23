@@ -445,6 +445,9 @@ SerializeCodecError(message, details) requires code, type, phase, chunkIndex and
 | aborted                   | ABORTED: cooperative cancellation; SerializeCodecError or tagged native error depending on the boundary.       |
 | invalidOption             | INVALID_OPTION: invalid plugin, version, portable input, scheduler, stream option, Base64 or output admission. |
 | envUnsupported            | ENV_UNSUPPORTED: required host capabilities such as Encoding are unavailable.                                  |
+| tagMissing                | TAG_MISSING: raw input has no explicit untagged reader.                                                        |
+| tagInvalid                | TAG_INVALID: reserved header is malformed; no fallback.                                                        |
+| tagUnknown                | TAG_UNKNOWN: valid tag has no registered codec revision.                                                       |
 
 tagSerializeError(error, code, context?) returns the original error with read-only source/code. Omitted context stays absent. Repeating the same identity is idempotent, with context filled only once. Identity conflicts delegate to utils and throw (@migaia/utils, ERROR_IDENTITY_CONFLICT), retaining the original error on cause instead of silently overwriting ownership.
 
@@ -469,3 +472,26 @@ console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
 ```
 
 Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner.
+
+### Carry a format tag in the encoded value
+
+The first codec writes new values; every listed id/version can read its own tagged payload. An optional untagged codec only reads raw legacy values. Unknown tags fail with TAG_UNKNOWN; malformed reserved headers fail with TAG_INVALID and never fall back. A raw text value starting with mgt1: is interpreted as tagged input, even when it was produced by the untagged codec.
+
+```ts
+import { createTaggedCodec } from '@migaia/serialize/tagged'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const current = defineJsonCodec({ version: 2 })
+const previous = defineJsonCodec({ version: 1 })
+const tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })
+console.log(tagged.encode({ count: 2 })) // mgt1:json@2;{"count":2}
+console.log(tagged.decode('mgt1:json@1;{"count":1}')) // { count: 1 }
+console.log(tagged.decode('{"count":1}')) // { count: 1 }
+try {
+  tagged.decode('mgt1:json@3;{"count":3}')
+} catch (error) {
+  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN
+}
+```
+
+String carriers prepend mgt1:<id>@<version>;. Byte carriers prepend 00 4d 47 54, framing byte 01, a two-byte big-endian UTF-8 tag length and the tag. Unknown carriers return a frozen object with own $migaia.codec and value fields; the inner value stays unfrozen. All codecs must declare the same carrier. The framing identity is tagged@1; it is separate from storage envelope versions. ICodecEncodedType, ITaggedCodecOptions, ITaggedEncoded, ITaggedValue and ITaggedCodec preserve carrier and business-value inference.

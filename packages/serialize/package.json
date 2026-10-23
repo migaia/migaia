@@ -59,6 +59,10 @@
     "./codecs/collections-json": {
       "types": "./dist/codecs/collections-json.d.ts",
       "default": "./dist/codecs/collections-json.js"
+    },
+    "./tagged": {
+      "types": "./dist/tagged.d.ts",
+      "default": "./dist/tagged.js"
     }
   },
   "scripts": {

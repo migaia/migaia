@@ -984,6 +984,9 @@
       "./codecs/identity/v1": [
         "identityCodec"
       ],
+      "./tagged": [
+        "createTaggedCodec"
+      ],
       "./codecs/collections-json": [
         "defineCollectionsJsonCodec"
       ],
