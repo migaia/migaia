@@ -444,7 +444,7 @@ lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.byt
 
 ### 并发执行
 
-后端与 persist 作者先调用 `resolveConcurrencyPolicy(store, capturedOptions.concurrency)`，再把策略交给 `runWithConcurrency({ store, options: capturedOptions, policy }, port)`。原 store 必须已登记事务 owner。借用的选项 getter 先只捕获一次；resolve 后把同一个普通捕获对象传入循环。循环在操作上下文字段之前读取 lock/concurrency，并只规范化一次锁身份。后端扩展选项仍由原后端准入。
+后端与 persist 作者直接把原 options 交给 `runWithConcurrency({ store, options }, port)`；原 store 必须已登记事务 owner。循环只捕获一次借用 getter，再解析捕获的覆盖策略或原 owner 默认策略；显式 request.policy 仍是唯一生效策略，保留原校验与错误。传入真实外层 attempt context 保留精确私有期限与规范锁，无需复制。循环在操作上下文字段前读取 lock/concurrency，只规范化一次锁身份；后端扩展选项仍由原后端准入。
 
 `IConcurrencyPort.attempt(context)` 必须真正结束原生事务、回滚和清理后，才返回冲突或抛错。循环先 try，只对真实冲突决策；仅 acquire 可 wait，旧尝试结束后才能 retry。拒绝准入为 LOCK_REJECTED；拒绝提交冲突为 WRITE_CONFLICT，并保留精确后端 cause。非法决策或策略抛错为 CONCURRENCY_POLICY_FAILED。后端确认自身租约被替换时使用 LOCK_LOST。
 
@@ -548,3 +548,5 @@ async function paidTotals(store: IStorageBase) {
     .all()
 }
 ```
+
+`readConcurrencyLockIdentities(ctx)` 读取真实活跃 attempt 的原元数据，返回包含通道隔离、按规范排序去重的不可变小写十六进制身份列表；列表只从已有编码字节生成一次，重复读取与嵌套尝试共用同一列表，不重新编码逻辑键、不暴露可变内部字节。伪造、已结算或只有 builder 元数据的 context 抛 INVALID_ARGUMENT；函数不授予登记、取锁或资源控制权。

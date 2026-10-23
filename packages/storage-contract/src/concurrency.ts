@@ -11,7 +11,7 @@ import { isUtilsAbortError, isUtilsTimeoutError } from '@migaia/utils/error'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { snapshotOperationContext } from './operation-context.js'
-import { readTransactionConcurrency } from './transaction.js'
+import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageKey, assertStringStorageKey } from './key.js'
 import { encodeOrderedStorageKey } from './key-order.js'
@@ -534,6 +534,7 @@ const concurrencyAttemptBudgets = new WeakMap<
   {
     readonly budget?: IConcurrencyBudget
     readonly locks: readonly INormalizedLockKey[] | undefined
+    readonly identities: readonly string[]
   }
 >()
 /**
@@ -544,7 +545,29 @@ export function associateNormalizedLockKeys(
   options: ITransactionOptions,
   locks: readonly INormalizedLockKey[]
 ): void {
-  concurrencyAttemptBudgets.set(options, { locks })
+  concurrencyAttemptBudgets.set(options, { locks, identities: snapshotLockIdentities(locks) })
+}
+/** Converts already canonical bytes once; neither policy loops nor consumers re-encode logical keys. */
+function lockBytesIdentity(encoded: Uint8Array): string {
+  return Array.from(encoded, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+/** One immutable ordered string list is retained with the original normalized option metadata. */
+function snapshotLockIdentities(
+  locks: readonly INormalizedLockKey[] | undefined
+): readonly string[] {
+  return Object.freeze(locks?.map((entry) => lockBytesIdentity(entry.encoded)) ?? [])
+}
+/**
+ * Reads the same active attempt's normalized, sorted and deduplicated lock identities. Repeated
+ * reads and nested native attempts share one immutable string list; no logical key is inspected or
+ * re-encoded here. Forged, builder-only and settled contexts reject with INVALID_ARGUMENT. This
+ * grants no transaction, registration, lock acquisition or lifecycle authority.
+ */
+export function readConcurrencyLockIdentities(ctx: IConcurrencyAttemptContext): readonly string[] {
+  /** Only the original live attempt metadata can grant read access to its immutable identities. */
+  const captured = concurrencyAttemptBudgets.get(ctx)
+  if (captured?.budget === undefined) throw invalidConcurrencyArgument()
+  return captured.identities
 }
 /** Internal managed waits distinguish logical policy budgets from physical database scheduling. */
 const ConcurrencyWaitKind = { logical: 'logical', physical: 'physical' } as const
@@ -601,9 +624,7 @@ function concurrencyLockFailure(
       : JSON.stringify(
           snapshot.map((key) => ({
             ...key,
-            encoded: Array.from(encodeOrderedStorageKey(key.key, backend), (byte) =>
-              byte.toString(16).padStart(2, '0')
-            ).join('')
+            encoded: lockBytesIdentity(encodeOrderedStorageKey(key.key, backend))
           }))
         )
   /** Handoff is a real identity gap, never a substituted old label. */
@@ -761,15 +782,15 @@ function snapshotConcurrencyDecision(
 /**
  * Runs the only logical decision/retry loop. A port attempt is always awaited to its actual native
  * terminal and cleanup before cancellation, a policy decision, or another attempt can finish. The
- * supplied genuine policy is the sole effective policy; callers resolve captured overrides through
- * the original transaction owner. Nested calls receiving the exact attempt context borrow its
- * budget and signal; only the outermost call releases that signal.
+ * supplied genuine policy is the sole effective policy; omission resolves the captured override or
+ * default through the original transaction owner. Nested calls receiving the exact attempt context
+ * borrow its budget and signal; only the outermost call releases that signal.
  */
 export async function runWithConcurrency<TResult>(
   request: {
     readonly store: IStorageBase
     readonly options: ITransactionOptions
-    readonly policy: IConcurrencyPolicy
+    readonly policy?: IConcurrencyPolicy
   },
   port: IConcurrencyPort<TResult>
 ): Promise<Awaited<TResult>> {
@@ -777,7 +798,12 @@ export async function runWithConcurrency<TResult>(
   const startedAt = systemScheduler.now()
   /** The original registration supplies immutable diagnostics and the host's sole stage binding. */
   const { backend, stages } = readTransactionConcurrency(request.store)
-  assertConcurrencyPolicy(request.policy)
+  /**
+   * Explicit policy remains the sole effective policy; omission resolves after original options
+   * capture.
+   */
+  const suppliedPolicy = request.policy
+  if (suppliedPolicy !== undefined) assertConcurrencyPolicy(suppliedPolicy)
   if (
     typeof request.options !== 'object' ||
     request.options === null ||
@@ -795,6 +821,8 @@ export async function runWithConcurrency<TResult>(
     throw invalidConcurrencyArgument(cause)
   }
   if (capturedOverride !== undefined) assertConcurrencyPolicy(capturedOverride)
+  /** Default resolution belongs to the same owner, after the original override getter is read once. */
+  const policy = suppliedPolicy ?? resolveConcurrencyPolicy(request.store, capturedOverride)
   /** The exact outer attempt context carries the one shared budget and encoded lock set. */
   const inherited = concurrencyAttemptBudgets.get(request.options)
   /** The original logical identities are encoded/sorted once, not again on nested entries or retry. */
@@ -803,6 +831,11 @@ export async function runWithConcurrency<TResult>(
     : capturedLocks === undefined
       ? undefined
       : normalizeLockKeys(capturedLocks, backend)
+  /**
+   * Every actual attempt and nested backend reuses the same immutable identities from
+   * normalization.
+   */
+  const identities = inherited?.identities ?? snapshotLockIdentities(locks)
   /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
   const context = snapshotOperationContext(request.options)
   /** Native options remain available to a backend while fixed fields keep their single capture. */
@@ -859,7 +892,7 @@ export async function runWithConcurrency<TResult>(
         lock: locks?.map((entry) => snapshotLockKey(entry.key, backend)),
         concurrency: capturedOverride,
         admission,
-        locking: request.policy.locking,
+        locking: policy.locking,
         waitTimeoutMs:
           logicalTimeoutMs === undefined
             ? undefined
@@ -883,11 +916,11 @@ export async function runWithConcurrency<TResult>(
             undefined
           )
       }
-      concurrencyAttemptBudgets.set(attemptContext, { budget, locks })
+      concurrencyAttemptBudgets.set(attemptContext, { budget, locks, identities })
       /** No handler means no argument array or event payload is created. */
       const beforeAcquire = readConcurrencyStage(stages, 'beforeLockAcquire')
       if (beforeAcquire)
-        observeConcurrencyResult(stages!, beforeAcquire, [request.policy.name, locks?.length ?? 0])
+        observeConcurrencyResult(stages!, beforeAcquire, [policy.name, locks?.length ?? 0])
       /**
        * Cleanup completion precedes every policy decision; abort never detaches accepted native
        * work.
@@ -932,7 +965,7 @@ export async function runWithConcurrency<TResult>(
       let decision: IConcurrencyDecision
       try {
         decision = snapshotConcurrencyDecision(
-          await raceWithAbort(() => concurrencyPolicies.get(request.policy)!(conflict), {
+          await raceWithAbort(() => concurrencyPolicies.get(policy)!(conflict), {
             signal: budget.cancellation.signal,
             report
           }),

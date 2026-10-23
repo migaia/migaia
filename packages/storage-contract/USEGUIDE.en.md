@@ -571,7 +571,7 @@ Optional `IOperationContext.orgId` accepts canonical lowercase, 36-character UUI
 
 ### Concurrency execution
 
-Backend and persist authors use `resolveConcurrencyPolicy(store, capturedOptions.concurrency)` and pass that policy to `runWithConcurrency({ store, options: capturedOptions, policy }, port)`. The original store must have a transaction-owner registration. Capture borrowed option getters once before resolving; pass the same plain captured options inward. The loop reads lock/concurrency before operation context fields and normalizes lock identities once. Backend-specific option admission stays with that backend.
+Backend and persist authors pass original options directly to `runWithConcurrency({ store, options }, port)`. The original store must have a transaction-owner registration. The loop captures borrowed option getters once, then resolves the captured override or the original owner default. An explicitly supplied request.policy remains the sole effective policy and retains its existing validation/errors. Passing an authentic outer attempt context preserves its exact private deadline and normalized locks; copying it is unnecessary. The loop reads lock/concurrency before operation context fields and normalizes lock identities once. Backend-specific option admission stays with that backend.
 
 `IConcurrencyPort.attempt(context)` must finish its native transaction, rollback and cleanup before returning a conflict or throwing. The loop starts with try, decides only on real conflicts, waits only for acquisition, and retries after the old attempt finishes. Rejected acquisition is LOCK_REJECTED; rejected commit conflict is WRITE_CONFLICT with the exact backend cause. Invalid or throwing decisions produce CONCURRENCY_POLICY_FAILED. Backends use LOCK_LOST when they prove their own lease was replaced.
 
@@ -675,3 +675,5 @@ async function paidTotals(store: IStorageBase) {
     .all()
 }
 ```
+
+`readConcurrencyLockIdentities(ctx)` reads the live original attempt metadata and returns its immutable canonical lowercase hexadecimal identities, including channel separation, in normalized sorted/deduplicated order. The string list is created once from the existing encoded bytes and shared by repeated reads and nested attempts. It never re-encodes logical keys or exposes mutable internal bytes. Forged, settled and builder-only contexts reject with INVALID_ARGUMENT. The function grants no registration, lock acquisition or resource control.
