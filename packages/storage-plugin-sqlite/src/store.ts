@@ -1567,6 +1567,7 @@ export function createSqliteStore<TValue>(
         const scope = createScope()
         registration = transactionOwner.register(scope, {
           createScope,
+          context,
           onFailure: (failure) => {
             state.failure ??= failure
           },
