@@ -1,11 +1,19 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
+  snapshotRecordStore,
+  snapshotKeyValueStoreDetailed,
+  isSecondaryIndexRecordStore,
+  assertTransactionOwner,
   type IBackendKind,
   type IStorageBase,
   type IStorageChange,
   type IStorageKey,
-  type IWriteOptions
+  type IWriteOptions,
+  type IKeyValueStore,
+  type IRecordStore,
+  type ISecondaryIndexRecordStore,
+  type ITransactionInfo
 } from '@migaia/storage-contract'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createStringLeaseRegistry, createAbortController } from '@migaia/lifecycle'
@@ -74,6 +82,83 @@ type IBackendRegistration = {
   controller?: IBackendChangeController
   valueCommit?: IBackendValueCommit
   envelopes?: IBackendEntityBinding[]
+  entity?: IBackendEntityAccess
+}
+
+/** Entity methods retain business access while omitting every resource ownership member. */
+export type IEntityKeyValueMethods = Omit<IKeyValueStore, 'dispose' | typeof Symbol.asyncDispose>
+/** Record methods preserve their original native transaction owner and metadata. */
+export type IEntityRecordMethods = Omit<IRecordStore, 'dispose' | typeof Symbol.asyncDispose>
+/** Secondary methods retain canonical admission while the native target stays private. */
+export type IEntitySecondaryMethods = Omit<
+  ISecondaryIndexRecordStore,
+  'dispose' | typeof Symbol.asyncDispose
+>
+/** The original exact-store row grants only already-authenticated business facts to entity. */
+export type IBackendEntityAccess = {
+  readonly store: IEntityKeyValueMethods
+  recordStore(): IEntityRecordMethods | undefined
+  secondaryStore(): IEntitySecondaryMethods | undefined
+  assertScope(scope: object): ITransactionInfo
+  assertCurrent(): void
+  readonly valueCommit?: IBackendValueCommit
+}
+
+/** Bind only an original host-authenticated alias, keeping its native owner private in a closure. */
+export function registerBackendEntityAccess(
+  view: object,
+  native: IStorageBase,
+  assertCurrent: () => void
+): () => void {
+  /** The same canonical KV admission validates this native target before ownership is hidden. */
+  const keyValue = snapshotKeyValueStoreDetailed(native)
+  if (!keyValue.valid) return () => undefined
+  /** Atomic text writes remain the original native endpoint, without exposing its registration. */
+  const valueCommit = controllerRegistry.get(native)?.valueCommit
+  /** The host's borrowed view forwards exactly these admitted native methods without close access. */
+  const access: IBackendEntityAccess = Object.freeze({
+    store: view as IEntityKeyValueMethods,
+    recordStore: () =>
+      snapshotRecordStore(native) === undefined ? undefined : (view as IEntityRecordMethods),
+    secondaryStore: () =>
+      isSecondaryIndexRecordStore(native) ? (view as IEntitySecondaryMethods) : undefined,
+    assertCurrent,
+    ...(valueCommit === undefined
+      ? {}
+      : {
+          valueCommit: (...args: Parameters<IBackendValueCommit>) => {
+            assertCurrent()
+            return valueCommit(...args)
+          }
+        }),
+    assertScope: (scope: object) => {
+      assertCurrent()
+      return assertTransactionOwner(native, scope)
+    }
+  })
+  /** This is the same original registry row as controller, envelope and query projection. */
+  const row = controllerRegistry.get(view) ?? {}
+  if (row.entity !== undefined)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+  row.entity = access
+  controllerRegistry.set(view, row)
+  return () => {
+    if (controllerRegistry.get(view) !== row || row.entity !== access) return
+    delete row.entity
+    if (
+      row.controller === undefined &&
+      row.envelopes === undefined &&
+      row.valueCommit === undefined
+    )
+      controllerRegistry.delete(view)
+  }
+}
+
+/** Read resource-free facts for the exact certified alias; never unwrap or return a native handle. */
+export function getBackendEntityAccess(view: object): IBackendEntityAccess | undefined {
+  const access = controllerRegistry.get(view)?.entity
+  access?.assertCurrent()
+  return access
 }
 
 /** One private exact-store registry; observation also supports admitted stores without a controller. */
@@ -263,7 +348,7 @@ export const registerBackendChangeController = (
   return () => {
     if (controllerRegistry.get(store) !== row || row.controller !== controller) return
     delete row.controller
-    if (row.envelopes === undefined && row.valueCommit === undefined)
+    if (row.envelopes === undefined && row.valueCommit === undefined && row.entity === undefined)
       controllerRegistry.delete(store)
   }
 }
@@ -297,7 +382,8 @@ export const registerBackendEnvelopeStages = (
     if (
       row.controller === undefined &&
       row.envelopes === undefined &&
-      row.valueCommit === undefined
+      row.valueCommit === undefined &&
+      row.entity === undefined
     )
       controllerRegistry.delete(store)
   }
@@ -305,7 +391,7 @@ export const registerBackendEnvelopeStages = (
 
 /** Entity borrows original host observers without gaining construction authority or store wrappers. */
 export const getBackendEnvelopeStages = (
-  store: IStorageBase,
+  store: object,
   operation: Readonly<{ operation: string; targetVersion: number }>
 ): IStorageEnvelopeStages | undefined => {
   /** The ordinary single-host path returns its original bound observer directly. */
@@ -355,17 +441,19 @@ export const registerBackendValueCommit = (
   return () => {
     if (controllerRegistry.get(store) !== row || row.valueCommit !== commit) return
     delete row.valueCommit
-    if (row.controller === undefined && row.envelopes === undefined)
+    if (row.controller === undefined && row.envelopes === undefined && row.entity === undefined)
       controllerRegistry.delete(store)
   }
 }
 
 /** Entity borrows the captured native endpoint without exposing its registration authority. */
-export const getBackendValueCommit = (store: IStorageBase): IBackendValueCommit | undefined =>
-  controllerRegistry.get(store)?.valueCommit
+export const getBackendValueCommit = (store: object): IBackendValueCommit | undefined => {
+  const row = controllerRegistry.get(store)
+  return row?.valueCommit ?? row?.entity?.valueCommit
+}
 
 /** Read selected methods from the original storage cell without duplicating its Feature table. */
-export const getBackendEntityQueryMethods = (store: IStorageBase): object | undefined => {
+export const getBackendEntityQueryMethods = (store: object): object | undefined => {
   /** Shared raw stores have no implicit host router; distinct control-plane bindings are ambiguous. */
   let methods: object | undefined
   let selectedBinding = false

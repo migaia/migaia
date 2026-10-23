@@ -28,6 +28,7 @@ export type {
   IEntityQuery,
   IEntityQueryNarrowed,
   IEntityConnectOptions,
+  IEntityConnectStore,
   IEntityStoreQueryMethods,
   IEntityIndex,
   IEntityIndexMap,

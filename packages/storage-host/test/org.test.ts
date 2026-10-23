@@ -21,6 +21,7 @@ import {
   type IStoragePluginCallContext
 } from '../src/index.js'
 import { catalog } from './helpers/catalog.js'
+import { defineEntity } from '../src/entity.js'
 
 describe('immutable storage organizations', () => {
   it('codes an organization callback getter failure at the original installation boundary', async () => {
@@ -259,5 +260,68 @@ describe('immutable storage organizations', () => {
     expect(await host.org(org).backend('first').get('key')).toBeNull()
     expect(await host.org(org).backend('third').get('key')).toBeNull()
     expect(attempted).toEqual(['broken'])
+  })
+
+  it('connects entity business access only to exact authenticated organization views', async () => {
+    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    /** Identical entity layouts remain isolated by the original native namespace. */
+    const users = defineEntity<{ id: string; email: string }>()({
+      name: 'users',
+      key: 'id',
+      indexes: { email: { path: 'email', unique: true } }
+    })
+    const first = createOrgId()
+    const second = createOrgId()
+    const leftStore = host.org(first).backend('memory')
+    const rightStore = host.org(second).backend('memory')
+    const left = users.connect(leftStore)
+    const right = users.connect(rightStore)
+    /**
+     * Installation-borrowed identity uses the same resource-free admission without a type
+     * assertion.
+     */
+    const borrowed = definePlugin('borrowed-entity', (core) => {
+      const store = core.getPublishedBackend('memory')
+      const repository = users.connect(store)
+      return { install: () => ({ readBorrowed: (id: string) => repository.get(id) }) }
+    })
+    const composed = await host.use(borrowed)
+    await users
+      .connect(host.backend('memory'))
+      .put({ id: 'default', email: 'default@example.test' })
+    expect(await composed.extensions.readBorrowed('default')).toEqual({
+      id: 'default',
+      email: 'default@example.test'
+    })
+    await left.put({ id: 'same', email: 'same@example.test' })
+    await right.put({ id: 'same', email: 'same@example.test' })
+    await leftStore.transaction(async (scope) => {
+      await left.in(scope).put({ id: 'left', email: 'left@example.test' })
+      await scope.set('status', 'left')
+    })
+    expect(await left.query().all()).toEqual([
+      { id: 'left', email: 'left@example.test' },
+      { id: 'same', email: 'same@example.test' }
+    ])
+    expect(await right.query().all()).toEqual([{ id: 'same', email: 'same@example.test' }])
+    await rightStore.transaction((scope) => {
+      expect(() => left.in(scope)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    })
+    /** Shape forwarding alone cannot copy the original host's exact identity admission. */
+    expect(() => users.connect({ ...leftStore })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
+    )
+    expect(() => users.connect(new Proxy(leftStore, {}))).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
+    )
+    expect('dispose' in leftStore).toBe(false)
+    const captured = left.query()
+    await host.dropOrg(first)
+    expect(await captured.all()).toEqual([])
+    expect(await right.get('same')).toEqual({ id: 'same', email: 'same@example.test' })
+    await host.dispose()
+    await expect(captured.all()).rejects.toBeDefined()
   })
 })

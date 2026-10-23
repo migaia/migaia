@@ -1,7 +1,7 @@
 import { EntityText } from './text.js'
 import { passthrough } from '../schema/passthrough.js'
 import { createRepository } from './repository.js'
-import type { IKeyValueStore } from '@migaia/storage-contract'
+import type { IEntityConnectStore } from './types.js'
 import type { ISchemaAdapter } from '../entity.js'
 import { createMigrationPlan, type IMigrationStep } from '@migaia/storage-contract'
 import type {
@@ -211,7 +211,7 @@ export function defineEntity<TDomain, TStored = TDomain>(
   return Object.freeze({
     name,
     version,
-    connect: <S extends IKeyValueStore>(
+    connect: <S extends IEntityConnectStore>(
       store: S,
       connectOptions?: IEntityConnectOptions
     ): IRepository<

@@ -354,6 +354,14 @@ console.log(host.extensions.label('draft'))`,
         }
       }
     },
+    IEntityConnectStore: {
+      summary: t(
+        'Entity input accepts a complete raw KV store or an exact host-authenticated business view. Raw inputs retain full resource admission; borrowed views reuse private method facts without exposing close authority.',
+        '实体输入接受完整raw KV或原宿主认证的精确业务视图。raw输入保留完整资源准入；借用视图复用私有方法事实，不暴露关闭权。'
+      ),
+      example: storageHostCases.entityOrganizations?.[0]?.example,
+      members: {}
+    },
     IEntityConnectOptions: {
       summary: t(
         'Explicit original codec/query observer ports; failures only report.',
