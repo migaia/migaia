@@ -73,6 +73,11 @@ import {
   type IVectorHit,
   type IVectorFilter,
   type IQueryCondition,
+  type IRecordQuerySource,
+  type IRdfQuerySource,
+  type IVectorQuerySource,
+  type IVectorQueryInput,
+  type IQueryDelete,
   type ITtlTarget,
   type ITtlApi,
   type ICounterApi,
@@ -163,6 +168,27 @@ const ttlOperations = Symbol()
 const counterOperations = Symbol()
 /** The RDF binder borrows the same original draft and accepted operation view. */
 const rdfOperations = Symbol()
+/** Query writes borrow this exact native scope's existing draft, never a second writer. */
+const queryDraft = Symbol()
+/** The record binder keeps the current scope's actual query factory and accepted operation. */
+const recordQueries = Symbol()
+/** One private selector keeps the native ranking algorithm shared by read and write cursors. */
+type IMemoryVectorSelection<P> = (
+  input: IVectorQueryInput,
+  points: Iterable<IStorageVectorPoint<P>>,
+  point: (id: string) => IStorageVectorPoint<P> | undefined
+) => Iterable<readonly [IStorageKey, IVectorHit<P, boolean>]>
+/** Internal query selection supplies original native rows and consumes accepted draft mutations. */
+type IMemoryQueryDraft = {
+  readonly record: NonNullable<IRecordQuerySource['mutate']>
+  readonly rdf: NonNullable<IRdfQuerySource['mutate']>
+  vector<P>(
+    collection: string,
+    request: IQueryDelete,
+    run: Parameters<NonNullable<IVectorQuerySource<P>['mutate']>>[1],
+    select: IMemoryVectorSelection<P>
+  ): Promise<number>
+}
 /**
  * This private member runs through the same original operation owner as every other native scope
  * method.
@@ -175,6 +201,8 @@ type IMemoryScope<T> = ITransactionScope<
   readonly [ttlOperations]: ITransactionTtlApi
   readonly [counterOperations]: ITransactionCounterApi
   readonly [rdfOperations]: ITransactionRdfApi
+  readonly [queryDraft]: IMemoryQueryDraft
+  readonly [recordQueries]: ITransactionRecordsApi['query']
 }
 /** The original store retains the concrete complete native transaction view. */
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
@@ -1341,6 +1369,15 @@ function createMemoryNamespace<T>(
         asyncDisposeKey,
         cursorSource: store,
         watch: ({ ctx }) => watchChanges('all', ctx),
+        mutate: (request, run) =>
+          atomicEntry(
+            request.operation === 'delete'
+              ? MemoryOperation.rdfQueryDelete
+              : MemoryOperation.rdfQueryReplace,
+            () => ({ ...request }),
+            { ...request.ctx, concurrency: request.concurrency },
+            (input) => ({ invoke: (scope) => scope[queryDraft].rdf(input, run) })
+          ),
         pushdown: {
           source: MemoryState.querySource,
           index: rdfIndex.select(physicalRdfPattern(captured)).name,
@@ -1614,7 +1651,7 @@ function createMemoryNamespace<T>(
       })
     }
     /** Delete returns actual draft membership, so repeated keys count at most once. */
-    const txRemove = (channel: IStorageChannel, key: IStorageKey): boolean => {
+    const txRemove = (channel: IStorageChannel | 'vector', key: IStorageKey): boolean => {
       /** Delete keys follow the same detached canonical domain as reads and writes. */
       const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
       /** One encoding serves membership and the resulting tombstone. */
@@ -1709,7 +1746,8 @@ function createMemoryNamespace<T>(
     /** The original transaction owner admits each native advance and closes the actual generator. */
     function rdfQuery(
       pattern: Partial<IQuad>,
-      scope: ITransactionScope<T>
+      scope: ITransactionScope<T>,
+      mutate: NonNullable<IRdfQuerySource<ITransactionScope<T>>['mutate']>
     ): ReturnType<ITransactionRdfApi['match']> {
       /** The shared planner owns subsequent query snapshots and operation-scope rebinding. */
       const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
@@ -1717,6 +1755,7 @@ function createMemoryNamespace<T>(
         {
           asyncDisposeKey,
           cursorSource: scope,
+          mutate,
           pushdown: {
             source: MemoryState.querySource,
             index: rdfIndex.select(physicalRdfPattern(captured)).name,
@@ -1752,6 +1791,51 @@ function createMemoryNamespace<T>(
         captured,
         core.getChainMethods('rdf')
       )
+    }
+    /** Query selection borrows the original iterator owner without a second operation pipeline. */
+    function queryIterator<V>(
+      scope: ITransactionScope<T>,
+      rows: () => Iterable<readonly [IStorageKey, V]>
+    ): IStorageIterator<readonly [IStorageKey, V]> {
+      assertTransactionOwner(store, scope)
+      /** The actual generator is drained and closed by this existing native transaction owner. */
+      const iterator = (async function* () {
+        for (const row of rows()) {
+          controller.assertLive()
+          throwIfAborted(ctx.signal)
+          yield row
+        }
+      })()
+      return owner.registerIterator(scope, {
+        next: () => iterator.next(),
+        close: async () => {
+          await iterator.return(undefined)
+        }
+      })
+    }
+    /** A vector write attempt streams native candidates while retaining the original read set. */
+    function* txVectorPoints<P>(collection: string): IterableIterator<IStorageVectorPoint<P>> {
+      if (!snapshotEpochs.has('vector')) snapshotEpochs.set('vector', revisions.epoch('vector'))
+      /** Physical and proposed rows use the same canonical collection tuple prefix. */
+      const bounds = snapshotStorageKeyPrefix([collection], STORAGE_MEMORY_BACKEND)
+      let leaf = ordered.vector.lowerBound(bounds.lower)
+      while (leaf !== undefined && compareRecordIndexKeys(leaf.key, bounds.upper) < 0) {
+        /** Expiry can unlink this row before the generator advances again. */
+        const next = leaf.next
+        const key = leaf.value.key
+        const encoded = encodeFlatStorageKey(key)
+        if (!draft.has(identity('vector', encoded))) {
+          const current = txSnapshot('vector', encoded, key)
+          if (current !== undefined) yield current.value as IStorageVectorPoint<P>
+        }
+        leaf = next
+      }
+      for (const row of draftOrdered.vector.range({
+        lower: bounds.lower,
+        upper: bounds.upper,
+        upperOpen: true
+      }))
+        if (!row.value.remove) yield row.value.value as IStorageVectorPoint<P>
     }
     /** Native text batches stage only into this attempt's existing draft and revision baseline. */
     const textDraft: IMemoryTextDraft = {
@@ -1806,6 +1890,136 @@ function createMemoryNamespace<T>(
     const createScope = (): IMemoryScope<T> => {
       /** Each method closes over its own authentic view, never an independently registered guard. */
       const scope: IMemoryScope<T> = {
+        [queryDraft]: {
+          record: (request, run) => {
+            assertTransactionOwner(store, scope)
+            /** Pipeline-provided patches detach once before selection can touch any draft row. */
+            const patch = request.operation === 'update' ? clone(request.patch) : undefined
+            if (
+              request.operation !== 'delete' &&
+              (request.operation !== 'update' ||
+                typeof patch !== 'object' ||
+                patch === null ||
+                Array.isArray(patch))
+            )
+              throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+                backend: STORAGE_MEMORY_BACKEND
+              })
+            return run({
+              execute: () =>
+                queryIterator(scope, function* () {
+                  for (const row of txRows('record'))
+                    yield [clone(row.key), copyValue('record', row.value, row.key)] as const
+                }),
+              accept: (key) => {
+                assertTransactionOwner(store, scope)
+                if (request.operation === 'delete') return txRemove('record', key)
+                /** Query projections never become replacement values; patch the actual draft row. */
+                const current = txEntry('record', key)
+                if (current === undefined) return false
+                if (typeof current.value !== 'object' || current.value === null)
+                  throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+                    backend: STORAGE_MEMORY_BACKEND
+                  })
+                /** Existing native cloning preserves Date/Map values admitted by memory. */
+                const value = clone(current.value, key)
+                for (const field of Object.keys(patch!)) {
+                  /** Existing native fields such as Array.length retain their original descriptors. */
+                  const descriptor = Object.getOwnPropertyDescriptor(value, field)
+                  Object.defineProperty(
+                    value,
+                    field,
+                    descriptor === undefined
+                      ? {
+                          value: patch![field],
+                          enumerable: true,
+                          configurable: true,
+                          writable: true
+                        }
+                      : { ...descriptor, value: patch![field] }
+                  )
+                }
+                txWrite('record', key, value, 'replace')
+                return true
+              }
+            })
+          },
+          rdf: (request, run) => {
+            assertTransactionOwner(store, scope)
+            /** Replacement admission precedes selection or any draft tombstone. */
+            const replacement =
+              request.operation === 'replace' ? captureRdfEntries([request.newQuad])[0] : undefined
+            return run({
+              execute: (input) =>
+                queryIterator(scope, function* () {
+                  for (const row of txRdfRows(input.pattern))
+                    yield [row.key, logicalRdfQuad(row)] as const
+                }),
+              accept: (_key, quad) => {
+                assertTransactionOwner(store, scope)
+                /**
+                 * The original physical identity resolves actual draft membership and no-op
+                 * replacement.
+                 */
+                const entry = captureRdfEntries([quad])[0]!
+                const proposed = draft.get(identity('rdf', entry.encoded))
+                const current = proposed
+                  ? proposed.remove
+                    ? undefined
+                    : proposed
+                  : txSnapshot('rdf', entry.encoded, entry.key)
+                if (current === undefined || replacement?.encoded === entry.encoded) return false
+                txRdfWrite([quad], true)
+                if (replacement !== undefined) txRdfWrite([logicalRdfQuad(replacement)], false)
+                return true
+              }
+            })
+          },
+          vector: <P>(
+            collection: string,
+            _request: IQueryDelete,
+            run: Parameters<NonNullable<IVectorQuerySource<P>['mutate']>>[1],
+            select: IMemoryVectorSelection<P>
+          ) => {
+            assertTransactionOwner(store, scope)
+            return run({
+              execute: (input) =>
+                queryIterator(scope, () =>
+                  select(
+                    input,
+                    txVectorPoints<P>(collection),
+                    (id) =>
+                      txRead('vector', vectorKey(collection, id)) as
+                        | IStorageVectorPoint<P>
+                        | undefined
+                  )
+                ),
+              accept: (_key, hit) => {
+                assertTransactionOwner(store, scope)
+                return txRemove('vector', vectorKey(collection, hit.id))
+              }
+            })
+          }
+        },
+        [recordQueries]: <R>() =>
+          createRecordQuery<R>(
+            {
+              asyncDisposeKey,
+              cursorSource: scope,
+              pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
+              execute: () => scope.iterateRecords(),
+              mutate: (request, run) =>
+                operation(
+                  request.operation === 'delete'
+                    ? MemoryOperation.recordQueryDelete
+                    : MemoryOperation.recordQueryUpdate,
+                  request,
+                  (captured) => scope[queryDraft].record(captured, run),
+                  true
+                )
+            },
+            core.getChainMethods('query')
+          ),
         [ttlOperations]: {
           expire: (target, ms) =>
             acceptedOperation(
@@ -1869,7 +2083,17 @@ function createMemoryNamespace<T>(
               (input) => txRdfWrite(input, true),
               scope
             ),
-          match: (pattern) => rdfQuery(pattern, scope)
+          match: (pattern) =>
+            rdfQuery(pattern, scope, (request, run) =>
+              operation(
+                request.operation === 'delete'
+                  ? MemoryOperation.rdfQueryDelete
+                  : MemoryOperation.rdfQueryReplace,
+                request,
+                (captured) => scope[queryDraft].rdf(captured, run),
+                true
+              )
+            )
         },
         [recordPrefix]: (prefix) =>
           operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
@@ -2016,10 +2240,11 @@ function createMemoryNamespace<T>(
       function operation<I, V>(
         name: string,
         input: I,
-        invoke: (captured: I) => V
+        invoke: (captured: I) => V,
+        settle?: true
       ): Promise<Awaited<V>> {
         return runTransactionOperation(scope, (current) =>
-          acceptedOperation(name, input, invoke, current)
+          acceptedOperation(name, input, invoke, current, settle)
         )
       }
       /** An already-admitted operation uses the same sole pipeline and native draft body. */
@@ -2027,7 +2252,8 @@ function createMemoryNamespace<T>(
         name: string,
         input: I,
         invoke: (captured: I) => V,
-        current: ITransactionScope
+        current: ITransactionScope,
+        settle?: true
       ): Promise<V> {
         return core.execution.run(
           { operation: name, input, scope: current, ctx },
@@ -2039,6 +2265,12 @@ function createMemoryNamespace<T>(
             void stage.beforeTxOperation?.(name)
             /** Native memory operations mutate only the private isolated draft. */
             const result = invoke(captured)
+            if (settle) {
+              /** Query writes finish their existing asynchronous reader before the after stage. */
+              const completed = await result
+              void stage.afterTxOperation?.(name)
+              return completed
+            }
             void stage.afterTxOperation?.(name)
             return result
           }
@@ -2267,15 +2499,7 @@ function createMemoryNamespace<T>(
 
   /** Records capability binding composes only the supplied original transaction's real methods. */
   const bindRecords = (scope: ITransactionScope): ITransactionRecordsApi => ({
-    query: <R>() =>
-      createRecordQuery<R>(
-        {
-          asyncDisposeKey,
-          pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
-          execute: () => scope.iterateRecords()
-        },
-        core.getChainMethods('query')
-      ),
+    query: (scope as IMemoryScope<unknown>)[recordQueries],
     removeByPrefix: (prefix) => (scope as IMemoryScope<unknown>)[recordPrefix](prefix)
   })
 
@@ -2588,14 +2812,49 @@ function createMemoryNamespace<T>(
       })
       /** A source keeps one immutable resolver; canonical query nodes still own every refinement. */
       const query = (
-        resolve: () => { query: readonly number[]; exclude: ReadonlySet<string> },
+        resolve: (lookup: typeof point) => {
+          query: readonly number[]
+          exclude: ReadonlySet<string>
+        },
         metric: IStorageVectorConfiguration['metric']
-      ) =>
-        createVectorQuery<TPayload>(
+      ) => {
+        /** Native ranking is shared verbatim by reads and this original transaction draft. */
+        const select: IMemoryVectorSelection<TPayload> = (input, values, lookup) => {
+          /** Samples resolve once inside the actual read or write attempt. */
+          const selected = resolve(lookup)
+          if (input.topK === 0) return []
+          /** Canonical conditions retain the sole compiler and original membership Sets. */
+          const predicates = input.conditions.map((condition) =>
+            compileStorageQueryCondition<TPayload | undefined>(condition)
+          )
+          return rankMemoryVectors(
+            values,
+            selected.query,
+            metric,
+            input.topK,
+            input.minScore,
+            (point) =>
+              !selected.exclude.has(point.id) &&
+              predicates.every((predicate) => predicate(point.payload))
+          ).map((hit): readonly [IStorageKey, IVectorHit<TPayload, boolean>] => [
+            hit.point.id,
+            output(hit, input.withVector, true)
+          ])
+        }
+        return createVectorQuery<TPayload>(
           {
             asyncDisposeKey,
             exact: true,
             watch: ({ ctx }) => watchChanges('all', ctx),
+            mutate: (request, run) =>
+              atomicEntry(
+                MemoryOperation.vectorQueryDelete,
+                () => ({ ...request }),
+                { ...request.ctx, concurrency: request.concurrency },
+                (input) => ({
+                  invoke: (scope) => scope[queryDraft].vector(captured.name, input, run, select)
+                })
+              ),
             pushdown: {
               source: MemoryState.querySource,
               operations: [QueryOperation.where, QueryOperation.topK, QueryOperation.minScore],
@@ -2606,34 +2865,7 @@ function createMemoryNamespace<T>(
               return nativeIterator(
                 MemoryOperation.vectorSearch,
                 input.ctx,
-                () => {
-                  /**
-                   * Samples resolve once within this native execution and never during
-                   * construction.
-                   */
-                  const selected = resolve()
-                  if (input.topK === 0) return []
-                  /**
-                   * Native canonical conditions use the sole original compiler, including one in
-                   * Set.
-                   */
-                  const predicates = input.conditions.map((condition) =>
-                    compileStorageQueryCondition<TPayload | undefined>(condition)
-                  )
-                  return rankMemoryVectors(
-                    points(),
-                    selected.query,
-                    metric,
-                    input.topK,
-                    input.minScore,
-                    (point) =>
-                      !selected.exclude.has(point.id) &&
-                      predicates.every((predicate) => predicate(point.payload))
-                  ).map((hit): readonly [IStorageKey, IVectorHit<TPayload, boolean>] => [
-                    hit.point.id,
-                    output(hit, input.withVector, true)
-                  ])
-                },
+                () => select(input, points(), point),
                 (row) => row,
                 () => controller.assertLive()
               )
@@ -2641,6 +2873,7 @@ function createMemoryNamespace<T>(
           },
           core.getChainMethods('vector')
         )
+      }
       return {
         near: (input, options) => {
           controller.assertLive()
@@ -2668,9 +2901,9 @@ function createMemoryNamespace<T>(
         similarTo: (id) => {
           controller.assertLive()
           assertStringStorageKey(id, STORAGE_MEMORY_BACKEND)
-          return query(() => {
+          return query((lookup) => {
             /** A missing/expired sample is rejected before native candidates are ranked. */
-            const sample = point(id)
+            const sample = lookup(id)
             if (sample === undefined) invalidVector()
             return {
               query: snapshotStorageVector(sample.vector, configuration, STORAGE_MEMORY_BACKEND),
@@ -2691,10 +2924,10 @@ function createMemoryNamespace<T>(
             if (exclude.size !== positiveIds.length + negativeIds.length) invalidVector()
             return { positiveIds, negativeIds, exclude }
           })
-          return query(() => {
+          return query((lookup) => {
             /** Every requested sample resolves against this collection and immutable organization. */
             const load = (id: string): readonly number[] => {
-              const sample = point(id)
+              const sample = lookup(id)
               if (sample === undefined) invalidVector()
               return sample.vector
             }
@@ -3237,6 +3470,15 @@ function createMemoryNamespace<T>(
               {
                 asyncDisposeKey,
                 watch: ({ ctx }) => watchChanges('record', ctx),
+                mutate: (request, run) =>
+                  atomicEntry(
+                    request.operation === 'delete'
+                      ? MemoryOperation.recordQueryDelete
+                      : MemoryOperation.recordQueryUpdate,
+                    () => ({ ...request }),
+                    { ...request.ctx, concurrency: request.concurrency },
+                    (input) => ({ invoke: (scope) => scope[queryDraft].record(input, run) })
+                  ),
                 pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
                 execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
               },
