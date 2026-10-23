@@ -41,6 +41,8 @@ Schema 与 codec 适配位于 `@migaia/storage-host/entity`：`passthrough`、`f
 
 需要按需创建物理组织后端的作者，在原安装窗口捕获 core.createOrgAuthoringPort()，只把端口保存在后端闭包。安装后它仍复用原 controller、本地键锁与精确 store 的 controller/value-commit 登记函数；子资源由同一 registration 清理，撤销后拒绝使用。业务视图和 getOrgContext 不暴露该权限。组织借用优先使用其物理后端已登记的原 controller，保留资源生命周期与组织通知过滤。
 
+作者入口还从原 plugin-host 拥有者重导出 asyncDisposeKey；支持环境缺少原生 Symbol.asyncDispose 时，后端仍使用同一 symbol，不新建符号或生命周期拥有者。
+
 实体可直接使用 `defineEntity(...).connect(host.org(orgId).backend(id))`，具备 KV 声明的安装期 `core.getPublishedBackend(id)` 借用视图也可连接；动态 ID 的缺省类型不声明 KV 渠道，调用方需明确已知依赖的渠道类型。只有原宿主 registry 认证的精确视图能复用 KV/record 方法事实；复制对象或再包一层 Proxy 不继承认证。实体不取得关闭权，事务校验仍由原生 owner 执行；任意 raw 输入继续要求原资源准入。记录 metadata 仍通过同一业务视图读取。
 
 memory 缺省组织和普通根后端共用配置 namespace；其它组织使用 `namespace + "/" + orgId`，每个插件实例仍独立。各 namespace 的数据、期限、修订和锁独立，关闭共用原 controller。根变更订阅接收全部组织事件；org 后端与 org hooks 仅接收本组织。`host.dropOrg(orgId)` 尝试全部已发布后端，成功目标不回滚；失败抛原生 `AggregateError`，code 为 `ORG_DELETE_FAILED`，`errors` 和首个 `cause` 保留原错误。

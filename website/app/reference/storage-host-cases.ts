@@ -3,6 +3,19 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  asyncDisposeKey: [
+    {
+      title: t('Use the original disposal key', '使用原释放键'),
+      problem: t(
+        'Keep native and fallback resource cleanup on the same identity.',
+        '原生与替代资源清理使用同一身份。'
+      ),
+      example:
+        "import { asyncDisposeKey } from '@migaia/storage-host/authoring/backend'\nconsole.log(typeof asyncDisposeKey === 'symbol')",
+      result: t('Prints true.', '输出true。')
+    }
+  ],
+
   storageLogStore: [
     {
       title: t('Open an isolated private log', '打开隔离的私有日志'),
