@@ -135,14 +135,26 @@ describe('native RDF storage and atomic transactions', () => {
       expect(cause.stack).not.toBe('')
       if (cause instanceof RangeError) expect(failed).toBeInstanceOf(RangeError)
     }
-    const transport = new TypeError('native read connection failed'),
-      network = await installed({
-        query: (body, next) => (body.startsWith('SELECT') ? Promise.reject(transport) : next())
+    for (const mode of ['sync', 'async'] as const) {
+      const transport = new TypeError('native read connection failed'),
+        network = await installed({
+          query: (body, next) => {
+            if (!body.startsWith('SELECT')) return next()
+            if (mode === 'sync') throw transport
+            return Promise.reject(transport)
+          }
+        })
+      const failure = await network.store
+        .transaction((scope) => scope.use(rdf).match({}).all())
+        .catch((error: unknown) => error)
+      expect(failure).toMatchObject({
+        source: 'storage.backend.sparql',
+        code: 'SPARQL_UNAVAILABLE'
       })
-    await expect(
-      network.store.transaction((scope) => scope.use(rdf).match({}).all())
-    ).rejects.toMatchObject({ source: 'storage.backend.sparql', code: 'SPARQL_UNAVAILABLE' })
-    expect(network.updates).toHaveLength(0)
+      expect([...walkErrorCauses(failure)]).toContain(transport)
+      expect(failure).toBeInstanceOf(TypeError)
+      expect(network.updates).toHaveLength(0)
+    }
     expect(updates).toHaveLength(0)
     expect(await store.use(rdf).match({}).all()).toEqual([original])
     await expect(
