@@ -835,3 +835,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。
 
 查询写终点复用同一 planner、reader 与资源清理：记录支持 `delete(ctx?)`、`update(patch,ctx?)`，有界向量仅 `topK(...).delete(ctx?)`，RDF 支持 `delete(ctx?)`、`replace(oldQuad,newQuad,ctx?)`；select/groupBy 后只有读取终点。作者源的可选 `mutate(request,run)` 必须在原宿主 pipeline、事务与锁路径中调用 run，提供该事务的 `execute` 和 `accept(key,row)`；没有接点在 I/O 前报 `UNSUPPORTED_CAPABILITY`。request.ctx 保留原上下文快照身份，request.concurrency 单独交原并发 owner，不能另建重试循环。共享核流式去重，只有 accept 返回 true 才计数；记录按规范键、向量按实际引擎 hit id、RDF 按规范 ground quad 身份去重。RDF replace 仅处理 query 真正选中的 oldQuad，new 已存在是否接纳由原 draft 决定；根终点必须等待真实提交确认，unknown 拒绝且不重放。事务内只返回已接纳 draft 数，不能据此声称提交；事务写不接受独立操作上下文。
+
+`encodeStorageRdfTerm(term, backend)` 经原快照 owner 校验一个 raw RDF term，返回独立、自定界的有序身份字节。原生索引排列可直接拼接这些分量；不能把输出重新送进公开 binary-key 域，否则会把其 1 MiB 输入限制错误施加到合法 RDF literal。IRI 拼写与 datatype/language 身份沿同一规范 term 规则；编码 raw blank 标签不会使它成为可移植的重复写身份。

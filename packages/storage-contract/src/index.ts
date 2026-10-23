@@ -297,6 +297,7 @@ export {
   snapshotStorageRdfTerm,
   snapshotStorageRdfPattern,
   snapshotStorageRdfQuad,
+  encodeStorageRdfTerm,
   encodeStorageRdfQuad,
   getStorageOrgGraphPrefix,
   prefixStorageOrgGraph,

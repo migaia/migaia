@@ -134,7 +134,7 @@ const rdfTermCase: ICaseDoc = {
   ),
   example: `import {
   term, snapshotStorageRdfTerm, snapshotStorageRdfPattern,
-  snapshotStorageRdfQuad, encodeStorageRdfQuad
+  snapshotStorageRdfQuad, encodeStorageRdfQuad, encodeStorageRdfTerm
 } from '@migaia/storage-contract'
 const quad = snapshotStorageRdfQuad({
   subject: term.iri('urn:user:1'),
@@ -144,6 +144,7 @@ const quad = snapshotStorageRdfQuad({
 }, 'memory')
 const pattern = snapshotStorageRdfPattern({ subject: quad.subject }, 'memory')
 const identityBytes = encodeStorageRdfQuad(quad, 'memory')
+const termBytes = encodeStorageRdfTerm(quad.object, 'memory')
 const responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), undefined)`,
   result: t(
     'Language becomes lowercase, IRI spelling stays exact, and omitted pattern graph covers all graphs. Identity bytes are self-delimiting; raw blank terms cannot enter ground quad positions.',
@@ -356,6 +357,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
   snapshotStorageRdfPattern: [rdfTermCase],
   snapshotStorageRdfQuad: [rdfTermCase],
   encodeStorageRdfQuad: [rdfTermCase],
+  encodeStorageRdfTerm: [rdfTermCase],
   ttl: [ttlCase],
   decodeOrderedStorageKey: [
     {
