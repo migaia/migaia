@@ -84,12 +84,12 @@ console.log(host.extensions.label('draft'))`
     memoryBackendPlugin: {
       role: 'factory',
       purpose: t(
-        'Define an isolated memory backend without acquiring data before installation. Native transactions and root writes share the original owner, policy budget and local lock/revision facts. Replace protects displaced channels; synchronous busy keys reject immediately, while clear/prefix mutation rechecks only affected channels before its uninterrupted native turn.',
+        'Define an isolated memory backend without acquiring data before installation. Native transactions and root writes share the original owner, policy budget and local lock/revision facts. Native value backends register a prepared compare/write endpoint with core.registerValueCommit only inside installation. Replace protects displaced channels; synchronous busy keys reject immediately, while clear/prefix mutation rechecks only affected channels before its uninterrupted native turn.',
         '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'
       ),
       returns: t(
-        'A literal-id memory plugin retaining selected Features. The default id is memory; where/select/all run through the shared records query core.',
-        '保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
+        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). The default id is memory; where/select/all run through the shared records query core.',
+        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
       ),
       cases: storageHostCases.memoryBackendPlugin
     },
@@ -191,8 +191,8 @@ console.log(host.extensions.label('draft'))`,
     defineFeature: {
       role: 'factory',
       purpose: t(
-        'Bind a synchronous Feature definition to authentic backend kind identities. Its selected capabilities, chain methods and grouped API retain precise author types.',
-        '把同步Feature定义绑定到真实后端种类身份，保留所选能力、链方法和分组API的作者类型。'
+        'Bind a synchronous Feature definition to authentic backend kind identities. Its selected capabilities, chain methods and grouped API retain precise author types. Original scope factories project transaction methods before freezing; original query and builder branches retain fluent methods and their receivers.',
+        '把同步Feature定义绑定到真实后端种类身份，保留所选能力、链方法和分组API的作者类型；原scope工厂冻结前投影事务方法，原query和builder分支保留链方法与receiver。'
       ),
       returns: t(
         'The original opaque PluginHost Feature with private storage target metadata.',

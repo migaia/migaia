@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, onTestFinished } from 'vitest'
-import { createStorageHost } from '@migaia/storage-host'
+import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { deferred } from '@migaia/utils/promise'
 import {
   kv,
   records,
@@ -249,6 +250,24 @@ describe('native SQLite installation', () => {
         await connection.dispose()
       })
       const second = other.backend('sqlite')
+      let pipelineCalls = 0
+      await other.use(
+        definePlugin('redirect', (core) => ({
+          install() {
+            core.usePipeline((request, next) => {
+              if (
+                request.operation === 'set' &&
+                (request.input as { key?: unknown }).key === 'redirect'
+              ) {
+                pipelineCalls++
+                return next({ ...request, input: { key: 'shared', value: 'redirected' } })
+              }
+              return next(request)
+            })
+            return {}
+          }
+        }))
+      )
       let enter!: () => void
       const entered = new Promise<void>((resolve) => {
         enter = resolve
@@ -281,9 +300,48 @@ describe('native SQLite installation', () => {
       expect(() => second.sync.set('shared', 'blocked')).toThrowError(
         expect.objectContaining({ code: 'LOCK_REJECTED' })
       )
+      const reads = { lock: 0, concurrency: 0, signal: 0, timeoutMs: 0, conflictPolicy: 0 }
+      const options = {
+        get lock() {
+          reads.lock++
+          return [lockKey.record('caller')]
+        },
+        get concurrency() {
+          reads.concurrency++
+          return ConcurrencyPolicy.fail()
+        },
+        get signal() {
+          reads.signal++
+          return undefined
+        },
+        get timeoutMs() {
+          reads.timeoutMs++
+          return undefined
+        },
+        get conflictPolicy() {
+          reads.conflictPolicy++
+          return 'replace' as const
+        }
+      }
+      await expect(second.set('redirect', 'input', options)).rejects.toMatchObject({
+        code: 'LOCK_REJECTED'
+      })
+      expect(pipelineCalls).toBe(1)
+      expect(reads).toEqual({ lock: 1, concurrency: 1, signal: 1, timeoutMs: 1, conflictPolicy: 1 })
       await expect(
-        second.clearValues({ concurrency: ConcurrencyPolicy.fail() } as never)
+        second.set('shared', 'optimistic', {
+          concurrency: ConcurrencyPolicy.optimistic({ retries: 0 })
+        })
       ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      await expect(
+        second.clearValues({ concurrency: ConcurrencyPolicy.fail() })
+      ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      let rootCommitted = false
+      const root = second
+        .set('root-different', 'root', { concurrency: ConcurrencyPolicy.fail() })
+        .then(() => {
+          rootCommitted = true
+        })
       let ran = false
       const different = second
         .tx()
@@ -295,12 +353,83 @@ describe('native SQLite installation', () => {
         })
       await Promise.resolve()
       expect(ran).toBe(false)
+      expect(rootCommitted).toBe(false)
       release()
       await first
+      await root
       await different
       expect(await second.get('shared')).toBe('one')
       expect(await second.get('different')).toBe('two')
+      expect(await second.get('root-different')).toBe('root')
       expect(await second.inspectLocks()).toEqual([])
+      await second
+        .tx()
+        .lock(lockKey.text(['self', 1]), lockKey.record(['self', 1]))
+        .run(async (tx) => {
+          await tx.setMany([{ key: ['self', 1], value: 'text' }])
+          expect(await tx.removeByPrefix(['self'])).toBe(1)
+          await tx.putRecord({ value: 1 }, ['self', 1])
+          expect(await tx.use(records).removeByPrefix(['self'])).toBe(1)
+        })
+      await second.set('redirect', 'input')
+      expect(pipelineCalls).toBe(2)
+      expect(await second.get('shared')).toBe('redirected')
+      expect(await second.get('redirect')).toBeNull()
     }
   )
+
+  it('keeps logical admission ahead of the physical queue on the same store', async () => {
+    const { store, host } = await installed({ memory: true })
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const queued = deferred<void>()
+    await host.use(
+      definePlugin('queue-marker', (core) => ({
+        install() {
+          core.usePipeline((request, next) => {
+            const result = next(request)
+            if (request.operation === 'set' && (request.input as { key?: unknown }).key === 'A')
+              queued.resolve()
+            return result
+          })
+          return {}
+        }
+      }))
+    )
+    const initial = store.transaction(
+      async (tx) => {
+        await tx.set('physical', 'held')
+        entered.resolve()
+        await release.promise
+      },
+      { lock: [lockKey.text('physical')], timeoutMs: 1000 }
+    )
+    await entered.promise
+    try {
+      const root = store.set('A', 'root', {
+        timeoutMs: 1000,
+        concurrency: ConcurrencyPolicy.wait()
+      })
+      await queued.promise
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      const following = store.transaction(
+        async (tx) => {
+          expect(await tx.get('A')).toBe('root')
+          await tx.set('A', 'transaction')
+        },
+        { lock: [lockKey.text('A')], timeoutMs: 1000, concurrency: ConcurrencyPolicy.wait() }
+      )
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      release.resolve()
+      const results = await Promise.allSettled([initial, root, following])
+      expect(results.map((result) => result.status)).toEqual([
+        'fulfilled',
+        'fulfilled',
+        'fulfilled'
+      ])
+      expect(await store.get('A')).toBe('transaction')
+    } finally {
+      release.resolve()
+    }
+  })
 })

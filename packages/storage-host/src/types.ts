@@ -16,7 +16,8 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IBackendChangeController,
-  IBackendChangeControllerOptions
+  IBackendChangeControllerOptions,
+  IBackendValueCommit
 } from './core/change-controller.js'
 import type {
   IOperationContext,
@@ -28,6 +29,7 @@ import type {
   IStorageImplementationsOf,
   IChainMethods,
   IChainMethodsOf,
+  IWithTransactionQueryMethods,
   IWithChainMethods,
   IAnyStorageCapability,
   ICapabilityApi,
@@ -201,9 +203,11 @@ export type IStorageFeatureOutput<
   A extends IStorageFeatureApi = IStorageFeatureApi
 > = { readonly capabilities: C; readonly chain: M; readonly api: A }
 type IInvalidMethods<C> = {
-  [G in keyof C]: {
-    [N in keyof C[G]]: C[G][N] extends (...args: never[]) => unknown ? never : N
-  }[keyof C[G]]
+  [G in keyof C]-?: {
+    [N in keyof NonNullable<C[G]>]: NonNullable<C[G]>[N] extends (...args: never[]) => unknown
+      ? never
+      : N
+  }[keyof NonNullable<C[G]>]
 }[keyof C]
 type IExactOutput<O extends IStorageFeatureOutput> = Record<
   Exclude<keyof O, keyof IStorageFeatureOutput>,
@@ -306,11 +310,16 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
     readonly stageBindings: IBackendStageBindings
+    /** Project selected transaction methods onto the original backend-created view before freeze. */
+    createTransactionApi(scope: object): object | undefined
+    /** Read installed methods for one actual original fluent creator; omission allocates nothing. */
+    getChainMethods(family: keyof IChainMethods): object | undefined
     createKeyLockPort(): IBackendKeyLockPort
     /** Construct revision facts for one physical data universe during this installation window. */
     createRevisionPort(): IBackendRevisionPort
     createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
     registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
+    registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void
     registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
     registerStore<S extends IStorageBase>(store: S): void
     getStore(): IStorageBase
@@ -405,18 +414,29 @@ type IWithFeatureChains<S extends IStorageBase, F extends IStorageFeatureRecord>
   : IWithFeatureCapabilities<S, F> extends infer T extends IStorageStore<never>
     ? IWithChainMethods<T, IChainMethodsOf<S> & IFeatureMethods<F>>
     : never
-type IScopeApi<S, F extends IStorageFeatureRecord> = Omit<S, 'api'> & {
-  readonly api: IFeatureApi<F, 'transaction'>
-}
+/** Read only the existing selected query group carried by the original enhanced store. */
+type IScopeQueryMethods<S> = 'query' extends keyof IChainMethodsOf<S>
+  ? NonNullable<IChainMethodsOf<S>['query']>
+  : Record<never, never>
+/** Scope query methods retain transaction-only context while native top-level members survive. */
+type IScopeApi<S, F extends IStorageFeatureRecord, Q extends object> =
+  IWithTransactionQueryMethods<S, Q> extends infer T
+    ? keyof IFeatureApi<F, 'transaction'> extends never
+      ? T
+      : Omit<T, 'api'> & { readonly api: IFeatureApi<F, 'transaction'> }
+    : never
 type IApiTransactionMembers<S, F extends IStorageFeatureRecord> = [
-  keyof IFeatureApi<F, 'transaction'>
+  keyof IFeatureApi<F, 'transaction'> | keyof IScopeQueryMethods<S>
 ] extends [never]
   ? Pick<S, Extract<keyof S, 'transaction' | 'tx'>>
   : S extends { transaction(run: (scope: infer T) => unknown, options?: infer O): unknown }
     ? {
-        transaction<R>(run: (scope: IScopeApi<T, F>) => R, options?: O): Promise<Awaited<R>>
+        transaction<R>(
+          run: (scope: IScopeApi<T, F, IScopeQueryMethods<S>>) => R,
+          options?: O
+        ): Promise<Awaited<R>>
       } & (S extends { tx(): ITransactionBuilder<infer T, infer A> }
-        ? { tx(): ITransactionBuilder<IScopeApi<T, F>, A> }
+        ? { tx(): ITransactionBuilder<IScopeApi<T, F, IScopeQueryMethods<S>>, A> }
         : {})
     : {}
 export type IStorageStoreWithFeatures<

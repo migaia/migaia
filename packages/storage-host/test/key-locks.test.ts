@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import {
   createTransactionOwner,
+  defineConcurrencyPolicy,
   ConcurrencyPolicy,
   lockKey,
   runWithConcurrency,
@@ -163,6 +164,78 @@ describe('the shared local key-lock provider', () => {
     await expect(pending).resolves.toBe('first')
     expect(order).toEqual(['acquired', 'native', 'cleanup', 'released'])
     expect(report).not.toHaveBeenCalled()
+  })
+
+  it('waits for async root ranges without replaying native attempts or blocking other channels', async () => {
+    /** The original owner supplies authentic contexts and a shared physical lock table. */
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** The first actual native attempt retains its record lease until real cleanup ends. */
+    const entered = deferred<void>()
+    /** Release is deliberately later than the root range's original wait decision. */
+    const release = deferred<void>()
+    /** Observing the policy proves the root saw the original held record. */
+    const decided = deferred<void>()
+    /** An optimistic root respects existing locks without creating its own held row. */
+    const decide = vi.fn(() => {
+      decided.resolve()
+      return { action: 'wait' } as const
+    })
+    /** Root native work must not begin until the original holder releases. */
+    const native = vi.fn(async () => ({ status: 'committed', value: 'root' }) as const)
+    /** The protected record falls inside a canonical typed prefix range. */
+    const holding = run(
+      current,
+      'record-owner',
+      { lock: [lockKey.record(['tenant', 1])] },
+      async () => {
+        entered.resolve()
+        await release.promise
+        return { status: 'committed', value: 'held' }
+      }
+    )
+    await entered.promise
+    /** Range bounds come from the original contract encoder, with no backend encoding. */
+    const ranges = [
+      {
+        channel: 'record' as const,
+        ...snapshotConcurrencyLockRange({ channel: 'record', prefix: ['tenant'] }, 'catalog')
+      }
+    ]
+    /** The same original loop retries admission once, then waits inside the existing FIFO. */
+    const pending = runWithConcurrency(
+      {
+        store: current.state.store,
+        options: {
+          concurrency: defineConcurrencyPolicy({
+            name: 'root-range-wait',
+            locking: 'optimistic',
+            decide
+          })
+        }
+      },
+      {
+        attempt: (ctx) =>
+          port.attempt(ctx, holder('root'), { attempt: native }, undefined, undefined, ranges)
+      }
+    )
+    await decided.promise
+    expect(native).not.toHaveBeenCalled()
+    await expect(
+      run(current, 'text-owner', { lock: [lockKey.text('tenant')] }, async () => ({
+        status: 'committed',
+        value: 'text'
+      }))
+    ).resolves.toBe('text')
+    expect(decide).toHaveBeenCalledTimes(1)
+    expect(native).not.toHaveBeenCalled()
+    release.resolve()
+    await expect(holding).resolves.toBe('held')
+    await expect(pending).resolves.toBe('root')
+    expect(native).toHaveBeenCalledTimes(1)
+    expect(decide).toHaveBeenCalledTimes(1)
+    expect(port.inspectLocks()).toEqual([])
   })
 
   it('uses only the original FIFO for wait decisions and prevents cancelled queued native work', async () => {
@@ -460,6 +533,107 @@ describe('the shared local key-lock provider', () => {
       port.probe(snapshotConcurrencyLockKeys([lockKey.text('root')], 'catalog').identities)
     ).toBeUndefined()
   })
+
+  it('retains original logical leases through physical admission and actual physical cleanup', async () => {
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** Existing backend physical admission owns its own ready and cleanup intervals. */
+    const entered = deferred<void>()
+    const ready = deferred<void>()
+    const wrote = deferred<void>()
+    const cleanup = deferred<void>()
+    const identities = snapshotConcurrencyLockKeys([lockKey.text('physical')], 'catalog').identities
+    let writes = 0
+    const pending = runWithConcurrency(
+      { store: current.state.store, options: { lock: [lockKey.text('physical')] } },
+      {
+        attempt: (ctx) =>
+          port.attemptWrite(
+            ctx,
+            holder('physical'),
+            () => ++writes,
+            undefined,
+            undefined,
+            undefined,
+            async (commit) => {
+              entered.resolve()
+              await ready.promise
+              const result = commit()
+              wrote.resolve()
+              await cleanup.promise
+              return result
+            }
+          )
+      }
+    )
+    await entered.promise
+    try {
+      expect(port.probe(identities)).toMatchObject({ holder: { owner: 'physical' } })
+      expect(writes).toBe(0)
+      ready.resolve()
+      await wrote.promise
+      expect(writes).toBe(1)
+      expect(port.probe(identities)).toBeDefined()
+      cleanup.resolve()
+      await expect(pending).resolves.toBe(1)
+      expect(port.probe(identities)).toBeUndefined()
+    } finally {
+      ready.resolve()
+      cleanup.resolve()
+      await Promise.allSettled([pending])
+    }
+  })
+
+  it.each(['operation', 'member'] as const)(
+    'rechecks %s cancellation after physical admission before native mutation',
+    async (kind) => {
+      const current = await fixture()
+      await using _host = current.host
+      await using port = current.port
+      const abort = new AbortController()
+      const reason = new Error('abort physical root wait')
+      const entered = deferred<void>()
+      const ready = deferred<void>()
+      const native = vi.fn(() => 1)
+      const release = current.controller.beginMutation()
+      const pending = runWithConcurrency(
+        {
+          store: current.state.store,
+          options: { lock: [lockKey.text('physical')], signal: abort.signal }
+        },
+        {
+          attempt: (ctx) =>
+            port.attemptWrite(
+              ctx,
+              holder('physical'),
+              native,
+              undefined,
+              current.controller.closingSignal,
+              undefined,
+              async (commit) => {
+                entered.resolve()
+                await ready.promise
+                return commit()
+              }
+            )
+        }
+      ).finally(release)
+      const rejected = expect(pending).rejects.toMatchObject({
+        code: 'ABORTED',
+        cause: kind === 'operation' ? reason : expect.objectContaining({ code: 'STORE_DISPOSED' })
+      })
+      await entered.promise
+      const closing = kind === 'member' ? current.controller.dispose() : undefined
+      if (kind === 'operation') abort.abort(reason)
+      ready.resolve()
+      await Promise.all([rejected, closing])
+      expect(native).not.toHaveBeenCalled()
+      expect(
+        port.probe(snapshotConcurrencyLockKeys([lockKey.text('physical')], 'catalog').identities)
+      ).toBeUndefined()
+    }
+  )
 
   it('keeps optimistic work unlocked and reports failed resource observers without affecting results', async () => {
     const current = await fixture()

@@ -1,8 +1,9 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { it, expect, onTestFinished } from 'vitest'
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { it, expect, onTestFinished, vi } from 'vitest'
+import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-host'
+import { sleep } from '@migaia/utils/promise'
 import type { IStorageChange } from '@migaia/storage-contract'
 import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
@@ -117,4 +118,90 @@ it('publishes canonical changed keys once in fixed channel order only after comm
     })
   ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
   expect(events).toEqual([])
+})
+
+/** The original deadline includes actual asynchronous stage settlement before any native write. */
+it('keeps asynchronous pipeline preparation inside the original root deadline', async () => {
+  const connection = nodeSqliteDriver(':memory:')
+  let pipelineCalls = 0
+  let settled = false
+  const slow = definePlugin('slow', (core) => ({
+    install() {
+      core.useAsyncPipeline(async (request, next) => {
+        if (request.operation === 'set') {
+          pipelineCalls++
+          await sleep(60)
+          settled = true
+        }
+        await next(request)
+      })
+      return {}
+    }
+  }))
+  const host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection }), slow] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await connection.dispose()
+  })
+  const store = host.backend('sqlite')
+  let timeoutReads = 0
+  /** The first mutation must prepare BEGIN before it can perform any native transaction work. */
+  const native = vi.spyOn(connection, 'prepare')
+  await expect(
+    store.set('late', 'must-not-commit', {
+      get timeoutMs() {
+        timeoutReads++
+        return 20
+      }
+    })
+  ).rejects.toMatchObject({ code: 'ABORTED' })
+  expect(settled).toBe(true)
+  expect(pipelineCalls).toBe(1)
+  expect(timeoutReads).toBe(1)
+  expect(native).not.toHaveBeenCalled()
+  expect(await store.get('late')).toBeNull()
+})
+
+/** Existing middleware surrounds the actual committed result and the exact native error. */
+it('keeps after-next reads and native error catches around the real terminal', async () => {
+  const connection = nodeSqliteDriver(':memory:')
+  let readCommitted!: () => Promise<string | null>
+  let afterNext: string | null | undefined
+  let caught: unknown
+  const around = definePlugin('around', (core) => ({
+    install() {
+      core.useAsyncPipeline(async (request, next) => {
+        if (request.operation !== 'set') {
+          await next(request)
+          return
+        }
+        try {
+          await next(request)
+          if ((request.input as { key?: unknown }).key === 'wrapped')
+            afterNext = await readCommitted()
+        } catch (error) {
+          caught = error
+          throw error
+        }
+      })
+      return {}
+    }
+  }))
+  const host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection }), around] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await connection.dispose()
+  })
+  const store = host.backend('sqlite')
+  readCommitted = () => store.get('wrapped')
+  await store.set('wrapped', 'committed')
+  // This isolated memory database forces an actual driver failure through the public SQL endpoint.
+  await store.sql`DROP TABLE migaia_text`.run()
+  const failure = await store.set('failed', 'native').catch((error) => error)
+  expect(failure).toMatchObject({ code: 'SQLITE_FAILED', cause: expect.any(Error) })
+  expect([afterNext, caught === failure]).toEqual(['committed', true])
 })

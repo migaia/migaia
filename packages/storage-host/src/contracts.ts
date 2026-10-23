@@ -12,7 +12,7 @@ import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { createStorageTypeError, StorageErrorCode } from './errors.js'
-import { installStorageFeatures } from './feature-install.js'
+import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.js'
 import { pluginNameFromBackendId } from './names.js'
 import { STORAGE_DESCRIPTOR_METADATA, STORAGE_RESERVED_EXPOSE } from './state-constants.js'
 import { StorageErrorText } from './error-text.js'
@@ -218,10 +218,14 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStorageHooks(): IStorageHooks
   readonly emit: IStorageHookEmitter
   readonly createKeyLockPort: IStoragePluginCore['createKeyLockPort']
+  readonly createTransactionApi: IStoragePluginCore['createTransactionApi']
+  readonly getChainMethods: IStoragePluginCore['getChainMethods']
+  setStorageFeatureProjection(projection: IStorageFeatureProjection | undefined): void
   readonly defaultOrgId: string
   readonly createRevisionPort: IStoragePluginCore['createRevisionPort']
   readonly createChangeController: IStoragePluginCore['createChangeController']
   readonly registerChangeController: IStoragePluginCore['registerChangeController']
+  readonly registerValueCommit: IStoragePluginCore['registerValueCommit']
   readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
   readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
@@ -271,9 +275,12 @@ export const definePlugin: IStorageDefinePlugin = ((
         },
         emit: nativeCore.emit,
         createKeyLockPort: nativeCore.createKeyLockPort,
+        createTransactionApi: nativeCore.createTransactionApi,
+        getChainMethods: nativeCore.getChainMethods,
         createRevisionPort: nativeCore.createRevisionPort,
         createChangeController: nativeCore.createChangeController,
         registerChangeController: nativeCore.registerChangeController,
+        registerValueCommit: nativeCore.registerValueCommit,
         getPublishedBackend: nativeCore.getPublishedBackend,
         registerDetect: nativeCore.registerDetect,
         registerStore: (store: IStorageBase) => {
@@ -358,8 +365,9 @@ export const definePlugin: IStorageDefinePlugin = ((
                   StorageErrorCode.backendPluginInvalid,
                   StorageErrorText.backendPluginInvalid
                 )
-              if (kind !== undefined && features !== undefined)
-                installStorageFeatures({
+              if (kind !== undefined && features !== undefined) {
+                /** An empty selection creates neither a projection nor an extra cleanup closure. */
+                const projection = installStorageFeatures({
                   name,
                   store: nativeCore.getStore(),
                   features: nativeCore.features,
@@ -371,6 +379,12 @@ export const definePlugin: IStorageDefinePlugin = ((
                   expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
                   onDispose: nativeCore.onDispose
                 })
+                if (projection !== undefined) {
+                  /** Original registration cleanup drops only its own selected Feature projection. */
+                  nativeCore.onDispose(() => nativeCore.setStorageFeatureProjection(undefined))
+                  nativeCore.setStorageFeatureProjection(projection)
+                }
+              }
               if (
                 extensions === null ||
                 typeof extensions !== 'object' ||

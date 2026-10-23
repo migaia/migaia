@@ -13,6 +13,7 @@ import {
   type IStorageHookMap
 } from '../src/index.js'
 import { catalog } from './helpers/catalog.js'
+import { getBackendEnvelopeStages } from '../src/core/change-controller.js'
 
 /** Actual backend identity binds observations without replacing the migration or store owner. */
 const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
@@ -38,6 +39,69 @@ function plugin() {
 }
 
 describe('envelope observation binding', () => {
+  it('retains each original host observer for one shared frozen raw store', async () => {
+    /** Shared raw resource identity is admitted without a controller or a mutable provider base. */
+    const raw = Object.freeze({
+      backend: 'shared-raw',
+      capabilities: {
+        syncRead: false,
+        binary: false,
+        records: false,
+        transactions: false,
+        iteration: false,
+        secondaryIndexes: false,
+        changeFeed: false,
+        opaqueEntries: false,
+        maxValueBytes: undefined
+      },
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {}
+    })
+    /** Both original hosts own their own normal registration window and observer identity. */
+    const rawKind = defineStorageBackendKind<typeof raw>()('shared-raw')
+    const descriptor = (core: IStoragePluginCore) => ({
+      kind: rawKind,
+      featureExpose: () => ({ getClient: () => undefined }),
+      install: () => {
+        core.registerStore(raw)
+        return {}
+      }
+    })
+    /** Observe one true boundary through the same package-owned endpoint consumed by entity. */
+    const seen: string[] = []
+    const first = await createStorageHost({
+      plugins: [definePlugin('first', descriptor)],
+      hooks: {
+        beforeEnvelopeCheck: (event) => {
+          seen.push(event.backendId)
+        }
+      }
+    })
+    await using second = await createStorageHost({
+      plugins: [definePlugin('second', descriptor)],
+      hooks: {
+        beforeEnvelopeCheck: (event) => {
+          seen.push(event.backendId)
+        }
+      }
+    })
+    getBackendEnvelopeStages(raw, {
+      operation: 'shared-read',
+      targetVersion: 1
+    })!.beforeEnvelopeCheck()
+    expect(seen).toEqual(['first', 'second'])
+    await first.dispose()
+    getBackendEnvelopeStages(raw, {
+      operation: 'shared-read',
+      targetVersion: 1
+    })!.beforeEnvelopeCheck()
+    expect(seen).toEqual(['first', 'second', 'second'])
+    await second.dispose()
+    expect(
+      getBackendEnvelopeStages(raw, { operation: 'shared-read', targetVersion: 1 })
+    ).toBeUndefined()
+  })
+
   it('borrows the original sync and async migration observer with immutable operation metadata', async () => {
     await using host = await createStorageHost({ plugins: [plugin()] })
     /** Metadata changes after binding must never affect concurrent recovery observations. */

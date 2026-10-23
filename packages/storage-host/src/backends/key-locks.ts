@@ -28,7 +28,12 @@ export type IBackendKeyLockPort = IStorageResource & {
     holder: IConcurrencyHolder,
     native: IConcurrencyPort<R>,
     stages?: IConcurrencyStageObserver,
-    admissionSignal?: IAbortSignal
+    admissionSignal?: IAbortSignal,
+    ranges?: readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[]
   ): Promise<IConcurrencyAttempt<R>>
   /** Probe canonical identities directly; ranges scan only this original active lock table. */
   probe(
@@ -51,7 +56,8 @@ export type IBackendKeyLockPort = IStorageResource & {
       readonly channel: ILockKey['channel']
       readonly lower: string
       readonly upper: string
-    }[]
+    }[],
+    admit?: (commit: () => IConcurrencyAttempt<R>) => Promise<IConcurrencyAttempt<R>>
   ): Promise<IConcurrencyAttempt<R>>
   inspectLocks(): readonly ILockHolding[]
 }
@@ -288,7 +294,9 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       readonly channel: ILockKey['channel']
       readonly lower: string
       readonly upper: string
-    }[] = []
+    }[] = [],
+    admit?: (commit: () => IConcurrencyAttempt<R>) => Promise<IConcurrencyAttempt<R>>,
+    protectHeld = write !== undefined
   ): Promise<IConcurrencyAttempt<R>> => {
     assertOpen()
     /** Only an authentic active original context can supply canonical identities. */
@@ -301,7 +309,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       throwIfAborted(ctx.signal)
       throwIfAborted(admissionSignal)
       if (
-        (ctx.locking === 'pessimistic' || write !== undefined) &&
+        (ctx.locking === 'pessimistic' || protectHeld) &&
         (identities.length !== 0 || ranges.length !== 0)
       ) {
         /** Empty tables admit immediately without scheduling through the limiter. */
@@ -313,7 +321,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
           return {
             status: 'conflict',
             phase: 'acquire',
-            keys: write === undefined ? (ctx.lock ?? []) : [held.key],
+            keys: protectHeld ? [held.key] : (ctx.lock ?? []),
             holder: held.holder
           }
         else lease = await waitForKeys(ctx, identities, holder, stages, admissionSignal, ranges)
@@ -321,14 +329,32 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       /** A member may close after acquisition but before the native terminal is entered. */
       throwIfAborted(admissionSignal)
       if (write !== undefined) {
-        /** A waiting continuation or observation may have admitted a new intersecting holder. */
+        if (admit !== undefined && typeof admit !== 'function')
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        /** A physical gate can enter this same original native terminal at most once. */
+        let invoked = false
+        /** The backend's existing physical admission invokes this final synchronous commit turn. */
+        const commit = (): IConcurrencyAttempt<R> => {
+          if (invoked) throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          invoked = true
+          /** Waiting, acquisition observation or physical admission may expose a new holder. */
+          const held = conflict(identities, ranges, lease?.context)
+          if (held !== undefined)
+            return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
+          /** Both original operation cancellation and member closure are live after physical waits. */
+          throwIfAborted(ctx.signal)
+          throwIfAborted(admissionSignal)
+          /** No await separates the final checks from native data/revision mutation. */
+          return { status: 'committed', value: write() }
+        }
+        return admit === undefined ? commit() : await admit(commit)
+      }
+      if (protectHeld) {
+        /** Async root writes use the same admission table before entering their actual native port. */
         const held = conflict(identities, ranges, lease?.context)
         if (held !== undefined)
           return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
-        /** An acquisition observer may have cancelled the original operation synchronously. */
         throwIfAborted(ctx.signal)
-        /** No await separates final cancellation/active-table checks from native mutation. */
-        return { status: 'committed', value: write() }
       }
       return await native!.attempt(ctx)
     } finally {
@@ -351,10 +377,20 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   }
 
   return {
-    attempt: (ctx, holder, native, stages, admissionSignal) =>
-      runAttempt(ctx, holder, native, stages, admissionSignal),
-    attemptWrite: (ctx, holder, write, stages, admissionSignal, ranges) =>
-      runAttempt(ctx, holder, undefined, stages, admissionSignal, write, ranges),
+    attempt: (ctx, holder, native, stages, admissionSignal, ranges) =>
+      runAttempt(
+        ctx,
+        holder,
+        native,
+        stages,
+        admissionSignal,
+        undefined,
+        ranges,
+        undefined,
+        ranges !== undefined
+      ),
+    attemptWrite: (ctx, holder, write, stages, admissionSignal, ranges, admit) =>
+      runAttempt(ctx, holder, undefined, stages, admissionSignal, write, ranges, admit),
     probe: (identities, ranges, current) => {
       assertOpen()
       /** Only the original live attempt can identify its own lease; key lists grant no exemption. */

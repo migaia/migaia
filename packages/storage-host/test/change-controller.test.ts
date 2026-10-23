@@ -72,6 +72,8 @@ describe('controlled backend change authoring', () => {
   it('publishes the same controller through its own lazy Feature getter and drains original mutations', async () => {
     /** Capture original core methods only to prove post-install window rejection. */
     let retained!: IStoragePluginCore
+    /** Prepared value writes borrow the same row without changing the controller object. */
+    const commitValue = async () => {}
     /** Finalization belongs to the original map and is invoked once through controller disposal. */
     let state!: ReturnType<typeof catalog>
     /** The factory creates one real controller, without an independent Feature registry. */
@@ -104,6 +106,10 @@ describe('controlled backend change authoring', () => {
           state.store.dispose = () => controller.dispose()
           core.registerStore(state.store)
           core.registerChangeController(state.store, controller)
+          core.registerValueCommit(state.store, commitValue)
+          expect(() => core.registerValueCommit(state.store, commitValue)).toThrowError(
+            expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+          )
           return {}
         }
       }
@@ -117,6 +123,9 @@ describe('controlled backend change authoring', () => {
       expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
     )
     expect(() => retained.registerChangeController(state.store, controller)).toThrowError(
+      expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
+    )
+    expect(() => retained.registerValueCommit(state.store, commitValue)).toThrowError(
       expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
     )
     /** An admitted mutation may publish its committed notification before physical cleanup. */
