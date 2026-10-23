@@ -4500,7 +4500,6 @@ export const indexedDbHost = <TValue = unknown>(
     query: <R = TValue>() =>
       createRecordQuery<R, undefined>(
         {
-          asyncDisposeKey,
           pushdown: { source: StorageBackend.indexedDb, operations: [], operators: [] },
           execute: () => scope.iterateRecords()
         },
