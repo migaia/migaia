@@ -1801,6 +1801,25 @@ export const storageContractReference: ILibraryReference = {
         '规范操作与事务终态观察名。'
       )
     },
+    createStorageIteratorLifetime: {
+      role: 'factory',
+      purpose: t(
+        'Reuse the original iterator drain and cached cleanup paths when authoring a native cursor; data admission and transaction registration stay with the original backend.',
+        '编写原生游标时复用既有迭代器排空与缓存清理路径；数据准入和事务登记仍属于原后端。'
+      ),
+      params: {
+        options: t(
+          'Original close and report callbacks, plus optional onSettled. Submit each complete accepted advance through advance; the helper owns no query, policy loop or native client.',
+          '原 close 与 report 回调，以及可选 onSettled；每次完整接纳的推进经 advance 提交；助手不拥有查询、策略循环或原生客户端。'
+        )
+      },
+      returns: t(
+        'IStorageIteratorLifetime<T> with accepted-advance drain, cached rejecting dispose, cached return and separately cached report-only symbolic cleanup.',
+        'IStorageIteratorLifetime<T>：排空已接纳推进，缓存拒绝型 dispose、return，以及独立缓存的只报告符号清理。'
+      ),
+      example: storageContractCases.createStorageIteratorLifetime![0]!.example,
+      cases: storageContractCases.createStorageIteratorLifetime
+    },
     createTransactionOwner: {
       role: 'operation',
       purpose: t(
@@ -3998,6 +4017,13 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Asynchronous iterator and owned cleanup resource.',
         '异步迭代器及其自有清理资源。'
+      ),
+      members: {}
+    },
+    IStorageIteratorLifetime: {
+      summary: t(
+        'Original backend-author advance and cleanup functions. It supplies no admission check or transaction authority; native callers retain those responsibilities.',
+        '原后端作者推进和清理函数，不提供准入检查或事务权限；这些职责仍由原生调用方持有。'
       ),
       members: {}
     },

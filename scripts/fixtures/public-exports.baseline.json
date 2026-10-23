@@ -1059,6 +1059,7 @@
         "createSparqlTag",
         "createStorageBatchKeyCapture",
         "createStorageBlobObject",
+        "createStorageIteratorLifetime",
         "createTransactionBuilder",
         "createTransactionOwner",
         "createVectorQuery",

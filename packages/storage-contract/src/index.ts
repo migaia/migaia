@@ -92,7 +92,8 @@ export {
 
 export { intrinsicConstructorName } from './bytes.js'
 
-export type { IStorageResource, IStorageIterator } from './resource.js'
+export { createStorageIteratorLifetime } from './resource.js'
+export type { IStorageResource, IStorageIterator, IStorageIteratorLifetime } from './resource.js'
 export {
   BACKEND_KIND_PATTERN,
   isBackendKind,

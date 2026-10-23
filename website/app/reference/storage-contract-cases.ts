@@ -847,6 +847,41 @@ function readNative(store: IRecordStore<{ count: number }>) {
       )
     }
   ],
+  createStorageIteratorLifetime: [
+    {
+      title: t('Share native cursor cleanup', '共享原生游标清理'),
+      problem: t(
+        'A native backend needs the existing accepted-advance drain and two cleanup Promises without another resource owner.',
+        '原生后端需要既有接纳推进排空与双清理 Promise，不能另建资源 owner。'
+      ),
+      example: t(
+        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
+let closed = 0
+const lifetime = createStorageIteratorLifetime<number>({
+  close: async () => { closed += 1 }, report: console.error
+})
+await lifetime.advance(async () => ({ done: false, value: 1 }))
+const cleanup = lifetime.dispose()
+console.log(cleanup === lifetime.dispose()) // true
+await cleanup
+console.log(closed) // 1`,
+        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
+let closed = 0
+const lifetime = createStorageIteratorLifetime<number>({
+  close: async () => { closed += 1 }, report: console.error
+})
+await lifetime.advance(async () => ({ done: false, value: 1 }))
+const cleanup = lifetime.dispose()
+console.log(cleanup === lifetime.dispose()) // true
+await cleanup
+console.log(closed) // 1`
+      ),
+      result: t(
+        'Prints true and 1. The original backend must still check admission before advance and register native transaction iterators with its original scope.',
+        '输出 true 与 1；原后端仍须在 advance 前检查准入，并把原生事务迭代器登记到原 scope。'
+      )
+    }
+  ],
   runWithConcurrency: [
     {
       title: t(

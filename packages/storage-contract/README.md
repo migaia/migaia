@@ -698,3 +698,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 每个遍历节点至多借用一个原匹配游标；并发 accepted pull 共用一次惰性前驱查找，不增加队列或调度器。后开的子源先关闭，所有原源都尝试清理；首错及后续清理错误保持可追溯。root symbolic cleanup 分别复用子源与根源原有的报告 Promise，注册资源则沿原 derive 的 additional-close 接点。
 
 `IRdfQueryInput<TOperationScope>` 与 `IRdfQuerySource<TOperationScope>` 可精确声明后端原 scope；只读 `operationScope?: Readonly<TOperationScope>` 仅在嵌套 match 时借用当前仍有效的原 operation view。事务作者用 `input.operationScope ?? 原创建scope` 做现有 iterator 登记；`createRdfQuery` 的第三个可省泛型声明该 scope，旧泛型参数保持。这个对象只在当前 accepted 操作内有效，不延长其寿命；跨 stream next 的 child advance 继续通过原 nextTransactionIterator 的同 owner 校验，错配 scope 不能获得读取权。
+
+后端作者使用根导出 `createStorageIteratorLifetime<T>({ close, report, onSettled? })` 复用既有游标清理。将一次完整接纳的推进交给 `advance`，由原 helper 排空后关闭一次，并保留主清理与符号清理的独立缓存 Promise；数据准入、错误规范化和事务迭代器登记仍由原后端负责。`IStorageIteratorLifetime<T>` 仅公开同一组推进与清理函数，不授予事务权限。
