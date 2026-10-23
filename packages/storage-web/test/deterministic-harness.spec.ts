@@ -122,6 +122,8 @@ describe('deterministic shared harness', () => {
         await repository.put({ id: 'row', value: backendId })
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        /** Join only an actual invalidation's pending generation, without creating a refresh. */
+        if (query.state.value.status === 'refreshing') await query.refresh()
         expect(query.state.value).toMatchObject({
           status: 'ready',
           value: [{ id: 'row', value: backendId }]
