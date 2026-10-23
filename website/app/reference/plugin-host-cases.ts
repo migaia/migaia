@@ -303,6 +303,40 @@ export const pluginHostOptionCases: Readonly<Record<string, readonly IOptionCase
 
 /** Installation, dependency and cleanup scenarios use only the published root entry. */
 export const pluginHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  getPluginRuntimeIntegration: [
+    {
+      title: t(
+        'Prepare a completed candidate before batch publication',
+        '批次发布前检查已完成候选'
+      ),
+      problem: t(
+        'A host adapter must prepare an already completed candidate while the final registration of the same original batch is installing. Ordinary config and committed-registration checks keep their existing admission.',
+        '宿主适配器需要在原批次最后一项安装时准备已完成候选；普通 config 与已提交注册检查保持原准入。'
+      ),
+      example: t(
+        `import { defineHost, definePlugin, getPluginRuntimeIntegration, type IPluginRuntimeIntegration } from '@migaia/plugin-host'
+const host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })
+let prepared: IPluginRuntimeIntegration
+await host.use(
+  definePlugin('backend', core => ({ install: () => { prepared = getPluginRuntimeIntegration(core); return {} } })),
+  definePlugin('bootstrap', () => ({ install: () => { prepared.assertPreparedRegistration(); return {} } }))
+)
+await host.dispose()`,
+        `import { defineHost, definePlugin, getPluginRuntimeIntegration, type IPluginRuntimeIntegration } from '@migaia/plugin-host'
+const host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })
+let prepared: IPluginRuntimeIntegration
+await host.use(
+  definePlugin('backend', core => ({ install: () => { prepared = getPluginRuntimeIntegration(core); return {} } })),
+  definePlugin('bootstrap', () => ({ install: () => { prepared.assertPreparedRegistration(); return {} } }))
+)
+await host.dispose()`
+      ),
+      result: t(
+        'The original candidate is admitted without returning registration or installation authority. Rollback, removal, and host closing revoke the check.',
+        '原候选检查通过，不返回注册对象或安装权限；回滚、移除或宿主关闭后检查失效。'
+      )
+    }
+  ],
   dualEntry: [
     {
       title: t(

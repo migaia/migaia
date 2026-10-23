@@ -2272,6 +2272,17 @@ for (const error of result.cleanupErrors) logger.warn(readPluginHostDisposalProv
           returns: t('Nothing when current.', '仍有效时无返回值。'),
           example: `integration.assertCurrent()`
         },
+        assertPreparedRegistration: {
+          summary: t(
+            'Checks this exact original registration during its current install, a prepared candidate in its still active batch, or its committed handle. Grants no installation or resource authority.',
+            '检查原注册的当前安装、仍有效批次中的已完成候选，或已提交 handle；不授予安装或资源登记权限。'
+          ),
+          returns: t(
+            'Nothing when admitted; original state errors otherwise.',
+            '准入时无返回值，否则抛原状态错误。'
+          ),
+          example: `integration.assertPreparedRegistration()`
+        },
         readSharedExtension: {
           summary: t(
             'Reads an already committed shared extension by key.',

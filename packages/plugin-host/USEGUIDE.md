@@ -558,3 +558,5 @@ pnpm --filter @migaia/plugin-host run test
 同步/异步宿主的拥有者可在 `defineHost` 句柄调用 `runPipelineSync(value, terminal)` 或 `runPipelineAsync(value, terminal)`；子类使用同名 protected 入口。两者共用登记列表、顺序和生命周期租约，同步 stage 在两边执行。存在可见异步 stage 时，同步入口在任何 stage 或终点执行前抛 `ASYNC_STAGE_IN_SYNC_ENTRY`；卸载或禁用该 stage 后恢复同步执行。
 
 同步入口返回 `TResult | undefined`；异步入口接受返回 `Promise<TResult>` 的终点，返回 `Promise<TResult | undefined>`。stage 不调用 next 时以 undefined 停止。零 stage 直接调用终点，保留原值或 Promise 身份；非空异步管线等待真实终点结束再清理。生成器宿主继续使用 `runPipeline`，显式同步/异步入口以 `PIPELINE_MODE_MISMATCH` 拒绝该模式。
+
+`getPluginRuntimeIntegration(core).assertPreparedRegistration()` 仅检查原注册：当前安装沿原 operation 准入；同一尚未发布批次已完成的候选沿原 batch 精确身份与当前安装检查；发布后沿原 handle 准入。回滚、移除或宿主关闭后拒绝，不返回注册对象，也不授予晚注册资源或安装权限。`assertCurrent()` 与 `core.config.get()` 的原有语义不变。
