@@ -75,6 +75,10 @@ describe('canonical RDF terms and ground quad identity', () => {
     expect(() =>
       term.literal('text', { language: 'en', datatype: 'urn:type' } as never)
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    for (const datatype of [null, '', 'relative'])
+      expect(() => term.literal('text', { datatype } as never)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
     expect(() => term.literal('\uD800')).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )

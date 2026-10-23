@@ -337,7 +337,11 @@ export const term = /* @__PURE__ */ Object.freeze({
       if (language !== undefined && datatype !== undefined) throw invalidRdf(undefined)
       return rdfLiteral(
         value,
-        datatype ?? (language === undefined ? RdfDatatype.string : RdfDatatype.langString),
+        datatype === undefined
+          ? language === undefined
+            ? RdfDatatype.string
+            : RdfDatatype.langString
+          : datatype,
         language,
         undefined
       )
