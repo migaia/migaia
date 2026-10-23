@@ -6,6 +6,8 @@ export type IStorageV2ArtifactProvenance = {
   readonly tarballPath: string
   readonly integrity: string
   readonly dependencies: Readonly<Record<string, string>>
+  readonly peerDependencies?: Readonly<Record<string, string>>
+  readonly peerDependenciesMeta?: Readonly<Record<string, { readonly optional?: boolean }>>
 }
 
 export type IStorageV2LockAuthorization = {
@@ -25,6 +27,8 @@ export type IStorageV2ParsedLockfile = {
     string,
     {
       readonly name?: string
+      readonly peerDependencies: ReadonlyMap<string, string>
+      readonly peerDependenciesMeta: ReadonlyMap<string, { readonly optional?: boolean }>
       readonly resolution: ReadonlyMap<string, string>
       readonly version: string
     }
@@ -41,7 +45,8 @@ export function storageV2TarballIntegrity(tarballBytes: Uint8Array): string
 export function authorizeStorageV2LockProvenance(
   lockfile: string,
   canonicalConsumerDirectory: string,
-  artifacts: readonly IStorageV2ArtifactProvenance[]
+  artifacts: readonly IStorageV2ArtifactProvenance[],
+  importerRoots?: readonly string[]
 ): ReadonlyMap<string, IStorageV2LockAuthorization>
 
 export function createStorageV2LockHostiles(
