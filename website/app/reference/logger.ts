@@ -14,7 +14,7 @@ import type {
   IText,
   ITypeDoc
 } from './contract.js'
-import { loggerCases } from './logger-cases.js'
+import { loggerCases, loggerIndexExample } from './logger-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -1494,6 +1494,58 @@ ${create}
     }
   },
   symbols: {
+    snapshotLogRecords: {
+      role: 'factory',
+      purpose: t(
+        'Capture portable JSON before asynchronous admission without assigning sequence/time.',
+        '异步准入前捕获可移植 JSON，不分配序号和时间。'
+      ),
+      returns: t(
+        'Committed data only; native transaction and publication remain with the adapter.',
+        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+      ),
+      example: loggerIndexExample,
+      cases: loggerCases.committedIndex
+    },
+    prepareLogAppend: {
+      role: 'factory',
+      purpose: t(
+        'Prepare sequence/time from a committed head without changing the index or performing I/O.',
+        '从已提交 head 准备序号和时间，不修改索引、不执行 I/O。'
+      ),
+      returns: t(
+        'Committed data only; native transaction and publication remain with the adapter.',
+        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+      ),
+      example: loggerIndexExample,
+      cases: loggerCases.committedIndex
+    },
+    snapshotLogStoreState: {
+      role: 'factory',
+      purpose: t(
+        'Validate and detach native recovery rows with the original file-store corruption rules.',
+        '用文件资源原有损坏规则校验并分离原生恢复行。'
+      ),
+      returns: t(
+        'Committed data only; native transaction and publication remain with the adapter.',
+        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+      ),
+      example: loggerIndexExample,
+      cases: loggerCases.committedIndex
+    },
+    createLogStoreIndex: {
+      role: 'factory',
+      purpose: t(
+        'Create the original committed map and pending list without another resource, queue or close authority.',
+        '创建原已提交 Map 与 pending 链表，不引入资源、队列或关闭权。'
+      ),
+      returns: t(
+        'Committed data only; native transaction and publication remain with the adapter.',
+        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+      ),
+      example: loggerIndexExample,
+      cases: loggerCases.committedIndex
+    },
     memoryLogStore: {
       role: 'factory',
       purpose: t(
@@ -1958,6 +2010,22 @@ ${create}
     IUndoImage: alias(
       'JSON target and before/after images; null is legitimate.',
       'JSON target 与 before/after 镜像；null 是合法值。'
+    ),
+    ILogRecordSnapshot: alias(
+      'Portable JSON batch captured before sequence/time assignment.',
+      '分配序号与时间前捕获的可移植 JSON 批次。'
+    ),
+    ILogStoreSnapshot: alias(
+      'Detached retained rows and permanent sequence/time/floor watermarks.',
+      '分离的保留行及永久序号、时间和 floor 水位。'
+    ),
+    ILogStoreRecoveryRow: alias(
+      'Native row identity, state and undecoded payload before recovery validation.',
+      '恢复校验前的原生行身份、状态及未解码载荷。'
+    ),
+    ILogStoreIndex: alias(
+      'Committed reads and check/apply methods; native serialization, commit and notifications remain external.',
+      '已提交读取与 check/apply 方法；原生串行化、提交和通知仍由外部原拥有者负责。'
     ),
     ILogStore: {
       summary: t(

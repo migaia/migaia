@@ -4,11 +4,10 @@ import { createEventChannel, invokeEachLive } from '@migaia/event-subscriber'
 import {
   createLoggerError,
   createLoggerTypeError,
-  tagLoggerError,
   LoggerErrorCode,
   LOGGER_SOURCE
 } from '../../errors.js'
-import { snapshotPayload, snapshotRecords } from './snapshot.js'
+import { snapshotLogRecords } from './snapshot.js'
 import {
   createObservation,
   durableReporter,
@@ -17,21 +16,14 @@ import {
 } from './observation.js'
 import { DurableKind, LogOperation, LogRecordState, LogStage } from './state-constants.js'
 import { DurableText } from './text.js'
-import type {
-  ILogAppendNotice,
-  ILogPayload,
-  ILogRecord,
-  ILogStore,
-  ILogStoreOptions
-} from './types.js'
+import {
+  createOwnedLogStoreIndex,
+  prepareLogAppend,
+  requireInteger,
+  type ILogStoreSnapshot
+} from './committed-index.js'
+import type { ILogAppendNotice, ILogRecord, ILogStore, ILogStoreOptions } from './types.js'
 
-/** Adapter snapshots include permanent watermarks even when no records remain. */
-export type ILogStoreSnapshot = {
-  lastSeq: number
-  time: number
-  floor: number
-  records: readonly (ILogRecord & { state: LogRecordState })[]
-}
 /** Durable adapters commit once before the common in-memory indexes change. */
 export type ILogStorePersistence = {
   append(records: readonly ILogRecord[], lastSeq: number, time: number): void
@@ -39,8 +31,6 @@ export type ILogStorePersistence = {
   setState(seq: number, state: LogRecordState): void
   close(): void
 }
-/** Constant-time unlink for active pending records. */
-type IPendingNode = { seq: number; previous?: IPendingNode; next?: IPendingNode }
 /** Standardizes raw I/O failures while retaining known logger errors and native cause identity. */
 export function logStorageFailure(error: unknown): Error {
   if (
@@ -50,17 +40,6 @@ export function logStorageFailure(error: unknown): Error {
     return error
   return createLoggerError(LoggerErrorCode.logStoreIoFailed, DurableText.ioFailed, { cause: error })
 }
-/** Public numeric admission keeps argument errors distinct from representational exhaustion. */
-export function requireInteger(value: unknown, minimum = 1): asserts value is number {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) {
-    const exhausted =
-      typeof value === 'number' && Number.isInteger(value) && value > Number.MAX_SAFE_INTEGER
-    throw tagLoggerError(
-      new RangeError(exhausted ? DurableText.exhausted : DurableText.invalidOption),
-      exhausted ? LoggerErrorCode.logSequenceExhausted : LoggerErrorCode.invalidOption
-    )
-  }
-}
 /** One canonical resource implementation owns serialization, indexes, notifications, and closing. */
 export function createLogStore(
   options: ILogStoreOptions = {},
@@ -69,17 +48,8 @@ export function createLogStore(
 ): ILogStore {
   /** All ordinary operations use the existing FIFO limiter. */
   const limiter = createConcurrencyLimiter({ concurrency: 1 })
-  /** Retained committed rows are indexed by actual sequence, never historical array position. */
-  const records = new Map<number, ILogRecord & { state: LogRecordState }>()
-  /** Pending nodes support constant-time terminal removal. */
-  const pending = new Map<number, IPendingNode>()
-  /** Pending creation order is also the sequence order. */
-  let head: IPendingNode | undefined
-  let tail: IPendingNode | undefined
-  /** Watermarks survive complete prefix truncation. */
-  let last = snapshot.lastSeq
-  let time = snapshot.time
-  let floor = snapshot.floor
+  /** One original committed index is shared with asynchronous native adapters. */
+  const { index, clear } = createOwnedLogStoreIndex(snapshot)
   /** Disposal closes admission immediately without dropping accepted work. */
   let accepting = true
   let failure: Error | undefined
@@ -91,28 +61,6 @@ export function createLogStore(
   const observe = createObservation(options, report)
   /** The resource owns this channel across plugin reinstallations. */
   const appended = createEventChannel<ILogAppendNotice, void>()
-  /** Adds one pending row to creation order. */
-  const addPending = (seq: number): void => {
-    const node: IPendingNode = { seq, previous: tail }
-    if (tail) tail.next = node
-    else head = node
-    tail = node
-    pending.set(seq, node)
-  }
-  /** Unlinks one retained pending row without scanning history. */
-  const removePending = (seq: number): void => {
-    const node = pending.get(seq)
-    if (!node) return
-    if (node.previous) node.previous.next = node.next
-    else head = node.next
-    if (node.next) node.next.previous = node.previous
-    else tail = node.previous
-    pending.delete(seq)
-  }
-  for (const row of snapshot.records) {
-    records.set(row.seq, row)
-    if (row.state === LogRecordState.pending) addPending(row.seq)
-  }
   /** Checks admission before enqueue; accepted callbacks never re-check the later close flag. */
   const admit = (): void => {
     if (failure) throw failure
@@ -152,37 +100,24 @@ export function createLogStore(
       throw failure
     }
   }
-  /** Public read results never reveal an index-owned payload. */
-  const copy = (row: ILogRecord): ILogRecord => ({
-    seq: row.seq,
-    time: row.time,
-    kind: row.kind,
-    payload: snapshotPayload(row.payload)
-  })
   const store: ILogStore = {
     append: (input) => {
-      let captured: readonly { readonly kind: string; readonly payload: ILogPayload }[]
+      let captured: ReturnType<typeof snapshotLogRecords>
       try {
         admit()
-        captured = snapshotRecords(input)
+        captured = snapshotLogRecords(input)
       } catch (error) {
         return Promise.reject(error)
       }
       return run(LogOperation.append, () => {
         if (captured.length === 0) return []
-        if (!Number.isSafeInteger(last + captured.length))
-          throw createLoggerError(LoggerErrorCode.logSequenceExhausted, DurableText.exhausted)
-        const stamp = Math.max(time, Date.now())
-        const batch = captured.map((row, index) => ({ seq: last + index + 1, time: stamp, ...row }))
-        write(() => persistence?.append(batch, last + batch.length, stamp))
-        for (const row of batch) {
-          records.set(row.seq, { ...row, state: LogRecordState.pending })
-          addPending(row.seq)
-        }
-        last += batch.length
-        time = stamp
+        const batch = prepareLogAppend(captured, index)
+        write(() =>
+          persistence?.append(batch, batch[batch.length - 1]!.seq, batch[batch.length - 1]!.time)
+        )
+        index.applyAppend(batch)
         if (appended.size > 0) {
-          const notice = Object.freeze({ lastSeq: last, count: batch.length })
+          const notice = Object.freeze({ lastSeq: index.lastSeq, count: batch.length })
           invokeEachLive(appended, notice, (invocation) =>
             observeResult(() => invocation.invoke(), report)
           )
@@ -191,7 +126,7 @@ export function createLogStore(
           stage: LogStage.onAppend,
           owner: DurableKind.store,
           operation: LogOperation.append,
-          seq: last,
+          seq: index.lastSeq,
           count: batch.length
         }))
         return batch.map((row) => row.seq)
@@ -204,16 +139,9 @@ export function createLogStore(
       } catch (error) {
         return Promise.reject(error)
       }
-      return run(LogOperation.read, () => {
-        const result: ILogRecord[] = []
-        for (let seq = Math.max(fromSeq, floor); seq <= last && result.length < limit; seq++) {
-          const row = records.get(seq)
-          if (row) result.push(copy(row))
-        }
-        return result
-      })
+      return run(LogOperation.read, () => index.read(fromSeq, limit))
     },
-    lastSeq: () => run(LogOperation.lastSeq, () => last),
+    lastSeq: () => run(LogOperation.lastSeq, () => index.lastSeq),
     onAppend: (listener) => {
       admit()
       if (typeof listener !== 'function')
@@ -227,18 +155,9 @@ export function createLogStore(
         return Promise.reject(error)
       }
       return run(LogOperation.truncate, () => {
-        if (beforeSeq > last + 1)
-          throw tagLoggerError(
-            new RangeError(DurableText.invalidOption),
-            LoggerErrorCode.invalidOption
-          )
-        if (beforeSeq <= floor) return
+        if (!index.checkTruncate(beforeSeq)) return
         write(() => persistence?.truncate(beforeSeq))
-        for (let seq = floor; seq < beforeSeq; seq++) {
-          records.delete(seq)
-          removePending(seq)
-        }
-        floor = beforeSeq
+        index.applyTruncate(beforeSeq)
       })
     },
     setState: (seq, state) => {
@@ -250,13 +169,9 @@ export function createLogStore(
         return Promise.reject(error)
       }
       return run(LogOperation.setState, () => {
-        const row = records.get(seq)
-        if (!row || row.state !== LogRecordState.pending)
-          throw createLoggerError(LoggerErrorCode.walRecordInvalid, DurableText.walInvalid)
-        if (state === LogRecordState.pending) return
+        if (!index.checkState(seq, state)) return
         write(() => persistence?.setState(seq, state))
-        row.state = state
-        removePending(seq)
+        index.applyState(seq, state)
       })
     },
     states: (filter) => {
@@ -264,11 +179,7 @@ export function createLogStore(
         return Promise.reject(
           createLoggerTypeError(LoggerErrorCode.invalidOption, DurableText.invalidOption)
         )
-      return run(LogOperation.states, () => {
-        const result: number[] = []
-        for (let node = head; node; node = node.next) result.push(node.seq)
-        return result
-      })
+      return run(LogOperation.states, () => index.pending())
     },
     dispose: () => {
       if (disposePromise) return disposePromise
@@ -285,10 +196,7 @@ export function createLogStore(
         await limiter.whenIdle()
         limiter.close()
         appended.clear()
-        records.clear()
-        pending.clear()
-        head = undefined
-        tail = undefined
+        clear()
         try {
           persistence?.close()
           observe(() => ({

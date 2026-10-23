@@ -3,8 +3,26 @@ import type { ICaseDoc, IText } from './contract.js'
 /** Localized task explanation for the public logger entries. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
+/** Native authors can prepare committed facts without allocating another resource owner. */
+export const loggerIndexExample =
+  "import { snapshotLogRecords, prepareLogAppend, snapshotLogStoreState, createLogStoreIndex } from '@migaia/logger/plugins/durable'\n\nconst state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])\nconst index = createLogStoreIndex(state)\nconst batch = prepareLogAppend(\n  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),\n  index\n)\nconsole.log(index.lastSeq, batch[0]?.seq) // 0 1: preparation is not a commit.\n"
+
 /** Complete examples use in-memory sinks and the public host capability port. */
 export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  committedIndex: [
+    {
+      title: t('Prepare a native append before commit', '原生提交前准备追加批次'),
+      problem: t(
+        'Keep asynchronous persistence in its native transaction while reusing the original committed index.',
+        '异步持久化仍由原生事务拥有，同时复用原已提交索引。'
+      ),
+      example: t(loggerIndexExample, loggerIndexExample),
+      result: t(
+        'Prints 0 1. Preparation leaves the index unchanged; apply the exact batch only after commit, and leave rollback unapplied.',
+        '输出 0 1。准备不修改索引；仅真实 commit 后应用原批次，rollback 不应用。'
+      )
+    }
+  ],
   memoryLogStore: [
     {
       title: t(

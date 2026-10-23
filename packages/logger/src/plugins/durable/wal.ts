@@ -1,6 +1,6 @@
 import { captureDurableOptions, createDurableRuntime } from './plugin-runtime.js'
-import { requireInteger } from './store.js'
-import { snapshotRecords } from './snapshot.js'
+import { requireInteger } from './committed-index.js'
+import { snapshotLogRecords } from './snapshot.js'
 import { DurableKind, LogOperation, LogRecordState, LogStage } from './state-constants.js'
 import type { IDurablePlugin, IDurablePluginOptions, ILogRecord, IWalExt } from './types.js'
 
@@ -17,10 +17,10 @@ export function wal(options: IDurablePluginOptions): IDurablePlugin<IWalExt> {
           ready: runtime.ready,
           whenIdle: runtime.whenIdle,
           begin: (kind, payload) => {
-            let captured: ReturnType<typeof snapshotRecords>
+            let captured: ReturnType<typeof snapshotLogRecords>
             try {
               runtime.admit()
-              captured = snapshotRecords([{ kind, payload }])
+              captured = snapshotLogRecords([{ kind, payload }])
             } catch (error) {
               return Promise.reject(error)
             }

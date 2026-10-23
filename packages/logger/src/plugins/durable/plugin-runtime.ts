@@ -9,7 +9,8 @@ import {
   LOGGER_SOURCE
 } from '../../errors.js'
 import { createObservation } from './observation.js'
-import { logStorageFailure, requireInteger } from './store.js'
+import { logStorageFailure } from './store.js'
+import { requireInteger } from './committed-index.js'
 import { LogOperation, LogStage } from './state-constants.js'
 import { DurableText } from './text.js'
 import type { IDurablePluginOptions, ILogAppendPort, ILogPayload, ILogStore } from './types.js'

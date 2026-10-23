@@ -389,3 +389,22 @@ const custom: ILogStore = {
 await custom.append([{ kind: 'custom', payload: null }])
 await custom.dispose()
 ```
+
+原生日志适配器从同一 durable 入口复用 `snapshotLogRecords`、`prepareLogAppend`、`snapshotLogStoreState` 与 `createLogStoreIndex`。异步准入前捕获可移植 JSON，串行读取已提交 head 后准备序号和时间，再由适配器的原生事务持久写入。只有真实 commit 后才用 `index.applyAppend` 应用原准备批次，并发布一次原追加通知；rollback 不应用批次、不推进水位。状态与截断先检查、原生提交后再应用。恢复复用文件资源原有行、状态和载荷检查；可选载荷解码器只在行身份校验后运行。索引只包含已提交数据和原 pending 链表算法，不提供队列、资源、通知通道或关闭权。作者函数不改变 memory/file 原有同步提交及观察时序。
+
+```ts
+import {
+  snapshotLogRecords,
+  prepareLogAppend,
+  snapshotLogStoreState,
+  createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
+
+const state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+const index = createLogStoreIndex(state)
+const batch = prepareLogAppend(
+  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+  index
+)
+console.log(index.lastSeq, batch[0]?.seq) // 0 1: preparation is not a commit.
+```

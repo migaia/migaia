@@ -1,6 +1,6 @@
 import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from '../../errors.js'
-import { requireInteger } from './store.js'
-import { snapshotPayload, snapshotRecords } from './snapshot.js'
+import { requireInteger } from './committed-index.js'
+import { snapshotPayload, snapshotLogRecords } from './snapshot.js'
 import {
   captureDurableOptions,
   captureAppendPort,
@@ -133,11 +133,11 @@ export function binlog(options: IBinlogOptions): IDurablePlugin<IBinlogExt> {
         ready: runtime.ready,
         whenIdle: runtime.whenIdle,
         append: (kind, payload, appendOptions) => {
-          let captured: ReturnType<typeof snapshotRecords>
+          let captured: ReturnType<typeof snapshotLogRecords>
           let port: import('./types.js').ILogAppendPort | undefined
           try {
             runtime.admit()
-            captured = snapshotRecords([{ kind, payload }])
+            captured = snapshotLogRecords([{ kind, payload }])
             port = captureAppendPort(appendOptions)
           } catch (error) {
             return Promise.reject(error)
@@ -154,11 +154,11 @@ export function binlog(options: IBinlogOptions): IDurablePlugin<IBinlogExt> {
           return result.then((seqs) => seqs[0])
         },
         appendBatch: (records, appendOptions) => {
-          let captured: ReturnType<typeof snapshotRecords>
+          let captured: ReturnType<typeof snapshotLogRecords>
           let port: import('./types.js').ILogAppendPort | undefined
           try {
             runtime.admit()
-            captured = snapshotRecords(records)
+            captured = snapshotLogRecords(records)
             port = captureAppendPort(appendOptions)
           } catch (error) {
             return Promise.reject(error)
