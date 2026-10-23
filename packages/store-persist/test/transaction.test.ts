@@ -2,11 +2,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { binaryCodec } from '@migaia/storage-host/entity'
+import { createStorageHost, definePlugin, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStore } from '@migaia/store-light'
+import { ObservableMap } from '@migaia/store-indexed'
+import { createAtomStore, familyDef } from '@migaia/store-keyed'
+import { walkErrorCauses } from '@migaia/utils/error'
 import {
   createTransactionOwner,
   ConcurrencyPolicy,
   defineConcurrencyPolicy,
   runTransactionOperation,
+  readTransactionOperationContext,
   useTransactionCapability,
   StorageContractError,
   StorageContractErrorCode,
@@ -18,7 +24,16 @@ import {
   type ITransactionScope,
   type ITransactionOptions
 } from '@migaia/storage-contract'
-import { persistTransaction, persistUnit, type IPersistUnit } from '../src/index.js'
+import {
+  defaultJsonCodec,
+  persistTransaction,
+  persistUnit,
+  readEnvelope,
+  type IPersistUnit
+} from '../src/index.js'
+import { persist } from '../src/light-index.js'
+import { persistCollection } from '../src/indexed-index.js'
+import { persistKeyed } from '../src/keyed-index.js'
 import { createMemoryTestStore } from './helpers/memory.js'
 import {
   runPersistCrossTaskCodecScenario,
@@ -487,4 +502,577 @@ describe('persistence transactions through actual memory ownership', () => {
       memory: 1
     })
   })
+
+  it('enlists the three original adapter handles without copying their private authority', async () => {
+    /** Each facade attaches to the same actual host-published record store. */
+    const storage = await createMemoryTestStore()
+    /** One existing reactive runtime owns notifications from all three application containers. */
+    const runtime = createRuntime()
+    /** The ordinary public store adapter retains its own synchronous application state. */
+    const store = createStore({ count: 0 }, { runtime })
+    /** The collection adapter retains its real Map snapshot representation. */
+    const collection = new ObservableMap<string, number>(undefined, runtime)
+    /** The keyed adapter receives the actual writable atom rather than a structural projection. */
+    const atoms = createAtomStore(runtime)
+    /** This public definition is shared by mutation and the persistence adapter. */
+    const definition = familyDef(() => ({ count: 0 }))('counter')
+    /** The stable list contains the exact original handles returned by the three facades. */
+    const handles = [
+      persist(store, { key: 'adapter-store', storage }),
+      persistCollection(collection, { key: 'adapter-collection', storage }),
+      persistKeyed(atoms, definition, 'counter', { namespace: 'adapter-keyed', storage })
+    ] as const
+    await Promise.all(handles.map((handle) => handle.ready))
+    try {
+      await persistTransaction(storage, handles, async (tx) => {
+        store.count = 7
+        collection.set('count', 7)
+        atoms.set(definition, { count: 7 })
+        runtime.flush()
+        for (const handle of handles) await handle.flush(tx)
+      })
+      expect(await readEnvelope(storage, 'adapter-store', defaultJsonCodec, {})).toEqual({
+        version: 0,
+        state: { count: 7 }
+      })
+      expect(await readEnvelope(storage, 'adapter-collection', defaultJsonCodec, {})).toEqual({
+        version: 0,
+        state: new Map([['count', 7]])
+      })
+      expect(await readEnvelope(storage, 'adapter-keyed:counter', defaultJsonCodec, {})).toEqual({
+        version: 0,
+        state: { count: 7 }
+      })
+    } finally {
+      await Promise.all(handles.map((handle) => handle.disposeAsync()))
+      await store.$dispose()
+    }
+  })
+
+  it('rejects invalid participation before a native transaction and blocks direct writes while enlisted', async () => {
+    /**
+     * Distinct real registrations make storage mismatches observable without fake transaction
+     * owners.
+     */
+    const storage = await createMemoryTestStore()
+    /** This second actual store cannot lend its attachment to the first store's native transaction. */
+    const foreign = await createMemoryTestStore()
+    /** Original callback entry is measured only after all supported admission checks. */
+    const entered = vi.fn()
+    /** The captured original method keeps its real host, native scope and owner. */
+    const transaction = storage.transaction
+    storage.transaction = (run, options) => {
+      entered()
+      return transaction(run, options)
+    }
+    /** Both attachment identities remain genuine until their explicit disposal. */
+    const value = mutableUnit()
+    /** This enlisted handle owns the first original store. */
+    const handle = persistUnit(value.unit, { key: 'admission', storage, runtime: createRuntime() })
+    /** A genuine but unlisted attachment is different from an enlisted derived scope. */
+    const unlisted = persistUnit(mutableUnit().unit, {
+      key: 'unlisted',
+      storage,
+      runtime: createRuntime()
+    })
+    /** A foreign handle is legitimate by itself, but belongs to another native owner. */
+    const other = persistUnit(mutableUnit().unit, {
+      key: 'foreign',
+      storage: foreign,
+      runtime: createRuntime()
+    })
+    await Promise.all([handle.ready, unlisted.ready, other.ready])
+    /** The business callback must not be invoked for any failed preflight. */
+    const run = vi.fn()
+    try {
+      for (const handles of [[], [{ ...handle }], [handle, other]])
+        await expect(persistTransaction(storage, handles, run)).rejects.toMatchObject({
+          code: 'INVALID_OPTION'
+        })
+      await expect(persistTransaction(foreign, [handle], run)).rejects.toMatchObject({
+        code: 'INVALID_OPTION'
+      })
+      expect(entered).not.toHaveBeenCalled()
+      expect(run).not.toHaveBeenCalled()
+      await persistTransaction(storage, [handle, handle], async (tx) => {
+        for (const direct of [
+          () => handle.flush(),
+          () => handle.clear(),
+          () => handle.retryHydrate()
+        ])
+          await expect(direct()).rejects.toMatchObject({ code: 'INVALID_OPTION' })
+        await expect(unlisted.flush(tx)).rejects.toMatchObject({ code: 'INVALID_OPTION' })
+        await expect(handle.flush({ ...tx })).rejects.toMatchObject({ code: 'INVALID_OPTION' })
+        await handle.flush(tx)
+      })
+      expect(entered).toHaveBeenCalledTimes(1)
+      expect(await storage.get('unlisted')).toBeNull()
+      expect(await foreign.get('foreign')).toBeNull()
+    } finally {
+      await Promise.all([handle, unlisted, other].map((current) => current.disposeAsync()))
+    }
+  })
+
+  it.each([false, true])(
+    'drains an admitted old write before native entry; failure=%s',
+    async (reject) => {
+      /** Real root writes may complete asynchronously before the coordinator opens its native scope. */
+      const storage = await createMemoryTestStore()
+      /** The original writer still performs every successful backend mutation. */
+      const set = storage.set
+      /** This gate represents one already-admitted old adapter call, without a second write queue. */
+      const release = Promise.withResolvers<void>()
+      /** Original adapter entry makes the old write overlap deterministic. */
+      const started = Promise.withResolvers<void>()
+      /** Failed old work must keep this exact rejection identity at the coordinator boundary. */
+      const primary = new Error('old persistence write failed')
+      /** Only the first root write is delayed; explicit retry uses the untouched backend owner. */
+      let delayed = true
+      storage.set = async (key, text, options) => {
+        if (delayed) {
+          delayed = false
+          started.resolve()
+          await release.promise
+          if (reject) throw primary
+        }
+        return set(key, text, options)
+      }
+      /** The actual native callback must stay closed while admitted older work is unresolved. */
+      const entered = vi.fn()
+      /** Original transaction allocation remains observable without replacing its scope. */
+      const transaction = storage.transaction
+      storage.transaction = (run, options) => {
+        entered()
+        return transaction(run, options)
+      }
+      /** Direct subscription notifications belong to this actual persistence unit. */
+      const value = mutableUnit()
+      /** No debounce is used before participation, so one old write is genuinely in flight. */
+      const handle = persistUnit(value.unit, {
+        key: 'old-write',
+        storage,
+        runtime: createRuntime()
+      })
+      await handle.ready
+      value.change(1)
+      await started.promise
+      /** New notification during pause must not create a bypass write behind the native snapshot. */
+      const pending = persistTransaction(storage, [handle], async (tx) => {
+        value.change(3)
+        await handle.flush(tx)
+      })
+      /** Observe this expected rejection immediately while the old request remains admitted. */
+      const outcome = pending.then(
+        () => undefined,
+        (cause: unknown) => cause
+      )
+      try {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        expect(entered).not.toHaveBeenCalled()
+        value.change(2)
+        release.resolve()
+        if (reject) {
+          expect(await outcome).toBe(primary)
+          expect(entered).not.toHaveBeenCalled()
+          await persistTransaction(storage, [handle], (tx) => handle.flush(tx))
+        } else expect(await outcome).toBeUndefined()
+        expect(entered).toHaveBeenCalledTimes(1)
+        expect(await readEnvelope(storage, 'old-write', defaultJsonCodec, {})).toEqual({
+          version: 0,
+          state: { count: reject ? 2 : 3 }
+        })
+      } finally {
+        release.resolve()
+        await outcome
+        await handle.disposeAsync()
+      }
+    }
+  )
+
+  it('releases slots after hydration failure and permits an explicit successful retry', async () => {
+    /** The original backend remains reusable after the failed initial adapter read. */
+    const storage = await createMemoryTestStore()
+    /** Only hydration is delayed and failed; subsequent I/O still uses the same registered store. */
+    const get = storage.get
+    /** This gate keeps initial hydration unresolved while the coordinator enlists the handle. */
+    const release = Promise.withResolvers<void>()
+    /** The expected hydration error must cross coordination unchanged. */
+    const primary = new Error('participating hydration failed')
+    storage.get = async () => {
+      await release.promise
+      throw primary
+    }
+    /** Only a real native transaction should increment this finite admission count. */
+    const entered = vi.fn()
+    /** Preserve the original method's owner and exact backend options. */
+    const transaction = storage.transaction
+    storage.transaction = (run, options) => {
+      entered()
+      return transaction(run, options)
+    }
+    /** The initial unit and handle retain authentic private enlistment identity. */
+    const value = mutableUnit()
+    /** Initial hydration is deliberately still pending when explicit coordination starts. */
+    const handle = persistUnit(value.unit, { key: 'hydrate', storage, runtime: createRuntime() })
+    /** The expected initial failure is observed independently from the coordination result. */
+    const ready = handle.ready.catch((cause: unknown) => cause)
+    /** This business callback must stay uncalled when hydration cannot finish. */
+    const run = vi.fn()
+    /** Rejection is observed before releasing the delayed initial read. */
+    const pending = persistTransaction(storage, [handle], run).catch((cause: unknown) => cause)
+    release.resolve()
+    expect(await ready).toBe(primary)
+    expect(await pending).toBe(primary)
+    expect(entered).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+    storage.get = get
+    try {
+      await handle.retryHydrate()
+      await persistTransaction(storage, [handle], (tx) => handle.flush(tx))
+      expect(entered).toHaveBeenCalledTimes(1)
+    } finally {
+      await handle.disposeAsync()
+    }
+  })
+
+  it('orders reversed handle arrays and removes an aborted actual FIFO waiter', async () => {
+    /**
+     * Every native attempt uses the original production store and its real transaction
+     * registration.
+     */
+    const storage = await createMemoryTestStore()
+    /** Two actual original handles are enough to expose conflicting public array order. */
+    const handles = ['first', 'second'].map((key) =>
+      persistUnit(mutableUnit().unit, { key, storage, runtime: createRuntime() })
+    )
+    await Promise.all(handles.map((handle) => handle.ready))
+    /** The first callback holds its actual participation slots until its own work ends. */
+    const started = Promise.withResolvers<void>()
+    /** Original accepted work, rather than a fabricated lock holder, controls contention. */
+    const release = Promise.withResolvers<void>()
+    /** The ordering evidence records only actual native callback entry. */
+    const order: string[] = []
+    /** One real owner holds both participant slots before the second reversed request arrives. */
+    const holding = persistTransaction(storage, handles, async () => {
+      order.push('holding')
+      started.resolve()
+      await release.promise
+    })
+    await started.promise
+    /** Cancellation must remove this actual queued limiter task without ever calling its callback. */
+    const controller = new AbortController()
+    /** The exact arbitrary reason must stay reachable through the existing abort error boundary. */
+    const reason = new Error('cancel queued persistence transaction')
+    /** This user callback is not accepted until both original slots are acquired. */
+    const cancelled = vi.fn()
+    /** Observe rejection immediately; no owner or policy is substituted by the fixture. */
+    const queued = persistTransaction(storage, [...handles].reverse(), cancelled, {
+      signal: controller.signal
+    }).catch((cause: unknown) => cause)
+    controller.abort(reason)
+    /** Another request uses the opposite input order and must later finish without a deadlock. */
+    const next = persistTransaction(storage, [...handles].reverse(), async (tx) => {
+      order.push('next')
+      await Promise.all(handles.map((handle) => handle.flush(tx)))
+    })
+    try {
+      expect(walkErrorCauses(await queued)).toContain(reason)
+      expect(cancelled).not.toHaveBeenCalled()
+      release.resolve()
+      await Promise.all([holding, next])
+      expect(order).toEqual(['holding', 'next'])
+    } finally {
+      release.resolve()
+      await Promise.allSettled([holding, next])
+      await Promise.all(handles.map((handle) => handle.disposeAsync()))
+    }
+  })
+
+  it('aborts immediately on handle disposal and drains the accepted callback before releasing slots', async () => {
+    /** The original native memory draft must remain uncommitted until the callback settles. */
+    const storage = await createMemoryTestStore()
+    /** Manual debounce makes a forbidden final root write observable after disposal. */
+    const scheduler = createManualScheduler()
+    /** The application state survives native rollback and synchronous attachment disposal. */
+    const value = mutableUnit()
+    /** Only this authentic attachment participates in the active transaction. */
+    const handle = persistUnit(value.unit, {
+      key: 'dispose',
+      storage,
+      runtime: createRuntime(),
+      scheduler,
+      debounceMs: 100
+    })
+    await handle.ready
+    await handle.flush()
+    /** The fixture releases genuine already-accepted callback work after cancellation starts. */
+    const release = Promise.withResolvers<void>()
+    /** Both actual draft requests are complete before handle disposal races the callback. */
+    const started = Promise.withResolvers<void>()
+    /** The original coordinator owns this native completion; observe its failure immediately. */
+    const pending = persistTransaction(storage, [handle], async (tx) => {
+      value.change(1)
+      await handle.flush(tx)
+      await tx.set('dispose-business', 'during')
+      started.resolve()
+      await release.promise
+    }).catch((cause: unknown) => cause)
+    await started.promise
+    handle.dispose()
+    /** Calling async disposal afterward must retain the same real transaction drain. */
+    const disposal = handle.disposeAsync()
+    /** Completion cannot be merely the fact that cancellation was requested. */
+    let disposed = false
+    void disposal.then(() => {
+      disposed = true
+    })
+    await Promise.resolve()
+    expect(disposed).toBe(false)
+    release.resolve()
+    expect(await pending).toMatchObject({ code: 'ABORTED_BY_DISPOSE' })
+    await disposal
+    scheduler.advance(100)
+    expect(await readEnvelope(storage, 'dispose', defaultJsonCodec, {})).toEqual({
+      version: 0,
+      state: { count: 0 }
+    })
+    expect(await storage.get('dispose-business')).toBeNull()
+    expect(value.state.count).toBe(1)
+    expect(scheduler.pendingCount).toBe(0)
+  })
+
+  it('rolls back native writes when the original transaction budget expires', async () => {
+    /** No second timeout or backend budget is introduced by the persistence consumer. */
+    const storage = await createMemoryTestStore()
+    /** The original debounce remains paused until native rollback is complete. */
+    const scheduler = createManualScheduler()
+    /** Application memory survives the same original attempt's timeout. */
+    const value = mutableUnit()
+    /** This authentic handle uses the real transaction store for both ordinary and scoped writes. */
+    const handle = persistUnit(value.unit, {
+      key: 'timeout',
+      storage,
+      runtime: createRuntime(),
+      scheduler,
+      debounceMs: 100
+    })
+    await handle.ready
+    await handle.flush()
+    /** The deadline reason is captured from the original attempt signal for identity comparison. */
+    let timeoutReason: unknown
+    try {
+      /** The cooperative callback waits for the actual captured attempt signal, not a local race. */
+      const failure = await persistTransaction(
+        storage,
+        [handle],
+        async (tx) => {
+          value.change(1)
+          await handle.flush(tx)
+          await tx.set('timeout-business', 'during')
+          /** This read-only original owner seam returns the same attempt's borrowed signal. */
+          const signal = readTransactionOperationContext(tx)!.signal!
+          await new Promise<void>((resolve) => {
+            /** The existing budget supplies both cancellation and its original coded reason. */
+            const aborted = () => {
+              timeoutReason = signal.reason
+              resolve()
+            }
+            if (signal.aborted) aborted()
+            else signal.addEventListener?.('abort', aborted, { once: true })
+          })
+        },
+        { timeoutMs: 20 }
+      ).catch((cause: unknown) => cause)
+      expect(failure).toMatchObject({ code: 'ABORTED' })
+      expect(walkErrorCauses(failure)).toContain(timeoutReason)
+      expect(await readEnvelope(storage, 'timeout', defaultJsonCodec, {})).toEqual({
+        version: 0,
+        state: { count: 0 }
+      })
+      expect(await storage.get('timeout-business')).toBeNull()
+      expect(value.state.count).toBe(1)
+      scheduler.advance(100)
+      await vi.waitFor(async () =>
+        expect(await readEnvelope(storage, 'timeout', defaultJsonCodec, {})).toEqual({
+          version: 0,
+          state: { count: 1 }
+        })
+      )
+    } finally {
+      await handle.disposeAsync()
+    }
+  })
+
+  it('commits each handle last call-time snapshot through real text and byte channels', async () => {
+    /** Both native channels belong to the exact same transaction and original host. */
+    const storage = await createMemoryTestStore()
+    /** These buffers deliberately retain their identity as the caller mutates them. */
+    const bytes = new Uint8Array([1])
+    /** The text unit likewise retains its original mutable snapshot object. */
+    const text = mutableUnit()
+    /** Pause post-commit ordinary mirroring until the committed call-time snapshots are inspected. */
+    const scheduler = createManualScheduler()
+    /**
+     * The genuine byte codec returns original input, so persistence must establish snapshot
+     * ownership.
+     */
+    const codec: ICodec = {
+      name: 'native-byte-snapshot',
+      output: 'binary',
+      encode: (envelope) => binaryCodec.encode((envelope as { state: Uint8Array }).state),
+      decode: (value) => binaryCodec.decode(value as Uint8Array)
+    }
+    /** A real text handle enlists beside a real byte handle, without another storage adapter. */
+    const handles = [
+      persistUnit(text.unit, {
+        key: 'snapshot-text',
+        storage,
+        runtime: createRuntime(),
+        scheduler,
+        debounceMs: 100
+      }),
+      persistUnit(
+        { snapshot: () => bytes, restore: () => undefined, subscribe: () => () => undefined },
+        {
+          key: 'snapshot-bytes',
+          storage,
+          runtime: createRuntime(),
+          codec
+        }
+      )
+    ] as const
+    await Promise.all(handles.map((handle) => handle.ready))
+    try {
+      await persistTransaction(storage, handles, async (tx) => {
+        text.change(1)
+        /** First call snapshots are admitted before either original mutable value changes. */
+        const first = handles.map((handle) => handle.flush(tx))
+        text.change(2)
+        bytes[0] = 2
+        /** Each handle retains its own ordered native request chain. */
+        const second = handles.map((handle) => handle.flush(tx))
+        text.change(3)
+        bytes[0] = 3
+        await Promise.all([...first, ...second])
+      })
+      expect(await readEnvelope(storage, 'snapshot-text', defaultJsonCodec, {})).toEqual({
+        version: 0,
+        state: { count: 2 }
+      })
+      expect(await storage.getBytes('snapshot-bytes')).toEqual(new Uint8Array([2]))
+      expect(text.state.count).toBe(3)
+      expect(bytes[0]).toBe(3)
+    } finally {
+      await Promise.all(handles.map((handle) => handle.disposeAsync()))
+    }
+  })
+
+  it.each(['snapshot', 'partialize', 'codec', 'pipeline'] as const)(
+    'retains %s failure and rolls back caught or unawaited flush work',
+    async (stage) => {
+      for (const caught of [false, true]) {
+        /** The exact preparation failure must survive the one canonical transaction owner. */
+        const primary = new Error(`persist ${stage} failure fixture`)
+        /** Only the actual transactional flush fails; ordinary restored mirroring remains usable. */
+        let failing = false
+        /** Interception belongs to the real host installation window and its original pipeline. */
+        const intervention = definePlugin('persist-failure', (core) => ({
+          install: () => {
+            core.useAsyncPipeline((input, next) => {
+              if (
+                failing &&
+                stage === 'pipeline' &&
+                input.scope !== undefined &&
+                input.operation === 'set' &&
+                (input.input as { readonly key?: string }).key === 'failed-flush'
+              )
+                throw primary
+              return next(input)
+            })
+            return {}
+          }
+        }))
+        await using host = await createStorageHost({
+          plugins: [memoryBackendPlugin(), intervention]
+        })
+        /** This original store's isolated draft remains the only native commit authority. */
+        const storage = host.backend('memory')
+        /** Caller state changes before snapshot conversion and remains changed after native failure. */
+        const value = mutableUnit()
+        /** Automatic mirror restoration reuses the handle's existing debounce window. */
+        const scheduler = createManualScheduler()
+        /** Every non-failing conversion delegates to the original production codec. */
+        const codec: ICodec = {
+          name: 'transaction-failure-fixture',
+          output: 'text',
+          encode: (envelope) => {
+            if (failing && stage === 'codec') throw primary
+            return defaultJsonCodec.encode(envelope)
+          },
+          decode: (text) => defaultJsonCodec.decode(text)
+        }
+        /** Snapshot and partialize failures enter the same original synchronous flush admission. */
+        const handle = persistUnit(
+          {
+            ...value.unit,
+            snapshot: () => {
+              if (failing && stage === 'snapshot') throw primary
+              return value.unit.snapshot()
+            }
+          },
+          {
+            key: 'failed-flush',
+            storage,
+            runtime: createRuntime(),
+            codec,
+            scheduler,
+            debounceMs: 100,
+            partialize: (state) => {
+              if (failing && stage === 'partialize') throw primary
+              return state
+            }
+          }
+        )
+        await handle.ready
+        await handle.flush()
+        /**
+         * The flush Promise itself must reject with the same normalized first failure as outer
+         * work.
+         */
+        let operation: Promise<void> | undefined
+        try {
+          failing = true
+          /**
+           * The earlier native channel write proves failure rolls back more than the failed
+           * request.
+           */
+          const failure = await persistTransaction(storage, [handle], async (tx) => {
+            value.change(1)
+            await tx.set('before-failed-flush', 'during')
+            operation = handle.flush(tx)
+            if (caught) await operation.catch(() => undefined)
+          }).catch((cause: unknown) => cause)
+          expect(walkErrorCauses(failure)).toContain(primary)
+          expect(await operation!.catch((cause: unknown) => cause)).toBe(failure)
+          expect(await readEnvelope(storage, 'failed-flush', defaultJsonCodec, {})).toEqual({
+            version: 0,
+            state: { count: 0 }
+          })
+          expect(await storage.get('before-failed-flush')).toBeNull()
+          expect(value.state.count).toBe(1)
+          failing = false
+          scheduler.advance(100)
+          await vi.waitFor(async () =>
+            expect(await readEnvelope(storage, 'failed-flush', defaultJsonCodec, {})).toEqual({
+              version: 0,
+              state: { count: 1 }
+            })
+          )
+        } finally {
+          failing = false
+          await handle.disposeAsync()
+        }
+      }
+    }
+  )
 })
