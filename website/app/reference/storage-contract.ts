@@ -542,6 +542,13 @@ const transactionMembers: Readonly<Record<string, IMemberDoc>> = {
       '原事务索引的可选资源迭代器。'
     ),
     example: `await using cursor = tx.iterateRecordIndex!({ handle, index: 'byName' }); console.log(await cursor.next())`
+  },
+  isRecordIndexReady: {
+    summary: t(
+      'Optional read of the current native transaction snapshot. Missing, pending or stale handles return false; complete metadata must match the generation and fingerprint. No index is built or refreshed.',
+      '可选读取当前原生事务快照。缺失、待就绪或失效句柄返回 false；完整元数据须匹配 generation 与 fingerprint，不建立或刷新索引。'
+    ),
+    example: `const ready = await tx.isRecordIndexReady?.(handle)`
   }
 }
 

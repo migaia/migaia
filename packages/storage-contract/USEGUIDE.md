@@ -368,6 +368,8 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 `register` 还可接收后端已捕获的 `context`。它复用 `snapshotOperationContext` 单次保存冻结字段与原 signal；`readTransactionOperationContext(scope)` 只在真实有效的用户、操作或检查视图返回同一快照，省略时返回 undefined，伪造或过期视图抛 INVALID_ARGUMENT。终态 close 释放原登记的上下文引用；该只读接点不授予登记、关闭或取消控制权，不创建第二套超时预算。
 
+`ITransactionScope.isRecordIndexReady?(handle)` 是可选的同事务只读查询：缺失、待就绪或失效索引返回 false；只有当前原生快照中的完整元数据与句柄 generation、fingerprint 都一致才返回 true。它不建立或刷新索引，也不另开事务；未提供该方法的既有 scope 仍合法。`ISecondaryIndexTransactionScope` 仍只要求原来的索引读写方法。
+
 普通与索引记录迭代统一返回 IStorageIterator，IKeyValueStore 继承唯一 IStorageResource 声明。拥有者只登记真实迭代器，以当前有效视图推进每次 next，等已接纳推进结束，再按创建的相反顺序关闭剩余资源。dispose 返回缓存的拒绝主 Promise，固定符号方法返回独立缓存、报告后成功的 Promise；return 与自然结束使用同一次真实清理。缺少原生符号时由外层传入规范 asyncDisposeKey，契约不创建后备键。伪造、错 store 或过期 scope 的绑定同步抛 INVALID_ARGUMENT；过期数据方法拒绝预存的后端 TRANSACTION_FAILED，不再调用工厂或数据回调。
 
 本包拥有中立事务协调，真实提交、隔离、取消与重试仍归后端。IndexedDB 严守原生活跃窗口：外部数据应先取再开事务，await 定时器后可能不能继续请求；memory 与 SQLite 自行管理活跃期。assertTransactionCallback 在分配后端资源前校验可调用性。声明与包内假后端验证不能替代真实后端原子持久化验收。

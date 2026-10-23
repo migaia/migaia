@@ -94,6 +94,12 @@ export type ITransactionScope<
       projection: IRecordIndexProjection,
       options?: ITransactionWriteOptions
     ): Promise<IStorageKey>
+    /**
+     * Reads only this transaction's native index snapshot. Missing, pending or stale handles return
+     * false; complete metadata must match the handle's generation and fingerprint. No index is
+     * refreshed or created.
+     */
+    isRecordIndexReady?(handle: IRecordIndexHandle): Promise<boolean>
     iterateRecordIndex?(query: IRecordIndexQuery): IStorageIterator<[IStorageKey, TValue]>
   }
 

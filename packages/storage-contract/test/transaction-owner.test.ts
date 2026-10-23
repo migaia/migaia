@@ -10,6 +10,7 @@ import {
   type IStorageBase,
   type IStorageIterator,
   type IRecordStore,
+  type IRecordIndexHandle,
   type IOperationContext,
   type ITransactionInfo,
   type ITransactionScope
@@ -573,6 +574,9 @@ describe('transaction public type contracts', () => {
       >()
       expectTypeOf(store.transaction(() => 3 as const)).toEqualTypeOf<Promise<3>>()
       expectTypeOf<ITransactionScope['get']>().returns.toEqualTypeOf<Promise<string | null>>()
+      expectTypeOf<ITransactionScope['isRecordIndexReady']>().toEqualTypeOf<
+        ((handle: IRecordIndexHandle) => Promise<boolean>) | undefined
+      >()
       // @ts-expect-error Plain iterators cannot promise explicit owned cleanup.
       const owned: IStorageIterator<number> = raw
       void owned
