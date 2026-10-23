@@ -1252,6 +1252,7 @@ export function createMemoryBackend<T = unknown>(
     query: <R>() =>
       createRecordQuery<R>(
         {
+          asyncDisposeKey,
           pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
           execute: () => scope.iterateRecords()
         },
@@ -1285,6 +1286,7 @@ export function createMemoryBackend<T = unknown>(
           query: <R = T>() =>
             createRecordQuery<R>(
               {
+                asyncDisposeKey,
                 pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
                 execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
               },

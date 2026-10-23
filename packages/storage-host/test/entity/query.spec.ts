@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { defineEntity } from '../../src/entity.js'
@@ -104,6 +105,9 @@ it('keeps a mapped stream advance active until disposal can drain it', async () 
     await entered.promise
     const closing = iterator.dispose()
     expect(iterator.dispose()).toBe(closing)
+    const symbolic = iterator[asyncDisposeKey]()
+    expect(iterator[asyncDisposeKey]()).toBe(symbolic)
+    expect(symbolic).not.toBe(closing)
     let closed = false
     void closing.then(() => {
       closed = true
@@ -113,6 +117,7 @@ it('keeps a mapped stream advance active until disposal can drain it', async () 
     ready.resolve()
     expect(await next).toMatchObject({ done: false, value: 'a' })
     await closing
+    await symbolic
     expect(await iterator.next()).toMatchObject({ done: true })
   })
 })
@@ -152,6 +157,19 @@ it('wraps original query callback failures even when they already carry a code',
       operation
     })
     expect(walkErrorCauses(failure)).toContain(original)
+    if (operation === 'query.select') {
+      /** The root mapped stream retains the same extension cause through canonical cleanup. */
+      const iterator = query.stream()
+      const streamFailure = await iterator.next().catch((cause: unknown) => cause)
+      expect(streamFailure).toMatchObject({ code: 'EXTENSION_FAILED', operation })
+      expect(walkErrorCauses(streamFailure)).toContain(original)
+      const closing = iterator.dispose()
+      expect(iterator.dispose()).toBe(closing)
+      const symbolic = iterator[asyncDisposeKey]()
+      expect(iterator[asyncDisposeKey]()).toBe(symbolic)
+      expect(symbolic).not.toBe(closing)
+      await Promise.all([closing, symbolic])
+    }
   }
 })
 
