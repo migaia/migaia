@@ -279,8 +279,8 @@ const backendSymbols: Readonly<Record<string, ISymbolDoc>> = Object.fromEntries(
         role: 'enhancer',
         options,
         purpose: t(
-          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' Native ttl covers text, bytes and records within the same transaction.' : ''}`,
-          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '原生 ttl 在同一事务支持文本、字节与记录期限。' : ''}`
+          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' Native ttl covers text, bytes and records within the same transaction.' : ' Text organization views preserve the configured default namespace and use namespace + "/" + orgId otherwise; dropOrg clears only that target and keeps borrowed unique writes native.'}`,
+          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '原生 ttl 在同一事务支持文本、字节与记录期限。' : '文本组织视图保留配置的缺省namespace，其它组织使用namespace + "/" + orgId；dropOrg只清该目标，借用唯一写仍由原生拥有者完成。'}`
         ),
         params: {
           options: t(

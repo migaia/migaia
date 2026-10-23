@@ -1,4 +1,6 @@
 import { bindBrowserExecution } from './execution.js'
+import { createBrowserOrgBinding } from './organizations.js'
+import { resolveStorageNamespace } from '@migaia/storage-host/authoring/backend'
 import { createTextBatchApi } from './batch.js'
 import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
 import { snapshotOperationContext, snapshotSyncWriteOptions } from '@migaia/storage-contract'
@@ -196,7 +198,8 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
  */
 export const cookiesHost = (
   options: ICookiesOptions,
-  runtime: IBackendRuntime
+  runtime: IBackendRuntime,
+  bindOrganizations = true
 ): IBackendConstruction<
   IKeyValueBackendStore<ISyncCapableStore<ICookieStore>>,
   ICookieDocument
@@ -229,6 +232,8 @@ export const cookiesHost = (
       backend: StorageBackend.cookie,
       cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
     })
+  if (bindOrganizations)
+    resolveStorageNamespace(namespace, runtime.defaultOrgId, runtime.defaultOrgId)
   const scope = snapshotCookieScope(configuredScope === undefined ? { path: '/' } : configuredScope)
   const documentCandidate =
     configuredDocument === undefined
@@ -273,7 +278,7 @@ export const cookiesHost = (
 
   /** Publish only after a visible cookie mutation has completed successfully. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
-    controller.publish(change)
+    controller.publish({ ...change, orgId: runtime.defaultOrgId })
   }
 
   /** Read the live cookie jar while preserving host failures in the storage error protocol. */
@@ -642,5 +647,16 @@ export const cookiesHost = (
     controller,
     () => doc
   )
-  return { ...construction, commitValueWrite }
+  /** The fixed cookie scope and native atomic writer remain on this same physical construction. */
+  const physical = { ...construction, commitValueWrite }
+  return {
+    ...physical,
+    ...(bindOrganizations
+      ? {
+          orgBinding: createBrowserOrgBinding(runtime, namespace, physical, (target, ports) =>
+            cookiesHost({ namespace: target, namespaceCodec, scope, document: doc }, ports, false)
+          )
+        }
+      : {})
+  }
 }
