@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { compareStorageKeys, encodeOrderedStorageKey, type IStorageKey } from '../src/index.js'
+import {
+  compareStorageKeys,
+  encodeOrderedStorageKey,
+  snapshotStorageKeyPrefix,
+  snapshotStorageKey,
+  type IStorageKey
+} from '../src/index.js'
 
 /** Compares public byte output lexicographically without decoding or depending on key tags. */
 function compareBytes(left: Uint8Array, right: Uint8Array): number {
@@ -91,6 +97,101 @@ describe('ordered storage key encoding', () => {
           backend: 'catalog'
         })
       )
+    }
+  })
+})
+
+describe('canonical typed key prefixes', () => {
+  it('matches strings, binary values and complete leading array children without crossing types', () => {
+    const text = snapshotStorageKeyPrefix('a\u0000\ud800', 'memory')
+    expect(text.matches('a\u0000\ud800')).toBe(true)
+    expect(text.matches('a\u0000\ud800suffix')).toBe(true)
+    expect(text.matches('a\u0000other')).toBe(false)
+    expect(text.matches(['a\u0000\ud800'])).toBe(false)
+    const binary = snapshotStorageKeyPrefix(new Uint8Array([0, 255]).buffer, 'memory')
+    expect(binary.matches(new Uint8Array([0, 255, 1]).buffer)).toBe(true)
+    expect(binary.matches(new Uint8Array([0]).buffer)).toBe(false)
+    const tuple = snapshotStorageKeyPrefix(['tenant', ['group', new Date(3)]], 'memory')
+    expect(tuple.matches(['tenant', ['group', new Date(3)], 'next'])).toBe(true)
+    expect(tuple.matches(['tenant', ['group', new Date(3), 'nested-extension']])).toBe(false)
+    expect(tuple.matches(['tenant-other', ['group', new Date(3)]])).toBe(false)
+    expect(snapshotStorageKeyPrefix(-0, 'memory').matches(0)).toBe(true)
+    expect(snapshotStorageKeyPrefix(3, 'memory').matches(new Date(3))).toBe(false)
+    expect(snapshotStorageKeyPrefix(new Date(3), 'memory').matches(new Date(3))).toBe(true)
+    expect(snapshotStorageKeyPrefix('', 'memory').matches('anything')).toBe(true)
+    expect(
+      snapshotStorageKeyPrefix(new ArrayBuffer(0), 'memory').matches(new Uint8Array([1]).buffer)
+    ).toBe(true)
+    expect(() => snapshotStorageKeyPrefix([], 'memory')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY' })
+    )
+  })
+
+  it('returns detached logical and byte bounds with a stable private matcher', () => {
+    /** Prefix construction must borrow the input no more often than the original snapshot owner. */
+    let reads = 0
+    const borrowed = Object.defineProperty(['captured'], 0, {
+      get() {
+        reads++
+        return 'captured'
+      }
+    })
+    snapshotStorageKey(borrowed, undefined)
+    const canonicalReads = reads
+    reads = 0
+    const captured = snapshotStorageKeyPrefix(borrowed, undefined)
+    expect(reads).toBe(canonicalReads)
+    expect(captured.matches(['captured', 'child'])).toBe(true)
+    expect(captured.matches(['other'])).toBe(false)
+    expect(reads).toBe(canonicalReads)
+    const date = new Date(3)
+    const bytes = new Uint8Array([1])
+    const input: IStorageKey[] = ['tenant', date, bytes.buffer]
+    const prefix = snapshotStorageKeyPrefix(input, undefined)
+    date.setTime(99)
+    bytes.fill(99)
+    input.push('later')
+    expect(prefix.key).toEqual(['tenant', new Date(3), new Uint8Array([1]).buffer])
+    prefix.lower.fill(0)
+    prefix.upper.fill(0)
+    ;(prefix.key as readonly [string, Date, ArrayBuffer])[1].setTime(99)
+    expect(prefix.matches(['tenant', new Date(3), new Uint8Array([1]).buffer, 'child'])).toBe(true)
+    expect(prefix.matches(['tenant', new Date(99), new Uint8Array([1]).buffer])).toBe(false)
+    expect(Object.isFrozen(prefix)).toBe(true)
+  })
+
+  it('produces exactly equivalent inclusive/exclusive byte ranges for every supported prefix kind', () => {
+    const keys: IStorageKey[] = [
+      -1,
+      0,
+      1,
+      new Date(0),
+      new Date(1),
+      '',
+      'a',
+      'aa',
+      'a\uffff',
+      'a\uffffx',
+      'b',
+      new ArrayBuffer(0),
+      new Uint8Array([0]).buffer,
+      new Uint8Array([0, 255]).buffer,
+      new Uint8Array([0, 255, 1]).buffer,
+      ['a'],
+      ['a', 1],
+      ['aa'],
+      [['a']],
+      [['a'], 1],
+      [['a', 1]]
+    ]
+    for (const prefixKey of keys) {
+      const prefix = snapshotStorageKeyPrefix(prefixKey, 'catalog')
+      for (const key of keys) {
+        const encoded = encodeOrderedStorageKey(key, 'catalog')
+        expect(prefix.matches(key)).toBe(
+          compareBytes(encoded, prefix.lower) >= 0 && compareBytes(encoded, prefix.upper) < 0
+        )
+      }
     }
   })
 })
