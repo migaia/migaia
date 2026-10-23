@@ -135,6 +135,7 @@ export {
   type ICapabilityStore,
   type IStorageCapabilitySet,
   type IStorageImplementationsOf,
+  type IStorageCapabilityApiOf,
   type ICapabilityPublication,
   type ICapabilityInstallPort
 } from './capability.js'
