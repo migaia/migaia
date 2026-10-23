@@ -1060,6 +1060,7 @@
         "createSqlTag",
         "createSparqlTag",
         "createStorageBatchKeyCapture",
+        "createStorageBlobBodyReader",
         "createStorageBlobObject",
         "createStorageIteratorLifetime",
         "createTransactionBuilder",

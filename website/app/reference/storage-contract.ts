@@ -1079,6 +1079,29 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.snapshotStorageBlobList![0]!.example,
       cases: storageContractCases.snapshotStorageBlobList
     },
+    createStorageBlobBodyReader: {
+      role: 'operation',
+      purpose: t(
+        'Read detached upload chunks through the original iterator lifetime after native condition admission.',
+        '原生条件准入后，沿原 iterator 生命周期读取独立上传 chunk。'
+      ),
+      params: {
+        body: t(
+          'Admitted bytes or an unclaimed WHATWG byte stream.',
+          '已准入字节或尚未取用的 WHATWG 字节流。'
+        ),
+        options: t(
+          'Original backend report and optional backend/normalizeFailure. Caller retains abort and native sink ownership.',
+          '原 backend report 与可选 backend/normalizeFailure；取消和 native sink 仍归调用方。'
+        )
+      },
+      returns: t(
+        'IStorageIterator<Uint8Array>; unfinished disposal cancels before read drain and releases once. Main and symbolic cleanup retain distinct cached promises.',
+        'IStorageIterator<Uint8Array>；提前释放先取消再排空 read，只 release 一次。主与符号清理保留独立缓存 Promise。'
+      ),
+      example: storageContractCases.createStorageBlobBodyReader![0]!.example,
+      cases: storageContractCases.createStorageBlobBodyReader
+    },
     createStorageBlobObject: {
       role: 'operation',
       purpose: t(
@@ -2438,8 +2461,8 @@ console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { prev
         )
       },
       returns: t(
-        'The exact store as `IChangeFeedStore`; incomplete feed capability throws `UNSUPPORTED_CAPABILITY`. Original reflection or accessor failures remain reachable through `cause`.',
-        '同一个存储收窄为 `IChangeFeedStore`；变更流能力不完整时抛 `UNSUPPORTED_CAPABILITY`，原始反射或访问器失败沿 `cause` 可达。'
+        'Original known store with full capability/native/sync/transaction/Feature precision plus native text watch; missing either callable rejects with UNSUPPORTED_CAPABILITY and preserves getter cause.',
+        '原已知 store，保留完整能力、原生、同步、事务与 Feature 类型并提供文本 watch；缺少任一方法时报 UNSUPPORTED_CAPABILITY，getter cause 保留。'
       ),
       example: `const feed = asChangeFeedStore(store)
 const unsubscribe = feed.subscribeChanges((change) => console.log(change.channel, change.kind))
@@ -2513,8 +2536,8 @@ unsubscribe()`
         )
       },
       returns: t(
-        'A boolean narrowing to `IChangeFeedStore`; access failures return false.',
-        '收窄到 `IChangeFeedStore` 的布尔值；访问失败返回假值。'
+        'Boolean after real KV/flag/two-callable admission; known stores retain full precision, while unknown inputs narrow only to the original KV/text feed shape.',
+        '真实 KV/flag/双 callable 准入后的布尔值；已知 store 保留完整类型，未知输入只缩窄到原 KV/text feed 形状。'
       ),
       example: `if (isChangeFeedStore(candidate)) {
   const unsubscribe = candidate.subscribeChanges((change) => console.log(change.sequence))
@@ -5348,10 +5371,31 @@ if (sync) {
       example: storeExample,
       members: recordMembers
     },
+    ITextWatchApi: {
+      summary: t(
+        'Native text-key invalidation stream through watch(key,ctx?), returning the original resource iterator.',
+        'watch(key,ctx?) 提供的原生文本键失效流，返回原资源迭代器。'
+      ),
+      members: {}
+    },
+    ITextChangeFeedApi: {
+      summary: t(
+        'Native watch and post-commit subscribeChanges methods sharing the original provider owner.',
+        '原生 watch 与提交后 subscribeChanges，共用原 provider owner。'
+      ),
+      members: {}
+    },
+    IWithChangeFeedCapabilities: {
+      summary: t(
+        'Known-store type refinement retaining native, sync, metadata, transaction and Feature types; only existing records/vector/RDF APIs gain the declared feed.',
+        '已知 store 类型细化，保留原生、同步、元数据、事务与 Feature；仅既有 records/vector/RDF API 获得 feed 声明。'
+      ),
+      members: {}
+    },
     IChangeFeedStore: {
       summary: t(
-        'Existing key-value store with a post-commit invalidation subscription, admitted through the change-feed capability guard.',
-        '具有提交后失效通知订阅的既有键值存储，通过变更流能力守卫接纳。'
+        'Existing key-value store with real subscribeChanges and watch(key,ctx?) functions; native invalidation does not promise reliable replay.',
+        '同时具有真实 subscribeChanges 与 watch(key,ctx?) 的既有键值存储；原生失效通知不承诺可靠重放。'
       ),
       scenarios: [
         t(

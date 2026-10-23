@@ -60,7 +60,13 @@ export type {
 } from './secondary-index.js'
 export { asSecondaryIndexRecordStore, isSecondaryIndexRecordStore } from './secondary-index.js'
 
-export type { IStorageChange, IChangeFeedStore } from './change-feed.js'
+export type {
+  IStorageChange,
+  IChangeFeedStore,
+  ITextWatchApi,
+  ITextChangeFeedApi
+} from './change-feed.js'
+export type { IWithChangeFeedCapabilities } from './backend.js'
 export { asChangeFeedStore, isChangeFeedStore } from './change-feed.js'
 
 export type {
@@ -323,7 +329,8 @@ export {
   snapshotStorageBlobPut,
   snapshotStorageBlobGet,
   snapshotStorageBlobList,
-  createStorageBlobObject
+  createStorageBlobObject,
+  createStorageBlobBodyReader
 } from './capabilities/blob.js'
 export type { IBlobInfo, IBlobObject, IBlobApi } from './capabilities/blob.js'
 export { durableChangeFeed } from './capabilities/durable-change-feed.js'
