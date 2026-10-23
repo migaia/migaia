@@ -220,8 +220,12 @@ function ownedRows<TKey extends IStorageKey = string>(
     readonly onNext?: () => void
     readonly onStopAdmission?: (stop: () => void) => void
     readonly key?: (row: unknown, position: number) => TKey
+    readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   }
 ): IStorageIterator<readonly [TKey | string, unknown]> {
+  /** The fixture base and its original owner expose the same host-selected resource key. */
+  const asyncDisposeKey: typeof Symbol.asyncDispose =
+    options?.asyncDisposeKey ?? Symbol.asyncDispose
   /** A specialized backend needs no fabricated KV methods to own the native cursor. */
   const base: IStorageBase = {
     backend: 'query-fixture',
@@ -237,10 +241,12 @@ function ownedRows<TKey extends IStorageKey = string>(
       opaqueEntries: false
     },
     dispose: async () => undefined,
-    [Symbol.asyncDispose]: async () => undefined
+    [asyncDisposeKey]: async () => undefined
   }
   /** Backend normalization keeps the original cursor error reachable through its existing code. */
-  const owner = createTransactionOwner<unknown, object>(base, normalizeQueryFixtureFailure)
+  const owner = createTransactionOwner<unknown, object>(base, normalizeQueryFixtureFailure, {
+    asyncDisposeKey
+  })
   /** One root belongs to the callback interval of the original transaction owner. */
   const scope = {}
   const registration = owner.register(scope, {
@@ -1213,6 +1219,144 @@ describe('bounded query operation context', () => {
 })
 
 describe('root mapped read cleanup', () => {
+  it('uses the captured original resource key and keeps both cleanup Promises cached while mapping drains', async () => {
+    /** The original host supplies one existing private key without changing global Symbol. */
+    const key: typeof Symbol.asyncDispose = Symbol(
+      'query-original-resource-key'
+    ) as typeof Symbol.asyncDispose
+    /** Native ownership stays with the original fixture owner under that exact key. */
+    let closed = 0
+    const native = ownedRows(
+      [1],
+      () => {
+        closed++
+      },
+      undefined,
+      { asyncDisposeKey: key }
+    )
+    /** The physical source is a legitimate borrowed resource, not a registered transaction view. */
+    const source: IStorageIterator<readonly [string, unknown]> = {
+      next: () => native.next(),
+      dispose: () => native.dispose(),
+      [key]: () => native[key](),
+      [Symbol.asyncIterator]() {
+        return this
+      }
+    }
+    /** Source author facts are captured once, rather than inspected during each cleanup. */
+    let keyReads = 0
+    const query = createRecordQuery<number>({
+      pushdown: noPushdown,
+      get asyncDisposeKey(): typeof Symbol.asyncDispose {
+        keyReads++
+        return key
+      },
+      execute: () => source
+    })
+    /** The original mapped read remains accepted until its actual asynchronous value settles. */
+    const entered = Promise.withResolvers<void>()
+    const mapping = Promise.withResolvers<number>()
+    const stream = query
+      .select(async () => {
+        entered.resolve()
+        return mapping.promise
+      })
+      .stream()
+    expect(typeof stream[key]).toBe('function')
+    const pending = stream.next()
+    await entered.promise
+    /** Main and report-only symbolic cleanup retain the original independent cached paths. */
+    const main = stream.dispose()
+    const symbolic = stream[key]()
+    expect(stream.dispose()).toBe(main)
+    expect(stream[key]()).toBe(symbolic)
+    expect(symbolic).not.toBe(main)
+    await Promise.resolve()
+    expect(closed).toBe(0)
+    mapping.resolve(7)
+    await expect(pending).resolves.toEqual({ done: false, value: 7 })
+    await main
+    await symbolic
+    expect(closed).toBe(1)
+    expect(keyReads).toBe(1)
+  })
+
+  it('reports a custom-key cleanup failure through the original symbolic entry and preserves its exact cause', async () => {
+    /** Observe the original host exception channel without introducing another production reporter. */
+    const reported: unknown[] = []
+    const enqueue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      try {
+        callback()
+      } catch (error) {
+        reported.push(error)
+      }
+    })
+    try {
+      /** Original native cleanup fails once under the host-supplied key. */
+      const key: typeof Symbol.asyncDispose = Symbol(
+        'query-cleanup-resource-key'
+      ) as typeof Symbol.asyncDispose
+      const cause = new RangeError('original cursor cleanup failed')
+      const close = vi.fn(() => {
+        throw cause
+      })
+      const native = ownedRows([1], close, undefined, { asyncDisposeKey: key })
+      /** Report entry calls retain the physical source receiver and original cached Promise. */
+      const report = vi.fn(function (this: IStorageIterator<readonly [string, unknown]>) {
+        expect(this).toBe(source)
+        return native[key]()
+      })
+      const source: IStorageIterator<readonly [string, unknown]> = {
+        next: () => native.next(),
+        dispose: () => native.dispose(),
+        [key]: report,
+        [Symbol.asyncIterator]() {
+          return this
+        }
+      }
+      const stream = createRecordQuery<number>({
+        pushdown: noPushdown,
+        asyncDisposeKey: key,
+        execute: () => source
+      }).stream()
+      expect(typeof stream[key]).toBe('function')
+      /** Main cleanup keeps the exact native-normalized error and original cause. */
+      const main = stream.dispose()
+      const failure = await main.catch((error: unknown) => error)
+      expect(failure).toMatchObject({ code: 'INVALID_ARGUMENT', cause })
+      const symbolic = stream[key]()
+      expect(stream[key]()).toBe(symbolic)
+      expect(stream.dispose()).toBe(main)
+      await expect(symbolic).resolves.toBeUndefined()
+      expect(report).toHaveBeenCalledTimes(1)
+      expect(reported).toEqual([failure])
+      expect(close).toHaveBeenCalledTimes(1)
+      expect((failure as Error).cause).toBe(cause)
+    } finally {
+      enqueue.mockRestore()
+    }
+  })
+
+  it('validates only an explicitly supplied resource key before source execution', () => {
+    /** Invalid author facts fail through the existing descriptor boundary without opening a cursor. */
+    const execute = vi.fn(() => ownedRows([]))
+    expect(() =>
+      createRecordQuery({ pushdown: noPushdown, execute, asyncDisposeKey: 'bad-key' as never })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    /** Reflection failure keeps the original cause rather than inventing another resource key. */
+    const cause = new Error('resource key getter failed')
+    expect(() =>
+      createRecordQuery({
+        pushdown: noPushdown,
+        execute,
+        get asyncDisposeKey(): never {
+          throw cause
+        }
+      })
+    ).toThrowError(expect.objectContaining({ cause }))
+    expect(execute).not.toHaveBeenCalled()
+  })
+
   it.each(['resolve', 'reject'] as const)(
     'drains accepted async mapping before main or symbolic cleanup can settle: %s',
     async (outcome) => {
