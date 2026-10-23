@@ -622,7 +622,7 @@ export function createMemoryBackend<T = unknown>(
           ).finally(release)
         }
       ),
-    tx: () => createTransactionBuilder(store),
+    tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
     inspectLocks: (ctx) =>
       asyncEntry(MemoryOperation.inspectLocks, undefined, ctx, () => {
         controller.assertLive()
@@ -1094,6 +1094,9 @@ export function createMemoryBackend<T = unknown>(
           })
         )
       }
+      /** Feature methods belong to this exact original view, before its owner admission/freeze. */
+      const api = core.createTransactionApi(scope)
+      if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
       return Object.freeze(scope)
     }
     /** The initial callback view is created and registered by the original owner exactly once. */
@@ -1215,10 +1218,13 @@ export function createMemoryBackend<T = unknown>(
   /** Records capability binding composes only the supplied original transaction's real methods. */
   const bindRecords = (scope: ITransactionScope): ITransactionRecordsApi => ({
     query: <R>() =>
-      createRecordQuery<R>({
-        pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
-        execute: () => scope.iterateRecords()
-      }),
+      createRecordQuery<R>(
+        {
+          pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
+          execute: () => scope.iterateRecords()
+        },
+        core.getChainMethods('query')
+      ),
     removeByPrefix: (prefix) => (scope as IMemoryScope<unknown>)[recordPrefix](prefix)
   })
 
@@ -1245,10 +1251,13 @@ export function createMemoryBackend<T = unknown>(
         records,
         {
           query: <R = T>() =>
-            createRecordQuery<R>({
-              pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
-              execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
-            }),
+            createRecordQuery<R>(
+              {
+                pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
+                execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
+              },
+              core.getChainMethods('query')
+            ),
           removeByPrefix: (prefix, ctx?: IOperationContext & IWriteConcurrencyOptions) =>
             mutationEntry(MemoryOperation.recordRemoveByPrefix, prefix, ctx, (input) => {
               /** Native membership is localized by the same canonical prefix bounds as queries. */

@@ -12,7 +12,7 @@ import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { createStorageTypeError, StorageErrorCode } from './errors.js'
-import { installStorageFeatures } from './feature-install.js'
+import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.js'
 import { pluginNameFromBackendId } from './names.js'
 import { STORAGE_DESCRIPTOR_METADATA, STORAGE_RESERVED_EXPOSE } from './state-constants.js'
 import { StorageErrorText } from './error-text.js'
@@ -218,6 +218,9 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStorageHooks(): IStorageHooks
   readonly emit: IStorageHookEmitter
   readonly createKeyLockPort: IStoragePluginCore['createKeyLockPort']
+  readonly createTransactionApi: IStoragePluginCore['createTransactionApi']
+  readonly getChainMethods: IStoragePluginCore['getChainMethods']
+  setStorageFeatureProjection(projection: IStorageFeatureProjection | undefined): void
   readonly defaultOrgId: string
   readonly createRevisionPort: IStoragePluginCore['createRevisionPort']
   readonly createChangeController: IStoragePluginCore['createChangeController']
@@ -271,6 +274,8 @@ export const definePlugin: IStorageDefinePlugin = ((
         },
         emit: nativeCore.emit,
         createKeyLockPort: nativeCore.createKeyLockPort,
+        createTransactionApi: nativeCore.createTransactionApi,
+        getChainMethods: nativeCore.getChainMethods,
         createRevisionPort: nativeCore.createRevisionPort,
         createChangeController: nativeCore.createChangeController,
         registerChangeController: nativeCore.registerChangeController,
@@ -358,19 +363,24 @@ export const definePlugin: IStorageDefinePlugin = ((
                   StorageErrorCode.backendPluginInvalid,
                   StorageErrorText.backendPluginInvalid
                 )
-              if (kind !== undefined && features !== undefined)
-                installStorageFeatures({
-                  name,
-                  store: nativeCore.getStore(),
-                  features: nativeCore.features,
-                  installer:
-                    capabilityInstaller === undefined
-                      ? undefined
-                      : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
-                  execution: nativeCore.execution,
-                  expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
-                  onDispose: nativeCore.onDispose
-                })
+              if (kind !== undefined && features !== undefined) {
+                /** Original registration cleanup drops only its own selected Feature projection. */
+                nativeCore.onDispose(() => nativeCore.setStorageFeatureProjection(undefined))
+                nativeCore.setStorageFeatureProjection(
+                  installStorageFeatures({
+                    name,
+                    store: nativeCore.getStore(),
+                    features: nativeCore.features,
+                    installer:
+                      capabilityInstaller === undefined
+                        ? undefined
+                        : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
+                    execution: nativeCore.execution,
+                    expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
+                    onDispose: nativeCore.onDispose
+                  })
+                )
+              }
               if (
                 extensions === null ||
                 typeof extensions !== 'object' ||

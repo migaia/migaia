@@ -79,3 +79,5 @@ console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).se
 普通范围、事务草稿与前缀删除复用同一包内压缩 radix 索引。基础数据仍用哈希点查；范围仅定位边界并归并命中草稿，tombstone 抑制同键基础项。树维护首尾与相邻叶，不在查询时全量排序；记录和文本各自拥有独立索引实例。
 
 /entity 的 registerRecordIndexBackfillStore 只登记原后端工厂捕获的补录 provider；RecordIndexBackfillPhase 保留原持久化 canonical/legacy 值。原生后端创建既有 coded 争用错误后调用 markRecordIndexBackfillContentionFailure，原对象不变。会话、checkpoint 与真实原生事务仍归后端，实体编排复用这同一原私表。
+
+后端原 scope factory 在冻结同一个视图前调用 `core.createTransactionApi(scope)`；没有选中事务方法时返回 undefined。已选方法通过原 `runTransactionOperation` 登记、排空和保留首错，再进入同一 execution 与当前 scope 的惰性 client getter；过期方法保留原后端事务错误。`core.getChainMethods(family)` 把已选链方法交给原 query/builder creator，所有派生分支保留同一方法引用和原 this。链配置同步执行，异步干预阶段按原同步入口规则拒绝；内置方法和重复名称在能力发布前拒绝。
