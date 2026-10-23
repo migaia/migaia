@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime, createRecordQuery } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -148,6 +148,8 @@ const nativeFeed = { next: () => watchLifetime.advance(async () => ({ done: true
 const nativeWatching = createRecordQuery({ pushdown: { source: 'packed-native-feed', operators: [], operations: [] }, execute: noAdmissionIo, watch: () => nativeFeed })
 if (nativeWatching.watch() !== nativeFeed) throw new Error('packed native watch identity mismatch')
 await nativeFeed.dispose()
+/** Native filters share the packed root's original canonical AST owner. */
+if (!compileStorageQueryCondition(snapshotStorageWhere({ active: true }))({ active: true })) throw new Error('packed canonical where mismatch')
 /** Both organization byte helpers reuse canonical packed-root identities. */
 const packedOrg = '12345678-1234-1234-1234-123456789abc'
 const packedPrefix = encodeStorageOrgStringPrefix(packedOrg, 'a', 'packed-fixture')

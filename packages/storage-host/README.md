@@ -156,4 +156,8 @@ memory 原生提供 `vector`：`store.use(vector).collection('docs', { dimension
 
 memory 原生提供 `rdf`：`store.use(rdf).add(quads)`、`delete(quads)` 与 `match(pattern)` 使用共享 ground term 校验与 canonical 身份，完整批次先快照，重复 quad 幂等；blank node 仍只用于 raw/parser 域。六个固定压缩 radix 索引覆盖全局及 graph 内的 SPO/POS/OSP 访问，匹配按实际 bound prefix 定位，流式推进，不另存完整候选数组。逻辑 default/named graph 都映射为当前 org 的真实 named graph，返回时沿共享 helper 还原；namespace、提取方法、查询与原事务 scope 固定 org。`tx.use(rdf)` 与 KV 共用原 draft、revision、提交、回滚和迭代器生命周期，RDF 锁与容量驱逐都使用同 namespace 的逻辑 quad 身份。RDF 新变更沿 `all` 通道宽失效；`maxBytes` 计共享 canonical quad 编码，六个索引不重复计条目。
 
-RDF pattern 是原生访问路径；`where`、`follow`、`inverse`、排序与 page/after 保留共享 query reader 的客户端执行，`requirePushdown()` 如实拒绝所需客户端步骤。没有原生 traversal、native watch 或跨每次 next 的全库快照承诺；事务仍保留原 first-read/draft 语义。合法大 literal 不会被再次当作 public binary key 而收窄到 1 MiB。
+RDF pattern 是原生访问路径；`where`、`follow`、`inverse`、排序与 page/after 保留共享 query reader 的客户端执行，`requirePushdown()` 如实拒绝所需客户端步骤。没有原生 traversal 或跨每次 next 的全库快照承诺；原生 pattern watch 沿真实 change-feed 接点，事务仍保留原 first-read/draft 语义。合法大 literal 不会被再次当作 public binary key 而收窄到 1 MiB。
+
+memory 的真实文本 `watch(key, ctx?)` 与原 `subscribeChanges` 共用 controller。root watch 固定缺省 org，org view 固定自身 org；root 的既有 subscribeChanges 仍观察全部 org。watch 是提交后失效提示：一个未消费槽合并多次匹配为最新 sequence 的 `all` 提示，省略 keys/scope，不提供逐事件历史或 replay。原 native generator 串行推进，原 iterator owner 保留主/符号双缓存 Promise，dispose/abort/根关闭先唤醒已接受 next 再排空、取消订阅；原取消 reason 保留。真实 change-feed guard 通过后，records、原生 RDF pattern 与完成 topK 的 vector query 可 watch；需要客户端谓词或 traversal 的查询在订阅前拒绝。
+
+后端作者可复用 `createBackendChangeIterator(controller, { orgId, channel, key?, ctx?, execute? })`；它只借用原 controller 的订阅和关闭 signal，固定组织/通道/可选文本键，在一个槽合并失效提示，复用原资源、context 与诊断 owner。可选 execute 接收原 advance 与单次捕获的 context，以保留该后端逐 next 的原 pipeline；没有新的 controller、事件队列、registry 或重试平台。

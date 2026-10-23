@@ -1750,6 +1750,25 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: 'console.log(QueryOperation.where, QueryOperation.select) // where select'
     },
+    snapshotStorageWhere: {
+      role: 'operation',
+      purpose: t(
+        'Capture the original immutable canonical query AST for native translation; reuse the same single-read parser, field validation and INVALID_ARGUMENT cause.',
+        '捕获原不可变规范查询 AST 供原生翻译；复用同一单读 parser、字段校验及 INVALID_ARGUMENT 原因。'
+      ),
+      params: {
+        where: t(
+          'Declarative IWhere input; field accessors are captured once.',
+          '声明式 IWhere 输入，字段访问器只读取一次。'
+        )
+      },
+      returns: t(
+        'The same frozen IQueryCondition domain supplied to native source callbacks; no I/O, compiler or owner is created.',
+        '与原生 source 回调相同的冻结 IQueryCondition 值域；不创建 I/O、compiler 或 owner。'
+      ),
+      example: storageContractCases.snapshotStorageWhere![0]!.example,
+      cases: storageContractCases.snapshotStorageWhere
+    },
     compileStorageQueryCondition: {
       role: 'operation',
       purpose: t(
@@ -3430,7 +3449,13 @@ console.log(candidate.name, candidate.output)`
         operators: { summary: t('Supported field operators.', '支持的字段操作符。') },
         operations: { summary: t('Supported native operations.', '支持的原生操作。') },
         source: { summary: t('Stable source label.', '稳定数据源标签。') },
-        index: { summary: t('Optional native index label.', '可选原生索引标签。') }
+        index: { summary: t('Optional native index label.', '可选原生索引标签。') },
+        canPushCondition: {
+          summary: t(
+            'Optional pure exact-domain predicate for one canonical condition, after original operator/identity checks. Its original function and receiver are captured once; false retains client filtering and requirePushdown rejects before I/O. Omission preserves prior declarations.',
+            '原操作符与身份检查后，对一个规范条件做可选纯精确值域判定。原函数与 receiver 单次捕获；false 保留客户端过滤，requirePushdown 在 I/O 前拒绝。省略时保留原声明语义。'
+          )
+        }
       }
     },
     IVectorHit: {

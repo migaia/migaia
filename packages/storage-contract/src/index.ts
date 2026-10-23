@@ -226,6 +226,7 @@ export {
   QueryOperator,
   QueryOperation,
   compileStorageWhere,
+  snapshotStorageWhere,
   compileStorageQueryCondition,
   createRecordQuery,
   createVectorQuery,

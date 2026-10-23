@@ -3,6 +3,37 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  createBackendChangeIterator: [
+    {
+      title: t('Borrow the installed invalidation owner', '借用已安装的失效提示拥有者'),
+      problem: t(
+        'A Feature needs a fixed-organization stream without constructing another controller.',
+        'Feature 需要固定组织的流，无需另建 controller。'
+      ),
+      example: `import { createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
+import { createBackendChangeIterator } from '@migaia/storage-host/authoring/backend'
+
+const changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
+  capabilities: [], chain: {},
+  api: { store: {
+    async changes() {
+      return createBackendChangeIterator(featureExpose.getChangeController()!, {
+        orgId: this.orgId, channel: 'value'
+      })
+    }
+  }, transaction: {} }
+}))
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { changes })] })
+await using stream = await host.api.memory.changes()
+const next = stream.next()
+await host.backend('memory').set('status', 'ready')
+console.log((await next).value?.kind)`,
+      result: t(
+        'Prints put; the stream borrows the original controller and disposes its one subscription.',
+        '输出 put；流借用原 controller，只释放自己的订阅。'
+      )
+    }
+  ],
   memoryNativeVector: [
     {
       title: t('Rank points in the installed memory namespace', '在已安装 memory namespace 排名点'),

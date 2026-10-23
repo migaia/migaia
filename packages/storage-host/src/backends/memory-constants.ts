@@ -22,6 +22,7 @@ export const MemoryOperation = {
   /** Authentic expired views retain the historical scope operation in their cached failure. */
   transactionScope: 'transaction.scope',
   inspectLocks: 'inspectLocks',
+  watch: 'watch',
   getMany: 'getMany',
   setMany: 'setMany',
   removeMany: 'removeMany',

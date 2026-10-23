@@ -849,3 +849,7 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 文本变更接口为 `ITextWatchApi.watch(key,ctx?)` 与 `ITextChangeFeedApi.subscribeChanges(listener)`，流返回原 `IStorageIterator<IStorageChange>`。as/isChangeFeedStore 只有在原 KV 准入、changeFeed=true、两个真实方法均可调用时才成功；仅有 subscriber 的旧形状拒绝，getter 错误保留为 cause，检查不订阅。as 返回原对象，=== 不变。已知 store 的同步、元数据、原生 API、能力集合、事务和 Feature 类型全部保留；既有 records/vector/RDF 查询得到 feed 声明，不添加不存在的能力。未知输入仍仅经原 KV/text guard 准入。该声明不实现 controller、订阅器、可靠重放或查询结果流。
 
 `createStorageBlobBodyReader(body, { report, backend?, normalizeFailure? })` 是有限上传作者入口：调用方先完成原生条件检查，再把已捕获 body 交给原 iterator 生命周期读取；每次 next 返回独立 Uint8Array chunk，不预取，不拥有原生 sink、分段缓冲或调度。EOF 或 read 失败不重复 cancel；提前 return(reason)/dispose 先取消未完成 read，再沿原 owner 排空并 release 一次。取消失败保持主错，后续 release 失败仅报告；主与符号清理仍为独立缓存 Promise。调用方保留原 signal/timeout 与 sink 清理，read 失败后也须释放 reader。
+
+原生后端可从包根调用 `snapshotStorageWhere(where)`，取得原查询 owner 的冻结 `IQueryCondition`；翻译或交 `compileStorageQueryCondition` 使用同一 AST。它复用既有字段单读、校验与 `INVALID_ARGUMENT` 原 cause，不另建 parser、编码器或执行器。
+
+原生后端可在既有 `IQueryPushdown` 上提供可选纯 `canPushCondition(condition)`，用同一原生翻译器判定规范 AST 的实际值域是否可忠实下推。原操作符与对象身份规则先执行；false 保留客户端步骤并使 `requirePushdown` 在 I/O 前拒绝，省略保持既有语义。函数和原 receiver 单次捕获，不增加查询执行器。

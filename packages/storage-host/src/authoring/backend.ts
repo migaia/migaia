@@ -20,6 +20,7 @@ export { safeJsonPayloadByteLength } from '../core/json.js'
 export { createStorageToken } from '../core/storage-token.js'
 export { resolveStorageNamespace } from '../core/namespace.js'
 export { observeStorageBatch } from '../core/batch-observation.js'
+export { createBackendChangeIterator } from '../core/change-iterator.js'
 export { planChannelWrite } from '../core/channel-write.js'
 export type {
   IChannelPresence,
