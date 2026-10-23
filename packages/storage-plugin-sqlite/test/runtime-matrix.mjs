@@ -5,7 +5,7 @@ import { defineEntity } from '@migaia/storage-host/entity'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
-import { lockKey, records } from '@migaia/storage-contract'
+import { kv, lockKey, records } from '@migaia/storage-contract'
 
 /** Each invocation performs exactly one real process phase against its runtime-owned test file. */
 const [mode, path] = process.argv.slice(2)
@@ -77,6 +77,26 @@ async function assertQueryResource(stream) {
 try {
   await handle.ready
   if (mode === 'write') {
+    /** Actual builtin drivers execute the same root batch and canonical duplicate reads. */
+    await storage.use(kv).setMany([
+      { key: ['runtime-batch', 1], value: 'persisted' },
+      { key: ['runtime-batch', 2], value: 'remove-in-scope' }
+    ])
+    assert.deepEqual(
+      await storage.use(kv).getMany([['runtime-batch', 1], ['runtime-batch', 1], 'absent-batch']),
+      ['persisted', 'persisted', undefined]
+    )
+    await storage.transaction(async (tx) => {
+      assert.equal(
+        await tx.use(kv).removeMany([
+          ['runtime-batch', 2],
+          ['runtime-batch', 2]
+        ]),
+        1
+      )
+      await tx.use(kv).setMany([{ key: ['runtime-batch', 3], value: 'native-scope' }])
+      assert.deepEqual(await tx.use(kv).getMany([['runtime-batch', 3]]), ['native-scope'])
+    })
     await handle.flush()
     const envelope = JSON.parse(await storage.get('runtime-counter'))
     assert.equal(envelope.version, 1)
@@ -136,6 +156,15 @@ try {
       9007199254740993n
     )
     assert.equal((await storage.sql`SELECT count(*) AS count FROM exact_integer`.get()).count, 1)
+    /** Reopening proves that batch rows were committed through the real native transaction. */
+    assert.deepEqual(
+      await storage.use(kv).getMany([
+        ['runtime-batch', 1],
+        ['runtime-batch', 2],
+        ['runtime-batch', 3]
+      ]),
+      ['persisted', undefined, 'native-scope']
+    )
   }
   assert.deepEqual(await entities.get('legacy'), { id: 'legacy', active: true, score: 2 })
   assert.deepEqual(await storage.getRecord(entities.lockKey('legacy').key), legacy)

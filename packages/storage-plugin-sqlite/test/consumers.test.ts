@@ -92,10 +92,14 @@ it('limits borrowed KV capabilities to original channel methods and precise sync
     'clearAll',
     'clearValues',
     'get',
+    'getMany',
     'has',
     'keys',
     'remove',
+    'removeByPrefix',
+    'removeMany',
     'set',
+    'setMany',
     'sync'
   ])
   expect(api.sync).toBe(storage.sync)

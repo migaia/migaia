@@ -13,16 +13,42 @@ import {
   compareStorageKeys,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { sqliteBackendPlugin } from '../src/index.js'
+import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 
 /** Each case owns its actual file and disposes host before the borrowed native connection. */
-async function installed(options: { wal?: boolean; memory?: boolean } = {}) {
+async function installed(options: { wal?: boolean; memory?: boolean; native?: string[] } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-'))
   const path = options.memory ? ':memory:' : join(directory, 'data.sqlite')
   const connection = nodeSqliteDriver(path)
+  /** Existing injected-driver calls expose actual native execution even when prepare is cached. */
+  const driver = options.native
+    ? {
+        exec: (text: string) => {
+          options.native!.push(text)
+          connection.exec(text)
+        },
+        prepare: (text: string) => {
+          const statement = connection.prepare(text)
+          return {
+            run: (...values: readonly ISqliteValue[]) => {
+              options.native!.push(text)
+              return statement.run(...values)
+            },
+            get: (...values: readonly ISqliteValue[]) => {
+              options.native!.push(text)
+              return statement.get(...values)
+            },
+            all: (...values: readonly ISqliteValue[]) => {
+              options.native!.push(text)
+              return statement.all(...values)
+            }
+          }
+        }
+      }
+    : connection
   const host = await createStorageHost({
-    plugins: [sqliteBackendPlugin({ driver: connection, wal: options.wal })] as const
+    plugins: [sqliteBackendPlugin({ driver, wal: options.wal })] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -33,6 +59,211 @@ async function installed(options: { wal?: boolean; memory?: boolean } = {}) {
 }
 
 describe('native SQLite installation', () => {
+  it('runs native root and scoped batches with canonical keys and one count observation', async () => {
+    /** Actual hook payloads prove that one public batch never expands into per-key operations. */
+    const observations: Array<{ operation: string; count?: number }> = []
+    /** Pipeline entry counts distinguish native batches from loops over public single methods. */
+    const operations: string[] = []
+    /** Caller ownership survives both failed batch validation and host release. */
+    const connection = nodeSqliteDriver(':memory:')
+    /** One existing host execution stage observes the actual native endpoints. */
+    const execution = definePlugin('batch-execution', (core) => ({
+      install() {
+        core.usePipeline((context, next) => {
+          operations.push(context.operation)
+          return next(context)
+        })
+        return {}
+      }
+    }))
+    /** Hooks receive only the canonical operation/count identity, never the batch values. */
+    const host = await createStorageHost({
+      hooks: {
+        afterStorageOperation: (payload) => {
+          observations.push({ operation: payload.operation, count: payload.count })
+        }
+      },
+      plugins: [execution, sqliteBackendPlugin({ driver: connection })] as const
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await connection.dispose()
+    })
+    /** Strict standard admission must publish all eleven methods before any business I/O. */
+    const store = host.backend('sqlite')
+    /** Equal tuples and signed zero retain the contract owner's canonical identity. */
+    const keys: IStorageKey[] = [['batch', 1], -0, ['batch', 1], 'missing']
+    await store.use(kv).setMany([
+      { key: keys[0]!, value: 'tuple' },
+      { key: 0, value: 'zero' }
+    ])
+    expect(await store.use(kv).getMany(keys)).toEqual(['tuple', 'zero', 'tuple', undefined])
+    expect(operations).toEqual(['setMany', 'getMany'])
+    expect(observations).toEqual([
+      { operation: 'setMany', count: 2 },
+      { operation: 'getMany', count: 4 }
+    ])
+    /** Empty admitted calls do not open a native transaction, pipeline, or hook. */
+    const native = vi.spyOn(connection, 'prepare')
+    operations.length = 0
+    observations.length = 0
+    expect(await store.use(kv).getMany([])).toEqual([])
+    await store.use(kv).setMany([])
+    expect(await store.use(kv).removeMany([])).toBe(0)
+    expect(native).not.toHaveBeenCalled()
+    expect(operations).toEqual([])
+    expect(observations).toEqual([])
+    /** Duplicate structural writes reject before the first native request or partial mutation. */
+    await expect(
+      store.use(kv).setMany([
+        { key: ['duplicate', 1], value: 'first' },
+        { key: ['duplicate', 1], value: 'second' }
+      ])
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(native).not.toHaveBeenCalled()
+    expect(await store.use(kv).getMany([['duplicate', 1]])).toEqual([undefined])
+    /** Removal counts distinct physical rows and preserves caller key order for reads. */
+    expect(await store.use(kv).removeMany([0, -0, ['absent']])).toBe(1)
+    expect(await store.use(kv).removeByPrefix(['batch'])).toBe(1)
+    /** Scope batches use the original native transaction and expire with that original owner. */
+    let expired!: Parameters<Parameters<typeof store.transaction>[0]>[0]
+    await store.transaction(async (tx) => {
+      expired = tx
+      await tx.use(kv).setMany([{ key: ['scoped', 1], value: 'draft' }])
+      expect(
+        await tx.use(kv).getMany([
+          ['scoped', 1],
+          ['scoped', 1]
+        ])
+      ).toEqual(['draft', 'draft'])
+      expect(
+        await tx.use(kv).removeMany([
+          ['scoped', 1],
+          ['scoped', 1]
+        ])
+      ).toBe(1)
+      await tx.setMany([{ key: ['kept', 1], value: 'committed', ttlMs: 0.5 }])
+    })
+    await expect(expired.getMany([])).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    /** Mid-batch native failure rolls back preceding writes and preserves the original cause. */
+    await store.putRecord({ other: true }, 'conflicting')
+    await expect(
+      store.use(kv).setMany([
+        { key: 'must-rollback', value: 'first' },
+        { key: 'conflicting', value: 'second' }
+      ])
+    ).rejects.toMatchObject({ code: 'DUPLICATE_KEY' })
+    expect(await store.get('must-rollback')).toBeNull()
+  })
+
+  it('chunks native IN batches in one snapshot and rejects absent lock channels before I/O', async () => {
+    /** More than one native parameter chunk exercises the real builtin statement path. */
+    const native: string[] = []
+    const { store } = await installed({ memory: true, native })
+    /** Canonical tuple keys exercise physical text encoding without adding string-only aliases. */
+    const entries = Array.from({ length: 1005 }, (_, index) => ({
+      key: ['chunk', index],
+      value: String(index)
+    }))
+    await store.use(kv).setMany(entries)
+    native.length = 0
+    expect(await store.use(kv).getMany(entries.map(({ key }) => key))).toEqual(
+      entries.map(({ value }) => value)
+    )
+    expect(native[0]).toBe('BEGIN DEFERRED')
+    expect(native.at(-1)).toBe('COMMIT')
+    expect(native.filter((text) => text.startsWith('SELECT key,value'))).toHaveLength(2)
+    expect(
+      await store.use(kv).removeMany([
+        ['chunk', 0],
+        ['chunk', 0],
+        ['chunk', 1]
+      ])
+    ).toBe(2)
+    await store.use(kv).setMany(entries.slice(0, 2))
+    await store.transaction(async (tx) => {
+      expect(await tx.getMany(entries.map(({ key }) => key))).toEqual(
+        entries.map(({ value }) => value)
+      )
+      expect(await tx.removeMany(entries.map(({ key }) => key))).toBe(1005)
+    })
+    expect(await store.use(kv).removeByPrefix(['chunk'])).toBe(0)
+    /** Unsupported domains never use an absent .key field or touch the physical connection. */
+    native.length = 0
+    await expect(
+      store
+        .tx()
+        .lock(lockKey.vector('collection', 'point'))
+        .run(() => undefined)
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    await expect(
+      store
+        .tx()
+        .lock(
+          lockKey.rdf({
+            subject: { termType: 'NamedNode', value: 'urn:test:subject' },
+            predicate: { termType: 'NamedNode', value: 'urn:test:predicate' },
+            object: { termType: 'NamedNode', value: 'urn:test:object' },
+            graph: { termType: 'DefaultGraph' }
+          })
+        )
+        .run(() => undefined)
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    expect(native).toEqual([])
+  })
+
+  it('uses supported in-place pipeline edits for native root and scoped batches', async () => {
+    /** This is the original public pipeline entry; its input is shallow-readonly, not deep-frozen. */
+    const { store, host } = await installed({ memory: true })
+    await host.use(
+      definePlugin('rewrite-batch', (core) => ({
+        install() {
+          core.usePipeline((request, next) => {
+            if (request.operation === 'setMany') {
+              const input = request.input as { entries: Array<{ key: IStorageKey; value: string }> }
+              input.entries[0]!.key = 'redirected:point'
+              input.entries[0]!.value = 'changed'
+            } else if (request.operation === 'getMany' || request.operation === 'removeMany') {
+              const input = request.input as { keys: IStorageKey[] }
+              input.keys[0] = 'redirected:point'
+            } else if (request.operation === 'removeByPrefix') {
+              const input = request.input as { prefix: IStorageKey }
+              input.prefix = 'redirected:'
+            }
+            return next(request)
+          })
+          return {}
+        }
+      }))
+    )
+    /** Original caller getters run once; the pipeline edits only the detached native payload. */
+    let keyReads = 0
+    await store.use(kv).setMany([
+      {
+        get key() {
+          keyReads++
+          return 'caller'
+        },
+        value: 'original'
+      }
+    ])
+    expect(keyReads).toBe(1)
+    expect(await store.get('caller')).toBeNull()
+    expect(await store.get('redirected:point')).toBe('changed')
+    expect(await store.use(kv).getMany(['caller'])).toEqual(['changed'])
+    expect(await store.use(kv).removeMany(['caller'])).toBe(1)
+    await store.transaction(async (tx) => {
+      await tx.setMany([{ key: 'caller', value: 'original' }])
+      expect(await tx.getMany(['caller'])).toEqual(['changed'])
+      expect(await tx.removeMany(['caller'])).toBe(1)
+      await tx.setMany([{ key: 'caller', value: 'original' }])
+      expect(await tx.removeByPrefix('wrong-prefix')).toBe(1)
+      await tx.putRecord({ retained: false }, 'redirected:record')
+      expect(await tx.use(records).removeByPrefix('wrong-prefix')).toBe(1)
+    })
+    expect(await store.getRecord('redirected:record')).toBeUndefined()
+  })
+
   it('rejects null root write contexts before native admission', async () => {
     /** The real installed backend retains its original native and mutation owners. */
     const { store, host, connection } = await installed({ memory: true })

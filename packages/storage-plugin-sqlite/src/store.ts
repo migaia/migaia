@@ -3,6 +3,9 @@ import {
   StorageContractErrorCode,
   assertStringStorageKey,
   snapshotStorageKey,
+  snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
+  assertStorageTtlDuration,
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix,
   snapshotOperationContext,
@@ -26,6 +29,8 @@ import {
   records,
   createRecordQuery,
   type IStorageKey,
+  type IStorageBatchKey,
+  type IKeyValueApi,
   type IOperationContext,
   type IKeyRange,
   type IStorageIterator,
@@ -52,6 +57,8 @@ import {
   subscribeToAbort,
   readAbortReason,
   snapshotKeyRange,
+  observeStorageBatch,
+  isStorageErrorFamily,
   type IBackendChangeController,
   type IBackendKeyLockPort,
   type IBackendRevisionPort
@@ -146,6 +153,13 @@ type IRootMutation<R> = {
   readonly guard?: IWriteGuard
   run(state: INativeState): R
 }
+/** Native batch rows retain the one canonical key capture and detached text payload. */
+type ITextBatchEntry = IStorageBatchKey & {
+  readonly value: string
+  readonly ttlMs?: number
+}
+/** Presence distinguishes a native batch from the unchanged single-operation observation path. */
+type IBatchObservation = { readonly count: number | undefined }
 /** Backend authoring state is supplied only by the original installation window. */
 export type ISqliteRuntime = { readonly core: IStoragePluginCore; readonly orgId: string }
 /** Construction returns only exact provider/controller handles needed for original host admission. */
@@ -194,6 +208,8 @@ export function createSqliteStore<TValue>(
   claimedDrivers.add(driver)
   /** Original host observation and execution ports carry no backend-owned subscriber registry. */
   const { core } = runtime
+  /** Batch durations use the existing host clock without introducing a backend timer. */
+  const scheduler = core.featureExpose.getScheduler()
   /** One final reporting boundary observes cleanup and observer failures. */
   const report = createStorageOperationReporter()
   /** A single bounded statement Map belongs to this store and is cleared at release. */
@@ -662,28 +678,48 @@ export function createSqliteStore<TValue>(
     input: I,
     context: IOperationContext | undefined,
     scope: object | undefined,
-    run: (captured: I) => R
+    run: (captured: I) => R,
+    batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     /** The original owner admits scope work synchronously before pipeline or codec work. */
-    const execute = (currentScope?: object): Promise<Awaited<R>> =>
-      core.execution.run<I, Awaited<R>>(
-        { operation: name, input, ctx: context, scope: currentScope },
-        async (captured): Promise<Awaited<R>> => {
-          const observer = currentScope
-            ? operationStages.forTransaction(currentScope)
-            : operationStages
-          const started = Date.now()
-          observe(observer, 'beforeStorageOperation', name)
-          try {
-            const result = await run(captured)
-            observe(observer, 'afterStorageOperation', name, Date.now() - started, 1)
-            return result as Awaited<R>
-          } catch (error) {
-            observe(observer, 'onStorageOperationError', name, (error as { code?: unknown })?.code)
-            throw error
+    const execute = (currentScope?: object): Promise<Awaited<R>> => {
+      /** The existing executor remains the sole pipeline owner for either observation form. */
+      const invoke = (): Promise<Awaited<R>> =>
+        core.execution.run<I, Awaited<R>>(
+          { operation: name, input, ctx: context, scope: currentScope },
+          async (captured): Promise<Awaited<R>> => {
+            if (batch) return (await run(captured)) as Awaited<R>
+            /** Existing single calls retain their original observer binding point after the stage. */
+            const observer = currentScope
+              ? operationStages.forTransaction(currentScope)
+              : operationStages
+            const started = Date.now()
+            observe(observer, 'beforeStorageOperation', name)
+            try {
+              const result = await run(captured)
+              observe(observer, 'afterStorageOperation', name, Date.now() - started, 1)
+              return result as Awaited<R>
+            } catch (error) {
+              observe(
+                observer,
+                'onStorageOperationError',
+                name,
+                (error as { code?: unknown })?.code
+              )
+              throw error
+            }
           }
-        }
-      )
+        )
+      return batch
+        ? observeStorageBatch(
+            currentScope ? operationStages.forTransaction(currentScope) : operationStages,
+            scheduler,
+            name,
+            batch.count,
+            invoke
+          )
+        : invoke()
+    }
     return scope ? runTransactionOperation(scope, (current) => execute(current)) : execute()
   }
   /** Synchronous calls use the original stage list and cannot wait for async middleware. */
@@ -712,31 +748,57 @@ export function createSqliteStore<TValue>(
     scope: object,
     name: string,
     input: unknown,
-    run: (state: INativeState, current: ISqliteTransactionScope<TValue>) => R
+    run: (state: INativeState, current: ISqliteTransactionScope<TValue>, input: unknown) => R,
+    batch?: IBatchObservation
   ): Promise<Awaited<R>> =>
     runTransactionOperation(scope, (current) => {
       const state = nativeFor(current)
       /** Capture inside original admission, before an asynchronous pipeline can wait. */
       const capturedInput = typeof input === 'function' ? input() : input
-      return core.execution.run(
-        { operation: name, input: capturedInput, scope: current },
-        async () => {
-          const observer = operationStages.forTransaction(current)
-          const transactionObserver = transactionStages.forTransaction(current)
-          observe(transactionObserver, 'beforeTxOperation', name)
-          observe(observer, 'beforeStorageOperation', name)
-          const started = Date.now()
-          try {
-            const result = await run(state, current as ISqliteTransactionScope<TValue>)
-            observe(transactionObserver, 'afterTxOperation', name)
-            observe(observer, 'afterStorageOperation', name, Date.now() - started, 1)
-            return result as Awaited<R>
-          } catch (error) {
-            observe(observer, 'onStorageOperationError', name, (error as { code?: unknown })?.code)
-            throw error
+      /** An empty native batch remains admitted but opens no pipeline, hook, or native request. */
+      if (batch?.count === 0)
+        return run(state, current as ISqliteTransactionScope<TValue>, capturedInput)
+      /** Existing scope admission owns one execution; batches only share its observation wrapper. */
+      const execute = () =>
+        core.execution.run(
+          { operation: name, input: capturedInput, scope: current },
+          async (preparedInput) => {
+            const observer = operationStages.forTransaction(current)
+            const transactionObserver = transactionStages.forTransaction(current)
+            observe(transactionObserver, 'beforeTxOperation', name)
+            if (batch)
+              return observeStorageBatch(observer, scheduler, name, batch.count, async () => {
+                const result = await run(
+                  state,
+                  current as ISqliteTransactionScope<TValue>,
+                  preparedInput
+                )
+                observe(transactionObserver, 'afterTxOperation', name)
+                return result as Awaited<R>
+              })
+            observe(observer, 'beforeStorageOperation', name)
+            const started = Date.now()
+            try {
+              const result = await run(
+                state,
+                current as ISqliteTransactionScope<TValue>,
+                preparedInput
+              )
+              observe(transactionObserver, 'afterTxOperation', name)
+              observe(observer, 'afterStorageOperation', name, Date.now() - started, 1)
+              return result as Awaited<R>
+            } catch (error) {
+              observe(
+                observer,
+                'onStorageOperationError',
+                name,
+                (error as { code?: unknown })?.code
+              )
+              throw error
+            }
           }
-        }
-      )
+        )
+      return execute()
     })
   /** String inputs use the existing key owner and the channel's narrow value contract. */
   const textInput = (key: string, value?: unknown, writing = false): void => {
@@ -762,18 +824,26 @@ export function createSqliteStore<TValue>(
     name: string,
     input: unknown,
     ctx: IOperationContext | undefined,
-    run: (orgId: string) => R
+    run: (orgId: string, input: unknown) => R,
+    batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     controller.assertLive()
     const finish = controller.beginMutation()
     return withAbort<Awaited<R>>(ctx, async (signal, context): Promise<Awaited<R>> => {
       assertRoot()
       throwIfAborted(signal)
-      return operation(name, input, context, undefined, () => {
-        assertRoot()
-        throwIfAborted(signal)
-        return run(context?.orgId ?? runtime.orgId)
-      })
+      return operation(
+        name,
+        input,
+        context,
+        undefined,
+        (captured) => {
+          assertRoot()
+          throwIfAborted(signal)
+          return run(context?.orgId ?? runtime.orgId, captured)
+        },
+        batch
+      )
     }).finally(finish)
   }
   /** Root mutations declare affected original channel keys before logical lock acquisition. */
@@ -781,7 +851,8 @@ export function createSqliteStore<TValue>(
     name: string,
     input: I,
     ctx: IOperationContext | undefined,
-    prepare: (captured: I) => IRootMutation<R>
+    prepare: (captured: I) => IRootMutation<R>,
+    batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     controller.assertLive()
     const finish = controller.beginMutation()
@@ -794,10 +865,17 @@ export function createSqliteStore<TValue>(
         store,
         options: ctx === undefined ? {} : ctx,
         execute: (context, proceed) =>
-          operation(name, input, context, undefined, (captured) => {
-            capturedInput = captured
-            return proceed()
-          }),
+          operation(
+            name,
+            input,
+            context,
+            undefined,
+            (captured) => {
+              capturedInput = captured
+              return proceed()
+            },
+            batch
+          ),
         lock: () => {
           mutation = prepare(capturedInput)
           return mutation.keys
@@ -896,35 +974,128 @@ export function createSqliteStore<TValue>(
         )
     }
   }
-  /** Complete batch input is snapshotted once before a native request or stage starts. */
-  const batchKeys = (keys: readonly IStorageKey[]): readonly IStorageKey[] => {
-    if (!Array.isArray(keys))
+  /** Borrowed array and entry access failures leave this new API through the original error owner. */
+  const captureBatch = <R>(capture: () => R): R => {
+    try {
+      return capture()
+    } catch (cause) {
+      if (isStorageErrorFamily(cause)) throw cause
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-        cause: new TypeError(SqliteErrorText.batch)
+        backend: SqliteNames.backend,
+        cause
       })
-    return keys.map((key) => snapshotStorageKey(key, SqliteNames.backend))
+    }
+  }
+  /** Empty root calls still validate their live resource and supplied context without doing I/O. */
+  const batchSize = (input: readonly unknown[]): number =>
+    captureBatch(() => {
+      controller.assertLive()
+      if (!Array.isArray(input))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: SqliteNames.backend
+        })
+      return input.length
+    })
+  /** Ordered entry capture reuses canonical equality while preserving the original getter order. */
+  const captureTextEntries = (
+    entries: Parameters<IKeyValueApi['setMany']>[0]
+  ): readonly ITextBatchEntry[] =>
+    captureBatch(() => {
+      if (!Array.isArray(entries))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: SqliteNames.backend
+        })
+      /** Only this call owns the original key owner's transient first-position facts. */
+      const capture = createStorageBatchKeyCapture(SqliteNames.backend)
+      /** Length is fixed before any caller entry getter can extend the array. */
+      const length = entries.length
+      /** Native work consumes only these detached fields after asynchronous stages. */
+      const result: ITextBatchEntry[] = []
+      for (let index = 0; index < length; index++) {
+        /** Keep key, value, TTL reads in the old scope batch order. */
+        const entry = entries[index]!
+        const fact = capture(entry.key)
+        const value = entry.value
+        const ttlMs = entry.ttlMs
+        if (fact.firstIndex !== index || typeof value !== 'string')
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+            backend: SqliteNames.backend,
+            cause: new TypeError(SqliteErrorText.batch)
+          })
+        if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, SqliteNames.backend)
+        result.push({ ...fact, value, ttlMs })
+      }
+      return result
+    })
+  /** A root read's synchronous native segment holds one real read snapshot across every IN chunk. */
+  const readSnapshot = <R>(run: () => R): R => {
+    assertRoot()
+    statement(SqliteControl.deferred, [], 'run')
+    active = SQLITE_CONTROL_ACTIVE
+    try {
+      const result = run()
+      statement(SqliteControl.commit, [], 'run')
+      active = undefined
+      return result
+    } catch (error) {
+      return rollback(error)
+    }
   }
   /** Batch get uses bounded IN lists inside one real native transaction snapshot. */
   const getMany = (
-    keys: readonly IStorageKey[],
-    state: INativeState,
-    scope: object
+    keys: readonly IStorageBatchKey[],
+    orgId: string,
+    state?: INativeState,
+    scope?: object
   ): readonly (string | undefined)[] => {
     const result = new Map<string, string>()
-    const captured = keys.map((key) => keyHex(encodeOrderedStorageKey(key, SqliteNames.backend)))
+    const captured = keys.filter(({ firstIndex }, index) => firstIndex === index)
+    /** Every chunk uses the same operation-local expiry cutoff inside the same native snapshot. */
+    const now = Date.now()
     for (let index = 0; index < captured.length; index += SqliteLimits.batch) {
-      const part = captured.slice(index, index + SqliteLimits.batch)
+      const part = captured.slice(index, index + SqliteLimits.batch).map(({ identity }) => identity)
       const rows = statement<readonly ISqliteRow[]>(
         `SELECT key,value FROM ${tables.text} WHERE org_id=? AND (expires_at IS NULL OR expires_at>?) AND key IN (${part.map(() => '?').join(',')})`,
-        [state.orgId, Date.now(), ...part],
+        [orgId, now, ...part],
         'all',
         state
       )
       for (const row of rows)
         result.set(row.key as string, convert('text', 'decode', row.value, scope) as string)
     }
-    for (const key of keys) revision(state, 'text', key)
-    return captured.map((key) => result.get(key))
+    if (state) for (const { key } of captured) revision(state, 'text', key)
+    return keys.map(({ identity }) => result.get(identity))
+  }
+  /** Distinct physical deletions use bounded IN lists and one existing native transaction. */
+  const removeTextBatch = (keys: readonly IStorageBatchKey[], state: INativeState): number => {
+    /** Canonical first positions own equality; no backend-specific duplicate-key representation. */
+    const captured = keys.filter(({ firstIndex }, index) => firstIndex === index)
+    /** Native row counts describe successful physical deletions, including existing expired rows. */
+    let removed = 0
+    for (let index = 0; index < captured.length; index += SqliteLimits.batch) {
+      /** All placeholders stay within the same conservative builtin parameter budget as reads. */
+      const part = captured.slice(index, index + SqliteLimits.batch)
+      /** Only this bounded chunk maps native row identities back to original detached keys. */
+      const keysByIdentity = new Map(part.map((fact) => [fact.identity, fact.key]))
+      for (const { key } of part) revision(state, 'text', key)
+      /** Native presence fixes the exact changed rows before the atomic DELETE. */
+      const rows = statement<readonly ISqliteRow[]>(
+        `SELECT key FROM ${tables.text} WHERE org_id=? AND key IN (${part.map(() => '?').join(',')})`,
+        [state.orgId, ...part.map(({ identity }) => identity)],
+        'all',
+        state
+      )
+      /** Matching rows cannot change between statements owned by this native writer. */
+      const result = statement<{ changes: number | bigint }>(
+        `DELETE FROM ${tables.text} WHERE org_id=? AND key IN (${part.map(() => '?').join(',')})`,
+        [state.orgId, ...part.map(({ identity }) => identity)],
+        'run',
+        state
+      )
+      removed += Number(result.changes)
+      for (const row of rows) changed(state, 'text', keysByIdentity.get(row.key as string)!)
+    }
+    return removed
   }
   /** Prefix bounds come from the canonical key owner and hit the existing ordered primary key. */
   const removePrefix = (
@@ -1079,73 +1250,74 @@ export function createSqliteStore<TValue>(
         )
       },
       getMany: (keys) => {
-        if (Array.isArray(keys) && keys.length === 0)
-          return runTransactionOperation(scope, () => [])
-        let captured: readonly IStorageKey[]
+        let captured: readonly IStorageBatchKey[]
+        let input: { keys: readonly IStorageKey[] }
         return scoped(
           scope,
           SqliteOperation.getMany,
           () => {
-            captured = batchKeys(keys)
-            return { keys: captured }
+            captured = snapshotStorageBatchKeys(keys, SqliteNames.backend)
+            return (input = { keys: captured.map(({ key }) => key) })
           },
-          (state, current) => getMany(captured, state, current)
+          (state, current, prepared) => {
+            const actual = snapshotStorageBatchKeys(
+              (prepared as typeof input).keys,
+              SqliteNames.backend
+            )
+            return getMany(actual, state.orgId, state, current)
+          },
+          {
+            get count() {
+              return captured.length
+            }
+          }
         )
       },
       setMany: (entries) => {
-        if (Array.isArray(entries) && entries.length === 0)
-          return runTransactionOperation(scope, () => undefined)
-        let captured: readonly {
-          readonly key: IStorageKey
-          readonly value: string
-          readonly ttlMs?: number
-        }[]
+        let captured: readonly ITextBatchEntry[]
+        let input: { entries: Parameters<IKeyValueApi['setMany']>[0] }
         return scoped(
           scope,
           SqliteOperation.setMany,
           () => {
-            if (!Array.isArray(entries))
-              throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-            /** Canonical identity detects duplicate typed keys before any table or stage changes. */
-            const seen = new Set<string>()
-            captured = entries.map((entry) => {
-              const key = snapshotStorageKey(entry.key, SqliteNames.backend)
-              const id = keyHex(encodeOrderedStorageKey(key, SqliteNames.backend))
-              const value = entry.value
-              const ttlMs = entry.ttlMs
-              if (
-                seen.has(id) ||
-                typeof value !== 'string' ||
-                (ttlMs !== undefined && (!Number.isSafeInteger(ttlMs) || ttlMs < 0))
-              )
-                throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-                  cause: new TypeError(SqliteErrorText.batch)
-                })
-              seen.add(id)
-              return { key, value, ttlMs }
+            captured = captureTextEntries(entries)
+            return (input = {
+              entries: captured.map(({ key, value, ttlMs }) => ({ key, value, ttlMs }))
             })
-            return { entries: captured }
           },
-          (state, current) => {
-            for (const entry of captured)
+          (state, current, prepared) => {
+            const actual = captureTextEntries((prepared as typeof input).entries)
+            for (const entry of actual)
               write('text', entry.key, entry.value, state, 'conflict', current, entry.ttlMs)
+          },
+          {
+            get count() {
+              return captured.length
+            }
           }
         )
       },
       removeMany: (keys) => {
-        if (Array.isArray(keys) && keys.length === 0) return runTransactionOperation(scope, () => 0)
-        let captured: readonly IStorageKey[]
+        let captured: readonly IStorageBatchKey[]
+        let input: { keys: readonly IStorageKey[] }
         return scoped(
           scope,
           SqliteOperation.removeMany,
           () => {
-            captured = batchKeys(keys)
-            return { keys: captured }
+            captured = snapshotStorageBatchKeys(keys, SqliteNames.backend)
+            return (input = { keys: captured.map(({ key }) => key) })
           },
-          (state) => {
-            let count = 0
-            for (const key of captured) if (remove('text', key, state)) count++
-            return count
+          (state, _current, prepared) => {
+            const actual = snapshotStorageBatchKeys(
+              (prepared as typeof input).keys,
+              SqliteNames.backend
+            )
+            return removeTextBatch(actual, state)
+          },
+          {
+            get count() {
+              return captured.length
+            }
           }
         )
       },
@@ -1158,7 +1330,13 @@ export function createSqliteStore<TValue>(
             captured = snapshotStorageKey(prefix, SqliteNames.backend)
             return { prefix: captured }
           },
-          (state) => removePrefix('text', captured, state)
+          (state, _current, input) =>
+            removePrefix(
+              'text',
+              snapshotStorageKey((input as { prefix: IStorageKey }).prefix, SqliteNames.backend),
+              state
+            ),
+          { count: undefined }
         )
       },
       iterateRecords: (range) => transactionIterator(scope, range),
@@ -1727,6 +1905,11 @@ export function createSqliteStore<TValue>(
       { store, options },
       {
         attempt: async (context) => {
+          /** This native backend owns no vector collection or RDF graph and never falls back to key. */
+          if (context.lock?.some(({ channel }) => channel === 'vector' || channel === 'rdf'))
+            throw new StorageContractError(StorageContractErrorCode.unsupported, {
+              backend: SqliteNames.backend
+            })
           const run = () =>
             physicalRun(context, () => {
               const invoke = () => nativeAttempt(context, callback)
@@ -2239,7 +2422,7 @@ export function createSqliteStore<TValue>(
       (symbolic ??= controller.dispose().catch((error) => reportCleanupError(report, error)))
   }
   /** A borrowed KV capability exposes only original channel methods, never resource authority. */
-  const keyValue = {
+  const keyValue: IKeyValueApi = {
     get: base.get,
     set: base.set,
     remove: base.remove,
@@ -2247,7 +2430,118 @@ export function createSqliteStore<TValue>(
     keys: base.keys,
     clearValues: base.clearValues,
     clearAll: base.clearAll,
-    sync: base.sync
+    sync: base.sync,
+    getMany: async (keys, ctx) => {
+      const count = batchSize(keys)
+      if (count === 0) {
+        throwIfAborted(snapshotOperationContext(ctx)?.signal)
+        return []
+      }
+      /** Capture caller keys before stages; terminal capture includes supported in-place rewrites. */
+      const captured = snapshotStorageBatchKeys(keys, SqliteNames.backend)
+      const input = { keys: captured.map(({ key }) => key) }
+      return rootRead(
+        SqliteOperation.getMany,
+        input,
+        ctx,
+        (orgId, prepared) => {
+          const actual = snapshotStorageBatchKeys(
+            (prepared as typeof input).keys,
+            SqliteNames.backend
+          )
+          return readSnapshot(() => getMany(actual, orgId))
+        },
+        { count }
+      )
+    },
+    setMany: async (entries, ctx) => {
+      const count = batchSize(entries)
+      if (count === 0) {
+        throwIfAborted(snapshotOperationContext(ctx)?.signal)
+        return
+      }
+      /** Every duplicate, value and TTL failure precedes the first pipeline or native request. */
+      const captured = captureTextEntries(entries)
+      const input = { entries: captured.map(({ key, value, ttlMs }) => ({ key, value, ttlMs })) }
+      return rootWrite(
+        SqliteOperation.setMany,
+        input,
+        ctx,
+        (prepared) => {
+          const actual = captureTextEntries(prepared.entries)
+          /** Codec success precedes locks and table changes, matching ordinary root replacement. */
+          const raw = actual.map((entry) => ({
+            ...entry,
+            value: convert('text', 'encode', entry.value) as string
+          }))
+          return {
+            keys: actual.flatMap(({ key }) =>
+              typeof key === 'string'
+                ? [lockKey.text(key), lockKey.bytes(key), lockKey.record(key)]
+                : [lockKey.text(key), lockKey.record(key)]
+            ),
+            run: (state) => {
+              for (const entry of raw)
+                writeRaw(
+                  'text',
+                  entry.key,
+                  entry.value,
+                  state,
+                  readTransactionConflictPolicy(state.context, SqliteNames.backend),
+                  entry.ttlMs
+                )
+            }
+          }
+        },
+        { count }
+      )
+    },
+    removeMany: async (keys, ctx) => {
+      const count = batchSize(keys)
+      if (count === 0) {
+        throwIfAborted(snapshotOperationContext(ctx)?.signal)
+        return 0
+      }
+      /** Repeated structural keys share first-position facts and affect one physical row. */
+      const captured = snapshotStorageBatchKeys(keys, SqliteNames.backend)
+      const input = { keys: captured.map(({ key }) => key) }
+      return rootWrite(
+        SqliteOperation.removeMany,
+        input,
+        ctx,
+        (prepared) => {
+          const actual = snapshotStorageBatchKeys(prepared.keys, SqliteNames.backend)
+          return {
+            keys: actual
+              .filter(({ firstIndex }, index) => firstIndex === index)
+              .map(({ key }) => lockKey.text(key)),
+            run: (state) => {
+              return removeTextBatch(actual, state)
+            }
+          }
+        },
+        { count }
+      )
+    },
+    removeByPrefix: async (prefix, ctx) => {
+      controller.assertLive()
+      /** The original prefix owner fixes the caller snapshot before asynchronous middleware. */
+      const captured = snapshotStorageKey(prefix, SqliteNames.backend)
+      return rootWrite(
+        SqliteOperation.removeByPrefix,
+        { prefix: captured },
+        ctx,
+        (input) => {
+          const actual = snapshotStorageKey(input.prefix, SqliteNames.backend)
+          return {
+            keys: [],
+            guard: { channels: ['text'], prefix: actual },
+            run: (state) => removePrefix('text', actual, state)
+          }
+        },
+        { count: undefined }
+      )
+    }
   }
   /** Transaction binders retain the authentic complete scope admitted by the original owner. */
   const kvImplementation = implement(kv, keyValue, { forTransaction: (scope) => scope })
@@ -2298,8 +2592,16 @@ export function createSqliteStore<TValue>(
             core.getChainMethods('query')
           ),
         removeByPrefix: (prefix) =>
-          scoped(scope, SqliteOperation.removeByPrefix, { prefix }, (state) =>
-            removePrefix('record', prefix, state)
+          scoped(
+            scope,
+            SqliteOperation.removeByPrefix,
+            () => ({ prefix: snapshotStorageKey(prefix, SqliteNames.backend) }),
+            (state, _current, input) =>
+              removePrefix(
+                'record',
+                snapshotStorageKey((input as { prefix: IStorageKey }).prefix, SqliteNames.backend),
+                state
+              )
           )
       }) satisfies ITransactionRecordsApi<TValue>
   })
