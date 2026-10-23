@@ -774,6 +774,46 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.createSqlTag![0]!.example,
       cases: storageContractCases.createSqlTag
     },
+    snapshotConcurrencyLockKeys: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot paired canonical keys and identities without acquiring locks.',
+        '对配对规范键与身份制作快照，不取锁。'
+      ),
+      params: {
+        keys: t(
+          'Unknown lock array admitted once by the original normalizer.',
+          '原规范化器一次准入的未知锁数组。'
+        ),
+        backend: t('Actual backend diagnostic name.', '实际后端诊断名。')
+      },
+      returns: t(
+        'Frozen detached sorted/deduplicated keys and matching readonly hexadecimal identities, without authority.',
+        '冻结的独立排序去重键与配对只读十六进制身份，不授予权限。'
+      ),
+      example: storageContractCases.snapshotConcurrencyLockKeys![0]!.example,
+      cases: storageContractCases.snapshotConcurrencyLockKeys
+    },
+    snapshotConcurrencyLockRange: {
+      role: 'operation',
+      purpose: t(
+        'Project a channel or typed prefix into canonical half-open lock identity bounds.',
+        '将通道或 typed 前缀投影为规范半开锁身份边界。'
+      ),
+      params: {
+        range: t(
+          'Channel and optional typed prefix; byte prefixes must be strings, including empty.',
+          '通道与可选 typed 前缀；bytes 前缀须为字符串，可为空。'
+        ),
+        backend: t('Actual backend diagnostic name.', '实际后端诊断名。')
+      },
+      returns: t(
+        'Frozen lower/upper hexadecimal bounds using original channel ranks and key prefix encoding. No lock authority.',
+        '冻结的 lower/upper 十六进制边界，复用原通道顺序与键前缀编码，无取锁权限。'
+      ),
+      example: storageContractCases.snapshotConcurrencyLockRange![0]!.example,
+      cases: storageContractCases.snapshotConcurrencyLockRange
+    },
     snapshotConcurrencyLockHoldings: {
       role: 'operation',
       purpose: t(
@@ -956,8 +996,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         request: t(
-          'Authentic registered store, plain captured ITransactionOptions, and already resolved genuine policy. Read borrowed getters once before resolving overrides.',
-          '真实登记 store 与原 ITransactionOptions 或精确外层 attempt；循环只捕获一次覆盖值，policy 省略时解析原默认策略，显式 policy 仍唯一生效。'
+          'Authentic registered store and original options or exact outer attempt; optional policy overrides the owner default. Optional lock(captured) runs once after fixed-field capture and merges implicit locks with all explicit locks, reusing inherited encodings and budget.',
+          '真实登记 store 与原 options 或精确外层 attempt；policy 省略用原默认。可选 lock(captured) 在固定字段捕获后调用一次，隐式锁与全部显式锁合并，复用继承编码与预算。'
         ),
         port: t(
           'Real backend attempt port. Return committed or conflict only after native completion and cleanup; use context.wait for logical admission and waitPhysical for physical scheduling.',
@@ -3360,10 +3400,19 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
     },
     IWriteOptions: {
       summary: t(
-        'Asynchronous operation context extended with an explicit existing-key policy for backend writes.',
-        '异步操作上下文加上后端写入的显式已有键策略。'
+        'Asynchronous operation context extended with optional existing-key and authentic concurrency policies for backend writes.',
+        '异步操作上下文加上后端写入的可选已有键策略与真实 concurrency 策略。'
       ),
-      members: { ...operationMembers, conflictPolicy: conflictMember }
+      members: {
+        ...operationMembers,
+        conflictPolicy: conflictMember,
+        concurrency: {
+          summary: t(
+            'Optional authentic policy; omission selects the original owner default.',
+            '可选真实策略；省略时选择原 owner 默认。'
+          )
+        }
+      }
     },
     ISyncWriteOptions: {
       summary: t(

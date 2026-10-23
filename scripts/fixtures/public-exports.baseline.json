@@ -1078,6 +1078,8 @@
         "runWithConcurrency",
         "snapshotCodec",
         "snapshotConcurrencyLockHoldings",
+        "snapshotConcurrencyLockKeys",
+        "snapshotConcurrencyLockRange",
         "snapshotKeyValueStore",
         "snapshotKeyValueStoreDetailed",
         "snapshotOperationContext",

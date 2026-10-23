@@ -680,6 +680,10 @@ async function paidTotals(store: IStorageBase) {
 
 `snapshotConcurrencyLockHoldings(rows)` detaches the current inspection rows and stably sorts them by the same channel/key byte order. It preserves each holder, expired flag and expiresAt value, including separate rows for equal keys. The result has no internal lock-table reference or lock authority.
 
+`snapshotConcurrencyLockKeys(keys, backend)` normalizes, orders and deduplicates once, returning frozen paired `{keys, identities}`. Keys are detached snapshots; identities are the original channel encoding as hexadecimal strings, without acquisition authority. `snapshotConcurrencyLockRange({channel,prefix?}, backend)` returns a half-open `{lower,upper}` interval in the same identity domain. Omitted prefix selects the entire channel; a supplied prefix reuses the canonical typed prefix rules. Byte prefixes accept strings only, including the empty string.
+
+The optional `runWithConcurrency` request field `lock(captured)` runs once after the original fixed context fields are captured. Its implicit locks merge with, order and deduplicate the explicit options.lock set without dropping explicit locks. Nested calls normalize only added keys, reusing existing encodings and the same budget; retries do not call the derivation again. Getter and raw callback failures retain their cause through INVALID_ARGUMENT; existing coded callback failures preserve identity. `IWriteOptions` and root removal/clear contexts for every data channel include `IWriteConcurrencyOptions`; omitted concurrency uses the original owner default.
+
 `IConcurrencyAttemptContext.attempt` is the original shared conflict count plus one. Backends forward this readonly ordinal to observations; they do not count attempts independently. Nested attempts use the same budget source.
 
 ## SQL fragments and backend binding

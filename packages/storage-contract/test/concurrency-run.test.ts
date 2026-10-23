@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
+import * as keyOrder from '../src/key-order.js'
 import {
   ConcurrencyPolicy,
   createTransactionOwner,
@@ -9,6 +10,11 @@ import {
   readConcurrencyLockIdentities,
   resolveConcurrencyPolicy,
   StorageStageKind,
+  StorageContractError,
+  StorageContractErrorCode,
+  type IWriteOptions,
+  type IWriteConcurrencyOptions,
+  type IRecordStore,
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext,
   type IConcurrencyPolicy,
@@ -127,6 +133,140 @@ describe('canonical concurrency attempts', () => {
     expect(() => readConcurrencyLockIdentities({} as IConcurrencyAttemptContext)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
+  })
+
+  it('adds implicit locks once after captured fields while preserving explicit locks and nested budget', async () => {
+    const { store } = base()
+    const policy = ConcurrencyPolicy.optimistic({ retries: 1, backoffMs: 0 })
+    const reads = { context: 0, hook: 0, derived: 0 }
+    let attempts = 0
+    const encode = vi.spyOn(keyOrder, 'encodeOrderedStorageKey')
+    const options = {
+      lock: [lockKey.record(new Date(1))],
+      concurrency: policy,
+      timeoutMs: 100,
+      get conflictPolicy() {
+        reads.context++
+        return 'replace' as const
+      }
+    }
+    try {
+      await expect(
+        runWithConcurrency(
+          {
+            store,
+            options,
+            get lock() {
+              reads.hook++
+              return (captured: IWriteOptions) => {
+                reads.derived++
+                expect(Object.isFrozen(captured)).toBe(true)
+                expect(captured.conflictPolicy).toBe('replace')
+                expect(reads.context).toBe(1)
+                return [lockKey.text('root'), lockKey.record(new Date(1))]
+              }
+            }
+          },
+          {
+            attempt: async (outer) => {
+              attempts++
+              if (attempts > 1) {
+                expect(outer.lock).toEqual([lockKey.text('root'), lockKey.record(new Date(1))])
+                return { status: 'committed', value: 9 }
+              }
+              expect(outer.lock).toEqual([lockKey.text('root'), lockKey.record(new Date(1))])
+              const before = readConcurrencyLockIdentities(outer)
+              ;(outer.lock![1]!.key as Date).setTime(90)
+              encode.mockClear()
+              await expect(
+                runWithConcurrency(
+                  {
+                    store,
+                    options: outer,
+                    lock: () => [lockKey.bytes('blob')]
+                  },
+                  {
+                    attempt: async (inner) => {
+                      expect(encode).toHaveBeenCalledTimes(1)
+                      expect(inner.signal).toBe(outer.signal)
+                      expect(inner.timeoutMs).toBeUndefined()
+                      expect(inner.lock).toEqual([
+                        lockKey.text('root'),
+                        lockKey.bytes('blob'),
+                        lockKey.record(new Date(1))
+                      ])
+                      const ids = readConcurrencyLockIdentities(inner)
+                      expect(ids).toContain(before[0])
+                      expect(ids).toContain(before[1])
+                      return { status: 'committed', value: 7 }
+                    }
+                  }
+                )
+              ).resolves.toBe(7)
+              return conflict('commit')
+            }
+          }
+        )
+      ).resolves.toBe(9)
+      expect(attempts).toBe(2)
+      expect(reads).toEqual({ context: 1, hook: 1, derived: 1 })
+    } finally {
+      encode.mockRestore()
+    }
+    expectTypeOf<IWriteOptions>().toExtend<IWriteConcurrencyOptions>()
+    expectTypeOf<
+      NonNullable<Parameters<IRecordStore['removeBytes']>[1]>
+    >().toExtend<IWriteConcurrencyOptions>()
+    expectTypeOf<
+      NonNullable<Parameters<IRecordStore['clearAll']>[0]>
+    >().toExtend<IWriteConcurrencyOptions>()
+  })
+
+  it('rejects implicit lock failures before native admission and preserves coded failures', async () => {
+    const { store } = base()
+    const attempt = vi.fn()
+    const original = new Error('derive failed')
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          lock: () => {
+            throw original
+          }
+        },
+        { attempt }
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          get lock(): never {
+            throw original
+          }
+        },
+        { attempt }
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
+    const coded = new StorageContractError(StorageContractErrorCode.aborted, { cause: original })
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          lock: () => {
+            throw coded
+          }
+        },
+        { attempt }
+      )
+    ).rejects.toBe(coded)
+    await expect(
+      runWithConcurrency({ store, options: {}, lock: () => [null as never] }, { attempt })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(attempt).not.toHaveBeenCalled()
   })
 
   it('keeps explicit policy authoritative and resolves the original default without another registry', async () => {

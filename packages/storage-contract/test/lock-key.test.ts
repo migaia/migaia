@@ -3,6 +3,8 @@ import {
   lockKey,
   compareStorageKeys,
   snapshotConcurrencyLockHoldings,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange,
   type ILockHolding,
   type ILockKey,
   type IStorageKey
@@ -219,6 +221,72 @@ describe('canonical lock identities', () => {
           }
         } as unknown as ILockHolding
       ])
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
+  })
+
+  it('publishes detached matching lock keys and pure half-open channel/prefix intervals', () => {
+    /** Public snapshots share canonical deduplication without exposing encoded mutable bytes. */
+    const date = new Date(1)
+    const captured = snapshotConcurrencyLockKeys(
+      [
+        lockKey.record(date),
+        lockKey.text('users/1'),
+        lockKey.bytes('users/1'),
+        lockKey.record(new Date(1))
+      ],
+      'memory'
+    )
+    date.setTime(9)
+    expect(captured.keys).toEqual([
+      lockKey.text('users/1'),
+      lockKey.bytes('users/1'),
+      lockKey.record(new Date(1))
+    ])
+    expect(captured.identities).toHaveLength(3)
+    expect(Object.isFrozen(captured)).toBe(true)
+    expect(Object.isFrozen(captured.keys)).toBe(true)
+    expect(Object.isFrozen(captured.identities)).toBe(true)
+    for (const [index, channel] of ['text', 'bytes', 'record'].entries()) {
+      const bounds = snapshotConcurrencyLockRange(
+        { channel: channel as ILockKey['channel'] },
+        'memory'
+      )
+      expect(Object.isFrozen(bounds)).toBe(true)
+      expect(captured.identities.filter((id) => bounds.lower <= id && id < bounds.upper)).toEqual([
+        captured.identities[index]
+      ])
+    }
+    /** Typed ranges retain content-prefix, complete array-child and exact scalar semantics. */
+    for (const [prefix, included, excluded] of [
+      ['users/', 'users/1', 'users-extra'],
+      [['users'], ['users', 1], ['users-extra']],
+      [new Uint8Array([1]).buffer, new Uint8Array([1, 2]).buffer, new Uint8Array([2]).buffer],
+      [1, 1, 2],
+      [new Date(1), new Date(1), new Date(2)]
+    ] as const) {
+      const bounds = snapshotConcurrencyLockRange({ channel: 'record', prefix }, 'memory')
+      const yes = snapshotConcurrencyLockKeys([lockKey.record(included)], 'memory').identities[0]!
+      const no = snapshotConcurrencyLockKeys([lockKey.record(excluded)], 'memory').identities[0]!
+      expect(bounds.lower <= yes && yes < bounds.upper).toBe(true)
+      expect(bounds.lower <= no && no < bounds.upper).toBe(false)
+    }
+    const bytes = snapshotConcurrencyLockRange({ channel: 'bytes', prefix: '' }, 'memory')
+    expect(captured.identities[1]! >= bytes.lower && captured.identities[1]! < bytes.upper).toBe(
+      true
+    )
+    expect(() =>
+      snapshotConcurrencyLockRange({ channel: 'bytes', prefix: 1 }, 'memory')
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    const original = new Error('range getter failed')
+    expect(() =>
+      snapshotConcurrencyLockRange(
+        {
+          get channel(): never {
+            throw original
+          }
+        },
+        'memory'
+      )
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
   })
 
