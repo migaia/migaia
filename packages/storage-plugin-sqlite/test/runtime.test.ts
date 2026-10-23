@@ -13,7 +13,7 @@ import { nodeSqliteDriver } from '../src/node.js'
 /** The same plain-JavaScript consumer proves the actual built entries in separate runtime processes. */
 const fixture = fileURLToPath(new URL('./runtime-matrix.mjs', import.meta.url))
 it.each(['Node', 'Bun', 'Deno'] as const)(
-  'persists, reopens and preserves exact integers through %s',
+  'persists, reopens and composes entities with exact integers through %s',
   (runtime) => {
     const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-runtime-'))
     onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
@@ -29,6 +29,7 @@ it.each(['Node', 'Bun', 'Deno'] as const)(
         runtime,
         phase,
         count: 1,
+        entity: 'versioned-query',
         result: 'passed'
       })
     }
