@@ -101,6 +101,32 @@ console.log(resolveStorageNamespace('cache', org, defaultOrg))`,
       )
     }
   ],
+  entityOrganizations: [
+    {
+      title: t(
+        'Connect one entity layout to separate organizations',
+        '将同一实体布局连接到不同组织'
+      ),
+      problem: t(
+        'Entity repositories need organization isolation without owning a backend lifetime.',
+        '实体仓储需要组织隔离，同时不取得后端生命周期所有权。'
+      ),
+      example: `import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' })
+const left = users.connect(host.org(createOrgId()).backend('memory'))
+const right = users.connect(host.org(createOrgId()).backend('memory'))
+await left.put({ id: 'same', name: 'Ada' })
+await right.put({ id: 'same', name: 'Grace' })
+console.log(await left.get('same'), await right.get('same'))`,
+      result: t(
+        'Prints Ada and Grace from independent native namespaces; root resource syntax closes both.',
+        '分别从独立原生namespace输出Ada与Grace；根资源语法统一关闭。'
+      )
+    }
+  ],
   storageOrganizations: [
     {
       title: t(

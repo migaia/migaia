@@ -11,7 +11,10 @@ import type {
   ICodecStageObserver,
   IQueryStageObserver
 } from '@migaia/storage-contract'
-import type { IKeyValueStore } from '@migaia/storage-contract'
+import type { IKeyValueStore, IStorageBase } from '@migaia/storage-contract'
+import type { IStorageBorrowedBackend } from '../types.js'
+/** Raw backends retain resource admission; only certified host views may omit ownership members. */
+export type IEntityConnectStore = IKeyValueStore | IStorageBorrowedBackend<IStorageBase>
 import type { ISchemaAdapter } from '../entity.js'
 import type { IMigrationStep } from '@migaia/storage-contract'
 import type { ICodec } from '../entity.js'
@@ -397,7 +400,7 @@ export type IEntityDefinition<
   /** Captured positive envelope version. */
   readonly version: number
   /** Bind to one actual store, selecting a capability-compatible codec and query route. */
-  connect<S extends IKeyValueStore>(
+  connect<S extends IEntityConnectStore>(
     store: S,
     options?: IEntityConnectOptions
   ): IRepository<TDomain, TIndexes, IEntityStoreChangeFeed<S>, IEntityStoreQueryMethods<S>>

@@ -13,6 +13,7 @@ import {
   registerBackendEnvelopeStages,
   registerBackendValueCommit,
   getBackendChangeController,
+  registerBackendEntityAccess,
   type IBackendChangeController
 } from './core/change-controller.js'
 import { StorageHookName as Hook } from './hook-names.js'
@@ -685,9 +686,15 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           },
           getPublishedBackend: (id) => {
             /** Original scope admission enforces the install window before any lookup. */
-            let view: object | undefined
+            let view: ReturnType<typeof borrowStorageBackend> | undefined
+            /**
+             * Aliases borrow the source registration's existing facts and release with this
+             * borrower.
+             */
+            const releases: Array<() => void> = []
             registrationCore!.onDispose(() => {
               if (view !== undefined) borrowed?.delete(view)
+              for (const release of releases) release()
             })
             /** Current-batch and future stores never enter this committed registry. */
             const store = this.#registry.get(id)
@@ -699,10 +706,22 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
               )
             /** Its existing context retains the exact original lifecycle and enablement guards. */
             const source = this.#storeContexts.get(store)!
-            view = borrowStorageBackend(store, () => {
+            const assertBorrowed = () => {
               assertRegistration()
               source.context.assertCurrent()
-            })
+            }
+            view = borrowStorageBackend(store, assertBorrowed)
+            releases.push(registerBackendEntityAccess(view, store, assertBorrowed))
+            releases.push(
+              registerBackendEnvelopeStages(
+                view,
+                (operation) => source.context.getEnvelopeStages(operation),
+                () => source.context.storeCell.getChainMethods('query')
+              )
+            )
+            const controller = getBackendChangeController(store)
+            if (controller !== undefined)
+              releases.push(registerBackendChangeController(view, controller))
             ;(borrowed ??= new Map()).set(view, store)
             return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
           },
@@ -1162,6 +1181,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           (operation) => context.getEnvelopeStages(operation, orgId),
           () => context.storeCell.getChainMethods('query')
         )
+      )
+      context.storeCell.retainOrgBinding(
+        registerBackendEntityAccess(view, native, () => {
+          this.#assertOpen()
+          context.assertExecution()
+        })
       )
       return view
     }) as ReturnType<typeof borrowStorageBackend>
