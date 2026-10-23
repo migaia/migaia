@@ -6,6 +6,7 @@ import {
   hasStorageCapability,
   useStorageCapability,
   kv,
+  records,
   StorageContractErrorCode,
   type ICapabilityInstallPort,
   type IStorageBase,
@@ -14,6 +15,8 @@ import {
   type IStorageImplementationsOf,
   type IKeyValueApi,
   type ICapabilityStore,
+  type ICapabilityImpl,
+  type IRecordsApi,
   type ITransactionBuilder,
   type IWithChainMethods
 } from '../src/index.js'
@@ -549,5 +552,44 @@ describe('capability type boundaries', () => {
       subset.use(write)
     }
     void invalidTypes
+  })
+})
+
+describe('record query Feature type projection', () => {
+  it('keeps native capability members and other tokens while carrying query methods through selection', () => {
+    /** An unrelated token must retain the exact supplied native API. */
+    const native = defineStorageCapability<{ readonly value: 'native' }>()('projection-native')
+    /** Original capability metadata owns the APIs; no runtime brand or method is fabricated. */
+    type IOriginal = ICapabilityStore<
+      IStorageBase,
+      typeof records | typeof native,
+      readonly [
+        ICapabilityImpl<
+          typeof records,
+          IRecordsApi<{ readonly id: string }> & { readonly nativeApi: 'kept' }
+        >,
+        ICapabilityImpl<typeof native, { readonly value: 'native'; readonly extra: 7 }>
+      ]
+    >
+    /** Host pure metadata carries only the actual selected method group. */
+    type IEnhanced = IWithChainMethods<
+      IOriginal,
+      { readonly query: { tag(): 'tagged'; live(): Promise<string> } }
+    >
+    /** Compile-only calls model the real host's explicit entity row domain. */
+    function validTypes(store: IEnhanced, original: IOriginal): void {
+      const query = store
+        .use(records)
+        .query<{ id: string; active: boolean }>()
+        .where({ active: true })
+      expectTypeOf(query.tag()).toEqualTypeOf<'tagged'>()
+      expectTypeOf(query.select('id').tag()).toEqualTypeOf<'tagged'>()
+      expectTypeOf(query.select((row) => row.id).live()).toEqualTypeOf<Promise<string>>()
+      expectTypeOf(store.use(records).nativeApi).toEqualTypeOf<'kept'>()
+      expectTypeOf(store.use(native).extra).toEqualTypeOf<7>()
+      // @ts-expect-error Zero-Feature queries have no selected Feature method.
+      original.use(records).query().tag()
+    }
+    void validTypes
   })
 })
