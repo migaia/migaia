@@ -1139,6 +1139,8 @@
         "snapshotStorageVectorCollection",
         "snapshotStorageVectorFilter",
         "snapshotStorageVectorSearch",
+        "snapshotStorageVectorIds",
+        "snapshotStorageDeleteCountMode",
         "snapshotStorageVectorUpsert",
         "snapshotStorageWhere",
         "snapshotSyncWriteOptions",

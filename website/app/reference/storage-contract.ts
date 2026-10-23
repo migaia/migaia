@@ -1016,6 +1016,41 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.snapshotStorageVectorFilter![0]!.example,
       cases: storageContractCases.snapshotStorageVectorFilter
     },
+    snapshotStorageVectorIds: {
+      role: 'operation',
+      purpose: t(
+        'Capture dense string IDs once, preserving duplicates unless explicitly rejected.',
+        '一次捕获稠密字符串 ID，默认保留重复，可显式拒绝。'
+      ),
+      params: {
+        ids: t('Dense string array.', '稠密字符串数组。'),
+        backend: t('Optional diagnostic backend.', '可选诊断后端。'),
+        rejectDuplicates: t(
+          'Reject duplicates when true; defaults false.',
+          'true 时拒绝重复，默认 false。'
+        )
+      },
+      returns: t('Frozen ordered string array.', '冻结的有序字符串数组。'),
+      example: storageContractCases.snapshotStorageVectorIds![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorIds
+    },
+    snapshotStorageDeleteCountMode: {
+      role: 'operation',
+      purpose: t(
+        'Validate precount/scroll and resolve omission to precount without native I/O.',
+        '校验 precount/scroll，省略时归为 precount，不做原生 I/O。'
+      ),
+      params: {
+        value: t('precount, scroll or undefined.', 'precount、scroll 或 undefined。'),
+        backend: t('Optional diagnostic backend.', '可选诊断后端。')
+      },
+      returns: t(
+        'Declared mode; omission defaults to precount.',
+        '声明的模式；省略时默认 precount。'
+      ),
+      example: storageContractCases.snapshotStorageDeleteCountMode![0]!.example,
+      cases: storageContractCases.snapshotStorageDeleteCountMode
+    },
     snapshotStorageVectorSearch: {
       role: 'operation',
       purpose: t(
