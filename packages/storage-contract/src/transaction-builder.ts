@@ -90,7 +90,7 @@ export function createTransactionBuilder<
   /** The borrowed transaction method is captured once and always invoked with the original store. */
   let transaction: TStore['transaction']
   /** Pure Feature methods retain their references and receive each real derived builder as this. */
-  let augmentation: TAugmentMethods
+  let augmentation: TAugmentMethods | undefined
   if (
     options !== undefined &&
     (typeof options !== 'object' || options === null || Array.isArray(options))
@@ -104,14 +104,15 @@ export function createTransactionBuilder<
       (typeof methods !== 'object' || methods === null || Array.isArray(methods))
     )
       throw new TypeError(StorageContractErrorText.concurrencyArgument)
-    augmentation = { ...methods } as TAugmentMethods
-    for (const key of Reflect.ownKeys(augmentation))
-      if (
-        (typeof key === 'string' && Object.hasOwn(TransactionBuilderMethod, key)) ||
-        typeof Reflect.get(augmentation, key) !== 'function'
-      )
-        throw new TypeError(StorageContractErrorText.concurrencyArgument)
-    Object.freeze(augmentation)
+    augmentation = methods === undefined ? undefined : ({ ...methods } as TAugmentMethods)
+    if (augmentation !== undefined)
+      for (const key of Reflect.ownKeys(augmentation))
+        if (
+          (typeof key === 'string' && Object.hasOwn(TransactionBuilderMethod, key)) ||
+          typeof Reflect.get(augmentation, key) !== 'function'
+        )
+          throw new TypeError(StorageContractErrorText.concurrencyArgument)
+    if (augmentation !== undefined) Object.freeze(augmentation)
   } catch (cause) {
     throw invalidBuilder(backend, cause)
   }

@@ -5,7 +5,7 @@ import type {
   IStorageCapabilityApiOf,
   records
 } from './capability.js'
-import type { IQueryChain } from './query-chain.js'
+import type { IRecordQuery } from './query-chain.js'
 import type { IStorageKey, IOperationContext } from './context.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { ICodecStageObserver } from './codec.js'
@@ -81,8 +81,8 @@ type IWithRecordQueryMethods<TApi, TValue, TMethods extends IChainMethods> = TAp
   query(): infer TQuery
 }
   ? Omit<TApi, 'query'> & {
-      query<R = TValue>(): Omit<TQuery, keyof IQueryChain<unknown>> &
-        IQueryChain<R, IOperationContext, R, true, IChainPart<TMethods, 'query'>> &
+      query<R = TValue>(): Omit<TQuery, keyof IRecordQuery<unknown>> &
+        IRecordQuery<R, IOperationContext, IChainPart<TMethods, 'query'>> &
         IChainPart<TMethods, 'query'>
     }
   : TApi

@@ -288,6 +288,34 @@ function totals(execute: IRecordQuerySource['execute']) {
         'Given an original cursor over paid totals 120 and 50, totals returns [{total:120}]. all awaits its actual disposal on success or failure. The empty support declaration keeps all steps client-side.',
         '传入 paid total 为 120、50 的原游标后，totals 返回 [{total:120}]；all 在成功或失败时都等待真实释放，空支持声明使所有步骤在客户端执行。'
       )
+    },
+    {
+      title: t(
+        'Stream the three smallest totals with a bounded heap',
+        '用有界堆流式读取最小的三个金额'
+      ),
+      problem: t(
+        'An entity list needs comparator ordering without materializing every source row. The explicit limit bounds retained candidates.',
+        '实体列表需要比较器排序，却不应物化全部源记录；显式上限约束保留的候选数量。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function smallest(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function smallest(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()
+}`
+      ),
+      result: t(
+        'Given totals 8, 2, 5 and 1, the returned real storage iterator yields 1, 2 and 5. Equal totals retain source order; iterator cleanup stays with the original source owner.',
+        '源金额为 8、2、5、1 时，返回的真实存储迭代器依次产出 1、2、5；同金额保留源顺序，清理仍由原数据源 owner 负责。'
+      )
     }
   ],
   compileStorageWhere: [
