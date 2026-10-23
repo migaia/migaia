@@ -1,5 +1,5 @@
 import type { IOperationContext } from '../context.js'
-import type { IStorageResource } from '../resource.js'
+import type { IStorageResource, IStorageIterator } from '../resource.js'
 import { STORAGE_BLOB_METHODS } from '../capability-constants.js'
 import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
 import type { IBackendKind } from '../capabilities.js'
@@ -228,6 +228,129 @@ export function snapshotStorageBlobList(
       )
     return Object.freeze({ prefix, after, limit, ctx: context })
   })
+}
+
+/**
+ * Borrows an admitted upload body through the original iterator lifetime. Native sinks retain their
+ * own buffering and backpressure; this owner only reads detached byte chunks, cancels an unfinished
+ * reader before draining, and releases that reader once. Create it after checking native write
+ * conditions, then dispose it when the native sink settles.
+ */
+export function createStorageBlobBodyReader(
+  body: Uint8Array | ReadableStream<Uint8Array>,
+  options: {
+    readonly report: (error: unknown) => void | PromiseLike<void>
+    readonly backend?: IBackendKind
+    readonly normalizeFailure?: (error: unknown) => unknown
+  }
+): IStorageIterator<Uint8Array> {
+  /** Classification belongs to the concrete backend, exactly as for native download content. */
+  const normalize = options.normalizeFailure ?? ((error: unknown): unknown => error)
+  /** Byte inputs use the same native reader protocol without adding an upload scheduler. */
+  const source = isUint8Array(body)
+    ? new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(body)
+          controller.close()
+        }
+      })
+    : body
+  /** The sink receives one native reader only after condition admission has completed. */
+  let reader: ReadableStreamDefaultReader<Uint8Array>
+  try {
+    reader = source.getReader()
+  } catch (error) {
+    throw normalize(error)
+  }
+  /** EOF and rejected reads are already terminal and must not be cancelled a second time. */
+  let ended = false
+  /** Early cancellation begins before accepted reads drain and settles in the same cleanup. */
+  let cancellation: Promise<void> | undefined
+  /** Cached cleanup and read-drain state remain in the original shared resource owner. */
+  const lifetime = createStorageIteratorLifetime<Uint8Array>({
+    close: async () => {
+      /** A cancellation failure remains primary when native release also fails. */
+      let primary: unknown
+      /** Rejection with undefined still denotes a failed cleanup. */
+      let failed = false
+      try {
+        await cancellation
+      } catch (error) {
+        failed = true
+        primary = normalize(error)
+      }
+      try {
+        reader.releaseLock()
+      } catch (error) {
+        if (failed) options.report(normalize(error))
+        else {
+          failed = true
+          primary = normalize(error)
+        }
+      }
+      if (failed) throw primary
+    },
+    report: options.report
+  })
+  /** Synchronous sealing retains the cancellation reason and wakes a blocked native read. */
+  const beginCancel = (reason?: unknown): void => {
+    if (ended || lifetime.isClosing()) return
+    try {
+      cancellation = reader.cancel(reason)
+    } catch (error) {
+      cancellation = Promise.reject(error)
+    }
+    void cancellation.catch(() => undefined)
+  }
+  return {
+    next: () => {
+      if (lifetime.isClosing()) return lifetime.returned()
+      return lifetime.advance(async () => {
+        /** A rejected native read is terminal even when its rejection value is undefined. */
+        let next: ReadableStreamReadResult<Uint8Array>
+        try {
+          next = await reader.read()
+        } catch (error) {
+          ended = true
+          throw normalize(error)
+        }
+        if (next.done) {
+          ended = true
+          return { done: true, value: undefined }
+        }
+        if (!isUint8Array(next.value))
+          throw new StorageContractError(
+            StorageContractErrorCode.invalidArgument,
+            { backend: options.backend },
+            StorageContractErrorText.blobArgument
+          )
+        try {
+          return { done: false, value: new Uint8Array(next.value) }
+        } catch (cause) {
+          throw new StorageContractError(
+            StorageContractErrorCode.invalidArgument,
+            { backend: options.backend, cause },
+            StorageContractErrorText.blobArgument
+          )
+        }
+      })
+    },
+    return: (reason) => {
+      beginCancel(reason)
+      return lifetime.returned(reason)
+    },
+    dispose: () => {
+      beginCancel()
+      return lifetime.dispose()
+    },
+    [Symbol.asyncDispose]: () => {
+      beginCancel()
+      return lifetime.symbolic()
+    },
+    [Symbol.asyncIterator]() {
+      return this
+    }
+  }
 }
 
 /**

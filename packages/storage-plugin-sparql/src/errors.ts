@@ -1,5 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
+import { normalizeError } from '@migaia/storage-host/authoring/backend'
 import { ERROR_SOURCE, SparqlErrorCode, type ISparqlErrorCode } from './error-code.js'
 import { SparqlErrorText } from './error-text.js'
 import { SparqlText } from './text.js'
@@ -12,7 +13,9 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
         ? SparqlErrorText.requestFailed
         : code === SparqlErrorCode.commitUnknown
           ? SparqlErrorText.commitUnknown
-          : SparqlErrorText.unavailable
+          : code === SparqlErrorCode.transactionFailed
+            ? SparqlErrorText.transactionFailed
+            : SparqlErrorText.unavailable
   const wrap = (): Error => {
     const error =
       cause instanceof TypeError
@@ -38,14 +41,25 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
     )
   return wrap()
 }
-/** Existing contract and package errors are not relabelled by native boundary normalization. */
+/** The original family boundary recognizes already-normalized native protocol errors. */
+function isSparqlError(error: unknown): error is Error {
+  return error instanceof Error && 'source' in error && error.source === ERROR_SOURCE
+}
+/** Native read failures gain protocol identity while existing error owners stay unchanged. */
 export function normalizeSparqlError(error: unknown): Error {
-  if (
-    error instanceof StorageContractError ||
-    (error instanceof Error && 'source' in error && error.source === ERROR_SOURCE)
+  return normalizeError(
+    error,
+    (cause) => sparqlError(SparqlErrorCode.unavailable, cause),
+    isSparqlError
   )
-    return error
-  return sparqlError(SparqlErrorCode.unavailable, error)
+}
+/** Callback and accepted draft failures use transaction semantics, never endpoint availability. */
+export function normalizeTransactionFailure(error: unknown): Error {
+  return normalizeError(
+    error,
+    (cause) => sparqlError(SparqlErrorCode.transactionFailed, cause),
+    isSparqlError
+  )
 }
 /** Pure invalid parameters stay in the canonical contract argument family. */
 export function invalidArgument(cause?: unknown): StorageContractError {

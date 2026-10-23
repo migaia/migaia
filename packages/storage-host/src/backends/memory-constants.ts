@@ -22,6 +22,7 @@ export const MemoryOperation = {
   /** Authentic expired views retain the historical scope operation in their cached failure. */
   transactionScope: 'transaction.scope',
   inspectLocks: 'inspectLocks',
+  watch: 'watch',
   getMany: 'getMany',
   setMany: 'setMany',
   removeMany: 'removeMany',
@@ -31,6 +32,15 @@ export const MemoryOperation = {
   ttlRemaining: 'ttl.remaining',
   ttlPersist: 'ttl.persist',
   counterIncrement: 'counter.increment',
+  rdfAdd: 'rdf.add',
+  rdfDelete: 'rdf.delete',
+  rdfMatch: 'rdf.match',
+  blobPut: 'blob.put',
+  blobGet: 'blob.get',
+  blobHead: 'blob.head',
+  blobRemove: 'blob.remove',
+  blobList: 'blob.list',
+  blobRemoveByPrefix: 'blob.removeByPrefix',
   vectorSearch: 'vector.search',
   vectorUpsert: 'vector.upsert',
   vectorDelete: 'vector.delete',
@@ -41,8 +51,10 @@ export const MemoryOperation = {
 export const MemoryState = {
   defaultNamespace: 'default',
   querySource: 'memory',
+  /** Cursor tag binds native object pages without creating a token registry. */
+  blobCursor: 'memory.blob',
   channels: ['value', 'bytes', 'record'] as const,
-  identity: (channel: IStorageChannel | 'vector', encoded: string): string =>
+  identity: (channel: IStorageChannel | 'vector' | 'rdf' | 'blob', encoded: string): string =>
     `${channel}:${encoded}`,
   ownerLabel: (runtime: string | undefined, pid: number | undefined): string =>
     runtime === undefined ? 'browser' : `${runtime}:${pid}`

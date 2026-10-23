@@ -330,7 +330,8 @@ export {
   snapshotStorageBlobPut,
   snapshotStorageBlobGet,
   snapshotStorageBlobList,
-  createStorageBlobObject
+  createStorageBlobObject,
+  createStorageBlobBodyReader
 } from './capabilities/blob.js'
 export type { IBlobInfo, IBlobObject, IBlobApi } from './capabilities/blob.js'
 export { durableChangeFeed } from './capabilities/durable-change-feed.js'

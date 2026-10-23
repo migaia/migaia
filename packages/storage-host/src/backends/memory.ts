@@ -36,6 +36,26 @@ import {
   ttl,
   counter,
   vector,
+  rdf,
+  blob,
+  snapshotStorageBlobPut,
+  snapshotStorageBlobGet,
+  snapshotStorageBlobList,
+  createStorageBlobObject,
+  createStorageBlobBodyReader,
+  prefixStorageOrgKey,
+  type IBlobApi,
+  type IBlobInfo,
+  type IBlobObject,
+  createRdfQuery,
+  snapshotStorageRdfQuad,
+  snapshotStorageRdfPattern,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph,
+  encodeStorageRdfQuad,
+  type IQuad,
+  type IRdfApi,
+  type ITransactionRdfApi,
   createVectorQuery,
   compileStorageWhere,
   compileStorageQueryCondition,
@@ -85,6 +105,8 @@ import {
 } from '@migaia/storage-contract'
 import { parseObjectPath } from '@migaia/utils/object-path'
 import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
+import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-core.js'
+import { createMemoryBlobData } from './memory-blob.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
@@ -102,9 +124,16 @@ import {
 import { planChannelWrite } from '../core/channel-write.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { resolveStorageNamespace } from '../core/namespace.js'
-import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
+import {
+  throwIfAborted,
+  mergeSignals,
+  withAbort,
+  subscribeToAbort,
+  readAbortReason
+} from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { observeStorageBatch } from '../core/batch-observation.js'
+import { createBackendChangeIterator } from '../core/change-iterator.js'
 import { StorageHookName } from '../hook-names.js'
 import {
   snapshotMemoryCapacity,
@@ -132,14 +161,20 @@ const recordPrefix = Symbol()
 const ttlOperations = Symbol()
 /** The counter binder borrows the same accepted operation and text draft from its fresh view. */
 const counterOperations = Symbol()
+/** The RDF binder borrows the same original draft and accepted operation view. */
+const rdfOperations = Symbol()
 /**
  * This private member runs through the same original operation owner as every other native scope
  * method.
  */
-type IMemoryScope<T> = ITransactionScope<T, typeof records | typeof ttl | typeof counter> & {
+type IMemoryScope<T> = ITransactionScope<
+  T,
+  typeof records | typeof ttl | typeof counter | typeof rdf
+> & {
   [recordPrefix](prefix: IStorageKey): Promise<number>
   readonly [ttlOperations]: ITransactionTtlApi
   readonly [counterOperations]: ITransactionCounterApi
+  readonly [rdfOperations]: ITransactionRdfApi
 }
 /** The original store retains the concrete complete native transaction view. */
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
@@ -157,9 +192,13 @@ type IMemoryEntry = {
   readonly value: unknown
   readonly ordered: Uint8Array
   readonly bytes?: number
+  readonly rdfKeys?: IMemoryRdfKeys
+  readonly rdfLock?: ILockKey
 }
-/** Vector metadata shares the native maps and draft without becoming a legacy logical channel. */
-type IMemoryChannel = IStorageChannel | 'vector'
+/** Native vector and RDF rows share the maps and draft without legacy channel replacement. */
+type IMemoryChannel = IStorageChannel | 'vector' | 'rdf'
+/** Blobs share capacity and invalidation, while remaining outside generic transactions and locks. */
+type IMemoryPhysicalChannel = IMemoryChannel | 'blob'
 /** A transaction retains its first deadline beside the existing detached value snapshot. */
 type IMemorySnapshot = IMemoryEntry & { readonly deadline?: number }
 /** This native unit supports only its actual three physical value channels. */
@@ -169,6 +208,12 @@ type IMemoryDraft = IMemorySnapshot & {
   readonly channel: IMemoryChannel
   readonly remove: boolean
   readonly encoded: string
+}
+/** A prepared RDF row keeps physical graph identity and the user's namespace-local logical lock. */
+type IMemoryRdfEntry = IMemoryEntry & {
+  readonly encoded: string
+  readonly rdfKeys: IMemoryRdfKeys
+  readonly rdfLock: ILockKey
 }
 
 /** Prepared root work owns detached inputs while borrowing the original admission and budget. */
@@ -285,12 +330,15 @@ function createMemoryNamespace<T>(
     value: new Map<string, IMemoryEntry>(),
     bytes: new Map<string, IMemoryEntry>(),
     record: new Map<string, IMemoryEntry>(),
-    vector: new Map<string, IMemoryEntry>()
+    vector: new Map<string, IMemoryEntry>(),
+    rdf: new Map<string, IMemoryEntry>()
   }
   /** Collection metadata is private to this namespace and consumes no second physical entry. */
   const vectorCollections = new Map<string, IStorageVectorConfiguration>()
-  /** Full physical clears include vector entries; legacy key replacement remains three-channel. */
-  const physicalChannels = [...MemoryState.channels, 'vector'] as const
+  /** Opaque objects keep independent native identity under the same namespace and controller. */
+  const blobs = createMemoryBlobData(orgId)
+  /** Full clears include native families; legacy key replacement remains three-channel. */
+  const physicalChannels = [...MemoryState.channels, 'vector', 'rdf'] as const
   /** Only live expiring identities retain deadline metadata. */
   const deadlines = new Map<string, number>()
   /** Optional policy metadata belongs only to this namespace's original physical rows. */
@@ -308,8 +356,11 @@ function createMemoryNamespace<T>(
     value: createOrderedRecordIndex<IMemoryEntry>(),
     bytes: createOrderedRecordIndex<IMemoryEntry>(),
     record: createOrderedRecordIndex<IMemoryEntry>(),
-    vector: createOrderedRecordIndex<IMemoryEntry>()
+    vector: createOrderedRecordIndex<IMemoryEntry>(),
+    rdf: createOrderedRecordIndex<IMemoryEntry>()
   }
+  /** RDF permutations index the same physical entries under this namespace and lifecycle. */
+  const rdfIndex = createMemoryRdfIndex(ordered.rdf)
   /** These original internal algorithms own only physical facts, without installation authority. */
   const revisions = createBackendRevisionPort()
   /** Each namespace has independent canonical locks under the one parent lifecycle. */
@@ -336,6 +387,8 @@ function createMemoryNamespace<T>(
     expiring?.clear()
     capacityIndex?.clear()
     vectorCollections.clear()
+    rdfIndex.clear()
+    blobs.clear()
   }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
   const normalize = (cause: unknown, expiredScope?: true) =>
@@ -369,7 +422,7 @@ function createMemoryNamespace<T>(
     ...(pid === undefined ? {} : { pid })
   })
   /** One physical channel plus the existing flat wire gives an unambiguous revision identity. */
-  const identity = (channel: IMemoryChannel, encoded: string): string =>
+  const identity = (channel: IMemoryPhysicalChannel, encoded: string): string =>
     MemoryState.identity(channel, encoded)
   /** Revision changes remain independent of whether an entry is currently present. */
   const revision = (channel: IMemoryChannel, encoded: string): number =>
@@ -412,22 +465,27 @@ function createMemoryNamespace<T>(
         (point.payload === undefined ? 0 : memoryCapacityValueBytes(point.payload))
       )
     }
+    if (channel === 'rdf')
+      return encodeStorageRdfQuad(value as IQuad, STORAGE_MEMORY_BACKEND).byteLength
     return memoryCapacityValueBytes(value)
   }
   /** One already owned physical identity is shared by the native entry and its policy metadata. */
   const capacityFact = (
-    channel: IMemoryChannel,
+    channel: IMemoryPhysicalChannel,
     key: IStorageKey,
-    bytes?: number
+    bytes?: number,
+    rdfLock?: ILockKey
   ): IMemoryCapacityChange => {
-    /** Encoding follows the original flat-key owner, not a capacity-specific key format. */
-    const encoded = encodeFlatStorageKey(key)
-    return { id: identity(channel, encoded), channel, encoded, key, bytes }
+    /** RDF already owns its original canonical identity; other channels retain the flat-key owner. */
+    const encoded = channel === 'rdf' ? (key as string) : encodeFlatStorageKey(key)
+    return { id: identity(channel, encoded), channel, encoded, key, bytes, lock: rdfLock }
   }
   /** Capacity uses only native physical channels already known to this namespace. */
-  const capacityLock = (entry: IMemoryCapacityChange): ILockKey => {
+  const capacityLock = (entry: IMemoryCapacityChange): ILockKey | undefined => {
+    if (entry.channel === 'blob') return undefined
     if (entry.channel === 'value') return lockKey.text(entry.key)
     if (entry.channel === 'bytes') return lockKey.bytes(entry.key as string)
+    if (entry.channel === 'rdf') return entry.lock!
     if (entry.channel === 'vector') {
       /** Vector rows already own the canonical collection/id tuple used by their lock owner. */
       const key = entry.key as readonly [string, string]
@@ -452,17 +510,28 @@ function createMemoryNamespace<T>(
     const victims = capacityIndex.preview([...expired, ...changes])
     /** Canonical point identities feed only the existing physical lock owner and its original FIFO. */
     const identities = snapshotConcurrencyLockKeys(
-      [...expired, ...victims].map(capacityLock),
+      [...expired, ...victims]
+        .map(capacityLock)
+        .filter((key): key is ILockKey => key !== undefined),
       STORAGE_MEMORY_BACKEND
     ).identities
     return { expired, victims, identities }
   }
   /** Native metadata deletion is shared by expiry, explicit removal and committed capacity victims. */
-  const deletePhysical = (channel: IMemoryChannel, encoded: string): IMemoryEntry | undefined => {
+  const deletePhysical = (
+    channel: IMemoryPhysicalChannel,
+    encoded: string
+  ): IMemoryEntry | undefined => {
+    if (channel === 'blob') {
+      const entry = blobs.removeEncoded(encoded)
+      if (entry !== undefined) capacityIndex?.remove(identity(channel, encoded))
+      return entry
+    }
     const entry = data[channel].get(encoded)
     if (entry === undefined) return undefined
     data[channel].delete(encoded)
-    ordered[channel].delete(entry.ordered)
+    if (channel === 'rdf') rdfIndex.delete(entry.rdfKeys!)
+    else ordered[channel].delete(entry.ordered)
     setDeadline(channel, encoded, undefined)
     capacityIndex?.remove(identity(channel, encoded))
     bump(channel, encoded)
@@ -482,7 +551,7 @@ function createMemoryNamespace<T>(
   }
   /** Memory values use one original clone rule for reads, writes and drafts. */
   const copyValue = (channel: IMemoryChannel, value: unknown, key: IStorageKey): unknown =>
-    channel === 'value'
+    channel === 'value' || channel === 'rdf'
       ? value
       : channel === 'bytes'
         ? cloneBytes(value as Uint8Array, key)
@@ -521,14 +590,14 @@ function createMemoryNamespace<T>(
    */
   let pendingChanges:
     | {
-        readonly channel: IMemoryChannel
+        readonly channel: IMemoryPhysicalChannel
         readonly kind: IStorageChange['kind']
         readonly keys?: readonly IStorageKey[]
       }[]
     | undefined
   /** Notifications retain original commit-after eviction order. */
   const publish = (
-    channel: IMemoryChannel,
+    channel: IMemoryPhysicalChannel,
     kind: IStorageChange['kind'],
     keys?: readonly IStorageKey[]
   ): void => {
@@ -537,10 +606,11 @@ function createMemoryNamespace<T>(
       return
     }
     controller.publish({
-      channel: channel === 'vector' ? 'all' : channel,
+      channel: channel === 'vector' || channel === 'rdf' || channel === 'blob' ? 'all' : channel,
       kind,
       orgId,
-      ...(keys === undefined ? {} : { keys })
+      // Broad RDF/object invalidations never expose physical graph or organization key envelopes.
+      ...(keys === undefined || channel === 'rdf' || channel === 'blob' ? {} : { keys })
     })
   }
   /** Capacity mutations and their events share the original final synchronous native turn. */
@@ -548,7 +618,7 @@ function createMemoryNamespace<T>(
     if (plan === undefined) return run()
     pendingChanges = []
     /** Counts retain only actual capacity removals, never ordinary expiry or user values. */
-    const counts = new Map<IMemoryChannel, number>()
+    const counts = new Map<IMemoryPhysicalChannel, number>()
     try {
       for (const entry of plan.expired) {
         const removed = deletePhysical(entry.channel as IMemoryChannel, entry.encoded)
@@ -557,7 +627,7 @@ function createMemoryNamespace<T>(
       /** Input preparation and final lock checks have already completed before this callback. */
       const result = run()
       for (const entry of plan.victims) {
-        const channel = entry.channel as IMemoryChannel
+        const channel = entry.channel as IMemoryPhysicalChannel
         const removed = deletePhysical(channel, entry.encoded)
         if (removed === undefined) continue
         publish(channel, 'remove', [removed.key])
@@ -804,7 +874,7 @@ function createMemoryNamespace<T>(
   const clearAll = (): void => {
     controller.assertLive()
     /** Empty physical channels still advance epochs without manufacturing change notifications. */
-    const changed = physicalChannels.some((channel) => data[channel].size !== 0)
+    const changed = blobs.size !== 0 || physicalChannels.some((channel) => data[channel].size !== 0)
     for (const channel of physicalChannels) {
       data[channel].clear()
       ordered[channel].clear()
@@ -813,6 +883,8 @@ function createMemoryNamespace<T>(
     deadlines.clear()
     expiring?.clear()
     capacityIndex?.clear()
+    rdfIndex.clear()
+    blobs.clear()
     if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
@@ -837,6 +909,22 @@ function createMemoryNamespace<T>(
     core.execution.run({ operation, input, ctx }, (captured) =>
       withAbort(ctx, async () => run(captured))
     )
+
+  /** Native feeds share one original subscription bridge and the backend's per-next pipeline. */
+  function watchChanges(
+    channel: IStorageChange['channel'],
+    ctx: IOperationContext | undefined,
+    key?: string
+  ): IStorageIterator<IStorageChange> {
+    return createBackendChangeIterator(controller, {
+      orgId,
+      channel,
+      key,
+      ctx,
+      execute: (advance, context) =>
+        core.execution.run({ operation: MemoryOperation.watch, input: key, ctx: context }, advance)
+    })
+  }
 
   /** New root batch admission keeps borrowed accessor failures on the contract error chain. */
   const captureBatch = <R>(capture: () => R): R => {
@@ -1138,6 +1226,11 @@ function createMemoryNamespace<T>(
         controller.assertLive()
         return locks.inspectLocks()
       }),
+    watch: (key, ctx) => {
+      controller.assertLive()
+      assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+      return watchChanges('value', ctx, key)
+    },
     subscribeChanges: (listener) => {
       controller.assertLive()
       return controller.subscribe((change) => {
@@ -1167,6 +1260,106 @@ function createMemoryNamespace<T>(
     }
   }
 
+  /** RDF graph projection reuses the one contract owner while keeping this namespace immutable. */
+  function physicalRdfPattern(pattern: Readonly<Partial<IQuad>>): Readonly<Partial<IQuad>> {
+    return pattern.graph === undefined
+      ? pattern
+      : { ...pattern, graph: prefixStorageOrgGraph(orgId, pattern.graph) }
+  }
+  /** Physical graph envelopes never escape a native organization view. */
+  function logicalRdfQuad(entry: IMemoryEntry): IQuad {
+    /** Native RDF entries own frozen ground terms and an organization-prefixed named graph. */
+    const quad = entry.value as IQuad
+    return Object.freeze({
+      ...quad,
+      graph: unprefixStorageOrgGraph(
+        orgId,
+        quad.graph as Parameters<typeof unprefixStorageOrgGraph>[1]
+      )
+    })
+  }
+  /** Full-batch canonical capture finishes before any logical lock or physical mutation. */
+  function captureRdfEntries(input: readonly IQuad[]): readonly IMemoryRdfEntry[] {
+    return captureBatch(() => {
+      if (!Array.isArray(input))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      /** Borrowed array bounds are captured once before validating any member or changing data. */
+      const length = input.length
+      if (!Number.isSafeInteger(length) || length < 0)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      /** Duplicate quads share one eventual physical change after every input has been admitted. */
+      const entries = new Map<string, IMemoryRdfEntry>()
+      for (let index = 0; index < length; index++) {
+        /** The contract alone owns ground position rules and detached term identity. */
+        const logical = snapshotStorageRdfQuad(input[index]!, STORAGE_MEMORY_BACKEND)
+        /** Each namespace stores real organization graphs even though its maps are also isolated. */
+        const value = Object.freeze({
+          ...logical,
+          graph: prefixStorageOrgGraph(orgId, logical.graph)
+        })
+        /** Explicit user locks and additional capacity victims must meet on this logical quad. */
+        const rdfLock = lockKey.rdf(logical)
+        /** A string row key avoids reclassifying large canonical RDF bytes as public binary keys. */
+        const encoded = snapshotConcurrencyLockKeys([lockKey.rdf(value)], STORAGE_MEMORY_BACKEND)
+          .identities[0]!
+        /** Six physical permutations retain only the canonical term writer's independent bytes. */
+        const rdfKeys = memoryRdfKeys(value)
+        entries.set(encoded, {
+          key: encoded,
+          encoded,
+          value,
+          ordered: rdfKeys[0]!,
+          rdfKeys,
+          rdfLock,
+          bytes: entryBytes('rdf', value)
+        })
+      }
+      return [...entries.values()]
+    })
+  }
+  /** Root pattern reads stream only the selected native prefix and retain safe leaf advancement. */
+  function* rdfRows(pattern: Readonly<Partial<IQuad>>): IterableIterator<IMemoryEntry> {
+    for (const row of rdfIndex.match(physicalRdfPattern(pattern))) {
+      capacityIndex?.touch(identity('rdf', row.key as string))
+      yield row
+    }
+  }
+  /**
+   * Root RDF queries expose truthful pattern access; traversal, sorting and cursors keep their
+   * owner.
+   */
+  function rootRdfQuery(pattern: Partial<IQuad>): ReturnType<IRdfApi['match']> {
+    controller.assertLive()
+    /** Caller getters detach at construction; native execution later receives this trusted shape. */
+    const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
+    return createRdfQuery(
+      {
+        asyncDisposeKey,
+        cursorSource: store,
+        watch: ({ ctx }) => watchChanges('all', ctx),
+        pushdown: {
+          source: MemoryState.querySource,
+          index: rdfIndex.select(physicalRdfPattern(captured)).name,
+          operations: [],
+          operators: []
+        },
+        execute: (input) =>
+          nativeIterator(
+            MemoryOperation.rdfMatch,
+            input.ctx,
+            () => rdfRows(input.pattern),
+            (row): readonly [IStorageKey, IQuad] => [row.key, logicalRdfQuad(row)]
+          )
+      },
+      captured,
+      core.getChainMethods('rdf')
+    )
+  }
+
   /** Root scans retain one actual native generator and one cached cleanup path. */
   function rootIterator(
     range: IKeyRange | undefined,
@@ -1194,7 +1387,7 @@ function createMemoryNamespace<T>(
   function nativeIterator<V, R>(
     operation: string,
     ctx: IOperationContext | undefined,
-    select: () => readonly V[],
+    select: () => Iterable<V>,
     project: (row: V) => R,
     beforeNext?: () => void
   ): IStorageIterator<R> {
@@ -1280,8 +1473,11 @@ function createMemoryNamespace<T>(
       value: createOrderedRecordIndex<IMemoryDraft>(),
       bytes: createOrderedRecordIndex<IMemoryDraft>(),
       record: createOrderedRecordIndex<IMemoryDraft>(),
-      vector: createOrderedRecordIndex<IMemoryDraft>()
+      vector: createOrderedRecordIndex<IMemoryDraft>(),
+      rdf: createOrderedRecordIndex<IMemoryDraft>()
     }
+    /** Proposed RDF entries and tombstones use the same six native permutations. */
+    const draftRdfIndex = createMemoryRdfIndex(draftOrdered.rdf)
     /** First reads are repeatable until a write in this attempt replaces their snapshot. */
     const snapshots = new Map<string, IMemorySnapshot | undefined>()
     /** Per-key tombstone revisions detect delete/reinsert and other ABA writes. */
@@ -1324,6 +1520,8 @@ function createMemoryNamespace<T>(
                 value: copyValue(channel, current.value, key),
                 ordered: current.ordered,
                 bytes: current.bytes,
+                rdfKeys: current.rdfKeys,
+                rdfLock: current.rdfLock,
                 deadline: deadlines.get(id)
               }
         )
@@ -1366,7 +1564,8 @@ function createMemoryNamespace<T>(
         ordered: draftOrdered[entry.channel].get(entry.ordered)?.key ?? entry.ordered
       }
       draft.set(track(proposed.channel, proposed.encoded, proposed.key), proposed)
-      draftOrdered[proposed.channel].set(proposed.ordered, proposed)
+      if (proposed.channel === 'rdf') draftRdfIndex.set(proposed.rdfKeys!, proposed)
+      else draftOrdered[proposed.channel].set(proposed.ordered, proposed)
     }
     /** Prepare first, then stage eviction and put atomically within this native draft. */
     const txWrite = (
@@ -1470,6 +1669,90 @@ function createMemoryNamespace<T>(
       }
       return rows
     }
+    /** RDF writes retain the same original draft, first-read revisions and logical lock facts. */
+    const txRdfWrite = (input: readonly IQuad[], remove: boolean): void => {
+      /** Admission of the entire batch precedes even the first draft tombstone. */
+      const entries = captureRdfEntries(input)
+      for (const entry of entries) {
+        /** Draft and first-read membership share the original channel identity. */
+        const id = identity('rdf', entry.encoded)
+        /** Own writes mask physical membership without introducing another transaction owner. */
+        const proposed = draft.get(id)
+        /** The original first-read owner records even absence for ABA conflict checks. */
+        const current = proposed
+          ? proposed.remove
+            ? undefined
+            : proposed
+          : txSnapshot('rdf', entry.encoded, entry.key)
+        if (remove ? current === undefined : current !== undefined) continue
+        stageDraft({ ...entry, channel: 'rdf', remove })
+      }
+    }
+    /** Physical and proposed prefix scans merge by identity without materializing complete results. */
+    function* txRdfRows(pattern: Readonly<Partial<IQuad>>): IterableIterator<IMemoryEntry> {
+      if (!snapshotEpochs.has('rdf')) snapshotEpochs.set('rdf', revisions.epoch('rdf'))
+      /** Both trees receive one identical bound graph envelope and access-path choice. */
+      const physical = physicalRdfPattern(pattern)
+      for (const row of rdfIndex.match(physical)) {
+        /** The original physical key remains a string even for a large literal. */
+        const encoded = row.key as string
+        if (draft.has(identity('rdf', encoded))) continue
+        /** Repeat reads retain the first physical snapshot and original revision. */
+        const current = txSnapshot('rdf', encoded, row.key)
+        if (current !== undefined) {
+          capacityIndex?.touch(identity('rdf', encoded))
+          yield current
+        }
+      }
+      for (const row of draftRdfIndex.match(physical)) if (!row.remove) yield row
+    }
+    /** The original transaction owner admits each native advance and closes the actual generator. */
+    function rdfQuery(
+      pattern: Partial<IQuad>,
+      scope: ITransactionScope<T>
+    ): ReturnType<ITransactionRdfApi['match']> {
+      /** The shared planner owns subsequent query snapshots and operation-scope rebinding. */
+      const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
+      return createRdfQuery<undefined, Record<never, never>, ITransactionScope<T>>(
+        {
+          asyncDisposeKey,
+          cursorSource: scope,
+          pushdown: {
+            source: MemoryState.querySource,
+            index: rdfIndex.select(physicalRdfPattern(captured)).name,
+            operations: [],
+            operators: []
+          },
+          execute: (input) => {
+            /** This actual generator, including client traversal children, has one native owner. */
+            const iterator = (async function* () {
+              for (const row of txRdfRows(input.pattern)) {
+                controller.assertLive()
+                throwIfAborted(ctx.signal)
+                yield [row.key, logicalRdfQuad(row)] as const
+              }
+            })()
+            return owner.registerIterator(input.operationScope ?? scope, {
+              next: (current) =>
+                core.execution.run(
+                  {
+                    operation: MemoryOperation.rdfMatch,
+                    input: input.pattern,
+                    scope: current,
+                    ctx
+                  },
+                  () => iterator.next()
+                ),
+              close: async () => {
+                await iterator.return(undefined)
+              }
+            })
+          }
+        },
+        captured,
+        core.getChainMethods('rdf')
+      )
+    }
     /** Native text batches stage only into this attempt's existing draft and revision baseline. */
     const textDraft: IMemoryTextDraft = {
       setMany: (entries) => {
@@ -1570,6 +1853,23 @@ function createMemoryNamespace<T>(
               },
               scope
             )
+        },
+        [rdfOperations]: {
+          add: (quads) =>
+            acceptedOperation(
+              MemoryOperation.rdfAdd,
+              quads,
+              (input) => txRdfWrite(input, false),
+              scope
+            ),
+          delete: (quads) =>
+            acceptedOperation(
+              MemoryOperation.rdfDelete,
+              quads,
+              (input) => txRdfWrite(input, true),
+              scope
+            ),
+          match: (pattern) => rdfQuery(pattern, scope)
         },
         [recordPrefix]: (prefix) =>
           operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
@@ -1837,7 +2137,10 @@ function createMemoryNamespace<T>(
                       (entry.key as readonly [string, string])[0],
                       (entry.key as readonly [string, string])[1]
                     )
-                  : lockKey.record(entry.key)
+                  : entry.channel === 'rdf'
+                    ? (draft.get(identity('rdf', entry.encoded)) ??
+                        snapshots.get(identity('rdf', entry.encoded)))!.rdfLock!
+                    : lockKey.record(entry.key)
           ),
           holder: undefined,
           cause: new Error(
@@ -1863,7 +2166,8 @@ function createMemoryNamespace<T>(
                   proposed.remove ||
                     (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
                     ? undefined
-                    : (proposed.bytes ?? 0)
+                    : (proposed.bytes ?? 0),
+                  proposed.rdfLock
                 )
               )
             )
@@ -1886,7 +2190,8 @@ function createMemoryNamespace<T>(
         value: [] as IStorageKey[],
         bytes: [] as IStorageKey[],
         record: [] as IStorageKey[],
-        vector: [] as IStorageKey[]
+        vector: [] as IStorageKey[],
+        rdf: [] as IStorageKey[]
       }
       commitCapacity(capacityPlan, () => {
         for (const proposed of draft.values()) {
@@ -1900,7 +2205,8 @@ function createMemoryNamespace<T>(
             setDeadline(proposed.channel, encoded, undefined)
             capacityIndex?.remove(identity(proposed.channel, encoded))
             if (!data[proposed.channel].delete(encoded)) continue
-            ordered[proposed.channel].delete(proposed.ordered)
+            if (proposed.channel === 'rdf') rdfIndex.delete(proposed.rdfKeys!)
+            else ordered[proposed.channel].delete(proposed.ordered)
           } else {
             /**
              * An overwrite retains its original live ordered encoding instead of keeping duplicate
@@ -1912,13 +2218,16 @@ function createMemoryNamespace<T>(
               key: proposed.key,
               value: proposed.value,
               ordered: keyBytes,
-              bytes: proposed.bytes
+              bytes: proposed.bytes,
+              rdfKeys: proposed.rdfKeys,
+              rdfLock: proposed.rdfLock
             }
             data[proposed.channel].set(encoded, entry)
-            ordered[proposed.channel].set(keyBytes, entry)
+            if (proposed.channel === 'rdf') rdfIndex.set(proposed.rdfKeys!, entry)
+            else ordered[proposed.channel].set(keyBytes, entry)
             setDeadline(proposed.channel, encoded, proposed.deadline)
             capacityIndex?.put({
-              ...capacityFact(proposed.channel, proposed.key),
+              ...capacityFact(proposed.channel, proposed.key, undefined, proposed.rdfLock),
               bytes: proposed.bytes ?? 0
             })
           }
@@ -1951,6 +2260,7 @@ function createMemoryNamespace<T>(
       expected.clear()
       snapshotEpochs.clear()
       for (const channel of physicalChannels) draftOrdered[channel].clear()
+      draftRdfIndex.clear()
       void stage.onTransactionClose?.()
     }
   }
@@ -2285,6 +2595,7 @@ function createMemoryNamespace<T>(
           {
             asyncDisposeKey,
             exact: true,
+            watch: ({ ctx }) => watchChanges('all', ctx),
             pushdown: {
               source: MemoryState.querySource,
               operations: [QueryOperation.where, QueryOperation.topK, QueryOperation.minScore],
@@ -2539,6 +2850,369 @@ function createMemoryNamespace<T>(
     }
   }
 
+  /** Native RDF writes use the original mutation runner, canonical locks and final synchronous turn. */
+  const rdfApi: IRdfApi = {
+    add: (quads, ctx) =>
+      mutationEntry(MemoryOperation.rdfAdd, quads, ctx, (input) => {
+        /** Full canonical admission precedes root lock acquisition and the final physical turn. */
+        const entries = captureRdfEntries(input)
+        return {
+          keys: entries.map((entry) => entry.rdfLock),
+          capacityChanges:
+            capacity === undefined
+              ? undefined
+              : () =>
+                  entries.map((entry) =>
+                    capacityFact('rdf', entry.key, entry.bytes, entry.rdfLock)
+                  ),
+          run: () => {
+            /** Idempotent additions publish only when physical membership really changes. */
+            let changed = false
+            for (const entry of entries) {
+              if (data.rdf.has(entry.encoded)) {
+                capacityIndex?.touch(identity('rdf', entry.encoded))
+                continue
+              }
+              data.rdf.set(entry.encoded, entry)
+              rdfIndex.set(entry.rdfKeys, entry)
+              capacityIndex?.put({
+                ...capacityFact('rdf', entry.key, undefined, entry.rdfLock),
+                bytes: entry.bytes ?? 0
+              })
+              bump('rdf', entry.encoded)
+              changed = true
+            }
+            if (changed) publish('rdf', 'batch')
+          }
+        }
+      }),
+    delete: (quads, ctx) =>
+      mutationEntry(MemoryOperation.rdfDelete, quads, ctx, (input) => {
+        /** All supplied quads validate before an existing point can be removed. */
+        const entries = captureRdfEntries(input)
+        return {
+          keys: entries.map((entry) => entry.rdfLock),
+          run: () => {
+            /** Repeated or absent deletions do not manufacture revisions or events. */
+            let changed = false
+            for (const entry of entries)
+              if (deletePhysical('rdf', entry.encoded) !== undefined) changed = true
+            if (changed) publish('rdf', 'batch')
+          }
+        }
+      }),
+    match: rootRdfQuery
+  }
+
+  /** Native object failures reuse the existing memory serialization boundary and original cause. */
+  const blobFailure = (cause: unknown, key?: string) =>
+    isStorageErrorFamily(cause)
+      ? cause
+      : new StorageError(StorageErrorCode.serializeFailed, {
+          backend: STORAGE_MEMORY_BACKEND,
+          key,
+          cause
+        })
+  /** Conditions inspect the current native generation both before reading and in the final turn. */
+  function assertBlobCondition(input: ReturnType<typeof snapshotStorageBlobPut>): void {
+    /** The current opaque generation is observed without taking reader ownership. */
+    const current = blobs.get(input.key)
+    if (
+      (input.options.ifMatch !== undefined && current?.value.info.etag !== input.options.ifMatch) ||
+      (input.options.ifNoneMatch === true && current !== undefined)
+    )
+      throw new StorageContractError(StorageContractErrorCode.writeConflict, {
+        backend: STORAGE_MEMORY_BACKEND
+      })
+  }
+  /** Only the native sink buffers the complete object; reader lifecycle stays in the contract owner. */
+  async function loadBlobBody(
+    input: ReturnType<typeof snapshotStorageBlobPut>,
+    signal: IOperationContext['signal']
+  ): Promise<Uint8Array> {
+    if (isUint8Array(input.body)) return input.body
+    /** Upload consumption and cancellation reuse the sole shared body-reader resource owner. */
+    const reader = createStorageBlobBodyReader(input.body, {
+      report,
+      backend: STORAGE_MEMORY_BACKEND,
+      normalizeFailure: (cause) => blobFailure(cause, input.key)
+    })
+    /** Only memory's native sink buffers complete content; server sinks keep their own backpressure. */
+    const chunks: Uint8Array[] = []
+    /** Byte accounting belongs to the completed native body rather than metadata or indexes. */
+    let size = 0
+    /** A primary read/abort/close failure must remain reachable if cleanup also fails. */
+    let failed = false
+    /** Cleanup failure becomes primary only when the body itself completed successfully. */
+    let cleanupFailed = false
+    /** Undefined rejection is still preserved when the shared cleanup rejects with it. */
+    let cleanupFailure: unknown
+    /** A fully collected body remains private until cleanup and the final CAS both succeed. */
+    let body!: Uint8Array
+    /** Context and host closure each release their original signal listener during settlement. */
+    let stopContext: () => void = () => undefined
+    /** Root closure wakes an unfinished read before the original mutation lease drains it. */
+    let stopClosing: () => void = () => undefined
+    /** The original dispose below consumes cancellation errors after the blocked read wakes. */
+    const cancel = (target: IOperationContext['signal']) => {
+      void reader.return!(readAbortReason(target)).catch(() => undefined)
+    }
+    try {
+      stopContext = subscribeToAbort(signal, () => cancel(signal), report)
+      stopClosing = subscribeToAbort(
+        controller.closingSignal,
+        () => cancel(controller.closingSignal),
+        report
+      )
+      for (;;) {
+        throwIfAborted(signal)
+        controller.assertLive()
+        /** The original reader returns a detached byte chunk or its stable EOF result. */
+        const next = await reader.next()
+        throwIfAborted(signal)
+        controller.assertLive()
+        if (next.done) break
+        chunks.push(next.value)
+        size += next.value.byteLength
+      }
+      body = new Uint8Array(size)
+      /** A single final allocation owns the bytes installed by the synchronous native commit. */
+      let offset = 0
+      for (const chunk of chunks) {
+        body.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+    } catch (cause) {
+      failed = true
+      throwIfAborted(signal)
+      controller.assertLive()
+      throw cause
+    } finally {
+      stopContext()
+      stopClosing()
+      try {
+        await reader.dispose()
+      } catch (cause) {
+        if (failed) reportCleanupError(report, cause)
+        else {
+          cleanupFailed = true
+          cleanupFailure = cause
+        }
+      }
+    }
+    if (cleanupFailed) throw cleanupFailure
+    return body
+  }
+  /** Opaque objects use the same original operation runner and physical capacity commit. */
+  const objects: IBlobApi = {
+    async put(key, body, options) {
+      controller.assertLive()
+      /** Caller-owned body/options are captured before the original operation pipeline can await. */
+      const input = snapshotStorageBlobPut(key, body, options, STORAGE_MEMORY_BACKEND)
+      /** Pipeline intervention receives owned writable fields without reviving caller getters. */
+      const pipelineInput = { ...input, options: { ...input.options } }
+      /** Pipeline-provided fields are captured once before upload starts or native admission waits. */
+      let prepared: ReturnType<typeof snapshotStorageBlobPut>
+      /** Complete content remains private through lock waits and the final generation recheck. */
+      let bytes: Uint8Array
+      /** Opaque generation metadata is prepared before capacity can remove any original entry. */
+      let info: IBlobInfo
+      /** Capacity uses the same shared physical tuple as this namespace's native object map. */
+      let physicalKey: IStorageKey
+      /** The original lock owner's final synchronous preflight selects the exact capacity victims. */
+      let plan: ReturnType<typeof planCapacity>
+      return runWithConcurrency(
+        {
+          store: base,
+          options: input.options.ctx ?? {},
+          execute: (context, invoke) =>
+            core.execution.run(
+              { operation: MemoryOperation.blobPut, input: pipelineInput, ctx: context },
+              async (captured) => {
+                controller.assertLive()
+                /** Accepted uploads drain through the existing controller's mutation lease. */
+                const release = controller.beginMutation()
+                try {
+                  prepared = snapshotStorageBlobPut(
+                    captured.key,
+                    captured.body,
+                    captured.options,
+                    STORAGE_MEMORY_BACKEND
+                  )
+                  assertBlobCondition(prepared)
+                  bytes = await loadBlobBody(prepared, context.signal)
+                  throwIfAborted(context.signal)
+                  controller.assertLive()
+                  physicalKey = prefixStorageOrgKey(orgId, prepared.key)
+                  info = Object.freeze({
+                    key: prepared.key,
+                    size: bytes.byteLength,
+                    etag: createStorageToken(),
+                    contentType: prepared.options.contentType,
+                    metadata: prepared.options.metadata ?? Object.freeze({}),
+                    updatedAt: Date.now()
+                  })
+                  return await invoke()
+                } catch (cause) {
+                  throw blobFailure(cause, input.key)
+                } finally {
+                  release()
+                }
+              }
+            ),
+          lock: () => []
+        },
+        {
+          attempt: (attempt) =>
+            locks.attemptWrite(
+              attempt,
+              holding(),
+              () => {
+                assertBlobCondition(prepared)
+                return commitCapacity(plan, () => {
+                  /** All failure-prone input and body work precedes this final synchronous turn. */
+                  const entry = blobs.put(bytes, info)
+                  capacityIndex?.put({
+                    ...capacityFact('blob', entry.key),
+                    bytes: bytes.byteLength
+                  })
+                  publish('blob', 'put')
+                  return info
+                })
+              },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal,
+              undefined,
+              undefined,
+              () => {
+                assertBlobCondition(prepared)
+                plan =
+                  capacity === undefined
+                    ? undefined
+                    : planCapacity([capacityFact('blob', physicalKey, bytes.byteLength)])
+                return plan?.identities ?? []
+              }
+            )
+        }
+      )
+    },
+    async get(key, options) {
+      controller.assertLive()
+      /** Range and caller context are admitted before any native object snapshot is opened. */
+      const input = snapshotStorageBlobGet(key, options, STORAGE_MEMORY_BACKEND)
+      /** The original pipeline may replace or mutate this owned request before native admission. */
+      const pipelineInput = { ...input, options: { ...input.options } }
+      /** This original timeout/context lifetime transfers to the returned shared object resource. */
+      const merged = mergeSignals(input.options.ctx, report)
+      /** A pipeline failure after opening content still disposes that exact original resource. */
+      let resource: IBlobObject | undefined
+      try {
+        throwIfAborted(merged.signal)
+        return await core.execution.run(
+          { operation: MemoryOperation.blobGet, input: pipelineInput, ctx: merged.context },
+          async (captured) => {
+            controller.assertLive()
+            throwIfAborted(merged.signal)
+            /** Re-capture pipeline changes even when it retained the same request object identity. */
+            const request = snapshotStorageBlobGet(
+              captured.key,
+              captured.options,
+              STORAGE_MEMORY_BACKEND
+            )
+            /** Native metadata and body come from the same immutable committed generation. */
+            const entry = blobs.get(request.key)
+            if (entry === undefined) {
+              merged.dispose()
+              return undefined
+            }
+            capacityIndex?.touch(identity('blob', entry.encoded))
+            /** Inclusive public range bounds become a detached native slice. */
+            const range = request.options.range
+            /** A clipped endpoint also makes reads beyond EOF return an empty body. */
+            const end =
+              range?.end === undefined
+                ? entry.value.body.byteLength
+                : Math.min(entry.value.body.byteLength, range.end + 1)
+            /** Future overwrites, removal and capacity eviction cannot change returned content. */
+            const snapshot = entry.value.body.slice(range?.start ?? 0, end)
+            /** Native pull opens no second lifecycle or storage subscription. */
+            const source = new ReadableStream<Uint8Array>(
+              {
+                pull(native) {
+                  controller.assertLive()
+                  throwIfAborted(merged.signal)
+                  native.enqueue(snapshot)
+                  native.close()
+                }
+              },
+              { highWaterMark: 0 }
+            )
+            resource = createStorageBlobObject(entry.value.info, source, {
+              close: () => merged.dispose(),
+              report,
+              backend: STORAGE_MEMORY_BACKEND,
+              normalizeFailure: (cause) => blobFailure(cause, request.key)
+            })
+            return resource
+          }
+        )
+      } catch (cause) {
+        try {
+          await resource?.dispose()
+        } catch (cleanup) {
+          reportCleanupError(report, cleanup)
+        }
+        merged.dispose()
+        throw blobFailure(cause, input.key)
+      }
+    },
+    head: (key, ctx) =>
+      asyncEntry(MemoryOperation.blobHead, key, ctx, (captured) => {
+        controller.assertLive()
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        const entry = blobs.get(captured)
+        if (entry !== undefined) capacityIndex?.touch(identity('blob', entry.encoded))
+        return entry?.value.info
+      }),
+    remove: (key, ctx) =>
+      mutationEntry(MemoryOperation.blobRemove, key, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [],
+          run: () => {
+            const entry = deletePhysical('blob', blobs.encodedOf(captured))
+            if (entry !== undefined) publish('blob', 'remove')
+            return entry !== undefined
+          }
+        }
+      }),
+    async list(options, ctx) {
+      const request = snapshotStorageBlobList(options, ctx, STORAGE_MEMORY_BACKEND)
+      return asyncEntry(MemoryOperation.blobList, { ...request }, request.ctx, (captured) => {
+        controller.assertLive()
+        const input = snapshotStorageBlobList(captured, request.ctx, STORAGE_MEMORY_BACKEND)
+        const result = blobs.list(input.prefix, input.after, input.limit)
+        for (const info of result.items)
+          capacityIndex?.touch(identity('blob', blobs.encodedOf(info.key)))
+        return result
+      })
+    },
+    removeByPrefix: (prefix, ctx) =>
+      mutationEntry(MemoryOperation.blobRemoveByPrefix, prefix, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [],
+          run: () => {
+            let count = 0
+            for (const entry of blobs.rows(captured))
+              if (deletePhysical('blob', entry.encoded) !== undefined) count++
+            if (count > 0) publish('blob', 'batch')
+            return count
+          }
+        }
+      })
+  }
+
   /** Publish the real built-in APIs on the original resource, never a copied base. */
   const store = provideCapabilities(
     base,
@@ -2548,6 +3222,10 @@ function createMemoryNamespace<T>(
         forTransaction: (scope) => (scope as IMemoryScope<T>)[ttlOperations]
       }),
       implement(vector, vectors),
+      implement(blob, objects),
+      implement(rdf, rdfApi, {
+        forTransaction: (scope) => (scope as IMemoryScope<T>)[rdfOperations]
+      }),
       implement(counter, counters, {
         forTransaction: (scope) => (scope as IMemoryScope<T>)[counterOperations]
       }),
@@ -2558,6 +3236,7 @@ function createMemoryNamespace<T>(
             createRecordQuery<R>(
               {
                 asyncDisposeKey,
+                watch: ({ ctx }) => watchChanges('record', ctx),
                 pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
                 execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
               },

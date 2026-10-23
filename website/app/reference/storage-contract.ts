@@ -1085,6 +1085,29 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.snapshotStorageBlobList![0]!.example,
       cases: storageContractCases.snapshotStorageBlobList
     },
+    createStorageBlobBodyReader: {
+      role: 'operation',
+      purpose: t(
+        'Read detached upload chunks through the original iterator lifetime after native condition admission.',
+        '原生条件准入后，沿原 iterator 生命周期读取独立上传 chunk。'
+      ),
+      params: {
+        body: t(
+          'Admitted bytes or an unclaimed WHATWG byte stream.',
+          '已准入字节或尚未取用的 WHATWG 字节流。'
+        ),
+        options: t(
+          'Original backend report and optional backend/normalizeFailure. Caller retains abort and native sink ownership.',
+          '原 backend report 与可选 backend/normalizeFailure；取消和 native sink 仍归调用方。'
+        )
+      },
+      returns: t(
+        'IStorageIterator<Uint8Array>; unfinished disposal cancels before read drain and releases once. Main and symbolic cleanup retain distinct cached promises.',
+        'IStorageIterator<Uint8Array>；提前释放先取消再排空 read，只 release 一次。主与符号清理保留独立缓存 Promise。'
+      ),
+      example: storageContractCases.createStorageBlobBodyReader![0]!.example,
+      cases: storageContractCases.createStorageBlobBodyReader
+    },
     createStorageBlobObject: {
       role: 'operation',
       purpose: t(

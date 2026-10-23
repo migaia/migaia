@@ -70,6 +70,29 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.recommendStorageVector![0]!.example,
       cases: storageHostCases.recommendStorageVector
     },
+    createBackendChangeIterator: {
+      role: 'operation',
+      purpose: t(
+        'Bridge the installed controller to its original iterator lifetime with one pending invalidation slot.',
+        '把已安装 controller 接到原 iterator 生命周期，仅保留一个待消费失效提示。'
+      ),
+      params: {
+        controller: t(
+          'The exact installed controller borrowed through the original core or Feature port.',
+          '沿原 core 或 Feature 接点借用的准确已安装 controller。'
+        ),
+        options: t(
+          'Fixed orgId/channel, optional text key/context, and optional original per-next execute callback. Context is captured once and supplied to execute.',
+          '固定 orgId/channel，可选文本 key/context 与原逐 next execute 回调；context 单次捕获并传给 execute。'
+        )
+      },
+      returns: t(
+        'The native IStorageIterator<IStorageChange>. Multiple unconsumed matches coalesce to the latest sequence with channel all and no keys/scope. Disposal wakes pending reads before draining and unsubscribes once.',
+        '原生 IStorageIterator<IStorageChange>；多个未消费匹配提示合并为最新 sequence 的 all，省略 keys/scope。释放先唤醒 pending read 再排空，只取消订阅一次。'
+      ),
+      example: storageHostCases.createBackendChangeIterator![0]!.example,
+      cases: storageHostCases.createBackendChangeIterator
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(
@@ -160,11 +183,12 @@ console.log(host.extensions.label('draft'))`
         '定义独立内存后端，安装前不获取数据。可选 namespace 容量单次捕获正 maxEntries/maxBytes 与 lru（缺省）或 lfu。策略双链节点和原 deadline radix 选择提交后的驱逐项，原生事务、根写共用原 owner、预算与目标锁。onEvict 只在提交后报告逐通道数量。显式 maxBytes 必须有真实 canonical 编码，不能编码的 record 修改前拒绝；省略容量及 maxEntries 保留原 structuredClone 值域。'
       ),
       returns: t(
-        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). The default id is memory; where/select/all run through the shared records query core.',
-        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
+        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). Native RDF uses six fixed canonical-term radix indexes, fixed-org graphs and the original transaction draft. Pattern matching is native; traversal and paging retain the shared query reader. Records use the shared records query core. Native blob keeps independent fixed-org object entries, conditional final commits, snapshot ranges and prefix pages, sharing original capacity and content resources without transaction projection.',
+        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件。原生RDF以六个固定term radix索引、固定org图与原事务draft执行；pattern原生匹配，traversal和分页沿共享query reader；records复用原查询核心。原生blob保持独立固定org对象条目、条件最终提交、范围快照与前缀分页，复用原容量与内容资源，不提供事务投影。'
       ),
       cases: [
         ...(storageHostCases.memoryBackendPlugin ?? []),
+        ...storageHostCases.createBackendChangeIterator!,
         ...storageHostCases.memoryNativeVector!
       ]
     },

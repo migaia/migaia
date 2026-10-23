@@ -3,6 +3,37 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  createBackendChangeIterator: [
+    {
+      title: t('Borrow the installed invalidation owner', '借用已安装的失效提示拥有者'),
+      problem: t(
+        'A Feature needs a fixed-organization stream without constructing another controller.',
+        'Feature 需要固定组织的流，无需另建 controller。'
+      ),
+      example: `import { createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
+import { createBackendChangeIterator } from '@migaia/storage-host/authoring/backend'
+
+const changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
+  capabilities: [], chain: {},
+  api: { store: {
+    async changes() {
+      return createBackendChangeIterator(featureExpose.getChangeController()!, {
+        orgId: this.orgId, channel: 'value'
+      })
+    }
+  }, transaction: {} }
+}))
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { changes })] })
+await using stream = await host.api.memory.changes()
+const next = stream.next()
+await host.backend('memory').set('status', 'ready')
+console.log((await next).value?.kind)`,
+      result: t(
+        'Prints put; the stream borrows the original controller and disposes its one subscription.',
+        '输出 put；流借用原 controller，只释放自己的订阅。'
+      )
+    }
+  ],
   memoryNativeVector: [
     {
       title: t('Rank points in the installed memory namespace', '在已安装 memory namespace 排名点'),
@@ -99,6 +130,49 @@ console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, r
     }
   ],
   memoryBackendPlugin: [
+    {
+      title: t('Read an immutable native object range', '读取原生对象的不可变范围快照'),
+      problem: t(
+        'An application needs opaque objects without projecting them into KV or a transaction.',
+        '业务需要独立的不透明对象，不将其投影为KV或事务。'
+      ),
+      example: `import { blob } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const objects = host.backend('memory').use(blob)
+await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: true })
+await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
+console.log((await object.bytes())[0])`,
+      result: t(
+        'Prints 2. Conditions precede upload ownership and are rechecked at commit; the inclusive range has one original content claim.',
+        '输出2。条件先于上传reader接管并在提交时复核；包含end的范围只有一次原内容消费权。'
+      )
+    },
+    {
+      title: t('Commit native RDF with the original draft', '用原 draft 提交原生 RDF'),
+      problem: t(
+        'Ground graph data must share namespace and transaction ownership with KV.',
+        'Ground 图数据需要与 KV 共用 namespace 和事务 owner。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { rdf, term } from '@migaia/storage-contract'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const memory = host.backend('memory')
+await memory.transaction(async tx => {
+  await tx.set('status', 'ready')
+  await tx.use(rdf).add([{
+    subject: term.iri('urn:alice'), predicate: term.iri('urn:knows'),
+    object: term.iri('urn:bob'), graph: term.defaultGraph
+  }])
+})
+console.log(await memory.use(rdf).match({ subject: term.iri('urn:alice') }).count())`,
+      result: t(
+        'Prints 1 after KV and the logical default graph commit together.',
+        'KV 与逻辑 default graph 同提交后输出 1。'
+      )
+    },
     {
       title: t('Bound one memory namespace with native LRU', '用原生 LRU 限制一个内存 namespace'),
       problem: t(
