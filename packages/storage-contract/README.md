@@ -706,3 +706,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 后端作者使用根导出 `createStorageIteratorLifetime<T>({ close, report, onSettled? })` 复用既有游标清理。将一次完整接纳的推进交给 `advance`，由原 helper 排空后关闭一次，并保留主清理与符号清理的独立缓存 Promise；数据准入、错误规范化和事务迭代器登记仍由原后端负责。`IStorageIteratorLifetime<T>` 仅公开同一组推进与清理函数，不授予事务权限。
 
 能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。
+
+查询写终点复用同一 planner、reader 与资源清理：记录支持 `delete(ctx?)`、`update(patch,ctx?)`，有界向量仅 `topK(...).delete(ctx?)`，RDF 支持 `delete(ctx?)`、`replace(oldQuad,newQuad,ctx?)`；select/groupBy 后只有读取终点。作者源的可选 `mutate(request,run)` 必须在原宿主 pipeline、事务与锁路径中调用 run，提供该事务的 `execute` 和 `accept(key,row)`；没有接点在 I/O 前报 `UNSUPPORTED_CAPABILITY`。request.ctx 保留原上下文快照身份，request.concurrency 单独交原并发 owner，不能另建重试循环。共享核流式去重，只有 accept 返回 true 才计数；记录按规范键、向量按实际引擎 hit id、RDF 按规范 ground quad 身份去重。RDF replace 仅处理 query 真正选中的 oldQuad，new 已存在是否接纳由原 draft 决定；根终点必须等待真实提交确认，unknown 拒绝且不重放。事务内只返回已接纳 draft 数，不能据此声称提交；事务写不接受独立操作上下文。
