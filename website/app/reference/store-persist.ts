@@ -822,7 +822,10 @@ export const storePersistReference: ILibraryReference = {
           'Callback retaining the concrete backend scope and Awaited result.',
           '保留具体后端 scope 与 Awaited 结果的回调。'
         ),
-        ctx: t('Optional original backend transaction options.', '可选的原后端事务选项。')
+        ctx: t(
+          'Original backend options. concurrency overrides its default; fail rejects busy handles immediately, while wait alone enters FIFO. One deadline and wait budget continue into backend retries; extension and symbol values remain intact.',
+          '原后端选项。concurrency 覆盖缺省策略；fail 立即拒绝忙句柄，只有 wait 进入 FIFO。期限与等待预算延续到后端重试，扩展与 symbol 值保留身份。'
+        )
       },
       returns: t(
         'Resolves only after native commit; failure preserves storage errors and does not undo memory. IndexedDB external data must be read before starting.',

@@ -1,21 +1,24 @@
 import { createAbortController, type IAbortController } from '@migaia/lifecycle'
+import { observeAbortSubscription, type IObservedAbortSubscription } from '@migaia/lifecycle/abort'
 import { observeThenableRejection } from '@migaia/utils/function'
 import {
   createConcurrencyLimiter,
-  createAbortTimeoutSignal,
   deferred,
-  raceWithAbort,
-  UtilsAbortError,
   type IAbortSignal,
   type IConcurrencyLimiter
 } from '@migaia/utils/promise'
 import {
   snapshotOperationContext,
   snapshotRecordStore,
+  resolveConcurrencyPolicy,
+  runWithConcurrency,
   StorageContractError,
   StorageContractErrorCode,
   type IOperationContext,
-  type IRecordStore
+  type IRecordStore,
+  type ITransactionOptions,
+  type IConcurrencyAttemptContext,
+  type IConcurrencyAttempt
 } from '@migaia/storage-contract'
 import type { IPersistHandle, IPersistStorage } from './types.js'
 import { createStorePersistTypeError } from '../errors.js'
@@ -117,6 +120,13 @@ function invalidParticipant(cause?: unknown): TypeError {
   )
 }
 
+/** Cleanup diagnostics use the original host reporting queue without replacing transaction results. */
+function reportCoordinationFailure(cause: unknown): void {
+  observeThenableRejection(undefined, { error: cause }, (error) => {
+    throw error
+  })
+}
+
 /** Coordinates existing handles before delegating the one native transaction to its original store. */
 export async function persistTransaction<const TStore extends IPersistTransactionStore, TResult>(
   store: TStore,
@@ -145,55 +155,69 @@ export async function persistTransaction<const TStore extends IPersistTransactio
   /** Stable global ordering prevents reversed handle arrays from taking conflicting slot orders. */
   const ordered = orderParticipants([...unique])
   /** Capture custom option fields once; the backend still owns lock/concurrency policy semantics. */
-  const options = ctx === undefined ? undefined : snapshotPersistOptions(ctx as object)
+  const options = ctx === undefined ? {} : snapshotPersistOptions(ctx as object)
   /** Common timing validation reuses the contract owner, without dropping concrete extra fields. */
   const timing = snapshotOperationContext(options as IOperationContext | undefined)
+  /** Only the original transaction registration supplies a default or validates an override. */
+  const policy = resolveConcurrencyPolicy(
+    admitted.store,
+    (options as ITransactionOptions).concurrency
+  )
   /** Disposal only cancels this coordination; the backend signal owns actual native rollback. */
   const controller: IAbortController = createAbortController()
   /** A private cancellation reason distinguishes disposal from an arbitrary outside signal reason. */
   let disposalReason: unknown
-  /** One deadline includes slot waiting and draining before the backend starts. */
-  const deadline = createAbortTimeoutSignal({
-    signal: timing?.signal,
-    timeoutMs: timing?.timeoutMs,
-    timeoutReason: () => new StorageContractError(StorageContractErrorCode.aborted)
-  })
-  /**
-   * The actual operation remains retained until native completion, even if the abort race settles
-   * first.
-   */
-  let work: Promise<Awaited<TResult>> | undefined
+  /** This borrowed listener relays external abort; the contract loop alone owns deadline and waits. */
+  let externalAbort: IObservedAbortSubscription | undefined
   try {
-    return await raceWithAbort(
-      ({ signal }) => {
-        work = execute(signal)
-        return work
-      },
-      {
-        signals:
-          deadline.signal === undefined
-            ? [controller.signal]
-            : [controller.signal, deadline.signal],
-        cleanupPolicy: 'report'
+    if (timing?.signal !== undefined) {
+      try {
+        externalAbort = observeAbortSubscription(
+          timing.signal,
+          (reason) => controller.abort(reason),
+          reportCoordinationFailure
+        )
+      } catch (cause) {
+        throw createStorePersistTypeError(
+          StorePersistErrorCode.invalidOption,
+          StorePersistErrorText.optionsObject,
+          { cause }
+        )
       }
+      externalAbort.retryRegistrationCleanup()
+    }
+    return await runWithConcurrency<Awaited<TResult>>(
+      { store: admitted.store, options: { ...options, signal: controller.signal }, policy },
+      { attempt: execute }
     )
   } catch (cause) {
-    if (work)
-      await work.then(
-        () => undefined,
-        () => undefined
-      )
-    if (cause instanceof UtilsAbortError) {
-      if (disposalReason !== undefined && cause.cause === disposalReason) throw disposalReason
-      throw new StorageContractError(StorageContractErrorCode.aborted, { cause: cause.cause })
-    }
+    if (
+      disposalReason !== undefined &&
+      cause instanceof Error &&
+      (cause as { readonly code?: unknown }).code === StorageContractErrorCode.aborted &&
+      cause.cause === disposalReason
+    )
+      throw disposalReason
     throw cause
   } finally {
-    deadline.dispose()
+    externalAbort?.unsubscribe()
   }
 
   /** Slots and attachment state remain owned until the delegated transaction actually ends. */
-  async function execute(signal: IAbortSignal): Promise<Awaited<TResult>> {
+  async function execute(
+    context: IConcurrencyAttemptContext
+  ): Promise<IConcurrencyAttempt<Awaited<TResult>>> {
+    /** The original loop always receives the disposal signal, including when no deadline exists. */
+    const signal = context.signal!
+    /** This controller only removes this attempt's actual utility waiter after cancellation/timeout. */
+    const queueController = createAbortController()
+    /** Queue cancellation follows the original combined signal without creating a deadline. */
+    const queueAbort = observeAbortSubscription(
+      signal,
+      (reason) => queueController.abort(reason),
+      reportCoordinationFailure
+    )
+    queueAbort.retryRegistrationCleanup()
     /** Native completion releases every paused attachment, including failed admission midway. */
     const completion = deferred<void>()
     /** Each held task stays active until its explicit reverse-order release. */
@@ -206,23 +230,38 @@ export async function persistTransaction<const TStore extends IPersistTransactio
     let failure: unknown
     try {
       for (const participant of ordered) {
+        /** Free slots start immediately; only an actual conflict enters the original policy loop. */
+        const busy = participant.limiter.activeCount !== 0
+        if (busy && context.admission === 'try')
+          return {
+            status: 'conflict',
+            phase: 'acquire',
+            keys: context.lock ?? [],
+            holder: undefined
+          }
         /** The utility limiter owns queue cancellation and FIFO scheduling. */
         const acquired = deferred<void>()
         /** This task owns exactly one slot until native transaction completion. */
         const released = deferred<void>()
-        /** Failure while queued rejects acquisition before any participant or native work starts. */
+        /** A rejected waiter resolves this handshake so the loop never receives a late rejection. */
+        let admissionFailure: { readonly cause: unknown } | undefined
+        /** The original limiter alone owns FIFO queueing and eventual slot task completion. */
         const done = participant.limiter.run(
           async () => {
             acquired.resolve()
             await released.promise
           },
-          { signal }
+          { signal: queueController.signal }
         )
-        void done.then(undefined, acquired.reject)
-        await acquired.promise
         held.push({ release: () => released.resolve(), done })
-        if (signal.aborted) throw signal.reason
-        if (participant.disposed()) throw invalidParticipant()
+        void done.then(undefined, (cause) => {
+          admissionFailure = { cause }
+          acquired.resolve()
+        })
+        if (busy) await context.wait(acquired.promise)
+        else await acquired.promise
+        if (admissionFailure !== undefined) throw admissionFailure.cause
+        assertNotAborted()
         paused.push(participant)
         await participant.pause({
           signal,
@@ -233,25 +272,21 @@ export async function persistTransaction<const TStore extends IPersistTransactio
           completion: completion.promise
         })
       }
-      if (signal.aborted) throw signal.reason
-      /**
-       * Complete options survive intact; the combined signal includes handle disposal and the
-       * original deadline.
-       */
-      const nativeOptions = { ...options, signal }
+      assertNotAborted()
       /** The existing store method owns callback execution, transaction views, commit and rollback. */
       const result = (await Reflect.apply(store.transaction, store, [
         (scope: ITransactionScopeOf<TStore>) => {
-          if (signal.aborted) throw signal.reason
+          assertNotAborted()
           for (const participant of paused) participant.bind(scope as object, admitted!.store)
           return run(scope)
         },
-        nativeOptions
+        context
       ])) as Awaited<TResult>
       committed = true
-      return result
+      return { status: 'committed', value: result }
     } catch (cause) {
       failure = cause
+      queueController.abort(cause)
       throw cause
     } finally {
       try {
@@ -260,19 +295,25 @@ export async function persistTransaction<const TStore extends IPersistTransactio
             paused[index]!.finish(committed, failure)
           } catch (cause) {
             // Restoring a background schedule cannot replace the actual transaction's outcome.
-            observeThenableRejection(undefined, { error: cause }, (error) => {
-              throw error
-            })
+            reportCoordinationFailure(cause)
           }
         }
       } finally {
         for (let index = held.length - 1; index >= 0; index--) held[index]!.release()
         try {
-          await Promise.all(held.map((slot) => slot.done))
+          /** Queued cancellation is acknowledged here before the next policy attempt can start. */
+          await Promise.allSettled(held.map((slot) => slot.done))
         } finally {
+          queueAbort.unsubscribe()
           completion.resolve()
         }
       }
+    }
+
+    /** Cancellation before native admission retains the same original reason on a coded boundary. */
+    function assertNotAborted(): void {
+      if (signal.aborted)
+        throw new StorageContractError(StorageContractErrorCode.aborted, { cause: signal.reason })
     }
   }
 }

@@ -341,3 +341,5 @@ async function saveExternal(loadSettings: () => Promise<{ count: number }>): Pro
 ```
 
 可选 `transactionStages: host.transactionStages(storage)` 沿三个适配入口传给同一引擎；这里只发出 beforePersistFlush / afterPersistFlush，后者表示请求完成。codecStages 绑定此次真实操作视图，每次转换只观察一次。观察失败只报告，不等待、不改变业务结果。导出的 `ITransactionScopeOf<typeof storage>` 保留具体后端事务类型。
+
+`ctx.concurrency` 可覆盖原始 store 的缺省策略。忙句柄先尝试一次：fail 立即拒绝，只有策略选择 wait 才进入可取消的 FIFO；自定义策略只在真实冲突后运行。句柄等待与后端内部重试共用这次调用的期限和等待预算，`timeoutMs` 不会在进入后端时重新起算。超时或取消后仍等待已开始的工作真正结束才释放占用。后端自有选项（包括 symbol 字段）保留值身份，取消 signal 则沿同一次协调传递。
