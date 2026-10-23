@@ -774,3 +774,99 @@ describe('canonical concurrency attempts', () => {
     expect(reads).toBe(1)
   })
 })
+
+describe('original concurrency preparation budget', () => {
+  it('captures once, prepares once and derives fixed-input locks before the first native attempt', async () => {
+    const { store } = base()
+    /** Getter counts prove preparation and derivation reuse the original admitted fields. */
+    let reads = 0
+    /** The pipeline owns this fixed operation input before implicit lock derivation. */
+    let key = 'before'
+    const options = {
+      get timeoutMs() {
+        reads++
+        return 100
+      },
+      lock: [lockKey.text('explicit')]
+    }
+    const prepare = vi.fn(async (ctx) => {
+      expect(Object.isFrozen(ctx)).toBe(true)
+      expect(ctx.timeoutMs).toBe(100)
+      key = 'after'
+    })
+    const derive = vi.fn(() => [lockKey.text(key)])
+    const attempt = vi.fn(async (ctx: IConcurrencyAttemptContext) => {
+      expect(prepare).toHaveBeenCalledTimes(1)
+      expect(derive).toHaveBeenCalledTimes(1)
+      expect(ctx.lock).toEqual([lockKey.text('after'), lockKey.text('explicit')])
+      expect(ctx.signal).toBe(prepare.mock.calls[0]![0].signal)
+      return { status: 'committed', value: 7 } as const
+    })
+    await expect(
+      runWithConcurrency({ store, options, prepare, lock: derive }, { attempt })
+    ).resolves.toBe(7)
+    expect(reads).toBe(1)
+  })
+
+  it('keeps the original deadline during preparation and awaits settlement before rejecting without lock or native admission', async () => {
+    vi.useFakeTimers()
+    const { store } = base()
+    const preparation = deferred<void>()
+    const attempt = vi.fn()
+    const derive = vi.fn(() => [])
+    let settled = false
+    let signal: AbortSignal | undefined
+    const pending = runWithConcurrency(
+      {
+        store,
+        options: { timeoutMs: 10 },
+        prepare: (ctx) => {
+          signal = ctx.signal as AbortSignal
+          return preparation.promise
+        },
+        lock: derive
+      },
+      { attempt }
+    )
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      }
+    )
+    await vi.advanceTimersByTimeAsync(10)
+    expect(signal?.aborted).toBe(true)
+    expect(settled).toBe(false)
+    expect(attempt).not.toHaveBeenCalled()
+    preparation.resolve()
+    await expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
+    expect(derive).not.toHaveBeenCalled()
+    expect(attempt).not.toHaveBeenCalled()
+  })
+
+  it('preserves original preparation failure without invoking derivation, native attempt or conflict observations', async () => {
+    const beforeLockAcquire = vi.fn()
+    const { store } = base({ beforeLockAcquire })
+    const failure = new StorageContractError(StorageContractErrorCode.invalidArgument)
+    const attempt = vi.fn()
+    const lock = vi.fn(() => [])
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          prepare: () => {
+            throw failure
+          },
+          lock
+        },
+        { attempt }
+      )
+    ).rejects.toBe(failure)
+    expect(lock).not.toHaveBeenCalled()
+    expect(attempt).not.toHaveBeenCalled()
+    expect(beforeLockAcquire).not.toHaveBeenCalled()
+  })
+})
