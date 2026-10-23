@@ -1017,6 +1017,7 @@
     "@migaia/storage-contract": {
       ".": [
         "BACKEND_KIND_PATTERN",
+        "ConcurrencyHolderState",
         "ConflictPolicy",
         "KEY_DOMAIN_LIMITS",
         "STORAGE_CONTRACT_SOURCE",
@@ -1056,6 +1057,7 @@
         "snapshotKeyValueStoreDetailed",
         "snapshotOperationContext",
         "snapshotRecordStore",
+        "snapshotStorageBaseDetailed",
         "snapshotStorageCapabilities",
         "snapshotStorageKey",
         "snapshotSyncWriteOptions"
