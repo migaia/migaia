@@ -24,6 +24,17 @@ import { createStorageOperationReporter, reportCleanupError } from '../core/oper
 
 /** The physical backend owns this port; creating it grants no transaction or retry authority. */
 export type IBackendKeyLockPort = IStorageResource & {
+  /**
+   * Hold backend-private metadata by canonical point identity without entering business clear
+   * ranges.
+   */
+  attemptMetadata<R>(
+    ctx: IConcurrencyAttemptContext,
+    holder: IConcurrencyHolder,
+    native: IConcurrencyPort<R>,
+    stages?: IConcurrencyStageObserver,
+    admissionSignal?: IAbortSignal
+  ): Promise<IConcurrencyAttempt<R>>
   attempt<R>(
     ctx: IConcurrencyAttemptContext,
     holder: IConcurrencyHolder,
@@ -76,6 +87,8 @@ type IKeyEntry = {
   readonly key: ILockKey
   readonly holder: IConcurrencyHolder
   readonly lease: IKeyLease
+  /** Business channel clears cannot touch private metadata, while exact point conflicts still apply. */
+  readonly rangeVisible: boolean
 }
 
 /** Construct only through the backend core's original installation window. */
@@ -154,7 +167,12 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     /** At most the affected physical channels are inspected; no range index or range lock exists. */
     for (const range of ranges)
       for (const [identity, held] of entries[range.channel])
-        if (held.lease.context !== current && range.lower <= identity && identity < range.upper)
+        if (
+          held.rangeVisible &&
+          held.lease.context !== current &&
+          range.lower <= identity &&
+          identity < range.upper
+        )
           return held
     return undefined
   }
@@ -164,7 +182,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     ctx: IConcurrencyAttemptContext,
     identities: readonly string[],
     holder: IConcurrencyHolder,
-    stages: IConcurrencyStageObserver | undefined
+    stages: IConcurrencyStageObserver | undefined,
+    rangeVisible = true
   ): IKeyLease => {
     /** Each waiting admission observes this exact signal only after all entries are released. */
     const released = deferred<void>()
@@ -197,7 +216,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     for (const [index, identity] of identities.entries()) {
       /** Authentic context keys and identities were paired by the same original normalization. */
       const key = ctx.lock![index]!
-      entries[key.channel].set(identity, { key, holder: capturedHolder, lease })
+      entries[key.channel].set(identity, { key, holder: capturedHolder, lease, rangeVisible })
     }
     observe(stages, 'onLockAcquired', ctx.attempt, identities.length)
     return lease
@@ -215,7 +234,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       readonly lower: string
       readonly upper: string
     }[],
-    additionalIdentities?: () => readonly string[]
+    additionalIdentities?: () => readonly string[],
+    rangeVisible = true
   ): Promise<IKeyLease | undefined> => {
     /** This bridge cancels only queued admission when the original ctx.wait budget ends. */
     const admission = createAbortController()
@@ -243,7 +263,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
               const held = conflict(identities, ranges) ?? conflict(additional)
               if (held === undefined)
                 return ctx.locking === 'pessimistic' && identities.length > 0
-                  ? acquire(ctx, identities, holder, stages)
+                  ? acquire(ctx, identities, holder, stages, rangeVisible)
                   : undefined
               await raceWithAbort(() => held.lease.released, {
                 signal: admission.signal,
@@ -308,7 +328,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     }[] = [],
     admit?: (commit: () => IConcurrencyAttempt<R>) => Promise<IConcurrencyAttempt<R>>,
     protectHeld = write !== undefined,
-    additionalIdentities?: () => readonly string[]
+    additionalIdentities?: () => readonly string[],
+    rangeVisible = true
   ): Promise<IConcurrencyAttempt<R>> => {
     assertOpen()
     /** Only an authentic active original context can supply canonical identities. */
@@ -329,7 +350,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
         const held = conflict(identities, ranges) ?? conflict(additional)
         if (held === undefined) {
           if (ctx.locking === 'pessimistic' && identities.length > 0)
-            lease = acquire(ctx, identities, holder, stages)
+            lease = acquire(ctx, identities, holder, stages, rangeVisible)
         } else if (ctx.admission === 'try')
           return {
             status: 'conflict',
@@ -345,7 +366,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
             stages,
             admissionSignal,
             ranges,
-            additionalIdentities
+            additionalIdentities,
+            rangeVisible
           )
       }
       /** A member may close after acquisition but before the native terminal is entered. */
@@ -403,6 +425,20 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   }
 
   return {
+    attemptMetadata: (ctx, holder, native, stages, admissionSignal) =>
+      runAttempt(
+        ctx,
+        holder,
+        native,
+        stages,
+        admissionSignal,
+        undefined,
+        [],
+        undefined,
+        false,
+        undefined,
+        false
+      ),
     attempt: (ctx, holder, native, stages, admissionSignal, ranges, additionalIdentities) =>
       runAttempt(
         ctx,

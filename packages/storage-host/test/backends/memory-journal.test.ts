@@ -5,7 +5,8 @@ import {
   createStorageHost,
   createOrgId,
   memoryBackendPlugin,
-  type IStorageJournalNamespaceView
+  type IStorageJournalNamespaceView,
+  type IStorageJournalNamespace
 } from '../../src/index.js'
 import { resolveStorageJournalBinding } from '../../src/journal/binding.js'
 
@@ -20,11 +21,13 @@ describe('memory private journal binding', () => {
     const firstOrg = host.org(createOrgId())
     const secondOrg = host.org(createOrgId())
     const targets = [host, firstOrg, secondOrg]
+    const handles: IStorageJournalNamespace[] = []
     for (const [index, target] of targets.entries()) {
       const access = resolveStorageJournalBinding(target, 'memory')
       expect(access.binding).not.toHaveProperty('forOrg')
       const namespace = await access.binding.openNamespace('history')
       access.retain(namespace)
+      handles.push(namespace)
       await namespace.run(async (view) => {
         await view.set('head', String(index))
         expect(await view.keys()).toEqual(['head'])
@@ -34,6 +37,7 @@ describe('memory private journal binding', () => {
       expect(await target.backend('memory').keys()).toEqual([])
       expect(await namespace.run((view) => view.get('head'))).toBe(String(index))
     }
+    await Promise.all(handles.map((handle) => handle.dispose()))
     await using defaultView = await resolveStorageJournalBinding(
       host.org(defaultOrg),
       'memory'
@@ -56,6 +60,26 @@ describe('memory private journal binding', () => {
     expect(() =>
       resolveStorageJournalBinding({ backend: () => host.backend('memory') }, 'memory')
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+  })
+
+  it('holds the original fixed resource lease separately from ordinary head transactions', async () => {
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const store = host.backend('memory')
+    const access = resolveStorageJournalBinding(host, 'memory')
+    const namespace = await access.binding.openNamespace('owned')
+    access.retain(namespace)
+    expect((await store.inspectLocks()).length).toBe(1)
+    await expect(access.binding.openNamespace('owned')).rejects.toMatchObject({
+      code: 'LOCK_REJECTED'
+    })
+    await namespace.run((view) => view.set('head', 'first'))
+    expect((await store.inspectLocks()).length).toBe(1)
+    await namespace.dispose()
+    expect((await store.inspectLocks()).length).toBe(0)
+    await using replacement = await access.binding.openNamespace('owned')
+    expect(await replacement.run((view) => view.get('head'))).toBe('first')
+    await store.dispose()
+    await replacement.dispose()
   })
 
   it('publishes private rows with business data only after the original commit and leaves rollback invisible', async () => {

@@ -15,6 +15,8 @@ export async function compileJournalBinding(
   scope: Omit<ITransactionScope, 'use'>
 ): Promise<void> {
   const namespace: IStorageJournalNamespace = await binding.forOrg(orgId).openNamespace('history')
+  const transactionId: string = namespace.transactionInfo(scope).id
+  void transactionId
   const off = namespace.onCommit(scope, () => undefined)
   await namespace.run(async (view: IStorageJournalNamespaceView) => {
     await view.set('head', 'encoded')
