@@ -1028,8 +1028,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         request: t(
-          'Authentic registered store and original options or exact outer attempt; optional policy overrides the owner default. Optional execute(captured, invokeOriginalLoop) wraps the real native loop once so before-next, after-next and catch remain in the original pipeline and call budget. Optional prepare(captured) settles once under the original deadline and signal before lock derivation; it is never a native attempt. Optional lock(captured) runs once after fixed-field capture and merges implicit locks with all explicit locks, reusing inherited encodings and budget.',
-          '真实登记 store 与原 options 或精确外层 attempt；policy 省略用原默认。可选 execute(captured, invokeOriginalLoop) 在原调用预算下包围一次真实循环，保留原 pipeline 的 before-next、after-next 与 catch。可选 prepare(captured) 在原期限与信号下完成一次，再派生锁；它不算原生尝试。可选 lock(captured) 在固定字段捕获后调用一次，隐式锁与全部显式锁合并，复用继承编码与预算。'
+          'Authentic registered store and original options or exact outer attempt; optional policy overrides the owner default. Optional execute(captured, invokeOriginalLoop) wraps the real native loop once so before-next, after-next and catch remain in the original pipeline and call budget. Optional prepare(captured) settles once under the original deadline and signal before lock derivation; it is never a native attempt. Optional lock(captured) merges implicit locks with explicit locks. Optional executeAttempt(captured, proceed), mutually exclusive with execute, wraps each native commit attempt: acquisition retries stay within one stage; a fully unwound commit conflict rethrows its exact coded identity before the original policy can retry. Stage halt/recovery settles directly. Each new segment derives from initial explicit/inherited locks while retaining the same captured options, signal and budget.',
+          '真实登记 store 与原 options 或精确外层 attempt；policy 省略用原默认。可选 execute(captured, invokeOriginalLoop) 在原调用预算下包围一次真实循环，保留原 pipeline 的 before-next、after-next 与 catch。可选 prepare(captured) 在原期限与信号下完成一次，再派生锁；它不算原生尝试。可选 lock(captured) 合并隐式与显式锁。可选 executeAttempt(captured, proceed) 与 execute 互斥，包围每次原生提交尝试：纯获取冲突留在同一 stage；提交冲突完整收尾后仍抛同一 coded 身份，原策略才可重试。stage 提前返回或恢复直接结算；新段从最初显式/继承锁派生，沿用同一 options 捕获、signal 与预算。'
         ),
         port: t(
           'Real backend attempt port. Return committed or conflict only after native completion and cleanup; use context.wait for logical admission and waitPhysical for physical scheduling.',
@@ -1226,6 +1226,37 @@ const control = owner.register(scope, { createScope, onFailure })`
       ),
       example: `const context = readTransactionOperationContext(operationScope)
 await codec.encode(value, context)`
+    },
+    deriveTransactionIterator: {
+      role: 'operation',
+      purpose: t(
+        'Project an actual registered iterator through its original owner, including the current next operation view and reverse cleanup of an optional additional cursor.',
+        '沿原 owner 派生真实已登记迭代器，提供当前 next 操作视图，并逆序清理可选附属游标。'
+      ),
+      params: {
+        iterator: t(
+          'Actual source iterator registered by the original owner.',
+          '原 owner 已登记的真实源迭代器。'
+        ),
+        read: t(
+          'Receives next, fail and the actual currentScope. The scope expires with this complete advance; existing two-argument callbacks remain valid.',
+          '接收 next、fail 与真实 currentScope；视图在本次完整推进结束时失效，旧两参数回调保持有效。'
+        ),
+        close: t(
+          'Optional cleanup for an actual lazily created additional source. Runs before original source cleanup; both are attempted and original first-failure aggregation applies.',
+          '可选实际惰性附属源清理，先于原 source 清理运行；两者都尝试，并沿原首错聚合。'
+        )
+      },
+      returns: t(
+        'A resource iterator owned by the same registration, or undefined for an unregistered source without invoking callbacks. No free scope construction, registration or store-close authority.',
+        '同一登记拥有的资源迭代器；未登记源返回 undefined 且不调用回调，不授予自由构造视图、登记或关闭 store 的权限。'
+      ),
+      example: `const projected = deriveTransactionIterator(cursor, async (next, _fail, currentScope) => {
+  const context = readTransactionOperationContext(currentScope)
+  const row = await next()
+  if (row.done) return row
+  return { done: false, value: await decode(row.value, context) }
+})`
     },
     runTransactionOperation: {
       role: 'operation',

@@ -981,3 +981,281 @@ describe('original concurrency execution continuation', () => {
     expect(once).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('original concurrency execution per native commit attempt', () => {
+  it('keeps acquisition retry inside one pipeline and fully unwinds commit conflict before replay', async () => {
+    const { store } = base()
+    /** Only actual rolled-back native work can close a pipeline segment and trigger replay. */
+    const failure = new StorageContractError(StorageContractErrorCode.writeConflict)
+    /** Events prove the first stage has completely unwound before policy and the next stage. */
+    const order: string[] = []
+    /** All attempt segments reuse one capture of caller-authored fields. */
+    const reads = { lock: 0, timeoutMs: 0, concurrency: 0 }
+    const policy = defineConcurrencyPolicy({
+      name: 'per-native-attempt',
+      locking: 'optimistic',
+      decide: ({ phase }) => {
+        order.push(`decide:${phase}`)
+        return phase === 'acquire' ? { action: 'wait' } : { action: 'retry' }
+      }
+    })
+    const options = {
+      get lock() {
+        reads.lock += 1
+        return [lockKey.text('explicit')]
+      },
+      get timeoutMs() {
+        reads.timeoutMs += 1
+        return 1000
+      },
+      get concurrency() {
+        reads.concurrency += 1
+        return policy
+      }
+    }
+    /** The original detached input is transformed anew by each real native attempt's stage. */
+    let transformed = ''
+    let stages = 0
+    let attempts = 0
+    const derive = vi.fn(() => [lockKey.text(transformed)])
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options,
+          lock: derive,
+          executeAttempt: async (_ctx, proceed) => {
+            const stage = ++stages
+            transformed = `stage-${stage}`
+            order.push(`before:${stage}`)
+            try {
+              const value = await proceed()
+              order.push(`after:${stage}`)
+              return value
+            } catch (cause) {
+              expect(cause).toBe(failure)
+              order.push(`catch:${stage}`)
+              throw cause
+            } finally {
+              order.push(`finally:${stage}`)
+            }
+          }
+        },
+        {
+          attempt: async (ctx) => {
+            attempts += 1
+            expect(ctx.lock).toEqual([lockKey.text('explicit'), lockKey.text(`stage-${stages}`)])
+            if (attempts === 1) {
+              order.push('acquire-conflict')
+              return conflict()
+            }
+            order.push(`native:${stages}`)
+            if (attempts === 2) return conflict('commit', failure)
+            return { status: 'committed', value: 7 }
+          }
+        }
+      )
+    ).resolves.toBe(7)
+    expect(stages).toBe(2)
+    expect(attempts).toBe(3)
+    expect(derive).toHaveBeenCalledTimes(2)
+    expect(reads).toEqual({ lock: 1, timeoutMs: 1, concurrency: 1 })
+    expect(order).toEqual([
+      'before:1',
+      'acquire-conflict',
+      'decide:acquire',
+      'native:1',
+      'catch:1',
+      'finally:1',
+      'decide:commit',
+      'before:2',
+      'native:2',
+      'after:2',
+      'finally:2'
+    ])
+  })
+
+  it('honors stage recovery and a different thrown identity without consulting retry policy', async () => {
+    const { store } = base()
+    const failure = new StorageContractError(StorageContractErrorCode.writeConflict)
+    /** Matching codes do not make a replacement error the original commit conflict. */
+    const replacement = new StorageContractError(StorageContractErrorCode.writeConflict)
+    const decide = vi.fn(() => ({ action: 'reject' }) as const)
+    const policy = defineConcurrencyPolicy({ name: 'unused-policy', locking: 'optimistic', decide })
+    const attempt = vi.fn(async () => conflict('commit', failure))
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          policy,
+          executeAttempt: async (_ctx, proceed) => {
+            try {
+              return await proceed()
+            } catch (cause) {
+              expect(cause).toBe(failure)
+              return 8
+            }
+          }
+        },
+        { attempt }
+      )
+    ).resolves.toBe(8)
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          policy,
+          executeAttempt: async (_ctx, proceed) => {
+            try {
+              return await proceed()
+            } catch {
+              throw replacement
+            }
+          }
+        },
+        { attempt }
+      )
+    ).rejects.toBe(replacement)
+    expect(attempt).toHaveBeenCalledTimes(2)
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it.each([undefined, new Error('native commit source')])(
+    'gives uncoded commit causes one coded identity before stage catch: %s',
+    async (cause) => {
+      const { store } = base()
+      let calls = 0
+      const policy = ConcurrencyPolicy.optimistic({ retries: 1 })
+      await expect(
+        runWithConcurrency(
+          {
+            store,
+            options: {},
+            policy,
+            executeAttempt: async (_ctx, proceed) => {
+              try {
+                return await proceed()
+              } catch (failure) {
+                expect(failure).toBeInstanceOf(StorageContractError)
+                expect(failure).toMatchObject({ code: 'WRITE_CONFLICT' })
+                expect((failure as Error).cause).toBe(cause)
+                throw failure
+              }
+            }
+          },
+          {
+            attempt: async () =>
+              ++calls === 1 ? conflict('commit', cause) : { status: 'committed', value: 4 }
+          }
+        )
+      ).resolves.toBe(4)
+      expect(calls).toBe(2)
+    }
+  )
+
+  it('keeps the original deadline across full unwind and the next stage without early settlement', async () => {
+    vi.useFakeTimers()
+    const { store } = base()
+    const failure = new StorageContractError(StorageContractErrorCode.writeConflict)
+    const signals: unknown[] = []
+    let stages = 0
+    let settled = false
+    const attempt = vi.fn(async () => conflict('commit', failure))
+    const pending = runWithConcurrency(
+      {
+        store,
+        options: { timeoutMs: 10 },
+        policy: ConcurrencyPolicy.optimistic({ retries: 1, backoffMs: 0 }),
+        executeAttempt: async (ctx, proceed) => {
+          const stage = ++stages
+          signals.push(ctx.signal)
+          if (stage === 2) await new Promise((resolve) => setTimeout(resolve, 6))
+          try {
+            return await proceed()
+          } finally {
+            if (stage === 1) await new Promise((resolve) => setTimeout(resolve, 6))
+          }
+        }
+      },
+      { attempt }
+    )
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      }
+    )
+    const rejected = expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
+    await vi.advanceTimersByTimeAsync(10)
+    expect(stages).toBe(2)
+    expect(signals[0]).toBe(signals[1])
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(10)
+    await rejected
+    expect(attempt).toHaveBeenCalledTimes(1)
+  })
+
+  it('drains an unawaited terminal before recovery without an unhandled native rejection', async () => {
+    const { store, report } = base()
+    /** The real native operation remains outstanding after the stage has already recovered. */
+    const native = deferred<IConcurrencyAttempt<number>>()
+    /** The exact native failure must remain observed even when the stage discards its Promise. */
+    const failure = new StorageContractError(StorageContractErrorCode.writeConflict)
+    /** Early stage return cannot release the actual accepted native attempt. */
+    let settled = false
+    /** The stage may legally return a recovery value without awaiting its typed continuation. */
+    const pending = runWithConcurrency(
+      {
+        store,
+        options: {},
+        executeAttempt: (_ctx, proceed) => {
+          void proceed()
+          return 6
+        }
+      },
+      { attempt: () => native.promise }
+    )
+    void pending.then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    native.resolve(conflict('commit', failure))
+    await expect(pending).resolves.toBe(6)
+    expect(report).not.toHaveBeenCalled()
+  })
+
+  it('allows a stage to halt without native work and rejects mixed execution modes', async () => {
+    const { store } = base()
+    const attempt = vi.fn()
+    const executeAttempt = vi.fn(() => 3)
+    await expect(
+      runWithConcurrency({ store, options: {}, executeAttempt }, { attempt })
+    ).resolves.toBe(3)
+    /** Each new segment still permits at most one real terminal admission. */
+    const once = vi.fn(async () => ({ status: 'committed', value: 1 }) as const)
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          executeAttempt: async (_ctx, proceed) => {
+            await proceed()
+            return proceed()
+          }
+        },
+        { attempt: once }
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(once).toHaveBeenCalledTimes(1)
+    await expect(
+      runWithConcurrency({ store, options: {}, execute: () => 1, executeAttempt }, { attempt })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(executeAttempt).toHaveBeenCalledTimes(1)
+    expect(attempt).not.toHaveBeenCalled()
+  })
+})

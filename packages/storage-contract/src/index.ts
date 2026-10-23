@@ -178,6 +178,7 @@ export {
   TransactionBeforeStage,
   TransactionObservedStage,
   createTransactionOwner,
+  deriveTransactionIterator,
   readTransactionOperationContext,
   assertTransactionOwner,
   runTransactionOperation,
