@@ -1,5 +1,7 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Locks must identify a supported physical channel and a valid independently owned key. */
+  lockArgument: 'lock key must identify a supported channel and valid key',
   /** Policy definitions and options must be valid before any backend or decision callback runs. */
   concurrencyArgument: 'concurrency policy or options are invalid',
   /** A backend owner, genuine fresh view and callable registration callbacks are required. */

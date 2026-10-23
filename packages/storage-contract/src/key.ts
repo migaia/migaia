@@ -20,7 +20,7 @@ export const KEY_DOMAIN_LIMITS = Object.freeze({
  */
 export function assertStringStorageKey(
   value: unknown,
-  backend: IBackendKind,
+  backend: IBackendKind | undefined,
   label = 'key'
 ): asserts value is string {
   if (typeof value !== 'string')
@@ -65,7 +65,7 @@ const bufferValue = (value: unknown): ArrayBuffer | undefined => {
  */
 export function assertStorageKey(
   value: unknown,
-  backend: IBackendKind,
+  backend: IBackendKind | undefined,
   label = 'key'
 ): asserts value is IStorageKey {
   let nodes = 0
@@ -116,7 +116,7 @@ export function assertStorageKey(
  */
 export const snapshotStorageKey = (
   value: unknown,
-  backend: IBackendKind,
+  backend: IBackendKind | undefined,
   label = 'key'
 ): IStorageKey => {
   assertStorageKey(value, backend, label)

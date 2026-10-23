@@ -419,3 +419,19 @@ console.log(wait.name, fail.name, optimistic.locking, custom.name)
 工厂只读取一次定义字段，冻结公开的 name/locking 元数据，私下保存原决策回调。复制或结构伪造的策略会被拒绝。允许零预算；时长与重试次数必须为非负安全整数。定义或选项 getter 失败以 INVALID_ARGUMENT 保留精确 cause。创建策略不执行决策回调、事务或取锁。
 
 原事务 owner 只捕获一次 defaultPolicy 与 concurrencyStages；省略策略时只创建一次 wait 缺省值，真实显式覆盖值优先。缺省解析只使用同一私有 owner 登记，不读公开 store 字段，不建立另一套 store registry。wait 缺省逻辑准入预算为 30,000 ms，optimistic 缺省对三个冲突按 20 ms 退避。决策循环与后端真实锁是另行接入的执行边界；仅有策略元数据不能证明锁或重试行为。
+
+### 规范锁键
+
+```ts
+import { lockKey } from '@migaia/storage-contract'
+
+const original = new Date(0)
+const saved = lockKey.record(original)
+original.setTime(1_000)
+console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
+// record 0
+```
+
+lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.bytes 只接收字符串。工厂立即校验并分离 Date、ArrayBuffer 与嵌套数组，只冻结通道/键容器。此时尚无 store，失败的 backend 诊断为 undefined；既有 assertStorageKey、snapshotStorageKey 与 assertStringStorageKey 的第二参数因此接纳 IBackendKind | undefined，函数 arity 与业务键域不变。
+
+原并发 owner 的内部规范化传入真实 backend，锁字段只读一次，只添加物理通道前缀，并调用唯一保序键编码器。显式 MSD 后缀栈使用固定字节/结束桶与一份 scratch 数组，相邻规范字节去重等值 Date、buffer、tuple 与正负零。text、bytes、record 保持分离，typed text 数值 1 与字符串 '1' 也不同。工作与空间随总键字节及键数增长，不使用比较排序、最长键填充或全局身份缓存。实际取锁仍由后端执行边界负责。
