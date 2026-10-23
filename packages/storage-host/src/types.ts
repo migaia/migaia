@@ -28,6 +28,7 @@ import type {
   IStorageImplementationsOf,
   IChainMethods,
   IChainMethodsOf,
+  IWithTransactionQueryMethods,
   IWithChainMethods,
   IAnyStorageCapability,
   ICapabilityApi,
@@ -411,18 +412,29 @@ type IWithFeatureChains<S extends IStorageBase, F extends IStorageFeatureRecord>
   : IWithFeatureCapabilities<S, F> extends infer T extends IStorageStore<never>
     ? IWithChainMethods<T, IChainMethodsOf<S> & IFeatureMethods<F>>
     : never
-type IScopeApi<S, F extends IStorageFeatureRecord> = Omit<S, 'api'> & {
-  readonly api: IFeatureApi<F, 'transaction'>
-}
+/** Read only the existing selected query group carried by the original enhanced store. */
+type IScopeQueryMethods<S> = 'query' extends keyof IChainMethodsOf<S>
+  ? NonNullable<IChainMethodsOf<S>['query']>
+  : Record<never, never>
+/** Scope query methods retain transaction-only context while native top-level members survive. */
+type IScopeApi<S, F extends IStorageFeatureRecord, Q extends object> =
+  IWithTransactionQueryMethods<S, Q> extends infer T
+    ? keyof IFeatureApi<F, 'transaction'> extends never
+      ? T
+      : Omit<T, 'api'> & { readonly api: IFeatureApi<F, 'transaction'> }
+    : never
 type IApiTransactionMembers<S, F extends IStorageFeatureRecord> = [
-  keyof IFeatureApi<F, 'transaction'>
+  keyof IFeatureApi<F, 'transaction'> | keyof IScopeQueryMethods<S>
 ] extends [never]
   ? Pick<S, Extract<keyof S, 'transaction' | 'tx'>>
   : S extends { transaction(run: (scope: infer T) => unknown, options?: infer O): unknown }
     ? {
-        transaction<R>(run: (scope: IScopeApi<T, F>) => R, options?: O): Promise<Awaited<R>>
+        transaction<R>(
+          run: (scope: IScopeApi<T, F, IScopeQueryMethods<S>>) => R,
+          options?: O
+        ): Promise<Awaited<R>>
       } & (S extends { tx(): ITransactionBuilder<infer T, infer A> }
-        ? { tx(): ITransactionBuilder<IScopeApi<T, F>, A> }
+        ? { tx(): ITransactionBuilder<IScopeApi<T, F, IScopeQueryMethods<S>>, A> }
         : {})
     : {}
 export type IStorageStoreWithFeatures<
