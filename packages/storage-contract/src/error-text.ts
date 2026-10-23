@@ -1,5 +1,7 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Physical key readers admit only the original complete canonical ordered wire encoding. */
+  orderedKeyInvalid: 'ordered storage key encoding is invalid',
   /** Blob inputs are captured before native object I/O or upload-reader ownership. */
   blobArgument: 'blob key, body or options are invalid',
   /** A returned object grants one stream-or-bytes right for its original resource lifetime. */
