@@ -6,6 +6,7 @@ import {
 import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageBackend } from '../constants.js'
+import type { ITextChangeFeedApi } from '@migaia/storage-contract'
 import type {
   IBackendConstruction,
   IBackendRuntime,
@@ -28,7 +29,7 @@ export const localStorageHost = (
   options: ILocalStorageOptions,
   runtime: IBackendRuntime
 ): IBackendConstruction<
-  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi>,
   IWebStorageLike
 > => {
   /** Capture namespace configuration before admitting either an injected or ambient port. */

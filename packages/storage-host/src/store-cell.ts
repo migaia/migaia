@@ -7,17 +7,22 @@ import type {
   IStorageOrgBinding,
   IStorageBorrowedBackend,
   IStoragePluginCallContext,
-  IStorageExecutionPort
+  IStorageExecutionPort,
+  IStorageFeatureClientResolver
 } from './types.js'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import type { IStorageJournalBackendBinding } from './journal/types.js'
 import { snapshotStorageJournalBinding } from './journal/binding.js'
 /** One registration binds one construction identity and publishes it only after admission. */
 export type IStorageStoreCell = {
+  /** A read-only original registration identity grants no methods or resource authority. */
+  readonly journalIdentity: object
   bind(store: IStorageBase): void
   set(store: IStorageBase): void
   get(): IStorageBase
   setFeatureProjection(projection: IStorageFeatureProjection | undefined): void
+  setFeatureClientResolver(resolver: IStorageFeatureClientResolver): void
+  getFeatureClientResolver(): IStorageFeatureClientResolver | undefined
   createTransactionApi(scope: object): object | undefined
   getChainMethods(family: keyof IChainMethods): object | undefined
   setOrgBinding(binding: IStorageOrgBinding): void
@@ -57,6 +62,8 @@ export function createStorageStoreCell(): IStorageStoreCell {
   let admitted = false
   /** Selected Feature output is owned by this same original registration, without a scope table. */
   let projection: IStorageFeatureProjection | undefined
+  /** Only an explicitly registered native client resolver changes Feature client selection. */
+  let featureClientResolver: IStorageFeatureClientResolver | undefined
   /** Optional native projection belongs to this same single-assignment store cell. */
   let orgBinding: IStorageOrgBinding | undefined
   /** The descriptor's one private journal binding shares this original single-assignment cell. */
@@ -70,6 +77,13 @@ export function createStorageStoreCell(): IStorageStoreCell {
   /** Exact aliases are released by the registration's existing resource scope. */
   const orgReleases: Array<() => void | Promise<void>> = []
   return {
+    journalIdentity: Object.freeze({}),
+    setFeatureClientResolver: (resolver) => {
+      if (featureClientResolver !== undefined)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      featureClientResolver = resolver
+    },
+    getFeatureClientResolver: () => featureClientResolver,
     retainJournalResource: (resource) => {
       if (journalResources.has(resource)) return () => undefined
       let dispose: IStorageResource['dispose']

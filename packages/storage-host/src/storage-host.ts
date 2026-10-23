@@ -156,6 +156,7 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         },
         getStore: context.storeCell.get,
         setStorageFeatureProjection: context.storeCell.setFeatureProjection,
+        getStorageFeatureClientResolver: context.storeCell.getFeatureClientResolver,
         setStorageJournalBinding: (
           binding: import('./journal/types.js').IStorageJournalBackendBinding
         ) => {
@@ -273,6 +274,37 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
             })
           )
         }) satisfies IStoragePluginCore['registerOrgBinding'],
+        registerFeatureClientResolver: ((store, resolver) => {
+          /** Window admission precedes callbacks, reflection, or any native client acquisition. */
+          registrationCore!.onDispose(() => undefined)
+          /** Capture each author callback once without exposing this cell or a mutable store handle. */
+          let getClient: typeof resolver.getClient
+          /** Native transaction access remains optional and synchronous on the original scope. */
+          let getTransactionClient: typeof resolver.getTransactionClient
+          try {
+            getClient = resolver?.getClient
+            getTransactionClient = resolver?.getTransactionClient
+          } catch (cause) {
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+          }
+          if (
+            context.storeCell.get() !== store ||
+            typeof getClient !== 'function' ||
+            (getTransactionClient !== undefined && typeof getTransactionClient !== 'function')
+          )
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          context.storeCell.setFeatureClientResolver(
+            Object.freeze({
+              getClient: (orgId) => Reflect.apply(getClient, resolver, [orgId]),
+              ...(getTransactionClient === undefined
+                ? {}
+                : {
+                    getTransactionClient: (scope: object, orgId: string) =>
+                      Reflect.apply(getTransactionClient!, resolver, [scope, orgId])
+                  })
+            })
+          )
+        }) satisfies IStoragePluginCore['registerFeatureClientResolver'],
         getChangeController: () => {
           context.assertCurrent()
           return getBackendChangeController(context.storeCell.get())
@@ -1187,6 +1219,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     context.assertExecution()
     const binding = context.storeCell.journalForOrg(orgId)
     return Object.freeze({
+      registration: context.storeCell.journalIdentity,
       orgId,
       backendInstanceId: context.id,
       binding,

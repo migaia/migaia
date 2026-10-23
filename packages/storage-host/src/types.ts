@@ -125,6 +125,13 @@ export type IStorageOrgBinding = {
   backend(orgId: string): IStorageBase
   drop(orgId: string): Promise<void>
 }
+/** Optional native Feature routing stays with the original backend and exact organization. */
+export type IStorageFeatureClientResolver<TClient = unknown, TTransactionClient = unknown> = {
+  /** Prepare and return this organization's original client; synchronous clients remain synchronous. */
+  getClient(orgId: string): TClient | PromiseLike<TClient>
+  /** Return the already-active original transaction synchronously, without opening or awaiting. */
+  getTransactionClient?(scope: object, orgId: string): TTransactionClient
+}
 /** Read-only invocation ports retain one immutable organization without installation authority. */
 export type IStorageBackendOrgContext = {
   readonly orgId: string
@@ -346,6 +353,11 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void
     /** Register immutable physical-org lookup and deletion only for this exact admitted store. */
     registerOrgBinding(store: IStorageBase, binding: IStorageOrgBinding): void
+    /** Register optional native Feature routing only during this exact store's installation. */
+    registerFeatureClientResolver(
+      store: IStorageBase,
+      resolver: IStorageFeatureClientResolver
+    ): void
     /** Read original execution and observation ports without registration or lifecycle authority. */
     getOrgContext(orgId: string): IStorageBackendOrgContext
     registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void

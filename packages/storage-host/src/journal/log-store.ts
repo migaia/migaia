@@ -20,7 +20,7 @@ import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import { resolveStorageJournalBinding } from './binding.js'
+import { resolveStorageJournalBinding, type IStorageJournalBackendAccess } from './binding.js'
 import {
   appendStorageLog,
   prepareStorageLogAppend,
@@ -356,6 +356,10 @@ export async function storageLogStore<
   }
   /** The closure verifies this exact object even if a caller copies an enumerable symbol manually. */
   const nativeAccess: IStorageLogNativeAccess = Object.freeze({
+    matches: (candidate: IStorageJournalBackendAccess) =>
+      candidate.registration === access.registration &&
+      candidate.orgId === access.orgId &&
+      candidate.backendInstanceId === access.backendInstanceId,
     orgId: access.orgId,
     backendInstanceId: access.backendInstanceId,
     headLock: storageJournalLockKey(prefix, StorageJournalLock.head),

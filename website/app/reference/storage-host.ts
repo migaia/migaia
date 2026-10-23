@@ -66,8 +66,8 @@ console.log(host.extensions.label('draft'))`
     storageLogStore: {
       role: 'factory',
       purpose: t(
-        'Recover a caller-closeable private ILogStore without granting raw backend or host authority.',
-        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权。'
+        'Recover a caller-closeable private ILogStore without granting raw backend or host authority. Native selection certifies the exact original registration, including across hosts with matching ids and orgs.',
+        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权；原生选择认证精确原 registration，跨宿主的同名 id/org 也不能替代。'
       ),
       params: {
         host: t(
@@ -411,7 +411,50 @@ console.log(host.extensions.label('draft'))`,
         'Descriptor-captured original native I/O with immutable forOrg projection, never public KV prefixes.',
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
-      members: {}
+      members: {
+        changes: {
+          summary: t(
+            'Memory enables ordered draft capture on the first call before business writes. Later reads return immutable images with final per-key revisions; late activation rejects instead of inventing history.',
+            'memory 首次调用在业务写前开启原 draft 按序捕获；后续返回不可变镜像与每键最终修订，迟到开启明确拒绝而不猜历史。'
+          )
+        },
+        writeCommitMarker: {
+          summary: t(
+            'Memory writes only its authentic native transaction id into the same private draft. Actual commit exposes the marker; rollback leaves none.',
+            'memory 只把原认证 native 事务 id 写入同一私有 draft；真实 commit 后可见，rollback 不留 marker。'
+          )
+        },
+        hasCommitMarker: {
+          summary: t(
+            'Read fixed-org private commit evidence through the original native owner, isolated from business clear and arbitrary user log prefixes.',
+            '经原 native owner 读取固定组织的私有提交证据，与业务 clear 及任意用户日志 prefix 隔离。'
+          )
+        },
+        removeCommitMarker: {
+          summary: t(
+            'Remove only terminal intent evidence in this original org through its existing native transaction path.',
+            '沿本组织既有 native 事务路径仅回收已终态 intent 的提交证据。'
+          )
+        },
+        readImage: {
+          summary: t(
+            'Read a missing/present durable image from the exact authenticated org scope. Memory uses the existing versioned portable JSON codec, original bytes encoding and logical RDF identity.',
+            '从精确认证组织 scope 读取缺失或存在的持久镜像；memory 复用已有版本化 portable JSON codec、字节编码与逻辑 RDF 身份。'
+          )
+        },
+        writeImage: {
+          summary: t(
+            'Restore through the original native draft and write validators; the same transaction commits or rolls back every restored channel and deadline.',
+            '经原 native draft 与写入校验恢复；同一事务提交或回滚各恢复通道与 deadline。'
+          )
+        },
+        readRevision: {
+          summary: t(
+            'Read complete original revision facts, including clear epochs and tombstones; memory own writes predict its one final per-key commit increment.',
+            '读取含 clear epoch 与墓碑的完整原修订；memory 自有写入沿每键最终一次提交递增。'
+          )
+        }
+      }
     },
     IStorageJournalTarget: {
       summary: t(
@@ -649,6 +692,27 @@ console.log(host.extensions.label('draft'))`,
           returns: t(
             'Completion of that native target deletion; failures retain the original error.',
             '返回该原生目标删除的完成结果，失败保留原错误。'
+          )
+        }
+      }
+    },
+    IStorageFeatureClientResolver: {
+      summary: t(
+        'Explicit backend-owned native client selection registered through core.registerFeatureClientResolver only during the original exact-store installation. No selection preserves original getters; async preparation retains admission, and transaction selection is synchronous on the authentic scope.',
+        '后端仅在精确store原安装窗口通过core.registerFeatureClientResolver登记原生客户端选择；未登记保持原getter，异步准备后仍检查原准入，事务选择同步使用认证scope。'
+      ),
+      example: storageHostCases.IStorageFeatureClientResolver![0]!.example,
+      members: {
+        getClient: {
+          summary: t(
+            'Prepare and return the original native client for this immutable organization.',
+            '为本不可变组织准备并返回原生客户端。'
+          )
+        },
+        getTransactionClient: {
+          summary: t(
+            'Return the already-active original native transaction synchronously; never open or await another transaction.',
+            '同步返回已活跃的原生事务，不另开或等待事务。'
           )
         }
       }

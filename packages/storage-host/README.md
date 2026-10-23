@@ -203,6 +203,12 @@ memory 已提供该私有 namespace 接点。私有字符串行与原业务 draf
 
 memory 日志 namespace 在整个资源期持有原规范 resource-owner 文本 lease；同组织、同 prefix 再次打开报 `LOCK_REJECTED`。普通私有事务在最初的原生锁集合中取得另一个固定 head 键。原后端关闭信号也会关闭部分构造的 namespace 资源。`transactionInfo(scope)` 返回精确 store/org 的原认证事务身份，同事务追加归并不信任调用方 id。后端作者仅对私有元数据 lease 使用 `IBackendKeyLockPort.attemptMetadata`：规范点身份冲突和原 acquire/release/wait 拥有者不变，业务 clear 范围跳过其本就不能触及的私有行；普通业务锁保持原范围行为。
 
+memory 的 `readImage`、`writeImage`、`readRevision` 只接受该固定组织的真实 native scope，并复用原 draft、写入校验与完整 `{epoch, revision}` 墓碑修订。覆盖 text、bytes、record、vector、逻辑 RDF quad 和同点锁下的 deadline 元数据；镜像明确携带原 JSON codec id/version，bytes 复用原 base64 编码，缺失不等于 null。可持久镜像使用原 serialize portable 值域；Date、Map、undefined 等不在该值域的记录读取镜像时保留原校验错误，普通 memory 的 structured-clone 支持不变。恢复仍参加同一原子提交与回滚；本单元不声称已经完成全局日志捕获或自动 undo。
+
+memory 的 `changes(scope)` 首次调用须在该真实 attempt 的首项业务写前，之后原 `stageDraft` 在修改前检查可记录性，并保留 text/bytes/record/vector/RDF 与 deadline 的实际顺序。返回值冻结，反映每键最终修订；先新增再删除且最终没有物理变更的身份不生成变更。迟到首次调用报 `UNSUPPORTED_CAPABILITY`，普通未开启事务不分配镜像。`writeCommitMarker` 只接受原认证事务 id，marker 与业务同提交/回滚，使用原私有 namespace Map 的不可公开 symbol 分区；同名用户 prefix、业务 clear 与其它 org 均不能触及。`hasCommitMarker`/`removeCommitMarker` 沿原 native 事务读取或回收。根快速写路径、capacity victim、blob 和全局桥仍未由这些作者方法自动接管。
+
+包内 native journal 提交桥已用真实 logger 的 binlog/undoLog 与两份 storageLogStore 验证：ready 在业务 native scope 前完成，head 锁交回原第一次规范取锁，按序 storage.commit 与按原身份合并的 undo 镜像在同一事务追加。binlogValues 默认不含值，undo 始终保留完整编码镜像与 afterRevision；rollback 不推进两个日志的已提交索引。原 storeCell 的冻结空身份仅用于私有精确 registration 比较；另一个宿主即使 backend id/org 相同，也不能选其日志。logger 自己继续检查实际载体身份。该提交桥尚为包内显式调用，未声明全局自动配置、外置 WAL、自动 undo 执行或根写路径已经完成。
+
 ### 私有日志资源
 
 `storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding 与可靠独占，打开先完成恢复。同组织与 prefix 同时只允许一个日志句柄；不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。
@@ -220,3 +226,5 @@ await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
 await log.setState(1, LogRecordState.done)
 console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
 ```
+
+后端作者可在原安装窗口调用 core.registerFeatureClientResolver(store, resolver)，为精确已登记 store 提供组织原生客户端选择。resolver.getClient(orgId) 可先沿原 opener 准备再返回客户端；只有真实异步结果才等待，完成后再次核对原 registration。可选 getTransactionClient(scope, orgId) 必须同步返回该原认证 scope 已打开的事务，不得另开或等待。未登记 resolver 时，原 Feature 的 getClient/getTransactionClient 调用顺序与行为保持。resolver 只占原 storeCell 的一个可选字段，业务视图不能登记或获得该接点，Feature factory 不重跑。

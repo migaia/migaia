@@ -35,3 +35,18 @@ test('真实浏览器页面中的 Storage 异常归一化并保留 cause', async
     incoherentClearPreservedValues: true
   })
 })
+
+test('native text backends isolate configured organization targets and preserve unique writers', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runBrowserTextOrgScenario())
+  expect(result).toEqual({
+    combinations: 6,
+    defaultShared: true,
+    isolated: true,
+    dropIsolated: true,
+    physicalPrefix: true,
+    uniqueConflicts: 6
+  })
+})
