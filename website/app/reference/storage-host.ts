@@ -27,8 +27,8 @@ console.log(await jsonCodec.decode(encoded))`
     },
     index: {
       summary: t(
-        'Install exact backend plugins and application extensions with one runtime-neutral host. Browser adapters and native clients remain in their owning packages.',
-        '用同一个运行时中立宿主安装精确后端插件和业务扩展。浏览器适配与原生客户端由各自包拥有。'
+        'Install exact backend plugins and application extensions with one runtime-neutral host. Installation-scoped borrowing reads committed dependencies without acquiring close authority. Browser adapters and native clients remain in their owning packages.',
+        '用同一个运行时中立宿主安装精确后端插件和业务扩展。安装窗口借用已提交依赖，不授予关闭权。浏览器适配与原生客户端由各自包拥有。'
       ),
       example: `import { createStorageHost, definePlugin } from '@migaia/storage-host'
 

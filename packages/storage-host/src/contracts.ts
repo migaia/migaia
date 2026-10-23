@@ -220,6 +220,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly createChangeController: IStoragePluginCore['createChangeController']
   readonly registerChangeController: IStoragePluginCore['registerChangeController']
   readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
+  readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
 }
 /** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
@@ -265,6 +266,7 @@ export const definePlugin: IStorageDefinePlugin = ((
         emit: nativeCore.emit,
         createChangeController: nativeCore.createChangeController,
         registerChangeController: nativeCore.registerChangeController,
+        getPublishedBackend: nativeCore.getPublishedBackend,
         registerDetect: nativeCore.registerDetect,
         registerStore: (store: IStorageBase) => {
           if (transferred)
@@ -401,6 +403,7 @@ export const definePlugin: IStorageDefinePlugin = ((
               getLifecycle: () => nativeCore.lifecycle,
               onDispose: nativeCore.onDispose,
               getScheduler: () => nativeCore.getScheduler(),
+              getPublishedBackend: nativeCore.getPublishedBackend,
               emit: nativeCore.emit,
               registerDetect: nativeCore.registerDetect
             },

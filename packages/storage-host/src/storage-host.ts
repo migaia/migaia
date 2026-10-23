@@ -13,6 +13,7 @@ import {
   type IBackendChangeController
 } from './core/change-controller.js'
 import { StorageHookName as Hook } from './hook-names.js'
+import { borrowStorageBackend } from './borrow.js'
 import { STORAGE_DEFAULT_ORG } from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import {
@@ -80,6 +81,7 @@ type IStorageNativeRegistrationContext = {
   readonly id: string
   readonly assertCurrent: () => void
   readonly assertExecution: () => void
+  readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
   readonly runDetect: () => Promise<void>
   readonly completeDetect: () => void
@@ -164,6 +166,7 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           context.assertCurrent()
           return getBackendChangeController(context.storeCell.get())
         },
+        getPublishedBackend: context.getPublishedBackend,
         registerDetect: context.registerDetect,
         getStorageHooks: () =>
           ({
@@ -500,6 +503,11 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         let registrationCore: IStorageInstallCore | undefined
         /** Construction bindings are allocated only when a backend actually requests them. */
         let stageBindings: IBackendStageBindings | undefined
+        /**
+         * The original installation owns only its captured dependency handles, never their
+         * resources.
+         */
+        let borrowed: Set<object> | undefined
         /** Checks belong to this original registration and retain registration order. */
         const checks = new Set<IStorageDetectCheck>()
         /** A successful complete host pass admits this registration's real execution endpoints. */
@@ -543,6 +551,29 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           isDetected: () => detected,
           completeDetect: () => {
             detected = true
+          },
+          getPublishedBackend: (id) => {
+            /** Original scope admission enforces the install window before any lookup. */
+            let view: object | undefined
+            registrationCore!.onDispose(() => {
+              if (view !== undefined) borrowed?.delete(view)
+            })
+            /** Current-batch and future stores never enter this committed registry. */
+            const store = this.#registry.get(id)
+            if (store === undefined)
+              throw new StorageError(
+                StorageErrorCode.backendNotInstalled,
+                {},
+                StorageErrorText.backendNotInstalled
+              )
+            /** Its existing context retains the exact original lifecycle and enablement guards. */
+            const source = this.#storeContexts.get(store)!
+            view = borrowStorageBackend(store, () => {
+              assertRegistration()
+              source.assertCurrent()
+            })
+            ;(borrowed ??= new Set()).add(view)
+            return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
           },
           registerDetect: (check) => {
             if (typeof check !== 'function')
