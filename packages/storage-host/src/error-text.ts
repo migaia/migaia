@@ -1,5 +1,7 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Aggregate organization deletion retains successful targets and every original failed target. */
+  orgDeleteFailed: 'storage organization deletion failed',
   /** Entity definitions capture a complete own upgrade graph before connecting to a backend. */
   entityMigrationGraphIncomplete: 'entity migration graph must contain every version step',
   /** A prepared value-only unique write must reject stale raw inputs before changing data. */

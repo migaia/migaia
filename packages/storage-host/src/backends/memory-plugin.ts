@@ -1,8 +1,4 @@
-import {
-  assertTransactionOwner,
-  type ITransactionScope,
-  type records
-} from '@migaia/storage-contract'
+import { type ITransactionScope, type records } from '@migaia/storage-contract'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
@@ -88,7 +84,7 @@ export function memoryBackendPlugin<
       featureExpose: () => ({
         getClient: () => undefined,
         getTransactionClient: (scope: ITransactionScope<unknown, typeof records>) => {
-          assertTransactionOwner(constructed!.store, scope)
+          constructed!.assertScope(scope)
           return undefined
         }
       }),
@@ -97,6 +93,7 @@ export function memoryBackendPlugin<
         constructed = createMemoryBackend(core, captured.options)
         core.registerStore(constructed.store)
         core.registerChangeController(constructed.store, constructed.controller)
+        core.registerOrgBinding(constructed.store, constructed.orgBinding)
         return {}
       }
     }

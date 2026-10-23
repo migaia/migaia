@@ -77,7 +77,7 @@ type IBackendRegistration = {
 }
 
 /** One private exact-store registry; observation also supports admitted stores without a controller. */
-const controllerRegistry = new WeakMap<IStorageBase, IBackendRegistration>()
+const controllerRegistry = new WeakMap<object, IBackendRegistration>()
 
 /** Monotonic fallback for unique same-realm event origins. */
 let controllerOriginSequence = 0
@@ -249,7 +249,7 @@ export const createBackendChangeController = (
 
 /** Register one exact store instance and reject accidental duplicate ownership. */
 export const registerBackendChangeController = (
-  store: IStorageBase,
+  store: Pick<IStorageBase, 'backend'>,
   controller: IBackendChangeController
 ): (() => void) => {
   if (controllerRegistry.get(store)?.controller !== undefined)
@@ -278,7 +278,7 @@ export const getBackendChangeController = (
 
 /** Bind original host observation at resource admission without changing or patching the store. */
 export const registerBackendEnvelopeStages = (
-  store: IStorageBase,
+  store: object,
   factory: IBackendEntityBinding['envelope'],
   queryMethods?: IBackendEntityBinding['queryMethods']
 ): (() => void) => {
