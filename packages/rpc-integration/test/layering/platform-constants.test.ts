@@ -2,13 +2,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSync, Visitor } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
-import { createEndpoint } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
-import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
-import type { IRpcTransport } from '@migaia/rpc-core'
+import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
+import { connect } from '../../../rpc-host/dist/core/index.js'
+import { RpcPlatform } from '@migaia/rpc-host/plugin'
+import { type IRpcTransport } from '../../../rpc-host/dist/core/index.js'
 
 /** All core source files, excluding declaration output. */
-const coreRoot = join(import.meta.dirname, '../../../rpc-core/src/core')
+const coreRoot = join(import.meta.dirname, '../../../rpc-host/src/core')
 
 /** Walks source roots so platform string literals cannot hide in nested files. */
 function sources(directory: string): string[] {

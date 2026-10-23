@@ -1,18 +1,18 @@
-import { RemoteMethodName } from '../../../rpc-core/dist/remote/constants.js'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { RemoteMethodName } from '../../../rpc-host/dist/remote/constants.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { defineFeature, definePlugin, getPluginRuntimeIntegration } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { createThreadPeer } from '@migaia/rpc-threads'
-import * as callable from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import * as callable from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import type {
   IRuntimePeerSource,
   IRuntimePeer
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
-import type { IRuntimeThreadPluginOptions } from '../../../rpc-threads/dist/threads/plugin.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
+import type { IThreadProtocolOptions as IRuntimeThreadPluginOptions } from './fixtures/thread-protocol.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 
 /** The baseline's ordinary callable owner also uses a real managed Host and real Feature refs. */

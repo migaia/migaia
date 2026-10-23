@@ -4,18 +4,18 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
-import { createNodeThreadChannel } from '@migaia/rpc-threads'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeThreadChannel } from '../../../rpc-plugin-thread/dist/threads/channel.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   NativeReplayReceipt,
   nativeReplayReceipt
-} from '../../../rpc-core/dist/core/internal/native-replay.js'
-import { NativeDefaultIdText } from '../../../rpc-core/dist/core/internal/native-default-id-text.js'
-import { nativeEndpoint } from '../../../rpc-core/test/replay-window/native-runtime.mjs'
+} from '../../../rpc-host/dist/core/internal/native-replay.js'
+import { NativeDefaultIdText } from '../../../rpc-host/dist/core/internal/native-default-id-text.js'
+import { nativeEndpoint } from '../../../rpc-host/test/replay-window/native-runtime.mjs'
 
 /** Only the failed-construction interval skips retirement in the explicit rollback mutant. */
 let failingEntropy = false

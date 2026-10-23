@@ -1,22 +1,22 @@
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget } from '@migaia/supervision'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { createProcessPlugin } from '@migaia/rpc-process'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import type { IRuntimePeerSourceContext } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import type { IRuntimePluginOptions } from '../../../rpc-core/dist/remote/runtime-api/plugin.js'
-import type { ISpawnProcessPluginDeployment } from '../../../rpc-process/dist/process/plugin/types.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import type { IRuntimePeerSourceContext } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IRuntimePluginOptions } from '../../../rpc-host/dist/remote/runtime-api/plugin.js'
+import type { ISpawnProcessPluginDeployment } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 
 /** A real child loads built public factories independently from the source-side parent Host. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-plugin.mjs', import.meta.url))

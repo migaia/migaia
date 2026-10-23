@@ -40,8 +40,8 @@
       "dependsOn": ["build"],
       "outputs": []
     },
-    "@migaia/rpc-core#typecheck:test": {
-      "dependsOn": ["build", "@migaia/rpc-process#build", "@migaia/rpc-threads#build"],
+    "@migaia/rpc-host#typecheck:test": {
+      "dependsOn": ["build", "@migaia/rpc-plugin-process#build", "@migaia/rpc-plugin-thread#build"],
       "outputs": []
     },
     "lint": {
@@ -51,9 +51,13 @@
       "dependsOn": ["build"],
       "cache": false
     },
-    "@migaia/rpc-core#test": {
-      "dependsOn": ["build", "@migaia/rpc-process#build", "@migaia/rpc-threads#build"],
+    "@migaia/rpc-host#test": {
+      "dependsOn": ["build", "@migaia/rpc-plugin-process#build", "@migaia/rpc-plugin-thread#build"],
       "cache": false
+    },
+    "@migaia/rpc-contract#typecheck:test": {
+      "dependsOn": ["build", "@migaia/rpc-host#build", "@migaia/rpc-plugin-process#build"],
+      "outputs": []
     }
   }
 }

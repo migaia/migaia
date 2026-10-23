@@ -28,7 +28,7 @@ const ProbeBench = {
   collectorEnabled: '1',
   coreAcceptance: 'core-probe',
   rootAcceptance: 'A-perf',
-  collectorRingPath: 'packages/rpc-devtools/dist/collector/ring.js',
+  collectorRingPath: 'packages/rpc-plugin-devtools/dist/collector/ring.js',
   sourceCommit: 'f607fe6a93c20799521ac1aacc019dde810f5d95',
   cells: [
     { id: 'node-stdio-64B-c1', carrier: 'stdio-framed', payloadBytes: 64, concurrency: 1 },
@@ -46,7 +46,7 @@ const readyNotice = /^const readyText = '([^']+)'/mu
   .exec(readFileSync(new URL('../test/bench/ipc-session.mjs', import.meta.url), 'utf8'))?.[1]
   ?.replaceAll('\\n', '\n')
 /** Base selection only overrides frozen Core bytes; every import still resolves through its owner. */
-const corePrefix = pathToFileURL(join(workspace, 'packages/rpc-core/dist/')).href
+const corePrefix = pathToFileURL(join(workspace, 'packages/rpc-host/dist/')).href
 /** Exact emitted-view identities are counted only in guard launches, outside formal timing. */
 const views = new WeakSet()
 /** Per-isolate native counters begin before IPC acquisition, then snapshots exclude warm-up. */
@@ -78,7 +78,7 @@ let stageSelection
 /**
  * The frozen collector host remains the installed identity; only cold snapshots call its API.
  *
- * @type {import('@migaia/rpc-devtools').IRpcDevtools | undefined}
+ * @type {import('@migaia/rpc-plugin-devtools').IRpcDevtools | undefined}
  */
 let collector
 /** Loaded guard provenance proves the actual collector event allocation site was instrumented. */
@@ -245,7 +245,7 @@ if (arm !== undefined) {
   }
   if (arm === ProbeBench.installed) {
     /** Canonical stage names select the same mask for the guard as the actual installed probe. */
-    const { defineProbe, RpcProbeStageName } = await import('@migaia/rpc-core/probe')
+    const { defineProbe, RpcProbeStageName } = await import('@migaia/rpc-host/probe')
     /** Fixed selected stages keep the near-noop Core arm comparable with the genuine collector. */
     const selectedStages =
       stageMode === IpcProbeBenchStages.default
@@ -262,12 +262,12 @@ if (arm !== undefined) {
     }
     if (collectorMode) {
       /** No host copy, wrapper or post-definition emit replacement changes its compiled identity. */
-      const { createRpcDevtools } = await import('@migaia/rpc-devtools')
-      collector = createRpcDevtools(
+      const { devtoolsPlugin } = await import('@migaia/rpc-plugin-devtools')
+      collector = devtoolsPlugin(
         stageMode === IpcProbeBenchStages.default
           ? { onError }
           : { stages: selectedStages, onError }
-      )
+      ).collector
       if (collector.captureMask !== 0 || collector.stageMask !== selectedMask)
         throw new Error(IpcBenchErrorText.configuration)
       globalThis.__PROBE_BENCH_PROBE = collector
@@ -667,19 +667,19 @@ async function main() {
     collectorAuditPath: resolve(
       value(
         ProbeBench.collectorAuditOption,
-        join(workspace, 'docs/rpc-devtools/scratch/hub/collector-source-audit.json')
+        join(workspace, 'docs/rpc-plugin-devtools/scratch/hub/collector-source-audit.json')
       )
     ),
     pairs: Number(value('--pairs', '5')),
     samples: Number(value('--samples', '1000')),
     warmup: Number(value('--warmup', '100')),
     baseDist: resolve(
-      value('--base-dist', join(workspace, 'docs/rpc-devtools/scratch/probe-core/base-dist'))
+      value('--base-dist', join(workspace, 'docs/rpc-plugin-devtools/scratch/probe-core/base-dist'))
     ),
     output: resolve(
       value(
         '--output',
-        join(workspace, `docs/rpc-devtools/scratch/${rootMode ? 'hub' : 'probe-core'}/bench`)
+        join(workspace, `docs/rpc-plugin-devtools/scratch/${rootMode ? 'hub' : 'probe-core'}/bench`)
       )
     )
   }
@@ -734,17 +734,17 @@ async function main() {
   mkdirSync(options.output, { recursive: true })
   /** Canonical declared codes bound the native fixture's observable package classification. */
   const codeTables = {
-    '@migaia/rpc/core': ['packages/rpc-core/src/core/error-code.ts', 'RpcCoreErrorCode'],
-    '@migaia/rpc/contract': [
-      'packages/rpc-contract/src/contract/error-code.ts',
-      'RpcContractErrorCode'
+    'rpc.endpoint': ['packages/rpc-host/src/core/error-code.ts', 'RpcCoreErrorCode'],
+    'rpc.contract': ['packages/rpc-contract/src/contract/error-code.ts', 'RpcContractErrorCode'],
+    'rpc.transport.process': [
+      'packages/rpc-plugin-process/src/error-code.ts',
+      'RpcProcessErrorCode'
     ],
-    '@migaia/rpc/process': ['packages/rpc-process/src/error-code.ts', 'RpcProcessErrorCode'],
-    '@migaia/rpc/threads': ['packages/rpc-threads/src/error-code.ts', 'RpcThreadErrorCode']
+    'rpc.transport.thread': ['packages/rpc-plugin-thread/src/error-code.ts', 'RpcThreadErrorCode']
   }
   if (rootMode)
     codeTables['rpc.devtools'] = [
-      'packages/rpc-devtools/src/error-code.ts',
+      'packages/rpc-plugin-devtools/src/error-code.ts',
       'RpcDevtoolsErrorCode'
     ]
   /** Inventory parsing reads source tables only; it never adds a production diagnostic path. */
@@ -762,7 +762,7 @@ async function main() {
     })
   )
   /** The original public reason domain avoids maintaining a parallel branch vocabulary. */
-  const { RpcProviderRejectionReason } = await import('@migaia/rpc-core')
+  const { RpcProviderRejectionReason } = await import('@migaia/rpc-host')
   /** Existing reporter/onRejected channels distinguish shared OVERLOADED and session/flow failures. */
   const failureInventory = {
     observableCodes,

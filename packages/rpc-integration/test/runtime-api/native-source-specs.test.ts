@@ -1,39 +1,40 @@
-import type { IRemoteChannelResources } from '../../../rpc-core/dist/remote/types.js'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import type { IRemoteChannelResources } from '../../../rpc-host/dist/remote/types.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createEndpoint } from '../../../rpc-core/dist/core/index.js'
-import type { IRpcEndpoint, IRpcProvider } from '../../../rpc-core/dist/core/typing.js'
-import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
-import { abort } from '../../../rpc-core/dist/core/middleware/abort.js'
-import { codec } from '../../../rpc-core/dist/core/middleware/codec.js'
-import { framer } from '../../../rpc-core/dist/core/middleware/framer.js'
-import { connect } from '../../../rpc-core/dist/core/middleware/connect.js'
-import { ping } from '../../../rpc-core/dist/core/middleware/ping.js'
-import { createProcessPeer, createProcessPlugin } from '@migaia/rpc-process'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createEndpoint } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcEndpoint, IRpcProvider } from '../../../rpc-host/dist/core/typing.js'
+import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { ping } from '../../../rpc-host/dist/core/middleware/ping.js'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
+} from '@migaia/rpc-plugin-thread/adapters/node'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import type { IProcessServeListenerIngress } from '@migaia/rpc-process'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../../rpc-core/dist/remote/types.js'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import type { IProcessServeListenerIngress } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../../../rpc-host/dist/remote/types.js'
 import type {
   IRuntimePeer,
   IRuntimePeerSourceResult
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RUNTIME_API_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 
 /** Native endpoints keep the actual negotiated codec, frame owner and IPC Features. */
 async function baselineEndpoint(

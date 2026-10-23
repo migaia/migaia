@@ -8,9 +8,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, beforeAll } from 'vitest'
-import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
+import { dialProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createProcessJsonRpcChannel } from '../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   peers,
@@ -28,7 +28,7 @@ import {
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(
     new URL(
-      '../../../rpc-process/test/process/fixtures/conformance-toolchains.mjs',
+      '../../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs',
       import.meta.url
     ).href
   )

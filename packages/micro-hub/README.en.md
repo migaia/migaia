@@ -23,7 +23,7 @@ Most community solutions cover only one part of the problem. qiankun's `initGlob
 
 **Do not use it for:**
 
-- iframes, Workers, or other browser tabs. These are separate realms; use [`@migaia/rpc-browser`](../rpc-browser/README.en.md).
+- iframes, Workers, or other browser tabs. These are separate realms; use [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.en.md).
 - State that belongs to a single app on the page. Use [`@migaia/store-keyed`](../store-keyed/README.en.md) or [`@migaia/store-light`](../store-light/README.en.md) directly.
 
 ## Installation
@@ -158,7 +158,7 @@ When a contract uses a plugin that is not installed, `use()` / `own()` throws `P
 
 ## Errors
 
-Every error carries `source: 'micro-frontend.hub'` and a `code` (`MicroHubErrorCode`): `HUB_ALREADY_CREATED`, `HUB_NOT_CREATED`, `APP_ALREADY_CONNECTED`, `APP_DISCONNECTED`, `PLUGIN_MISSING`, `CONTRACT_VERSION_MISMATCH`, `CONTRACT_OWNED`, `WRITE_DENIED`, `EMIT_DENIED`, `COMMAND_ASYNC`, `HANDLER_DUPLICATED`, `OWNER_ABSENT`, `OWNER_TIMEOUT`, `OWNER_GONE`, `INVALID_OPTION`. See the [USEGUIDE](./USEGUIDE.en.md#error-codes) for when each code is thrown and what to do.
+Every error carries `source: '@migaia/micro-hub'` and a `code` (`MicroHubErrorCode`): `HUB_ALREADY_CREATED`, `HUB_NOT_CREATED`, `APP_ALREADY_CONNECTED`, `APP_DISCONNECTED`, `PLUGIN_MISSING`, `CONTRACT_VERSION_MISMATCH`, `CONTRACT_OWNED`, `WRITE_DENIED`, `EMIT_DENIED`, `COMMAND_ASYNC`, `HANDLER_DUPLICATED`, `OWNER_ABSENT`, `OWNER_TIMEOUT`, `OWNER_GONE`, `INVALID_OPTION`. See the [USEGUIDE](./USEGUIDE.en.md#error-codes) for when each code is thrown and what to do.
 
 To branch on an error, compare `error.source === MICRO_HUB_SOURCE` and `error.code`; do not match the message text. `MicroHubErrorText` exports every message; refer to it when a test or a log needs to check the exact wording.
 
@@ -172,4 +172,4 @@ Errors thrown by listeners and subscription callbacks do not stop other listener
 | [`@migaia/event-subscriber`](../event-subscriber/README.en.md) | Event channels and request handler selection |
 | [`@migaia/plugin-host`](../plugin-host/README.en.md) | Installing and unloading capability plugins and each app |
 | [`@migaia/store-persist`](../store-persist/README.en.md) | Persistence debouncing, versions and hydrate races |
-| [`@migaia/rpc-browser`](../rpc-browser/README.en.md) | Cross-realm communication such as iframes and Workers |
+| [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.en.md) | Cross-realm communication such as iframes and Workers |

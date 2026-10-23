@@ -33,12 +33,13 @@ const sourceRoot = process.env.XRT_SOURCE_ROOT
 const child = process.argv.includes('--child'),
   stem = process.env.XRT_STEM
 /** Exact source imports correspond to public package export subpaths. */
-const api = async () => import(new URL('./rpc-process/src/process/index.ts', sourceRoot).href)
+const api = async () =>
+  import(new URL('./rpc-plugin-process/src/process/index.ts', sourceRoot).href)
 /** Each runtime uses its delivered public process and socket adapter. */
 const processAdapter = () =>
   import(
     new URL(
-      'rpc-process/src/process/adapters/' +
+      'rpc-plugin-process/src/process/adapters/' +
         { node: 'node-child-process', bun: 'bun-spawn', deno: 'deno-command' }[runtime] +
         '.ts',
       sourceRoot
@@ -47,7 +48,7 @@ const processAdapter = () =>
 const socketAdapter = () =>
   import(
     new URL(
-      'rpc-process/src/process/adapters/' +
+      'rpc-plugin-process/src/process/adapters/' +
         { node: 'node-socket', bun: 'bun-socket', deno: 'deno-socket' }[runtime] +
         '.ts',
       sourceRoot
@@ -469,7 +470,7 @@ async function session(physicalSide = side) {
   const connect = foreign
     ? async (context) => {
         const { createProcessJsonRpcChannel } = await import(
-          new URL('./rpc-process/src/process/jsonrpc-channel.ts', sourceRoot).href
+          new URL('./rpc-plugin-process/src/process/jsonrpc-channel.ts', sourceRoot).href
         )
         return createProcessJsonRpcChannel({
           byte: raw,

@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { evidence, peers } from './fixtures/conformance-business.js'
 import { randomUUID } from 'node:crypto'
-import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 import { endpointFor } from './peers/ts/runtime.js'
 
 /** Independent scope is frozen here, so editing the baseline artifact cannot shrink it. */
@@ -59,7 +60,7 @@ const requiredIds = [
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(
     new URL(
-      '../../../rpc-process/test/process/fixtures/conformance-toolchains.mjs',
+      '../../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs',
       import.meta.url
     ).href
   )

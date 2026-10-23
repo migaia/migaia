@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
 
 /** Read genuine physical listener count without installing another source reader. */
 const before = parentPort.listenerCount('message')

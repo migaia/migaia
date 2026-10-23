@@ -132,7 +132,7 @@ void loadProfile('1')
 pnpm add @migaia/resource @migaia/reactive
 ```
 
-包只有根入口 `resource`：`Resource`、`ResourceStatus`、`ResourceFetchStatus`、`ResourceErrorCode`、`RESOURCE_SOURCE` 和全部公开类型都从这里导入，没有稳定的深层子路径。`runtime` 参数来自 `reactive` 的 `createRuntime()`，两个包要用配套的版本。
+包只有根入口 `@migaia/resource`：`Resource`、`ResourceStatus`、`ResourceFetchStatus`、`ResourceErrorCode`、`RESOURCE_SOURCE` 和全部公开类型都从这里导入，没有稳定的深层子路径。`runtime` 参数来自 `@migaia/reactive` 的 `createRuntime()`，两个包要用配套的版本。
 
 ## 常用 API
 

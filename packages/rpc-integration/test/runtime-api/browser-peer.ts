@@ -1,11 +1,11 @@
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
-  createThreadPeer,
-  createWebThreadLauncher,
-  createWebThreadChannelFactory
-} from '@migaia/rpc-threads'
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
 /** Playwright loads this owning-package fixture through the existing Vite scenario entry. */
 globalThis.runAutomaticThreadScenario = async () => {

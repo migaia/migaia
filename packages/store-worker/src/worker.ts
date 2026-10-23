@@ -4,7 +4,7 @@ import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
-import type { IWebWorkerLikePort } from '@migaia/rpc-core/adapters/web-worker'
+import type { IWebWorkerLikePort } from '@migaia/rpc-plugin-browser/adapters/web-worker'
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
 import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js'
 import { StoreWorkerErrorText } from './error-text.js'
@@ -211,7 +211,7 @@ export function createWorkerHandler<Input, Output>(
   }
   let inboundListener: ((event: IWorkerMessageEvent) => void) | undefined
   const endpointOptions = snapshotWorkerClientOptions(options)
-  const endpoint = createWorkerContractEndpoint(
+  const endpointPromise = createWorkerContractEndpoint(
     {
       postMessage,
       addEventListener: (type, listener) => {
@@ -225,19 +225,19 @@ export function createWorkerHandler<Input, Output>(
       id: WorkerRpcIdentity.worker,
       targetId: endpointOptions.clientId ?? WorkerRpcIdentity.main,
       timeoutMs: endpointOptions.timeoutMs
-    }
-  )
-  const endpointPromise = endpoint.then((readyEndpoint) => {
-    const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
-      compute(payload as Input, { signal })
-    )
-    return {
-      dispose: async () => {
-        unsubscribe()
-        await readyEndpoint.close()
+    },
+    (readyEndpoint) => {
+      const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
+        compute(payload as Input, { signal })
+      )
+      return {
+        dispose: async () => {
+          unsubscribe()
+          await readyEndpoint.close()
+        }
       }
     }
-  })
+  )
   let deliver: (message: unknown) => void = () => undefined
   const handler = toManagedRpcHandler(endpointPromise, (message) => deliver(message))
   // The managed callback is the host boundary: it forwards each raw message into

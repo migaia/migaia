@@ -1,18 +1,19 @@
 import { RpcControl } from '@migaia/rpc-contract'
-import { readManagedRuntimeRegistration } from '../../../rpc-core/dist/remote/runtime-api/managed-peer.js'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import type { IRuntimeEvent } from '../../../rpc-core/dist/remote/runtime-api/events.js'
+import { readManagedRuntimeRegistration } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import type { IRuntimeEvent } from '../../../rpc-host/dist/remote/runtime-api/events.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it('borrowed connections reject every native control and retain ordinary business', async () => {
   /** Two real local registrations own channels, not execution on the opposite side. */

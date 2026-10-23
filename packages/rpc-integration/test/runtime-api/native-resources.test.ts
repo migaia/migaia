@@ -2,14 +2,14 @@ import { fileURLToPath } from 'node:url'
 import { expect, it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { RuntimeQueryReason } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
-import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { createNodeThreadChannelFactory } from '@migaia/rpc-plugin-thread/adapters/node'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { RuntimeQueryReason } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { nativeWorkerFor } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 it('each actual child PID supplies current RSS and cumulative user/system CPU', async () => {
   /** Both processes remain alive while local cold sampling reads their distinct native PIDs. */
@@ -51,7 +51,10 @@ it('each actual child PID supplies current RSS and cumulative user/system CPU', 
 it('a genuine Node Worker samples its isolate and native thread CPU without RSS', async () => {
   /** The existing Worker fixture owns its own isolate independently of the test process heap. */
   const entry = fileURLToPath(
-    new URL('../../../rpc-threads/test/threads/fixtures/lifecycle-worker.mjs', import.meta.url)
+    new URL(
+      '../../../rpc-plugin-thread/test/threads/fixtures/lifecycle-worker.mjs',
+      import.meta.url
+    )
   )
   /** Only the actual launcher and native Worker participate in sampling. */
   const handle = await createNodeThreadLauncher().launch(

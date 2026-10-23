@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { readEndpointClientCounters } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '@migaia/rpc-threads'
-import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { readEndpointClientCounters } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 /** Actual source offers retain the required v2/batch baseline without optional controls. */
 const capabilities = [RpcCapability.runtimeApi, RpcCapability.batch]

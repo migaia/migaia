@@ -20,7 +20,7 @@ const oracleStrategy: IErrorChainStrategy = {
   }
 }
 
-/** Minimal remote record copied from rpc-core/test/error-format/deserializer.test.ts. */
+/** Minimal remote record copied from rpc-host/test/error-format/deserializer.test.ts. */
 function wire(name = 'Error'): {
   source: string
   code: string

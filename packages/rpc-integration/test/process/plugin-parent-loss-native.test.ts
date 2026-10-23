@@ -8,8 +8,7 @@ describe('real Node parent-loss ownership', () => {
     async (mode) => {
       const test = await matrixFixture()
       if (test.options.deployment.kind !== 'spawn') throw new Error('spawn required')
-      const { createProcessPlugin } =
-        await import('../../../rpc-process/src/process/plugin/client.js')
+      const { createProcessPlugin } = await import('../../../rpc-plugin-process/test/protocol.ts')
       const plugin = createProcessPlugin({
         ...test.options,
         deployment: {

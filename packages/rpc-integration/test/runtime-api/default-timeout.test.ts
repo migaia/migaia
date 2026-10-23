@@ -1,21 +1,23 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
-import { createProcessPeer, createProcessPlugin } from '@migaia/rpc-process'
-import { createThreadPeer, createThreadPlugin } from '@migaia/rpc-threads'
-import type { IRpcContext } from '../../../rpc-core/dist/core/typing.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import type { IRpcContext } from '../../../rpc-host/dist/core/typing.js'
 import {
   createRuntimePeer,
   type IRuntimePeerSourceContext
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RUNTIME_API_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import {
   connected,
   runtimeSources,
   RuntimeApiFixtureText
-} from '../../../rpc-core/test/runtime-api/fixture.js'
+} from '../../../rpc-host/test/runtime-api/fixture.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 
 /** Capture only real timer registration; the original host clock and callbacks still execute. */

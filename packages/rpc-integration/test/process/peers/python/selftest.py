@@ -677,6 +677,21 @@ def check_runtime_description(results: Results, data: dict[str, Any]) -> None:
             results.check(f"runtime-description.json/{section}/{index}", check)
 
 
+def check_description_schema(results: Results, data: dict[str, Any]) -> None:
+    """Replay every shared schema case through the real reverse directory consumer."""
+    from reverse import ReverseCalls
+    for case in data["cases"]:
+        def check(case=case):
+            value = case["value"]
+            try:
+                ReverseCalls(value["self"]["instanceId"], None).directory(value)
+                accepted = True
+            except (ValueError, TypeError):
+                accepted = False
+            expect(accepted, case["valid"])
+        results.check(f"description-schema.json/{case['id']}", check)
+
+
 def check_batch(results: Results, data: dict[str, Any]) -> None:
     """Check physical admission and each sibling independently; one invalid member stays isolated."""
     for section in ("valid", "invalid", "isolated"):
@@ -711,6 +726,7 @@ def run_selftest(path: str | None = None) -> int:
         ("stream-framing.json", lambda data: check_framing(results, data)),
         ("remote-host-control.json", lambda data: check_host_control(results, data)),
         ("runtime-description.json", lambda data: check_runtime_description(results, data)),
+        ("description-schema.json", lambda data: check_description_schema(results, data)),
         ("batch.json", lambda data: check_batch(results, data)),
     ]
     for name, check in required:

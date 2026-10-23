@@ -1,26 +1,27 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import * as runtimePeerOwner from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readRuntimePreparationContext } from '../../../rpc-core/dist/remote/runtime-api/launch-context.js'
-import type { IRemoteChannelResources } from '../../../rpc-core/dist/remote/types.js'
+import * as runtimePeerOwner from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimePreparationContext } from '../../../rpc-host/dist/remote/runtime-api/launch-context.js'
+import type { IRemoteChannelResources } from '../../../rpc-host/dist/remote/types.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
-import { type IRuntimeThreadPluginOptions } from '../../../rpc-threads/dist/threads/plugin.js'
-import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
+import { type IThreadProtocolOptions as IRuntimeThreadPluginOptions } from './fixtures/thread-protocol.js'
+import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import {
   readRuntimePeerEndpoint,
   readRuntimePeerConnection,
   prepareRuntimePeerEndpoint
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
+} from '@migaia/rpc-plugin-thread/adapters/node'
 import { fileURLToPath } from 'node:url'
 import { createHmac } from 'node:crypto'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
@@ -29,43 +30,43 @@ import {
   messageProcessPipeline,
   createProcessFixtureChannel
 } from '../fixtures/process-diagnostics.js'
-import { registerFastCodec } from '../../../rpc-core/dist/core/internal/fast-path.js'
-import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
-import { authentication } from '../../../rpc-core/dist/core/middleware/authentication.js'
-import { connect } from '../../../rpc-core/dist/core/middleware/connect.js'
-import { abort } from '../../../rpc-core/dist/core/middleware/abort.js'
-import { timeout } from '../../../rpc-core/dist/core/middleware/timeout.js'
-import { hooks } from '../../../rpc-core/dist/core/middleware/hooks.js'
-import { ping } from '../../../rpc-core/dist/core/middleware/ping.js'
-import { codec } from '../../../rpc-core/dist/core/middleware/codec.js'
-import { framer } from '../../../rpc-core/dist/core/middleware/framer.js'
+import { registerFastCodec } from '../../../rpc-host/dist/core/internal/fast-path.js'
+import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../rpc-host/dist/core/middleware/timeout.js'
+import { hooks } from '../../../rpc-host/dist/core/middleware/hooks.js'
+import { ping } from '../../../rpc-host/dist/core/middleware/ping.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
 import {
   readAuthenticationEnvelope,
   wrapAuthenticationEnvelope
-} from '../../../rpc-core/dist/core/middleware/authentication-envelope.js'
-import type { IRemoteServeEndpoint } from '../../../rpc-core/dist/remote/types.js'
-import type { IRpcEndpoint } from '../../../rpc-core/dist/core/typing.js'
+} from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
+import type { IRemoteServeEndpoint } from '../../../rpc-host/dist/remote/types.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
-import type { RpcOutboundSender } from '../../../rpc-core/dist/core/internal/outbound-sender.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import type { IRuntimeOutlet } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
-import type { IProviderAdmissionScope } from '../../../rpc-core/dist/core/internal/provider-admission.js'
-import type { RequestReplayLedger } from '../../../rpc-core/dist/core/internal/request-replay-ledger.js'
-import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import { RpcError, RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
-import { RpcCoreErrorText } from '../../../rpc-core/dist/core/error-text.js'
+import type { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/outbound-sender.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import type { IRuntimeOutlet } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
+import type { IProviderAdmissionScope } from '../../../rpc-host/dist/core/internal/provider-admission.js'
+import type { RequestReplayLedger } from '../../../rpc-host/dist/core/internal/request-replay-ledger.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import { RpcError, RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorText } from '../../../rpc-host/dist/core/error-text.js'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
-import { createProcessProviderAdmission } from '../../../rpc-process/dist/process/resilience/provider-admission.js'
-import { normalizeProcessResilienceOptions } from '../../../rpc-process/dist/process/resilience/session.js'
-import { createRemoteBindingDrain } from '../../../rpc-core/dist/remote/internal/binding-drain.js'
+import { createProcessProviderAdmission } from '../../../rpc-plugin-process/dist/process/resilience/provider-admission.js'
+import { normalizeProcessResilienceOptions } from '../../../rpc-plugin-process/dist/process/resilience/session.js'
+import { createRemoteBindingDrain } from '../../../rpc-host/dist/remote/internal/binding-drain.js'
 import {
   readRuntimeLaunchContext,
   withRuntimeLaunchContext
-} from '../../../rpc-core/dist/remote/runtime-api/launch-context.js'
-import { readManagedRuntimeRegistration } from '../../../rpc-core/dist/remote/runtime-api/managed-peer.js'
+} from '../../../rpc-host/dist/remote/runtime-api/launch-context.js'
+import { readManagedRuntimeRegistration } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
 
 it.each([
   'request',
@@ -2656,7 +2657,7 @@ it('forwarded binary notify releases B after real C business completion', async 
   const carriers: ReturnType<typeof runtimeSources>[] = []
   /** The real new binary profile needs its complete original generation/admission capabilities. */
   const { RUNTIME_API_CAPABILITIES: offered } =
-    await import('../../../rpc-core/dist/remote/runtime-api/constants.js')
+    await import('../../../rpc-host/dist/remote/runtime-api/constants.js')
   let enter!: () => void, release!: () => void
   const entered = new Promise<void>((resolve) => {
     enter = resolve

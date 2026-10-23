@@ -16,7 +16,7 @@ const entry = fileURLToPath(new URL('./ipc-session.mjs', import.meta.url))
  */
 async function source(topology, policy, handles) {
   const { createNodeThreadLauncher, createNodeThreadChannelFactory } =
-    await import('@migaia/rpc-threads/adapters/node')
+    await import('@migaia/rpc-plugin-thread/adapters/node')
   const { createUnitBudget } = await import('@migaia/supervision')
   const { systemScheduler } = await import('@migaia/utils/scheduler')
   /**
@@ -59,10 +59,14 @@ export async function createRuntimeSession({ carrier, side, payload, topology },
   )
     throw new TypeError(IpcBenchErrorText.configuration)
   const { PluginHost } = await import('@migaia/plugin-host')
-  const { createThreadPeer, createThreadPlugin } = await import('@migaia/rpc-threads')
-  const { createProcessPlugin, createProcessTransport } = await import('@migaia/rpc-process')
+  const { createThreadPeer } = await import('../../../rpc-plugin-thread/test/protocol.ts')
+  const { threadProtocolDefinition: createThreadPlugin } =
+    await import('../runtime-api/fixtures/thread-protocol.ts')
+  const { createProcessPlugin } = await import('../../../rpc-plugin-process/test/protocol.ts')
+  const { createProcessTransport } =
+    await import('../../../rpc-plugin-process/dist/process/handshake.js')
   const { readRuntimeOutletConnection } =
-    await import('../../../rpc-core/dist/remote/runtime-api/outlet.js')
+    await import('../../../rpc-host/dist/remote/runtime-api/outlet.js')
   /** Captured handles are the canonical launcher's actual native resource observations. */
   const handles = []
   if (topology === RuntimeBench.reverse) {
@@ -115,7 +119,7 @@ export async function createRuntimeSession({ carrier, side, payload, topology },
       )
     else {
       const { createNodeProcessLauncher } =
-        await import('@migaia/rpc-process/adapters/node-child-process')
+        await import('@migaia/rpc-plugin-process/adapters/node-child-process')
       const { systemScheduler } = await import('@migaia/utils/scheduler')
       const { createUnitBudget } = await import('@migaia/supervision')
       /** The process relay can explicitly own a Worker without ambiguous automatic Thread sources. */
@@ -240,8 +244,10 @@ export async function createRuntimeSession({ carrier, side, payload, topology },
  * @returns {Promise<void>} Actual role readiness; all physical dispatch remains in RPC.
  */
 export async function serveRuntimeWorker(input, policy) {
-  const { createThreadPeer, createThreadPlugin } = await import('@migaia/rpc-threads')
-  const { createProcessPlugin } = await import('@migaia/rpc-process')
+  const { createThreadPeer } = await import('../../../rpc-plugin-thread/test/protocol.ts')
+  const { threadProtocolDefinition: createThreadPlugin } =
+    await import('../runtime-api/fixtures/thread-protocol.ts')
+  const { createProcessPlugin } = await import('../../../rpc-plugin-process/test/protocol.ts')
   if (input.topology === RuntimeBench.reverse) {
     /** Handler closures capture only this exact factory Promise; no callback reselects a successor. */
     const prepared = createThreadPeer({

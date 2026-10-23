@@ -1,5 +1,5 @@
-import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
-import { readEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
+import { createServiceWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/service-worker'
+import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, installErrorGuards } from './rpc.js'
 
 const errors = installErrorGuards()

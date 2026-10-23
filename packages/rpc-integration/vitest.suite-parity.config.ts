@@ -10,10 +10,10 @@ const collect = process.env.RPC_SUITE_PARITY_COLLECT === '1'
 /** Each real owner has a unique project name and its own test root. */
 const owners = [
   'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-browser',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
   'rpc-integration'
 ] as const
 

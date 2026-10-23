@@ -659,7 +659,7 @@ function createStoreKeyedAggregateError(
 ): AggregateError
 ```
 
-The first three differ only in the runtime type they return (`Error`/`RangeError`/`TypeError`) and take the same arguments: `code` (required), `message` (required), `options?.cause` (optional, passed to the native `Error` constructor's `{ cause }`). Each result gets `source: '@migaia/store-keyed'` and `code` through `attachErrorIdentity` (from `@migaia/utils/error`), without touching `stack`/`name`. `createStoreKeyedAggregateError` also requires `errors: unknown[]` (which become `AggregateError.errors`) and takes no `cause` option.
+The first three differ only in the runtime type they return (`Error`/`RangeError`/`TypeError`) and take the same arguments: `code` (required), `message` (required), `options?.cause` (optional, passed to the native `Error` constructor's `{ cause }`). Each result gets `source: 'store.keyed'` and `code` through `attachErrorIdentity` (from `@migaia/utils/error`), without touching `stack`/`name`. `createStoreKeyedAggregateError` also requires `errors: unknown[]` (which become `AggregateError.errors`) and takes no `cause` option.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 const STORE_KEYED_SOURCE = 'store.keyed'

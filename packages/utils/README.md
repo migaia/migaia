@@ -43,13 +43,15 @@ const body = await retry(
   async ({ attempt, signal }) => {
     console.log(`第 ${attempt} 次请求`)
     const response = await fetch(`http://localhost:${port}/orders`, { signal })
-    if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
+    if (!response.ok)
+      throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
     return response.text()
   },
   {
     maxAttempts: 4,
     attemptTimeoutMs: 300, // 每次最多等 300 毫秒，到点取消这次 fetch
-    shouldRetry: (error) => isUtilsTimeoutError(error) || (error as { status?: number }).status! >= 500,
+    shouldRetry: (error) =>
+      isUtilsTimeoutError(error) || (error as { status?: number }).status! >= 500,
     delay: 100 // 两次请求之间等 100 毫秒
   }
 )
@@ -115,16 +117,16 @@ async function fetchWithTimeout(url: string, ms: number) {
 
 ## 典型场景
 
-| 场景 | 怎么组合 | 详细说明 |
-| --- | --- | --- |
-| 给慢请求加超时，并让请求真的停下 | `withTimeout`，把 `signal` 传给 `fetch` | [USEGUIDE](./USEGUIDE.md#给慢请求加超时并让请求真的停下) |
-| 不看 `signal` 的操作在超时后才失败 | `withTimeout` 的 `report` | [USEGUIDE](./USEGUIDE.md#超时之后才到的失败去了哪里) |
-| 只重试 5xx，带退避和总时限 | `retry` 的 `shouldRetry`、`delay`、`totalTimeoutMs` | [USEGUIDE](./USEGUIDE.md#只重试值得重试的错误) |
+| 场景                                     | 怎么组合                                              | 详细说明                                                     |
+| ---------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------ |
+| 给慢请求加超时，并让请求真的停下         | `withTimeout`，把 `signal` 传给 `fetch`               | [USEGUIDE](./USEGUIDE.md#给慢请求加超时并让请求真的停下)     |
+| 不看 `signal` 的操作在超时后才失败       | `withTimeout` 的 `report`                             | [USEGUIDE](./USEGUIDE.md#超时之后才到的失败去了哪里)         |
+| 只重试 5xx，带退避和总时限               | `retry` 的 `shouldRetry`、`delay`、`totalTimeoutMs`   | [USEGUIDE](./USEGUIDE.md#只重试值得重试的错误)               |
 | 批量下载限制并发，离开页面时取消排队任务 | `createConcurrencyLimiter` 加 `run(task, { signal })` | [USEGUIDE](./USEGUIDE.md#批量任务限制并发离开时取消排队任务) |
-| 多个模块同时初始化，只建一个连接 | `onceAsync` | [USEGUIDE](./USEGUIDE.md#并发初始化只执行一次) |
-| 不可变地修改深层字段 | `set`、`get` | [USEGUIDE](./USEGUIDE.md#不可变地修改深层字段) |
-| 防止配置在传入之后被改掉 | `ownConfig`、`readonlyConfig`、`patchConfig` | [USEGUIDE](./USEGUIDE.md#防止配置在传入之后被改掉) |
-| 错误包装后仍按代码识别 | `attachErrorIdentity`、`walkErrorCauses` | [USEGUIDE](./USEGUIDE.md#错误被包装后仍能认出底层原因) |
+| 多个模块同时初始化，只建一个连接         | `onceAsync`                                           | [USEGUIDE](./USEGUIDE.md#并发初始化只执行一次)               |
+| 不可变地修改深层字段                     | `set`、`get`                                          | [USEGUIDE](./USEGUIDE.md#不可变地修改深层字段)               |
+| 防止配置在传入之后被改掉                 | `ownConfig`、`readonlyConfig`、`patchConfig`          | [USEGUIDE](./USEGUIDE.md#防止配置在传入之后被改掉)           |
+| 错误包装后仍按代码识别                   | `attachErrorIdentity`、`walkErrorCauses`              | [USEGUIDE](./USEGUIDE.md#错误被包装后仍能认出底层原因)       |
 
 ## 安装
 
@@ -134,14 +136,15 @@ pnpm add @migaia/utils
 
 ## 常用 API
 
-| API | 子路径 | 做什么 |
-| --- | --- | --- |
-| `withTimeout` | `/promise` | 给一个操作加截止时间；到点先取消操作收到的 `signal`，再以 `DEADLINE_EXCEEDED` 拒绝。 |
-| `retry` | `/promise` | 按 `shouldRetry` 串行重试，支持退避、单次限时和总时限。 |
-| `createConcurrencyLimiter` | `/promise` | 限制同时运行的任务数，其余按提交顺序排队，排队中的任务可以取消。 |
-| `onceAsync` | `/function` | 第一次调用时保存 Promise，之后的调用（包括同时发生的）都拿到它。 |
-| `attachErrorIdentity` / `walkErrorCauses` | `/error` | 给原错误加上 `source` 和 `code`；沿 `cause` 和 `AggregateError.errors` 找回它。 |
-| `ownConfig` / `patchConfig` | `/config` | 接收时复制配置；生成新配置并复用没改动的部分。 |
+| API                                                                       | 子路径      | 做什么                                                                               |
+| ------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ |
+| `withTimeout`                                                             | `/promise`  | 给一个操作加截止时间；到点先取消操作收到的 `signal`，再以 `DEADLINE_EXCEEDED` 拒绝。 |
+| `retry`                                                                   | `/promise`  | 按 `shouldRetry` 串行重试，支持退避、单次限时和总时限。                              |
+| `createConcurrencyLimiter`                                                | `/promise`  | 限制同时运行的任务数，其余按提交顺序排队，排队中的任务可以取消。                     |
+| `onceAsync`                                                               | `/function` | 第一次调用时保存 Promise，之后的调用（包括同时发生的）都拿到它。                     |
+| `attachErrorIdentity` / `walkErrorCauses`                                 | `/error`    | 给原错误加上 `source` 和 `code`；沿 `cause` 和 `AggregateError.errors` 找回它。      |
+| `ownConfig` / `patchConfig`                                               | `/config`   | 接收时复制配置；生成新配置并复用没改动的部分。                                       |
+| `detectServerRuntime` / `detectElectronProcessType` / `detectGlobalScope` | 根入口      | 读取当前服务端运行时、Electron 角色与浏览器作用域。                                  |
 
 ## 契约细节
 
@@ -154,6 +157,22 @@ pnpm add @migaia/utils
 - [`/config`](./USEGUIDE.md#config-模块)：配置所有权、只读视图、补丁和合并策略
 - [`/function`](./USEGUIDE.md#function-模块)：`once`、`onceAsync` 的适用范围
 - [Collector](./USEGUIDE.md#collector)、[排查清单](./USEGUIDE.md#排查与构建门禁)、[公开入口索引](./USEGUIDE.md#公开入口索引)
+
+### 根入口：当前运行时与全局作用域
+
+根入口 `@migaia/utils` 导出 `detectServerRuntime`、`detectElectronProcessType`、`detectGlobalScope`，以及对应的值/类型域 `ServerRuntime`、`ElectronProcessType`、`GlobalScopeKind`。
+
+- `detectServerRuntime()` 按 Deno、Bun、Node 的顺序识别。Deno 要求非空的 `Deno.version.deno`；Bun 可由全局对象或非空的 process 版本标记识别。没有受支持的服务端标记时返回 `undefined`。
+- `detectElectronProcessType()` 要求 Electron 版本标记；历史上的 `process.type === 'browser'` 映射到 `ElectronProcessType.main`，renderer 与 utility 保留同名值，未知类型返回 `undefined`。
+- `detectGlobalScope()` 只在未识别为服务端运行时时返回 Window、dedicated-worker、shared-worker 或 service-worker 作用域。当前全局必须是对应构造器的实例；仅存在构造器不足以识别。
+
+每次调用都重新读取当前全局，不缓存导入时的判断。这些函数不加载宿主模块，也不引入 Node 或 DOM 声明依赖。
+
+```ts
+import { detectServerRuntime, detectElectronProcessType, detectGlobalScope } from '@migaia/utils'
+
+console.log(detectServerRuntime(), detectElectronProcessType(), detectGlobalScope())
+```
 
 ### `/promise`：什么时候执行，什么时候共用 Promise
 
@@ -197,7 +216,7 @@ await later
 
 ### `/error`：按代码决定怎样处理失败
 
-错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。
+错误上的 `source` 表示来源，`code` 表示这个来源内的失败种类。 本包稳定领域为 `UTILS_SOURCE === 'foundation.utils'`，npm 导入仍使用 `@migaia/utils` 及其公开子路径。`UtilsErrorCode` 的键与值如下；原生 `TypeError`、`RangeError` 等加码后仍保留原类型，不能只看消息文本。
 
 - `invalidArgument` / `INVALID_ARGUMENT`：参数类型或范围不合法，修正参数后再调用。
 - `nonErrorValue` / `NON_ERROR_VALUE`：`toError()` 包装了非错误的抛出值，原值在 `cause`。

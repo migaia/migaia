@@ -1,23 +1,21 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import {
-  createProcessJsonRpcChannel,
-  type IProcessJsonRpcChannelOptions
-} from '@migaia/rpc-process'
-import type { IRemoteContract } from '@migaia/rpc-core/remote'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'
-import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
-import { createOneWayFeature } from '@migaia/rpc-core/features/one-way'
-import { codec } from '@migaia/rpc-core'
-import { framer } from '@migaia/rpc-core'
-import { abort } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
-import type { IRpcEndpoint } from '@migaia/rpc-core'
-import type { IOneWaySurface } from '@migaia/rpc-core/features/one-way'
-import type { IRemoteChannel } from '@migaia/rpc-core/remote'
+import { createProcessJsonRpcChannel } from '../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
+import type { IProcessJsonRpcChannelOptions } from '../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
+import type { IRemoteContract } from '@migaia/rpc-host/plugin'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
+import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/stream/index.js'
+import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
+import { createOneWayFeature } from '../../../rpc-host/dist/core/features/one-way.js'
+import { codec } from '../../../rpc-host/dist/core/index.js'
+import { framer } from '../../../rpc-host/dist/core/index.js'
+import { abort } from '../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
+import type { IOneWaySurface } from '../../../rpc-host/dist/core/features/one-way.js'
+import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
 
 /** Declared request and notification methods keep the fixture strictly inside the bridge profile. */
 export const BRIDGE_CONTRACT: IRemoteContract = {

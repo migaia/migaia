@@ -5,39 +5,39 @@ import { fileURLToPath } from 'node:url'
 import { MessageChannel } from 'node:worker_threads'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { authentication } from '../../../rpc-core/dist/core/middleware/authentication.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
 import {
   createRpcIdempotencyStore,
   type IRpcIdempotencyStore
-} from '../../../rpc-core/dist/core/idempotency-store.js'
-import { createNodeMessagePortTransport } from '../../../rpc-core/dist/core/adapters/message-port.js'
-import { registerBatchAgreement } from '../../../rpc-core/dist/core/internal/batch-frame.js'
+} from '../../../rpc-host/dist/core/idempotency-store.js'
+import { createNodeMessagePortTransport } from '../../../rpc-host/dist/core/adapters/message-port.js'
+import { registerBatchAgreement } from '../../../rpc-host/dist/core/internal/batch-frame.js'
 import {
   createRuntimePeer,
   type IRuntimePeer,
   type IRuntimePeerOptions
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createProcessPeer } from '@migaia/rpc-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { nativeBytePair } from '../process/fixtures/native-runtime.js'
 import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
+} from '@migaia/rpc-plugin-thread/adapters/node'
 import { RpcCapability } from '@migaia/rpc-contract'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { RUNTIME_API_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
-import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
 import { RpcNativeBinaryKind, RpcBinaryProfile, RpcBinaryStorage } from '@migaia/rpc-contract/wire'
-import { readAuthenticationEnvelope } from '../../../rpc-core/dist/core/middleware/authentication-envelope.js'
-import * as authenticationReplay from '../../../rpc-core/dist/core/internal/authentication-replay.js'
-import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
-import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
+import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
+import * as authenticationReplay from '../../../rpc-host/dist/core/internal/authentication-replay.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import {
   codec,
   framer,
@@ -46,7 +46,7 @@ import {
   timeout,
   hooks,
   type IRpcEndpoint
-} from '../../../rpc-core/dist/core/index.js'
+} from '../../../rpc-host/dist/core/index.js'
 
 /** Both source offers request the exact native profile; no platform label grants this capability. */
 const capabilities = [

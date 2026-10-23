@@ -3,13 +3,13 @@ import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 
 /** Both cases load the same actual managed Worker and original launcher/channel/registration. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))

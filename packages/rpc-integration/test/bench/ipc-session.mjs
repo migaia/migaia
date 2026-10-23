@@ -22,12 +22,14 @@ import { readFileSync, existsSync } from 'node:fs'
 const deno = typeof Deno !== 'undefined'
 /** Loader registration finishes before importing the actual production adapter modules. */
 const { createNodeProcessLauncher, openProcessStdioChannel } =
-  await import('@migaia/rpc-process/adapters/node-child-process')
+  await import('@migaia/rpc-plugin-process/adapters/node-child-process')
 /** Bare and RPC Deno sides share the same delivered byte carrier, without Node spawn substitution. */
-const denoProcess = deno ? await import('@migaia/rpc-process/adapters/deno-command') : undefined
+const denoProcess = deno
+  ? await import('@migaia/rpc-plugin-process/adapters/deno-command')
+  : undefined
 /** Both bare and RPC byte sides reuse the exact delivered physical carrier. */
 const { dialProcessByteChannel, listenProcessByteChannel } =
-  await import('@migaia/rpc-process/adapters/node-socket')
+  await import('@migaia/rpc-plugin-process/adapters/node-socket')
 /** Channel scheduling uses the runtime-neutral canonical owner. */
 const { systemScheduler } = await import('@migaia/utils/scheduler')
 import {
@@ -97,17 +99,33 @@ const readyText = 'IPC_READY\n'
 let offer
 /** Load the delivered public Peer graph only on RPC sides; bare RSS must not include it. */
 async function rpcApi() {
-  const processApi = await import('@migaia/rpc-process')
-  const threads = await import('@migaia/rpc-threads')
-  const threadAdapters = await import('@migaia/rpc-threads/adapters/node')
+  const { createProcessTransport } =
+    await import('../../../rpc-plugin-process/dist/process/handshake.js')
+  const { createNativeProcessOffer } =
+    await import('../../../rpc-plugin-process/dist/process/offer.js')
+  const { createProcessPeer } = await import('../../../rpc-plugin-process/test/protocol.ts')
+  const { createThreadPeer } = await import('../../../rpc-plugin-thread/test/protocol.ts')
+  const {
+    createAdapterWebThreadLauncher: createWebThreadLauncher,
+    createAdapterWebThreadChannelFactory: createWebThreadChannelFactory
+  } = await import('../../../rpc-plugin-thread/dist/threads/web-launcher.js')
+  const threadAdapters = await import('@migaia/rpc-plugin-thread/adapters/node')
   /** Capability declarations come from the actual factory source context, never a fixture guess. */
   offer = (id, capabilities) => ({
-    ...processApi.createNativeProcessOffer({
+    ...createNativeProcessOffer({
       peer: { id, runtime: deno ? 'deno' : process.versions.bun ? 'bun' : 'node' }
     }),
     capabilities
   })
-  return { ...processApi, ...threads, ...threadAdapters }
+  return {
+    createProcessTransport,
+    createNativeProcessOffer,
+    createProcessPeer,
+    createThreadPeer,
+    createWebThreadLauncher,
+    createWebThreadChannelFactory,
+    ...threadAdapters
+  }
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
 const echoMethod = RuntimeBench.echo
@@ -137,7 +155,7 @@ function waitReady(child) {
 /**
  * Serve bare socket/stdio frames with one JSON parse and serialization per payload.
  *
- * @param {import('@migaia/rpc-process').IProcessByteChannel} raw Owned physical channel.
+ * @param {import('@migaia/rpc-plugin-process').IProcessByteChannel} raw Owned physical channel.
  * @returns {Promise<void>} Resolves at physical close.
  */
 async function serveBare(raw) {
@@ -172,9 +190,9 @@ async function serveBare(raw) {
 /**
  * Build the public process Peer on the original physical source and provide an exact echo.
  *
- * @param {import('@migaia/rpc-core/remote').IRuntimePeerSource} source Original channel negotiation
+ * @param {import('@migaia/rpc-host/plugin').IRuntimePeerSource} source Original channel negotiation
  *   receives the actual factory identity and installed capability offer.
- * @returns {Promise<import('@migaia/rpc-core/remote').IRuntimePeer>} Real public Peer.
+ * @returns {Promise<import('@migaia/rpc-host/plugin').IRuntimePeer>} Real public Peer.
  */
 async function serveRpc(source) {
   const { createProcessPeer } = await rpcApi()
@@ -738,11 +756,11 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
     } else throw new Error(IpcBenchErrorText.bridgeCarrier)
     cleanup.push(() => raw.close())
     if (side === 'rpc') {
-      const { createProcessJsonRpcChannel } = await import('@migaia/rpc-process')
-      const { createProcessPeer } = await import('@migaia/rpc-process')
+      const { createProcessJsonRpcChannel } =
+        await import('../../../rpc-plugin-process/dist/process/jsonrpc-channel.js')
+      const { createProcessPeer } = await import('../../../rpc-plugin-process/test/protocol.ts')
       /** Only capabilities with actual mappings in the canonical bridge profile are offered. */
-      const { JSONRPC_ALLOWED_CAPABILITIES } =
-        await import('@migaia/rpc-core/adapter/internal-advanced')
+      const { JSONRPC_ALLOWED_CAPABILITIES } = await import('@migaia/rpc-host/plugin')
       /** Contract describes the same request echo already proved by the conformance facade cases. */
       const contract = {
         schemaVersion: 1,
@@ -910,7 +928,7 @@ async function childMain(side, carrier, address) {
     if (side === 'bare') {
       const { createServer } = await import('node:net')
       const { nodeByteStream } =
-        await import('../../../rpc-process/dist/process/node-byte-stream.js')
+        await import('../../../rpc-plugin-process/dist/process/node-byte-stream.js')
       const server = createServer((socket) => {
         void serveBare(nodeByteStream(socket, socket, () => socket.destroy())).catch((error) => {
           process.stderr.write(String(error))

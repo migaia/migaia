@@ -1,6 +1,6 @@
-import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
-import { readEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
-import type { IRpcEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
+import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
+import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
+import type { IRpcEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, installErrorGuards } from './rpc.js'
 
 const errors = installErrorGuards()

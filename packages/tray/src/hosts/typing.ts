@@ -7,7 +7,7 @@ import type {
   IPluginFeatureOutput
 } from '@migaia/plugin-host'
 import type { IAbortSignal, IUrlLike } from '@migaia/utils'
-import type { IRuntimeConnectionDetail } from '@migaia/rpc-core/remote'
+import type { IRuntimeConnectionDetail } from '@migaia/rpc-host/plugin'
 import type { TrayInstanceEvent, TrayInstanceState, TrayRuntime } from './constants.js'
 import type { ITrayRoutingPolicy } from './routing-policy.js'
 
@@ -129,8 +129,8 @@ export type ITraySandbox = Readonly<{
   wrap(command: ITrayLaunchCommand): ITrayLaunchCommand
 }>
 /**
- * The launch command a sandbox may rewrite. Structurally identical to rpc-process
- * `IProcessLaunchCommand`; declared here so Tray's public types do not pull in rpc-process
+ * The launch command a sandbox may rewrite. Structurally identical to rpc-plugin-process
+ * `IProcessLaunchCommand`; declared here so Tray's public types do not pull in rpc-plugin-process
  * declarations and their Node types.
  */
 export type ITrayLaunchCommand = Readonly<{

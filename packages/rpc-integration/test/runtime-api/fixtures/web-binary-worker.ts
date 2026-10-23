@@ -1,9 +1,9 @@
-import { readThreadBootstrap } from '@migaia/rpc-threads'
-import { createEventTargetMessageResource } from '@migaia/rpc-core/adapter/internal-advanced'
+import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
+import { createEventTargetMessageResource } from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import type { IThreadWebPort } from '@migaia/rpc-threads'
+import type { IThreadWebPort } from '../../../../rpc-plugin-thread/dist/threads/types.js'
 import { webBinaryEndpoint } from './web-binary-endpoint.js'
 
 /** The real Worker global supplies initial input and ACK through the canonical Core resource. */

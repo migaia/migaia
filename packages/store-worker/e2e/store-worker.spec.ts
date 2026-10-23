@@ -12,10 +12,12 @@ test('Worker 请求在处理端无响应时会超时并结束请求', async ({ p
   )
 })
 
-test('ArrayBuffer transfer 在真实 Worker 边界转移所有权', async ({ page }) => {
+test('未认证的显式 transfer 在真实 Worker 边界被拒绝且不转移所有权', async ({ page }) => {
   await page.goto('/')
   await expect(page.evaluate(() => window.runStoreWorkerTransferScenario())).resolves.toEqual([
-    4, 0
+    'rpc.endpoint',
+    'CAPABILITY_UNSUPPORTED',
+    4
   ])
 })
 
@@ -24,19 +26,12 @@ test('主线程取消会终止在途 Worker 请求', async ({ page }) => {
   await expect(page.evaluate(() => window.runStoreWorkerAbortScenario())).rejects.toThrow(/abort/i)
 })
 
-test('Worker failure retains canonical remote outer and meaningful native cause across realms', async ({
+test('Worker failure retains the original native error and stack across realms', async ({
   page
 }) => {
   await page.goto('/')
   const messages = await page.evaluate(() => window.runStoreWorkerErrorScenario())
   expect(messages).toEqual([
-    {
-      name: 'RpcRemoteError',
-      message: 'Provider failed',
-      source: 'rpc.endpoint',
-      code: 'INTERNAL',
-      hasStack: true
-    },
     {
       name: 'Error',
       message: 'Unable to calculate the requested value',

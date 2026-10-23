@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
-import { ThreadBootstrap } from '../../../rpc-threads/dist/threads/constants.js'
+import {
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
+import { ThreadBootstrap } from '../../../rpc-plugin-thread/dist/threads/constants.js'
 
 /** A real launcher owns acknowledgement and failure handling on this controllable Worker port. */
 function webFixture() {

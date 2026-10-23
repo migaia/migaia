@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 import { bindProcessByteWire } from '../fixtures/process-diagnostics.js'
-import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '@migaia/rpc-process'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
+import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '../../../rpc-plugin-process/dist/process/bootstrap.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 
 /** A synchronous byte source exposes the exact bootstrap and handshake reader boundary. */
 function source() {

@@ -19,7 +19,7 @@ describe('canonical child stdio replay registration', () => {
       }
     })
     /** Observe supplied host handles while leaving the actual byte-channel implementation intact. */
-    const byteStreams = await import('../../../rpc-process/dist/process/node-byte-stream.js')
+    const byteStreams = await import('../../../rpc-plugin-process/dist/process/node-byte-stream.js')
     /** Substitutes isolated streams while observing the canonical stdio constructor arguments. */
     const construct = vi.fn((_readable: Readable, _writable: Writable, _destroy: () => void) =>
       byteStreams.nodeByteStream(readable, writable, () => {
@@ -27,13 +27,13 @@ describe('canonical child stdio replay registration', () => {
         writable.destroy()
       })
     )
-    vi.doMock('../../../rpc-process/dist/process/node-byte-stream.js', () => ({
+    vi.doMock('../../../rpc-plugin-process/dist/process/node-byte-stream.js', () => ({
       ...byteStreams,
       nodeByteStream: construct
     }))
     try {
       const { openProcessStdioChannel } =
-        await import('@migaia/rpc-process/adapters/node-child-process')
+        await import('@migaia/rpc-plugin-process/adapters/node-child-process')
       await expect(openProcessStdioChannel({ bootstrap: 'fd', fd: 3 })).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
       })
@@ -44,7 +44,7 @@ describe('canonical child stdio replay registration', () => {
       expect(construct).toHaveBeenCalledOnce()
       expect(construct.mock.calls[0]).toEqual([process.stdin, process.stdout, expect.any(Function)])
       const { bindNativeReplayTransport, claimNativeReplayTransport } =
-        await import('../../../rpc-core/dist/core/internal/native-replay.js')
+        await import('../../../rpc-host/dist/core/internal/native-replay.js')
       /** The registration transfers provenance to one canonical transport identity. */
       const transport = {
         platform: 'Memory' as const,
@@ -79,7 +79,7 @@ describe('canonical child stdio replay registration', () => {
       await expect(failingChannel.write(new Uint8Array([6]))).rejects.toBe(writeFailure)
       await failingChannel.close()
     } finally {
-      vi.doUnmock('../../../rpc-process/dist/process/node-byte-stream.js')
+      vi.doUnmock('../../../rpc-plugin-process/dist/process/node-byte-stream.js')
       readable.destroy()
       writable.destroy()
       failingReadable.destroy()

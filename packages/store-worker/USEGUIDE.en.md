@@ -169,7 +169,7 @@ A Worker calculation throws a TypeError caused by an earlier RangeError, but the
 
 Sending only an error message loses native types, the nested cause and the original stack information across the thread boundary.
 
-Wrap the real computation with createWorkerHandler and forward incoming messages to it. RPC returns a remote failure whose cause retains the native TypeError and its RangeError cause; no custom error-message protocol is needed.
+Wrap the real computation with createWorkerHandler and forward incoming messages to it. RPC restores the native TypeError and its RangeError cause; no custom error-message protocol is needed.
 
 ### Example parameters
 
@@ -204,7 +204,7 @@ if (!isMainThread) {
   const adapter = new WorkerAdapter(port1)
   try {
     const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error
-    const primary = failure.cause as Error
+    const primary = failure
     const root = primary.cause as Error
     console.log('remote:', failure.name, (failure as Error & { code?: string }).code)
     console.log('primary:', primary instanceof TypeError, primary.message)
@@ -221,15 +221,15 @@ if (!isMainThread) {
 Output:
 
 ```text
-remote: RpcRemoteError INTERNAL
+remote: TypeError UNKNOWN
 primary: true cannot compute total
 cause: true invalid row
 stacks: true true
 ```
 
-The output is `remote: RpcRemoteError INTERNAL`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.
+The output is `remote: TypeError UNKNOWN`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.
 
-The outer error belongs to RPC Core; the native errors remain below cause rather than becoming the top-level TypeError. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.
+The native terminal restores the provider TypeError at the top level, with its original stack and the RangeError on cause. An unclassified provider error has code UNKNOWN; no artificial RpcRemoteError outer is added. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.
 
 ## Use Resource state and cache for Worker results
 
@@ -437,18 +437,18 @@ Copy is the default ownership policy. This pre-cancelled decode preserves the ca
 
 ### Responsibility, entries, and runtime boundaries
 
-This package connects two Worker use cases. WorkerAdapter / createWorkerHandler execute general computation, and workerComputed connects those requests to Resource. The serialization subentry connects an ordinary parser to a Worker and SerializeRegistry. rpc-core owns request correlation, providers, cancellation, deadlines, source handling, and error transport. resource owns caching, retry, and reactive lifetime; serialize owns formats and registry behavior. This package owns payload conversion, chunk credit / ACK, and the integration rather than another RPC engine.
+This package connects two Worker use cases. WorkerAdapter / createWorkerHandler execute general computation, while workerComputed connects requests to Resource; the serialization subentry connects an ordinary parser to Worker and SerializeRegistry. The bridge internally creates one `createRpcHost` with `dedicatedWorkerPlugin({ worker })`. rpc-host owns request correlation, providers, cancellation, deadlines, source identity, and error transport; rpc-plugin-browser lends the physical carrier. Resource owns caching and reactive lifetime, and serialize owns formats. This package retains payload conversion and chunk credit / ACK without another RPC engine.
 
 | Entry                                   | Public contents                                                                                                                                     |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/store-worker`                  | WorkerAdapter, createWorkerHandler, workerComputed, IManagedRpcHandler, port / Resource option types, ownership / diagnostic constants, and errors. |
 | `@migaia/store-worker/serialize/worker` | workerParser, workerPlugin, createSerializeWorkerHandler, IWorkerPluginOptions, IWorkerLike, and IWorkerFailureEvent.                               |
 
-reactive, resource, serialize, rpc-core, rpc-contract, and utils are runtime dependencies. Install packages directly when your application imports them. Serialization factories no longer have root aliases, and there is no serialize/* wildcard entry; migrate imports to the exact subentry without a compatibility shim. encodeWorkerValue / decodeWorkerValue and transferablesOf are internal. CHUNK_MERGE_FAILED was removed because its former merge path no longer exists; six local codes remain.
+Runtime dependencies are reactive, resource, serialize, rpc-host, rpc-plugin-browser, rpc-contract, and utils. Install directly imported packages explicitly. Serialization factories use the exact `/serialize/worker` subentry, without root aliases or a wildcard. encodeWorkerValue / decodeWorkerValue and transferablesOf stay internal. The obsolete CHUNK_MERGE_FAILED path is removed; six local codes remain.
 
-The bridge uses exclusive topology: one logical connection has one port pair, with main and worker as default identities. connect performs Core consistency checks and directory wiring without a custom identifier. This is not a guarantee of arbitrary multi-client sharing on one Worker object. A MessagePort can satisfy the port surface while its creator still owns physical connection setup and resources.
+One bridge owns one RPC host and one borrowed physical Worker connection, defaulting to local identity main and remote identity worker. Initial providers register before connection preparation; later registration uses the same Host provide path. This does not make one Worker object a shared multi-client service. A MessagePort can satisfy the port shape, but its creator still arranges a separate physical link and ownership.
 
-IWorkerPort aliases Core IWebWorkerLikePort, requiring postMessage, addEventListener, and removeEventListener for message / error / messageerror events. Browser Workers, MessagePorts, and an individual SharedWorker port can provide that surface. Node examples run handlers in real Workers through native MessagePorts rather than fabricated ports. IWorkerLike additionally permits terminate(); accepting this structure does not transfer Worker creation or native-exit ownership.
+IWorkerPort aliases the browser plugin's IWebWorkerLikePort: postMessage, addEventListener, and removeEventListener with message / error / messageerror events. Browser Worker, MessagePort, or one SharedWorker.port can provide that shape. Node examples use an actual Worker and native MessagePort. IWorkerLike also permits optional terminate(); structural compatibility does not transfer native Worker creation or exit ownership.
 
 ### WorkerAdapter: the caller's connection
 
@@ -465,11 +465,11 @@ IWorkerPort aliases Core IWebWorkerLikePort, requiring postMessage, addEventList
 
 Construction captures clientId / timeoutMs, and requests capture signal / transfer without rereading caller getters after initialization. Invalid option objects or property reads produce INVALID_OPTION with caught failures on cause. request rejects its Promise while construction errors throw synchronously. Core retains later port and RPC admission rather than every Core failure becoming a local error.
 
-One adapter supports concurrent requests. Core correlates results and handles each call's cancellation / deadline separately. Use Promise.all for independent work: built-in carriers supporting batch@1 immediately send when idle and coalesce ready requests or responses while a physical write is active. Dependent serial awaits do not become batching. request awaits provider results; internal one-way notify awaits sending rather than business completion.
+One Adapter supports concurrent requests. The Host correlates each result and isolates its deadline / cancellation. Independent requests can use Promise.all, but this native runtime path emits call/terminal operations and does not promise legacy envelope auto-batching. request waits for business completion. Internal notify uses `host.notify(method, payload, { targetId, transfer })`: its Promise settles after actual physical send, not a provider reply. A native postMessage failure rejects with its original error on cause; no business response is sent for notification.
 
 | Member    | Lifetime                                                                                                                                                      |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| disposed  | True immediately after close / dispose.                                                                                                                       |
+| disposed  | `adapter.disposed` becomes `true` synchronously when `adapter.close()` or `adapter.dispose()` starts, marking this adapter closed to new requests.            |
 | close()   | No arguments; synchronous and idempotent retirement. New requests reject ADAPTER_DISPOSED, but it does not release the Endpoint.                              |
 | dispose() | No arguments; the sole async release operation. It closes admission, awaits initialization, then closes the Endpoint; repeated calls return the same Promise. |
 
@@ -485,13 +485,13 @@ The bridge converts input to portable data: plain records / arrays, finite primi
 
 ### IManagedRpcHandler closure and cleanup
 
-| Member           | Behavior                                                                                                       |
-| ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| handler(message) | Accepts a parsed raw message value; after closure it resolves without processing late queue residue.           |
-| pendingCount     | Admitted messages awaiting initialization or delivery, not completed provider computations.                    |
-| disposed         | True immediately after close / dispose.                                                                        |
-| close()          | Synchronously and idempotently retires admission without Endpoint or user cleanup.                             |
-| dispose()        | Closes admission, awaits initialization, and cleans up the Endpoint; reuses one Promise and retains rejection. |
+| Member           | Behavior                                                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| handler(message) | Accepts a parsed raw message value; after closure it resolves without processing late queue residue.                                               |
+| pendingCount     | Admitted messages awaiting initialization or delivery, not completed provider computations.                                                        |
+| disposed         | `handler.disposed` becomes `true` synchronously when `handler.close()` or `handler.dispose()` starts, marking this handler closed to new messages. |
+| close()          | Synchronously and idempotently retires admission without Endpoint or user cleanup.                                                                 |
+| dispose()        | Closes admission, awaits initialization, and cleans up the Endpoint; reuses one Promise and retains rejection.                                     |
 
 A message admitted during initialization is not delivered after close, and pendingCount eventually returns to zero. This counter is not a safe quiescence gate for Worker.terminate. Core owns provider drain and cleanup; await dispose and follow physical-resource ownership. No disposeAsync alias exists. A serialization handler likewise releases its own Endpoint / provider registrations without invoking the borrowed parser.dispose; the parser creator owns its lifetime.
 
@@ -517,7 +517,7 @@ A message admitted during initialization is not delivered after close, and pendi
 
 Resource receives these options without Worker-specific reimplementation. Known keys are captured once without object-rest enumeration of unknown getters. Invalid adapter, selectInput, transfer, or option getters synchronously produce INVALID_OPTION before Resource ownership / automatic startup, retaining caught causes. refetch, load, state, and dispose retain the resource package's semantics.
 
-Release Resource first, await adapter.dispose, then let the creator terminate the physical Worker / ports. Do not destroy a connection that Resource still uses. A transfer callback must reflect whether the application will read that input again; Resource retry cannot restore detached backing.
+Release Resource first, await adapter.dispose, then let the creator terminate the physical Worker / ports. An explicit nonempty transfer list from the callback follows the unsigned-transfer rejection below; retry does not bypass capability admission.
 
 ### Serialization parser and plugin
 
@@ -543,23 +543,23 @@ createSerializeWorkerHandler(parser, post) requires a real parser with encode / 
 
 The handler passes the input chunk payload to parser.encode. Results may be one valid ISerializeChunk or a sync / async chunk iterable. The caller receives open / chunk / end incrementally, with two initial credits and ordered ACK; consumption restores credit. Neither collectStream nor whole-output merging is used. Credit bounds sending progress for one stream, not the whole Worker's byte budget; the producer may obtain its next chunk before waiting for sending credit.
 
-Valid text / bytes / value chunks retain order, including empty and mixed streams. The removed CHUNK_MERGE_FAILED no longer handles that path. parser.decode receives its original chunk, and a Uint8Array result becomes bytes while other results become value. Eligible complete byte backing may transfer on Worker output according to that send path; caller input ownership does not grant reuse guarantees for producer output.
+Valid text / bytes / value chunks retain order, including empty and mixed streams. parser.decode receives the original chunk; Uint8Array output is classified as bytes and other output as value. Worker output uses the existing portable-copy representation; caller input ownership does not make output backing transferable.
 
 Early consumer completion or cancellation notifies that stream, wakes producers awaiting credit, and attempts iterator.return. If cleanup also fails, existing secondary-error attachment retains the primary and secondary chains. Core RPC rejection transports source/code/name/message/stack/cause/errors rather than a separate application error frame. Uncooperative business code still requires application ownership; stream cancellation does not forcibly stop the Worker.
 
 ### Copying, transfer, and actual payloads
 
-WorkerByteOwnership publicly defines copy / transfer and IByteOwnership is their union. WorkerDiagnosticType contains only worker, represented by IWorkerDiagnosticType. These constants take no arguments. Default copy preserves caller input, while transfer explicitly gives up exclusively owned storage.
+WorkerByteOwnership retains the public copy / transfer vocabulary; IByteOwnership is its value union. WorkerDiagnosticType contains worker. Default copy preserves caller input and transports bytes through the existing base64url portable representation.
 
-Serializer input enters the transfer list only for bytes containing a genuine Uint8Array whose view spans one entire ordinary ArrayBuffer: offset zero and view length equal to backing length. Partial subarrays and SharedArrayBuffer-backed views fall back to copying. Other aliases of an eligible ordinary ArrayBuffer are not detected or excluded from transfer, so transferring that backing can detach them too. This does not provide a shared-memory computation protocol. Top-level text / value chunks do not recursively transfer their nested objects because of ownership alone.
+An explicit nonempty transfer list on this unsigned Worker bridge rejects with `source: 'rpc.endpoint'` and `code: 'CAPABILITY_UNSUPPORTED'` before any business frame is posted. The original backing remains attached. This includes eligible full ordinary ArrayBuffer backing selected by serialization ownership transfer; a partial subarray or SharedArrayBuffer-backed view does not enter the native transfer list and uses copying instead. Nested objects in a text / value chunk are not recursively transferred.
 
-A submitted native transfer may detach the full backing and all aliasing views. Pre-cancelled unsent input remains usable, so neither the option nor a cancellation code proves loss. Inspect actual backing before retrying, or use copy / retain an application copy. transferablesOf / exclusiveBuffer are internal rather than callable public APIs.
+The old one-way endpoint submitted a native transfer sidecar separately from its encoded payload. The Host runtime requires genuine authenticated binary admission and backing present in the payload graph; this package supplies neither a fake signing profile nor an unsigned binary extension. Use copy for this bridge. Empty transfer lists do not request native ownership transfer. transferablesOf / exclusiveBuffer remain internal helpers, not business APIs.
 
-The current bridge base64url-encodes bytes as portable payload before separately passing a native transfer list. Detachment therefore does not prove zero-copy payload delivery. Small computations and object graphs still incur encoding and round trips. Old timings and ratios do not establish this implementation's behavior; no current timing or speed guarantee is made. Evaluate actual work instead of deriving speed from the presence of a Worker.
+Worker output also uses portable copying. Encoding and round trips still cost time; no zero-copy delivery or current speed ratio is promised.
 
 ### Cancellation, errors, and ownership
 
-General Adapter requests retain canonical Core cancellation, timeout, transport, and remote identities. A compute failure commonly has RpcRemoteError / INTERNAL outside reconstructed native TypeError / RangeError causes with their messages and stacks. Do not expect sender-side object identity or require the top-level error itself to be the original native class. Without a deadline, a provider that never settles can leave a request pending; every broken Worker is not guaranteed to settle promptly.
+General Adapter requests retain canonical Host cancellation, timeout, and transport errors. Native runtime terminal errors restore the original provider Error/TypeError directly, including its original message, stack, and native cause chain; there is no former RpcRemoteError / INTERNAL outer. Unidentified native errors use unknown / UNKNOWN. A cross-realm object is reconstructed rather than retaining sender-side reference identity. Without a deadline, a provider that never settles can still leave a request pending.
 
 Serialization decode / request and pre-cancelled encode use SerializeCodecError / REQUEST_ABORTED with type (default worker), phase encode / decode, context, chunkIndex 0, and bytesConsumed (input byte length or zero). The caller's signal.reason remains on cause. Active encode streams can end with the original RPC / cancellation error rather than every codec diagnostic field. Credit waits and explicit stream stop create native DOMException / AbortError with message serialize stream cancelled and REQUEST_ABORTED, preserving native type, message, and stack through the error chain.
 

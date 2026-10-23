@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { isThreadChild } from '@migaia/rpc-threads'
+import { isThreadChild } from '@migaia/rpc-plugin-thread'
 import { createTray, defineTrayHost, serveTrayHost } from '@migaia/tray'
 
 /** Preserve diagnostic classification instead of reducing distinct cleanup branches to a code. */

@@ -5,13 +5,16 @@ import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 /** Every current RPC test owner contributes to the same executed-source coverage unit. */
 const testOwners = [
   'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-browser',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools',
   'rpc-integration'
 ]
-/** Runtime coverage belongs to exactly the five final Source owners; integration has no runtime API. */
+/** Runtime coverage belongs to exactly the final source owners; integration has no runtime API. */
 const runtimeOwners = testOwners.filter((owner) => owner !== 'rpc-integration')
 /** Preserve the existing test discovery origin while each owner supplies its TS transformer. */
 const familyDirectory = fileURLToPath(new URL('.', import.meta.url))
@@ -30,7 +33,7 @@ const excluded = [
 export default defineConfig(
   withDistFreshness({
     test: {
-      // Shared budget of the six unit projects in sequence group 0; large frames stay serial.
+      // Shared budget of the family unit projects; large frames stay serial.
       maxWorkers: 3,
       exclude: excluded,
       projects: [

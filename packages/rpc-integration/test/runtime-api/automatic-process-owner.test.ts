@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
 import { it } from 'vitest'
-import { createAutomaticProcessPeer } from '../../../rpc-process/dist/process/automatic-peer.js'
-import { nodeByteStream } from '../../../rpc-process/dist/process/node-byte-stream.js'
-import { prepareProcessRuntimeBootstrap } from '../../../rpc-process/dist/process/runtime-bootstrap.js'
-import { createProcessTransport, receiveAdapterBootstrap } from '@migaia/rpc-process'
+import { createAutomaticProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { nodeByteStream } from '../../../rpc-plugin-process/dist/process/node-byte-stream.js'
+import { prepareProcessRuntimeBootstrap } from '../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { receiveAdapterBootstrap } from '../../../rpc-plugin-process/dist/process/bootstrap.js'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-process/dist/process/constants.js'
-import { createRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-plugin-process/dist/process/constants.js'
+import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 it('automatic process authenticates its bootstrap parent and retains bidirectional business', async () => {
   /**

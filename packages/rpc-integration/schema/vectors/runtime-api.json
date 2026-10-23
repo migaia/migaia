@@ -878,11 +878,7 @@
   ],
   "binary": {
     "profile": "migaia.rpc.portable-binary/1",
-    "capabilities": [
-      "portable-binary@1",
-      "native-binary-authenticated-manifest@1",
-      "transfer@1"
-    ],
+    "capabilities": ["portable-binary@1", "native-binary-authenticated-manifest@1", "transfer@1"],
     "valid": [
       {
         "id": "inline-call",
@@ -919,11 +915,7 @@
               "cancel": "before-start",
               "idempotencyKey": "key-1"
             },
-            "payload": [
-              "uint8array",
-              1,
-              "AQI"
-            ]
+            "payload": ["uint8array", 1, "AQI"]
           },
           "backings": []
         },
@@ -963,10 +955,7 @@
             "steps": [
               {
                 "method": "echo",
-                "payload": [
-                  "buffer",
-                  "AQI"
-                ]
+                "payload": ["buffer", "AQI"]
               }
             ]
           },
@@ -1008,11 +997,7 @@
             "operation": "terminal",
             "completion": {
               "ok": true,
-              "result": [
-                "uint8array",
-                1,
-                "AQI"
-              ]
+              "result": ["uint8array", 1, "AQI"]
             }
           },
           "backings": []
@@ -1055,11 +1040,7 @@
               "result": [
                 {
                   "state": "success",
-                  "result": [
-                    "uint8array",
-                    1,
-                    "AQI"
-                  ]
+                  "result": ["uint8array", 1, "AQI"]
                 }
               ]
             }
@@ -1103,11 +1084,7 @@
             "stream": {
               "event": "item",
               "seq": 0,
-              "value": [
-                "uint8array",
-                1,
-                "AQI"
-              ]
+              "value": ["uint8array", 1, "AQI"]
             }
           },
           "backings": []
@@ -1160,11 +1137,7 @@
               },
               "completion": {
                 "ok": true,
-                "result": [
-                  "uint8array",
-                  1,
-                  "AQI"
-                ]
+                "result": ["uint8array", 1, "AQI"]
               }
             }
           },
@@ -1210,31 +1183,9 @@
             "payload": [
               "object",
               [
-                [
-                  "buffer",
-                  [
-                    "buffer",
-                    0
-                  ]
-                ],
-                [
-                  "first",
-                  [
-                    "uint8array",
-                    0,
-                    1,
-                    2
-                  ]
-                ],
-                [
-                  "second",
-                  [
-                    "uint8array",
-                    0,
-                    2,
-                    1
-                  ]
-                ]
+                ["buffer", ["buffer", 0]],
+                ["first", ["uint8array", 0, 1, 2]],
+                ["second", ["uint8array", 0, 2, 1]]
               ]
             ]
           },
@@ -1245,14 +1196,7 @@
             }
           ]
         },
-        "sidecars": [
-          [
-            9,
-            1,
-            2,
-            8
-          ]
-        ]
+        "sidecars": [[9, 1, 2, 8]]
       }
     ],
     "invalid": [
@@ -1291,11 +1235,7 @@
               "cancel": "before-start",
               "idempotencyKey": "key-1"
             },
-            "payload": [
-              "buffer",
-              "AQI",
-              0
-            ]
+            "payload": ["buffer", "AQI", 0]
           },
           "backings": []
         },
@@ -1337,10 +1277,7 @@
               "cancel": "before-start",
               "idempotencyKey": "key-1"
             },
-            "payload": [
-              "buffer",
-              "AB"
-            ]
+            "payload": ["buffer", "AB"]
           },
           "backings": []
         },
@@ -1426,9 +1363,7 @@
               "cancel": "before-start",
               "idempotencyKey": "key-1"
             },
-            "payload": [
-              "undefined"
-            ]
+            "payload": ["undefined"]
           },
           "backings": []
         },
@@ -1473,18 +1408,8 @@
             "payload": [
               "object",
               [
-                [
-                  "x",
-                  [
-                    "null"
-                  ]
-                ],
-                [
-                  "x",
-                  [
-                    "null"
-                  ]
-                ]
+                ["x", ["null"]],
+                ["x", ["null"]]
               ]
             ]
           },
@@ -1528,12 +1453,7 @@
               "cancel": "before-start",
               "idempotencyKey": "key-1"
             },
-            "payload": [
-              "uint8array",
-              0,
-              3,
-              2
-            ]
+            "payload": ["uint8array", 0, 3, 2]
           },
           "backings": [
             {
@@ -1542,14 +1462,7 @@
             }
           ]
         },
-        "sidecars": [
-          [
-            9,
-            1,
-            2,
-            8
-          ]
-        ],
+        "sidecars": [[9, 1, 2, 8]],
         "schemaAccepted": true
       },
       {
@@ -1590,31 +1503,9 @@
             "payload": [
               "object",
               [
-                [
-                  "buffer",
-                  [
-                    "buffer",
-                    0
-                  ]
-                ],
-                [
-                  "first",
-                  [
-                    "uint8array",
-                    0,
-                    1,
-                    2
-                  ]
-                ],
-                [
-                  "second",
-                  [
-                    "uint8array",
-                    0,
-                    2,
-                    1
-                  ]
-                ]
+                ["buffer", ["buffer", 0]],
+                ["first", ["uint8array", 0, 1, 2]],
+                ["second", ["uint8array", 0, 2, 1]]
               ]
             ]
           },
@@ -1625,14 +1516,7 @@
             }
           ]
         },
-        "sidecars": [
-          [
-            7,
-            1,
-            2,
-            8
-          ]
-        ],
+        "sidecars": [[7, 1, 2, 8]],
         "schemaAccepted": true
       }
     ]

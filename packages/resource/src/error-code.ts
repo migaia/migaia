@@ -2,11 +2,11 @@
 export const ERROR_SOURCE = 'resource'
 
 /**
- * Owns the error-code declarations for `resource`. Under `docs/contracts/error-codes.md`,
- * `(source, code)` uniquely identifies an error. The `source` is always `'resource'`. Throw
- * sites reference these constants instead of inline literals. This table assigns codes to earlier
- * bare-error messages. `REQUEST_ABORTED` and `REQUEST_CANCELLED` retain `DOMException` with `name
- * === 'AbortError'`. Callers, including `store-react` suspension paths, recognize that native error
+ * Owns the error-code declarations for `resource`. Under `docs/contracts/error-codes.md`, `(source,
+ * code)` uniquely identifies an error. The `source` is always `'resource'`. Throw sites reference
+ * these constants instead of inline literals. This table assigns codes to earlier bare-error
+ * messages. `REQUEST_ABORTED` and `REQUEST_CANCELLED` retain `DOMException` with `name ===
+ * 'AbortError'`. Callers, including `store-react` suspension paths, recognize that native error
  * type. Codes attach as properties and never replace the native type. Code values are public API.
  * Renaming a code is a breaking change.
  */

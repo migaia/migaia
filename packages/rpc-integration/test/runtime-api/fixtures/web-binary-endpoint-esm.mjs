@@ -2,8 +2,16 @@
  * Fixture emit of maintained fixtures/web-binary-endpoint.ts for runtimes requiring concrete
  * .js/.mjs specifiers; production is unchanged.
  */
-import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
-import { codec, framer, connect, abort, timeout, hooks, authentication } from '@migaia/rpc-core'
+import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import {
+  codec,
+  framer,
+  connect,
+  abort,
+  timeout,
+  hooks,
+  authentication
+} from '../../../../rpc-host/dist/core/index.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import fixture from './managed-binary-key.json' with { type: 'json' }
 /** This fixture's verifier owns its failure; production authentication supplies Core's wrapper. */

@@ -1,14 +1,14 @@
 import { vi } from 'vitest'
 import { CapabilityLevel, StandardCapability, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
-import type { IRpcEndpoint } from '@migaia/rpc-core'
-import type { ISpawnProcessPluginDeployment } from '@migaia/rpc-process'
-import type { IRemoteHostCatalog } from '@migaia/rpc-core/remote'
-import { remoteHarness, remoteDescription } from '../../../../rpc-core/test/remote/fixture.js'
-import { runtimeTestHost } from '../../../../rpc-core/test/runtime-api/public-host.js'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import type { IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
-import type { IRemoteEndpointFactory } from '@migaia/rpc-core/remote'
+import { type IRpcEndpoint } from '../../../../rpc-host/dist/core/index.js'
+import type { ISpawnProcessPluginDeployment } from '../../../../rpc-plugin-process/dist/process/plugin/types.js'
+import type { IRemoteHostCatalog } from '@migaia/rpc-host/plugin'
+import { remoteHarness, remoteDescription } from '../../../../rpc-host/test/remote/fixture.js'
+import { runtimeTestHost } from '../../../../rpc-host/test/runtime-api/public-host.js'
+import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import type { IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
+import type { IRemoteEndpointFactory } from '@migaia/rpc-host/plugin'
 
 /** The neutral control harness still validates a real catalog with no fabricated local Host state. */
 export const catalog: IRemoteHostCatalog = {

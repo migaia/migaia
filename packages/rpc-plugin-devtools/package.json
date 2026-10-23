@@ -1,0 +1,67 @@
+{
+  "name": "@migaia/rpc-plugin-devtools",
+  "version": "0.0.11",
+  "private": true,
+  "description": "RPC probe, service and offline record contracts.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-plugin-devtools"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "default": "./dist/contract/index.js"
+    },
+    "./hub": {
+      "types": "./dist/hub/index.d.ts",
+      "default": "./dist/hub/index.js"
+    },
+    "./log": {
+      "types": "./dist/log/index.d.ts",
+      "default": "./dist/log/index.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run test",
+    "bench:ingest": "node --expose-gc bench/ingest.mjs",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-host": "workspace:*",
+    "@types/node": "24.13.2",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-host": "workspace:*"
+  }
+}

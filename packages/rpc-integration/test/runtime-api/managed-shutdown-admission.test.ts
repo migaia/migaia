@@ -3,12 +3,12 @@ import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 
 /** The same actual native child used by generation and shutdown acceptance holds its provider. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))

@@ -262,25 +262,34 @@ rejected INVALID_FRAME
 
 本包定义 RPC 的线上格式并提供数据构造、校验、规范化与分帧函数。它不打开连接、不执行远程方法、不拥有 Endpoint，也不绑定 Node、DOM 或 Worker。状态型 framer 只拥有有界重组缓存及 assembly expiry 计时器。运行时依赖仅 `@migaia/serialize` 与 `@migaia/utils`，没有 peer 依赖。
 
-普通 TS 调用方通常通过 rpc-core 使用它；rpc-core 将它列为 peer 依赖。独立语言对端、载体适配器和跨边界错误处理才需要直接使用这些入口。rpc-process 复用 Content-Length 分帧及错误转换；serialize 提供底层可移植遍历与错误链实现。
+业务调用通常使用 `@migaia/rpc-host` 的 `createRpcHost` 加传输 plugin。独立语言对端、适配器作者与错误边界消费者可直接使用 contract 入口。`@migaia/rpc-plugin-process` 复用 Content-Length 分帧及错误转换；serialize 提供底层可移植遍历与错误链实现。contract checker 不反向依赖 Host、plugin 或原生 I/O。
 
-| 公开入口                                                            | 用途                                                         |
-| ------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `@migaia/rpc-contract`                                              | 常量、V1 信封、握手、portable 与错误工具                     |
-| `./wire`                                                            | 线上常量和类型，也含 measurePortableStreamValue 等纯数据操作 |
-| `./portable`                                                        | wire portable 规范化与深度常量                               |
-| `./errors`                                                          | 错误树序列化、还原、校验、JSON-RPC 转换与本地分类            |
-| `./handshake`                                                       | hello/accept/reject 的构造、协商与校验                       |
-| `./v1`、`./framing/v1`                                              | 协议 1.x 信封与消息 framer                                   |
-| `./framing`                                                         | 字符串/二进制消息分片、重组、物理帧检查                      |
-| `./framing/stream`                                                  | 四字节大端长度前缀及 bootstrap/handshake 接收器              |
-| `./framing/jsonrpc`                                                 | Content-Length 字节分帧及桥错误码                            |
-| `./runtime`、`./runtime/metadata`、`./runtime/lazy`                 | runtime 信封、调用头部、generation/steps，及按需加载版本     |
-| `./stream`                                                          | 流负载、序号、进度、额度和控制状态检查                       |
-| `./binary`、`./binary/lazy`、`./binary/capture`、`./binary/inspect` | 二进制捕获、准备、还原、清单、完整性与大小检查               |
-| `./schema/wire-error`                                               | 随包发布的错误树 JSON Schema                                 |
+| 公开入口                                                            | 用途                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@migaia/rpc-contract`                                              | 常量、V1 信封、握手、portable 与错误工具                            |
+| `./wire`                                                            | 线上常量和类型，也含 measurePortableStreamValue 等纯数据操作        |
+| `./portable`                                                        | wire portable 规范化与深度常量                                      |
+| `./errors`                                                          | 错误树序列化、还原、校验、JSON-RPC 转换与本地分类                   |
+| `./handshake`                                                       | hello/accept/reject 的构造、协商与校验                              |
+| `./v1`、`./framing/v1`                                              | 协议 1.x 信封与消息 framer                                          |
+| `./framing`                                                         | 字符串/二进制消息分片、重组、物理帧检查                             |
+| `./framing/stream`                                                  | 四字节大端长度前缀及 bootstrap/handshake 接收器                     |
+| `./framing/jsonrpc`                                                 | Content-Length 字节分帧及桥错误码                                   |
+| `./remote`                                                          | remote 契约、目录、控制载荷的纯 checker、形状原因与方法 schema 类型 |
+| `./runtime`、`./runtime/metadata`、`./runtime/lazy`                 | runtime 信封、调用头部、generation/steps，及按需加载版本            |
+| `./stream`                                                          | 流负载、序号、进度、额度和控制状态检查                              |
+| `./binary`、`./binary/lazy`、`./binary/capture`、`./binary/inspect` | 二进制捕获、准备、还原、清单、完整性与大小检查                      |
+| `./schema/wire-error`                                               | 随包发布的错误树 JSON Schema                                        |
 
-以上共根入口及 18 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。
+以上共根入口及 19 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。
+
+### remote 与 runtime 的纯形状检查
+
+`@migaia/rpc-contract/remote` 导出 `checkRemoteContract(value)`、`checkRemoteHostCatalog(value)` 与 `checkRemoteControlShape(definition, value)`；`@migaia/rpc-contract/runtime` 导出 `checkRuntimeDescription(value)`。返回值统一为 `IRpcShapeCheck<T>`：`{ ok: true, value }` 是规范化快照，`{ ok: false, reason, path, cause? }` 是有界诊断；`RpcShapeReason` 维护原因词表。这些函数不构造 Host 错误、不建立连接；Host 的抛错封装继续拥有原生类型、source、code、文案与原始 cause。
+
+方法声明与 runtime 目录可携带可选的 `input`、`output`、`yield` schema 数据（`IRpcMethodSchema`）。支持的 JSON Schema 子集为 `type`、`properties`、`required`、`items`、`enum`、`const`、`anyOf`、`$defs` 与本地 `#/$defs/...` 引用。未知关键字与外部引用被拒绝；schema 是可移植数据，不是可执行校验器或远端抓取指令。实际载荷执行仍属于 Host/provider。
+
+包内发布 [remote-contract.schema.json](./schema/remote-contract.schema.json) 与 [runtime-description.schema.json](./schema/runtime-description.schema.json)，并保留 runtime-api 与 wire schema。`./remote` 导出 checker 类型；上述两个 JSON 文件是随包产物，没有额外的 package export 别名。Schema 校验不替代有界 normalizer 或原生 source 资格判断。
 
 ### 常量、描述符与线上格式
 
@@ -387,11 +396,11 @@ toJsonRpcError(wire, code) 把错误树放入 error.data.migaiaWireError；整�
 
 classifyRpcContractError(error) 只按本地对象引用识别本包签发错误，返回对外 code/message；复制或远端还原的错误返回 undefined。远端 source/code 是诊断身份，不证明本地来源，也不授予重试或控制权。
 
-schema/wire-error 只提供结构校验起点，不等于有界 normalizer。独立实现还须执行 x-migaia-limits、canonical base64url、surrogate 等规则；Schema 的 additionalProperties 与 normalizer 默认 reject 并不等价。用其它语言实现原生对端还需长度前缀、握手和 runtime 信封；JSON-RPC 桥还需其四个扩展方法，由 rpc-process 的协议层负责，不由本包完成连接。
+schema/wire-error 只提供结构校验起点，不等于有界 normalizer。独立实现还须执行 x-migaia-limits、canonical base64url、surrogate 等规则；Schema 的 additionalProperties 与 normalizer 默认 reject 并不等价。用其它语言实现原生对端还需长度前缀、握手和 runtime 信封；JSON-RPC 桥还需其四个扩展方法，由 rpc-plugin-process 的协议层负责，不由本包完成连接。
 
 ### 错误身份与维护
 
-本包 source 为 `rpc.contract`，常量 RPC_CONTRACT_SOURCE，code 来自 RpcContractErrorCode：
+本包错误的语义来源 `source` 为 `rpc.contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode：
 
 | code                   | 原生类型与含义                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------ |
@@ -411,7 +420,7 @@ schema/wire-error 只提供结构校验起点，不等于有界 normalizer。独
 
 JSON-RPC 桥身份为 `rpc.contract.jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。
 
-其他层的 source 分别是 rpc-core 的 `rpc.endpoint`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `rpc.remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `rpc.transport.process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `rpc.transport.thread`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。
+其他层的 source 分别是 rpc-host 的 `rpc.endpoint`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-host/plugin 的 `rpc.remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-plugin-process 的 `rpc.transport.process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-plugin-thread 的 `rpc.transport.thread`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。
 
 ```bash
 pnpm --filter @migaia/rpc-contract run fmt

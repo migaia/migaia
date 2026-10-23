@@ -178,7 +178,7 @@
         "pct": 82.69
       }
     },
-    "rpc-devtools": {
+    "rpc-plugin-devtools": {
       "lines": {
         "covered": 1230,
         "total": 1305,
@@ -4294,7 +4294,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/adapters/broadcast-channel.ts": {
+    "packages/rpc-plugin-browser/src/browser/adapters/broadcast-channel.ts": {
       "lines": {
         "covered": 49,
         "total": 51,
@@ -4316,7 +4316,7 @@
         "pct": 91.66
       }
     },
-    "packages/rpc-browser/src/browser/adapters/rtc-data-channel.ts": {
+    "packages/rpc-plugin-browser/src/browser/adapters/rtc-data-channel.ts": {
       "lines": {
         "covered": 104,
         "total": 111,
@@ -4338,7 +4338,7 @@
         "pct": 94.79
       }
     },
-    "packages/rpc-browser/src/browser/adapters/service-worker.ts": {
+    "packages/rpc-plugin-browser/src/browser/adapters/service-worker.ts": {
       "lines": {
         "covered": 46,
         "total": 50,
@@ -4360,7 +4360,7 @@
         "pct": 96.15
       }
     },
-    "packages/rpc-browser/src/browser/adapters/shared-worker.ts": {
+    "packages/rpc-plugin-browser/src/browser/adapters/shared-worker.ts": {
       "lines": {
         "covered": 47,
         "total": 49,
@@ -4382,7 +4382,7 @@
         "pct": 92.85
       }
     },
-    "packages/rpc-browser/src/browser/adapters/web-transport.ts": {
+    "packages/rpc-plugin-browser/src/browser/adapters/web-transport.ts": {
       "lines": {
         "covered": 86,
         "total": 101,
@@ -4404,7 +4404,7 @@
         "pct": 86.36
       }
     },
-    "packages/rpc-browser/src/browser/adapters/window.ts": {
+    "packages/rpc-plugin-browser/src/browser/adapters/window.ts": {
       "lines": {
         "covered": 47,
         "total": 49,
@@ -4426,7 +4426,7 @@
         "pct": 78.26
       }
     },
-    "packages/rpc-browser/src/browser/error-text.ts": {
+    "packages/rpc-plugin-browser/src/browser/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -4448,7 +4448,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/error.ts": {
+    "packages/rpc-plugin-browser/src/browser/error.ts": {
       "lines": {
         "covered": 9,
         "total": 9,
@@ -4470,7 +4470,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/peer-adapter.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer-adapter.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -4492,7 +4492,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/peer-error.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer-error.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -4514,7 +4514,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/peer-listener.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer-listener.ts": {
       "lines": {
         "covered": 55,
         "total": 70,
@@ -4536,7 +4536,7 @@
         "pct": 63.15
       }
     },
-    "packages/rpc-browser/src/browser/peer-port.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer-port.ts": {
       "lines": {
         "covered": 32,
         "total": 33,
@@ -4558,7 +4558,7 @@
         "pct": 85.71
       }
     },
-    "packages/rpc-browser/src/browser/peer-text.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer-text.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -4580,7 +4580,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/peer-types.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer-types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -4602,7 +4602,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/browser/peer.ts": {
+    "packages/rpc-plugin-browser/src/browser/peer.ts": {
       "lines": {
         "covered": 21,
         "total": 23,
@@ -4624,7 +4624,7 @@
         "pct": 96.66
       }
     },
-    "packages/rpc-browser/src/browser/probe-detail.ts": {
+    "packages/rpc-plugin-browser/src/browser/probe-detail.ts": {
       "lines": {
         "covered": 38,
         "total": 38,
@@ -4646,7 +4646,7 @@
         "pct": 88.09
       }
     },
-    "packages/rpc-browser/src/error-code.ts": {
+    "packages/rpc-plugin-browser/src/error-code.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -4668,7 +4668,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/error-text.ts": {
+    "packages/rpc-plugin-browser/src/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -4690,7 +4690,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-browser/src/index.ts": {
+    "packages/rpc-plugin-browser/src/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -6318,7 +6318,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/adapter.ts": {
+    "packages/rpc-host/src/adapter.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -6340,7 +6340,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/adapter/internal-advanced.ts": {
+    "packages/rpc-host/src/adapter/internal-advanced.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -6362,7 +6362,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/adapters/error-text.ts": {
+    "packages/rpc-host/src/core/adapters/error-text.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -6384,7 +6384,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/adapters/memory.ts": {
+    "packages/rpc-host/src/core/adapters/memory.ts": {
       "lines": {
         "covered": 65,
         "total": 66,
@@ -6406,7 +6406,7 @@
         "pct": 96.87
       }
     },
-    "packages/rpc-core/src/core/adapters/message-port-text.ts": {
+    "packages/rpc-host/src/core/adapters/message-port-text.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -6428,7 +6428,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/adapters/message-port.ts": {
+    "packages/rpc-host/src/core/adapters/message-port.ts": {
       "lines": {
         "covered": 202,
         "total": 211,
@@ -6450,7 +6450,7 @@
         "pct": 96.36
       }
     },
-    "packages/rpc-core/src/core/adapters/probe-content.ts": {
+    "packages/rpc-host/src/core/adapters/probe-content.ts": {
       "lines": {
         "covered": 20,
         "total": 20,
@@ -6472,7 +6472,7 @@
         "pct": 77.27
       }
     },
-    "packages/rpc-core/src/core/adapters/probe-detail.ts": {
+    "packages/rpc-host/src/core/adapters/probe-detail.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -6494,7 +6494,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/adapters/web-worker.ts": {
+    "packages/rpc-host/src/core/adapters/web-worker.ts": {
       "lines": {
         "covered": 93,
         "total": 98,
@@ -6516,7 +6516,7 @@
         "pct": 80.64
       }
     },
-    "packages/rpc-core/src/core/client.ts": {
+    "packages/rpc-host/src/core/client.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -6538,7 +6538,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/composed.ts": {
+    "packages/rpc-host/src/core/composed.ts": {
       "lines": {
         "covered": 144,
         "total": 168,
@@ -6560,7 +6560,7 @@
         "pct": 80.95
       }
     },
-    "packages/rpc-core/src/core/default-reporter.ts": {
+    "packages/rpc-host/src/core/default-reporter.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -6582,7 +6582,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/endpoint-kernel.ts": {
+    "packages/rpc-host/src/core/endpoint-kernel.ts": {
       "lines": {
         "covered": 119,
         "total": 128,
@@ -6604,7 +6604,7 @@
         "pct": 84.16
       }
     },
-    "packages/rpc-core/src/core/error-code.ts": {
+    "packages/rpc-host/src/core/error-code.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -6626,7 +6626,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/error-family.ts": {
+    "packages/rpc-host/src/core/error-family.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -6648,7 +6648,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/error-text.ts": {
+    "packages/rpc-host/src/core/error-text.ts": {
       "lines": {
         "covered": 17,
         "total": 17,
@@ -6670,7 +6670,7 @@
         "pct": 87.5
       }
     },
-    "packages/rpc-core/src/core/errors.ts": {
+    "packages/rpc-host/src/core/errors.ts": {
       "lines": {
         "covered": 94,
         "total": 98,
@@ -6692,7 +6692,7 @@
         "pct": 59.37
       }
     },
-    "packages/rpc-core/src/core/feature.ts": {
+    "packages/rpc-host/src/core/feature.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -6714,7 +6714,7 @@
         "pct": 87.5
       }
     },
-    "packages/rpc-core/src/core/features/canonical-chunk.ts": {
+    "packages/rpc-host/src/core/features/canonical-chunk.ts": {
       "lines": {
         "covered": 10,
         "total": 10,
@@ -6736,7 +6736,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/features/control.ts": {
+    "packages/rpc-host/src/core/features/control.ts": {
       "lines": {
         "covered": 18,
         "total": 20,
@@ -6758,7 +6758,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-core/src/core/features/discovery.ts": {
+    "packages/rpc-host/src/core/features/discovery.ts": {
       "lines": {
         "covered": 31,
         "total": 34,
@@ -6780,7 +6780,7 @@
         "pct": 60
       }
     },
-    "packages/rpc-core/src/core/features/one-way.ts": {
+    "packages/rpc-host/src/core/features/one-way.ts": {
       "lines": {
         "covered": 11,
         "total": 12,
@@ -6802,7 +6802,7 @@
         "pct": 42.85
       }
     },
-    "packages/rpc-core/src/core/features/outbound.ts": {
+    "packages/rpc-host/src/core/features/outbound.ts": {
       "lines": {
         "covered": 96,
         "total": 101,
@@ -6824,7 +6824,7 @@
         "pct": 81.81
       }
     },
-    "packages/rpc-core/src/core/features/provider.ts": {
+    "packages/rpc-host/src/core/features/provider.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -6846,7 +6846,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/features/stream.ts": {
+    "packages/rpc-host/src/core/features/stream.ts": {
       "lines": {
         "covered": 10,
         "total": 11,
@@ -6868,7 +6868,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-core/src/core/full.ts": {
+    "packages/rpc-host/src/core/full.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -6890,7 +6890,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/idempotency-store.ts": {
+    "packages/rpc-host/src/core/idempotency-store.ts": {
       "lines": {
         "covered": 94,
         "total": 94,
@@ -6912,7 +6912,7 @@
         "pct": 83.58
       }
     },
-    "packages/rpc-core/src/core/index.ts": {
+    "packages/rpc-host/src/core/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -6934,7 +6934,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/async-control.ts": {
+    "packages/rpc-host/src/core/internal/async-control.ts": {
       "lines": {
         "covered": 55,
         "total": 66,
@@ -6956,7 +6956,7 @@
         "pct": 81.81
       }
     },
-    "packages/rpc-core/src/core/internal/authentication-replay.ts": {
+    "packages/rpc-host/src/core/internal/authentication-replay.ts": {
       "lines": {
         "covered": 61,
         "total": 63,
@@ -6978,7 +6978,7 @@
         "pct": 78.04
       }
     },
-    "packages/rpc-core/src/core/internal/auxiliary-error-text.ts": {
+    "packages/rpc-host/src/core/internal/auxiliary-error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -7000,7 +7000,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/batch-frame.ts": {
+    "packages/rpc-host/src/core/internal/batch-frame.ts": {
       "lines": {
         "covered": 15,
         "total": 15,
@@ -7022,7 +7022,7 @@
         "pct": 88.88
       }
     },
-    "packages/rpc-core/src/core/internal/canonical-chunk-attachment.ts": {
+    "packages/rpc-host/src/core/internal/canonical-chunk-attachment.ts": {
       "lines": {
         "covered": 16,
         "total": 17,
@@ -7044,7 +7044,7 @@
         "pct": 83.33
       }
     },
-    "packages/rpc-core/src/core/internal/client-first-party-roots.ts": {
+    "packages/rpc-host/src/core/internal/client-first-party-roots.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -7066,7 +7066,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/composed-disposal-observer.ts": {
+    "packages/rpc-host/src/core/internal/composed-disposal-observer.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -7088,7 +7088,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/construction-install.ts": {
+    "packages/rpc-host/src/core/internal/construction-install.ts": {
       "lines": {
         "covered": 77,
         "total": 83,
@@ -7110,7 +7110,7 @@
         "pct": 86.36
       }
     },
-    "packages/rpc-core/src/core/internal/contract.ts": {
+    "packages/rpc-host/src/core/internal/contract.ts": {
       "lines": {
         "covered": 37,
         "total": 39,
@@ -7132,7 +7132,7 @@
         "pct": 90.47
       }
     },
-    "packages/rpc-core/src/core/internal/control-attachment.ts": {
+    "packages/rpc-host/src/core/internal/control-attachment.ts": {
       "lines": {
         "covered": 118,
         "total": 129,
@@ -7154,7 +7154,7 @@
         "pct": 68
       }
     },
-    "packages/rpc-core/src/core/internal/define-rpc-feature.ts": {
+    "packages/rpc-host/src/core/internal/define-rpc-feature.ts": {
       "lines": {
         "covered": 4,
         "total": 4,
@@ -7176,7 +7176,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-core/src/core/internal/diagnostic-reporter.ts": {
+    "packages/rpc-host/src/core/internal/diagnostic-reporter.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -7198,7 +7198,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/discovery-attachment.ts": {
+    "packages/rpc-host/src/core/internal/discovery-attachment.ts": {
       "lines": {
         "covered": 572,
         "total": 638,
@@ -7220,7 +7220,7 @@
         "pct": 76.26
       }
     },
-    "packages/rpc-core/src/core/internal/discovery-registry.ts": {
+    "packages/rpc-host/src/core/internal/discovery-registry.ts": {
       "lines": {
         "covered": 270,
         "total": 285,
@@ -7242,7 +7242,7 @@
         "pct": 84.7
       }
     },
-    "packages/rpc-core/src/core/internal/disposal-translation.ts": {
+    "packages/rpc-host/src/core/internal/disposal-translation.ts": {
       "lines": {
         "covered": 40,
         "total": 43,
@@ -7264,7 +7264,7 @@
         "pct": 69.64
       }
     },
-    "packages/rpc-core/src/core/internal/endpoint-bootstrap.ts": {
+    "packages/rpc-host/src/core/internal/endpoint-bootstrap.ts": {
       "lines": {
         "covered": 220,
         "total": 233,
@@ -7286,7 +7286,7 @@
         "pct": 88.05
       }
     },
-    "packages/rpc-core/src/core/internal/endpoint-capabilities-plugin.ts": {
+    "packages/rpc-host/src/core/internal/endpoint-capabilities-plugin.ts": {
       "lines": {
         "covered": 114,
         "total": 121,
@@ -7308,7 +7308,7 @@
         "pct": 87.09
       }
     },
-    "packages/rpc-core/src/core/internal/endpoint-options.ts": {
+    "packages/rpc-host/src/core/internal/endpoint-options.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -7330,7 +7330,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/endpoint-projection.ts": {
+    "packages/rpc-host/src/core/internal/endpoint-projection.ts": {
       "lines": {
         "covered": 96,
         "total": 100,
@@ -7352,7 +7352,7 @@
         "pct": 86.73
       }
     },
-    "packages/rpc-core/src/core/internal/error-wire-metadata.ts": {
+    "packages/rpc-host/src/core/internal/error-wire-metadata.ts": {
       "lines": {
         "covered": 9,
         "total": 9,
@@ -7374,7 +7374,7 @@
         "pct": 62.5
       }
     },
-    "packages/rpc-core/src/core/internal/factory-types.ts": {
+    "packages/rpc-host/src/core/internal/factory-types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -7396,7 +7396,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/fast-path.ts": {
+    "packages/rpc-host/src/core/internal/fast-path.ts": {
       "lines": {
         "covered": 30,
         "total": 30,
@@ -7418,7 +7418,7 @@
         "pct": 94.44
       }
     },
-    "packages/rpc-core/src/core/internal/feature-contract.ts": {
+    "packages/rpc-host/src/core/internal/feature-contract.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -7440,7 +7440,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/feature-policy.ts": {
+    "packages/rpc-host/src/core/internal/feature-policy.ts": {
       "lines": {
         "covered": 138,
         "total": 157,
@@ -7462,7 +7462,7 @@
         "pct": 74.32
       }
     },
-    "packages/rpc-core/src/core/internal/first-party-roots.ts": {
+    "packages/rpc-host/src/core/internal/first-party-roots.ts": {
       "lines": {
         "covered": 16,
         "total": 16,
@@ -7484,7 +7484,7 @@
         "pct": 71.21
       }
     },
-    "packages/rpc-core/src/core/internal/hooks.ts": {
+    "packages/rpc-host/src/core/internal/hooks.ts": {
       "lines": {
         "covered": 23,
         "total": 24,
@@ -7506,7 +7506,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/id.ts": {
+    "packages/rpc-host/src/core/internal/id.ts": {
       "lines": {
         "covered": 27,
         "total": 28,
@@ -7528,7 +7528,7 @@
         "pct": 96.42
       }
     },
-    "packages/rpc-core/src/core/internal/identity.ts": {
+    "packages/rpc-host/src/core/internal/identity.ts": {
       "lines": {
         "covered": 59,
         "total": 63,
@@ -7550,7 +7550,7 @@
         "pct": 88.77
       }
     },
-    "packages/rpc-core/src/core/internal/inbound-identity.ts": {
+    "packages/rpc-host/src/core/internal/inbound-identity.ts": {
       "lines": {
         "covered": 75,
         "total": 81,
@@ -7572,7 +7572,7 @@
         "pct": 74.24
       }
     },
-    "packages/rpc-core/src/core/internal/inbound-normalization.ts": {
+    "packages/rpc-host/src/core/internal/inbound-normalization.ts": {
       "lines": {
         "covered": 20,
         "total": 23,
@@ -7594,7 +7594,7 @@
         "pct": 86.66
       }
     },
-    "packages/rpc-core/src/core/internal/json-object-port.ts": {
+    "packages/rpc-host/src/core/internal/json-object-port.ts": {
       "lines": {
         "covered": 31,
         "total": 31,
@@ -7616,7 +7616,7 @@
         "pct": 88.46
       }
     },
-    "packages/rpc-core/src/core/internal/listener-safety.ts": {
+    "packages/rpc-host/src/core/internal/listener-safety.ts": {
       "lines": {
         "covered": 70,
         "total": 70,
@@ -7638,7 +7638,7 @@
         "pct": 89.58
       }
     },
-    "packages/rpc-core/src/core/internal/message-listener-hub.ts": {
+    "packages/rpc-host/src/core/internal/message-listener-hub.ts": {
       "lines": {
         "covered": 19,
         "total": 19,
@@ -7660,7 +7660,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/native-default-id-text.ts": {
+    "packages/rpc-host/src/core/internal/native-default-id-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -7682,7 +7682,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/native-default-id.ts": {
+    "packages/rpc-host/src/core/internal/native-default-id.ts": {
       "lines": {
         "covered": 16,
         "total": 16,
@@ -7704,7 +7704,7 @@
         "pct": 72.22
       }
     },
-    "packages/rpc-core/src/core/internal/native-replay.ts": {
+    "packages/rpc-host/src/core/internal/native-replay.ts": {
       "lines": {
         "covered": 46,
         "total": 48,
@@ -7726,7 +7726,7 @@
         "pct": 78.57
       }
     },
-    "packages/rpc-core/src/core/internal/operation-scope.ts": {
+    "packages/rpc-host/src/core/internal/operation-scope.ts": {
       "lines": {
         "covered": 32,
         "total": 33,
@@ -7748,7 +7748,7 @@
         "pct": 90
       }
     },
-    "packages/rpc-core/src/core/internal/outbound-attachment.ts": {
+    "packages/rpc-host/src/core/internal/outbound-attachment.ts": {
       "lines": {
         "covered": 712,
         "total": 776,
@@ -7770,7 +7770,7 @@
         "pct": 76.72
       }
     },
-    "packages/rpc-core/src/core/internal/outbound-envelope.ts": {
+    "packages/rpc-host/src/core/internal/outbound-envelope.ts": {
       "lines": {
         "covered": 87,
         "total": 89,
@@ -7792,7 +7792,7 @@
         "pct": 76.31
       }
     },
-    "packages/rpc-core/src/core/internal/outbound-gate.ts": {
+    "packages/rpc-host/src/core/internal/outbound-gate.ts": {
       "lines": {
         "covered": 30,
         "total": 30,
@@ -7814,7 +7814,7 @@
         "pct": 94.44
       }
     },
-    "packages/rpc-core/src/core/internal/outbound-owned-codec.ts": {
+    "packages/rpc-host/src/core/internal/outbound-owned-codec.ts": {
       "lines": {
         "covered": 34,
         "total": 34,
@@ -7836,7 +7836,7 @@
         "pct": 93.75
       }
     },
-    "packages/rpc-core/src/core/internal/outbound-sender.ts": {
+    "packages/rpc-host/src/core/internal/outbound-sender.ts": {
       "lines": {
         "covered": 460,
         "total": 491,
@@ -7858,7 +7858,7 @@
         "pct": 79.81
       }
     },
-    "packages/rpc-core/src/core/internal/peers.ts": {
+    "packages/rpc-host/src/core/internal/peers.ts": {
       "lines": {
         "covered": 33,
         "total": 33,
@@ -7880,7 +7880,7 @@
         "pct": 92
       }
     },
-    "packages/rpc-core/src/core/internal/pending.ts": {
+    "packages/rpc-host/src/core/internal/pending.ts": {
       "lines": {
         "covered": 12,
         "total": 13,
@@ -7902,7 +7902,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/plugin-contract.ts": {
+    "packages/rpc-host/src/core/internal/plugin-contract.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -7924,7 +7924,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/plugin-descriptor.ts": {
+    "packages/rpc-host/src/core/internal/plugin-descriptor.ts": {
       "lines": {
         "covered": 7,
         "total": 9,
@@ -7946,7 +7946,7 @@
         "pct": 87.5
       }
     },
-    "packages/rpc-core/src/core/internal/plugin-inventory.ts": {
+    "packages/rpc-host/src/core/internal/plugin-inventory.ts": {
       "lines": {
         "covered": 93,
         "total": 99,
@@ -7968,7 +7968,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-core/src/core/internal/plugin-shared-keys.ts": {
+    "packages/rpc-host/src/core/internal/plugin-shared-keys.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -7990,7 +7990,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/port-feature.ts": {
+    "packages/rpc-host/src/core/internal/port-feature.ts": {
       "lines": {
         "covered": 32,
         "total": 37,
@@ -8012,7 +8012,7 @@
         "pct": 80.76
       }
     },
-    "packages/rpc-core/src/core/internal/probe-emitter.ts": {
+    "packages/rpc-host/src/core/internal/probe-emitter.ts": {
       "lines": {
         "covered": 244,
         "total": 250,
@@ -8034,7 +8034,7 @@
         "pct": 80.88
       }
     },
-    "packages/rpc-core/src/core/internal/provider-admission.ts": {
+    "packages/rpc-host/src/core/internal/provider-admission.ts": {
       "lines": {
         "covered": 113,
         "total": 113,
@@ -8056,7 +8056,7 @@
         "pct": 88.19
       }
     },
-    "packages/rpc-core/src/core/internal/provider-attachment.ts": {
+    "packages/rpc-host/src/core/internal/provider-attachment.ts": {
       "lines": {
         "covered": 190,
         "total": 202,
@@ -8078,7 +8078,7 @@
         "pct": 74.41
       }
     },
-    "packages/rpc-core/src/core/internal/provider-executor.ts": {
+    "packages/rpc-host/src/core/internal/provider-executor.ts": {
       "lines": {
         "covered": 543,
         "total": 577,
@@ -8100,7 +8100,7 @@
         "pct": 78.21
       }
     },
-    "packages/rpc-core/src/core/internal/provider-feature.ts": {
+    "packages/rpc-host/src/core/internal/provider-feature.ts": {
       "lines": {
         "covered": 25,
         "total": 26,
@@ -8122,7 +8122,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-core/src/core/internal/provider-first-party-roots.ts": {
+    "packages/rpc-host/src/core/internal/provider-first-party-roots.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -8144,7 +8144,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/provider.ts": {
+    "packages/rpc-host/src/core/internal/provider.ts": {
       "lines": {
         "covered": 94,
         "total": 94,
@@ -8166,7 +8166,7 @@
         "pct": 80.85
       }
     },
-    "packages/rpc-core/src/core/internal/replay.ts": {
+    "packages/rpc-host/src/core/internal/replay.ts": {
       "lines": {
         "covered": 29,
         "total": 30,
@@ -8188,7 +8188,7 @@
         "pct": 97.05
       }
     },
-    "packages/rpc-core/src/core/internal/request-replay-ledger.ts": {
+    "packages/rpc-host/src/core/internal/request-replay-ledger.ts": {
       "lines": {
         "covered": 106,
         "total": 120,
@@ -8210,7 +8210,7 @@
         "pct": 85.52
       }
     },
-    "packages/rpc-core/src/core/internal/resource-scope.ts": {
+    "packages/rpc-host/src/core/internal/resource-scope.ts": {
       "lines": {
         "covered": 51,
         "total": 51,
@@ -8232,7 +8232,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/runtime-call-options.ts": {
+    "packages/rpc-host/src/core/internal/runtime-call-options.ts": {
       "lines": {
         "covered": 12,
         "total": 12,
@@ -8254,7 +8254,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/safe-value.ts": {
+    "packages/rpc-host/src/core/internal/safe-value.ts": {
       "lines": {
         "covered": 24,
         "total": 24,
@@ -8276,7 +8276,7 @@
         "pct": 89.28
       }
     },
-    "packages/rpc-core/src/core/internal/settlement.ts": {
+    "packages/rpc-host/src/core/internal/settlement.ts": {
       "lines": {
         "covered": 14,
         "total": 14,
@@ -8298,7 +8298,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/source-identity.ts": {
+    "packages/rpc-host/src/core/internal/source-identity.ts": {
       "lines": {
         "covered": 12,
         "total": 12,
@@ -8320,7 +8320,7 @@
         "pct": 92.85
       }
     },
-    "packages/rpc-core/src/core/internal/stream/error-text.ts": {
+    "packages/rpc-host/src/core/internal/stream/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -8342,7 +8342,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/stream/owner.ts": {
+    "packages/rpc-host/src/core/internal/stream/owner.ts": {
       "lines": {
         "covered": 533,
         "total": 575,
@@ -8364,7 +8364,7 @@
         "pct": 81.2
       }
     },
-    "packages/rpc-core/src/core/internal/test-observer.ts": {
+    "packages/rpc-host/src/core/internal/test-observer.ts": {
       "lines": {
         "covered": 50,
         "total": 63,
@@ -8386,7 +8386,7 @@
         "pct": 61.25
       }
     },
-    "packages/rpc-core/src/core/internal/time-port.ts": {
+    "packages/rpc-host/src/core/internal/time-port.ts": {
       "lines": {
         "covered": 39,
         "total": 39,
@@ -8408,7 +8408,7 @@
         "pct": 86.36
       }
     },
-    "packages/rpc-core/src/core/internal/transport-activation.ts": {
+    "packages/rpc-host/src/core/internal/transport-activation.ts": {
       "lines": {
         "covered": 16,
         "total": 16,
@@ -8430,7 +8430,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/internal/utf8.ts": {
+    "packages/rpc-host/src/core/internal/utf8.ts": {
       "lines": {
         "covered": 5,
         "total": 6,
@@ -8452,7 +8452,7 @@
         "pct": 25
       }
     },
-    "packages/rpc-core/src/core/internal/variation-admission.ts": {
+    "packages/rpc-host/src/core/internal/variation-admission.ts": {
       "lines": {
         "covered": 28,
         "total": 39,
@@ -8474,7 +8474,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-core/src/core/internal/variation-coordinator.ts": {
+    "packages/rpc-host/src/core/internal/variation-coordinator.ts": {
       "lines": {
         "covered": 40,
         "total": 42,
@@ -8496,7 +8496,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-core/src/core/internal/web-rpc-plugin-host.ts": {
+    "packages/rpc-host/src/core/internal/web-rpc-plugin-host.ts": {
       "lines": {
         "covered": 51,
         "total": 64,
@@ -8518,7 +8518,7 @@
         "pct": 58.82
       }
     },
-    "packages/rpc-core/src/core/middleware.ts": {
+    "packages/rpc-host/src/core/middleware.ts": {
       "lines": {
         "covered": 71,
         "total": 75,
@@ -8540,7 +8540,7 @@
         "pct": 77.41
       }
     },
-    "packages/rpc-core/src/core/middleware/abort.ts": {
+    "packages/rpc-host/src/core/middleware/abort.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -8562,7 +8562,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/middleware/authentication-envelope.ts": {
+    "packages/rpc-host/src/core/middleware/authentication-envelope.ts": {
       "lines": {
         "covered": 22,
         "total": 25,
@@ -8584,7 +8584,7 @@
         "pct": 73.33
       }
     },
-    "packages/rpc-core/src/core/middleware/authentication.ts": {
+    "packages/rpc-host/src/core/middleware/authentication.ts": {
       "lines": {
         "covered": 173,
         "total": 189,
@@ -8606,7 +8606,7 @@
         "pct": 72.58
       }
     },
-    "packages/rpc-core/src/core/middleware/canonical-protocol.ts": {
+    "packages/rpc-host/src/core/middleware/canonical-protocol.ts": {
       "lines": {
         "covered": 9,
         "total": 9,
@@ -8628,7 +8628,7 @@
         "pct": 80
       }
     },
-    "packages/rpc-core/src/core/middleware/codec.ts": {
+    "packages/rpc-host/src/core/middleware/codec.ts": {
       "lines": {
         "covered": 3,
         "total": 4,
@@ -8650,7 +8650,7 @@
         "pct": 60
       }
     },
-    "packages/rpc-core/src/core/middleware/connect.ts": {
+    "packages/rpc-host/src/core/middleware/connect.ts": {
       "lines": {
         "covered": 57,
         "total": 63,
@@ -8672,7 +8672,7 @@
         "pct": 81.6
       }
     },
-    "packages/rpc-core/src/core/middleware/contract.ts": {
+    "packages/rpc-host/src/core/middleware/contract.ts": {
       "lines": {
         "covered": 38,
         "total": 41,
@@ -8694,7 +8694,7 @@
         "pct": 78.12
       }
     },
-    "packages/rpc-core/src/core/middleware/error-text.ts": {
+    "packages/rpc-host/src/core/middleware/error-text.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -8716,7 +8716,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/middleware/framer.ts": {
+    "packages/rpc-host/src/core/middleware/framer.ts": {
       "lines": {
         "covered": 3,
         "total": 4,
@@ -8738,7 +8738,7 @@
         "pct": 60
       }
     },
-    "packages/rpc-core/src/core/middleware/hooks.ts": {
+    "packages/rpc-host/src/core/middleware/hooks.ts": {
       "lines": {
         "covered": 17,
         "total": 19,
@@ -8760,7 +8760,7 @@
         "pct": 71.42
       }
     },
-    "packages/rpc-core/src/core/middleware/index.ts": {
+    "packages/rpc-host/src/core/middleware/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -8782,7 +8782,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/middleware/ping.ts": {
+    "packages/rpc-host/src/core/middleware/ping.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -8804,7 +8804,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/middleware/timeout.ts": {
+    "packages/rpc-host/src/core/middleware/timeout.ts": {
       "lines": {
         "covered": 18,
         "total": 19,
@@ -8826,7 +8826,7 @@
         "pct": 76.92
       }
     },
-    "packages/rpc-core/src/core/middleware/uuid.ts": {
+    "packages/rpc-host/src/core/middleware/uuid.ts": {
       "lines": {
         "covered": 10,
         "total": 11,
@@ -8848,7 +8848,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-core/src/core/pipeline-contract.ts": {
+    "packages/rpc-host/src/core/pipeline-contract.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -8870,7 +8870,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/plugins/error-text.ts": {
+    "packages/rpc-host/src/core/plugins/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -8892,7 +8892,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/plugins/flow-control.ts": {
+    "packages/rpc-host/src/core/plugins/flow-control.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -8914,7 +8914,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/plugins/log.ts": {
+    "packages/rpc-host/src/core/plugins/log.ts": {
       "lines": {
         "covered": 14,
         "total": 14,
@@ -8936,7 +8936,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/plugins/reporter-context.ts": {
+    "packages/rpc-host/src/core/plugins/reporter-context.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -8958,7 +8958,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/plugins/send-queue.ts": {
+    "packages/rpc-host/src/core/plugins/send-queue.ts": {
       "lines": {
         "covered": 146,
         "total": 152,
@@ -8980,7 +8980,7 @@
         "pct": 93.6
       }
     },
-    "packages/rpc-core/src/core/probe/constants.ts": {
+    "packages/rpc-host/src/core/probe/constants.ts": {
       "lines": {
         "covered": 8,
         "total": 8,
@@ -9002,7 +9002,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/probe/define.ts": {
+    "packages/rpc-host/src/core/probe/define.ts": {
       "lines": {
         "covered": 59,
         "total": 61,
@@ -9024,7 +9024,7 @@
         "pct": 96.87
       }
     },
-    "packages/rpc-core/src/core/probe/index.ts": {
+    "packages/rpc-host/src/core/probe/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9046,7 +9046,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/probe/internal.ts": {
+    "packages/rpc-host/src/core/probe/internal.ts": {
       "lines": {
         "covered": 8,
         "total": 8,
@@ -9068,7 +9068,7 @@
         "pct": 25
       }
     },
-    "packages/rpc-core/src/core/probe/plugin.ts": {
+    "packages/rpc-host/src/core/probe/plugin.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -9090,7 +9090,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/probe/sample.ts": {
+    "packages/rpc-host/src/core/probe/sample.ts": {
       "lines": {
         "covered": 20,
         "total": 22,
@@ -9112,7 +9112,7 @@
         "pct": 71.42
       }
     },
-    "packages/rpc-core/src/core/probe/snapshot.ts": {
+    "packages/rpc-host/src/core/probe/snapshot.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -9134,7 +9134,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/probe/types.ts": {
+    "packages/rpc-host/src/core/probe/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9156,7 +9156,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/protocol-constants.ts": {
+    "packages/rpc-host/src/core/protocol-constants.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -9178,7 +9178,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/provider-admission.ts": {
+    "packages/rpc-host/src/core/provider-admission.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9200,7 +9200,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/provider.ts": {
+    "packages/rpc-host/src/core/provider.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -9222,7 +9222,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/runtime-api-endpoint.ts": {
+    "packages/rpc-host/src/core/runtime-api-endpoint.ts": {
       "lines": {
         "covered": 78,
         "total": 84,
@@ -9244,7 +9244,7 @@
         "pct": 53
       }
     },
-    "packages/rpc-core/src/core/semantic-constants.ts": {
+    "packages/rpc-host/src/core/semantic-constants.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -9266,7 +9266,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/stream/index.ts": {
+    "packages/rpc-host/src/core/stream/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9288,7 +9288,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/transport-constants.ts": {
+    "packages/rpc-host/src/core/transport-constants.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -9310,7 +9310,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/transport-kit.ts": {
+    "packages/rpc-host/src/core/transport-kit.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9332,7 +9332,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/transport.ts": {
+    "packages/rpc-host/src/core/transport.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9354,7 +9354,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/core/typing.ts": {
+    "packages/rpc-host/src/core/typing.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9376,7 +9376,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/error-code.ts": {
+    "packages/rpc-host/src/error-code.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9398,7 +9398,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/constants.ts": {
+    "packages/rpc-host/src/remote/constants.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -9420,7 +9420,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/contract.ts": {
+    "packages/rpc-host/src/remote/contract.ts": {
       "lines": {
         "covered": 162,
         "total": 172,
@@ -9442,7 +9442,7 @@
         "pct": 83.08
       }
     },
-    "packages/rpc-core/src/remote/error-code.ts": {
+    "packages/rpc-host/src/remote/error-code.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -9464,7 +9464,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/error-text.ts": {
+    "packages/rpc-host/src/remote/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -9486,7 +9486,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/error.ts": {
+    "packages/rpc-host/src/remote/error.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -9508,7 +9508,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/host.ts": {
+    "packages/rpc-host/src/remote/host.ts": {
       "lines": {
         "covered": 44,
         "total": 46,
@@ -9530,7 +9530,7 @@
         "pct": 82.5
       }
     },
-    "packages/rpc-core/src/remote/index.ts": {
+    "packages/rpc-host/src/remote/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -9552,7 +9552,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/internal/assemble-plugin.ts": {
+    "packages/rpc-host/src/remote/internal/assemble-plugin.ts": {
       "lines": {
         "covered": 83,
         "total": 84,
@@ -9574,7 +9574,7 @@
         "pct": 90.9
       }
     },
-    "packages/rpc-core/src/remote/internal/binding-drain.ts": {
+    "packages/rpc-host/src/remote/internal/binding-drain.ts": {
       "lines": {
         "covered": 95,
         "total": 95,
@@ -9596,7 +9596,7 @@
         "pct": 94.87
       }
     },
-    "packages/rpc-core/src/remote/internal/runtime-call.ts": {
+    "packages/rpc-host/src/remote/internal/runtime-call.ts": {
       "lines": {
         "covered": 147,
         "total": 158,
@@ -9618,7 +9618,7 @@
         "pct": 86.09
       }
     },
-    "packages/rpc-core/src/remote/plugin.ts": {
+    "packages/rpc-host/src/remote/plugin.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -9640,7 +9640,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/proxy.ts": {
+    "packages/rpc-host/src/remote/proxy.ts": {
       "lines": {
         "covered": 436,
         "total": 479,
@@ -9662,7 +9662,7 @@
         "pct": 84.71
       }
     },
-    "packages/rpc-core/src/remote/retry.ts": {
+    "packages/rpc-host/src/remote/retry.ts": {
       "lines": {
         "covered": 65,
         "total": 73,
@@ -9684,7 +9684,7 @@
         "pct": 83.33
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/catalog.ts": {
+    "packages/rpc-host/src/remote/runtime-api/catalog.ts": {
       "lines": {
         "covered": 61,
         "total": 64,
@@ -9706,7 +9706,7 @@
         "pct": 84.5
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/constants.ts": {
+    "packages/rpc-host/src/remote/runtime-api/constants.ts": {
       "lines": {
         "covered": 23,
         "total": 23,
@@ -9728,7 +9728,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/coroutine-binding.ts": {
+    "packages/rpc-host/src/remote/runtime-api/coroutine-binding.ts": {
       "lines": {
         "covered": 25,
         "total": 33,
@@ -9750,7 +9750,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/coroutine-plugin.ts": {
+    "packages/rpc-host/src/remote/runtime-api/coroutine-plugin.ts": {
       "lines": {
         "covered": 15,
         "total": 15,
@@ -9772,7 +9772,7 @@
         "pct": 88.88
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/coroutine-task.ts": {
+    "packages/rpc-host/src/remote/runtime-api/coroutine-task.ts": {
       "lines": {
         "covered": 19,
         "total": 22,
@@ -9794,7 +9794,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/description.ts": {
+    "packages/rpc-host/src/remote/runtime-api/description.ts": {
       "lines": {
         "covered": 60,
         "total": 60,
@@ -9816,7 +9816,7 @@
         "pct": 98.85
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/events.ts": {
+    "packages/rpc-host/src/remote/runtime-api/events.ts": {
       "lines": {
         "covered": 78,
         "total": 80,
@@ -9838,7 +9838,7 @@
         "pct": 88.88
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/launch-context.ts": {
+    "packages/rpc-host/src/remote/runtime-api/launch-context.ts": {
       "lines": {
         "covered": 14,
         "total": 14,
@@ -9860,7 +9860,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/managed-peer.ts": {
+    "packages/rpc-host/src/remote/runtime-api/managed-peer.ts": {
       "lines": {
         "covered": 52,
         "total": 55,
@@ -9882,7 +9882,7 @@
         "pct": 88.46
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/outlet.ts": {
+    "packages/rpc-host/src/remote/runtime-api/outlet.ts": {
       "lines": {
         "covered": 98,
         "total": 103,
@@ -9904,7 +9904,7 @@
         "pct": 86.77
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/overview.ts": {
+    "packages/rpc-host/src/remote/runtime-api/overview.ts": {
       "lines": {
         "covered": 20,
         "total": 22,
@@ -9926,7 +9926,7 @@
         "pct": 89.79
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/peer.ts": {
+    "packages/rpc-host/src/remote/runtime-api/peer.ts": {
       "lines": {
         "covered": 253,
         "total": 275,
@@ -9948,7 +9948,7 @@
         "pct": 86.53
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/plugin.ts": {
+    "packages/rpc-host/src/remote/runtime-api/plugin.ts": {
       "lines": {
         "covered": 205,
         "total": 221,
@@ -9970,7 +9970,7 @@
         "pct": 87.05
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/resources.ts": {
+    "packages/rpc-host/src/remote/runtime-api/resources.ts": {
       "lines": {
         "covered": 11,
         "total": 13,
@@ -9992,7 +9992,7 @@
         "pct": 71.42
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/timeout.ts": {
+    "packages/rpc-host/src/remote/runtime-api/timeout.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -10014,7 +10014,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/transfer.ts": {
+    "packages/rpc-host/src/remote/runtime-api/transfer.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10036,7 +10036,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/runtime-api/typing.ts": {
+    "packages/rpc-host/src/remote/runtime-api/typing.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10058,7 +10058,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/remote/serve-host.ts": {
+    "packages/rpc-host/src/remote/serve-host.ts": {
       "lines": {
         "covered": 102,
         "total": 118,
@@ -10080,7 +10080,7 @@
         "pct": 81.42
       }
     },
-    "packages/rpc-core/src/remote/serve-methods.ts": {
+    "packages/rpc-host/src/remote/serve-methods.ts": {
       "lines": {
         "covered": 38,
         "total": 41,
@@ -10102,7 +10102,7 @@
         "pct": 86.95
       }
     },
-    "packages/rpc-core/src/remote/serve-plugin.ts": {
+    "packages/rpc-host/src/remote/serve-plugin.ts": {
       "lines": {
         "covered": 48,
         "total": 60,
@@ -10124,7 +10124,7 @@
         "pct": 70
       }
     },
-    "packages/rpc-core/src/remote/types.ts": {
+    "packages/rpc-host/src/remote/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10146,7 +10146,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/binding.ts": {
+    "packages/rpc-host/src/runtime-adapter/binding.ts": {
       "lines": {
         "covered": 12,
         "total": 12,
@@ -10168,7 +10168,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/bootstrap.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/bootstrap.ts": {
       "lines": {
         "covered": 30,
         "total": 31,
@@ -10190,7 +10190,7 @@
         "pct": 88.88
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/carrier.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/carrier.ts": {
       "lines": {
         "covered": 262,
         "total": 277,
@@ -10212,7 +10212,7 @@
         "pct": 78.83
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/connection-identity.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/connection-identity.ts": {
       "lines": {
         "covered": 4,
         "total": 4,
@@ -10234,7 +10234,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/diagnostics.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/diagnostics.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -10256,7 +10256,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/error-text.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -10278,7 +10278,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/event-byte-io.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/event-byte-io.ts": {
       "lines": {
         "covered": 72,
         "total": 72,
@@ -10300,7 +10300,7 @@
         "pct": 89.18
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/handshake.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/handshake.ts": {
       "lines": {
         "covered": 65,
         "total": 71,
@@ -10322,7 +10322,7 @@
         "pct": 91.83
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/ipc-connection.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/ipc-connection.ts": {
       "lines": {
         "covered": 30,
         "total": 41,
@@ -10344,7 +10344,7 @@
         "pct": 66.66
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/peer.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/peer.ts": {
       "lines": {
         "covered": 21,
         "total": 31,
@@ -10366,7 +10366,7 @@
         "pct": 57.14
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/pipeline.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/pipeline.ts": {
       "lines": {
         "covered": 27,
         "total": 30,
@@ -10388,7 +10388,7 @@
         "pct": 93.75
       }
     },
-    "packages/rpc-core/src/runtime-adapter/byte/types.ts": {
+    "packages/rpc-host/src/runtime-adapter/byte/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10410,7 +10410,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/data.ts": {
+    "packages/rpc-host/src/runtime-adapter/data.ts": {
       "lines": {
         "covered": 10,
         "total": 10,
@@ -10432,7 +10432,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/definition-text.ts": {
+    "packages/rpc-host/src/runtime-adapter/definition-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -10454,7 +10454,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/definition-types.ts": {
+    "packages/rpc-host/src/runtime-adapter/definition-types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10476,7 +10476,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/definition.ts": {
+    "packages/rpc-host/src/runtime-adapter/definition.ts": {
       "lines": {
         "covered": 82,
         "total": 102,
@@ -10498,7 +10498,7 @@
         "pct": 67
       }
     },
-    "packages/rpc-core/src/runtime-adapter/entry-text.ts": {
+    "packages/rpc-host/src/runtime-adapter/entry-text.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -10520,7 +10520,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/entry.ts": {
+    "packages/rpc-host/src/runtime-adapter/entry.ts": {
       "lines": {
         "covered": 23,
         "total": 24,
@@ -10542,7 +10542,7 @@
         "pct": 97.67
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/channel.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/channel.ts": {
       "lines": {
         "covered": 38,
         "total": 40,
@@ -10564,7 +10564,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/constants.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/constants.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -10586,7 +10586,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/error-text.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -10608,7 +10608,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/error.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/error.ts": {
       "lines": {
         "covered": 4,
         "total": 4,
@@ -10630,7 +10630,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/handshake.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/handshake.ts": {
       "lines": {
         "covered": 25,
         "total": 26,
@@ -10652,7 +10652,7 @@
         "pct": 92.72
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/index.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10674,7 +10674,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/jsonrpc/transport.ts": {
+    "packages/rpc-host/src/runtime-adapter/jsonrpc/transport.ts": {
       "lines": {
         "covered": 251,
         "total": 276,
@@ -10696,7 +10696,7 @@
         "pct": 80.35
       }
     },
-    "packages/rpc-core/src/runtime-adapter/listener.ts": {
+    "packages/rpc-host/src/runtime-adapter/listener.ts": {
       "lines": {
         "covered": 82,
         "total": 89,
@@ -10718,7 +10718,7 @@
         "pct": 96.72
       }
     },
-    "packages/rpc-core/src/runtime-adapter/message/connection.ts": {
+    "packages/rpc-host/src/runtime-adapter/message/connection.ts": {
       "lines": {
         "covered": 52,
         "total": 62,
@@ -10740,7 +10740,7 @@
         "pct": 70.96
       }
     },
-    "packages/rpc-core/src/runtime-adapter/message/constants.ts": {
+    "packages/rpc-host/src/runtime-adapter/message/constants.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -10762,7 +10762,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/message/handoff.ts": {
+    "packages/rpc-host/src/runtime-adapter/message/handoff.ts": {
       "lines": {
         "covered": 85,
         "total": 85,
@@ -10784,7 +10784,7 @@
         "pct": 98.3
       }
     },
-    "packages/rpc-core/src/runtime-adapter/message/resource.ts": {
+    "packages/rpc-host/src/runtime-adapter/message/resource.ts": {
       "lines": {
         "covered": 217,
         "total": 226,
@@ -10806,7 +10806,7 @@
         "pct": 93.37
       }
     },
-    "packages/rpc-core/src/runtime-adapter/message/types.ts": {
+    "packages/rpc-host/src/runtime-adapter/message/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10828,7 +10828,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/object/connection.ts": {
+    "packages/rpc-host/src/runtime-adapter/object/connection.ts": {
       "lines": {
         "covered": 55,
         "total": 56,
@@ -10850,7 +10850,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/object/error-text.ts": {
+    "packages/rpc-host/src/runtime-adapter/object/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -10872,7 +10872,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/object/index.ts": {
+    "packages/rpc-host/src/runtime-adapter/object/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10894,7 +10894,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/object/pipeline.ts": {
+    "packages/rpc-host/src/runtime-adapter/object/pipeline.ts": {
       "lines": {
         "covered": 21,
         "total": 24,
@@ -10916,7 +10916,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/object/types.ts": {
+    "packages/rpc-host/src/runtime-adapter/object/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -10938,7 +10938,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/runtime-adapter/peer.ts": {
+    "packages/rpc-host/src/runtime-adapter/peer.ts": {
       "lines": {
         "covered": 70,
         "total": 77,
@@ -10960,7 +10960,7 @@
         "pct": 91.66
       }
     },
-    "packages/rpc-core/src/runtime-adapter/provider/governor.ts": {
+    "packages/rpc-host/src/runtime-adapter/provider/governor.ts": {
       "lines": {
         "covered": 134,
         "total": 138,
@@ -10982,7 +10982,7 @@
         "pct": 92.1
       }
     },
-    "packages/rpc-core/src/runtime-adapter/provider/scope.ts": {
+    "packages/rpc-host/src/runtime-adapter/provider/scope.ts": {
       "lines": {
         "covered": 14,
         "total": 14,
@@ -11004,7 +11004,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-core/src/testing/index.ts": {
+    "packages/rpc-host/src/testing/index.ts": {
       "lines": {
         "covered": 27,
         "total": 34,
@@ -11026,7 +11026,7 @@
         "pct": 70
       }
     },
-    "packages/rpc-core/src/testing/text.ts": {
+    "packages/rpc-host/src/testing/text.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -11048,7 +11048,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/collector-types.ts": {
+    "packages/rpc-plugin-devtools/src/collector-types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11070,7 +11070,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/collector/devtools.ts": {
+    "packages/rpc-plugin-devtools/src/collector/devtools.ts": {
       "lines": {
         "covered": 199,
         "total": 220,
@@ -11092,7 +11092,7 @@
         "pct": 78.28
       }
     },
-    "packages/rpc-devtools/src/collector/failure.ts": {
+    "packages/rpc-plugin-devtools/src/collector/failure.ts": {
       "lines": {
         "covered": 9,
         "total": 9,
@@ -11114,7 +11114,7 @@
         "pct": 92.85
       }
     },
-    "packages/rpc-devtools/src/collector/intern.ts": {
+    "packages/rpc-plugin-devtools/src/collector/intern.ts": {
       "lines": {
         "covered": 28,
         "total": 30,
@@ -11136,7 +11136,7 @@
         "pct": 80
       }
     },
-    "packages/rpc-devtools/src/collector/query.ts": {
+    "packages/rpc-plugin-devtools/src/collector/query.ts": {
       "lines": {
         "covered": 28,
         "total": 30,
@@ -11158,7 +11158,7 @@
         "pct": 78.72
       }
     },
-    "packages/rpc-devtools/src/collector/record.ts": {
+    "packages/rpc-plugin-devtools/src/collector/record.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -11180,7 +11180,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/collector/report.ts": {
+    "packages/rpc-plugin-devtools/src/collector/report.ts": {
       "lines": {
         "covered": 5,
         "total": 7,
@@ -11202,7 +11202,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-devtools/src/collector/ring.ts": {
+    "packages/rpc-plugin-devtools/src/collector/ring.ts": {
       "lines": {
         "covered": 155,
         "total": 155,
@@ -11224,7 +11224,7 @@
         "pct": 98.87
       }
     },
-    "packages/rpc-devtools/src/collector/service.ts": {
+    "packages/rpc-plugin-devtools/src/collector/service.ts": {
       "lines": {
         "covered": 31,
         "total": 34,
@@ -11246,7 +11246,7 @@
         "pct": 66.66
       }
     },
-    "packages/rpc-devtools/src/collector/stats.ts": {
+    "packages/rpc-plugin-devtools/src/collector/stats.ts": {
       "lines": {
         "covered": 88,
         "total": 92,
@@ -11268,7 +11268,7 @@
         "pct": 92.85
       }
     },
-    "packages/rpc-devtools/src/collector/text.ts": {
+    "packages/rpc-plugin-devtools/src/collector/text.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -11290,7 +11290,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/collector/watch.ts": {
+    "packages/rpc-plugin-devtools/src/collector/watch.ts": {
       "lines": {
         "covered": 92,
         "total": 95,
@@ -11312,7 +11312,7 @@
         "pct": 73.68
       }
     },
-    "packages/rpc-devtools/src/contract/index.ts": {
+    "packages/rpc-plugin-devtools/src/contract/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11334,7 +11334,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/contract/record-codec.ts": {
+    "packages/rpc-plugin-devtools/src/contract/record-codec.ts": {
       "lines": {
         "covered": 52,
         "total": 57,
@@ -11356,7 +11356,7 @@
         "pct": 85.33
       }
     },
-    "packages/rpc-devtools/src/contract/record.ts": {
+    "packages/rpc-plugin-devtools/src/contract/record.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -11378,7 +11378,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/contract/service.ts": {
+    "packages/rpc-plugin-devtools/src/contract/service.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11400,7 +11400,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/contract/wire.ts": {
+    "packages/rpc-plugin-devtools/src/contract/wire.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11422,7 +11422,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/error-code.ts": {
+    "packages/rpc-plugin-devtools/src/error-code.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -11444,7 +11444,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/error-text.ts": {
+    "packages/rpc-plugin-devtools/src/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -11466,7 +11466,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/errors.ts": {
+    "packages/rpc-plugin-devtools/src/errors.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -11488,7 +11488,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/hub/clock.ts": {
+    "packages/rpc-plugin-devtools/src/hub/clock.ts": {
       "lines": {
         "covered": 21,
         "total": 21,
@@ -11510,7 +11510,7 @@
         "pct": 87.5
       }
     },
-    "packages/rpc-devtools/src/hub/index.ts": {
+    "packages/rpc-plugin-devtools/src/hub/index.ts": {
       "lines": {
         "covered": 187,
         "total": 209,
@@ -11532,7 +11532,7 @@
         "pct": 84.67
       }
     },
-    "packages/rpc-devtools/src/hub/ingest.ts": {
+    "packages/rpc-plugin-devtools/src/hub/ingest.ts": {
       "lines": {
         "covered": 45,
         "total": 51,
@@ -11554,7 +11554,7 @@
         "pct": 80.76
       }
     },
-    "packages/rpc-devtools/src/hub/interactions.ts": {
+    "packages/rpc-plugin-devtools/src/hub/interactions.ts": {
       "lines": {
         "covered": 69,
         "total": 70,
@@ -11576,7 +11576,7 @@
         "pct": 96.96
       }
     },
-    "packages/rpc-devtools/src/hub/stats.ts": {
+    "packages/rpc-plugin-devtools/src/hub/stats.ts": {
       "lines": {
         "covered": 55,
         "total": 56,
@@ -11598,7 +11598,7 @@
         "pct": 82.14
       }
     },
-    "packages/rpc-devtools/src/hub/targets.ts": {
+    "packages/rpc-plugin-devtools/src/hub/targets.ts": {
       "lines": {
         "covered": 12,
         "total": 12,
@@ -11620,7 +11620,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/hub/text.ts": {
+    "packages/rpc-plugin-devtools/src/hub/text.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -11642,7 +11642,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/hub/timeline.ts": {
+    "packages/rpc-plugin-devtools/src/hub/timeline.ts": {
       "lines": {
         "covered": 72,
         "total": 72,
@@ -11664,7 +11664,7 @@
         "pct": 94.2
       }
     },
-    "packages/rpc-devtools/src/hub/types.ts": {
+    "packages/rpc-plugin-devtools/src/hub/types.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -11686,7 +11686,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/index.ts": {
+    "packages/rpc-plugin-devtools/src/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11708,7 +11708,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/log/index.ts": {
+    "packages/rpc-plugin-devtools/src/log/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11730,7 +11730,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/log/log-probe.ts": {
+    "packages/rpc-plugin-devtools/src/log/log-probe.ts": {
       "lines": {
         "covered": 57,
         "total": 60,
@@ -11752,7 +11752,7 @@
         "pct": 94.04
       }
     },
-    "packages/rpc-devtools/src/log/text.ts": {
+    "packages/rpc-plugin-devtools/src/log/text.ts": {
       "lines": {
         "covered": 4,
         "total": 4,
@@ -11774,7 +11774,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-devtools/src/log/types.ts": {
+    "packages/rpc-plugin-devtools/src/log/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11928,7 +11928,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/error-code.ts": {
+    "packages/rpc-plugin-process/src/error-code.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -11950,7 +11950,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/adapter.ts": {
+    "packages/rpc-plugin-process/src/process/adapter.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -11972,7 +11972,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/adapters/bun-socket.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/bun-socket.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -11994,7 +11994,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/adapters/bun-spawn.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/bun-spawn.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12016,7 +12016,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/adapters/deno-command.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/deno-command.ts": {
       "lines": {
         "covered": 64,
         "total": 67,
@@ -12038,7 +12038,7 @@
         "pct": 76.47
       }
     },
-    "packages/rpc-process/src/process/adapters/deno-peer.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/deno-peer.ts": {
       "lines": {
         "covered": 9,
         "total": 10,
@@ -12060,7 +12060,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/adapters/deno-socket.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/deno-socket.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -12082,7 +12082,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-process/src/process/adapters/electron-utility-process.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/electron-utility-process.ts": {
       "lines": {
         "covered": 74,
         "total": 78,
@@ -12104,7 +12104,7 @@
         "pct": 67.5
       }
     },
-    "packages/rpc-process/src/process/adapters/native-usage.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/native-usage.ts": {
       "lines": {
         "covered": 20,
         "total": 35,
@@ -12126,7 +12126,7 @@
         "pct": 34.09
       }
     },
-    "packages/rpc-process/src/process/adapters/node-child-process.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/node-child-process.ts": {
       "lines": {
         "covered": 67,
         "total": 71,
@@ -12148,7 +12148,7 @@
         "pct": 87.27
       }
     },
-    "packages/rpc-process/src/process/adapters/node-peer.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/node-peer.ts": {
       "lines": {
         "covered": 6,
         "total": 9,
@@ -12170,7 +12170,7 @@
         "pct": 66.66
       }
     },
-    "packages/rpc-process/src/process/adapters/node-socket.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/node-socket.ts": {
       "lines": {
         "covered": 133,
         "total": 158,
@@ -12192,7 +12192,7 @@
         "pct": 72.13
       }
     },
-    "packages/rpc-process/src/process/adapters/short-source.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/short-source.ts": {
       "lines": {
         "covered": 131,
         "total": 147,
@@ -12214,7 +12214,7 @@
         "pct": 76.19
       }
     },
-    "packages/rpc-process/src/process/adapters/unix-socket-ownership.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/unix-socket-ownership.ts": {
       "lines": {
         "covered": 56,
         "total": 67,
@@ -12236,7 +12236,7 @@
         "pct": 87.06
       }
     },
-    "packages/rpc-process/src/process/adapters/windows-job.ts": {
+    "packages/rpc-plugin-process/src/process/adapters/windows-job.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -12258,7 +12258,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/automatic-peer.ts": {
+    "packages/rpc-plugin-process/src/process/automatic-peer.ts": {
       "lines": {
         "covered": 21,
         "total": 22,
@@ -12280,7 +12280,7 @@
         "pct": 85.71
       }
     },
-    "packages/rpc-process/src/process/bootstrap.ts": {
+    "packages/rpc-plugin-process/src/process/bootstrap.ts": {
       "lines": {
         "covered": 3,
         "total": 4,
@@ -12302,7 +12302,7 @@
         "pct": 66.66
       }
     },
-    "packages/rpc-process/src/process/child.ts": {
+    "packages/rpc-plugin-process/src/process/child.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -12324,7 +12324,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-process/src/process/connection-options.ts": {
+    "packages/rpc-plugin-process/src/process/connection-options.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -12346,7 +12346,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/constants.ts": {
+    "packages/rpc-plugin-process/src/process/constants.ts": {
       "lines": {
         "covered": 10,
         "total": 10,
@@ -12368,7 +12368,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/diagnostics.ts": {
+    "packages/rpc-plugin-process/src/process/diagnostics.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -12390,7 +12390,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/error-code.ts": {
+    "packages/rpc-plugin-process/src/process/error-code.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12412,7 +12412,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/error-text.ts": {
+    "packages/rpc-plugin-process/src/process/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -12434,7 +12434,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/error.ts": {
+    "packages/rpc-plugin-process/src/process/error.ts": {
       "lines": {
         "covered": 8,
         "total": 9,
@@ -12456,7 +12456,7 @@
         "pct": 88.88
       }
     },
-    "packages/rpc-process/src/process/handshake.ts": {
+    "packages/rpc-plugin-process/src/process/handshake.ts": {
       "lines": {
         "covered": 18,
         "total": 18,
@@ -12478,7 +12478,7 @@
         "pct": 95.83
       }
     },
-    "packages/rpc-process/src/process/host/adopted-binding.ts": {
+    "packages/rpc-plugin-process/src/process/host/adopted-binding.ts": {
       "lines": {
         "covered": 35,
         "total": 40,
@@ -12500,7 +12500,7 @@
         "pct": 70.37
       }
     },
-    "packages/rpc-process/src/process/host/error.ts": {
+    "packages/rpc-plugin-process/src/process/host/error.ts": {
       "lines": {
         "covered": 0,
         "total": 2,
@@ -12522,7 +12522,7 @@
         "pct": 0
       }
     },
-    "packages/rpc-process/src/process/host/index.ts": {
+    "packages/rpc-plugin-process/src/process/host/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12544,7 +12544,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/host/registration.ts": {
+    "packages/rpc-plugin-process/src/process/host/registration.ts": {
       "lines": {
         "covered": 49,
         "total": 66,
@@ -12566,7 +12566,7 @@
         "pct": 53.84
       }
     },
-    "packages/rpc-process/src/process/host/types.ts": {
+    "packages/rpc-plugin-process/src/process/host/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12588,7 +12588,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/index.ts": {
+    "packages/rpc-plugin-process/src/process/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12610,7 +12610,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/jsonrpc-channel.ts": {
+    "packages/rpc-plugin-process/src/process/jsonrpc-channel.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -12632,7 +12632,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/launch.ts": {
+    "packages/rpc-plugin-process/src/process/launch.ts": {
       "lines": {
         "covered": 12,
         "total": 13,
@@ -12654,7 +12654,7 @@
         "pct": 71.05
       }
     },
-    "packages/rpc-process/src/process/node-byte-stream.ts": {
+    "packages/rpc-plugin-process/src/process/node-byte-stream.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -12676,7 +12676,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/node-io.ts": {
+    "packages/rpc-plugin-process/src/process/node-io.ts": {
       "lines": {
         "covered": 5,
         "total": 7,
@@ -12698,7 +12698,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/node-launch.ts": {
+    "packages/rpc-plugin-process/src/process/node-launch.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -12720,7 +12720,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/object-channel.ts": {
+    "packages/rpc-plugin-process/src/process/object-channel.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -12742,7 +12742,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/offer.ts": {
+    "packages/rpc-plugin-process/src/process/offer.ts": {
       "lines": {
         "covered": 16,
         "total": 16,
@@ -12764,7 +12764,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/peer.ts": {
+    "packages/rpc-plugin-process/src/process/peer.ts": {
       "lines": {
         "covered": 13,
         "total": 15,
@@ -12786,7 +12786,7 @@
         "pct": 72.22
       }
     },
-    "packages/rpc-process/src/process/plugin/binding.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/binding.ts": {
       "lines": {
         "covered": 135,
         "total": 168,
@@ -12808,7 +12808,7 @@
         "pct": 77.18
       }
     },
-    "packages/rpc-process/src/process/plugin/client.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/client.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -12830,7 +12830,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/plugin/constants.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/constants.ts": {
       "lines": {
         "covered": 8,
         "total": 8,
@@ -12852,7 +12852,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/plugin/descriptor.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/descriptor.ts": {
       "lines": {
         "covered": 127,
         "total": 130,
@@ -12874,7 +12874,7 @@
         "pct": 86.84
       }
     },
-    "packages/rpc-process/src/process/plugin/index.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12896,7 +12896,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/plugin/operation.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/operation.ts": {
       "lines": {
         "covered": 65,
         "total": 70,
@@ -12918,7 +12918,7 @@
         "pct": 95.31
       }
     },
-    "packages/rpc-process/src/process/plugin/serve.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/serve.ts": {
       "lines": {
         "covered": 223,
         "total": 271,
@@ -12940,7 +12940,7 @@
         "pct": 58.88
       }
     },
-    "packages/rpc-process/src/process/plugin/types.ts": {
+    "packages/rpc-plugin-process/src/process/plugin/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -12962,7 +12962,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/resilience/constants.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/constants.ts": {
       "lines": {
         "covered": 12,
         "total": 12,
@@ -12984,7 +12984,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/resilience/fallback.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/fallback.ts": {
       "lines": {
         "covered": 47,
         "total": 51,
@@ -13006,7 +13006,7 @@
         "pct": 71.73
       }
     },
-    "packages/rpc-process/src/process/resilience/index.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/index.ts": {
       "lines": {
         "covered": 122,
         "total": 134,
@@ -13028,7 +13028,7 @@
         "pct": 72.38
       }
     },
-    "packages/rpc-process/src/process/resilience/liquidation.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/liquidation.ts": {
       "lines": {
         "covered": 30,
         "total": 39,
@@ -13050,7 +13050,7 @@
         "pct": 61.11
       }
     },
-    "packages/rpc-process/src/process/resilience/provider-admission.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/provider-admission.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -13072,7 +13072,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/resilience/rendezvous.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/rendezvous.ts": {
       "lines": {
         "covered": 62,
         "total": 70,
@@ -13094,7 +13094,7 @@
         "pct": 85
       }
     },
-    "packages/rpc-process/src/process/resilience/session.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/session.ts": {
       "lines": {
         "covered": 38,
         "total": 40,
@@ -13116,7 +13116,7 @@
         "pct": 87.14
       }
     },
-    "packages/rpc-process/src/process/resilience/terminal.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/terminal.ts": {
       "lines": {
         "covered": 72,
         "total": 77,
@@ -13138,7 +13138,7 @@
         "pct": 65.11
       }
     },
-    "packages/rpc-process/src/process/resilience/types.ts": {
+    "packages/rpc-plugin-process/src/process/resilience/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -13160,7 +13160,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/runtime-bootstrap.ts": {
+    "packages/rpc-plugin-process/src/process/runtime-bootstrap.ts": {
       "lines": {
         "covered": 18,
         "total": 18,
@@ -13182,7 +13182,7 @@
         "pct": 66.66
       }
     },
-    "packages/rpc-process/src/process/runtime-listener.ts": {
+    "packages/rpc-plugin-process/src/process/runtime-listener.ts": {
       "lines": {
         "covered": 20,
         "total": 22,
@@ -13204,7 +13204,7 @@
         "pct": 46.42
       }
     },
-    "packages/rpc-process/src/process/runtime-loader.ts": {
+    "packages/rpc-plugin-process/src/process/runtime-loader.ts": {
       "lines": {
         "covered": 3,
         "total": 4,
@@ -13226,7 +13226,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-process/src/process/runtime-peer.ts": {
+    "packages/rpc-plugin-process/src/process/runtime-peer.ts": {
       "lines": {
         "covered": 20,
         "total": 21,
@@ -13248,7 +13248,7 @@
         "pct": 65.78
       }
     },
-    "packages/rpc-process/src/process/short-source-constants.ts": {
+    "packages/rpc-plugin-process/src/process/short-source-constants.ts": {
       "lines": {
         "covered": 9,
         "total": 9,
@@ -13270,7 +13270,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/stderr.ts": {
+    "packages/rpc-plugin-process/src/process/stderr.ts": {
       "lines": {
         "covered": 43,
         "total": 52,
@@ -13292,7 +13292,7 @@
         "pct": 76.66
       }
     },
-    "packages/rpc-process/src/process/types.ts": {
+    "packages/rpc-plugin-process/src/process/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -13314,7 +13314,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-process/src/process/web-byte-stream.ts": {
+    "packages/rpc-plugin-process/src/process/web-byte-stream.ts": {
       "lines": {
         "covered": 56,
         "total": 57,
@@ -13336,7 +13336,7 @@
         "pct": 95.83
       }
     },
-    "packages/rpc-threads/src/error-code.ts": {
+    "packages/rpc-plugin-thread/src/error-code.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -13358,7 +13358,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/adapter.ts": {
+    "packages/rpc-plugin-thread/src/threads/adapter.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -13380,7 +13380,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/adapters/electron-main.ts": {
+    "packages/rpc-plugin-thread/src/threads/adapters/electron-main.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -13402,7 +13402,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/adapters/node.ts": {
+    "packages/rpc-plugin-thread/src/threads/adapters/node.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -13424,7 +13424,7 @@
         "pct": 83.33
       }
     },
-    "packages/rpc-threads/src/threads/adapters/web.ts": {
+    "packages/rpc-plugin-thread/src/threads/adapters/web.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -13446,7 +13446,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/automatic-peer.ts": {
+    "packages/rpc-plugin-thread/src/threads/automatic-peer.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -13468,7 +13468,7 @@
         "pct": 62.5
       }
     },
-    "packages/rpc-threads/src/threads/bootstrap.ts": {
+    "packages/rpc-plugin-thread/src/threads/bootstrap.ts": {
       "lines": {
         "covered": 22,
         "total": 22,
@@ -13490,7 +13490,7 @@
         "pct": 85
       }
     },
-    "packages/rpc-threads/src/threads/channel.ts": {
+    "packages/rpc-plugin-thread/src/threads/channel.ts": {
       "lines": {
         "covered": 20,
         "total": 22,
@@ -13512,7 +13512,7 @@
         "pct": 75
       }
     },
-    "packages/rpc-threads/src/threads/child.ts": {
+    "packages/rpc-plugin-thread/src/threads/child.ts": {
       "lines": {
         "covered": 17,
         "total": 20,
@@ -13534,7 +13534,7 @@
         "pct": 66.66
       }
     },
-    "packages/rpc-threads/src/threads/constants.ts": {
+    "packages/rpc-plugin-thread/src/threads/constants.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -13556,7 +13556,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/error-text.ts": {
+    "packages/rpc-plugin-thread/src/threads/error-text.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -13578,7 +13578,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/error.ts": {
+    "packages/rpc-plugin-thread/src/threads/error.ts": {
       "lines": {
         "covered": 12,
         "total": 13,
@@ -13600,7 +13600,7 @@
         "pct": 85.71
       }
     },
-    "packages/rpc-threads/src/threads/index.ts": {
+    "packages/rpc-plugin-thread/src/threads/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -13622,7 +13622,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/node-launcher.ts": {
+    "packages/rpc-plugin-thread/src/threads/node-launcher.ts": {
       "lines": {
         "covered": 65,
         "total": 66,
@@ -13644,7 +13644,7 @@
         "pct": 81.81
       }
     },
-    "packages/rpc-threads/src/threads/node-parent.ts": {
+    "packages/rpc-plugin-thread/src/threads/node-parent.ts": {
       "lines": {
         "covered": 2,
         "total": 2,
@@ -13666,7 +13666,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/node-peer.ts": {
+    "packages/rpc-plugin-thread/src/threads/node-peer.ts": {
       "lines": {
         "covered": 6,
         "total": 6,
@@ -13688,7 +13688,7 @@
         "pct": 85.71
       }
     },
-    "packages/rpc-threads/src/threads/peer.ts": {
+    "packages/rpc-plugin-thread/src/threads/peer.ts": {
       "lines": {
         "covered": 8,
         "total": 11,
@@ -13710,7 +13710,7 @@
         "pct": 50
       }
     },
-    "packages/rpc-threads/src/threads/plugin.ts": {
+    "packages/rpc-plugin-thread/src/threads/plugin.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -13732,7 +13732,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/runtime-peer.ts": {
+    "packages/rpc-plugin-thread/src/threads/runtime-peer.ts": {
       "lines": {
         "covered": 30,
         "total": 35,
@@ -13754,7 +13754,7 @@
         "pct": 84.84
       }
     },
-    "packages/rpc-threads/src/threads/runtime-resource.ts": {
+    "packages/rpc-plugin-thread/src/threads/runtime-resource.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -13776,7 +13776,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/runtime-types.ts": {
+    "packages/rpc-plugin-thread/src/threads/runtime-types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -13798,7 +13798,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/short-spawn.ts": {
+    "packages/rpc-plugin-thread/src/threads/short-spawn.ts": {
       "lines": {
         "covered": 35,
         "total": 35,
@@ -13820,7 +13820,7 @@
         "pct": 90.19
       }
     },
-    "packages/rpc-threads/src/threads/types.ts": {
+    "packages/rpc-plugin-thread/src/threads/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -13842,7 +13842,7 @@
         "pct": 100
       }
     },
-    "packages/rpc-threads/src/threads/web-launcher.ts": {
+    "packages/rpc-plugin-thread/src/threads/web-launcher.ts": {
       "lines": {
         "covered": 72,
         "total": 77,

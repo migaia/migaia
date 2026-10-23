@@ -1,14 +1,14 @@
 import { installPage } from './page-common.mjs'
 import { peerOptions } from './rpc.mjs'
 import { BrowserBenchText } from './text.mjs'
+import { createThreadPeer } from '../../../../../rpc-plugin-thread/test/protocol.ts'
 import {
-  createThreadPeer,
-  createWebThreadLauncher,
-  createWebThreadChannelFactory
-} from '@migaia/rpc-threads'
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { readRuntimePeerConnection } from '../../../../../rpc-core/dist/remote/runtime-api/peer.js'
+import { readRuntimePeerConnection } from '../../../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 installPage('/worker-rpc.js', async (createWorker, payload, classification) => {
   /** Each side retains exactly one sampling policy and coded report callback. */

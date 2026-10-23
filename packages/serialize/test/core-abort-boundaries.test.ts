@@ -98,7 +98,8 @@ describe('serialize boundaries', () => {
       .map((chunk) => chunk.code ?? '')
       .join('\n')
 
-    expect(bundle).toContain('@migaia/lifecycle')
+    /** The bundled abort leaf retains its domain after package-name source values are removed. */
+    expect(bundle).toMatch(/["'`]lifecycle["'`]/)
     for (const dependency of dependencies.filter(
       (dependency) => dependency !== '@migaia/utils' && dependency !== '@migaia/lifecycle'
     )) {

@@ -22,7 +22,7 @@ registerHooks({
     if (!url.startsWith('file:') || result.source == null) return result
     /** Source replacement counts actual Core owners; the Remote facades remain raw delegates. */
     let source = Buffer.from(result.source).toString()
-    if (url.endsWith('/rpc-core/dist/remote/runtime-api/peer.js')) {
+    if (url.endsWith('/rpc-host/dist/remote/runtime-api/peer.js')) {
       assert.ok(source.includes('createRuntimePeerCalls('), 'public facade delegates to Core')
       assert.equal(
         source.includes('function payloadValue('),
@@ -30,7 +30,7 @@ registerHooks({
         'Remote adds no payload walker'
       )
     }
-    if (url.endsWith('/rpc-core/dist/remote/runtime-api/managed-peer.js')) {
+    if (url.endsWith('/rpc-host/dist/remote/runtime-api/managed-peer.js')) {
       assert.ok(source.includes('createManagedRuntimeCalls('), 'managed facade delegates to Core')
       assert.equal(
         source.includes('binding.trackRequest('),
@@ -38,7 +38,7 @@ registerHooks({
         'Remote adds no request closure'
       )
     }
-    if (url.endsWith('/rpc-core/dist/remote/internal/runtime-call.js'))
+    if (url.endsWith('/rpc-host/dist/remote/internal/runtime-call.js'))
       if (source.includes('binding.trackRequest(() => registration.invokeRequest'))
         source = source.replace(
           'binding.trackRequest(() => registration.invokeRequest(method, payload, callTimeout(callOptions)))',
@@ -64,7 +64,7 @@ registerHooks({
       assert.ok(pattern.test(source), 'binary capture declaration required')
       source = source.replace(pattern, '$& globalThis.__rpcFacadeCounters.binaryPrepare++;')
     }
-    if (url.endsWith('/rpc-core/dist/core/internal/outbound-envelope.js')) {
+    if (url.endsWith('/rpc-host/dist/core/internal/outbound-envelope.js')) {
       /**
        * Capture moved into Core; instrument its delivered body rather than observing an absent
        * facade.

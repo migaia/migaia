@@ -1,5 +1,5 @@
-import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
-import { readEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
+import { createSharedWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/shared-worker'
+import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, terminalProviders } from './rpc.js'
 
 const endpoints = new Map<MessagePort, { dispose(): Promise<void> }>()

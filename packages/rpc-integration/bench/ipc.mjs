@@ -717,7 +717,7 @@ async function pairedMain() {
   )
     throw new Error(IpcBenchErrorText.inventory)
   const { admitConformanceToolchains } =
-    await import('../../rpc-process/test/process/fixtures/conformance-toolchains.mjs')
+    await import('../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs')
   const admission = admitConformanceToolchains()
   console.log(JSON.stringify({ type: 'toolchain-admission', ...admission }))
   if (!admission.accepted) throw new Error(JSON.stringify(admission))

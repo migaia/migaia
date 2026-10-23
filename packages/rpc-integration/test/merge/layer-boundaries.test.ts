@@ -5,11 +5,15 @@ import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Source root whose dependency direction is enforced here. */
-const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core/src')
+const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-host/src')
 /** Actual independent owner roots make the source-tree assertion non-vacuous after physical split. */
-const ownerRoots = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map(
-  (owner) => ({ owner, root: resolve(import.meta.dirname, '../../..', owner, 'src') })
-)
+const ownerRoots = [
+  'rpc-contract',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser'
+].map((owner) => ({ owner, root: resolve(import.meta.dirname, '../../..', owner, 'src') }))
 /** Ordinary package entries are checked against real manifests, never against a wildcard path. */
 const ordinaryRpcEntries = new Set(
   ownerRoots.flatMap(({ root }) => {
@@ -25,10 +29,10 @@ const ordinaryRpcEntries = new Set(
 /** The mandatory five-owner graph permits only inward ordinary RPC dependencies. */
 const inwardOwners: Record<string, readonly string[]> = {
   'rpc-contract': [],
-  'rpc-core': ['rpc-contract'],
-  'rpc-process': ['rpc-core', 'rpc-contract'],
-  'rpc-threads': ['rpc-core', 'rpc-contract'],
-  'rpc-browser': ['rpc-core', 'rpc-contract']
+  'rpc-host': ['rpc-contract'],
+  'rpc-plugin-process': ['rpc-host', 'rpc-contract'],
+  'rpc-plugin-thread': ['rpc-host', 'rpc-contract'],
+  'rpc-plugin-browser': ['rpc-host', 'rpc-contract']
 }
 /**
  * Logical foundation labels retain the existing synthetic directional cases without merging package
@@ -105,6 +109,7 @@ function layerViolations(file: string, source: string): string[] {
       invalid ||=
         outside ||
         (!isRelative &&
+          specifier !== '@migaia/utils' &&
           specifier !== '@migaia/utils/bytes' &&
           specifier !== '@migaia/utils/error' &&
           specifier !== '@migaia/utils/scheduler' &&
@@ -135,7 +140,7 @@ function sourceFiles(directory: string): string[] {
 describe('layer dependency direction', () => {
   it('keeps remote retry independent of process and coroutine launchers', () => {
     const source = readFileSync(
-      join(import.meta.dirname, '../../../rpc-core/src/remote/retry.ts'),
+      join(import.meta.dirname, '../../../rpc-host/src/remote/retry.ts'),
       'utf8'
     )
     const imports = parseSync('retry.ts', source).program.body.flatMap((statement) =>

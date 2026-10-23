@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ReplaceStrategy } from '@migaia/supervision'
 import { describe, expect, it } from 'vitest'
-import { REMOTE_NAME_PATTERN } from '@migaia/rpc-core/remote'
-import { parseProcessPluginDescriptor } from '@migaia/rpc-process'
-import { ProcessPluginInstanceMode } from '../../../rpc-process/dist/process/plugin/constants.js'
-import { ProcessPluginWire } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { REMOTE_NAME_PATTERN } from '@migaia/rpc-host/plugin'
+import { parseProcessPluginDescriptor } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+import { ProcessPluginInstanceMode } from '../../../rpc-plugin-process/dist/process/plugin/constants.js'
+import { ProcessPluginWire } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 import { acceptsSchema, type ISchemaRule } from '../fixtures/schema-accepts.js'
 
 /** The published schema is checked as an independent structural contract. */
@@ -14,7 +14,7 @@ const schema = JSON.parse(
   readFileSync(
     resolve(
       import.meta.dirname,
-      '../../../rpc-process/schema/process-plugin-descriptor.schema.json'
+      '../../../rpc-plugin-process/schema/process-plugin-descriptor.schema.json'
     ),
     'utf8'
   )

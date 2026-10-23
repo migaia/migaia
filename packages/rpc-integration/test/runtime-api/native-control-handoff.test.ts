@@ -3,10 +3,10 @@ import { expect, it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
-import { prepareRuntimePeerSourceContext } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { prepareRuntimePeerSourceContext } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { nativeWorkerFor } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 it('ready process stop drains then SIGTERM without launcher abort issuing SIGKILL', async () => {
   /** Actual child readiness precedes stop, avoiding a race with native handler installation. */

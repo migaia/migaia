@@ -1,0 +1,65 @@
+{
+  "name": "@migaia/rpc-plugin-coroutines",
+  "version": "0.0.11",
+  "private": true,
+  "description": "Cooperative coroutine transport plugin for RPC hosts.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-plugin-coroutines"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "fmt": "oxfmt src test vitest.config.ts package.json",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@migaia/supervision": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-host": "workspace:*",
+    "@migaia/rpc-plugin-process": "workspace:*",
+    "@migaia/rpc-plugin-thread": "workspace:*",
+    "@migaia/serialize": "workspace:^",
+    "@types/node": "24.13.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-host": "workspace:*"
+  },
+  "peerDependenciesMeta": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

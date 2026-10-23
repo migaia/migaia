@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { peers } from './runtime-interop-fixture.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { createRuntimePeer, type IRuntimePeer } from '@migaia/rpc-core/remote'
-import { readRuntimePeerConnection } from '../../../../rpc-core/dist/remote/runtime-api/peer.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { type IRuntimePeer } from '@migaia/rpc-host/plugin'
+import { readRuntimePeerConnection } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 for (const fixture of peers) {
   it(`production TS standard request → ${fixture.language}`, async () => {

@@ -1,6 +1,6 @@
 import { createIpcSession } from '../../bench/ipc-session.mjs'
-import { readRuntimePeerConnection } from '../../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readRuntimeOutletConnection } from '../../../../rpc-core/dist/remote/runtime-api/outlet.js'
+import { readRuntimePeerConnection } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimeOutletConnection } from '../../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { threadId } from 'node:worker_threads'
 import { snapshot } from '../../../bench/observe.mjs'
 

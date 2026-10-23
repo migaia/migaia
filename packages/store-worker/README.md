@@ -82,7 +82,7 @@ void request
 | 让结果带加载状态与缓存 | workerComputed 返回 Resource，借用已有 Adapter。                           |
 | 保持序列化注册表调用   | Worker 侧 createSerializeWorkerHandler，主端 workerPlugin / workerParser。 |
 
-端点是本次消息连接；适配器借用物理端口。Resource 管理结果的新鲜度与取值状态，不创建线程。parser 负责实际格式算法，type 只是注册表标签。copy 保留输入，transfer 则显式交出符合条件的字节存储，不代表载荷零拷贝。
+适配器拥有一个逻辑 RPC host，借用物理端口。Resource 管理结果的新鲜度与取值状态，不创建线程。parser 拥有格式算法，type 只是注册表标签。copy 保留输入；显式未认证 transfer 在发送前被拒绝，backing 保持可用。
 
 ## 典型场景
 
@@ -124,18 +124,18 @@ pnpm add @migaia/reactive @migaia/serialize
 
 ### 职责、入口与运行边界
 
-本包提供两条 Worker 接线：WorkerAdapter / createWorkerHandler 执行通用计算，workerComputed 把该请求接入 Resource；序列化子入口则把普通 parser 接入 Worker 和 SerializeRegistry。请求关联、provider、取消、deadline、来源与错误传输归 rpc-core，Resource 的缓存、重试和响应式生命周期归 resource，格式解析与注册表归 serialize。本包只拥有应用载荷转换、分段 credit / ACK 和这些 API 的接线，不创建另一套 RPC 引擎。
+本包提供两条 Worker 接线：WorkerAdapter / createWorkerHandler 执行通用计算，workerComputed 把请求接入 Resource；序列化子入口连接普通 parser、Worker 与 SerializeRegistry。桥内部使用一个 `createRpcHost` 加 `dedicatedWorkerPlugin({ worker })`。rpc-host 拥有请求关联、provider、取消、deadline、source 身份与错误传输；rpc-plugin-browser 提供实际载体。Resource 拥有缓存与响应式生命周期，serialize 拥有格式。本包只保留载荷转换、分段 credit / ACK 接线，不创建另一套 RPC 引擎。
 
 | 入口                                    | 公开内容                                                                                                                    |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/store-worker`                  | WorkerAdapter、createWorkerHandler、workerComputed、IManagedRpcHandler、端口 / Resource 配置类型、所有权 / 诊断常量与错误。 |
 | `@migaia/store-worker/serialize/worker` | workerParser、workerPlugin、createSerializeWorkerHandler，及 IWorkerPluginOptions、IWorkerLike、IWorkerFailureEvent。       |
 
-reactive、resource、serialize、rpc-core、rpc-contract、utils 是运行时依赖。直接导入它们时，应用也应直接安装需要的包。根入口不导出序列化 factory，没有 serialize/* 通配入口；旧根 aliases 需迁移到精确子路径，没有兼容 shim。encodeWorkerValue / decodeWorkerValue 与 transferablesOf 是内部工具，不作为业务导出。无抛点的旧 CHUNK_MERGE_FAILED 已移除，当前保留六码。
+运行时依赖为 reactive、resource、serialize、rpc-host、rpc-plugin-browser、rpc-contract 与 utils。应用直接导入的包应显式安装。序列化 factory 使用精确 `/serialize/worker` 子入口，没有根 aliases 或通配入口。encodeWorkerValue / decodeWorkerValue 与 transferablesOf 保持内部；旧 CHUNK_MERGE_FAILED 路径已删除，保留六码。
 
-该桥固定使用 exclusive 拓扑：一个逻辑连接对应一对端口，默认本端 main、对端 worker，经 connect 做 Core 的一致性检查和目录接线，不使用自定义 identifier。这不赋予任意共享 Worker 对象多客户端复用保证。一个 MessagePort 可以满足端口形状，但创建者仍须安排独立的物理连接和资源归属。
+一个桥拥有一个 RPC host 和一条借用的物理 Worker 连接，默认本端身份 main、对端 worker。初始 provider 在连接准备前登记，后续注册走同一个 Host provide 路径。这不赋予同一个 Worker 对象共享多客户端服务的保证。MessagePort 可以满足端口形状，创建者仍负责独立物理链路与资源归属。
 
-IWorkerPort 是 Core IWebWorkerLikePort 的别名，要求 postMessage、addEventListener、removeEventListener，消息事件为 message / error / messageerror。浏览器 Worker / MessagePort / 单条 SharedWorker.port 可提供这种面；Node 示例使用真实 Worker 内运行的 handler 与原生 MessagePort，不伪造端口。IWorkerLike 额外允许可选 terminate()；结构可传入不等于本包获得原生 Worker 的创建或退出所有权。
+IWorkerPort 是 browser plugin 的 IWebWorkerLikePort 类型别名，要求 postMessage、addEventListener、removeEventListener 与 message / error / messageerror 事件。浏览器 Worker、MessagePort 或单个 SharedWorker.port 可提供该形状；Node 示例使用真实 Worker 与原生 MessagePort。IWorkerLike 额外允许可选 terminate()；结构兼容不转移原生 Worker 的创建或退出所有权。
 
 ### WorkerAdapter：调用方的连接
 
@@ -152,7 +152,7 @@ IWorkerPort 是 Core IWebWorkerLikePort 的别名，要求 postMessage、addEven
 
 构造 options 的 clientId / timeoutMs、请求 options 的 signal / transfer 各在入口捕获，不在等待初始化后重读调用方 getter。非法 options 对象或读取失败带 INVALID_OPTION，捕获原错保留在 cause；request 返回 rejected Promise，构造期失败同步抛出。端口与 RPC 配置的后续准入继续由 Core 负责，不把所有 Core 错误改成本包错误。
 
-同一 Adapter 可并发 request；Core 按请求关联结果、隔离 deadline 与取消。独立请求可用 Promise.all，让支持 batch@1 的内建载体在物理写进行时合并已就绪请求或响应；空闲时立即单帧发送，有依赖的串行 await 不会因此变成批处理。request 等处理结果，内部 one-way notify 仅等物理发送，不是业务执行回执。
+同一 Adapter 可并发 request；Host 关联每项结果，隔离 deadline 与取消。独立请求可用 Promise.all，但该原生 runtime 路径发送 call/terminal 操作，不承诺旧 envelope 自动批处理。request 等业务完成；内部 notify 使用 `host.notify(method, payload, { targetId, transfer })`，其 Promise 在真实物理发送后结算，不等 provider 回复。原生 postMessage 失败以原错误作为 cause 拒绝，通知不发送业务响应。
 
 | 成员      | 生命周期                                                                                                           |
 | --------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -204,7 +204,7 @@ Adapter.dispose 不 terminate 借用的 Worker / port。清理失败以 rejected
 
 这些 Resource 字段原样交给 Resource，不在 Worker 层重新实现规则。读取已知 options 各一次，不通过对象 rest 枚举未知 getter；非法 adapter、selectInput、transfer 或配置 getter 在 Resource 接管 / 自动启动前以 INVALID_OPTION 同步拒绝，原错为 cause。Resource 的 refetch、load、state 和 dispose 继续遵循 resource 包。
 
-结束时先释放 Resource，再 await adapter.dispose，最后由创建者终止原生 Worker / 端口，避免销毁 Resource 仍在使用的连接。传 transfer 时必须由应用决定输入以后是否还会读取；Resource 重试不使已经 detach 的 backing 自动恢复。
+结束时先释放 Resource，再 await adapter.dispose，最后由创建者终止原生 Worker / 端口。transfer 回调返回的显式非空列表遵循下方未认证 transfer 拒绝规则；重试不会绕过能力准入。
 
 ### 序列化 parser 与插件
 
@@ -230,23 +230,23 @@ createSerializeWorkerHandler(parser, post) 的两个参数必填：真实 parser
 
 handler 传 parser.encode 输入段的 payload；输出可为一个合法 ISerializeChunk，或同步 / 异步 chunk iterable。主端以 open / chunk / end 帧增量接收，初始两个 credit、按顺序 ACK，消费后补 credit；不调用 collectStream 或先把所有结果拼为一份。credit 限制单流发送进度，不是全 Worker 的总字节上限，producer 可先取得下一块再等待发送 credit。
 
-返回的合法 text / bytes / value 段保持顺序，可有空流和混合段；删掉的 CHUNK_MERGE_FAILED 不再承担这种路径。parser.decode 接收原 chunk，解码结果是 Uint8Array 则分类为 bytes，否则为 value。Worker 侧向外发送的完整 bytes backing 可按其发送规则转移，不由主端输入 ownership 自动赋予输出重用保证。
+合法 text / bytes / value 段保持顺序，可有空流和混合段。parser.decode 接收原 chunk，Uint8Array 输出分类为 bytes，其他输出分类为 value。Worker 输出使用既有 portable-copy 表示；主端输入 ownership 不赋予输出 backing 转移资格。
 
 消费者提前结束或取消会通知对应 stream，唤醒等待 credit 的 producer，并尝试 iterator.return；清理又失败时用既有 secondary-error 附加保留主错与次错。终结错误通过 Core RPC rejection 传 source/code/name/message/stack/cause/errors 链，不另造普通 error 应用帧。实际不可合作的业务代码仍须由应用负责，不把流取消宣称为强制停止 Worker。
 
 ### 字节复制、转移与实际载荷
 
-WorkerByteOwnership 是公开词表 copy / transfer，IByteOwnership 是其值联合；WorkerDiagnosticType 只有 worker，IWorkerDiagnosticType 是该值类型。它们不接收参数。默认 copy 保留调用方输入；transfer 是显式放弃独占输入存储的策略。
+WorkerByteOwnership 保留公开的 copy / transfer 词表，IByteOwnership 是值联合；WorkerDiagnosticType 只有 worker。默认 copy 保留调用方输入，字节沿既有 base64url portable 表示传输。
 
-序列化输入只有 bytes 段、真实 Uint8Array、且视图覆盖整个普通 ArrayBuffer（offset 为 0、length 等于 backing 长度）才进入 transfer list。局部 subarray、SharedArrayBuffer backing 等不满足条件时回退复制；普通 ArrayBuffer 的其他别名不会被检测并排除转移，整块转移可能同时使它们失效。共享 backing 不因此变成一个支持的共享内存计算协议。顶层非 bytes 的 text / value 不因 ownership 自动转移内部对象。
+该未认证 Worker 桥收到显式非空 transfer list 时，在发送业务帧前以 `source: 'rpc.endpoint'`、`code: 'CAPABILITY_UNSUPPORTED'` 拒绝，原 backing 不 detach。序列化 ownership transfer 选中的完整普通 ArrayBuffer backing 也遵循此规则；局部 subarray 或 SharedArrayBuffer backing 不进入原生转移列表，继续复制。text / value 段内的对象不会被递归转移。
 
-实际原生 post 提交后，转移可能让整个 backing 及所有别名 view detach；预取消尚未发送时输入仍可用，不能看到 transfer 选项或取消码就断言数据已丢失。重试前检查实际 buffer 状态，或选择 copy / 保留应用副本。transferablesOf / exclusiveBuffer 是内部工具，不作为公开 API 调用。
+旧单向 endpoint 曾在编码载荷之外提交独立的 native transfer sidecar。Host runtime 要求真实认证的 binary 准入与载荷图内的 backing，本包不伪签名，也不新增未认证 binary 扩展。此桥应使用 copy；空 transfer list 不请求原生所有权转移。transferablesOf / exclusiveBuffer 保持内部工具，不作为业务 API。
 
-当前 portable 桥先把 bytes 转成 base64url 载荷，再独立传 native transfer list，因此 detach 不证明载荷零拷贝。小计算与复杂对象图还要承担编码和往返成本；旧实现耗时与倍率不代表当前实现，没有本轮性能数字或速度保证。应用应按真实工作量判断是否值得卸载，而不是从“用了 Worker”推导提速。
+Worker 输出也使用 portable 复制。编码与往返仍有成本，不承诺零拷贝或当前速度倍率。
 
 ### 取消、错误与清理归属
 
-通用 Adapter request 保留 canonical Core 取消、超时、transport 与远程错误。compute 异常通常在 RpcRemoteError / INTERNAL 外层之下恢复原生 TypeError / RangeError 等 cause、message 和 stack；不要要求接收对象与 Worker 原对象 identity 相同，也不要把所有顶层异常当成业务原生类型。未配置期限且 provider 一直不结算时，请求仍可能等待；不能承诺任何坏 Worker 都必然及时 settle。
+通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。原生 runtime terminal 直接恢复 provider 的 Error/TypeError，保留原 message、stack 与原生 cause 链，不再加旧 RpcRemoteError / INTERNAL 外壳；未分类原生错误使用 unknown / UNKNOWN。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。
 
 序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。
 

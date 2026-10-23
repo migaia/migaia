@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import math
 from typing import Any
 import peer
 
@@ -9,6 +10,78 @@ import peer
 DESCRIBE = "migaia.remote.runtime.describe"
 NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,39}$")
 LIMIT = 2
+
+# These optional method fields share the closed JSON Schema subset with the TS directory owner.
+SCHEMA_FIELDS = ("input", "output", "yield")
+SCHEMA_KEYS = {"type", "properties", "required", "items", "enum", "const", "anyOf", "$defs", "$ref"}
+SCHEMA_TYPES = {"null", "boolean", "object", "array", "number", "integer", "string"}
+
+
+def schema_value(value, depth=0):
+    """Compare portable JSON values structurally, keeping booleans distinct from numbers."""
+    if depth > 64:
+        raise ValueError("invalid method")
+    if value is None:
+        return ("null",)
+    if type(value) is bool:
+        return ("boolean", value)
+    if type(value) in (int, float) and math.isfinite(value):
+        return ("number", value)
+    if isinstance(value, str) and not any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+        return ("string", value)
+    if isinstance(value, list):
+        return ("array", tuple(schema_value(item, depth + 1) for item in value))
+    if isinstance(value, dict):
+        return ("object", tuple((key, schema_value(item, depth + 1)) for key, item in sorted(value.items())))
+    raise ValueError("invalid method")
+
+
+def valid_runtime_schema(value):
+    """Validate schema nodes and local references without following references or executing text."""
+    nodes, references = set(), []
+
+    def visit(schema, path):
+        if not isinstance(schema, dict) or set(schema) - SCHEMA_KEYS:
+            return False
+        nodes.add(path)
+        for key, child in schema.items():
+            if key == "type":
+                values = child if isinstance(child, list) else [child]
+                if not values or any(not isinstance(item, str) or item not in SCHEMA_TYPES for item in values) or len(set(values)) != len(values):
+                    return False
+            elif key in ("properties", "$defs"):
+                if not isinstance(child, dict):
+                    return False
+                for name, member in child.items():
+                    pointer = name.replace("~", "~0").replace("/", "~1")
+                    if not visit(member, f"{path}/{key}/{pointer}"):
+                        return False
+            elif key == "required":
+                if not isinstance(child, list) or any(not isinstance(item, str) for item in child) or len(set(child)) != len(child):
+                    return False
+            elif key == "items":
+                if not visit(child, f"{path}/items"):
+                    return False
+            elif key == "enum":
+                if not isinstance(child, list) or not child:
+                    return False
+                values = [schema_value(item) for item in child]
+                if len(set(values)) != len(values):
+                    return False
+            elif key == "anyOf":
+                if not isinstance(child, list) or not child or any(not visit(member, f"{path}/anyOf/{index}") for index, member in enumerate(child)):
+                    return False
+            elif key == "$ref":
+                if not isinstance(child, str) or not child.startswith("#/$defs/") or re.search(r"~(?![01])", child):
+                    return False
+                references.append(child[1:])
+        return True
+
+    try:
+        schema_value(value)
+        return visit(value, "") and all(reference in nodes for reference in references)
+    except (ValueError, TypeError, RecursionError):
+        return False
 
 
 def error(code: str, message: str) -> dict[str, Any]:
@@ -70,7 +143,7 @@ class ReverseCalls:
             raise ValueError("invalid directory methods")
         names, requests = set(), {}
         for method in methods:
-            if not isinstance(method, dict) or not {"name", "supportedModes", "modeSource"} <= set(method) or set(method) - {"name", "supportedModes", "modeSource", "idempotent"}:
+            if not isinstance(method, dict) or not {"name", "supportedModes", "modeSource"} <= set(method) or set(method) - {"name", "supportedModes", "modeSource", "idempotent", *SCHEMA_FIELDS} or any(not valid_runtime_schema(method[key]) for key in SCHEMA_FIELDS if key in method):
                 raise ValueError("invalid method")
             name, modes = method["name"], method["supportedModes"]
             if not isinstance(name, str) or len(name) > 128 or name in names or not all(NAME.fullmatch(part) for part in name.split(".")):
@@ -80,6 +153,8 @@ class ReverseCalls:
             names.add(name)
             if not name.startswith("migaia.remote."):
                 requests[name] = set(modes)
+        # Schema nesting consumes the complete directory's existing portable depth budget.
+        schema_value(value)
         return requests
 
     def response(self, message):

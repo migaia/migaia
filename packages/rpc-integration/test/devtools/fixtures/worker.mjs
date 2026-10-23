@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { isMainThread, threadId, workerData } from 'node:worker_threads'
-import { createThreadPeer, readThreadBootstrap } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 import { fixtureAuthentication } from './auth.mjs'
 import { createFixtureReporter, createTraceCollector, startFixtureService } from './core.mjs'
 import { FixtureMethod, FixtureTrace } from './text.mjs'
@@ -38,7 +39,7 @@ await createThreadPeer({
      * Real Worker execution supplies both the business result and native host identity.
      *
      * @param {number} value Business payload passed through the real child Peer.
-     * @param {import('@migaia/rpc-core').IRpcContext} context Original admitted provider context
+     * @param {import('@migaia/rpc-host').IRpcContext} context Original admitted provider context
      *   with the caller-owned trace.
      * @returns {{
      *   value: number

@@ -166,10 +166,10 @@ const requiredTargetedRuleContract = [
       '@migaia/store-persist',
       '@migaia/store-worker',
       '@migaia/rpc-contract',
-      '@migaia/rpc-core',
-      '@migaia/rpc-process',
-      '@migaia/rpc-threads',
-      '@migaia/rpc-browser'
+      '@migaia/rpc-host',
+      '@migaia/rpc-plugin-process',
+      '@migaia/rpc-plugin-thread',
+      '@migaia/rpc-plugin-browser'
     ],
     pathPattern: '^src/',
     sourcePatterns: ['instanceof\\s+(?:Uint8Array|ArrayBuffer)\\b']

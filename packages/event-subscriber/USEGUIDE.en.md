@@ -253,7 +253,7 @@ Prints `save result: 3`, `duplicate target: TASK_NOT_UNIQUE`, then `save calls: 
 
 The root entry, `@migaia/event-subscriber`, exports channels, the Hub, invocation helpers, constants and public types. The `@migaia/event-subscriber/subscriber` subpath exports `subscribeOnce`, `subscribeUntil`, `subscribeSubscriber` and their subscription types. The only runtime dependency is `@migaia/utils`. The package needs neither DOM nor Node APIs and declares `sideEffects: false`.
 
-A channel delivers events as they are published. It stores no current value and replays no history. A registration is one subscription and its cancellation ownership. A snapshot fixes the target list when an invocation starts. Use `@migaia/reactive` for current state or derived dependencies, `@migaia/middleware-pipeline` for a sequence that passes each result to the next step, `@migaia/lifecycle` or `@migaia/resource` for resource ownership, queues and backpressure, and `@migaia/rpc-core` for messages crossing Workers, windows or networks.
+A channel delivers events as they are published. It stores no current value and replays no history. A registration is one subscription and its cancellation ownership. A snapshot fixes the target list when an invocation starts. Use `@migaia/reactive` for current state or derived dependencies, `@migaia/middleware-pipeline` for a sequence that passes each result to the next step, `@migaia/lifecycle` or `@migaia/resource` for resource ownership, queues and backpressure, and `@migaia/rpc-host` + transport plugin for messages crossing Workers, windows or networks.
 
 ## Channel creation and every option
 

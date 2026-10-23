@@ -18,7 +18,16 @@ const scriptDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const repositoryRoot = resolve(scriptDirectory, '..')
 const consumerNodeModules = resolve(repositoryRoot, 'fixtures/consumers/node_modules')
 /** Every split producer is checked through its actual package exports. */
-const rpcPackages = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
+const rpcPackages = [
+  'rpc-contract',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools'
+]
 const eventSubscriberPackage = resolve(repositoryRoot, 'packages/event-subscriber')
 const projects = [
   'node',

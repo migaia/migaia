@@ -5,8 +5,8 @@ export const ERROR_SOURCE = 'plugin.host'
  * The single declaration site for `plugin.host` error codes.
  *
  * The pair `(source, code)` uniquely identifies a package-owned failure. `source` is always
- * `'plugin.host'`. Throw sites use these constants instead of inline values. Localized
- * messages live in `error-text.ts` and correspond to code names.
+ * `'plugin.host'`. Throw sites use these constants instead of inline values. Localized messages
+ * live in `error-text.ts` and correspond to code names.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

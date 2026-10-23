@@ -4,7 +4,7 @@ import {
   normalizeRemoteContract,
   normalizeRemoteHostCatalog,
   normalizeRemoteControlShape
-} from '@migaia/rpc-core/remote'
+} from '@migaia/rpc-host/plugin'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame

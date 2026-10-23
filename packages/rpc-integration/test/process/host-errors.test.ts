@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { RpcProcessErrorCode } from '@migaia/rpc-process'
-import { createProcessError } from '../../../rpc-process/dist/process/error.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
 
 describe('process Host error identity', () => {
   it.each([

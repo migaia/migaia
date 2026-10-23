@@ -91,14 +91,14 @@ close database
 
 不知道从哪个包开始？先看你遇到的问题：
 
-| 你遇到的问题                                         | 从这里开始                                        |
-| ---------------------------------------------------- | ------------------------------------------------- |
-| 发布新版本时，进行中的请求被砍断，写了一半的数据丢失 | [`lifecycle`](./packages/lifecycle/README.md)     |
-| 搜索框显示旧结果：先发出的慢请求晚到，覆盖了新结果   | [`resource`](./packages/resource/README.md)       |
-| 后台任务崩溃后不停重启，一个坏配置拖垮整台机器       | [`supervision`](./packages/supervision/README.md) |
-| 计算挪到 Worker 后，取消和超时都失效了               | [`rpc-threads`](./packages/rpc-threads/README.md) |
-| 插件装到一半失败，前面装好的插件没人回滚             | [`plugin-host`](./packages/plugin-host/README.md) |
-| 同一页面里几个微前端抢着改同一份状态                 | [`micro-hub`](./packages/micro-hub/README.md)     |
+| 你遇到的问题                                         | 从这里开始                                                    |
+| ---------------------------------------------------- | ------------------------------------------------------------- |
+| 发布新版本时，进行中的请求被砍断，写了一半的数据丢失 | [`lifecycle`](./packages/lifecycle/README.md)                 |
+| 搜索框显示旧结果：先发出的慢请求晚到，覆盖了新结果   | [`resource`](./packages/resource/README.md)                   |
+| 后台任务崩溃后不停重启，一个坏配置拖垮整台机器       | [`supervision`](./packages/supervision/README.md)             |
+| 计算挪到 Worker 后，取消和超时都失效了               | [`rpc-plugin-thread`](./packages/rpc-plugin-thread/README.md) |
+| 插件装到一半失败，前面装好的插件没人回滚             | [`plugin-host`](./packages/plugin-host/README.md)             |
+| 同一页面里几个微前端抢着改同一份状态                 | [`micro-hub`](./packages/micro-hub/README.md)                 |
 
 <details open>
 <summary><strong>收尾、取消与错误追踪</strong></summary>
@@ -163,15 +163,18 @@ close database
 
 RPC（远程过程调用）让你像调用本地函数一样调用另一个线程、进程或页面里的函数，并保留超时、取消和错误信息。
 
-| 包                                                  | 用来做什么                                                                |
-| --------------------------------------------------- | ------------------------------------------------------------------------- |
-| [`rpc-contract`](./packages/rpc-contract/README.md) | 为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。             |
-| [`rpc-core`](./packages/rpc-core/README.md)         | 跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。              |
-| [`rpc-threads`](./packages/rpc-threads/README.md)   | 把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。                    |
-| [`rpc-process`](./packages/rpc-process/README.md)   | 在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。             |
-| [`rpc-pool`](./packages/rpc-pool/README.md)         | 将 RPC 调用分配到线程池或进程池，并用有限队列承接繁忙时的请求。           |
-| [`rpc-browser`](./packages/rpc-browser/README.md)   | 在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。 |
-| [`rpc-devtools`](./packages/rpc-devtools/README.md) | 采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。           |
+使用 `createRpcHost` 创建一个 host，选择一个传输 plugin，并按需叠加 features。连接、调用、流和释放由同一个 host 管理。
+
+| 包                                                                    | 用来做什么                                                                |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [`rpc-contract`](./packages/rpc-contract/README.md)                   | 为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。             |
+| [`rpc-host`](./packages/rpc-host/README.md)                           | 跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。              |
+| [`rpc-plugin-thread`](./packages/rpc-plugin-thread/README.md)         | 把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。                    |
+| [`rpc-plugin-process`](./packages/rpc-plugin-process/README.md)       | 在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。             |
+| [`rpc-plugin-pool`](./packages/rpc-plugin-pool/README.md)             | 将 RPC 调用分配到线程池或进程池，并用有限队列承接繁忙时的请求。           |
+| [`rpc-plugin-browser`](./packages/rpc-plugin-browser/README.md)       | 在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。 |
+| [`rpc-plugin-coroutines`](./packages/rpc-plugin-coroutines/README.md) | 在同一运行环境中监督协程任务，并通过同一个 host 调用。                    |
+| [`rpc-plugin-devtools`](./packages/rpc-plugin-devtools/README.md)     | 采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。           |
 
 </details>
 
@@ -191,7 +194,7 @@ RPC（远程过程调用）让你像调用本地函数一样调用另一个线�
 ```text
 应用集成          micro-hub   tray
 状态与存储适配     store-*     storage-web
-RPC              rpc-core → rpc-threads · rpc-process · rpc-browser → rpc-pool
+RPC              rpc-host + rpc-plugin-{process,thread,browser,coroutines,pool,devtools}
 插件与开关         plugin-host   capability
 通用基础          reactive   resource   serialize   storage-contract   supervision
                  lifecycle   event-subscriber   middleware-pipeline
@@ -204,7 +207,7 @@ RPC              rpc-core → rpc-threads · rpc-process · rpc-browser → rpc-
 
 | 环境      | 要求                                                                                    |
 | --------- | --------------------------------------------------------------------------------------- |
-| Node.js   | 18 及以上；`rpc-pool` 需要 24 及以上                                                    |
+| Node.js   | 18 及以上；`rpc-plugin-pool` 需要 24 及以上                                             |
 | Bun、Deno | 当前稳定版本                                                                            |
 | 浏览器    | 当前版本的主流浏览器；各包 README 会注明额外要求，例如 `SharedArrayBuffer` 需要跨源隔离 |
 | 模块格式  | 只发布 ESM，用 `import` 引入                                                            |

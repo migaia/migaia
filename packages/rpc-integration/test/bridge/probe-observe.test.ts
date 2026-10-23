@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { IRpcCarrierProbe } from '@migaia/rpc-core/probe'
+import type { IRpcCarrierProbe } from '@migaia/rpc-host/probe'
 import { bridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC carrier observation', () => {

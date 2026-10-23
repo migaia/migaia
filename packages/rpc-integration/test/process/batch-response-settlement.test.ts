@@ -6,12 +6,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
-import { createProcessPeer } from '@migaia/rpc-process'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
 import {
   prepareRuntimePeerSourceContext,
   readRuntimePeerConnection
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame

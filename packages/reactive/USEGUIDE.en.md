@@ -662,7 +662,7 @@ Migration: `@migaia/reactive/internals` has been removed. The old `internalsOf` 
 import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 ```
 
-The stable error code table has **18 codes**, declared only in `src/error-code.ts`, and `source` is always `'reactive'`. (Background: the five codes `SCOPE_CLOSED` / `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` / `SCOPE_DISPOSAL_FAILED` that used to belong here moved out with the lifecycle primitives and now belong to `lifecycle`.)
+The stable error code table has **18 codes**, declared only in `src/error-code.ts`, and `source` is always `'reactive'`. (Background: the five codes `SCOPE_CLOSED` / `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` / `SCOPE_DISPOSAL_FAILED` that used to belong here moved out with the lifecycle primitives and now belong to `@migaia/lifecycle`.)
 
 | `ReactiveErrorCode` key | Code | When it happens |
 | --- | --- | --- |

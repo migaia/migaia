@@ -237,9 +237,7 @@ describe('store-middleware audit regressions', () => {
           return 1
         }
       })
-    ).toThrow(
-      expect.objectContaining({ source: 'store.middleware', code: 'CLONE_UNSUPPORTED' })
-    )
+    ).toThrow(expect.objectContaining({ source: 'store.middleware', code: 'CLONE_UNSUPPORTED' }))
     expect(reads).toBe(0)
   })
 

@@ -3,13 +3,13 @@ import { readFile, writeFile, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { readAuthenticationEnvelope } from '../../../rpc-core/dist/core/middleware/authentication-envelope.js'
+import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 import { nativeSession } from './native-harness.mjs'
 import {
   nativeFixtureAuthentication,
   verifyNativeFixture
-} from '../../../rpc-browser/test/replay-window/native-auth-fixture.mjs'
+} from '../../../rpc-plugin-browser/test/replay-window/native-auth-fixture.mjs'
 
 /** Two real native endpoints exercise L-to-legacy transition with fresh signed physical counters. */
 const results = []

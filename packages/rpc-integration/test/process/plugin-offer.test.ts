@@ -1,9 +1,9 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
-import { createConnectProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createConnectProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 
 /** Two physical ports exchange framed handshake bytes without a platform socket. */
 function bytePair(): readonly [IProcessByteChannel, IProcessByteChannel] {

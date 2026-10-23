@@ -1,18 +1,16 @@
 import assert from 'node:assert/strict'
 import { systemScheduler } from '@migaia/utils/scheduler'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
 import {
-  createThreadPeer,
-  createWebThreadLauncher,
-  createWebThreadChannelFactory
-} from '@migaia/rpc-threads'
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'
-import {
-  createProcessPeer,
-  createProcessTransport,
-  createNativeProcessOffer
-} from '@migaia/rpc-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 
 /** This fixture executes within an actual runtime; a Node host cannot grant its PASS. */
 const deno = typeof Deno !== 'undefined'

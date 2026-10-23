@@ -1,5 +1,6 @@
 import { workerData } from 'node:worker_threads'
-import { createThreadPeer, readThreadBootstrap } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 
 /** The real native launcher carries its attempt number as ordinary bootstrap business data. */
 const data = readThreadBootstrap(workerData).data as { sequence: number }

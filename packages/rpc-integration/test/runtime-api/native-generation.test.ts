@@ -3,34 +3,34 @@ import { it, vi } from 'vitest'
 import {
   prepareProcessRuntimeBootstrap,
   decodeProcessRuntimeBootstrap
-} from '../../../rpc-process/dist/process/runtime-bootstrap.js'
-import { createThreadRuntimeBootstrap } from '../../../rpc-threads/dist/threads/bootstrap.js'
+} from '../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
+import { createThreadRuntimeBootstrap } from '../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { fileURLToPath } from 'node:url'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import {
   readRuntimeLaunchContext,
   withRuntimeLaunchContext
-} from '../../../rpc-core/dist/remote/runtime-api/launch-context.js'
+} from '../../../rpc-host/dist/remote/runtime-api/launch-context.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
-import { connected } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { createRemoteRuntimeRegistration } from '../../../rpc-core/dist/remote/proxy.js'
-import { readRuntimePeerEndpoint } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
-import type { IRuntimeOutlet } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
+import { connected } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { createRemoteRuntimeRegistration } from '../../../rpc-host/dist/remote/proxy.js'
+import { readRuntimePeerEndpoint } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import type { IRuntimeOutlet } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it.each(['memory', 'external'] as const)(
   'true Worker execution restart reports actual %s store continuity and sealed generation',

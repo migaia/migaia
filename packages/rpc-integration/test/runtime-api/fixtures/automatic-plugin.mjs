@@ -1,8 +1,8 @@
 import { parentPort } from 'node:worker_threads'
 import { setTimeout as delay } from 'node:timers/promises'
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
 
 /** This genuine child uses the same managed Host and public Plugin factory as its caller. */
 const host = defineHost({

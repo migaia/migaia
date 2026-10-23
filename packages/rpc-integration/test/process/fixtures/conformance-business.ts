@@ -5,18 +5,20 @@ import { expect } from 'vitest'
 import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'
 import { createUnitBudget, type IUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
-import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
-import { type IProcessByteChannel, type IProcessPluginOptions } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import type { IRemoteContract, IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
+import { type IProcessPluginOptions } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { dialProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
+import type { IRemoteContract, IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
-import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
-import { createProcessPeer } from '@migaia/rpc-process'
+import { createProcessJsonRpcChannel } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
 import {
   readRuntimePeerConnection,
   prepareRuntimePeerSourceContext
-} from '../../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 /** Portable business outputs are observed on the provider, never inferred from send completion. */
 const expected = JSON.parse(

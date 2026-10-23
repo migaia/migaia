@@ -1,5 +1,5 @@
-import { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'
-import { readEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
+import { createBrowserMessagePortTransport } from '@migaia/rpc-plugin-browser/adapters/message-port'
+import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, echoProvider, installErrorGuards } from './rpc.js'
 
 const errors = installErrorGuards()

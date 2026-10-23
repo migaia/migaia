@@ -108,28 +108,28 @@ export async function shutdown(): Promise<void> {
 6. **停止**：`stop()`、`replace()` 或 `dispose()` 按三段限时结束它。
 7. **归还名额**：只有单元真正退出后，名额才回到预算里。
 
-| 名词 | 含义 |
-| --- | --- |
-| unit | 一次启动出来的执行单元：一个协程、一个线程或一个子进程。 |
+| 名词               | 含义                                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| unit               | 一次启动出来的执行单元：一个协程、一个线程或一个子进程。                                                               |
 | launcher（启动器） | 真正创建单元的那段代码。Node、Bun、Deno、Electron 创建进程的方式不同，所以由应用或适配包提供；本包只管启动之后的一切。 |
-| budget（预算） | 一组单元共享的名额：最多同时运行几个、每秒最多启动几个、排队最多等多久。 |
-| spec（规格） | 启动一个单元需要的参数，例如协程的任务函数、进程的命令和参数。 |
-| generation | 每次启动尝试的编号。成功启动后，它标识当前在服务的那个单元。 |
-| `ready` | 你提供的就绪检查，用来回答“这个单元现在能用了吗”。 |
-| `report` | 接收不会抛给调用方的错误：进入终态、清理失败、迟到的失败和能力降级。 |
+| budget（预算）     | 一组单元共享的名额：最多同时运行几个、每秒最多启动几个、排队最多等多久。                                               |
+| spec（规格）       | 启动一个单元需要的参数，例如协程的任务函数、进程的命令和参数。                                                         |
+| generation         | 每次启动尝试的编号。成功启动后，它标识当前在服务的那个单元。                                                           |
+| `ready`            | 你提供的就绪检查，用来回答“这个单元现在能用了吗”。                                                                     |
+| `report`           | 接收不会抛给调用方的错误：进入终态、清理失败、迟到的失败和能力降级。                                                   |
 
 ## 典型场景
 
-| 场景 | 怎么组合 | 详细说明 |
-| --- | --- | --- |
-| 本地索引、转码等子进程崩溃后自动恢复 | `createProcessSupervisor` + `@migaia/rpc-process` 提供的 Node 启动器 | [监督一个真实的子进程](./USEGUIDE.md#监督一个真实的子进程) |
-| 配置错误导致崩溃循环时及时停下 | `restart.maxRestarts` + `report` | [崩溃太多次就停下](./USEGUIDE.md#崩溃太多次就停下) |
-| 后台扫描任务卡住时自动重启 | 协程的 `heartbeat` | [用心跳发现卡住的任务](./USEGUIDE.md#用心跳发现卡住的任务) |
-| 批量导出时限制同时运行的数量 | `createUnitBudget({ maxUnits })` | [限制同时运行的数量](./USEGUIDE.md#限制同时运行的数量) |
-| 发布新版本时不中断服务 | `replace({ strategy: 'start-then-switch' })` | [不中断地替换实例](./USEGUIDE.md#不中断地替换实例) |
-| 关闭应用时不被卡住 | `stop` 的三段时限 | [限时停止与名额归还](./USEGUIDE.md#限时停止与名额归还) |
-| 父进程退出后，子进程自己收尾；下次启动清理遗留进程 | `createParentLossGuard`、`reclaimOrphanProcesses` | [父进程退出与遗留进程](./USEGUIDE.md#父进程退出与遗留进程) |
-| 减少冷启动等待 | `createPrewarmPool` | [预热进程](./USEGUIDE.md#预热进程) |
+| 场景                                               | 怎么组合                                                                                                | 详细说明                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 本地索引、转码等子进程崩溃后自动恢复               | `createProcessSupervisor` + `@migaia/rpc-plugin-process/adapters/node-child-process` 提供的 Node 启动器 | [监督一个真实的子进程](./USEGUIDE.md#监督一个真实的子进程) |
+| 配置错误导致崩溃循环时及时停下                     | `restart.maxRestarts` + `report`                                                                        | [崩溃太多次就停下](./USEGUIDE.md#崩溃太多次就停下)         |
+| 后台扫描任务卡住时自动重启                         | 协程的 `heartbeat`                                                                                      | [用心跳发现卡住的任务](./USEGUIDE.md#用心跳发现卡住的任务) |
+| 批量导出时限制同时运行的数量                       | `createUnitBudget({ maxUnits })`                                                                        | [限制同时运行的数量](./USEGUIDE.md#限制同时运行的数量)     |
+| 发布新版本时不中断服务                             | `replace({ strategy: 'start-then-switch' })`                                                            | [不中断地替换实例](./USEGUIDE.md#不中断地替换实例)         |
+| 关闭应用时不被卡住                                 | `stop` 的三段时限                                                                                       | [限时停止与名额归还](./USEGUIDE.md#限时停止与名额归还)     |
+| 父进程退出后，子进程自己收尾；下次启动清理遗留进程 | `createParentLossGuard`、`reclaimOrphanProcesses`                                                       | [父进程退出与遗留进程](./USEGUIDE.md#父进程退出与遗留进程) |
+| 减少冷启动等待                                     | `createPrewarmPool`                                                                                     | [预热进程](./USEGUIDE.md#预热进程)                         |
 
 ## 安装
 
@@ -139,14 +139,14 @@ pnpm add @migaia/supervision
 
 ## 常用 API
 
-| API | 作用 |
-| --- | --- |
-| `createUnitBudget()` | 创建一组单元共享的名额。 |
-| `createCoroutineSupervisor()` | 监督在当前事件循环里运行、能响应取消的任务。 |
-| `createProcessSupervisor()` | 监督由启动器创建的子进程。 |
-| `createThreadSupervisor()` | 监督由启动器创建的工作线程。 |
-| `start()` / `stop()` / `replace()` / `dispose()` | 启动、停止、替换和永久关闭。 |
-| `subscribe()` / `inspect()` | 观察状态变化，读取当前状态和最近一次退出原因。 |
+| API                                              | 作用                                           |
+| ------------------------------------------------ | ---------------------------------------------- |
+| `createUnitBudget()`                             | 创建一组单元共享的名额。                       |
+| `createCoroutineSupervisor()`                    | 监督在当前事件循环里运行、能响应取消的任务。   |
+| `createProcessSupervisor()`                      | 监督由启动器创建的子进程。                     |
+| `createThreadSupervisor()`                       | 监督由启动器创建的工作线程。                   |
+| `start()` / `stop()` / `replace()` / `dispose()` | 启动、停止、替换和永久关闭。                   |
+| `subscribe()` / `inspect()`                      | 观察状态变化，读取当前状态和最近一次退出原因。 |
 
 完整用法见 [USEGUIDE.md](./USEGUIDE.md)。
 

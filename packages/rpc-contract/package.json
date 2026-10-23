@@ -94,6 +94,10 @@
     "./stream": {
       "types": "./dist/contract/stream-index.d.ts",
       "default": "./dist/contract/stream-index.js"
+    },
+    "./remote": {
+      "types": "./dist/contract/remote/index.d.ts",
+      "default": "./dist/contract/remote/index.js"
     }
   },
   "publishConfig": {

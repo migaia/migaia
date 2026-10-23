@@ -154,9 +154,12 @@ function createActualPackageFixture() {
     'serialize',
     'supervision',
     'rpc-contract',
-    'rpc-core',
-    'rpc-process',
-    'rpc-threads',
+    'rpc-host',
+    'rpc-plugin-process',
+    'rpc-plugin-thread',
+    'rpc-plugin-coroutines',
+    'rpc-plugin-pool',
+    'rpc-plugin-devtools',
     'utils',
     'capability',
     'event-subscriber'
@@ -205,7 +208,13 @@ async function buildConsumer(consumer, source) {
   return {
     root: consumer,
     code: chunks.map((chunk) => chunk.code).join('\n'),
-    modules: chunks.flatMap((chunk) => Object.keys(chunk.modules))
+    modules: chunks.flatMap((chunk) => Object.keys(chunk.modules)),
+    /** Zero-byte barrel entries are graph nodes, not retained feature implementations. */
+    retainedModules: chunks.flatMap((chunk) =>
+      Object.entries(chunk.modules)
+        .filter(([, information]) => information.renderedLength > 0)
+        .map(([modulePath]) => modulePath)
+    )
   }
 }
 
@@ -225,6 +234,54 @@ function packageModules(consumer, packageName) {
     .map((modulePath) => modulePath.slice(modulePath.indexOf(packageMarker) + packageMarker.length))
     .map((modulePath) => normalize(modulePath).split('\\').join('/'))
     .sort()
+}
+
+for (const style of ['named', 'default']) {
+  test(`RPC timeout feature retains only its own implementation through ${style} import`, async () => {
+    /** A packed consumer resolves the real publication and its existing inward dependencies. */
+    const fixture = createActualPackageFixture()
+    try {
+      /** Both supported import forms retain a callable factory rather than a dead bare import. */
+      const source =
+        style === 'named'
+          ? "import { timeoutFeature } from '@migaia/rpc-host/features'; export { timeoutFeature }"
+          : "import timeoutFeature from '@migaia/rpc-host/features/timeout'; export { timeoutFeature }"
+      /** Actual bundler output proves retained implementations, independently of export baselines. */
+      const result = await buildConsumer(fixture.consumer, source)
+      /** Ignore erased barrels while keeping every rendered canonical owner visible. */
+      const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
+      assert.ok(retained.includes('dist/features/timeout.js'), JSON.stringify(retained))
+      assert.equal(
+        retained.filter((name) =>
+          /^dist\/features\/(?:auth|chunk|retry|typegen)(?:-render)?\.js$/.test(name)
+        ).length,
+        0,
+        JSON.stringify(retained)
+      )
+      assert.equal(
+        retained.filter((name) =>
+          /^dist\/(?:core\/(?:middleware\/(?:connect|authentication|timeout)|features\/canonical-chunk|internal\/(?:chunk|canonical-chunk)|plugins\/chunk)|remote\/retry\.js)/.test(
+            name
+          )
+        ).length,
+        0,
+        JSON.stringify(retained)
+      )
+      assert.doesNotMatch(
+        result.code,
+        /createCanonicalChunkFeature|createRemoteRetryPort|function authentication\(/
+      )
+      /** Both publication forms must resolve to one factory identity in an actual consumer realm. */
+      const entry = join(fixture.consumer, 'timeout-identity.mjs')
+      writeFileSync(
+        entry,
+        "import { strict as assert } from 'node:assert'; import { timeoutFeature } from '@migaia/rpc-host/features'; import direct from '@migaia/rpc-host/features/timeout'; assert.equal(timeoutFeature, direct)"
+      )
+      execFileSync(process.execPath, [entry], { cwd: fixture.consumer, stdio: 'pipe' })
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  })
 }
 
 /** Serves an isolated packed wasm publication for a real Chromium module/asset probe. */

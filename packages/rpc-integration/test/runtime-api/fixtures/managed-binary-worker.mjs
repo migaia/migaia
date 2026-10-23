@@ -1,12 +1,19 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
-import { readThreadBootstrap } from '@migaia/rpc-threads'
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
-import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
-import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter/internal-advanced'
+import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { createEventEmitterMessageResource } from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { codec, framer, connect, abort, timeout, authentication } from '@migaia/rpc-core'
+import {
+  codec,
+  framer,
+  connect,
+  abort,
+  timeout,
+  authentication
+} from '../../../../rpc-host/dist/core/index.js'
 import fixture from './managed-binary-key.json' with { type: 'json' }
 
 /** Original launcher metadata provides the real native address and portable business configuration. */

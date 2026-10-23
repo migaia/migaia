@@ -1,25 +1,31 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createRpcIdempotencyStore, abort, codec, connect, framer, ping } from '@migaia/rpc-core'
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'
-import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
-import { createProviderFeature } from '@migaia/rpc-core/features/provider'
-import { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'
-import { createControlFeature } from '@migaia/rpc-core/features/control'
-import { createOneWayFeature } from '@migaia/rpc-core/features/one-way'
 import {
-  createNativeProcessOffer,
-  createProcessTransport,
-  createProcessResilience
-} from '@migaia/rpc-process'
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
+  createRpcIdempotencyStore,
+  abort,
+  codec,
+  connect,
+  framer,
+  ping
+} from '../../../../rpc-host/dist/core/index.js'
+import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
+import {
+  createCanonicalChunkFeature,
+  createStreamFeature
+} from '../../../../rpc-host/dist/core/stream/index.js'
+import { createOutboundFeature } from '../../../../rpc-host/dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../../rpc-host/dist/core/features/provider.js'
+import { createDiscoveryFeature } from '../../../../rpc-host/dist/core/features/discovery.js'
+import { createControlFeature } from '../../../../rpc-host/dist/core/features/control.js'
+import { createOneWayFeature } from '../../../../rpc-host/dist/core/features/one-way.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createProcessResilience } from '../../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import {
-  serveProcessSessions,
-  createProcessSessionService
-} from '../../../../rpc-process/dist/process/plugin/serve.js'
+import { serveProcessSessions } from '../../../../rpc-plugin-process/dist/process/plugin/serve.js'
+import { createProcessSessionService } from '../../../../rpc-plugin-process/test/protocol.ts'
 
 /** Bootstrap ownership starts before asynchronous Host installation, keeping the real pipe alive. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })

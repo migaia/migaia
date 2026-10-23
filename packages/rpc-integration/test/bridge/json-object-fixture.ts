@@ -1,16 +1,20 @@
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'
-import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
-import { createOneWayFeature } from '@migaia/rpc-core/features/one-way'
-import { abort } from '@migaia/rpc-core'
-import { codec } from '@migaia/rpc-core'
-import { framer } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
-import { uuid } from '@migaia/rpc-core'
-import type { IRpcEndpoint, IRpcPlugin, IRpcConnectConfig } from '@migaia/rpc-core'
-import type { IRemoteChannel } from '@migaia/rpc-core/remote'
-import type { IOneWaySurface } from '@migaia/rpc-core/features/one-way'
-import type { IRpcFeature } from '@migaia/rpc-core'
+import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
+import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/stream/index.js'
+import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
+import { createOneWayFeature } from '../../../rpc-host/dist/core/features/one-way.js'
+import { abort } from '../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../rpc-host/dist/core/index.js'
+import { framer } from '../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../rpc-host/dist/core/index.js'
+import { uuid } from '../../../rpc-host/dist/core/index.js'
+import type {
+  IRpcEndpoint,
+  IRpcPlugin,
+  IRpcConnectConfig
+} from '../../../rpc-host/dist/core/index.js'
+import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
+import type { IOneWaySurface } from '../../../rpc-host/dist/core/features/one-way.js'
+import type { IRpcFeature } from '../../../rpc-host/dist/core/index.js'
 
 /** Unknown user middleware forces the original public pipeline without mutating a descriptor. */
 export const stringFallbackMiddleware: IRpcPlugin = Object.freeze({
@@ -44,7 +48,10 @@ export async function objectFixtureEndpoint(
   const outbound = createOutboundFeature(chunk)
   /** Each endpoint generates the same independent sequence for golden comparisons. */
   let nextId = 0
-  /** Only public constructors assemble either the private default or its public fallback. */
+  /**
+   * The same built internal kernel assembles both the canonical default and its middleware
+   * fallback.
+   */
   const endpoint = await createComposedEndpoint(
     {
       id: 'client',

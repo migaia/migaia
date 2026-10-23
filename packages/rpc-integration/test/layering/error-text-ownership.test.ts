@@ -5,9 +5,13 @@ import { describe, expect, it } from 'vitest'
 import { childNodes, parseSourceTree } from '../fixtures/source-tree.ts'
 
 /** Source tree guarded by the package-owned error text contracts. */
-const packageRoots = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map(
-  (owner) => resolve(import.meta.dirname, '../../..', owner, 'src')
-)
+const packageRoots = [
+  'rpc-contract',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser'
+].map((owner) => resolve(import.meta.dirname, '../../..', owner, 'src'))
 
 /** Text-owner labels follow the actual package-owned source after adapter extraction. */
 function sourceLabel(root: string, path: string): string {

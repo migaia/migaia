@@ -14,8 +14,8 @@ const fixtureImports = Object.freeze({
   randomUUID: 'node:crypto',
   CapabilityLevel: '@migaia/supervision',
   ProcessCapability: '@migaia/supervision/process',
-  createNodeProcessLauncher: '@migaia/rpc-process/adapters/node-child-process',
-  nodeByteStream: '../../../../rpc-process/dist/process/node-byte-stream.js'
+  createNodeProcessLauncher: '@migaia/rpc-plugin-process/adapters/node-child-process',
+  nodeByteStream: '../../../../rpc-plugin-process/dist/process/node-byte-stream.js'
 })
 
 /**
@@ -89,8 +89,8 @@ import {once} from 'node:events';
 import {randomUUID} from 'node:crypto';
 import {CapabilityLevel} from '@migaia/supervision';
 import {ProcessCapability} from '@migaia/supervision/process';
-import {createNodeProcessLauncher} from '@migaia/rpc-process/adapters/node-child-process';
-import {nodeByteStream} from ${JSON.stringify(new URL('../../../rpc-process/dist/process/node-byte-stream.js', import.meta.url).href)};
+import {createNodeProcessLauncher} from '@migaia/rpc-plugin-process/adapters/node-child-process';
+import {nodeByteStream} from ${JSON.stringify(new URL('../../../rpc-plugin-process/dist/process/node-byte-stream.js', import.meta.url).href)};
 `
   const body = stripTypeScriptTypes(source.slice(start, end))
   assertFdFixtureImports(source, body)
@@ -104,11 +104,11 @@ function writePrepared(fixture, contents, filename) {
   mkdirSync(directory, { recursive: true })
   mkdirSync(join(directory, 'node_modules/@migaia'), { recursive: true })
   for (const name of [
-    'rpc-core',
+    'rpc-host',
     'rpc-contract',
-    'rpc-process',
-    'rpc-threads',
-    'rpc-browser',
+    'rpc-plugin-process',
+    'rpc-plugin-thread',
+    'rpc-plugin-browser',
     'supervision'
   ]) {
     const link = join(directory, 'node_modules/@migaia', name)
@@ -123,7 +123,7 @@ function writePrepared(fixture, contents, filename) {
 /** Erase the entire canonical endpoint module without altering its runtime imports or graph. */
 async function prepareEndpoint() {
   const { stripTypeScriptTypes } = await import('node:module')
-  const fixture = new URL('../../../rpc-core/test/core/qualification-runtime.ts', import.meta.url)
+  const fixture = new URL('../../../rpc-host/test/core/qualification-runtime.ts', import.meta.url)
   return writePrepared(fixture, stripTypeScriptTypes(readFileSync(fixture, 'utf8')), 'endpoint.mjs')
 }
 

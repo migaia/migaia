@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createDescriptor, serializeRpcError } from '@migaia/rpc-contract'
 import { RPC_CONTRACT_SOURCE as contractSource } from '@migaia/rpc-contract/errors'
-import {
-  createEndpoint,
-  isRpcErrorInstance,
-  RPC_CORE_ERROR_SOURCE as coreSource
-} from '@migaia/rpc-core'
-import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
+import { isRpcErrorInstance, RPC_CORE_ERROR_SOURCE as coreSource } from '@migaia/rpc-host'
+import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
 
 describe('source continuity through merged layers', () => {
   it('tags contract descriptor failure with contract source and original native type', () => {

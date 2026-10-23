@@ -1,10 +1,10 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
-import { createProcessPeer } from '@migaia/rpc-process'
-import type { IRuntimeProcessPeerOptions } from '@migaia/rpc-process'
-import type { IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
-import { RemoteMethodName } from '@migaia/rpc-core/remote'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import type { IRuntimeProcessPeerOptions } from '../../../rpc-plugin-process/dist/process/runtime-peer.js'
+import type { IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
+import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import { BRIDGE_CONTRACT } from './fixture.js'
 import {
   childPath,

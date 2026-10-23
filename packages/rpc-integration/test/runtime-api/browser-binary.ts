@@ -1,4 +1,7 @@
-import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
+import {
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 import { runWebBinaryQualification } from './web-binary.js'
 
 /** Existing Playwright scenario loading runs the genuine browser Worker path with built owners. */

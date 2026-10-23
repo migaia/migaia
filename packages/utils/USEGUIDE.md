@@ -6,16 +6,16 @@
 
 ## 按场景查找
 
-| 你遇到的问题 | 看这一节 |
-| --- | --- |
-| 超时后请求还在后台跑 | [给慢请求加超时，并让请求真的停下](#给慢请求加超时并让请求真的停下) |
-| 不看 `signal` 的操作在超时之后才失败 | [超时之后才到的失败去了哪里](#超时之后才到的失败去了哪里) |
-| 404 也在重试，重试没有总时限 | [只重试值得重试的错误](#只重试值得重试的错误) |
+| 你遇到的问题                                 | 看这一节                                                                    |
+| -------------------------------------------- | --------------------------------------------------------------------------- |
+| 超时后请求还在后台跑                         | [给慢请求加超时，并让请求真的停下](#给慢请求加超时并让请求真的停下)         |
+| 不看 `signal` 的操作在超时之后才失败         | [超时之后才到的失败去了哪里](#超时之后才到的失败去了哪里)                   |
+| 404 也在重试，重试没有总时限                 | [只重试值得重试的错误](#只重试值得重试的错误)                               |
 | 一次发出太多请求；离开页面后排队的请求还在跑 | [批量任务限制并发，离开时取消排队任务](#批量任务限制并发离开时取消排队任务) |
-| 同时初始化，建了多个连接 | [并发初始化只执行一次](#并发初始化只执行一次) |
-| 手写展开更新改到了原对象 | [不可变地修改深层字段](#不可变地修改深层字段) |
-| 调用方事后改了传进来的配置 | [防止配置在传入之后被改掉](#防止配置在传入之后被改掉) |
-| 错误包装后只能比对 message 文本 | [错误被包装后，仍能认出底层原因](#错误被包装后仍能认出底层原因) |
+| 同时初始化，建了多个连接                     | [并发初始化只执行一次](#并发初始化只执行一次)                               |
+| 手写展开更新改到了原对象                     | [不可变地修改深层字段](#不可变地修改深层字段)                               |
+| 调用方事后改了传进来的配置                   | [防止配置在传入之后被改掉](#防止配置在传入之后被改掉)                       |
+| 错误包装后只能比对 message 文本              | [错误被包装后，仍能认出底层原因](#错误被包装后仍能认出底层原因)             |
 
 ## 给慢请求加超时，并让请求真的停下
 
@@ -114,16 +114,19 @@ async function readStock(signal: AbortSignal): Promise<number> {
   return 42
 }
 
-const stock = await retry(({ attempt, signal }) => {
-  console.log(`第 ${attempt} 次尝试`)
-  return readStock(signal)
-}, {
-  maxAttempts: 5,
-  // 只重试 5xx；参数错误（4xx）重试也没用，直接抛出。
-  shouldRetry: (error) => (error as { status?: number }).status! >= 500,
-  delay: (_error, { attempt }) => 100 * 2 ** (attempt - 1), // 100ms、200ms……
-  totalTimeoutMs: 2_000 // 包括等待在内，整体最多 2 秒
-})
+const stock = await retry(
+  ({ attempt, signal }) => {
+    console.log(`第 ${attempt} 次尝试`)
+    return readStock(signal)
+  },
+  {
+    maxAttempts: 5,
+    // 只重试 5xx；参数错误（4xx）重试也没用，直接抛出。
+    shouldRetry: (error) => (error as { status?: number }).status! >= 500,
+    delay: (_error, { attempt }) => 100 * 2 ** (attempt - 1), // 100ms、200ms……
+    totalTimeoutMs: 2_000 // 包括等待在内，整体最多 2 秒
+  }
+)
 console.log('库存:', stock)
 ```
 
@@ -151,13 +154,16 @@ import { retry } from '@migaia/utils/promise'
 
 let calls = 0
 try {
-  await retry(() => {
-    calls += 1
-    throw Object.assign(new Error('订单号不存在'), { status: 404 })
-  }, {
-    maxAttempts: 5,
-    shouldRetry: (error) => (error as { status?: number }).status! >= 500
-  })
+  await retry(
+    () => {
+      calls += 1
+      throw Object.assign(new Error('订单号不存在'), { status: 404 })
+    },
+    {
+      maxAttempts: 5,
+      shouldRetry: (error) => (error as { status?: number }).status! >= 500
+    }
+  )
 } catch (error) {
   console.log('调用次数:', calls, '错误:', (error as Error).message)
 }
@@ -187,7 +193,9 @@ import { createConcurrencyLimiter } from '@migaia/utils/promise'
 const limiter = createConcurrencyLimiter({ concurrency: 2 })
 const download = (id: number) =>
   limiter.run(async () => {
-    console.log(`开始下载 ${id}，同时进行 ${limiter.activeCount} 个，排队 ${limiter.pendingCount} 个`)
+    console.log(
+      `开始下载 ${id}，同时进行 ${limiter.activeCount} 个，排队 ${limiter.pendingCount} 个`
+    )
     await new Promise((resolve) => setTimeout(resolve, 50))
     return `文件 ${id}`
   })
@@ -226,10 +234,13 @@ const page = new AbortController() // 用户离开页面时取消
 
 const thumbnails = [1, 2, 3].map((id) =>
   limiter
-    .run(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50))
-      return `缩略图 ${id} 完成`
-    }, { signal: page.signal })
+    .run(
+      async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return `缩略图 ${id} 完成`
+      },
+      { signal: page.signal }
+    )
     .catch((reason) => `缩略图 ${id} 已取消：${reason}`)
 )
 
@@ -388,7 +399,13 @@ try {
 
 // 生成新配置：改 endpoint，删掉 debug；没改的 retry 直接复用
 const next = patchConfig(config, { endpoint: 'https://staging.example.com', debug: CONFIG_DELETE })
-console.log(next.endpoint, '| debug 还在吗:', 'debug' in next, '| retry 复用:', next.retry === config.retry)
+console.log(
+  next.endpoint,
+  '| debug 还在吗:',
+  'debug' in next,
+  '| retry 复用:',
+  next.retry === config.retry
+)
 ```
 
 输出：
@@ -453,6 +470,7 @@ try {
 
 ## 目录
 
+- [根入口运行时识别](#runtime-detection)
 - [`/promise` 模块](#promise-模块)
 - [`/error` 模块](#error-模块)
 - [`/bytes` 模块](#bytes-模块)
@@ -466,6 +484,48 @@ try {
 
 ---
 
+<a id="runtime-detection"></a>
+
+## 根入口：运行时与全局作用域识别
+
+从 `@migaia/utils` 导入这三个函数与对应常量/类型域。它们无参数，返回当前分类或 `undefined`：
+
+```ts
+declare function detectServerRuntime(): ServerRuntime | undefined
+declare function detectElectronProcessType(): ElectronProcessType | undefined
+declare function detectGlobalScope(): GlobalScopeKind | undefined
+```
+
+| 域                    | 值                                                              |
+| --------------------- | --------------------------------------------------------------- |
+| `ServerRuntime`       | `deno`、`bun`、`node`                                           |
+| `ElectronProcessType` | `main`、`renderer`、`utility`                                   |
+| `GlobalScopeKind`     | `window`、`dedicated-worker`、`shared-worker`、`service-worker` |
+
+`detectServerRuntime()` 按 Deno、Bun、Node 的顺序判断。Deno 要求非空的 `Deno.version.deno`，即使同时存在 Node 兼容 process 全局也优先；Bun 接受其全局对象或非空 `process.versions.bun`，最后才使用非空 `process.versions.node`。
+
+`detectElectronProcessType()` 先要求 `process.versions.electron`。Electron 历史上的 `process.type === 'browser'` 映射为 main，renderer 与 utility 保留同名值；普通 Node 进程或未知 Electron 类型返回 `undefined`。
+
+`detectGlobalScope()` 先排除任何已识别的服务端运行时，再依次检查当前全局是否为 Window、DedicatedWorkerGlobalScope、SharedWorkerGlobalScope、ServiceWorkerGlobalScope 的实例。仅存在构造器不能识别作用域；未识别时返回 `undefined`。
+
+每次调用都重新读取当前全局。导入模块不缓存宿主分类，不启动运行体、不建立连接，也不安排计时器；函数不加载原生宿主模块，公开类型不要求 Node/DOM 声明。识别结果不授予载体或权限，使用具体原生 API 的 adapter 继续负责能力准入。
+
+```ts
+import {
+  detectServerRuntime,
+  detectElectronProcessType,
+  detectGlobalScope,
+  ServerRuntime,
+  ElectronProcessType,
+  GlobalScopeKind
+} from '@migaia/utils'
+
+console.log(detectServerRuntime(), detectElectronProcessType(), detectGlobalScope())
+console.log(ServerRuntime.node, ElectronProcessType.main, GlobalScopeKind.window)
+```
+
+第一行依赖实际宿主，不会因为 Node 暴露兼容构造器就报告浏览器作用域；第二行输出稳定域值 `node main window`。
+
 <a id="promise-模块"></a>
 
 ## `/promise` 模块
@@ -477,21 +537,21 @@ try {
 调度器契约与实现只由 `@migaia/utils/scheduler`（及根入口 `@migaia/utils`）导出；本模块的 `sleep`、`withTimeout`、`retry`、`createAbortTimeoutSignal` 以它为 `scheduler` 选项类型与默认值。
 
 ```ts
-import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler';
-import { createManualScheduler } from '@migaia/utils/testing';
+import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 // /scheduler 导出 IScheduledTask、IScheduler、IWallClock；/testing 导出 IManualScheduler。
 
-type IScheduledTask = { cancel(): void; unref?(): void };
+type IScheduledTask = { cancel(): void; unref?(): void }
 type IScheduler = {
-  now(): number;
-  schedule(callback: () => void, delayMs: number): IScheduledTask;
-  defer?(callback: () => void): void;
-};
+  now(): number
+  schedule(callback: () => void, delayMs: number): IScheduledTask
+  defer?(callback: () => void): void
+}
 type IManualScheduler = IScheduler & {
-  advance(ms: number): void;
-  readonly pendingCount: number;
-};
-type IWallClock = { timestamp(): number };
+  advance(ms: number): void
+  readonly pendingCount: number
+}
+type IWallClock = { timestamp(): number }
 ```
 
 - `IScheduler`：唯一调度器契约。`now()` 是单调不递减的毫秒数（连续两次可相等），只用于差值与本地截止时间，不解释为 epoch；`schedule()` 的 `delayMs` 必须有限非负，回调至多执行一次，且不会在 `schedule()` 调用内同步执行。
@@ -499,8 +559,8 @@ type IWallClock = { timestamp(): number };
 - `IWallClock`：只产生诊断时间戳（epoch 毫秒安全整数），不得参与截止时间、过期或重放窗口比较。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-export const systemScheduler: IScheduler;
-export const systemWallClock: IWallClock;
+export const systemScheduler: IScheduler
+export const systemWallClock: IWallClock
 ```
 
 `systemScheduler` 以 `performance.now()` 为单调时钟、以宿主 `setTimeout`/`clearTimeout` 排程，每次调用都经 `globalThis` 读取宿主能力。宿主缺少 `performance.now`、返回非有限值，或缺少定时器函数时抛带 `ENV_UNSUPPORTED` 的原生错误；`performance.now` 自身抛出的错误原样传播。`delayMs` 非 number 抛 `TypeError`、非有限或为负抛 `RangeError`，二者都带 `INVALID_ARGUMENT`，且不创建定时器。超过 `2_147_483_647` 的延迟分段等待；`unref()` 以原生 timer 为接收者，并对后续分段持续生效；`cancel()` 幂等。
@@ -508,7 +568,7 @@ export const systemWallClock: IWallClock;
 `systemWallClock.timestamp()` 返回 `Date.now()`。需要 epoch 时间戳时使用它；实现接受 `IScheduler` 的超时、重试或调度逻辑时，必须配对使用 `scheduler.now()` 和 `scheduler.schedule()`，不要把墙钟值与 `now()` 相减或比较。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function createManualScheduler(): IManualScheduler;
+function createManualScheduler(): IManualScheduler
 ```
 
 > 本仓测试专用：用于本仓单元测试与适配器验证，不建议外部业务代码使用。外部项目应优先选择测试框架自带的 fake timers，生产代码使用 `systemScheduler` 或默认调度器。
@@ -516,28 +576,28 @@ function createManualScheduler(): IManualScheduler;
 创建一个 FIFO 虚拟时钟调度器：`schedule()` 按 `到期时间 → 注册顺序` 排队；调用 `advance(ms)` 会一次性执行所有到期回调（回调内部再 `schedule` 的新任务，只要到期时间 `<= 目标时刻` 也会在同一次 `advance` 内继续触发）。`advance` 单次循环超过 10000 次会抛 `RangeError`/`SCHEDULER_RUNAWAY`（防止回调间互相递归调度导致死循环）。`delayMs`/`ms` 必须是有限的非负数（非 number 抛 `TypeError`，否则抛 `RangeError`），到期时刻或目标时刻溢出为非有限值时同样抛 `RangeError`，均带 `INVALID_ARGUMENT` 且不改变时钟与队列；回调内再次调用 `advance()` 抛 `TypeError`/`REENTRANT_CALL`，外层 `advance` 照常完成。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const scheduler = createManualScheduler();
-const task = scheduler.schedule(() => console.log('fired'), 100);
-scheduler.advance(50); // 未触发
-scheduler.advance(50); // 触发，打印 'fired'
+const scheduler = createManualScheduler()
+const task = scheduler.schedule(() => console.log('fired'), 100)
+scheduler.advance(50) // 未触发
+scheduler.advance(50) // 触发，打印 'fired'
 ```
 
 ### 异步任务、时间切片与调用频率（`@migaia/utils/scheduler`）
 
 `asyncTask(strategy, callback, delay | options)` 用一个入口覆盖各运行时的微任务/宏任务队列。`strategy` 取 `AsyncTaskStrategy` 的键：
 
-| 键 | 宿主 API | 适用 |
-| --- | --- | --- |
-| `promise` / `microtask` | `Promise.then` / `queueMicrotask` | 当前同步代码之后、任何 I/O 之前 |
-| `nextTick` | `process.nextTick` | Node/Bun，宏任务中调度时先于 promise 微任务 |
-| `timeout` | `setTimeout` | 处处可用，原生支持 `delay` |
-| `immediate` | `setImmediate` | Node/Bun 的 check 阶段 |
-| `messageChannel` | `MessageChannel` | 没有 4ms 钳制的快速宏任务 |
-| `animationFrame` | `requestAnimationFrame` | 下一次绘制前，回调拿到 `frameTime` |
-| `idleCallback` | `requestIdleCallback` | 空闲期，回调拿到 `timeRemaining()`；`idleTimeout` 设兜底 |
-| `postTaskUserBlocking` / `postTaskUserVisible` / `postTaskBackground` | `scheduler.postTask` | 按优先级排队，原生支持 `delay` |
-| `schedulerYield` | `scheduler.yield()` | 拆分长任务后优先续跑 |
-| `auto` | 依次尝试 `schedulerYield → postTaskUserVisible → messageChannel → immediate → timeout` | 默认让出 |
+| 键                                                                    | 宿主 API                                                                               | 适用                                                     |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `promise` / `microtask`                                               | `Promise.then` / `queueMicrotask`                                                      | 当前同步代码之后、任何 I/O 之前                          |
+| `nextTick`                                                            | `process.nextTick`                                                                     | Node/Bun，宏任务中调度时先于 promise 微任务              |
+| `timeout`                                                             | `setTimeout`                                                                           | 处处可用，原生支持 `delay`                               |
+| `immediate`                                                           | `setImmediate`                                                                         | Node/Bun 的 check 阶段                                   |
+| `messageChannel`                                                      | `MessageChannel`                                                                       | 没有 4ms 钳制的快速宏任务                                |
+| `animationFrame`                                                      | `requestAnimationFrame`                                                                | 下一次绘制前，回调拿到 `frameTime`                       |
+| `idleCallback`                                                        | `requestIdleCallback`                                                                  | 空闲期，回调拿到 `timeRemaining()`；`idleTimeout` 设兜底 |
+| `postTaskUserBlocking` / `postTaskUserVisible` / `postTaskBackground` | `scheduler.postTask`                                                                   | 按优先级排队，原生支持 `delay`                           |
+| `schedulerYield`                                                      | `scheduler.yield()`                                                                    | 拆分长任务后优先续跑                                     |
+| `auto`                                                                | 依次尝试 `schedulerYield → postTaskUserVisible → messageChannel → immediate → timeout` | 默认让出                                                 |
 
 宿主不支持所选策略时同步抛出 `ENV_UNSUPPORTED`，不会静默降级；传数组即声明自己的回退顺序。没有原生延迟的策略会先用定时器等待 `delay` 再进入对应队列。`signal` 在回调开始前中止会撤销宿主注册并以 `ABORTED` 拒绝。
 
@@ -545,7 +605,9 @@ scheduler.advance(50); // 触发，打印 'fired'
 import { asyncTask, isAsyncTaskSupported, yieldToHost } from '@migaia/utils/scheduler'
 
 await asyncTask(['postTaskBackground', 'idleCallback', 'timeout'], flushLogs, 100)
-await asyncTask('idleCallback', ({ timeRemaining }) => prefetch(timeRemaining()), { idleTimeout: 2000 })
+await asyncTask('idleCallback', ({ timeRemaining }) => prefetch(timeRemaining()), {
+  idleTimeout: 2000
+})
 for (const row of rows) {
   process(row)
   if (++count % 500 === 0) await yieldToHost()
@@ -555,7 +617,10 @@ for (const row of rows) {
 `timeSlice(source, handler, { budget, strategy, signal, onProgress, clock })` 处理大数据时按时间片切分：每片最多工作 `budget` 毫秒（默认 8），然后让出宿主；每片至少处理一项，保证前进。支持同步/异步可迭代对象和生成器。处理函数抛错时会调用迭代器 `return()` 并以原始错误拒绝，`return()` 自身的失败挂在 `errors` 上。`timeSliceMap` / `timeSliceReduce` 是对应的 map/reduce 形式。
 
 ```ts
-const parsed = await timeSliceMap(lines, parseLine, { budget: 5, onProgress: ({ processed }) => bar(processed) })
+const parsed = await timeSliceMap(lines, parseLine, {
+  budget: 5,
+  onProgress: ({ processed }) => bar(processed)
+})
 ```
 
 调用频率控制，都接受可注入的 `scheduler`（测试用 `createManualScheduler()`）：
@@ -571,11 +636,11 @@ const parsed = await timeSliceMap(lines, parseLine, { budget: 5, onProgress: ({ 
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IDeferred<T> = {
-  readonly promise: Promise<T>;
-  readonly resolve: (value: T | PromiseLike<T>) => void;
-  readonly reject: (reason?: unknown) => void;
-};
-function deferred<T>(): IDeferred<T>;
+  readonly promise: Promise<T>
+  readonly resolve: (value: T | PromiseLike<T>) => void
+  readonly reject: (reason?: unknown) => void
+}
+function deferred<T>(): IDeferred<T>
 ```
 
 创建一个可从外部结算的原生 Promise。适合把回调式 API 转成 Promise，或在测试中手动控制某个异步操作何时完成/失败。
@@ -583,32 +648,32 @@ function deferred<T>(): IDeferred<T>;
 新代码应先选择平台原生的 `Promise.withResolvers()`。`deferred()` 主要服务于尚未支持该 API 的旧运行时，或必须统一依赖 `IDeferred<T>` 的项目边界：
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const { promise, resolve, reject } = Promise.withResolvers<number>();
-resolve(42);
+const { promise, resolve, reject } = Promise.withResolvers<number>()
+resolve(42)
 ```
 
 兼容旧运行时：
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const { promise, resolve } = deferred<number>();
-setTimeout(() => resolve(42), 0);
-await promise; // 42
+const { promise, resolve } = deferred<number>()
+setTimeout(() => resolve(42), 0)
+await promise // 42
 ```
 
 ### `toPromise`
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function toPromise<T>(run: () => T): Promise<Awaited<T>>;
+function toPromise<T>(run: () => T): Promise<Awaited<T>>
 ```
 
 同步且恰好调用 `run` 一次，并用原生 Promise 规则同化返回值。若 `run` 同步抛出，调用点不会同步抛错，而是返回以 exact reason reject 的 Promise。它只负责同步计算到 Promise 的规范化，不创建 timer、scheduler、retry 或 cancellation 状态。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const found = await toPromise(() => cache.get('key'));
+const found = await toPromise(() => cache.get('key'))
 const pending = toPromise(() => {
-  throw new Error('read failed');
-});
-await pending; // 异步观察 rejection
+  throw new Error('read failed')
+})
+await pending // 异步观察 rejection
 ```
 
 与 `Promise.resolve().then(() => run())` 对比：
@@ -622,44 +687,44 @@ await pending; // 异步观察 rejection
 ### `sleep`
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;
+function sleep(delayMs: number, options?: IAsyncControls): Promise<void>
 ```
 
 在调度器延迟后 resolve；若传入的 `signal`/`signals` 在等待期间中止，则以 `UtilsAbortError` reject。`delayMs` 必须是有限非负数。会正确清理已注册的定时器与 abort 监听器，即使清理过程本身抛错也会通过 `hostRethrowReporter`（sleep 不接受自定义 reporter）上报，而不是吞掉。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IAsyncControls = {
-  readonly signal?: IAbortSignal;
-  readonly signals?: readonly IAbortSignal[];
-  readonly scheduler?: IScheduler;
-  readonly unref?: boolean;
-};
+  readonly signal?: IAbortSignal
+  readonly signals?: readonly IAbortSignal[]
+  readonly scheduler?: IScheduler
+  readonly unref?: boolean
+}
 ```
 
 `signal` 与 `signals` **互斥**——同时提供两者会 reject 一个 `TypeError`。`unref: true` 会尝试调用底层定时器句柄的 `unref()`（Node 环境下避免阻塞进程退出）。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const controller = new AbortController();
-const p = sleep(1000, { signal: controller.signal as any });
-controller.abort('cancelled');
-await p; // 抛 UtilsAbortError，cause 为 'cancelled'
+const controller = new AbortController()
+const p = sleep(1000, { signal: controller.signal as any })
+controller.abort('cancelled')
+await p // 抛 UtilsAbortError，cause 为 'cancelled'
 ```
 
 ### `createAbortTimeoutSignal`
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IAbortTimeoutSignalOptions = {
-  readonly signal?: IAbortSignal;
-  readonly timeoutMs?: number;
-  readonly scheduler?: IScheduler;
-  readonly timeoutReason?: () => unknown;
-  readonly report?: IUtilsReporter;
-};
+  readonly signal?: IAbortSignal
+  readonly timeoutMs?: number
+  readonly scheduler?: IScheduler
+  readonly timeoutReason?: () => unknown
+  readonly report?: IUtilsReporter
+}
 type IAbortTimeoutSignal = {
-  readonly signal: IAbortSignal | undefined;
-  readonly dispose: () => void;
-};
-function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;
+  readonly signal: IAbortSignal | undefined
+  readonly dispose: () => void
+}
+function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal
 ```
 
 创建一个可交给多个底层请求共享的 operation signal，但不创建、race 或结算业务 Promise。外部 signal 先中止时保留原始 reason；deadline 先到时使用 `timeoutReason()` 的返回值。reason factory 抛出的原始错误会成为 signal reason，不会从 timer callback 逃逸。无 `timeoutMs` 时透传外部 signal identity；`dispose()` 幂等并负责取消 timer、移除 listener，cleanup 失败通过 `report` 的 `operation: 'abort-timeout-signal'` 上报。
@@ -669,11 +734,11 @@ const merged = createAbortTimeoutSignal({
   signal: controller.signal as any,
   timeoutMs: 500,
   timeoutReason: () => new Error('deadline')
-});
+})
 try {
-  await Promise.all([requestA(merged.signal), requestB(merged.signal)]);
+  await Promise.all([requestA(merged.signal), requestB(merged.signal)])
 } finally {
-  merged.dispose();
+  merged.dispose()
 }
 ```
 
@@ -682,21 +747,24 @@ try {
 ### `withTimeout`
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>;
-type IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;
+type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>
+type IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>
 
 type IWithTimeoutOptions = IAsyncControls & {
-  readonly timeoutMs: number;
-  readonly report?: IUtilsReporter;
-  readonly zeroTimeoutBehavior?: 'skip' | 'start';
-  readonly cooperativeCancellation?: boolean;
-};
+  readonly timeoutMs: number
+  readonly report?: IUtilsReporter
+  readonly zeroTimeoutBehavior?: 'skip' | 'start'
+  readonly cooperativeCancellation?: boolean
+}
 
 function withTimeout<T>(
   operation: ITimeoutOperation<T>,
   options: IWithTimeoutOptions & { readonly cooperativeCancellation?: true }
-): Promise<T>;
-function withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTimeoutOptions): Promise<T>;
+): Promise<T>
+function withTimeout<T>(
+  operation: IDeadlineOnlyOperation<T>,
+  options: IWithTimeoutOptions
+): Promise<T>
 ```
 
 `INativeAbortSignal` 是本包内部用原生 `AbortController` 生成、再交给操作的 signal 类型。它按消费方自己的全局类型解析：项目带 `lib.dom`、`@types/node`、Deno 或 Bun 类型时，它就是宿主 `AbortSignal`，可以直接写 `fetch(url, { signal })`；没有宿主类型时退回结构化的 `IAbortSignal`，所以发布的声明不依赖任何宿主库。所有入参仍接受结构化的 `IAbortSignal`。
@@ -709,72 +777,72 @@ function withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTime
 - 清理阶段（取消定时器、移除监听器）失败时，会把清理错误与原始错误一起包装成 `AggregateError` 一并 reject。
 
 ```ts
-import { sleep, withTimeout } from '@migaia/utils/promise';
+import { sleep, withTimeout } from '@migaia/utils/promise'
 
 await withTimeout(
   async ({ signal }) => {
     while (!signal.aborted) {
       // 完成一小批同步工作后，必须让出事件循环，让 deadline 能执行。
-      await sleep(10);
+      await sleep(10)
     }
-    throw signal.reason;
+    throw signal.reason
   },
   { timeoutMs: 500 }
-); // 500ms 后以 UtilsTimeoutError('operation', 500) reject
+) // 500ms 后以 UtilsTimeoutError('operation', 500) reject
 ```
 
 ### `raceWithAbort`
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-type IAbortOperation<T> = ITimeoutOperation<T>;
+type IAbortOperation<T> = ITimeoutOperation<T>
 
 function raceWithAbort<T>(
   operation: IAbortOperation<T>,
   options?: Pick<IAsyncControls, 'signal' | 'signals'> & {
-    readonly report?: IUtilsReporter;
-    readonly cleanupPolicy?: 'reject' | 'report';
+    readonly report?: IUtilsReporter
+    readonly cleanupPolicy?: 'reject' | 'report'
   }
-): Promise<T>;
+): Promise<T>
 ```
 
 与 `withTimeout` 语义相同，但**不设置截止时间定时器**，只在外部 `signal(s)` 中止时让操作提前失败。`cleanupPolicy: 'report'`（默认 `'reject'`）让监听器清理失败时改为上报诊断而不是让最终 Promise reject。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const controller = new AbortController();
+const controller = new AbortController()
 const result = raceWithAbort(({ signal }) => fetchSomething({ signal }), {
   signal: controller.signal as any
-});
+})
 ```
 
 ### `retry`
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IRetryContext = {
-  readonly attempt: number;
-  readonly signal: INativeAbortSignal;
-  readonly remainingMs?: number;
-};
-type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };
+  readonly attempt: number
+  readonly signal: INativeAbortSignal
+  readonly remainingMs?: number
+}
+type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number }
 
 function retry<T>(
   operation: (context: IRetryContext) => T | PromiseLike<T>,
   options: {
-    readonly maxAttempts: number;
+    readonly maxAttempts: number
     readonly shouldRetry: (
       error: unknown,
       context: IRetryFailureContext
-    ) => boolean | PromiseLike<boolean>;
-    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);
-    readonly totalTimeoutMs?: number;
-    readonly attemptTimeoutMs?: number;
-    readonly signal?: IAbortSignal;
-    readonly signals?: readonly IAbortSignal[];
-    readonly zeroTimeoutBehavior?: 'skip' | 'start';
-    readonly report?: IUtilsReporter;
-    readonly unref?: boolean;
-    readonly scheduler?: IScheduler;
+    ) => boolean | PromiseLike<boolean>
+    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number)
+    readonly totalTimeoutMs?: number
+    readonly attemptTimeoutMs?: number
+    readonly signal?: IAbortSignal
+    readonly signals?: readonly IAbortSignal[]
+    readonly zeroTimeoutBehavior?: 'skip' | 'start'
+    readonly report?: IUtilsReporter
+    readonly unref?: boolean
+    readonly scheduler?: IScheduler
   }
-): Promise<T>;
+): Promise<T>
 ```
 
 串行重试，带三层限制：
@@ -789,11 +857,11 @@ function retry<T>(
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 await retry(
   async ({ attempt }) => {
-    if (attempt < 3) throw new Error('boom');
-    return 'ok';
+    if (attempt < 3) throw new Error('boom')
+    return 'ok'
   },
   { maxAttempts: 5, shouldRetry: () => true, delay: (_, { attempt }) => attempt * 100 }
-); // 'ok'，共尝试 3 次，两次退避分别约 100ms/200ms
+) // 'ok'，共尝试 3 次，两次退避分别约 100ms/200ms
 ```
 
 ### `hostRethrowReporter` 与 `IUtilsReporter`
@@ -802,12 +870,13 @@ await retry(
 type IUtilsReporter = (
   error: unknown,
   context: {
-    readonly operation: 'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter';
-    readonly phase: 'late-rejection' | 'cleanup' | 'reporter';
-    readonly attempt?: number;
+    readonly operation:
+      'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter'
+    readonly phase: 'late-rejection' | 'cleanup' | 'reporter'
+    readonly attempt?: number
   }
-) => void;
-const hostRethrowReporter: IUtilsReporter;
+) => void
+const hostRethrowReporter: IUtilsReporter
 ```
 
 `hostRethrowReporter` 是默认诊断上报器：把错误通过 `queueMicrotask` 重新抛出（在不支持 `queueMicrotask` 的环境下同步抛出），使其成为未捕获异常，交由宿主（进程/浏览器）的全局错误处理机制记录，而不是被静默吞掉。自定义 `report` 选项可以替换为日志上报、埋点等。在 Node 中，未捕获异常默认会让进程退出；所以操作不看 `signal`、可能在超时之后才失败时，请传入自己的 `report`。操作用收到的 `signal.reason` 拒绝属于确认取消，`withTimeout`、`raceWithAbort` 和 `retry` 都不会上报它。
@@ -819,17 +888,17 @@ type IConcurrencyLimiter = {
   run<T>(
     task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,
     options?: { readonly signal?: IAbortSignal }
-  ): Promise<T>;
-  readonly activeCount: number;
-  readonly pendingCount: number;
-  whenIdle(): Promise<void>;
-  close(reason?: unknown): void;
-  dispose(reason?: unknown): Promise<void>;
-};
+  ): Promise<T>
+  readonly activeCount: number
+  readonly pendingCount: number
+  whenIdle(): Promise<void>
+  close(reason?: unknown): void
+  dispose(reason?: unknown): Promise<void>
+}
 function createConcurrencyLimiter(options: {
-  readonly concurrency: number;
-  readonly report?: IUtilsReporter;
-}): IConcurrencyLimiter;
+  readonly concurrency: number
+  readonly report?: IUtilsReporter
+}): IConcurrencyLimiter
 ```
 
 本包中**唯一具有跨调用生命周期**的原语——一个带并发上限的 FIFO 任务队列：
@@ -843,9 +912,9 @@ function createConcurrencyLimiter(options: {
 `concurrency` 必须是正安全整数，否则构造时抛 `RangeError`。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-const limiter = createConcurrencyLimiter({ concurrency: 2 });
-const results = await Promise.all([1, 2, 3, 4].map((n) => limiter.run(() => fetchPage(n))));
-await limiter.dispose(); // 等待剩余任务完成后关闭
+const limiter = createConcurrencyLimiter({ concurrency: 2 })
+const results = await Promise.all([1, 2, 3, 4].map((n) => limiter.run(() => fetchPage(n))))
+await limiter.dispose() // 等待剩余任务完成后关闭
 ```
 
 ---
@@ -858,9 +927,11 @@ await limiter.dispose(); // 等待剩余任务完成后关闭
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IPropertyRead<T> =
-  | { readonly threw: false; readonly value: T }
-  | { readonly threw: true; readonly error: unknown };
-function tryReadProperty<T extends object, K extends keyof T>(target: T, key: K): IPropertyRead<T[K]>;
+  { readonly threw: false; readonly value: T } | { readonly threw: true; readonly error: unknown }
+function tryReadProperty<T extends object, K extends keyof T>(
+  target: T,
+  key: K
+): IPropertyRead<T[K]>
 ```
 
 对一个属性执行恰好一次读取，保留 getter 的接收者；读取抛出时将原始值放在 `error`，不包装、不上报。调用方负责目标对象检查与失败策略。新代码中独立的单属性受保护读取应复用此原语。
@@ -868,27 +939,27 @@ function tryReadProperty<T extends object, K extends keyof T>(target: T, key: K)
 外部 abort signal 的 reason 也通过同一入口读取：
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const read = tryReadProperty(signal, 'reason');
-if (read.threw) report(read.error);
-else handleAbort(read.value);
+const read = tryReadProperty(signal, 'reason')
+if (read.threw) report(read.error)
+else handleAbort(read.value)
 ```
 
 失败后是重抛、包装、上报还是把原错误当作 reason，取决于调用方原有契约；此原语只返回读取结果。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 abstract class UtilsError extends Error {
-  readonly source = 'foundation.utils';
-  readonly code: IUtilsErrorCode;
+  readonly source = 'foundation.utils'
+  readonly code: IUtilsErrorCode
 }
 class UtilsAbortError extends UtilsError {
-  readonly name = 'AbortError';
-  constructor(reason?: unknown);
+  readonly name = 'AbortError'
+  constructor(reason?: unknown)
 }
 class UtilsTimeoutError extends UtilsError {
-  readonly name = 'TimeoutError';
-  readonly scope: 'operation' | 'attempt' | 'total';
-  readonly timeoutMs: number;
-  constructor(scope: 'operation' | 'attempt' | 'total', timeoutMs: number);
+  readonly name = 'TimeoutError'
+  readonly scope: 'operation' | 'attempt' | 'total'
+  readonly timeoutMs: number
+  constructor(scope: 'operation' | 'attempt' | 'total', timeoutMs: number)
 }
 ```
 
@@ -898,30 +969,40 @@ class UtilsTimeoutError extends UtilsError {
 function attachErrorIdentity<T extends object>(
   error: T,
   identity: {
-    readonly source: string;
-    readonly code: string;
-    readonly phase?: string;
-    readonly detail?: Readonly<Record<string, unknown>>;
+    readonly source: string
+    readonly code: string
+    readonly phase?: string
+    readonly detail?: Readonly<Record<string, unknown>>
   },
   hooks?: {
     // 字段冲突时由调用方选择替代对象；不提供时冲突抛 TypeError
-    readonly onConflict?: (context: { target: T; key: string; existing: unknown; incoming: unknown }) => T;
+    readonly onConflict?: (context: {
+      target: T
+      key: string
+      existing: unknown
+      incoming: unknown
+    }) => T
     // 定义字段失败（如对象被冻结）时由调用方选择替代对象；不提供时原样抛出
-    readonly onFailure?: (context: { target: T; key: string; incoming: unknown; cause: unknown }) => T;
+    readonly onFailure?: (context: {
+      target: T
+      key: string
+      incoming: unknown
+      cause: unknown
+    }) => T
   }
-): T;
+): T
 ```
 
 就地给一个已存在的错误对象追加不可写的身份字段（`source`/`code`/`phase`/`detail`），**不会**替换或包装该错误。如果同一字段已存在且值不同，会抛出 `TypeError`（避免悄悄覆盖其他代码写入的身份信息）；值相同则视为幂等，直接返回。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const error = new Error('boom');
-attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' });
-(error as Error & { readonly code?: string }).code; // 'FETCH_FAILED'（返回类型仍是 T，不扩展 code 字段）
+const error = new Error('boom')
+attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' })
+;(error as Error & { readonly code?: string }).code // 'FETCH_FAILED'（返回类型仍是 T，不扩展 code 字段）
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function toError(value: unknown, options?: { readonly message?: string }): Error;
+function toError(value: unknown, options?: { readonly message?: string }): Error
 ```
 
 把任意抛出值规整为可诊断错误：原生 `Error` 或具有字符串 name/message/stack 的跨 realm/结构化错误形状原样返回；后者不保证 instanceof 本地 Error。其余值包装成携带 `cause: value` 的内部错误类型，消息优先取 `options.message`，其次（当抛出值本身是字符串时）取该字符串，否则用固定的兜底文案。
@@ -930,29 +1011,29 @@ function toError(value: unknown, options?: { readonly message?: string }): Error
 function walkErrorCauses(
   error: unknown,
   options?: { readonly maxDepth?: number }
-): readonly unknown[];
+): readonly unknown[]
 ```
 
 按 `cause` 链与 `AggregateError.errors` 展开遍历，返回访问到的全部节点（含起始 `error` 自身），用 `Set` 做同一值去重防止环路。`maxDepth`（默认 32）限制最大深度，超出后停止继续下探那一支。用 `cause: undefined` 创建的错误会在结果里留下一个 `undefined` 项，读取字段时请用可选链（`item?.code`）。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 try {
-  throw new Error('outer', { cause: new Error('inner') });
+  throw new Error('outer', { cause: new Error('inner') })
 } catch (error) {
-  walkErrorCauses(error); // [outerError, innerError]
+  walkErrorCauses(error) // [outerError, innerError]
 }
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;
+function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined
 ```
 
 把 0 个、1 个或多个错误合并：0 个返回 `undefined`；1 个原样返回（经 `toError` 规整）；多个包装成 `AggregateError(errors, message)`。如果遍历 `errors` 这个 `Iterable` 本身抛错，会把已收集的错误连同该次遍历失败一起打包进 `AggregateError` 再抛出。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function isUtilsError(value: unknown): value is UtilsError;
-function isUtilsAbortError(value: unknown): value is UtilsAbortError;
-function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;
+function isUtilsError(value: unknown): value is UtilsError
+function isUtilsAbortError(value: unknown): value is UtilsAbortError
+function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError
 ```
 
 诊断形状守卫：检查 error-like 的 name/message/stack、source 为 foundation.utils，且 code 属于 UtilsErrorCode；abort/timeout 再核对对应 code。无需 instanceof 本地构造器，不用作来源认证。
@@ -982,7 +1063,7 @@ const UtilsErrorCode = {
   formatInvalid: 'FORMAT_INVALID',
   formatValueMissing: 'FORMAT_VALUE_MISSING',
   numberFormatInvalid: 'NUMBER_FORMAT_INVALID'
-} as const;
+} as const
 ```
 
 全包统一使用的稳定语义码，`IUtilsErrorCode` 是其取值的联合类型。除 `UtilsError` 子类外，`base64ToBytes`/`object-path`/`config` 等模块抛出的原生 `TypeError`/`RangeError` 也会通过 `Object.defineProperty` 挂上对应的 `code`（与 `source: 'foundation.utils'`），可用同一套判断逻辑识别。
@@ -1022,11 +1103,18 @@ const UtilsErrorCode = {
 ```ts
 import { IdentifyError } from '@migaia/utils/error'
 
-const OrderError = IdentifyError.define('@app/orders', { notFound: 'NOT_FOUND', conflict: 'CONFLICT' })
-throw OrderError.notFound({ cause, detail: { id } })      // IdentifyError<'@app/orders', 'NOT_FOUND'>
+const OrderError = IdentifyError.define('@app/orders', {
+  notFound: 'NOT_FOUND',
+  conflict: 'CONFLICT'
+})
+throw OrderError.notFound({ cause, detail: { id } }) // IdentifyError<'@app/orders', 'NOT_FOUND'>
 
 if (OrderError.is(error, 'notFound')) showEmpty()
-const status = IdentifyError.match(error, { NOT_FOUND: () => 404, CONFLICT: () => 409, _: () => 500 })
+const status = IdentifyError.match(error, {
+  NOT_FOUND: () => 404,
+  CONFLICT: () => 409,
+  _: () => 500
+})
 const timeout = IdentifyError.find(error, { source: 'foundation.utils', code: 'DEADLINE_EXCEEDED' })
 ```
 
@@ -1046,8 +1134,8 @@ const timeout = IdentifyError.find(error, { source: 'foundation.utils', code: 'D
 - 普通 `ArrayBuffer` 跨 Worker 转移后可能 detached；`SharedArrayBuffer` 是并发共享内存，具有不同的所有权和同步要求，所以 `isArrayBuffer()` 明确拒绝它。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function isUint8Array(value: unknown): value is Uint8Array;
-function isArrayBuffer(value: unknown): value is ArrayBuffer;
+function isUint8Array(value: unknown): value is Uint8Array
+function isArrayBuffer(value: unknown): value is ArrayBuffer
 ```
 
 两个 guard 通过引擎的 `%TypedArray%.prototype[Symbol.toStringTag]` 与 `ArrayBuffer.prototype.byteLength` 内部槽 getter 判定真实品牌，因此能识别跨 iframe/Worker realm 的合法实例与子类，同时拒绝 `constructor.name` / 原型 / `Symbol.toStringTag` 伪造、其他 TypedArray、`DataView`、`SharedArrayBuffer` 和 Proxy。检测不读取候选值的用户属性。
@@ -1055,21 +1143,21 @@ function isArrayBuffer(value: unknown): value is ArrayBuffer;
 detached `Uint8Array` / `ArrayBuffer` 仍返回 `true`：detachment 不改变对象品牌，但会影响读取能力；需要消费字节的调用方仍须独立处理 detached 状态。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function bytesToBase64(value: Uint8Array): string;
+function bytesToBase64(value: Uint8Array): string
 ```
 
 按 RFC 4648 规范字母表编码为标准（非 URL-safe）、带 `=` 补齐的 Base64 字符串。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-function base64ToBytes(value: string, target?: Uint8Array): Uint8Array; // target 长度须等于解码字节数，复用而不分配
+function base64ToBytes(value: string, target?: Uint8Array): Uint8Array // target 长度须等于解码字节数，复用而不分配
 ```
 
 **只接受规范形式**：标准字母表、必须 4 的倍数长度、正确的 `=` 补齐。非规范输入（URL-safe 变体、无补齐、多余空白等）一律拒绝，抛出携带 `code: 'INVALID_ENCODING'` 的 `TypeError`。解码时直接检查 padding 未使用位必须为零，不进行反向编码，拒绝数值不对齐的输入。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'
-base64ToBytes('AQID'); // Uint8Array [1, 2, 3]
-base64ToBytes('AQID-_'); // 抛 TypeError（URL-safe 字符不被接受）
+bytesToBase64(new Uint8Array([1, 2, 3])) // 'AQID'
+base64ToBytes('AQID') // Uint8Array [1, 2, 3]
+base64ToBytes('AQID-_') // 抛 TypeError（URL-safe 字符不被接受）
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
@@ -1079,26 +1167,26 @@ function* streamBase64Chunks(value: Uint8Array, maxChunkBytes?: number): Iterabl
 把大字节数组切分成多个**各自独立合法**的 Base64 片段（每片段都在 3 字节边界上切分，因此每片段自身都能正确解码，不需要拼接后才合法）。`maxChunkBytes` 默认 `32763`，必须是 `>= 3` 的安全整数；实际切分宽度会向下取整到 3 的倍数。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function utf8ByteLength(value: string): number;
+function utf8ByteLength(value: string): number
 ```
 
 计算字符串编码为 UTF-8 后的字节数，不分配缓冲区（正确处理代理对/非法代理，用 U+FFFD 的宽度 3 计入非法代理）。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function encodeUtf8(value: string): Uint8Array;
-function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean }): string;
+function encodeUtf8(value: string): Uint8Array
+function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean }): string
 ```
 
 `encodeUtf8` 编码为新分配的 UTF-8 字节数组。`decodeUtf8` 解码：`fatal: false`（默认）遇到非法字节序列时用 U+FFFD 替换并跳过 1 字节继续；`fatal: true` 时直接抛出携带偏移量的编码错误。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function splitUtf8(value: string, maxBytes: number): readonly string[];
+function splitUtf8(value: string, maxBytes: number): readonly string[]
 ```
 
 把字符串按码点边界切分成若干子串，保证每个子串编码后的字节数不超过 `maxBytes`（绝不会在一个码点中间切断）。`maxBytes` 必须是 `>= 4` 的安全整数（4 是单个码点的最大 UTF-8 宽度）。空字符串返回 `['']`。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']
+splitUtf8('你好世界', 6) // 每个汉字 3 字节 → ['你好', '世界']
 ```
 
 ---
@@ -1112,7 +1200,7 @@ splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']
 ### 快照与探测
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;
+function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>
 ```
 
 非数组对象的原型为 null，或其原型的父原型为 null 时返回 true。因此也接受 Object.create(Object.create(null))，并非只检查当前 realm 的 Object.prototype 等值；通常的 class 实例与 Date/Map 等内置对象返回 false。读取原型链失败（代理陷阱抛错）时同样返回 `false`，不会向上抛错。
@@ -1121,46 +1209,46 @@ function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;
 type IProbePropertyResult<T> =
   | { readonly kind: 'missing' }
   | { readonly kind: 'value'; readonly value: T }
-  | { readonly kind: 'failed'; readonly error: unknown };
-function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>;
+  | { readonly kind: 'failed'; readonly error: unknown }
+function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>
 ```
 
 读取单个属性且只读取一次（避免 getter 被调用两次产生副作用）：属性不存在返回 `missing`；读取（包括触发 getter）抛错返回 `failed` 并携带原始错误；否则返回 `value`。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const profileUnavailable = new Error('profile unavailable');
-let profileReads = 0;
+const profileUnavailable = new Error('profile unavailable')
+let profileReads = 0
 const user = {
   name: 'Ada',
   get profile(): never {
-    profileReads += 1;
-    throw profileUnavailable;
-  }
-};
-
-function readLabel(value: object, key: PropertyKey): string {
-  const result = probeProperty<string>(value, key);
-  switch (result.kind) {
-    case 'value':
-      return result.value;
-    case 'missing':
-      return 'Anonymous';
-    case 'failed':
-      console.error('property read failed', result.error);
-      return 'Unavailable';
+    profileReads += 1
+    throw profileUnavailable
   }
 }
 
-readLabel(user, 'name'); // 'Ada'
-readLabel(user, 'email'); // 'Anonymous'
-readLabel(user, 'profile'); // 'Unavailable'
-profileReads; // 1：getter 只被读取一次
+function readLabel(value: object, key: PropertyKey): string {
+  const result = probeProperty<string>(value, key)
+  switch (result.kind) {
+    case 'value':
+      return result.value
+    case 'missing':
+      return 'Anonymous'
+    case 'failed':
+      console.error('property read failed', result.error)
+      return 'Unavailable'
+  }
+}
+
+readLabel(user, 'name') // 'Ada'
+readLabel(user, 'email') // 'Anonymous'
+readLabel(user, 'profile') // 'Unavailable'
+profileReads // 1：getter 只被读取一次
 ```
 
 第一个参数可以是普通对象、class 实例或其他可读取属性的对象；第二参数接受字符串、数字或 Symbol key。它把缺失字段与读取失败拆成不同分支，避免 `try/catch` 后错误地使用默认值；返回 `failed` 时不会重建错误，`error` 就是 getter 原样抛出的实例。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function immutableSnapshot<T>(value: T): T;
+function immutableSnapshot<T>(value: T): T
 ```
 
 实现直接调用宿主原生 `globalThis.structuredClone(value)`，不是 JSON 序列化或手写递归：它一次复制完整对象图，保留循环引用、共享引用关系以及 `Date`、`Map`、`Set`、`ArrayBuffer`、TypedArray 等结构化克隆支持的数据类型。本 API 不接受 transfer list，因此 `ArrayBuffer` 会复制而不会转移所有权。
@@ -1168,33 +1256,33 @@ function immutableSnapshot<T>(value: T): T;
 结构化克隆不会保留自定义 class 的原型方法、getter/setter 与属性描述符；函数、WeakMap 等不支持的成员会让整个克隆失败。“immutable”表示快照不再共享源对象引用，不表示返回值经过 `Object.freeze()`；需要运行时冻结或递归只读时由调用方另行处理。宿主不提供 `structuredClone` 时抛出 `code: 'ENV_UNSUPPORTED'` 的 `TypeError`；值本身不可结构化克隆时抛出 `code: 'CLONE_UNSUPPORTED'` 的 `TypeError`。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const shared = { count: 1 };
+const shared = { count: 1 }
 const source = {
   primary: shared,
   alias: shared,
   createdAt: new Date('2026-01-01T00:00:00Z')
-};
-const copy = immutableSnapshot(source);
+}
+const copy = immutableSnapshot(source)
 
-source.primary.count = 2;
-copy.primary.count; // 1
-copy.primary === copy.alias; // true
-copy.createdAt instanceof Date; // true
-Object.isFrozen(copy); // false
+source.primary.count = 2
+copy.primary.count // 1
+copy.primary === copy.alias // true
+copy.createdAt instanceof Date // true
+Object.isFrozen(copy) // false
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type ISnapshotDiagnostic = {
-  readonly path: readonly PropertyKey[];
-  readonly reason: 'accessor' | 'read-failed' | 'unsupported';
-  readonly cause: unknown;
-};
+  readonly path: readonly PropertyKey[]
+  readonly reason: 'accessor' | 'read-failed' | 'unsupported'
+  readonly cause: unknown
+}
 type IDiagnosticSnapshot<T> = {
-  readonly value: T;
-  readonly diagnostics: readonly ISnapshotDiagnostic[];
-};
-function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
-function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
+  readonly value: T
+  readonly diagnostics: readonly ISnapshotDiagnostic[]
+}
+function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>
+function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>
 ```
 
 与原生 `structuredClone` / `immutableSnapshot` 的关键区别是失败粒度：前两者是整图“全有或全无”，任何不支持成员都会让调用抛错；`diagnosticSnapshot` 始终尝试返回 `{ value, diagnostics }`。它递归复制普通对象与数组，可克隆的内建子树独立调用 `structuredClone`；函数、class 实例等不支持类型则**保留原引用**并记录 `unsupported`。访问器会被读取一次、投影为普通值并记录 `accessor`；读取或反射失败记录 `read-failed`。循环引用通过 `WeakMap` 保持安全。
@@ -1204,7 +1292,7 @@ function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
 `structuredDiagnosticSnapshot` 是两种策略的组合：优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能完整克隆就完整克隆，否则仍返回可观测降级结果”的遥测边界优先使用它。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function identitySnapshot<T>(value: T): T;
+function identitySnapshot<T>(value: T): T
 ```
 
 原样返回入参。单独调用没有运行时收益；它用于 `snapshot` / `clone` 这类可配置策略槽的零拷贝分支，明确表示调用方接受共享引用、后续修改双方可见。本仓的 clone policy 正是用它实现 `opaque` 分支，服务于身份敏感或不可克隆、且允许共享所有权的可信进程内数据。需要外部输入隔离、历史快照或跨边界传输时不要使用它，应选择 `immutableSnapshot`。
@@ -1219,57 +1307,54 @@ function identitySnapshot<T>(value: T): T;
 两种形式共享同一套安全限制：单段最长 512 字符、路径最多 256 段、字符串路径总长不超过 4096 字符；`__proto__`/`prototype`/`constructor` 一律被拒绝（防止原型污染）。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple;
+function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple
 ```
 
 把字符串路径解析成规范化的 `readonly` 段元组（数字下标解析成 `number`），或校验并冻结一个已给定的元组路径。任何越界/危险段都会抛出携带 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IPathValueProbe<T, P extends IObjectPathInput<T>> = {
-  readonly kind: 'value';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly value: IObjectPathValue<T, P>;
-};
+  readonly kind: 'value'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly value: IObjectPathValue<T, P>
+}
 type IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
-  readonly kind: 'missing';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly failedAt: number;
-  readonly failedKey: IObjectPathSegment;
-  readonly resolvedPath: IObjectPathTuple;
-  readonly parent: unknown;
-};
+  readonly kind: 'missing'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly failedAt: number
+  readonly failedKey: IObjectPathSegment
+  readonly resolvedPath: IObjectPathTuple
+  readonly parent: unknown
+}
 type IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
-  readonly kind: 'blocked';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly failedAt: number;
-  readonly failedKey: IObjectPathSegment;
-  readonly resolvedPath: IObjectPathTuple;
-  readonly parent: unknown;
-};
+  readonly kind: 'blocked'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly failedAt: number
+  readonly failedKey: IObjectPathSegment
+  readonly resolvedPath: IObjectPathTuple
+  readonly parent: unknown
+}
 type IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
-  readonly kind: 'failed';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly failedAt: number;
-  readonly failedKey: IObjectPathSegment;
-  readonly resolvedPath: IObjectPathTuple;
-  readonly parent: unknown;
-  readonly error: unknown;
-};
+  readonly kind: 'failed'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly failedAt: number
+  readonly failedKey: IObjectPathSegment
+  readonly resolvedPath: IObjectPathTuple
+  readonly parent: unknown
+  readonly error: unknown
+}
 type IPathProbe<T, P extends IObjectPathInput<T>> =
-  | IPathValueProbe<T, P>
-  | IPathMissingProbe<P>
-  | IPathBlockedProbe<P>
-  | IPathFailedProbe<P>;
+  IPathValueProbe<T, P> | IPathMissingProbe<P> | IPathBlockedProbe<P> | IPathFailedProbe<P>
 
-function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;
+function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>
 function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
   object: T,
   segments: P
-): IPathProbe<T, P>;
+): IPathProbe<T, P>
 ```
 
 沿路径逐段探测，每段只读取一次。四种结果分别对应：**成功取到值**（`value`，携带 `value`）、**某一段属性不存在**（`missing`）、**某一段的父值不是对象/函数因而无法继续深入**（`blocked`，例如路径指向 `a.b.c` 但 `a.b` 是 `null` 或字符串）、**某一段读取本身抛出异常**（`failed`，例如触发了会抛错的 getter，携带 `error`）。
@@ -1282,16 +1367,16 @@ function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
 function get<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P
-): IObjectPathValue<T, P> | undefined;
+): IObjectPathValue<T, P> | undefined
 ```
 
 基于 `probeObjectPath` 的简化读取：`missing`/`blocked` 统一返回 `undefined`；`failed`（读取本身抛错）会**原样重新抛出**该错误，不会被静默吞掉——这一点区别于"路径不存在"，调用方需要分别处理。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const data = { user: { name: 'Ada' } };
-get(data, 'user.name'); // 'Ada'
-get(data, 'user.missing'); // undefined（missing）
-get(data, 'user.name.x'); // undefined（blocked：'Ada' 是字符串，无法继续深入 .x）
+const data = { user: { name: 'Ada' } }
+get(data, 'user.name') // 'Ada'
+get(data, 'user.missing') // undefined（missing）
+get(data, 'user.name.x') // undefined（blocked：'Ada' 是字符串，无法继续深入 .x）
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
@@ -1299,52 +1384,52 @@ function set<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P,
   nextValue: IObjectPathWriteValue<T, P>
-): T;
+): T
 ```
 
 不可变路径写入：每次值真正变化的 `set()` 都返回一个新根对象，传入对象保持不变。只有路径上的节点被浅拷贝（结构共享，未涉及的兄弟节点保持同一引用）。这里的 immutable 描述更新方式，不表示返回对象经过深拷贝或 `Object.freeze()`；返回值本身仍可修改。路径中间缺失的容器会按下一段键的类型自动创建（数字键 → `[]`，其他 → `{}`）。若路径中途遇到非空的原始值（字符串、数字等，无法继续深入）会抛出 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。若新值与旧值经 `Object.is` 相等，则没有发生更新，直接复用原对象，不做任何拷贝。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const before = { user: { name: 'Ada', tags: ['a'] } };
-const after = set(before, 'user.name', 'Grace');
-after.user.name; // 'Grace'
-after !== before; // true（发生更新时返回新根对象）
-after.user !== before.user; // true（更新路径上的节点被复制）
-after.user.tags === before.user.tags; // true（未涉及的分支保持引用不变）
-before.user.name; // 'Ada'（原对象未被修改）
-Object.isFrozen(after); // false（immutable update 不等于冻结）
+const before = { user: { name: 'Ada', tags: ['a'] } }
+const after = set(before, 'user.name', 'Grace')
+after.user.name // 'Grace'
+after !== before // true（发生更新时返回新根对象）
+after.user !== before.user // true（更新路径上的节点被复制）
+after.user.tags === before.user.tags // true（未涉及的分支保持引用不变）
+before.user.name // 'Ada'（原对象未被修改）
+Object.isFrozen(after) // false（immutable update 不等于冻结）
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly probe: IPathValueProbe<T, P>;
-  readonly value: IObjectPathValue<T, P>;
-  replace(value: IObjectPathValue<T, P>): void;
-};
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly probe: IPathValueProbe<T, P>
+  readonly value: IObjectPathValue<T, P>
+  replace(value: IObjectPathValue<T, P>): void
+}
 type IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly probe: IPathValueProbe<T, P>;
-  readonly value: IObjectPathWriteValue<T, P>;
-  replace(value: IObjectPathWriteValue<T, P>): void;
-};
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly probe: IPathValueProbe<T, P>
+  readonly value: IObjectPathWriteValue<T, P>
+  replace(value: IObjectPathWriteValue<T, P>): void
+}
 type IPathAccessorOptions<T> = {
-  readonly ifMissing?: (probe: IPathMissingProbe) => void;
-  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;
-  readonly ifFailed?: (probe: IPathFailedProbe) => void;
-  readonly onGet?: (event: IPathGetEvent<T>) => void;
-  readonly onSet?: (event: IPathSetEvent<T>) => void;
-};
+  readonly ifMissing?: (probe: IPathMissingProbe) => void
+  readonly ifBlocked?: (probe: IPathBlockedProbe) => void
+  readonly ifFailed?: (probe: IPathFailedProbe) => void
+  readonly onGet?: (event: IPathGetEvent<T>) => void
+  readonly onSet?: (event: IPathSetEvent<T>) => void
+}
 type IPathAccessor<T> = {
-  readonly value: T;
-  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;
-  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;
-  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;
-  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;
-};
-function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;
+  readonly value: T
+  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined
+  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T
+  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>
+  parsePath(path: string | IObjectPathTuple): IObjectPathTuple
+}
+function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>
 ```
 
 封装一个**内部持有当前根对象**的有状态访问器：每次 `set()` 成功后，`accessor.value` 自动前进到写入后的新根（后续 `get`/`set` 都基于最新根）。`ifMissing`/`ifBlocked`/`ifFailed` 在对应探测结果出现时被调用，用作集中式诊断钩子。
@@ -1355,9 +1440,9 @@ function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IP
 const accessor = createPathAccessor(
   { count: 0 },
   { onSet: (event) => console.log('write', event.originKey, event.value) }
-);
-accessor.set('count', 5); // 打印 write count 5
-accessor.value; // { count: 5 }
+)
+accessor.set('count', 5) // 打印 write count 5
+accessor.value // { count: 5 }
 ```
 
 对应的类型工具（用于给调用方提供编译期路径补全与值类型推断）：`IObjectPathSegment`、`IObjectPathTuple`、`IObjectPath<T>`（字符串路径，最深 8 层）、`IObjectPathTupleFor<T>`（元组路径）、`IObjectPathInput<T>`（两者联合）、`IObjectPathValue<T, P>`（路径指向的值类型）、`IObjectPathWriteValue<T, P>`（写入时接受的类型，字面量类型会被适度放宽为其基础类型，例如字面量联合放宽为 `string`/`number`/`boolean`/`bigint`）。
@@ -1384,8 +1469,8 @@ accessor.value; // { count: 5 }
 ```ts
 /** 按一个顶层、值为 PropertyKey 的判别字段对联合类型分组。 */
 type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = {
-  [K in T[F]]: Extract<T, Record<F, K>>;
-};
+  [K in T[F]]: Extract<T, Record<F, K>>
+}
 ```
 
 - 类型参数 `F extends PropertyKey`：判别字段名（`string`/`number`/`symbol`）。
@@ -1395,8 +1480,8 @@ type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKe
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 /** 按一个 string 或 tuple 对象路径对联合类型分组，路径解析规则与 /object 模块的 IObjectPath 完全一致。 */
 type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
-  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;
-};
+  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>
+}
 ```
 
 - 类型参数 `T`：目标联合类型本身。
@@ -1409,28 +1494,28 @@ type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IEvent =
   | {
-      readonly type: 'created';
-      readonly meta: { readonly category: 'write' };
-      readonly payload: { readonly userId: string };
+      readonly type: 'created'
+      readonly meta: { readonly category: 'write' }
+      readonly payload: { readonly userId: string }
     }
   | {
-      readonly type: 'deleted';
-      readonly meta: { readonly category: 'write' };
-      readonly payload: { readonly reason: string };
+      readonly type: 'deleted'
+      readonly meta: { readonly category: 'write' }
+      readonly payload: { readonly reason: string }
     }
   | {
-      readonly type: 'read';
-      readonly meta: { readonly category: 'read' };
-      readonly payload: { readonly cache: boolean };
-    };
+      readonly type: 'read'
+      readonly meta: { readonly category: 'read' }
+      readonly payload: { readonly cache: boolean }
+    }
 
-type IByType = IDiscriminatedByField<'type', IEvent>;
+type IByType = IDiscriminatedByField<'type', IEvent>
 // { created: Extract<IEvent, { type: 'created' }>; deleted: ...; read: ... }
 
-type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;
+type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>
 // { write: 'created' | 'deleted' 两个分支的联合; read: 'read' 分支 }
 
-type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>;
+type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>
 // 与 IByCategory 完全等价——字符串路径和元组路径是同一套解析逻辑的两种写法
 ```
 
@@ -1438,11 +1523,11 @@ type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // @ts-expect-error 所有分支均不存在此路径，违反 IObjectPathInput 约束
-type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>;
+type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>
 
-type INotPropertyKey = { readonly discriminator: { readonly nested: true } };
+type INotPropertyKey = { readonly discriminator: { readonly nested: true } }
 // @ts-expect-error 判别字段的值是对象，不满足 PropertyKey 约束，无法作为映射类型的 key
-type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>;
+type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>
 ```
 
 ---
@@ -1454,14 +1539,14 @@ type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>;
 带**所有权语义**的配置对象：只有经 `ownConfig` 接纳的对象才能被 `readonlyConfig`/`patchConfig`/`readConfigPath`/`combineConfig` 处理，用运行时 `WeakMap` 元数据（而非可伪造的字段）标记"这是一个受本包管理的配置根"。
 
 ```ts
-const ConfigProfile = { data: 'data', richRuntime: 'richRuntime' } as const;
-type IConfigProfile = 'data' | 'richRuntime';
+const ConfigProfile = { data: 'data', richRuntime: 'richRuntime' } as const
+type IConfigProfile = 'data' | 'richRuntime'
 ```
 
 `data`（默认）：只接受可移植的纯数据——普通对象、数组、`Date`/`RegExp`/`Map`/`Set` 等内置类型；**拒绝函数**。`richRuntime`：额外接受函数/可构造类（连同其自身属性与 `prototype` 一起深拷贝），用于确实需要在配置里携带回调或工厂的场景。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const CONFIG_DELETE: unique symbol;
+const CONFIG_DELETE: unique symbol
 ```
 
 在 `patchConfig`/`combineConfig` 的补丁对象中，把某个键的值设为这个符号，表示"删除该键"（而不是设为 `undefined`）。
@@ -1470,7 +1555,7 @@ const CONFIG_DELETE: unique symbol;
 function ownConfig<T extends IConfigRecord>(
   value: T,
   options?: { readonly profile?: IConfigProfile; readonly limits?: Partial<IConfigLimits> }
-): IOwnedConfig<T>;
+): IOwnedConfig<T>
 ```
 
 深拷贝 `value` 得到一个独立的、被本包元数据标记为"已拥有"的图。要求根必须是普通对象（不能是数组）且不含 `symbol` 键。深拷贝过程中：
@@ -1486,18 +1571,18 @@ function ownConfig<T extends IConfigRecord>(
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConfigLimits = {
-  readonly maxDepth: number; // 默认 256
-  readonly maxNodes: number; // 默认 100_000
-  readonly maxKeys: number; // 默认 1_000_000
-  readonly maxPathLength: number; // 默认 4096
-  readonly maxSegmentLength: number; // 默认 512
-};
+  readonly maxDepth: number // 默认 256
+  readonly maxNodes: number // 默认 100_000
+  readonly maxKeys: number // 默认 1_000_000
+  readonly maxPathLength: number // 默认 4096
+  readonly maxSegmentLength: number // 默认 512
+}
 ```
 
 `limits` 不得超过包级默认上限。`patchConfig` 相对输入基准只能收紧，放宽会抛 CONFIG_CONFLICT；`combineConfig` 取所有输入与请求上限的逐项最小值，放宽请求被自动收紧，不因此抛 CONFIG_CONFLICT。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;
+function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T
 ```
 
 返回一个**带缓存的只读对象**，内部通过 `Proxy` 拦截修改；同一输入对象重复调用会返回同一个只读对象。读取时仍然访问原配置，没有再复制一份数据。任何写操作（`set`/`defineProperty`/`deleteProperty`/`setPrototypeOf`/`preventExtensions`，以及 `Map`/`Set`/`Date` 上的变更方法如 `.set()`/`.add()`/`.setFullYear()`）都会抛出 `code: 'CONFIG_READONLY'` 的 `TypeError`。嵌套对象、`Map`、`Set` 和函数字段也会受到同样的写入保护。`value` 必须是 `ownConfig` 的产物，否则抛 `code: 'CONFIG_UNSUPPORTED'`。
@@ -1507,38 +1592,38 @@ function patchConfig<T extends IConfigRecord>(
   base: IOwnedConfig<T>,
   patch: IConfigPatch<T>,
   options?: {
-    readonly profile?: IConfigProfile;
-    readonly limits?: Partial<IConfigLimits>;
-    readonly reuseUnchangedRoot?: boolean;
+    readonly profile?: IConfigProfile
+    readonly limits?: Partial<IConfigLimits>
+    readonly reuseUnchangedRoot?: boolean
   }
-): IOwnedConfig<T>;
+): IOwnedConfig<T>
 ```
 
 对**根**做写时复制式覆盖：`patch` 中每个键要么设为新值（会被递归深拷贝并纳入所有权），要么设为 `CONFIG_DELETE` 表示删除。只有被改动路径上的节点被复制，未涉及的子树按引用共享。`patch` 为空对象且 `reuseUnchangedRoot`（默认 `true`）时直接返回 `base` 本身，不做任何拷贝。`patch` 必须是普通对象、键不能是 `symbol`、不能是访问器属性，否则抛 `code: 'CONFIG_UNSUPPORTED'`；键名撞上 `__proto__`/`prototype`/`constructor` 抛 `code: 'CONFIG_PATH_INVALID'`。**注意**：`patchConfig` 只在根一层应用补丁——要修改嵌套字段，先用 `get`/`set`（`/object` 模块）在应用层算出新的嵌套子树，再作为整体值放进 `patch`。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true });
-const next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE });
-next.retries; // 3
-'debug' in next; // false
+const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true })
+const next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE })
+next.retries // 3
+'debug' in next // false
 ```
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function parseConfigPath(
   path: string,
   limits?: Pick<IConfigLimits, 'maxPathLength' | 'maxSegmentLength'>
-): readonly string[];
+): readonly string[]
 ```
 
 在 `/object` 模块的 `parseObjectPath` 基础上叠加 config 专属限制（长度上限可自定义，默认取包级默认值）并强制所有段都是字符串（不支持数字下标简写形式在 config 路径里独立出现，统一按字符串段处理）。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConfigReadResult =
-  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown };
+  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown }
 function readConfigPath(
   config: IOwnedConfig<IConfigRecord>,
   path: string | readonly string[]
-): IConfigReadResult;
+): IConfigReadResult
 ```
 
 读取配置内某条路径，区分"键不存在"（`missing`）与"值就是 `undefined`"（`value: undefined`）。返回的对象/函数类型的值会自动包一层只读 Proxy（与 `readonlyConfig` 相同的包装逻辑），保证读到的嵌套值也不可被外部修改。`config` 必须是 `ownConfig` 的产物。
@@ -1547,41 +1632,41 @@ function readConfigPath(
 function combineConfig(
   sources: readonly IOwnedConfig<IConfigRecord>[],
   options?: {
-    readonly profile?: IConfigProfile;
-    readonly limits?: Partial<IConfigLimits>;
-    readonly strategies?: Partial<IConfigMergeStrategies>;
-    readonly pathRules?: readonly IConfigPathRule[];
-    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;
+    readonly profile?: IConfigProfile
+    readonly limits?: Partial<IConfigLimits>
+    readonly strategies?: Partial<IConfigMergeStrategies>
+    readonly pathRules?: readonly IConfigPathRule[]
+    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision
   }
-): IOwnedConfig<IConfigRecord>;
+): IOwnedConfig<IConfigRecord>
 ```
 
 按 `sources` 数组的顺序（后者覆盖前者）合并多个已拥有的配置根。只有一个来源且未提供任何合并选项时，直接返回该来源，保留根 identity；其他情形产出新的 owned 配置。全部来源必须共享同一个 `profile`，否则抛 `code: 'CONFIG_CONFLICT'`。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IConfigMergeStrategies = {
-  readonly record: 'merge' | 'replace'; // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖
-  readonly array: 'replace' | 'concat' | 'mergeByIndex'; // 默认 'replace'
-  readonly map: 'replace' | 'merge'; // 默认 'replace'
-  readonly set: 'replace' | 'union'; // 默认 'replace'
-  readonly undefined: 'ignore' | 'assign'; // 默认 'ignore'：右侧显式 undefined 不覆盖左侧
-};
+  readonly record: 'merge' | 'replace' // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖
+  readonly array: 'replace' | 'concat' | 'mergeByIndex' // 默认 'replace'
+  readonly map: 'replace' | 'merge' // 默认 'replace'
+  readonly set: 'replace' | 'union' // 默认 'replace'
+  readonly undefined: 'ignore' | 'assign' // 默认 'ignore'：右侧显式 undefined 不覆盖左侧
+}
 
 type IConfigPathRule = {
-  readonly prefix: readonly PropertyKey[];
-  readonly strategies: Partial<IConfigMergeStrategies>;
-};
+  readonly prefix: readonly PropertyKey[]
+  readonly strategies: Partial<IConfigMergeStrategies>
+}
 
 type IConfigConflictContext = {
-  readonly path: readonly PropertyKey[];
-  readonly left: unknown;
-  readonly right: unknown;
-};
+  readonly path: readonly PropertyKey[]
+  readonly left: unknown
+  readonly right: unknown
+}
 type IConfigConflictDecision =
   | { readonly kind: 'left' }
   | { readonly kind: 'right' }
   | { readonly kind: 'delete' }
-  | { readonly kind: 'value'; readonly value: unknown };
+  | { readonly kind: 'value'; readonly value: unknown }
 ```
 
 `strategies` 是全局默认策略；`pathRules` 是一组 `{ prefix, strategies }`，按 `prefix`（从根开始的键路径）匹配当前正在合并的键路径，`prefix` 更长（更具体）的规则优先生效，命中的规则会与全局 `strategies` 合并（规则内声明的字段覆盖全局同名字段，规则未声明的字段沿用全局值）。
@@ -1592,20 +1677,20 @@ type IConfigConflictDecision =
 const defaults = ownConfig({
   retries: 1,
   tags: ['default'],
-  transport: { timeoutMs: 1_000, keepAlive: true },
-});
+  transport: { timeoutMs: 1_000, keepAlive: true }
+})
 const override = ownConfig({
   retries: 3,
   tags: ['custom'],
-  transport: { timeoutMs: 2_500 },
-});
+  transport: { timeoutMs: 2_500 }
+})
 
 const merged = combineConfig([defaults, override], {
-  strategies: { record: 'merge', array: 'concat' },
-});
+  strategies: { record: 'merge', array: 'concat' }
+})
 
 // merged 是新配置；defaults 和 override 都不会被修改。
-merged;
+merged
 // {
 //   retries: 3,
 //   tags: ['default', 'custom'],
@@ -1616,8 +1701,8 @@ merged;
 const diff = {
   retries: { before: defaults.retries, after: merged.retries },
   tags: { before: defaults.tags, after: merged.tags },
-  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },
-};
+  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }
+}
 ```
 
 ---
@@ -1632,14 +1717,20 @@ const diff = {
 import { ConfigOwner } from '@migaia/utils/config'
 
 const config = new ConfigOwner(defaults, { validate: (value) => value.server.port > 0 })
-config.set('server.port', 8080).patch({ debug: true }).combine({ cache: { ttl: 60 } })
-config.require('server.port')            // 缺失时抛 CONFIG_VALUE_MISSING
+config
+  .set('server.port', 8080)
+  .patch({ debug: true })
+  .combine({ cache: { ttl: 60 } })
+config.require('server.port') // 缺失时抛 CONFIG_VALUE_MISSING
 const stop = config.watch('server.port', (next, prev) => restart(next))
 
-const fromText = ConfigOwner.from<IAppConfig>(text)                       // 非法 JSON：CONFIG_PARSE_FAILED
-const remote = await ConfigOwner.fromAsync(({ signal }) => fetch(url, { signal }).then((r) => r.text()), {
-  timeoutMs: 5000
-})                                                                        // 源失败：CONFIG_SOURCE_FAILED
+const fromText = ConfigOwner.from<IAppConfig>(text) // 非法 JSON：CONFIG_PARSE_FAILED
+const remote = await ConfigOwner.fromAsync(
+  ({ signal }) => fetch(url, { signal }).then((r) => r.text()),
+  {
+    timeoutMs: 5000
+  }
+) // 源失败：CONFIG_SOURCE_FAILED
 const env = ConfigOwner.fromEnv(process.env, { prefix: 'APP__', key: (s) => s.toLowerCase() })
 ```
 
@@ -1652,13 +1743,13 @@ const env = ConfigOwner.fromEnv(process.env, { prefix: 'APP__', key: (s) => s.to
 ## `/function` 模块
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-const noop: () => undefined;
+const noop: () => undefined
 ```
 
 恒返回 `undefined` 的空函数，用作默认回调占位符。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function once<T extends (...args: never[]) => unknown>(functionValue: T): T;
+function once<T extends (...args: never[]) => unknown>(functionValue: T): T
 ```
 
 记忆化一个**同步**函数：只在首次调用时真正执行，之后的调用直接返回首次的结果（或重新抛出首次的异常——包括异常也被缓存，不会在第二次调用时重新执行函数体）。若在首次调用**尚未完成**时发生重入（函数体内部再次调用了被包装后的自身），会抛出 `code: 'REENTRANT_CALL'` 的 `TypeError`，防止意外的递归自调用绕过缓存语义。
@@ -1666,13 +1757,13 @@ function once<T extends (...args: never[]) => unknown>(functionValue: T): T;
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // runtime.ts：整个模块只创建并导出这一份包装函数。
 export const getRuntime = once(() => {
-  const registry = buildCommandRegistry();
-  return { registry, startedAt: Date.now() };
-});
+  const registry = buildCommandRegistry()
+  return { registry, startedAt: Date.now() }
+})
 
-const first = getRuntime(); // 创建 registry
-const second = getRuntime(); // 直接返回 first
-first === second; // true
+const first = getRuntime() // 创建 registry
+const second = getRuntime() // 直接返回 first
+first === second // true
 ```
 
 适合模块内昂贵且确定的同步初始化，例如构建只读 registry、编译 schema 或探测一次运行时能力。首次异常也会永久缓存，所以需要 retry、reset、热更新或按请求隔离时不要使用。
@@ -1682,7 +1773,7 @@ first === second; // true
 `Proxy` 适合把首次属性访问变成惰性初始化，或限制访问方式；它本身不提供唯一性。是否是单例仍由 Proxy 后面的实例存储位置和 owner 数量决定，因此无需为了“真实单例”给 `once` 结果额外套 Proxy。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>;
+function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>
 ```
 
 记忆化一次**异步**调用：首次调用时启动 `functionValue()`，包装函数会保留并返回同一个 Promise；后续调用无论发生在 pending、fulfilled 还是 rejected 阶段，都直接拿到这个 Promise。`functionValue()` 可以返回原生 `Promise` 或合法 PromiseLike；其他值会让共享 Promise 以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。
@@ -1690,15 +1781,12 @@ function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>;
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。
 export const loadAppConfig = onceAsync(async () => {
-  const response = await fetch('/config');
-  if (!response.ok) throw new Error(`config request failed: ${response.status}`);
-  return response.json() as Promise<{ apiBaseUrl: string }>;
-});
+  const response = await fetch('/config')
+  if (!response.ok) throw new Error(`config request failed: ${response.status}`)
+  return response.json() as Promise<{ apiBaseUrl: string }>
+})
 
-const [routerConfig, telemetryConfig] = await Promise.all([
-  loadAppConfig(),
-  loadAppConfig()
-]); // 两处共享同一次请求
+const [routerConfig, telemetryConfig] = await Promise.all([loadAppConfig(), loadAppConfig()]) // 两处共享同一次请求
 ```
 
 适合页面或进程生命周期内只应执行一次的异步初始化，例如加载不会刷新的启动配置、初始化共享 SDK 客户端、动态导入并编译同一份 WASM 模块。它同时解决“并发时别重复启动”和“完成后继续复用结果”两个问题。
@@ -1718,29 +1806,28 @@ Collector 是包根入口提供的、数组专用的惰性查询流水线：
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 // 内部组合类型，不是公开导出；使用者导入 ICollector 或 IFieldCollector。
 type ICollectorActions<T, Self> = {
-  readonly result: readonly T[];
+  readonly result: readonly T[]
   fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(
     ...paths: P
-  ): IFieldCollector<T, P[number]>;
-  where(predicate: (source: T) => boolean): Self;
-  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;
-  skip(count: number): Self;
-  take(count: number): Self;
-};
+  ): IFieldCollector<T, P[number]>
+  where(predicate: (source: T) => boolean): Self
+  distinctBy<P extends IObjectPathInput<T>>(path: P): Self
+  skip(count: number): Self
+  take(count: number): Self
+}
 
 interface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}
 
-interface IFieldCollector<T, P extends IObjectPathInput<T>>
-  extends ICollectorActions<T, IFieldCollector<T, P>> {
-  like(query: string): IFieldCollector<T, P>;
-  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;
-  oneOf(
-    value: IObjectPathValue<T, P>,
-    ...values: IObjectPathValue<T, P>[]
-  ): IFieldCollector<T, P>;
+interface IFieldCollector<T, P extends IObjectPathInput<T>> extends ICollectorActions<
+  T,
+  IFieldCollector<T, P>
+> {
+  like(query: string): IFieldCollector<T, P>
+  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>
+  oneOf(value: IObjectPathValue<T, P>, ...values: IObjectPathValue<T, P>[]): IFieldCollector<T, P>
 }
 
-function collect<T>(dataSource: readonly T[]): ICollector<T>;
+function collect<T>(dataSource: readonly T[]): ICollector<T>
 ```
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
@@ -1749,9 +1836,9 @@ const collector = collect(users)
   .like(' World ')
   .distinctBy('id')
   .skip(10)
-  .take(20);
+  .take(20)
 
-const result = collector.result;
+const result = collector.result
 ```
 
 执行与缓存：
@@ -1780,29 +1867,29 @@ const result = collector.result;
 > 该组合用于本仓测试验证，不是外部生产代码示例。外部测试应优先使用测试框架的 fake timers。
 
 ```ts
-import { retry, withTimeout } from '@migaia/utils/promise';
-import { createManualScheduler } from '@migaia/utils/testing';
-import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
+import { retry, withTimeout } from '@migaia/utils/promise'
+import { createManualScheduler } from '@migaia/utils/testing'
+import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'
 
-const scheduler = createManualScheduler();
-const initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });
-const next = patchConfig(initial, { debug: CONFIG_DELETE });
-const publicConfig = readonlyConfig(next);
+const scheduler = createManualScheduler()
+const initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true })
+const next = patchConfig(initial, { debug: CONFIG_DELETE })
+const publicConfig = readonlyConfig(next)
 
 const request = withTimeout(
   ({ signal }) =>
     retry(
       async () => {
-        if (signal.aborted) throw signal.reason;
-        return publicConfig.endpoint;
+        if (signal.aborted) throw signal.reason
+        return publicConfig.endpoint
       },
       { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }
     ),
   { timeoutMs: 100, scheduler }
-);
+)
 
-scheduler.advance(100);
-await request.catch(() => undefined);
+scheduler.advance(100)
+await request.catch(() => undefined)
 ```
 
 `createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并登记入参；`readonlyConfig` 返回带缓存、只能读取不能修改的对象；`patchConfig` 返回一份新的受管理配置，`CONFIG_DELETE` 只在根一层的补丁里生效。
@@ -1810,10 +1897,10 @@ await request.catch(() => undefined);
 ### 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-import { createConcurrencyLimiter, retry } from '@migaia/utils/promise';
-import { combineErrors } from '@migaia/utils/error';
+import { createConcurrencyLimiter, retry } from '@migaia/utils/promise'
+import { combineErrors } from '@migaia/utils/error'
 
-const limiter = createConcurrencyLimiter({ concurrency: 4 });
+const limiter = createConcurrencyLimiter({ concurrency: 4 })
 const outcomes = await Promise.allSettled(
   urls.map((url) =>
     limiter.run(() =>
@@ -1823,14 +1910,14 @@ const outcomes = await Promise.allSettled(
       })
     )
   )
-);
-await limiter.dispose();
+)
+await limiter.dispose()
 
 const failed = combineErrors(
   outcomes.filter((o) => o.status === 'rejected').map((o) => (o as PromiseRejectedResult).reason),
   'some URLs failed'
-);
-if (failed) throw failed;
+)
+if (failed) throw failed
 ```
 
 `combineErrors` 在没有失败时返回 `undefined`，只有一个失败时返回它本身，多个失败时合并成 `AggregateError`。
@@ -1838,28 +1925,28 @@ if (failed) throw failed;
 ### 对象路径 + 配置：把修改后的嵌套结构整体写回配置根
 
 ```ts
-import { get, set } from '@migaia/utils/object';
-import { ownConfig, patchConfig } from '@migaia/utils/config';
+import { get, set } from '@migaia/utils/object'
+import { ownConfig, patchConfig } from '@migaia/utils/config'
 
-const config = ownConfig({ server: { host: 'localhost', port: 8080 } });
+const config = ownConfig({ server: { host: 'localhost', port: 8080 } })
 // patchConfig 只在根一层生效：嵌套修改先用 set() 算出新的子树，再整体放进补丁
-const nextServer = set(get(config, 'server')!, 'port', 9090);
-const next = patchConfig(config, { server: nextServer });
+const nextServer = set(get(config, 'server')!, 'port', 9090)
+const next = patchConfig(config, { server: nextServer })
 ```
 
 ### 一次性初始化 + 错误身份：让初始化失败带上可识别的 code
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-import { once } from '@migaia/utils/function';
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { once } from '@migaia/utils/function'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 const initOnce = once(() => {
   try {
-    return dangerousInit();
+    return dangerousInit()
   } catch (error) {
-    throw attachErrorIdentity(error as Error, { source: 'my-package', code: 'INIT_FAILED' });
+    throw attachErrorIdentity(error as Error, { source: 'my-package', code: 'INIT_FAILED' })
   }
-});
+})
 ```
 
 `once` 会记住第一次抛出的错误，之后的调用都会抛出同一个错误对象，不会重新初始化。
@@ -1891,11 +1978,11 @@ console.log(jitter(60_000, 0.2, () => 0.5)) // 54000，永不超过原来的 600
 `tryString(value)` 从 `/string` 导出，string 原样通过，其他值只执行一次原生 `String(value)`。它返回 `{ threw: false, value: string }` 或 `{ threw: true, error: unknown }`；失败保留精确原抛出值，不提供 fallback、不调用 reporter、不生成新错误。调用方根据自己的边界选择报告、fallback 或重抛：
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-import { tryString } from '@migaia/utils/string';
+import { tryString } from '@migaia/utils/string'
 
-const converted = tryString(value);
-if (converted.threw) throw converted.error;
-const text = converted.value;
+const converted = tryString(value)
+if (converted.threw) throw converted.error
+const text = converted.value
 ```
 
 `isNullish` 只识别 `null | undefined`；`isBlankString` 只识别 trim 后为空的字符串。`isEmptyValue` 组合两者并额外把 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。
@@ -1905,15 +1992,15 @@ const text = converted.value;
 `formatNumber`、`formatCurrency`、`formatPercent`、`formatInteger`、`formatCompactNumber` 共享一个 64 项有界 `Intl.NumberFormat` 缓存。高频表格、行情或库存循环使用 `createNumberFormatter(options)`，避免每项重复解析配置。所有 locale、币种、精度和舍入规则由调用方显式拥有。
 
 ```ts
-import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';
+import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils'
 
-isEmptyValue('  '); // true；0、false、0n 均为 false
-isPrimitive(Symbol('id')); // true
-format('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });
+isEmptyValue('  ') // true；0、false、0n 均为 false
+isPrimitive(Symbol('id')) // true
+format('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' })
 formatCurrency(1234.5, 'CNY', {
   locales: 'zh-CN',
   format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-});
+})
 ```
 
 ---
@@ -1951,17 +2038,17 @@ if (isNativeErrorValue(failure)) console.log(failure.stack)
 回调或方法不是函数时，抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的原生 `TypeError`；读取 `defer` 方法本身失败时，原错误放在 `cause` 上。使用默认的 `systemScheduler` 而宿主缺少 `queueMicrotask` 时抛 `ENV_UNSUPPORTED`；显式传入的手动时钟或宿主时钟不依赖这个全局函数。用展开语法复制 `systemScheduler` 时也会复制它的 `defer`：如果要改变延后任务的执行方式，记得同时覆盖 `defer`。
 
 ```ts
-import { deferTask } from '@migaia/utils/scheduler';
-import { createManualScheduler } from '@migaia/utils/testing';
+import { deferTask } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 
-const clock = createManualScheduler();
-let delivered = false;
+const clock = createManualScheduler()
+let delivered = false
 deferTask(clock, () => {
-  delivered = true;
-});
-console.log(delivered); // false
-clock.advance(0);
-console.log(delivered); // true
+  delivered = true
+})
+console.log(delivered) // false
+clock.advance(0)
+console.log(delivered) // true
 ```
 
 UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 UTF-8 与字节偏移；Base64 失败仍标明 Base64。
@@ -2154,3 +2241,6 @@ console.log(unwrapOr(mapped, 0), toUndefined(missing))
 // true true
 // 6 undefined
 ```
+| `detectServerRuntime` / `ServerRuntime`             | `@migaia/utils`           | 当前 Deno/Bun/Node 分类及对应常量/类型域。                                                                                          |
+| `detectElectronProcessType` / `ElectronProcessType` | `@migaia/utils`           | 当前 Electron main/renderer/utility 角色及对应域。                                                                                  |
+| `detectGlobalScope` / `GlobalScopeKind`             | `@migaia/utils`           | 服务端之外的真实浏览器全局作用域及对应域。                                                                                          |

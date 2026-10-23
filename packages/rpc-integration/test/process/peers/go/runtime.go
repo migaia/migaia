@@ -1,17 +1,198 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
 
 // Runtime directory names share the current logical method grammar, without a second catalog.
 var runtimeMethodName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,39}(\.[A-Za-z][A-Za-z0-9_-]{0,39})*$`)
+
+// Schema fields and keywords are the closed optional directory extension shared by all peers.
+var runtimeSchemaFields = []string{"input", "output", "yield"}
+var runtimeSchemaKeys = []string{"type", "properties", "required", "items", "enum", "const", "anyOf", "$defs", "$ref"}
+var runtimeSchemaTypes = []string{"null", "boolean", "object", "array", "number", "integer", "string"}
+var runtimeSchemaBadEscape = regexp.MustCompile(`~($|[^01])`)
+
+// runtimeSchemaData admits only portable JSON within the directory owner's recursion budget.
+func runtimeSchemaData(value any, depth int) bool {
+	if depth > 64 {
+		return false
+	}
+	switch item := value.(type) {
+	case nil, bool:
+		return true
+	case json.Number:
+		number, err := strconv.ParseFloat(string(item), 64)
+		return err == nil && !math.IsNaN(number) && !math.IsInf(number, 0)
+	case float64:
+		return !math.IsNaN(item) && !math.IsInf(item, 0)
+	case string:
+		return utf8.ValidString(item)
+	case []any:
+		for _, member := range item {
+			if !runtimeSchemaData(member, depth+1) {
+				return false
+			}
+		}
+		return true
+	case record:
+		for key, member := range item {
+			if !utf8.ValidString(key) || !runtimeSchemaData(member, depth+1) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// runtimeSchemaEqual treats enum objects independently of key order and numbers by JSON value.
+func runtimeSchemaEqual(left, right any) bool {
+	switch item := left.(type) {
+	case nil:
+		return right == nil
+	case bool:
+		other, ok := right.(bool)
+		return ok && item == other
+	case string:
+		other, ok := right.(string)
+		return ok && item == other
+	case json.Number:
+		other, ok := right.(json.Number)
+		if !ok {
+			return false
+		}
+		a, _ := strconv.ParseFloat(string(item), 64)
+		b, _ := strconv.ParseFloat(string(other), 64)
+		return a == b
+	case float64:
+		other, ok := right.(float64)
+		return ok && item == other
+	case []any:
+		other, ok := right.([]any)
+		if !ok || len(item) != len(other) {
+			return false
+		}
+		for index, member := range item {
+			if !runtimeSchemaEqual(member, other[index]) {
+				return false
+			}
+		}
+		return true
+	case record:
+		other, ok := right.(record)
+		if !ok || len(item) != len(other) {
+			return false
+		}
+		for key, member := range item {
+			candidate, present := other[key]
+			if !present || !runtimeSchemaEqual(member, candidate) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// validRuntimeSchema checks schema nodes and local pointers without resolving references recursively.
+func validRuntimeSchema(value any) bool {
+	if !runtimeSchemaData(value, 0) {
+		return false
+	}
+	nodes := map[string]bool{}
+	references := []string{}
+	var visit func(any, string) bool
+	visit = func(value any, path string) bool {
+		schema, ok := value.(record)
+		if !ok {
+			return false
+		}
+		nodes[path] = true
+		for key, child := range schema {
+			if !slices.Contains(runtimeSchemaKeys, key) {
+				return false
+			}
+			switch key {
+			case "type", "required":
+				values, array := child.([]any)
+				if key == "type" && !array {
+					values = []any{child}
+				} else if !array {
+					return false
+				}
+				if key == "type" && len(values) == 0 {
+					return false
+				}
+				seen := map[string]bool{}
+				for _, member := range values {
+					text, ok := member.(string)
+					if !ok || seen[text] || key == "type" && !slices.Contains(runtimeSchemaTypes, text) {
+						return false
+					}
+					seen[text] = true
+				}
+			case "properties", "$defs":
+				members, ok := child.(record)
+				if !ok {
+					return false
+				}
+				for name, member := range members {
+					pointer := strings.ReplaceAll(strings.ReplaceAll(name, "~", "~0"), "/", "~1")
+					if !visit(member, path+"/"+key+"/"+pointer) {
+						return false
+					}
+				}
+			case "items":
+				if !visit(child, path+"/items") {
+					return false
+				}
+			case "enum", "anyOf":
+				members, ok := child.([]any)
+				if !ok || len(members) == 0 {
+					return false
+				}
+				for index, member := range members {
+					if key == "anyOf" && !visit(member, path+"/anyOf/"+strconv.Itoa(index)) {
+						return false
+					}
+					if key == "enum" {
+						for _, earlier := range members[:index] {
+							if runtimeSchemaEqual(member, earlier) {
+								return false
+							}
+						}
+					}
+				}
+			case "$ref":
+				pointer, ok := child.(string)
+				if !ok || !strings.HasPrefix(pointer, "#/$defs/") || runtimeSchemaBadEscape.MatchString(pointer) {
+					return false
+				}
+				references = append(references, pointer[1:])
+			}
+		}
+		return true
+	}
+	if !visit(value, "") {
+		return false
+	}
+	for _, pointer := range references {
+		if !nodes[pointer] {
+			return false
+		}
+	}
+	return true
+}
 
 // validRuntimeDescription admits only a closed v2 directory bound to the authenticated peer.
 func validRuntimeDescription(value record, remoteID string) bool {
@@ -32,7 +213,12 @@ func validRuntimeDescription(value record, remoteID string) bool {
 	for _, raw := range methods {
 		method := field(raw)
 		for key := range method {
-			if key != "name" && key != "supportedModes" && key != "modeSource" && key != "idempotent" {
+			if key != "name" && key != "supportedModes" && key != "modeSource" && key != "idempotent" && !slices.Contains(runtimeSchemaFields, key) {
+				return false
+			}
+		}
+		for _, key := range runtimeSchemaFields {
+			if schema, present := method[key]; present && !validRuntimeSchema(schema) {
 				return false
 			}
 		}
@@ -62,7 +248,8 @@ func validRuntimeDescription(value record, remoteID string) bool {
 			}
 		}
 	}
-	return true
+	// Method schemas consume the complete directory's existing portable nesting budget.
+	return runtimeSchemaData(value, 0)
 }
 
 // The runtime baseline uses one directory and physical batch contract, independent of optional runtime profiles.

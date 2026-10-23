@@ -7,14 +7,13 @@ import {
 } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import {
-  createCoroutinePlugin,
+  coroutinePlugin,
   type ICoroutineTaskContext,
-  type ICoroutineUserTask,
-  type IRuntimeDynamicSurface,
-  type IRuntimePluginTyping
-} from '@migaia/rpc-core/remote'
-import type { IRpcContext } from '@migaia/rpc-core'
-import type { IRuntimeTestRegistry } from '../../../../rpc-core/test/runtime-api/fixture.js'
+  type ICoroutineUserTask
+} from '@migaia/rpc-plugin-coroutines'
+import type { IRuntimeDynamicSurface, IRuntimePluginTyping } from '@migaia/rpc-host/plugin'
+import type { IRpcContext } from '@migaia/rpc-host'
+import type { IRuntimeTestRegistry } from '../../../../rpc-host/test/runtime-api/fixture.js'
 
 /** Dynamic behavior fixtures retain the genuine Host and explicit coroutine metadata only. */
 type ICoroutineRegistry = readonly [
@@ -119,9 +118,9 @@ export function coroutineService(label: string, report: (error: unknown) => void
         })
       )
       await child.use(
-        createCoroutinePlugin({
+        coroutinePlugin({
           name: 'parent',
-          connect: context.connect,
+          connectToParent: context.connect,
           expose: ['service'],
           report
         })

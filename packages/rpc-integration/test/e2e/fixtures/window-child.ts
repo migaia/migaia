@@ -1,4 +1,4 @@
-import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
 import { createRpc, echoProvider, terminalProviders } from './rpc.js'
 
 const parentOrigin = new URL(document.referrer).origin

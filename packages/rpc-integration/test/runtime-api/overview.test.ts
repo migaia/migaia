@@ -7,18 +7,20 @@ import {
   connected,
   runtimeSources,
   runtimeTestHost
-} from '../../../rpc-core/test/runtime-api/fixture.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPlugin, type INodeThreadHandle, createThreadPeer } from '@migaia/rpc-threads'
-import { createRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it.each([true, false])(
   'Peer detail reports the accepted remote generation or explicit unavailability (%s)',

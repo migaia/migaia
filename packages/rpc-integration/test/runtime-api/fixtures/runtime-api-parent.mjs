@@ -2,23 +2,21 @@ import assert from 'node:assert/strict'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { systemScheduler } from '@migaia/utils/scheduler'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
 import {
-  createProcessPeer,
-  createProcessTransport,
-  createNativeProcessOffer
-} from '@migaia/rpc-process'
-import {
-  createThreadPeer,
-  createWebThreadLauncher,
-  createWebThreadChannelFactory
-} from '@migaia/rpc-threads'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'
-import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
+} from '@migaia/rpc-plugin-thread/adapters/node'
 
 /** Every receipt is emitted by the actual selected runtime, never by a Node stand-in. */
 const runtime = process.argv[2]

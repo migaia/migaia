@@ -2,11 +2,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
-import { createEndpoint, isRpcErrorInstance } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
+import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
+import { isRpcErrorInstance } from '@migaia/rpc-host'
+import { connect } from '../../../rpc-host/dist/core/index.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import * as kit from '@migaia/rpc-core/transport-kit'
-import type { IRpcTransport } from '@migaia/rpc-core/transport-kit'
+import * as kit from '../../../rpc-host/dist/core/transport-kit.js'
+import * as sdk from '@migaia/rpc-host/plugin'
+import type { IRpcTransport } from '@migaia/rpc-host/plugin'
 
 /** Only the adapter primitives declared by the transport-kit contract are public. */
 const runtimeExports = [
@@ -30,7 +32,7 @@ const runtimeExports = [
 ].sort()
 
 /** Browser adapter source location for the import boundary oracle. */
-const adapters = join(import.meta.dirname, '../../../rpc-browser/src/browser/adapters')
+const adapters = join(import.meta.dirname, '../../../rpc-plugin-browser/src/browser/adapters')
 
 /** Creates the smallest asynchronous in-memory transport using public adapter primitives. */
 function loopback(): readonly [IRpcTransport, IRpcTransport] {
@@ -61,15 +63,14 @@ function loopback(): readonly [IRpcTransport, IRpcTransport] {
 describe('public transport kit', () => {
   it('exports exactly the adapter primitives and keeps browser adapters on the public boundary', () => {
     expect(Object.keys(kit).sort()).toEqual(runtimeExports)
+    for (const name of runtimeExports) expect(Reflect.get(sdk, name)).toBe(Reflect.get(kit, name))
     for (const name of readdirSync(adapters).filter((name) => name.endsWith('.ts'))) {
       const path = join(adapters, name)
       for (const statement of parseSync(path, readFileSync(path, 'utf8')).program.body) {
         if (statement.type !== 'ImportDeclaration') continue
         const specifier = statement.source.value
         if (!specifier.startsWith('.')) {
-          expect(specifier, path).toMatch(
-            /^@migaia\/(?:utils\/|rpc-core(?:\/(?:transport-kit|adapters\/web-worker))?$)/u
-          )
+          expect(specifier, path).toMatch(/^@migaia\/(?:utils(?:\/|$)|rpc-host(?:\/plugin)?$)/u)
           continue
         }
         // probe-detail is the package-owned carrier observation helper; it reaches Core only

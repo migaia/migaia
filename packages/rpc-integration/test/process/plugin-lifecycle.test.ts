@@ -3,9 +3,9 @@ import { PluginHost } from '@migaia/plugin-host'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { describe, expect, it, vi } from 'vitest'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 
 /** Advance promise continuations without depending on wall-clock delays. */
 async function settle(): Promise<void> {

@@ -1,13 +1,13 @@
-import * as resilienceOwner from '../../../rpc-process/dist/process/resilience/index.js'
+import * as resilienceOwner from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { createProcessResilience } from '@migaia/rpc-process'
-import type { IProcessRegistrationBinding } from '@migaia/rpc-process'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import type { IProcessRegistrationBinding } from '../../../rpc-plugin-process/dist/process/resilience/types.js'
 
 /** Flush only the promise continuations created by terminal subscribers and cleanup. */
 async function settle(): Promise<void> {

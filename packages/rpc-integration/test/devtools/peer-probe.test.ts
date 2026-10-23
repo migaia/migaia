@@ -3,15 +3,21 @@ import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPeer } from '@migaia/rpc-process'
-import { createThreadPeer, type INodeThreadHandle } from '@migaia/rpc-threads'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { createBrowserPeer } from '@migaia/rpc-browser'
-import { defineProbe, RpcProbeStage, RpcProbeKind } from '@migaia/rpc-core/probe'
-import type { IRuntimeDynamicSurface, IRuntimePeer } from '@migaia/rpc-core/remote'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
+import { windowPlugin } from '@migaia/rpc-plugin-browser'
+import { defineProbe, RpcProbeStage, RpcProbeKind } from '@migaia/rpc-host/probe'
+import {
+  defineFeaturePlugin,
+  type IRuntimeDynamicSurface,
+  type IRuntimePeer
+} from '@migaia/rpc-host/plugin'
 
 /** Existing native fixtures exercise public source construction without another carrier owner. */
 const workerEntry = fileURLToPath(
@@ -132,12 +138,27 @@ it('process spawn:true forwards probe through ordinary entry discovery and emits
   }
 }, 15000)
 
-/** Compile-time fixture: Browser Peer inherits one probe and a readonly array without carrier tests. */
+/** Compile-time fixture: browser Hosts consume one probe or a readonly probe array through features. */
 export function browserProbeOptionFixture(
-  options: Omit<Parameters<typeof createBrowserPeer>[0], 'probe'>
+  options: Omit<IRpcHostOptions, 'plugins' | 'probe'> &
+    Readonly<{ window: Parameters<typeof windowPlugin>[0] }>
 ) {
   /** The function is checked by tsc and never executed by this Node test. */
   const probe = defineProbe({ stages: ['peer'], emit: () => undefined })
-  createBrowserPeer({ ...options, probe })
-  createBrowserPeer({ ...options, probe: [probe] as const })
+  /** Native carrier preparation and Host probe configuration retain their separate public owners. */
+  const { window, ...host } = options
+  createRpcHost({
+    ...host,
+    plugins: [
+      windowPlugin(window),
+      defineFeaturePlugin({ name: 'browser-probe', contribution: { probe } })
+    ]
+  })
+  createRpcHost({
+    ...host,
+    plugins: [
+      windowPlugin(window),
+      defineFeaturePlugin({ name: 'browser-probes', contribution: { probe: [probe] as const } })
+    ]
+  })
 }

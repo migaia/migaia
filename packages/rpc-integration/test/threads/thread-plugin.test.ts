@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
-import * as remoteProxy from '../../../rpc-core/dist/remote/proxy.js'
+import * as remoteProxy from '../../../rpc-host/dist/remote/proxy.js'
 import * as threadSupervision from '@migaia/supervision/threads'
-import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
-import { nativeFixture } from '../../../rpc-threads/test/threads/fixture.js'
+import { createNodeThreadChannelFactory } from '@migaia/rpc-plugin-thread/adapters/node'
+import { nativeFixture } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 /** Public assembly must publish only after describe and use no message handshake. */
 describe('thread Plugin facade', () => {
@@ -93,7 +93,8 @@ describe('thread Plugin facade', () => {
     }
   })
   it('rejects an explicitly narrowed missing baseline before endpoint creation or business frame', async () => {
-    const { createNodeThreadChannelFactory } = await import('@migaia/rpc-threads/adapters/node')
+    const { createNodeThreadChannelFactory } =
+      await import('@migaia/rpc-plugin-thread/adapters/node')
     const { systemScheduler } = await import('@migaia/utils/scheduler')
     const fixture = nativeFixture({
       channelFactory: createNodeThreadChannelFactory({

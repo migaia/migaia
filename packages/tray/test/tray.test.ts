@@ -20,6 +20,22 @@ const deferred = <T>() => {
   return { promise, resolve }
 }
 describe('tray', () => {
+  it('source domains keeps the public tray error and source export aligned', () => {
+    /** Capture the actual admission error emitted by the published root entry. */
+    let received: unknown
+    try {
+      trayRoot.createTray([] as never)
+    } catch (error) {
+      received = error
+    }
+    expect(received, 'SOURCE_DOMAIN_TRAY_SOURCE').toMatchObject({
+      source: 'tray',
+      code: trayRoot.TrayErrorCode.hostInvalid
+    })
+    expect(Reflect.get(received as object, 'source')).toBe(trayRoot.TRAY_SOURCE)
+    expect(Reflect.get(received as object, 'source')).toBe(TRAY_SOURCE)
+  })
+
   it('exports the static graph separately from the host manager', () => {
     expect(trayRoot).toHaveProperty('createTray', expect.any(Function))
     expect(trayRoot.createTray).not.toBe(trayRoot.createTrayGraph)

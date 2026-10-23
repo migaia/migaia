@@ -6,24 +6,22 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
-import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../../rpc-plugin-process/dist/process/offer.js'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import {
-  serveRemotePlugin,
-  serveRemoteHost,
-  type IRemoteChannel,
-  type IRemoteContract
-} from '@migaia/rpc-core/remote'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { serveRemotePlugin } from '../../../../../rpc-host/dist/remote/serve-plugin.js'
+import { serveRemoteHost } from '../../../../../rpc-host/dist/remote/serve-host.js'
+import { type IRemoteChannel, type IRemoteContract } from '@migaia/rpc-host/plugin'
 import {
   RpcCoreErrorCode,
   RPC_CORE_ERROR_SOURCE,
   type IRpcContext,
   type IRpcCoreErrorCode
-} from '@migaia/rpc-core'
+} from '@migaia/rpc-host'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { serializeRpcError } from '@migaia/rpc-contract'
 import { endpointFor } from './runtime.js'

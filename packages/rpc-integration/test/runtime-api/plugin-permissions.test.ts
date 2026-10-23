@@ -1,12 +1,12 @@
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import type { IRuntimeTestRegistry } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import type { IRuntimeTestRegistry } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 
 /** Rejection checks retain the canonical wrapper while requiring the original permission code. */
 function permission(error: unknown, code: string, source = 'plugin.host'): boolean {

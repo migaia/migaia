@@ -74,8 +74,8 @@ class AsyncHostWithDiagnostic extends PluginHost<Record<string, never>, number> 
 /**
  * Host-owned failure and closing semantics of an async host. These restore the earlier baselines
  * that exercised the retired `runAsyncPipeline` wrapper directly; they now run through a real host
- * so the host's combiner (`PIPELINE_FAILED`, source `plugin.host`) and active checks are
- * what is asserted, not middleware-pipeline's defaults.
+ * so the host's combiner (`PIPELINE_FAILED`, source `plugin.host`) and active checks are what is
+ * asserted, not middleware-pipeline's defaults.
  */
 describe('async host pipeline failure and closing baselines', () => {
   /** Runs once and returns the rejection value, or a sentinel when the run resolved. */

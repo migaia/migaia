@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it('target queries return safe promises and apply source/name/direction filters before business dispatch', async () => {
   /** Genuine Hosts retain the original committed registration and ready indexes. */

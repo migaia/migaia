@@ -13,6 +13,9 @@
 .npmrc.local
 .vscode/
 docs/
+# The owning package keeps its executable Markdown example acceptance beside its tests.
+!packages/rpc-host/test/docs/
+!packages/rpc-host/test/docs/migration-examples.test.ts
 **/coverage/
 **/test-results/
 packages/plugin-host/.pack/

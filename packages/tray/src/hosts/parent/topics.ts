@@ -1,5 +1,5 @@
 import { createEventHub } from '@migaia/event-subscriber'
-import type { IRpcContext } from '@migaia/rpc-core'
+import type { IRpcContext } from '@migaia/rpc-host'
 import { TrayErrorCode } from '../../error-code.js'
 import { createTrayError } from '../../errors.js'
 import { TrayInstanceState } from '../constants.js'

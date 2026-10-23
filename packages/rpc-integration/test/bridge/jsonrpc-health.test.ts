@@ -4,9 +4,9 @@ import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { createSpawnProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
-import { createRemotePlugin } from '@migaia/rpc-core/remote'
-import type { IRpcEndpoint } from '@migaia/rpc-core'
+import { createSpawnProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
+import { createRemotePlugin } from '../../../rpc-host/dist/remote/plugin.js'
+import { type IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
 import { BRIDGE_CONTRACT, bridgeEndpoint, flush } from './fixture.js'
 import {
   childPath,

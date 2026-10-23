@@ -6,16 +6,16 @@ import { objectFixtureEndpoint, objectDeepValue } from './json-object-fixture.js
 import {
   createRuntimeObjectPipeline,
   materializeAdapterJson as materializeJsonSnapshot
-} from '../../../rpc-core/dist/runtime-adapter/object/pipeline.js'
+} from '../../../rpc-host/dist/runtime-adapter/object/pipeline.js'
 import { remoteProcessJsonCodec } from '../fixtures/process-diagnostics.js'
-import { readJsonObjectPort } from '../../../rpc-core/dist/core/internal/json-object-port.js'
+import { readJsonObjectPort } from '../../../rpc-host/dist/core/internal/json-object-port.js'
 import { rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
-import { defineFeature } from '@migaia/rpc-core'
-import { authentication } from '@migaia/rpc-core'
-import { readAuthenticationEnvelope } from '../../../rpc-core/dist/core/middleware/authentication-envelope.js'
+import { defineFeature } from '../../../rpc-host/dist/core/index.js'
+import { authentication } from '../../../rpc-host/dist/core/index.js'
+import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import type { IRpcAuthenticationCapability } from '@migaia/rpc-core'
-import { installPlugin } from '../../../rpc-core/test/core/middleware/helpers.js'
+import { type IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/index.js'
+import { installPlugin } from '../../../rpc-host/test/core/middleware/helpers.js'
 
 /** The moved Core factory supplies the same object encoder; this fixture never uses text decode. */
 const { codec: jsonObjectCodec } = createRuntimeObjectPipeline(

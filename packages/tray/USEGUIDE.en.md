@@ -494,7 +494,19 @@ Tray composes existing capabilities and lifecycle owners rather than adding anot
 | `@migaia/tray/adapter` | defineAdapter and conversion contracts.                                                                          |
 | `@migaia/tray/runtime` | createRuntime and callback execution, cooperative cancellation and self-mutation tickets.                        |
 
-Loader, Adapter and Runtime are not aggregated by the root. Directly imported dependencies such as plugin-host or lifecycle should be installed directly. Runtime dependencies are capability, event-subscriber, lifecycle, plugin-host, rpc-contract, rpc-core, rpc-process, rpc-threads, supervision and utils. Cross-machine discovery, browser Worker integration, UI, durable messages and automatic failover retry are outside these composition guarantees.
+Loader, Adapter and Runtime are not aggregated by the root. Install directly imported dependencies explicitly. Runtime dependencies are capability, event-subscriber, lifecycle, plugin-host, rpc-contract, rpc-host, rpc-plugin-process, rpc-plugin-thread, rpc-plugin-coroutines, supervision, and utils. Cross-machine discovery, browser Worker integration, UI, durable messages, and automatic failover retry are outside these composition guarantees.
+
+### RPC plugins on the original ordinary Host
+
+Tray installs `processPlugin`, `threadPlugin`, or `coroutinePlugin` on its existing plugin-host Host. The plugin keeps the actual definition name and expose list; the Host's process/thread/coroutine outlet continues to address one named instance and use its original stop/restart/replace controls.
+
+| Carrier   | Parent source                                                          | Child source                                                                                            |
+| --------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| process   | `processPlugin({ spawn: { entry, supervision, wrap }, name, expose })` | `processPlugin({ connectToParent: true, name, expose })`                                                |
+| thread    | `threadPlugin({ spawn: { entry, limits, supervisor }, name, expose })` | `threadPlugin({ connectToParent: true, name, expose })`                                                 |
+| coroutine | `coroutinePlugin({ spawn: task, supervisor, name, expose })`           | `coroutinePlugin({ connectToParent: connect, name, expose })` with the task's genuine opaque connection |
+
+The table shows option placement; optional fields may be omitted. Tray selects these from its existing Host definition and task context. Coroutine connectToParent is the actual callback token, not boolean true. Per-instance request/notify/stream remain targeted; Tray retains the original supervisor lifecycle owner.
 
 ### Static Graph definitions and startup
 

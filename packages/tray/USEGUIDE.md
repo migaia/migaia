@@ -489,7 +489,19 @@ Tray 组合已有的能力与生命周期，不另建一套协议。静态 Graph
 | `@migaia/tray/adapter` | defineAdapter 与转换合同。                                                                 |
 | `@migaia/tray/runtime` | createRuntime 与回调运行、协作取消、自变更回执类型。                                       |
 
-Loader、Adapter、Runtime 不从根入口聚合。直接导入 plugin-host、lifecycle 等依赖的示例应直接安装这些包。本包运行时依赖 capability、event-subscriber、lifecycle、plugin-host、rpc-contract、rpc-core、rpc-process、rpc-threads、supervision 与 utils。跨机器发现、浏览器 Worker 接入、UI、持久消息与自动故障转移重试不属于这里的组合保证。
+Loader、Adapter、Runtime 不从根入口聚合，直接导入的依赖应显式安装。本包运行时依赖 capability、event-subscriber、lifecycle、plugin-host、rpc-contract、rpc-host、rpc-plugin-process、rpc-plugin-thread、rpc-plugin-coroutines、supervision 与 utils。跨机器发现、浏览器 Worker 接入、UI、持久消息与自动故障转移重试不属于这里的组合保证。
+
+### 原普通 Host 上的 RPC plugins
+
+Tray 在既有 plugin-host Host 上安装 `processPlugin`、`threadPlugin` 或 `coroutinePlugin`。plugin 保留真实 definition 的 name 与 expose 列表；Host 的 process/thread/coroutine outlet 继续按实例名定向调用，并沿原 stop/restart/replace 控制释放或替换。
+
+| 载体      | 父端来源                                                               | 子端来源                                                                                              |
+| --------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| process   | `processPlugin({ spawn: { entry, supervision, wrap }, name, expose })` | `processPlugin({ connectToParent: true, name, expose })`                                              |
+| thread    | `threadPlugin({ spawn: { entry, limits, supervisor }, name, expose })` | `threadPlugin({ connectToParent: true, name, expose })`                                               |
+| coroutine | `coroutinePlugin({ spawn: task, supervisor, name, expose })`           | `coroutinePlugin({ connectToParent: connect, name, expose })`，connect 是 task 给出的真实 opaque 连接 |
+
+表中只说明选项层级，可选字段可省略；Tray 从既有 Host 定义与 task 上下文选择它们。协程 connectToParent 是实际 callback token，不是 true。按实例的 request/notify/stream 保持定向，supervisor 生命周期继续由原 owner 管理。
 
 ### 静态 Graph：定义与启动
 

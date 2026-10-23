@@ -11,7 +11,8 @@ import {
 import { RpcBinaryStorage } from '@migaia/rpc-contract/wire'
 import { Buffer } from 'node:buffer'
 import { PassThrough } from 'node:stream'
-import { createNativeProcessOffer, createProcessTransport } from '@migaia/rpc-process'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { asCodecValue } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
@@ -21,14 +22,14 @@ import { remoteProcessStringFramer } from '@migaia/rpc-contract/framing'
 import {
   proveFastComponents,
   readFastInlineEncoder
-} from '../../../rpc-core/dist/core/internal/fast-path.js'
+} from '../../../rpc-host/dist/core/internal/fast-path.js'
 import {
   prepareOwnedBinaryJsonSnapshot,
   readOwnedJsonSnapshot,
   RpcOwnedBinaryAlphabet
-} from '../../../rpc-core/dist/core/internal/outbound-owned-codec.js'
-import { nodeByteStream } from '../../../rpc-process/dist/process/node-byte-stream.js'
-import type { IRpcSelectedComponents } from '../../../rpc-core/dist/core/internal/endpoint-options.js'
+} from '../../../rpc-host/dist/core/internal/outbound-owned-codec.js'
+import { nodeByteStream } from '../../../rpc-plugin-process/dist/process/node-byte-stream.js'
+import type { IRpcSelectedComponents } from '../../../rpc-host/dist/core/internal/endpoint-options.js'
 
 /** Original task/route vectors supply the complete normative metadata rather than a fake endpoint. */
 const envelope = (payload: unknown) => normalizeRuntimeEnvelope({ ...vectors.valid[0], payload })

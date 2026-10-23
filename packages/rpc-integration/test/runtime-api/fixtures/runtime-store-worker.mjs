@@ -1,15 +1,15 @@
 import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
-import { prepareRuntimePeerEndpoint } from '../../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createRpcIdempotencyStore } from '@migaia/rpc-core'
-import { createRuntimeProviderScope } from '@migaia/rpc-core/adapter/internal-advanced'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { prepareRuntimePeerEndpoint } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createRpcIdempotencyStore } from '../../../../rpc-host/dist/core/index.js'
+import { createRuntimeProviderScope } from '@migaia/rpc-host/plugin'
 import { readFileSync, appendFileSync } from 'node:fs'
-import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-core/dist/remote/runtime-api/constants.js'
-import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter/internal-advanced'
+import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { createEventEmitterMessageResource } from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { readAdapterMessagePreparation } from '../../../../rpc-core/dist/runtime-adapter/message/resource.js'
-import '@migaia/rpc-threads/adapters/node'
+import { readAdapterMessagePreparation } from '../../../../rpc-host/dist/runtime-adapter/message/resource.js'
+import '@migaia/rpc-plugin-thread/adapters/node'
 
 /** Only the actual native launcher supplies execution identity; fixture offers are explicit. */
 const resource = createEventEmitterMessageResource(parentPort)

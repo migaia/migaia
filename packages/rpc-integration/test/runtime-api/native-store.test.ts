@@ -5,20 +5,20 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import {
   createRpcIdempotencyStore,
   type IRpcIdempotencyStore
-} from '../../../rpc-core/dist/core/idempotency-store.js'
+} from '../../../rpc-host/dist/core/idempotency-store.js'
 import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
-import { createProcessResilience } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { createProcessTransport } from '@migaia/rpc-process'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
 import {
   createRuntimePeer,
   type IRuntimePeer
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 /** Actual native handshake offers exercise the new store port independently of unfinished defaults. */
 const capabilities = [

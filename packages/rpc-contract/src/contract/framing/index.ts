@@ -16,3 +16,9 @@ export {
   readRpcBatchMembers
 } from '../batch-frame.js'
 export type { IRpcPhysicalFrameInspection } from '../batch-frame.js'
+
+/** Reuse the existing pure stdio bootstrap grammar without transferring live receive ownership. */
+export {
+  rpcByteRuntimeBootstrap,
+  type IRpcByteRuntimeBootstrap
+} from '../runtime-api/byte-bootstrap.js'

@@ -3,8 +3,8 @@ import { serializeRpcError } from '@migaia/rpc-contract'
  * Fixture emit of maintained web-binary.ts for runtimes requiring concrete .js/.mjs specifiers;
  * production is unchanged.
  */
-import { createThreadPeer } from '@migaia/rpc-threads'
-import { RUNTIME_API_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { webBinaryEndpoint } from './fixtures/web-binary-endpoint-esm.mjs'

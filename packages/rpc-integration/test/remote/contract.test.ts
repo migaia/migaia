@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { acceptsSchema } from '../fixtures/schema-accepts.js'
-import { RemoteCatalogLimit } from '../../../rpc-core/dist/remote/contract.js'
+import { RemoteCatalogLimit } from '../../../rpc-host/dist/remote/contract.js'
 import {
   normalizeRemoteContract,
   normalizeRemoteControlShape,
@@ -10,9 +10,9 @@ import {
   REMOTE_METHOD_MAX_LENGTH,
   REMOTE_METHOD_MODES,
   REMOTE_NAME_PATTERN
-} from '../../../rpc-core/dist/remote/contract.js'
-import { RpcRemoteLayerErrorText } from '../../../rpc-core/dist/remote/error-text.js'
-import { RpcRemoteLayerErrorCode } from '../../../rpc-core/dist/remote/error-code.js'
+} from '../../../rpc-host/dist/remote/contract.js'
+import { RpcRemoteLayerErrorText } from '../../../rpc-host/dist/remote/error-text.js'
+import { RpcRemoteLayerErrorCode } from '../../../rpc-host/dist/remote/error-code.js'
 
 /** Narrow JSON Schema keyword set used by the checked protocol document. */
 type ISchema = Record<string, unknown>

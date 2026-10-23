@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
+import {
+  readRuntimeCarrier,
+  RpcRuntimeKind,
+  RpcRuntimeMode,
+  RpcRuntimeOperation,
+  type IRpcRuntimeEnvelope
+} from '@migaia/rpc-contract/runtime'
 import { WorkerAdapter, createWorkerHandler } from '../src/index.js'
 import { createWorkerContractEndpoint } from '../src/worker-contract.js'
 
@@ -28,7 +35,7 @@ function linked() {
 }
 
 describe('store-worker existing APIs consume core batching', () => {
-  it('concurrent request results remain independent and real frames include automatic batches', async () => {
+  it('concurrent request results remain independent with one native invocation and terminal per request', async () => {
     const { ports, frames } = linked()
     const handler = createWorkerHandler(
       (value: unknown) => `result:${String(value)}`,
@@ -49,9 +56,39 @@ describe('store-worker existing APIs consume core batching', () => {
         await Promise.all(inputs.map((value) => adapter.request(value))),
         inputs.map((value) => `result:${value}`)
       )
-      assert.ok(
-        frames.flat().some((value) => (value as { kind: string }).kind === 'batch'),
-        'actual store-worker consumer uses the core physical grouping'
+      /** Read the actual native runtime selector without introducing another framing owner. */
+      const runtimeFrames = frames.map((side) =>
+        side.flatMap((value) => {
+          const selected = readRuntimeCarrier(value)
+          return selected ? [selected.frame as IRpcRuntimeEnvelope] : []
+        })
+      )
+      /** The native semantic profile retains one independent invocation for every old request. */
+      const calls = runtimeFrames[0]!.filter(
+        (frame) =>
+          frame.kind === RpcRuntimeKind.call &&
+          frame.task.mode === RpcRuntimeMode.request &&
+          frame.task.method === 'call'
+      )
+      /** Terminal correlation proves every physical business invocation completed exactly once. */
+      const terminals = runtimeFrames[1]!.filter(
+        (frame) =>
+          frame.kind === RpcRuntimeKind.control &&
+          frame.operation === RpcRuntimeOperation.terminal &&
+          frame.task.mode === RpcRuntimeMode.request &&
+          frame.task.method === 'call'
+      )
+      assert.equal(calls.length, inputs.length)
+      assert.equal(terminals.length, inputs.length)
+      assert.equal(new Set(calls.map((frame) => frame.id)).size, inputs.length)
+      assert.deepEqual(
+        new Set(terminals.map((frame) => frame.id)),
+        new Set(calls.map((frame) => frame.id))
+      )
+      assert.equal(
+        frames.flat().filter((value) => (value as { kind: string }).kind === 'batch').length,
+        0,
+        'native runtime carriers use the original physical gate without legacy envelope batching'
       )
     } finally {
       await adapter.dispose()
@@ -60,25 +97,31 @@ describe('store-worker existing APIs consume core batching', () => {
   })
   it('existing notify settles after physical emission and request waits for computation', async () => {
     const { ports } = linked()
-    const client = await createWorkerContractEndpoint(ports[0] as never)
-    const server = await createWorkerContractEndpoint(ports[1] as never, {
-      id: 'worker',
-      targetId: 'main'
-    })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
     })
     let entered = 0
-    server.onRequest('notify', async () => {
-      entered++
-      await held
-    })
-    server.onRequest('call', async (value) => {
-      entered++
-      await held
-      return value
-    })
+    /** Both real handshake sides start together; providers exist at local Host preparation. */
+    const [client, server] = await Promise.all([
+      createWorkerContractEndpoint(ports[0] as never),
+      createWorkerContractEndpoint(
+        ports[1] as never,
+        { id: 'worker', targetId: 'main' },
+        (endpoint) => {
+          endpoint.onRequest('notify', async () => {
+            entered++
+            await held
+          })
+          endpoint.onRequest('call', async (value) => {
+            entered++
+            await held
+            return value
+          })
+          return endpoint
+        }
+      )
+    ])
     try {
       await client.notify('sent')
       assert.equal(entered, 1, 'notify does not wait for the held remote computation')

@@ -49,12 +49,13 @@
     "@utils": "pnpm --filter ./packages/utils run",
     "@wasm": "pnpm --filter ./packages/wasm run",
     "@rpc-contract": "pnpm --filter ./packages/rpc-contract run",
-    "@rpc-core": "pnpm --filter ./packages/rpc-core run",
-    "@rpc-process": "pnpm --filter ./packages/rpc-process run",
-    "@rpc-threads": "pnpm --filter ./packages/rpc-threads run",
-    "@rpc-browser": "pnpm --filter ./packages/rpc-browser run",
+    "@rpc-host": "pnpm --filter ./packages/rpc-host run",
+    "@rpc-plugin-process": "pnpm --filter ./packages/rpc-plugin-process run",
+    "@rpc-plugin-thread": "pnpm --filter ./packages/rpc-plugin-thread run",
+    "@rpc-plugin-browser": "pnpm --filter ./packages/rpc-plugin-browser run",
     "@rpc-integration": "pnpm --filter ./packages/rpc-integration run",
-    "@rpc-pool": "pnpm --filter ./packages/rpc-pool run"
+    "@rpc-plugin-pool": "pnpm --filter ./packages/rpc-plugin-pool run",
+    "@rpc-plugin-coroutines": "pnpm --filter ./packages/rpc-plugin-coroutines run"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

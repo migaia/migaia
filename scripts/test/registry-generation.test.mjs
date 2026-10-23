@@ -504,31 +504,31 @@ const domainInventory = Object.freeze([
     source: 'rpc.contract.jsonrpc'
   },
   {
-    file: 'packages/rpc-core/src/core/error-code.ts',
+    file: 'packages/rpc-host/src/core/error-code.ts',
     source: 'rpc.endpoint'
   },
   {
-    file: 'packages/rpc-core/src/remote/error-code.ts',
+    file: 'packages/rpc-host/src/remote/error-code.ts',
     source: 'rpc.remote'
   },
   {
-    file: 'packages/rpc-process/src/error-code.ts',
+    file: 'packages/rpc-plugin-process/src/error-code.ts',
     source: 'rpc.transport.process'
   },
   {
-    file: 'packages/rpc-threads/src/error-code.ts',
+    file: 'packages/rpc-plugin-thread/src/error-code.ts',
     source: 'rpc.transport.thread'
   },
   {
-    file: 'packages/rpc-browser/src/error-code.ts',
+    file: 'packages/rpc-plugin-browser/src/error-code.ts',
     source: 'rpc.transport.browser'
   },
   {
-    file: 'packages/rpc-pool/src/error-code.ts',
+    file: 'packages/rpc-plugin-pool/src/error-code.ts',
     source: 'rpc.pool'
   },
   {
-    file: 'packages/rpc-devtools/src/error-code.ts',
+    file: 'packages/rpc-plugin-devtools/src/error-code.ts',
     source: 'rpc.devtools'
   },
   {

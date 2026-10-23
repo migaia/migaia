@@ -378,46 +378,6 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-browser:
-    dependencies:
-      '@migaia/utils':
-        specifier: workspace:^
-        version: link:../utils
-    devDependencies:
-      '@migaia/rpc-contract':
-        specifier: workspace:*
-        version: link:../rpc-contract
-      '@migaia/rpc-core':
-        specifier: workspace:*
-        version: link:../rpc-core
-      '@playwright/test':
-        specifier: ^1.62.1
-        version: 1.62.1
-      '@types/node':
-        specifier: 24.13.2
-        version: 24.13.2
-      cborg:
-        specifier: 6.1.1
-        version: 6.1.1
-      elysia:
-        specifier: 1.4.30
-        version: 1.4.30(@sinclair/typebox@0.34.52)(@types/bun@1.4.3)(exact-mirror@1.2.4)(file-type@22.0.2(supports-color@7.2.0))(openapi-types@12.1.3)(typescript@7.0.2)
-      msgpackr:
-        specifier: 2.1.0
-        version: 2.1.0
-      protobufjs:
-        specifier: 8.8.0
-        version: 8.8.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: 8.1.1
-        version: 8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0)
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
-
   packages/rpc-contract:
     dependencies:
       '@migaia/serialize':
@@ -449,7 +409,7 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-core:
+  packages/rpc-host:
     dependencies:
       '@migaia/event-subscriber':
         specifier: workspace:^
@@ -501,28 +461,6 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-devtools:
-    dependencies:
-      '@migaia/utils':
-        specifier: workspace:^
-        version: link:../utils
-    devDependencies:
-      '@migaia/rpc-contract':
-        specifier: workspace:*
-        version: link:../rpc-contract
-      '@migaia/rpc-core':
-        specifier: workspace:*
-        version: link:../rpc-core
-      '@types/node':
-        specifier: 24.13.2
-        version: 24.13.2
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: 4.1.10
-        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
-
   packages/rpc-integration:
     devDependencies:
       '@migaia/capability':
@@ -537,24 +475,30 @@ importers:
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
-      '@migaia/rpc-browser':
-        specifier: workspace:*
-        version: link:../rpc-browser
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
-      '@migaia/rpc-core':
+      '@migaia/rpc-host':
         specifier: workspace:*
-        version: link:../rpc-core
-      '@migaia/rpc-devtools':
+        version: link:../rpc-host
+      '@migaia/rpc-plugin-browser':
         specifier: workspace:*
-        version: link:../rpc-devtools
-      '@migaia/rpc-process':
+        version: link:../rpc-plugin-browser
+      '@migaia/rpc-plugin-coroutines':
         specifier: workspace:*
-        version: link:../rpc-process
-      '@migaia/rpc-threads':
+        version: link:../rpc-plugin-coroutines
+      '@migaia/rpc-plugin-devtools':
         specifier: workspace:*
-        version: link:../rpc-threads
+        version: link:../rpc-plugin-devtools
+      '@migaia/rpc-plugin-pool':
+        specifier: workspace:*
+        version: link:../rpc-plugin-pool
+      '@migaia/rpc-plugin-process':
+        specifier: workspace:*
+        version: link:../rpc-plugin-process
+      '@migaia/rpc-plugin-thread':
+        specifier: workspace:*
+        version: link:../rpc-plugin-thread
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
@@ -589,24 +533,79 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-pool:
+  packages/rpc-plugin-browser:
     dependencies:
-      '@migaia/lifecycle':
-        specifier: workspace:^
-        version: link:../lifecycle
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/rpc-core':
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/rpc-contract':
         specifier: workspace:*
-        version: link:../rpc-core
-      '@migaia/rpc-process':
+        version: link:../rpc-contract
+      '@migaia/rpc-host':
         specifier: workspace:*
-        version: link:../rpc-process
-      '@migaia/rpc-threads':
+        version: link:../rpc-host
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.62.1
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
+      cborg:
+        specifier: 6.1.1
+        version: 6.1.1
+      elysia:
+        specifier: 1.4.30
+        version: 1.4.30(@sinclair/typebox@0.34.52)(@types/bun@1.4.3)(exact-mirror@1.2.4)(file-type@22.0.2(supports-color@7.2.0))(openapi-types@12.1.3)(typescript@7.0.2)
+      msgpackr:
+        specifier: 2.1.0
+        version: 2.1.0
+      protobufjs:
+        specifier: 8.8.0
+        version: 8.8.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.1.1
+        version: 8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
+
+  packages/rpc-plugin-coroutines:
+    dependencies:
+      '@migaia/supervision':
+        specifier: workspace:^
+        version: link:../supervision
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/rpc-contract':
         specifier: workspace:*
-        version: link:../rpc-threads
+        version: link:../rpc-contract
+      '@migaia/rpc-host':
+        specifier: workspace:*
+        version: link:../rpc-host
+      '@migaia/rpc-plugin-process':
+        specifier: workspace:*
+        version: link:../rpc-plugin-process
+      '@migaia/rpc-plugin-thread':
+        specifier: workspace:*
+        version: link:../rpc-plugin-thread
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -617,7 +616,63 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-process:
+  packages/rpc-plugin-devtools:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/rpc-contract':
+        specifier: workspace:*
+        version: link:../rpc-contract
+      '@migaia/rpc-host':
+        specifier: workspace:*
+        version: link:../rpc-host
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
+
+  packages/rpc-plugin-pool:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/rpc-host':
+        specifier: workspace:*
+        version: link:../rpc-host
+      '@migaia/rpc-plugin-coroutines':
+        specifier: workspace:*
+        version: link:../rpc-plugin-coroutines
+      '@migaia/rpc-plugin-process':
+        specifier: workspace:*
+        version: link:../rpc-plugin-process
+      '@migaia/rpc-plugin-thread':
+        specifier: workspace:*
+        version: link:../rpc-plugin-thread
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
+
+  packages/rpc-plugin-process:
     dependencies:
       '@migaia/plugin-host':
         specifier: workspace:^
@@ -638,9 +693,9 @@ importers:
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
-      '@migaia/rpc-core':
+      '@migaia/rpc-host':
         specifier: workspace:*
-        version: link:../rpc-core
+        version: link:../rpc-host
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
@@ -666,7 +721,7 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-threads:
+  packages/rpc-plugin-thread:
     dependencies:
       '@migaia/lifecycle':
         specifier: workspace:^
@@ -687,9 +742,9 @@ importers:
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
-      '@migaia/rpc-core':
+      '@migaia/rpc-host':
         specifier: workspace:*
-        version: link:../rpc-core
+        version: link:../rpc-host
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
@@ -1387,9 +1442,12 @@ importers:
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
-      '@migaia/rpc-core':
+      '@migaia/rpc-host':
         specifier: workspace:*
-        version: link:../rpc-core
+        version: link:../rpc-host
+      '@migaia/rpc-plugin-browser':
+        specifier: workspace:*
+        version: link:../rpc-plugin-browser
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
@@ -1443,15 +1501,18 @@ importers:
       '@migaia/rpc-contract':
         specifier: workspace:^
         version: link:../rpc-contract
-      '@migaia/rpc-core':
+      '@migaia/rpc-host':
         specifier: workspace:^
-        version: link:../rpc-core
-      '@migaia/rpc-process':
+        version: link:../rpc-host
+      '@migaia/rpc-plugin-coroutines':
+        specifier: workspace:*
+        version: link:../rpc-plugin-coroutines
+      '@migaia/rpc-plugin-process':
         specifier: workspace:^
-        version: link:../rpc-process
-      '@migaia/rpc-threads':
+        version: link:../rpc-plugin-process
+      '@migaia/rpc-plugin-thread':
         specifier: workspace:^
-        version: link:../rpc-threads
+        version: link:../rpc-plugin-thread
       '@migaia/supervision':
         specifier: workspace:^
         version: link:../supervision

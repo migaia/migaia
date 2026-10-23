@@ -6,7 +6,7 @@ import { configDefaults } from 'vitest/config'
 
 /** Config files load in Vitest, outside the source/test TypeScript project. */
 const { default: defaultConfig } = await import(
-  new URL('../../../rpc-process/vitest.config.ts', import.meta.url).href
+  new URL('../../../rpc-plugin-process/vitest.config.ts', import.meta.url).href
 )
 /** The dedicated runner remains independently configurable and serial. */
 const { default: conformanceConfig } = await import(
@@ -161,7 +161,10 @@ describe('preparation only; no aggregate performance PASS', () => {
     /** The tracked inventory contains assertion responsibilities without reading local docs. */
     const inventory = JSON.parse(
       readFileSync(
-        new URL('../../../rpc-process/test/process/conformance-inventory.json', import.meta.url),
+        new URL(
+          '../../../rpc-plugin-process/test/process/conformance-inventory.json',
+          import.meta.url
+        ),
         'utf8'
       )
     )

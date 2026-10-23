@@ -1,334 +1,110 @@
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { createProviderEndpoint } from '@migaia/rpc-core/provider'
-import { createFullEndpoint } from '@migaia/rpc-core/full'
-import { createClientEndpoint } from '@migaia/rpc-core/client'
-import {
-  connect,
-  codec,
-  createEndpoint,
-  defineFeature,
-  defineMiddleware,
-  framer,
-  protocol as canonicalProtocol,
-  type IRpcFeature,
-  type IRpcPlugin
-} from '@migaia/rpc-core'
-import { buildCapabilityTopology, type ITopologyNode } from '@migaia/capability/graph/topology'
-import { normalizeRpcEnvelope as normalizeV1Envelope, rpcProtocol } from '@migaia/rpc-contract/v1'
-import { messageFramer } from '@migaia/rpc-contract/framing/v1'
-import { createBinaryFramer, createStringFramer } from '@migaia/rpc-contract/framing'
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import {
-  createProcessTransport,
-  type IProcessByteChannel,
-  type IProcessByteOptions
-} from '@migaia/rpc-process'
-import type { IRpcEnvelope, IRpcFramer, IRpcStringFrame } from '@migaia/rpc-contract'
-import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import type { ICodec } from '@migaia/serialize/codec'
-import type { IRpcTransport } from '@migaia/rpc-core'
-import { createPeerPair } from '@migaia/rpc-core/testing'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { defineFeaturePlugin, type IRpcFeaturePlugin } from '@migaia/rpc-host/plugin'
+import { timeoutFeature } from '@migaia/rpc-host/features'
+import timeout from '@migaia/rpc-host/features/timeout'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
+import { coroutinePlugin, type ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
+import { poolPlugin, type IRpcPoolControls } from '@migaia/rpc-plugin-pool'
+import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 
-declare const semantic: IRpcTransport<IRpcEnvelope>
-declare const opaque: IRpcTransport<unknown>
-declare const text: IRpcTransport<string>
-declare const textFrames: IRpcTransport<string | IRpcStringFrame>
-declare const customStringFramer: IRpcFramer<string, string, 'custom', 1>
-declare const processByteChannel: IProcessByteChannel
-declare const processByteOptions: IProcessByteOptions
-declare const stagedInboundMismatch: Omit<IRpcTransport<string | IRpcStringFrame>, 'subscribe'> & {
-  readonly subscribe: (listener: (message: { readonly data: Uint8Array }) => void) => () => void
+// @ts-expect-error Complete endpoint factories are not a public Host entry.
+import { createEndpoint } from '@migaia/rpc-host'
+// @ts-expect-error Full endpoint presets remain private kernel owners.
+import { createFullEndpoint } from '@migaia/rpc-host'
+// @ts-expect-error One-way endpoint construction is not a second public entry.
+import { createFullOneWayEndpoint } from '@migaia/rpc-host'
+// @ts-expect-error Runtime Peer construction is private to the canonical Host owner.
+import { createRuntimePeer } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Managed Peer construction remains private to native orchestration.
+import { createManagedRuntimePeer } from '@migaia/rpc-host/plugin'
+// @ts-expect-error The legacy runtime plugin is replaced by registered transport definitions.
+import { createRuntimePlugin } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Remote host construction remains private to protocol regressions.
+import { createRemoteHost } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Remote plugin construction is not a user or author public entry.
+import { createRemotePlugin } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Standalone serve constructors remain private to protocol owners.
+import { serveRemoteHost } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Standalone serve constructors remain private to protocol owners.
+import { serveRemotePlugin } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
+import { createComposedEndpoint } from '@migaia/rpc-host/composed'
+// @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
+import { createClientEndpoint } from '@migaia/rpc-host/client'
+// @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
+import { createProviderEndpoint } from '@migaia/rpc-host/provider'
+// @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
+import { createFullEndpoint as fullPreset } from '@migaia/rpc-host/full'
+
+/** The packed Host surface correlates a direct target with its actual scalar and stream methods. */
+type IWorkerApi = Readonly<{
+  echo(value: number): number
+  values(value: number): AsyncIterable<number>
+}>
+/** Target names belong to the application declaration, independently of transport construction. */
+declare const host: IRpcHost<Readonly<{ worker: IWorkerApi }>>
+/** This opaque connection is supplied by the actual coroutine task, never forged by a consumer. */
+declare const connect: ICoroutineConnect
+
+/** Compile every final user entry without executing a native acquisition during type checking. */
+async function verifyPackedHostContracts(): Promise<void> {
+  /** Negative imports are compile-only evidence; no retired constructor is invoked. */
+  void [
+    createEndpoint,
+    createFullEndpoint,
+    createFullOneWayEndpoint,
+    createRuntimePeer,
+    createManagedRuntimePeer,
+    createRuntimePlugin,
+    createRemoteHost,
+    createRemotePlugin,
+    serveRemoteHost,
+    serveRemotePlugin,
+    createComposedEndpoint,
+    createClientEndpoint,
+    createProviderEndpoint,
+    fullPreset
+  ]
+  /** Explicit direct calls retain the declared scalar result. */
+  const scalar: number = await host.send('worker', 'echo', 21)
+  void scalar
+  // @ts-expect-error An undeclared direct target cannot borrow another target's surface.
+  host.send('another', 'echo', 21)
+  // @ts-expect-error A scalar payload is not replaced by an unrelated string.
+  host.send('worker', 'echo', 'wrong')
+  // @ts-expect-error The iterable declaration cannot be invoked through a scalar call.
+  host.send('worker', 'values', 1)
+  /** The same timeout definition supports the aggregate and individual feature imports. */
+  const features: readonly IRpcFeaturePlugin[] = [
+    timeoutFeature({ ms: 1000 }),
+    timeout({ ms: 1000 })
+  ]
+  /** Author definitions remain the explicit SDK boundary instead of endpoint constructors. */
+  const authorFeature = defineFeaturePlugin({ name: 'packed-author-feature' })
+  /** A pool definition exposes the original installation-specific controls. */
+  const pool = poolPlugin({ size: 3 })
+  /** Controls use the actual Host identity and preserve their own terminal stats/close surface. */
+  const controls: IRpcPoolControls = pool.controls(host)
+  void controls.stats()
+  /** A collector is owned explicitly by its feature instance. */
+  const devtools = devtoolsPlugin()
+  void devtools.collector.stats()
+  void [
+    features,
+    authorFeature,
+    processPlugin({ spawn: './worker.mjs' }),
+    threadPlugin({ spawn: './worker.mjs' })
+  ]
+  /** Browser carrier shells accept their actual native structural port. */
+  const worker = undefined as unknown as Parameters<typeof dedicatedWorkerPlugin>[0]['worker']
+  void dedicatedWorkerPlugin({ worker })
+  void coroutinePlugin({ connectToParent: connect })
+  /** Generic Host construction retains the caller's capability declaration. */
+  const created: IRpcHost<IWorkerApi> = await createRpcHost<IWorkerApi>({
+    plugins: [processPlugin({ spawn: './worker.mjs' }), timeoutFeature({ ms: 1000 })]
+  })
+  await created.close()
 }
-
-/** Provides the smallest configuration accepted by packed type consumers. */
-function config(id: string) {
-  return { id, transport: undefined as never, middlewares: [connect()] as const }
-}
-
-async function verifyPackedContracts(): Promise<void> {
-  /** The tarball's testing declarations must infer the opposite side's complete surface. */
-  const pair = await createPeerPair({
-    a: { provide: { double: (value: number) => value * 2 } },
-    b: {
-      provide: {
-        echo: (value: ArrayBuffer) => value,
-        values: async function* (value: number) {
-          yield value
-        }
-      }
-    }
-  })
-  /** Native binary result types survive package resolution instead of widening to wire markers. */
-  const binary: ArrayBuffer = await pair.a.request('echo', new ArrayBuffer(1))
-  /** Reverse-side inference comes from A, independently of B's method set. */
-  const doubled: number = await pair.b.request('double', 2)
-  /** Stream yield inference must also survive the packed declaration boundary. */
-  const streamed = await pair.a.stream('values', 2).next()
-  if (!streamed.done) {
-    /** A yielded item is a number; the generator's terminal void remains a separate branch. */
-    const yielded: number = streamed.value
-    void yielded
-  }
-  void [binary, doubled]
-  // @ts-expect-error A calls B, so A's own provider is not a remote method.
-  pair.a.request('double', 2)
-  // @ts-expect-error B's binary payload cannot be replaced with a number.
-  pair.a.request('echo', 2)
-  // @ts-expect-error B's scalar route is not a typed stream producer.
-  pair.a.stream('echo', new ArrayBuffer(1))
-  await Promise.all([pair.a.close(), pair.b.close()])
-  const encodedProcessFrame: Uint8Array = encodeRpcStreamFrame(new Uint8Array([1]))
-  void encodedProcessFrame
-  const processChannel = await createProcessTransport(processByteChannel, processByteOptions)
-  void processChannel.pipeline.codec
-  const literal: { readonly packed: true } = identityCodec.encode({ packed: true } as const)
-  const decoded: { readonly packed: true } = identityCodec.decode(literal)
-  /** Preserves the legacy frame call shape while proving the identity generic remains concrete. */
-  const frameContext = { source: 'packed-fixture', messageId: 'identity-literal' }
-  const framed = messageFramer.frame(decoded, frameContext)
-  const accepted = messageFramer.accept(framed[0], frameContext)
-  const normalized = normalizeV1Envelope(
-    rpcProtocol.normalize({ kind: 'request', id: 'packed-v1', method: 'ping', data: null })
-  )
-  const retainedIdentity: typeof identityCodec = identityCodec
-  void [accepted, normalized, retainedIdentity]
-
-  const topologyNodes: ITopologyNode[] = [{ id: 'packed-topology', dependencies: [], ordinal: 0 }]
-  void buildCapabilityTopology(
-    topologyNodes,
-    () => {
-      throw new Error('unexpected unknown provider')
-    },
-    () => {
-      throw new Error('unexpected cycle')
-    },
-    () => {
-      throw new Error('unexpected invalid topology')
-    }
-  )
-
-  const full = await createFullEndpoint(config('packed-full-types'))
-  void full.connect
-  void full.discovery
-  void full.provide('echo', (context) => context.success(context.data)).connect
-  void full.provide('echo', (context) => context.success(context.data)).discovery
-
-  const root = await createEndpoint(config('packed-root-types'))
-  void root.provide('echo', (context) => context.success(context.data)).connect
-  void root.provide('echo', (context) => context.success(context.data)).discovery
-
-  const nativeMiddleware = defineMiddleware('packed-native-surface', () => ({
-    install: () => ({ foo: 1 as const }),
-    expose: () => ({ bar: () => 'packed-bar' as const })
-  }))
-  const fullWithNativeMiddleware = await createFullEndpoint({
-    ...config('packed-native-surface'),
-    middlewares: [connect(), nativeMiddleware] as const
-  })
-  const nativeFoo: 1 = fullWithNativeMiddleware.foo
-  const nativeBar: 'packed-bar' = fullWithNativeMiddleware.bar()
-  const fluentNativeFoo: 1 = fullWithNativeMiddleware.provide('echo', (context) =>
-    context.success(context.data)
-  ).foo
-  const fluentNativeBar: 'packed-bar' = fullWithNativeMiddleware
-    .provide('echo', (context) => context.success(context.data))
-    .bar()
-  void [nativeFoo, nativeBar, fluentNativeFoo, fluentNativeBar]
-  // @ts-expect-error unexposed native middleware keys remain absent from the endpoint surface.
-  void fullWithNativeMiddleware.missingNativeKey
-
-  const packedFeature = defineFeature(() => ({ custom: () => 'packed-custom' }))
-  const rootWithFeature = await createEndpoint({
-    ...config('packed-root-feature-types'),
-    features: [packedFeature] as const
-  })
-  void rootWithFeature.custom()
-  const widenedFeatures = [packedFeature] as IRpcFeature[]
-  /** Compile-only branch proves widened feature arrays remain rejected at the public boundary. */
-  const typeOnlyBranch: boolean = false
-  if (typeOnlyBranch) {
-    // @ts-expect-error Feature composition requires a finite readonly tuple.
-    void createEndpoint({ ...config('packed-widened-feature-types'), features: widenedFeatures })
-  }
-
-  // @ts-expect-error removed context middleware objects are not native public plugins
-  const legacyPlugin: IRpcPlugin = { name: 'legacy', install() {} }
-  void legacyPlugin
-
-  const providerEndpoint = await createProviderEndpoint(config('packed-provider-types'))
-  // @ts-expect-error slim provider roots do not expose discovery
-  void providerEndpoint.discovery
-  // @ts-expect-error slim provider roots do not expose connect
-  void providerEndpoint.connect
-
-  const grown = await createComposedEndpoint(config('packed-custom-types'), {
-    custom: packedFeature
-  })
-  void grown.custom()
-
-  const publicTuple = await createFullEndpoint(config('packed-public-tuple-types'))
-  void publicTuple.send
-  void publicTuple.connect
-  void publicTuple.discovery
-
-  // @ts-expect-error default public roots do not expose the private one-way capability.
-  void publicTuple.sendOneWay
-  const clientWithoutOneWay = await createClientEndpoint({
-    id: 'packed-client-no-one-way',
-    transport: semantic,
-    middlewares: []
-  })
-  // @ts-expect-error client roots without oneWay do not expose sendOneWay
-  void clientWithoutOneWay.sendOneWay
-  const providerWithoutOneWay = await createProviderEndpoint({
-    id: 'packed-provider-no-one-way',
-    transport: semantic,
-    middlewares: []
-  })
-  // @ts-expect-error provider roots without oneWay do not expose sendOneWay
-  void providerWithoutOneWay.sendOneWay
-  const rootWithoutOneWay = await createEndpoint({
-    id: 'packed-root-no-one-way',
-    transport: semantic,
-    middlewares: []
-  })
-  // @ts-expect-error default roots without oneWay do not expose sendOneWay
-  void rootWithoutOneWay.sendOneWay
-}
-
-void verifyPackedContracts
-
-/** Packed declarations keep every independently exported factory on the checked route. */
-async function verifyPackedPipelineMatrix(): Promise<void> {
-  await createFullEndpoint({ id: 'packed-full-semantic', middlewares: [], transport: semantic })
-  await createEndpoint({ id: 'packed-root-opaque', middlewares: [], transport: opaque })
-  await createClientEndpoint({ id: 'packed-client-opaque', middlewares: [], transport: opaque })
-  await createProviderEndpoint({
-    id: 'packed-provider-semantic',
-    middlewares: [],
-    transport: semantic
-  })
-  await createComposedEndpoint(
-    { id: 'packed-core-opaque', middlewares: [], transport: opaque },
-    { packed: defineFeature(() => ({ packed: true as const })) }
-  )
-  await createFullEndpoint<'packed-legacy-semantic', readonly []>({
-    id: 'packed-legacy-semantic',
-    middlewares: [],
-    transport: semantic
-  })
-  await createFullEndpoint<'packed-legacy-opaque', readonly []>({
-    id: 'packed-legacy-opaque',
-    middlewares: [],
-    transport: opaque
-  })
-
-  // @ts-expect-error full default semantic envelopes cannot use a string-only sink.
-  await createFullEndpoint({ id: 'packed-full-string', middlewares: [], transport: text })
-  await createFullEndpoint<'packed-legacy-string', readonly []>({
-    id: 'packed-legacy-string',
-    middlewares: [],
-    // @ts-expect-error explicit legacy generics cannot reopen a string-only sink.
-    transport: text
-  })
-  // @ts-expect-error root default semantic envelopes cannot use a string-only sink.
-  await createEndpoint({ id: 'packed-root-string', middlewares: [], transport: text })
-  // @ts-expect-error client default semantic envelopes cannot use a string-only sink.
-  await createClientEndpoint({ id: 'packed-client-string', middlewares: [], transport: text })
-  // @ts-expect-error provider default semantic envelopes cannot use a string-only sink.
-  await createProviderEndpoint({ id: 'packed-provider-string', middlewares: [], transport: text })
-  const packedCoreStringConfig = { id: 'packed-core-string', middlewares: [], transport: text }
-  // @ts-expect-error core default semantic envelopes cannot use a string-only sink.
-  await createComposedEndpoint(packedCoreStringConfig, {
-    packed: defineFeature(() => ({ packed: true as const }))
-  })
-
-  const json = defineJsonCodec({ version: 1 })
-  const stringFrames = createStringFramer()
-  await createFullEndpoint({
-    id: 'packed-union-frame',
-    middlewares: [],
-    protocol: rpcProtocol,
-    codec: json,
-    framer: stringFrames,
-    transport: textFrames
-  })
-  await createFullEndpoint({
-    id: 'packed-identity',
-    middlewares: [],
-    protocol: rpcProtocol,
-    codec: identityCodec,
-    framer: messageFramer,
-    transport: semantic
-  })
-  await createFullEndpoint({
-    id: 'packed-plugin-json-identity-string',
-    middlewares: [canonicalProtocol(rpcProtocol), codec(json), framer(messageFramer)] as const,
-    transport: text
-  })
-  const packedPluginJsonIdentityBinaryConfig = {
-    id: 'packed-plugin-json-identity-binary',
-    middlewares: [canonicalProtocol(rpcProtocol), codec(json), framer(messageFramer)] as const,
-    transport: undefined as unknown as IRpcTransport<Uint8Array>
-  }
-  // @ts-expect-error JSON plus identity framing cannot target a binary sink.
-  await createFullEndpoint(packedPluginJsonIdentityBinaryConfig)
-  await createFullEndpoint({
-    id: 'packed-top-level-framer-overrides-plugin-binary',
-    protocol: rpcProtocol,
-    framer: messageFramer,
-    middlewares: [
-      canonicalProtocol(rpcProtocol),
-      codec(json),
-      framer(createBinaryFramer())
-    ] as const,
-    transport: text
-  })
-  await createFullEndpoint({
-    id: 'packed-native-string-top-level',
-    protocol: rpcProtocol,
-    codec: json,
-    framer: stringFrames,
-    middlewares: [],
-    transport: textFrames
-  })
-  await createFullEndpoint({
-    id: 'packed-native-string-plugin',
-    middlewares: [canonicalProtocol(rpcProtocol), codec(json), framer(stringFrames)] as const,
-    transport: textFrames
-  })
-  // @ts-expect-error a custom protocol identity requires its supplied descriptor.
-  void canonicalProtocol<IRpcProtocol<IRpcEnvelope, 'forged.protocol', 1>>()
-  void framer({
-    id: 'packed-invalid-accept',
-    version: 1,
-    inputEncodedType: 'unknown',
-    outputEncodedType: 'unknown',
-    frame: (value: unknown) => [value],
-    // @ts-expect-error framer acceptance must return the native frame result union.
-    accept: () => 123,
-    close: () => undefined
-  })
-  const packedEncodedMismatchConfig = {
-    id: 'packed-encoded-mismatch',
-    middlewares: [],
-    protocol: rpcProtocol,
-    codec: json,
-    framer: createBinaryFramer(),
-    transport: opaque
-  }
-  // @ts-expect-error encoded JSON strings cannot enter a binary framer.
-  await createClientEndpoint(packedEncodedMismatchConfig)
-  const packedStagedInboundMismatchConfig = {
-    id: 'packed-staged-inbound-mismatch',
-    middlewares: [],
-    protocol: rpcProtocol,
-    codec: undefined as unknown as ICodec<IRpcEnvelope, string>,
-    framer: customStringFramer,
-    transport: stagedInboundMismatch
-  }
-  // @ts-expect-error staged inbound data must be accepted by the selected framer.
-  await createFullEndpoint(packedStagedInboundMismatchConfig)
-}
-void verifyPackedPipelineMatrix
+void verifyPackedHostContracts

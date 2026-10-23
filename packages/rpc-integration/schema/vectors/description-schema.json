@@ -1,0 +1,1112 @@
+{
+  "profile": "runtime-description-schema/1",
+  "cases": [
+    {
+      "id": "legacy-without-schema",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "scalar-number",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "type": "number"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "object-required",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "width"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "array-items",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "output": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "enum-const",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "enum": [
+                "small",
+                "large"
+              ],
+              "const": "small"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "union-anyof",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "type-union",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "empty-schema",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {}
+          }
+        ]
+      }
+    },
+    {
+      "id": "empty-required",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "required": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "local-ref",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "value": {
+                  "type": "number"
+                }
+              },
+              "$ref": "#/$defs/value"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "local-ref-escaped-key",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "x/~key": {
+                  "type": "string"
+                }
+              },
+              "$ref": "#/$defs/x~1~0key"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "self-recursive-ref",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "node": {
+                  "type": "object",
+                  "properties": {
+                    "next": {
+                      "$ref": "#/$defs/node"
+                    }
+                  }
+                }
+              },
+              "$ref": "#/$defs/node"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "stream-yield",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "stream"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "yield": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "arbitrary-data-keys",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "properties": {
+                "quote\"\n../sentinel": {
+                  "type": "string"
+                }
+              },
+              "$defs": {
+                "quote\"\n../sentinel": {}
+              },
+              "const": {
+                "nested": "declaration sentinel"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "unknown-keyword",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "additionalProperties": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-type",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "type": "SENTINEL_TYPE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-type-union",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "type": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-type-union",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "type": [
+                "string",
+                "string"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-properties",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "properties": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-property-schema",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "properties": {
+                "SENTINEL_PROPERTY": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-required",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "required": [
+                1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-required",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "required": [
+                "a",
+                "a"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-items",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "items": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-enum",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "enum": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-enum",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "enum": [
+                {
+                  "x": 1,
+                  "y": 2
+                },
+                {
+                  "y": 2,
+                  "x": 1
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-anyof",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "anyOf": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-anyof-member",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "anyOf": [
+                false
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-defs",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-def-schema",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "SENTINEL_DEF": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "remote-ref",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$ref": "https://SENTINEL_REF.invalid/value"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "file-ref",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$ref": "file:///SENTINEL_REF"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "missing-local-ref",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {},
+              "$ref": "#/$defs/missing"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "bad-pointer-escape",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "a": {}
+              },
+              "$ref": "#/$defs/a~2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "non-schema-reference-target",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "a": {
+                  "const": {
+                    "value": {}
+                  }
+                }
+              },
+              "$ref": "#/$defs/a/const/value"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "unknown-method-field",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "unsupported": "SENTINEL_FIELD"
+          }
+        ]
+      }
+    },
+    {
+      "id": "schema-depth-counts-directory",
+      "valid": false,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "input": {
+              "items": {
+                "items": {
+                  "items": {
+                    "items": {
+                      "items": {
+                        "items": {
+                          "items": {
+                            "items": {
+                              "items": {
+                                "items": {
+                                  "items": {
+                                    "items": {
+                                      "items": {
+                                        "items": {
+                                          "items": {
+                                            "items": {
+                                              "items": {
+                                                "items": {
+                                                  "items": {
+                                                    "items": {
+                                                      "items": {
+                                                        "items": {
+                                                          "items": {
+                                                            "items": {
+                                                              "items": {
+                                                                "items": {
+                                                                  "items": {
+                                                                    "items": {
+                                                                      "items": {
+                                                                        "items": {
+                                                                          "items": {
+                                                                            "items": {
+                                                                              "items": {
+                                                                                "items": {
+                                                                                  "items": {
+                                                                                    "items": {
+                                                                                      "items": {
+                                                                                        "items": {
+                                                                                          "items": {
+                                                                                            "items": {
+                                                                                              "items": {
+                                                                                                "items": {
+                                                                                                  "items": {
+                                                                                                    "items": {
+                                                                                                      "items": {
+                                                                                                        "items": {
+                                                                                                          "items": {
+                                                                                                            "items": {
+                                                                                                              "items": {
+                                                                                                                "items": {
+                                                                                                                  "items": {
+                                                                                                                    "items": {
+                                                                                                                      "items": {
+                                                                                                                        "items": {
+                                                                                                                          "items": {
+                                                                                                                            "items": {
+                                                                                                                              "items": {
+                                                                                                                                "items": {
+                                                                                                                                  "items": {
+                                                                                                                                    "items": {
+                                                                                                                                      "items": {
+                                                                                                                                        "items": {
+                                                                                                                                          "items": {
+                                                                                                                                            "type": "string"
+                                                                                                                                          }
+                                                                                                                                        }
+                                                                                                                                      }
+                                                                                                                                    }
+                                                                                                                                  }
+                                                                                                                                }
+                                                                                                                              }
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "local-ref-through-array-index",
+      "valid": true,
+      "value": {
+        "schemaVersion": 2,
+        "self": {
+          "name": "schema-peer",
+          "instanceId": "schema-peer-1"
+        },
+        "methods": [
+          {
+            "name": "resize",
+            "supportedModes": [
+              "request"
+            ],
+            "modeSource": "declared",
+            "idempotent": false,
+            "input": {
+              "$defs": {
+                "x": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "$ref": "#/$defs/x/anyOf/0"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

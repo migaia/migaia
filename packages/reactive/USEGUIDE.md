@@ -663,7 +663,7 @@ import {
 import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 ```
 
-稳定错误码表，**18 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `lifecycle`，不在本表。）
+稳定错误码表，**18 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）
 
 | `ReactiveErrorCode` 键 | 码值                    | 触发条件                                                                                                                                       |
 | ---------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |

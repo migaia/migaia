@@ -9,7 +9,7 @@ it('reports a missed concurrency target without making it a gate', async () => {
   /** Existing complete raw receipts isolate verdict semantics from new timing measurements. */
   const original = JSON.parse(
     await readFile(
-      new URL('../../../rpc-core/test/core/fixtures/budget-raw.json', import.meta.url),
+      new URL('../../../rpc-host/test/core/fixtures/budget-raw.json', import.meta.url),
       'utf8'
     )
   )
@@ -32,7 +32,7 @@ it('rejects an overbudget endpoint CPU hidden by an acceptable total', async () 
   /** Historical full raw supplies complete samples and two independently attributed PIDs. */
   const original = JSON.parse(
     await readFile(
-      new URL('../../../rpc-core/test/core/fixtures/budget-raw.json', import.meta.url),
+      new URL('../../../rpc-host/test/core/fixtures/budget-raw.json', import.meta.url),
       'utf8'
     )
   )

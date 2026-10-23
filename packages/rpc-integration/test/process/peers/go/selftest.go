@@ -547,15 +547,17 @@ func entryVectorChecks(suite *vectorSuite, directory string) {
 		for _, section := range []string{"valid", "invalid"} {
 			for index, raw := range entries(vector[section]) {
 				value := field(raw)
-				remoteID := stringField(field(value["self"]), "instanceId")
-				remote := localOffer()
-				remote.Peer = record{"id": remoteID, "runtime": "go"}
-				var input, output bytes.Buffer
-				_ = send(&input, acceptRecord(agreement{Major: 1, Minor: 1, Codec: "json", Capabilities: []string{runtimeCapability, batchCapability, "close@1"}}, remote))
-				_ = send(&input, record{"kind": "response", "id": "go-describe-1", "ok": true, "data": record{"payload": value}})
-				_ = send(&input, record{"kind": "response", "id": "go-echo-1", "ok": true, "data": record{"payload": record{"probe": "go"}}})
-				suite.check(fmt.Sprintf("runtime-description.json/%s/%d", section, index), (initiator(&input, &output) == nil) == (section == "valid"))
+				checkDescriptionCase(suite, value, section == "valid", fmt.Sprintf("runtime-description.json/%s/%d", section, index))
 			}
+		}
+	}
+	if vector, err := loadVector(filepath.Join(directory, "description-schema.json")); err != nil {
+		suite.unavailable("description-schema")
+	} else {
+		for _, raw := range entries(vector["cases"]) {
+			entry := field(raw)
+			expected, _ := entry["valid"].(bool)
+			checkDescriptionCase(suite, field(entry["value"]), expected, "description-schema.json/"+stringField(entry, "id"))
 		}
 	}
 	if vector, err := loadVector(filepath.Join(directory, "batch.json")); err != nil {
@@ -590,6 +592,18 @@ func entryVectorChecks(suite *vectorSuite, directory string) {
 			}
 		}
 	}
+}
+
+// checkDescriptionCase sends a directory over the actual initiator's framing and admission path.
+func checkDescriptionCase(suite *vectorSuite, value record, expected bool, label string) {
+	remoteID := stringField(field(value["self"]), "instanceId")
+	remote := localOffer()
+	remote.Peer = record{"id": remoteID, "runtime": "go"}
+	var input, output bytes.Buffer
+	_ = send(&input, acceptRecord(agreement{Major: 1, Minor: 1, Codec: "json", Capabilities: []string{runtimeCapability, batchCapability, "close@1"}}, remote))
+	_ = send(&input, record{"kind": "response", "id": "go-describe-1", "ok": true, "data": record{"payload": value}})
+	_ = send(&input, record{"kind": "response", "id": "go-echo-1", "ok": true, "data": record{"payload": record{"probe": "go"}}})
+	suite.check(label, (initiator(&input, &output) == nil) == expected)
 }
 
 // u36Request creates a selected-receiver request for the new baseline's real session checks.

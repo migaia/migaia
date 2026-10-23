@@ -5,8 +5,7 @@ export const ERROR_SOURCE = 'store.keyed'
  * Declares the public error codes for `store.keyed` in one place.
  *
  * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'store.keyed'`. Throw sites use these constants instead of inline
- * literals.
+ * `source` is always `'store.keyed'`. Throw sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

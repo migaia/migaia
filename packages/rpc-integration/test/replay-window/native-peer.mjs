@@ -1,21 +1,21 @@
 import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { writeFile, rename } from 'node:fs/promises'
 import { writeFileSync, appendFileSync } from 'node:fs'
-import '@migaia/rpc-threads/adapters/node'
-import { createNodeThreadChannel } from '@migaia/rpc-threads'
-import { readThreadBootstrap } from '@migaia/rpc-threads'
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeThreadChannel } from '../../../rpc-plugin-thread/dist/threads/channel.js'
+import { readThreadBootstrap } from '../../../rpc-plugin-thread/dist/threads/bootstrap.js'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { nativeEndpoint } from '../../../rpc-core/test/replay-window/native-runtime.mjs'
-import { NativeReplayReceipt } from '../../../rpc-core/dist/core/internal/native-replay.js'
-import { loadedModules } from '../../../rpc-browser/test/replay-window/native-loaded.mjs'
+import { nativeEndpoint } from '../../../rpc-host/test/replay-window/native-runtime.mjs'
+import { NativeReplayReceipt } from '../../../rpc-host/dist/core/internal/native-replay.js'
+import { loadedModules } from '../../../rpc-plugin-browser/test/replay-window/native-loaded.mjs'
 import {
   classifyFailure,
   classifyProviderRejection,
   nativeSample
-} from '../../../rpc-core/test/replay-window/native-telemetry.mjs'
+} from '../../../rpc-host/test/replay-window/native-telemetry.mjs'
 
 /** Physical adapters, rather than fixture fields, register the owned replay resource. */
 let channel
@@ -49,7 +49,7 @@ if (config.mutant === 'missing-owner-checkpoint')
   NativeReplayReceipt.prototype.observeOwner = () => undefined
 /** The original classes are instrumented only in a separate diagnostic session. */
 const counters = config.diagnostic
-  ? await import('../../../rpc-core/test/replay-window/native-counters.mjs')
+  ? await import('../../../rpc-host/test/replay-window/native-counters.mjs')
   : undefined
 /** A supported scheduler seam advances identity age while physical timers keep their real deadlines. */
 let clockOffset = 0

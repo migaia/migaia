@@ -493,7 +493,7 @@ test('source domains known source readers contain no legacy error identities', (
     ['packages/tray/src/runtime/create-runtime.ts', ".source === '@migaia/tray'"],
     ['packages/lifecycle/src/abort-factory.ts', ".source === '@migaia/lifecycle'"],
     [
-      'packages/rpc-core/src/core/internal/endpoint-projection.ts',
+      'packages/rpc-host/src/core/internal/endpoint-projection.ts',
       ".source === '@migaia/plugin-host'"
     ]
   ]
@@ -506,7 +506,7 @@ test('source domains known source readers contain no legacy error identities', (
 
 test('source domains cross-package readers reference owner constants instead of inlining migrated domains', () => {
   /** The included cross-package reader must import the owning package constant after migration. */
-  const readers = [['packages/rpc-core/src/core/internal/endpoint-projection.ts', 'plugin.host']]
+  const readers = [['packages/rpc-host/src/core/internal/endpoint-projection.ts', 'plugin.host']]
   /** A quoted new domain in this reader duplicates the owner's source contract. */
   const duplicated = readers.filter(([file, domain]) => {
     /** Public module specifiers retain package names and are not semantic domain literals. */

@@ -1,10 +1,10 @@
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import * as remoteRetry from '../../../rpc-core/dist/remote/retry.js'
-import { createRemoteRetryPort } from '@migaia/rpc-core/remote'
-import type { IRemoteRetryDispatch } from '@migaia/rpc-core/remote'
-import { nativeFixture } from '../../../rpc-threads/test/threads/fixture.js'
+import * as remoteRetry from '../../../rpc-host/dist/remote/retry.js'
+import { createRemoteRetryPort } from '@migaia/rpc-host/plugin'
+import type { IRemoteRetryDispatch } from '@migaia/rpc-host/plugin'
+import { nativeFixture } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 /** Real Worker startup still needs event-loop turns; bounded polling does not run policy timers. */
 async function until(predicate: () => boolean): Promise<void> {
@@ -118,8 +118,10 @@ describe('thread generation recovery', () => {
     const fixture = nativeFixture({
       scheduler,
       spec: {
-        entry: new URL('../../../rpc-threads/test/threads/fixtures/rpc-worker.mjs', import.meta.url)
-          .pathname,
+        entry: new URL(
+          '../../../rpc-plugin-thread/test/threads/fixtures/rpc-worker.mjs',
+          import.meta.url
+        ).pathname,
         limits: { callWallTimeMs: 100 }
       }
     })
@@ -145,7 +147,7 @@ describe('thread generation recovery', () => {
           scheduler,
           spec: {
             entry: new URL(
-              '../../../rpc-threads/test/threads/fixtures/rpc-worker.mjs',
+              '../../../rpc-plugin-thread/test/threads/fixtures/rpc-worker.mjs',
               import.meta.url
             ).pathname,
             limits: { callWallTimeMs: 100 }

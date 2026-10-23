@@ -6,27 +6,27 @@ The [README](./README.en.md) explains what the package is for, what sets it apar
 
 ## Find your scenario
 
-| Your problem | Read |
-| --- | --- |
-| A child process should restart after it crashes | [Supervise a real child process](#supervise-a-real-child-process) |
-| A bad config causes a crash loop; you want it to stop and show why | [Stop after too many crashes](#stop-after-too-many-crashes) |
-| A background task hangs without exiting | [Detect a stuck task with heartbeats](#detect-a-stuck-task-with-heartbeats) |
-| Too many jobs start at once and the machine struggles | [Limit how many run at once](#limit-how-many-run-at-once) |
-| A new version must ship without downtime | [Replace a unit without downtime](#replace-a-unit-without-downtime) |
-| Shutdown hangs on a task that will not exit | [Bounded stop and slot release](#bounded-stop-and-slot-release) |
-| Children outlive a killed parent; the next start spawns another batch | [Parent loss and leftover processes](#parent-loss-and-leftover-processes) |
-| Spawning a process on demand takes too long | [Prewarm processes](#prewarm-processes) |
+| Your problem                                                          | Read                                                                        |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A child process should restart after it crashes                       | [Supervise a real child process](#supervise-a-real-child-process)           |
+| A bad config causes a crash loop; you want it to stop and show why    | [Stop after too many crashes](#stop-after-too-many-crashes)                 |
+| A background task hangs without exiting                               | [Detect a stuck task with heartbeats](#detect-a-stuck-task-with-heartbeats) |
+| Too many jobs start at once and the machine struggles                 | [Limit how many run at once](#limit-how-many-run-at-once)                   |
+| A new version must ship without downtime                              | [Replace a unit without downtime](#replace-a-unit-without-downtime)         |
+| Shutdown hangs on a task that will not exit                           | [Bounded stop and slot release](#bounded-stop-and-slot-release)             |
+| Children outlive a killed parent; the next start spawns another batch | [Parent loss and leftover processes](#parent-loss-and-leftover-processes)   |
+| Spawning a process on demand takes too long                           | [Prewarm processes](#prewarm-processes)                                     |
 
 ## Supervise a real child process
 
-This package defines only a launcher interface and never calls an operating-system API itself, so one policy works on Node, Bun, Deno and Electron. `@migaia/rpc-process` ships ready-made launchers; on Node use `createNodeProcessLauncher()`.
+This package defines only a launcher interface and never calls an operating-system API itself, so one policy works on Node, Bun, Deno and Electron. `@migaia/rpc-plugin-process` ships ready-made launchers; on Node use `createNodeProcessLauncher()`.
 
 The child below always exits with code 3, 200 ms after starting, like an indexing service that reads a broken config. The supervisor waits between restarts; after 2 restarts it still fails, so the supervisor moves to `terminal` and stops trying.
 
 ```ts doc-test=run
 import { createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
 const indexer = createProcessSupervisor({
@@ -334,7 +334,11 @@ When a parent process is killed, its children never receive a normal stop reques
 
 ```ts doc-test=run
 import { createParentLossGuard, reclaimOrphanProcesses } from '@migaia/supervision/process'
-import type { IProcessLauncher, IProcessRecord, IProcessRegistry } from '@migaia/supervision/process'
+import type {
+  IProcessLauncher,
+  IProcessRecord,
+  IProcessRegistry
+} from '@migaia/supervision/process'
 
 // Child side: once the parent is gone, clean up and exit within 1 second.
 const guard = createParentLossGuard({
@@ -351,13 +355,30 @@ await new Promise((resolve) => setTimeout(resolve, 100))
 
 // Parent side: an in-memory stand-in for durable storage; use a file or database in practice.
 const records = new Map<string, IProcessRecord>([
-  ['a', { id: 'a', namespace: 'indexer', identity: { fingerprint: 'boot-1:4101', pid: 4101 }, launchedAt: 0 }],
-  ['b', { id: 'b', namespace: 'indexer', identity: { fingerprint: 'boot-1:4102', pid: 4102 }, launchedAt: 0 }]
+  [
+    'a',
+    {
+      id: 'a',
+      namespace: 'indexer',
+      identity: { fingerprint: 'boot-1:4101', pid: 4101 },
+      launchedAt: 0
+    }
+  ],
+  [
+    'b',
+    {
+      id: 'b',
+      namespace: 'indexer',
+      identity: { fingerprint: 'boot-1:4102', pid: 4102 },
+      launchedAt: 0
+    }
+  ]
 ])
 const registry: IProcessRegistry = {
   add: async (record) => void records.set(record.id, record),
   remove: async (id) => void records.delete(id),
-  list: async (namespace) => [...records.values()].filter((record) => record.namespace === namespace)
+  list: async (namespace) =>
+    [...records.values()].filter((record) => record.namespace === namespace)
 }
 // Reclaiming needs a launcher that can probe and end recorded processes; only those steps are faked here.
 const launcher: IProcessLauncher = {
@@ -366,7 +387,12 @@ const launcher: IProcessLauncher = {
   probe: async (record) => (record.identity.pid === 4101 ? 'alive' : 'reused'),
   terminateRecord: async (record) => console.log('ending leftover process', record.identity.pid)
 }
-const result = await reclaimOrphanProcesses({ registry, namespace: 'indexer', launcher, report: console.error })
+const result = await reclaimOrphanProcesses({
+  registry,
+  namespace: 'indexer',
+  launcher,
+  report: console.error
+})
 console.log('terminated:', result.terminated, '| records removed:', result.removed)
 ```
 
@@ -389,7 +415,7 @@ Pass `registry: { port, namespace }` to `createProcessSupervisor` and the superv
 import { createUnitBudget } from '@migaia/supervision'
 import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const launcher = createNodeProcessLauncher()
 const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })
@@ -399,7 +425,14 @@ const spec: IProcessSpec = {
   env: { inherit: [], set: {} },
   stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }
 }
-const options = { id: 'renderer', launcher, budget, spec, isolation: 'best-effort' as const, report: () => undefined }
+const options = {
+  id: 'renderer',
+  launcher,
+  budget,
+  spec,
+  isolation: 'best-effort' as const,
+  report: () => undefined
+}
 const pool = createPrewarmPool({ ...options, size: 1 })
 await new Promise((resolve) => setTimeout(resolve, 300))
 console.log('idle processes:', pool.idle)

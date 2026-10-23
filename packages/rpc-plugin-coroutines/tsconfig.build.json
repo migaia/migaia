@@ -1,0 +1,29 @@
+{
+  // The actual independent-publish artifact: real ESM `.js` + `.d.ts` output
+  // under `dist/`, source only (no tests).
+  // Run via `pnpm --filter ./packages/rpc run build`.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "ESNext.Disposable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": [],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "inlineSources": true,
+    "stripInternal": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

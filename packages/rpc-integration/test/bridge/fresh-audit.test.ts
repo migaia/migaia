@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { bridgeFixture } from './fixture.js'
-import { readJsonObjectPort } from '../../../rpc-core/dist/core/internal/json-object-port.js'
+import { readJsonObjectPort } from '../../../rpc-host/dist/core/internal/json-object-port.js'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import { createRpcStreamFrameDecoderWithLimit } from '@migaia/rpc-contract/framing/stream'
-import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from '@migaia/rpc-process'
-import { normalizeRemoteHostCatalog } from '@migaia/rpc-core/remote'
-import { RemoteCatalogLimit } from '../../../rpc-core/dist/remote/contract.js'
+import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from '../../../rpc-plugin-process/dist/process/constants.js'
+import { normalizeRemoteHostCatalog } from '@migaia/rpc-host/plugin'
+import { RemoteCatalogLimit } from '../../../rpc-host/dist/remote/contract.js'
 import { createJsonRpcFrameDecoder } from '@migaia/rpc-contract/framing/jsonrpc'
 
 /** Release global allocation observers after every adversarial case. */

@@ -1,25 +1,25 @@
 import { describe, expect, it, vi } from 'vitest'
-import { RemoteMethodName } from '@migaia/rpc-core/remote'
+import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { createLifecycleScope } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessResilience } from '@migaia/rpc-process'
-import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
-import { createProcessError } from '../../../rpc-process/dist/process/error.js'
-import { RpcProcessErrorCode } from '@migaia/rpc-process'
-import type { IProcessRegistrationListener } from '@migaia/rpc-process'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { listenProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import type { IProcessRegistrationListener } from '../../../rpc-plugin-process/dist/process/resilience/types.js'
 import { nativeEndpoint } from './fixtures/native-runtime.js'
 import { nativeHostCatalog, nativeHostChildPath, nativeHostToken } from './fixtures/host-native.js'
-import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from '../../../rpc-core/test/remote/fixture.js'
+import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from '../../../rpc-host/test/remote/fixture.js'
 import {
   adoptHostRegistration,
   type IAdoptedHostRegistration,
   type IProcessHostAdoptionOptions
-} from '../../../rpc-process/dist/process/host/registration.js'
+} from '../../../rpc-plugin-process/test/protocol.ts'
 
 /** Cold process connection work stays within the existing 5000ms test envelope. */
 const REGISTRATION_CONNECTION_TIMEOUT_MS = 4000

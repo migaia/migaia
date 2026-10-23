@@ -2,11 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://migaia.dev/rpc/runtime-description.schema.json",
   "type": "object",
-  "required": [
-    "schemaVersion",
-    "self",
-    "methods"
-  ],
+  "required": ["schemaVersion", "self", "methods"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
@@ -14,10 +10,7 @@
     },
     "self": {
       "type": "object",
-      "required": [
-        "name",
-        "instanceId"
-      ],
+      "required": ["name", "instanceId"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -29,6 +22,9 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128
+        },
+        "generation": {
+          "$ref": "#/$defs/generation"
         }
       }
     },
@@ -37,11 +33,7 @@
       "maxItems": 4096,
       "items": {
         "type": "object",
-        "required": [
-          "name",
-          "supportedModes",
-          "modeSource"
-        ],
+        "required": ["name", "supportedModes", "modeSource"],
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -55,18 +47,11 @@
             "maxItems": 3,
             "uniqueItems": true,
             "items": {
-              "enum": [
-                "request",
-                "notify",
-                "stream"
-              ]
+              "enum": ["request", "notify", "stream"]
             }
           },
           "modeSource": {
-            "enum": [
-              "declared",
-              "generated-routes"
-            ]
+            "enum": ["declared", "generated-routes"]
           },
           "idempotent": {
             "type": "boolean"
@@ -74,6 +59,15 @@
           "forwardedVia": {
             "type": "string",
             "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$"
+          },
+          "input": {
+            "$ref": "#/$defs/methodSchema"
+          },
+          "output": {
+            "$ref": "#/$defs/methodSchema"
+          },
+          "yield": {
+            "$ref": "#/$defs/methodSchema"
           }
         }
       }
@@ -81,6 +75,121 @@
     "nodeId": {
       "type": "string",
       "pattern": "^[0-9a-f]{32}$"
+    }
+  },
+  "$defs": {
+    "methodSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "enum": ["null", "boolean", "object", "array", "number", "integer", "string"]
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["null", "boolean", "object", "array", "number", "integer", "string"]
+              }
+            }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/methodSchema"
+          }
+        },
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "$ref": "#/$defs/methodSchema"
+        },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/portable"
+          }
+        },
+        "const": {
+          "$ref": "#/$defs/portable"
+        },
+        "anyOf": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/methodSchema"
+          }
+        },
+        "$defs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/methodSchema"
+          }
+        },
+        "$ref": {
+          "type": "string",
+          "pattern": "^#/[\\$]defs/"
+        }
+      }
+    },
+    "portable": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/portable"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/portable"
+          }
+        }
+      ]
+    },
+    "generation": {
+      "type": "object",
+      "required": ["kind", "value", "providerId"],
+      "properties": {
+        "kind": {
+          "enum": ["restart", "session"]
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "providerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

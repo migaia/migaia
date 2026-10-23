@@ -30,7 +30,7 @@ const HELLO = JSON.parse(createRpcHello(OFFER)) as Record<string, unknown>
 /** Resolve the package without relying on the process working directory. */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 /** Core owns the existing retained-root measurement; Contract consumes its actual result. */
-const CORE_PACKAGE_ROOT = resolve(PACKAGE_ROOT, '../rpc-core')
+const CORE_PACKAGE_ROOT = resolve(PACKAGE_ROOT, '../rpc-host')
 
 /** Inspect visible, hidden, wire and cause values for every six-character token fragment. */
 function leaks(error: unknown, token: string): boolean {

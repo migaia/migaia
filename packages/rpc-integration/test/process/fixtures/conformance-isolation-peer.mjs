@@ -3,26 +3,26 @@ import { inspect } from 'node:util'
 import { serializeRpcError } from '@migaia/rpc-contract'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
+import { createProcessResilience } from '../../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { listenProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { serveProcessSessions } from '../../../../rpc-plugin-process/dist/process/plugin/serve.js'
+import { createProcessSessionService } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessInstanceFallback } from '../../../../rpc-plugin-process/dist/process/resilience/fallback.js'
+import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
+import { codec, framer, abort, connect, ping } from '../../../../rpc-host/dist/core/index.js'
+import { isRpcTimeoutError } from '@migaia/rpc-host'
 import {
-  createProcessResilience,
-  createNativeProcessOffer,
-  createProcessTransport
-} from '@migaia/rpc-process'
-import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
-import {
-  serveProcessSessions,
-  createProcessSessionService
-} from '../../../../rpc-process/dist/process/plugin/serve.js'
-import { createProcessInstanceFallback } from '../../../../rpc-process/dist/process/resilience/fallback.js'
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { codec, framer, abort, connect, ping, isRpcTimeoutError } from '@migaia/rpc-core'
-import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'
-import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
-import { createProviderFeature } from '@migaia/rpc-core/features/provider'
-import { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'
-import { createControlFeature } from '@migaia/rpc-core/features/control'
-import { createOneWayFeature } from '@migaia/rpc-core/features/one-way'
+  createCanonicalChunkFeature,
+  createStreamFeature
+} from '../../../../rpc-host/dist/core/stream/index.js'
+import { createOutboundFeature } from '../../../../rpc-host/dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../../rpc-host/dist/core/features/provider.js'
+import { createDiscoveryFeature } from '../../../../rpc-host/dist/core/features/discovery.js'
+import { createControlFeature } from '../../../../rpc-host/dist/core/features/control.js'
+import { createOneWayFeature } from '../../../../rpc-host/dist/core/features/one-way.js'
 
 /** The published vector owns every business method and mode used by this fixture. */
 const contract = JSON.parse(

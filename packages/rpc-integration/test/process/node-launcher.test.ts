@@ -7,11 +7,11 @@ import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame
 } from '@migaia/rpc-contract/framing/stream'
-import { createNodeProcessLauncher } from '../../../rpc-process/src/process/adapters/node-child-process.js'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-process/src/process/offer.js'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/src/process/adapters/node-child-process.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/src/process/offer.js'
 import { CHILD_STDERR_REDACTED } from '../fixtures/process-diagnostics.js'
-import type { IIpcLogRecord } from '@migaia/rpc-core/plugins/flow-control'
+import type { IIpcLogRecord } from '@migaia/rpc-host/plugin'
 
 /** The fixture is a separate Node process and imports only the built package output. */
 const fixture = fileURLToPath(new URL('./fixtures/node-child.mjs', import.meta.url))

@@ -262,7 +262,7 @@ Invalid incoming fragments return categorized rejections, while invalid construc
 
 This package defines RPC wire data and provides construction, validation, normalization, and framing. It opens no connection, executes no remote method, owns no Endpoint, and binds to neither Node nor DOM/Worker APIs. Stateful framers own bounded assembly buffers and expiry timers only. Runtime dependencies are `@migaia/serialize` and `@migaia/utils`, without peer dependencies.
 
-Ordinary TypeScript callers usually use it through rpc-core, where this package is a peer dependency. Independent-language peers, carrier adapters, and cross-boundary error handling are its direct consumers. rpc-process reuses Content-Length framing and error conversion; serialize owns the underlying portable traversal and error-chain implementation.
+Application code normally calls `createRpcHost` from `@migaia/rpc-host` with a transport plugin. Independent-language peers, adapter authors, and error-boundary consumers use contract entries directly. `@migaia/rpc-plugin-process` reuses Content-Length framing and error conversion; serialize owns the underlying portable traversal and error-chain implementation. Contract checkers remain independent of Host, plugins, and native I/O.
 
 | Public entry                                                        | Purpose                                                                               |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -275,12 +275,21 @@ Ordinary TypeScript callers usually use it through rpc-core, where this package 
 | `./framing`                                                         | String/binary fragmentation, assembly, and physical frame inspection                  |
 | `./framing/stream`                                                  | Four-byte network-order length prefixes and bootstrap/handshake receivers             |
 | `./framing/jsonrpc`                                                 | Content-Length byte framing and bridge error codes                                    |
+| `./remote`                                                          | Pure remote contract/catalog/control checkers, shape reasons, and method-schema types |
 | `./runtime`, `./runtime/metadata`, `./runtime/lazy`                 | Runtime envelopes, call headers, generations/steps, and lazy loading                  |
 | `./stream`                                                          | Stream payload, sequence, progress, credit, and control-state checks                  |
 | `./binary`, `./binary/lazy`, `./binary/capture`, `./binary/inspect` | Binary capture, preparation, restoration, manifests, integrity, and size              |
 | `./schema/wire-error`                                               | Published wire-error JSON Schema                                                      |
 
-These are the root and 18 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias.
+These are the root and 19 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias.
+
+### Pure remote and runtime shape checks
+
+`@migaia/rpc-contract/remote` exports `checkRemoteContract(value)`, `checkRemoteHostCatalog(value)`, and `checkRemoteControlShape(definition, value)`. `@migaia/rpc-contract/runtime` exports `checkRuntimeDescription(value)`. Each returns `IRpcShapeCheck<T>`: `{ ok: true, value }` is the normalized snapshot, while `{ ok: false, reason, path, cause? }` is a bounded diagnostic. `RpcShapeReason` defines the reason vocabulary. These functions do not construct Host errors or establish a connection; Host's throwing wrappers retain their own native class, source, code, text, and original cause.
+
+Method declarations and runtime directory entries may carry optional `input`, `output`, and `yield` schema data (`IRpcMethodSchema`). The supported JSON Schema subset is `type`, `properties`, `required`, `items`, `enum`, `const`, `anyOf`, `$defs`, and local `#/$defs/...` references. Unknown keywords and external references are rejected; schemas are portable data, not executable validators or remote fetch instructions. Payload execution remains with the Host/provider owner.
+
+The package ships [remote-contract.schema.json](./schema/remote-contract.schema.json) and [runtime-description.schema.json](./schema/runtime-description.schema.json), alongside runtime-api and wire schemas. The `./remote` entry exposes the checker types; these two schema files are shipped artifacts, not extra package-export aliases. Schema validation does not replace bounded normalizers or native source qualification.
 
 ### Constants, descriptors, and wire vocabulary
 
@@ -389,11 +398,11 @@ toJsonRpcError(wire, code) stores the tree in error.data.migaiaWireError. The ca
 
 classifyRpcContractError recognizes only exact local references issued by this package and returns their outward code/message. Copies or deserialized remote errors return undefined. Remote source/code is diagnostic identity, not proof of local origin or authority to retry/control an operation.
 
-schema/wire-error is a structural starting point, not the complete bounded normalizer. Independent implementations also enforce x-migaia-limits, canonical base64url, and surrogate rules. Schema additionalProperties does not match default normalizer rejection. A native peer in another language also needs prefix framing, handshake, and runtime envelopes. The JSON-RPC bridge needs its four extension methods, owned by the rpc-process protocol layer rather than a connection implementation here.
+schema/wire-error is a structural starting point, not the complete bounded normalizer. Independent implementations also enforce x-migaia-limits, canonical base64url, and surrogate rules. Schema additionalProperties does not match default normalizer rejection. A native peer in another language also needs prefix framing, handshake, and runtime envelopes. The JSON-RPC bridge needs its four extension methods, owned by the rpc-plugin-process protocol layer rather than a connection implementation here.
 
 ### Error identity and maintenance
 
-Contract errors use source rpc.contract, exported as RPC_CONTRACT_SOURCE, and RpcContractErrorCode.
+Contract errors retain the semantic source `rpc.contract`, exported as `RPC_CONTRACT_SOURCE`, and use RpcContractErrorCode for the code.
 
 | Code                   | Native type and trigger                                                           |
 | ---------------------- | --------------------------------------------------------------------------------- |
@@ -411,9 +420,9 @@ Contract errors use source rpc.contract, exported as RPC_CONTRACT_SOURCE, and Rp
 
 Shape errors retain native classes. Mutable callback errors are tagged in place without stack rewriting; immutable/non-Error values stay on cause. Complete upstream source/code identities retain their owner. Fatal UTF-8 decoder errors remain on HANDSHAKE_INVALID/INVALID_FRAME causes.
 
-The bridge source is rpc.contract.jsonrpc, exported as JSONRPC_BRIDGE_ERROR_SOURCE. JsonRpcBridgeErrorCode contains JSONRPC_FRAME_INVALID, JSONRPC_EXTENSION_MISSING, JSONRPC_PROFILE_INVALID, JSONRPC_UNSUPPORTED_MODE, and JSONRPC_HANDSHAKE_TIMEOUT for framing, extensions, profile, mode, and handshake timing. Do not classify bridge errors as the contract source.
+The bridge source is `rpc.contract.jsonrpc`, exported as JSONRPC_BRIDGE_ERROR_SOURCE. JsonRpcBridgeErrorCode contains JSONRPC_FRAME_INVALID, JSONRPC_EXTENSION_MISSING, JSONRPC_PROFILE_INVALID, JSONRPC_UNSUPPORTED_MODE, and JSONRPC_HANDSHAKE_TIMEOUT for framing, extensions, profile, mode, and handshake timing. Do not classify bridge errors as the contract source.
 
-Other layers use rpc.endpoint (RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode), rpc.remote (RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode), rpc.transport.process (RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode), and rpc.transport.thread (RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode). Branch on source/code; message is presentation text rather than retry policy.
+Other layers use `rpc.endpoint` (RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode), `rpc.remote` (RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode), `rpc.transport.process` (RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode), and `rpc.transport.thread` (RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode). Branch on source/code; message is presentation text rather than retry policy.
 
 ```bash
 pnpm --filter @migaia/rpc-contract run fmt

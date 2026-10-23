@@ -164,22 +164,6 @@
       "./plugins/file": [
         "FILE_PLUGIN_NAME",
         "file"
-      ],
-      "./plugins/durable": [
-        "LogRecordState",
-        "LogStage",
-        "assertLogInteger",
-        "binlog",
-        "createLogStoreIndex",
-        "memoryLogStore",
-        "prepareLogAppend",
-        "snapshotLogRecords",
-        "snapshotLogStoreState",
-        "undoLog",
-        "wal"
-      ],
-      "./plugins/durable/file": [
-        "fileLogStore"
       ]
     },
     "@migaia/micro-hub": {
@@ -301,31 +285,6 @@
         "createResource"
       ]
     },
-    "@migaia/rpc-browser": {
-      ".": [
-        "RPC_BROWSER_ERROR_SOURCE",
-        "RpcBrowserErrorCode",
-        "createBrowserPeer"
-      ],
-      "./adapters/window": [
-        "createWindowMessageTransport"
-      ],
-      "./adapters/shared-worker": [
-        "createSharedWorkerTransport"
-      ],
-      "./adapters/service-worker": [
-        "createServiceWorkerTransport"
-      ],
-      "./adapters/broadcast-channel": [
-        "createBroadcastChannelTransport"
-      ],
-      "./adapters/web-transport": [
-        "createWebTransportDatagramTransport"
-      ],
-      "./adapters/rtc-data-channel": [
-        "createRtcDataChannelTransport"
-      ]
-    },
     "@migaia/rpc-contract": {
       ".": [
         "RPC_CONTRACT_SOURCE",
@@ -391,7 +350,8 @@
         "measureRpcPhysicalFrame",
         "messageFramerV1",
         "readRpcBatchMembers",
-        "remoteProcessStringFramer"
+        "remoteProcessStringFramer",
+        "rpcByteRuntimeBootstrap"
       ],
       "./framing/v1": [
         "RpcBinaryProfile",
@@ -506,6 +466,7 @@
         "normalizeRpcHandshake"
       ],
       "./runtime": [
+        "RUNTIME_API_SCHEMA_VERSION",
         "RpcRuntimeCancel",
         "RpcRuntimeCarrier",
         "RpcRuntimeField",
@@ -520,6 +481,19 @@
         "RpcRuntimeStoreContinuity",
         "RpcRuntimeStoreKind",
         "RpcRuntimeStreamPrefix",
+        "RuntimeApiMode",
+        "RuntimeApiModeSource",
+        "RuntimeConnectionDirection",
+        "RuntimeEventName",
+        "RuntimeMetricScope",
+        "RuntimeMetricUnit",
+        "RuntimeQueryClock",
+        "RuntimeQueryReason",
+        "RuntimeQueryStatus",
+        "RuntimeRecentKind",
+        "RuntimeResourceKind",
+        "RuntimeSourceKind",
+        "checkRuntimeDescription",
         "normalizeRuntimeEnvelope",
         "normalizeRuntimeEnvelopeDecoded",
         "normalizeRuntimeGeneration",
@@ -553,9 +527,15 @@
         "rpcBinaryView"
       ],
       "./framing/jsonrpc": [
+        "JSONRPC_ALLOWED_CAPABILITIES",
         "JSONRPC_BRIDGE_ERROR_SOURCE",
+        "JSONRPC_REQUIRED_CAPABILITIES",
+        "JSONRPC_REQUIRED_METHODS",
         "JsonRpcBridgeErrorCode",
+        "JsonRpcErrorNumber",
         "JsonRpcLimit",
+        "JsonRpcProfile",
+        "checkJsonRpcDescription",
         "createJsonRpcFrameDecoder",
         "encodeJsonRpcFrame"
       ],
@@ -595,117 +575,36 @@
         "checkRpcStreamSequence",
         "measurePortableStreamValue",
         "normalizeStreamPayload"
-      ]
-    },
-    "@migaia/rpc-core": {
+      ],
       "./remote": [
-        "DEFAULT_DRAIN_MS",
+        "REMOTE_INVALID_PATH_SEGMENT",
         "REMOTE_METHOD_MAX_LENGTH",
         "REMOTE_METHOD_MODES",
         "REMOTE_NAME_PATTERN",
         "REMOTE_SCHEMA_VERSION",
-        "RPC_REMOTE_ERROR_SOURCE",
-        "RUNTIME_API_SCHEMA_VERSION",
+        "RemoteCatalogLimit",
         "RemoteMethodMode",
         "RemoteMethodName",
-        "RpcRemoteLayerErrorCode",
-        "RuntimeApiMode",
-        "RuntimeConnectionDirection",
-        "RuntimeEventName",
-        "RuntimePluginKey",
-        "RuntimeQueryStatus",
-        "RuntimeSourceKind",
-        "createCoroutinePlugin",
-        "createManagedRuntimePeer",
-        "createRemoteHost",
-        "createRemotePlugin",
-        "createRemoteRetryPort",
-        "createRuntimePeer",
-        "createRuntimePlugin",
-        "normalizeRemoteContract",
-        "normalizeRemoteControlShape",
-        "normalizeRemoteHostCatalog",
-        "sameRemoteContract",
-        "serveRemoteHost",
-        "serveRemotePlugin"
-      ],
+        "RpcShapeReason",
+        "checkRemoteContract",
+        "checkRemoteControlShape",
+        "checkRemoteHostCatalog",
+        "sameRemoteContract"
+      ]
+    },
+    "@migaia/rpc-host": {
       ".": [
         "RPC_CORE_ERROR_SOURCE",
-        "RpcCandidateStatus",
         "RpcCoreErrorCode",
-        "RpcEndpointStatus",
         "RpcLifecycleError",
-        "RpcOperation",
-        "RpcPlatform",
         "RpcProviderRejectionReason",
-        "RpcTransportEncoding",
-        "RpcTransportOwnership",
-        "RpcTransportTopology",
-        "abort",
-        "authentication",
-        "codec",
-        "connect",
-        "contract",
-        "createEndpoint",
-        "createFullEndpoint",
-        "createFullOneWayEndpoint",
+        "createRpcHost",
         "createRpcIdempotencyStore",
-        "createRuntimeApiEndpoint",
         "defaultRpcReporter",
-        "defineFeature",
-        "defineMiddleware",
-        "deserializeRpcError",
-        "framer",
-        "hooks",
         "isRpcError",
         "isRpcErrorInstance",
         "isRpcRemoteError",
-        "isRpcTimeoutError",
-        "ping",
-        "protocol",
-        "serializeRpcError",
-        "timeout",
-        "uuid"
-      ],
-      "./composed": [
-        "createComposedEndpoint"
-      ],
-      "./client": [
-        "createClientEndpoint"
-      ],
-      "./provider": [
-        "createProviderEndpoint"
-      ],
-      "./full": [
-        "createFullEndpoint",
-        "createFullOneWayEndpoint"
-      ],
-      "./transport-constants": [
-        "RpcCandidateStatus",
-        "RpcEndpointStatus",
-        "RpcOperation",
-        "RpcPlatform",
-        "RpcTransportEncoding",
-        "RpcTransportOwnership",
-        "RpcTransportTopology"
-      ],
-      "./transport-kit": [
-        "RpcPlatform",
-        "RpcTransportOwnership",
-        "collectListenerCleanupFailures",
-        "collectListenerFailure",
-        "createListenerFailure",
-        "createListenerFailureState",
-        "createMessageListenerHub",
-        "drainListenerFailures",
-        "drainTerminalListenerFailures",
-        "identifyRpcBoundaryFailure",
-        "observeListener",
-        "registerListeners",
-        "releaseListenerRegistration",
-        "reportListenerFailure",
-        "safeRead",
-        "safeString"
+        "isRpcTimeoutError"
       ],
       "./probe": [
         "IpcReporterContext",
@@ -725,95 +624,197 @@
         "snapshotProbeEvent",
         "subscribeProbeStages"
       ],
-      "./features/outbound": [
-        "createOutboundFeature"
-      ],
-      "./features/one-way": [
-        "createOneWayFeature"
-      ],
-      "./features/provider": [
-        "createProviderAdmissionScope",
-        "createProviderFeature"
-      ],
-      "./features/discovery": [
-        "createDiscoveryFeature"
-      ],
-      "./features/control": [
-        "createControlFeature"
-      ],
       "./stream": [
         "createCanonicalChunkFeature",
         "createStreamFeature"
       ],
-      "./plugins/flow-control": [
-        "IpcLogEventName",
-        "IpcSendClass"
-      ],
-      "./plugins/send-queue": [
-        "createIpcSendQueueFeature",
-        "createIpcSendQueueTransport"
-      ],
-      "./plugins/log": [
-        "createIpcLogFeature"
-      ],
       "./adapters/memory": [
         "createMemoryTransportPair"
-      ],
-      "./adapters/message-port": [
-        "createBrowserMessagePortTransport",
-        "createNodeMessagePortTransport"
       ],
       "./testing": [
         "createPeerPair"
       ],
-      "./adapters/web-worker": [
-        "createWebWorkerTransport"
-      ],
-      "./adapter": [
-        "defineByteAdapter",
-        "defineMessageAdapter"
-      ],
-      "./adapter/internal-advanced": [
+      "./plugin": [
+        "DEFAULT_DRAIN_MS",
+        "IpcLogEventName",
         "IpcReporterContext",
+        "IpcSendClass",
         "JSONRPC_ALLOWED_CAPABILITIES",
         "JSONRPC_REQUIRED_CAPABILITIES",
         "JSONRPC_REQUIRED_METHODS",
         "JsonRpcErrorNumber",
         "JsonRpcProfile",
-        "assembleAdapterPlugin",
-        "captureAdapterTask",
+        "MessageResourceEvent",
+        "REMOTE_METHOD_MAX_LENGTH",
+        "REMOTE_METHOD_MODES",
+        "REMOTE_NAME_PATTERN",
+        "REMOTE_SCHEMA_VERSION",
+        "RPC_REMOTE_ERROR_SOURCE",
+        "RUNTIME_API_SCHEMA_VERSION",
+        "RemoteMethodMode",
+        "RemoteMethodName",
+        "RpcAdapterErrorText",
+        "RpcCandidateStatus",
+        "RpcCarrierDetailKey",
+        "RpcEndpointStatus",
+        "RpcOperation",
+        "RpcPlatform",
+        "RpcRemoteLayerErrorCode",
+        "RpcTransportEncoding",
+        "RpcTransportMode",
+        "RpcTransportOwnership",
+        "RpcTransportTopology",
+        "RuntimeApiErrorText",
+        "RuntimeApiMode",
+        "RuntimeConnectionDirection",
+        "RuntimeEventName",
+        "RuntimePluginKey",
+        "RuntimeQueryStatus",
+        "RuntimeSourceKind",
+        "assertJsonRpcExtensions",
         "carrierSizeBytes",
+        "collectListenerCleanupFailures",
+        "collectListenerFailure",
         "createAdapterBindingDrain",
         "createAdapterConfigurationError",
         "createAdapterConfigurationTypeError",
+        "createAdapterDeployment",
         "createAdapterId",
-        "createAdapterJsonRpcChannel",
-        "createAdapterPlugin",
+        "createAdapterMessageHandshakeBudget",
         "createAdapterSourceConfigurationError",
         "createAdapterTransportError",
+        "createBrowserMessagePortTransport",
         "createEventEmitterMessageResource",
         "createEventTargetMessageResource",
+        "createIpcLogFeature",
+        "createIpcSendQueueFeature",
         "createJsonRpcBridgeError",
+        "createListenerFailure",
+        "createListenerFailureState",
+        "createMessageListenerHub",
+        "createRemoteRetryPort",
+        "createRpcTransportError",
         "createRuntimeByteConnection",
         "createRuntimeEventByteIO",
         "createRuntimeMessageConnection",
         "createRuntimeProviderGovernor",
         "createRuntimeProviderScope",
+        "createRuntimeWebByteStream",
+        "createWebWorkerTransport",
+        "defaultRpcReporter",
+        "defineByteAdapter",
+        "defineFeaturePlugin",
+        "defineMessageAdapter",
+        "defineTransportPlugin",
+        "deserializeRpcError",
+        "drainListenerFailures",
+        "drainTerminalListenerFailures",
+        "holdAdapterByteBootstrapSource",
         "holdAdapterLaunch",
+        "holdAdapterMessageBootstrapSource",
+        "holdAdapterObjectChannel",
         "holdAdapterRegistration",
+        "identifyRpcBoundaryFailure",
+        "materializeAdapterJson",
+        "normalizeRemoteContract",
+        "normalizeRemoteControlShape",
+        "normalizeRemoteHostCatalog",
+        "observeListener",
+        "prepareJsonRpcOffer",
         "readAdapterAbortReason",
+        "readJsonRpcReply",
         "readRuntimeByteBootstrap",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure",
         "resolveAdapterEntry",
         "retainAdapterRuntimeFlags",
+        "runtimeQuery",
+        "safeRead",
+        "safeString",
+        "sameRemoteContract",
+        "serializeRpcError",
         "validateAdapterPeerMethods",
-        "validateAdapterPeerTimeout"
+        "validateAdapterPeerTimeout",
+        "validateJsonRpcDescription"
+      ],
+      "./features": [
+        "authFeature",
+        "chunkFeature",
+        "retryFeature",
+        "timeoutFeature",
+        "typegenFeature"
+      ],
+      "./features/auth": [
+        "authFeature",
+        "default"
+      ],
+      "./features/chunk": [
+        "chunkFeature",
+        "default"
+      ],
+      "./features/retry": [
+        "default",
+        "retryFeature"
+      ],
+      "./features/timeout": [
+        "default",
+        "timeoutFeature"
+      ],
+      "./features/typegen": [
+        "default",
+        "typegenFeature"
       ]
     },
-    "@migaia/rpc-devtools": {
+    "@migaia/rpc-plugin-browser": {
+      ".": [
+        "RPC_BROWSER_ERROR_SOURCE",
+        "RpcBrowserErrorCode",
+        "broadcastChannelPlugin",
+        "dedicatedWorkerPlugin",
+        "rtcDataChannelPlugin",
+        "serviceWorkerPlugin",
+        "sharedWorkerPlugin",
+        "webTransportPlugin",
+        "windowPlugin"
+      ],
+      "./adapters/window": [
+        "createWindowMessageTransport"
+      ],
+      "./adapters/shared-worker": [
+        "createSharedWorkerTransport"
+      ],
+      "./adapters/service-worker": [
+        "createServiceWorkerTransport"
+      ],
+      "./adapters/broadcast-channel": [
+        "createBroadcastChannelTransport"
+      ],
+      "./adapters/web-transport": [
+        "createWebTransportDatagramTransport"
+      ],
+      "./adapters/rtc-data-channel": [
+        "createRtcDataChannelTransport"
+      ],
+      "./adapters/message-port": [
+        "createBrowserMessagePortTransport"
+      ],
+      "./adapters/web-worker": [
+        "createWebWorkerTransport"
+      ]
+    },
+    "@migaia/rpc-plugin-coroutines": {
+      ".": [
+        "RPC_COROUTINE_ERROR_SOURCE",
+        "RpcCoroutineErrorCode",
+        "coroutinePlugin"
+      ]
+    },
+    "@migaia/rpc-plugin-devtools": {
       ".": [
         "RPC_DEVTOOLS_SOURCE",
         "RpcDevtoolsErrorCode",
-        "createRpcDevtools"
+        "devtoolsPlugin"
       ],
       "./contract": [
         "RPC_DEVTOOLS_SOURCE",
@@ -830,42 +831,21 @@
         "createRpcLogProbe"
       ]
     },
-    "@migaia/rpc-pool": {
+    "@migaia/rpc-plugin-pool": {
       ".": [
         "RPC_POOL_ERROR_SOURCE",
+        "RPC_POOL_PEER_ID",
         "RpcPoolErrorCode",
         "RpcPoolState",
-        "createProcessPool",
-        "createThreadPool"
+        "poolPlugin"
       ]
     },
-    "@migaia/rpc-process": {
+    "@migaia/rpc-plugin-process": {
       ".": [
-        "PROCESS_HANDSHAKE_MAX_FRAME_BYTES",
-        "PROCESS_RUNTIME_API_BOOTSTRAP_KIND",
-        "PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS",
-        "PROCESS_RUNTIME_API_BOOTSTRAP_VERSION",
-        "PROCESS_RUNTIME_API_ENV",
-        "PROCESS_RUNTIME_API_ENV_VERSION",
-        "PROCESS_RUNTIME_API_FINGERPRINT_PREFIX",
-        "ProcessPluginWire",
         "RPC_PROCESS_ERROR_SOURCE",
         "RpcProcessErrorCode",
-        "createAdapterProcessLaunch",
-        "createAdapterProcessPeer",
-        "createAdapterProcessPlugin",
-        "createAdapterWebByteIO",
-        "createNativeProcessOffer",
-        "createProcessChannelClosedError",
-        "createProcessJsonRpcChannel",
-        "createProcessPeer",
-        "createProcessPlugin",
-        "createProcessResilience",
-        "createProcessTransport",
         "isProcessChild",
-        "openProcessObjectChannel",
-        "parseProcessPluginDescriptor",
-        "receiveAdapterBootstrap"
+        "processPlugin"
       ],
       "./adapters/node-child-process": [
         "createAdapterChildStdio",
@@ -900,24 +880,32 @@
       ],
       "./adapters/windows-job": [
         "createWindowsJobProcessLauncher"
+      ],
+      "./features": [
+        "IpcLogEventName",
+        "IpcSendClass",
+        "ipcLogFeature",
+        "sendQueueFeature"
+      ],
+      "./features/send-queue": [
+        "default",
+        "sendQueueFeature"
+      ],
+      "./features/log": [
+        "default",
+        "ipcLogFeature"
+      ],
+      "./features/flow-control": [
+        "IpcLogEventName",
+        "IpcSendClass"
       ]
     },
-    "@migaia/rpc-threads": {
+    "@migaia/rpc-plugin-thread": {
       ".": [
-        "AdapterNodeThreadParentChannel",
         "RPC_THREAD_ERROR_SOURCE",
         "RpcThreadErrorCode",
-        "createAdapterNodeThreadLauncher",
-        "createAdapterNodeThreadPeer",
-        "createNodeThreadChannel",
-        "createThreadPeer",
-        "createThreadPlugin",
-        "createWebThreadChannel",
-        "createWebThreadChannelFactory",
-        "createWebThreadLauncher",
         "isThreadChild",
-        "readThreadBootstrap",
-        "receiveThreadData"
+        "threadPlugin"
       ],
       "./adapters/node": [
         "createNodeThreadChannelFactory",
@@ -1012,505 +1000,43 @@
       ],
       "./codecs/protobuf": [
         "defineProtobufCodec"
-      ],
-      "./codecs/collections-json": [
-        "defineCollectionsJsonCodec"
-      ],
-      "./tagged": [
-        "createTaggedCodec"
       ]
     },
     "@migaia/storage-contract": {
       ".": [
-        "BACKEND_KIND_PATTERN",
-        "ConcurrencyHolderState",
-        "ConcurrencyLocking",
+        "COLLECTIONS_JSON_CODEC_NAME",
         "ConflictPolicy",
-        "DeleteCountMode",
         "KEY_DOMAIN_LIMITS",
-        "LockChannel",
-        "QueryOperation",
-        "QueryOperator",
-        "RdfDatatype",
-        "RdfQuadPosition",
-        "RdfQueryMethod",
-        "RdfTermType",
-        "RecordQueryMethod",
-        "STORAGE_CAPABILITY_METHODS",
         "STORAGE_CONTRACT_SOURCE",
-        "STORAGE_KEY_VALUE_METHODS",
-        "STORAGE_KEY_VALUE_PROPERTIES",
-        "SqlQueryMethod",
-        "StorageCapabilityMethod",
         "StorageContractError",
         "StorageContractErrorCode",
-        "StorageContractErrorText",
-        "StorageStageKind",
-        "TransactionActivityMode",
-        "TransactionBeforeStage",
-        "TransactionBuilderMethod",
-        "TransactionObservedStage",
-        "VectorQueryMethod",
-        "VectorQueryOriginKind",
         "asChangeFeedStore",
         "asRecordStore",
         "asSecondaryIndexRecordStore",
         "assertCodec",
-        "assertConcurrencyPolicy",
-        "assertLockKey",
         "assertOperationContext",
-        "assertRdfIri",
-        "assertRdfLiteral",
-        "assertStorageBlobGet",
-        "assertStorageBlobList",
-        "assertStorageBlobPut",
         "assertStorageKey",
-        "assertStorageOrgId",
-        "assertStorageRdfPattern",
-        "assertStorageRdfQuad",
-        "assertStorageRdfTerm",
-        "assertStorageTtlDuration",
-        "assertStorageTtlTarget",
-        "assertStorageVector",
-        "assertStorageVectorCollection",
-        "assertStorageVectorIds",
         "assertStringStorageKey",
         "assertSyncWriteOptions",
         "assertTransactionCallback",
-        "assertVectorObject",
-        "assertVersionedEnvelope",
-        "blob",
-        "counter",
-        "defineConcurrencyPolicy",
-        "defineStorageCapability",
-        "durableChangeFeed",
-        "implement",
-        "inspectStoreShape",
-        "invalidBlobInput",
-        "invalidCapability",
-        "invalidConcurrencyArgument",
-        "invalidLockArgument",
-        "invalidRdf",
-        "invalidVector",
-        "isBackendKind",
-        "isCapabilityToken",
+        "collectionsJsonCodec",
+        "compareStorageKeys",
+        "intrinsicConstructorName",
         "isChangeFeedStore",
         "isKeyValueStore",
         "isRecordStore",
         "isSecondaryIndexRecordStore",
-        "isStorageBase",
         "isStorageCapabilities",
         "isStorageContractError",
-        "kv",
-        "rdf",
-        "readCapabilityTokenFacts",
-        "readConcurrencyPolicy",
-        "readStorageImplementation",
         "readTransactionConflictPolicy",
-        "records",
-        "sparql",
-        "sql",
-        "ttl",
-        "vector"
-      ],
-      "./conformance": [
-        "runConformance"
-      ]
-    },
-    "@migaia/storage-host": {
-      ".": [
-        "STORAGE_HOST_SOURCE",
-        "StorageError",
-        "StorageErrorCode",
-        "StorageErrorText",
-        "StorageHostFacade",
-        "assertStorageBackendId",
-        "createOrgId",
-        "createStorageHost",
-        "defineFeature",
-        "definePlugin",
-        "defineStorageBackendKind",
-        "memoryBackendKind",
-        "memoryBackendPlugin"
-      ],
-      "./journal": [
-        "storageJournalPlugin",
-        "storageLogStore"
-      ],
-      "./entity": [
-        "REPOSITORY_KEY_PREFIX",
-        "RecordIndexBackfillPhase",
-        "binaryCodec",
-        "defineEntity",
-        "fromStandardSchema",
-        "jsonCodec",
-        "markRecordIndexBackfillContentionFailure",
-        "passthrough",
-        "registerRecordIndexBackfillStore",
-        "repositoryMigrationKey",
-        "selectCodec",
-        "structuredCodec"
-      ],
-      "./authoring/vector": [
-        "recommendStorageVector",
-        "snapshotStorageDeleteCountMode",
-        "snapshotStorageVector",
-        "snapshotStorageVectorCollection",
-        "snapshotStorageVectorFilter",
-        "snapshotStorageVectorIds",
-        "snapshotStorageVectorSearch",
-        "snapshotStorageVectorUpsert"
-      ],
-      "./vector/mmr": [
-        "mmr"
-      ],
-      "./authoring/backend": [
-        "StorageJournalLock",
-        "assertKeyRange",
-        "asyncDisposeKey",
-        "collectUniqueIndexOwners",
-        "createBackendJournalNamespace",
-        "createStorageOperationReporter",
-        "createStorageOperationRuntime",
-        "createStorageToken",
-        "decodeFlatStorageKey",
-        "decodeStorageJournalImage",
-        "encodeFlatStorageKey",
-        "encodeStorageJournalImage",
-        "intrinsicConstructorName",
-        "invokeExtension",
-        "isStorageErrorFamily",
-        "isStorageKeyInRange",
-        "mergeSignals",
-        "normalizeError",
-        "observeStorageBatch",
-        "planChannelWrite",
-        "readAbortReason",
-        "reportCleanupError",
-        "resolveStorageNamespace",
-        "safeJsonPayloadByteLength",
-        "snapshotKeyRange",
-        "storageJournalLockKey",
-        "subscribeToAbort",
-        "throwIfAborted",
-        "withAbort"
-      ],
-      "./authoring/migration": [
-        "createMigrationPlan",
-        "migrateEnvelope",
-        "migrateEnvelopeSync"
-      ],
-      "./authoring/codec": [
-        "fromValueCodec",
-        "snapshotCodec"
-      ],
-      "./authoring/concurrency": [
-        "ConcurrencyPolicy",
-        "associateNormalizedLockKeys",
-        "lockKey",
-        "normalizeLockKeys",
-        "readConcurrencyLockIdentities",
-        "runWithConcurrency",
-        "snapshotConcurrencyLockHoldings",
-        "snapshotConcurrencyLockKeys",
-        "snapshotConcurrencyLockRange",
-        "snapshotLockKey"
-      ],
-      "./authoring/transaction": [
-        "assertTransactionOwner",
-        "createTransactionBuilder",
-        "createTransactionOwner",
-        "deriveTransactionIterator",
-        "nextTransactionIterator",
-        "readTransactionConcurrency",
-        "readTransactionOperationContext",
-        "registerTransactionFinalizer",
-        "resolveConcurrencyPolicy",
-        "runTransactionIteratorOperation",
-        "runTransactionOperation",
-        "useTransactionCapability"
-      ],
-      "./authoring/query": [
-        "compileStorageQueryCondition",
-        "compileStorageWhere",
-        "createRdfQuery",
-        "createRecordQuery",
-        "createRecordQueryWithoutKeyset",
-        "createVectorQuery",
-        "refineStorageVectorQuery",
-        "snapshotStorageWhere"
-      ],
-      "./authoring/sql": [
-        "createSqlTag",
-        "deriveStorageSqlQuery",
-        "sqlFragment"
-      ],
-      "./authoring/key": [
-        "compareStorageKeys",
-        "createStorageBatchKeyCapture",
-        "createStorageBatchKeyProjection",
-        "decodeOrderedStorageKey",
-        "decodeStorageOrgKey",
-        "encodeOrderedStorageKey",
-        "encodeStorageOrgKey",
-        "encodeStorageOrgStringPrefix",
-        "orderStorageKeysByBytes",
-        "prefixStorageOrgKey",
-        "projectStorageBatchKeys",
-        "snapshotStorageBatchKeys",
-        "snapshotStorageKey",
-        "snapshotStorageKeyPrefix",
-        "snapshotStorageOrgKeyPrefix",
-        "sortStorageByteIdentities",
-        "storageKeyBytesIdentity",
-        "unprefixStorageOrgKey"
-      ],
-      "./authoring/resource": [
-        "createStorageIteratorLifetime"
-      ],
-      "./authoring/context": [
-        "snapshotOperationContext",
-        "snapshotSyncWriteOptions"
-      ],
-      "./authoring/rdf": [
-        "encodeRdfQuadSnapshot",
-        "encodeStorageRdfQuad",
-        "encodeStorageRdfTerm",
-        "getStorageOrgGraphPrefix",
-        "prefixStorageOrgGraph",
-        "snapshotStorageRdfPattern",
-        "snapshotStorageRdfQuad",
-        "snapshotStorageRdfTerm",
-        "term",
-        "unprefixStorageOrgGraph"
-      ],
-      "./authoring/sparql": [
-        "createSparqlTag",
-        "sparqlFragment"
-      ],
-      "./authoring/ttl": [
-        "snapshotStorageTtlTarget"
-      ],
-      "./authoring/counter": [
-        "snapshotStorageCounterIncrement"
-      ],
-      "./authoring/blob": [
-        "createStorageBlobBodyReader",
-        "createStorageBlobObject",
-        "snapshotStorageBlobGet",
-        "snapshotStorageBlobList",
-        "snapshotStorageBlobPut"
-      ],
-      "./authoring/store": [
+        "snapshotCodec",
         "snapshotKeyValueStore",
         "snapshotKeyValueStoreDetailed",
+        "snapshotOperationContext",
         "snapshotRecordStore",
-        "snapshotStorageBaseDetailed",
         "snapshotStorageCapabilities",
-        "snapshotStorageCapabilitiesDetailed"
-      ],
-      "./authoring/capability": [
-        "hasStorageCapability",
-        "provideCapabilities",
-        "readTransactionImplementation",
-        "useStorageCapability"
-      ],
-      "./entity/query": [
-        "entityQueryFeature"
-      ],
-      "./entity/unique": [
-        "entityUniqueFeature"
-      ],
-      "./entity/migration": [
-        "entityMigrationFeature"
-      ],
-      "./entity/indexes": [
-        "entityIndexesFeature"
-      ],
-      "./entity/keyset": [
-        "entityKeysetFeature"
-      ],
-      "./authoring/change-controller": [
-        "createBackendChangeController",
-        "createBackendLifecycleController"
-      ],
-      "./authoring/change-iterator": [
-        "createBackendChangeIterator"
-      ],
-      "./features/memory-notifications": [
-        "memoryNotificationsFeature"
-      ],
-      "./features/memory-change-feed": [
-        "memoryChangeFeedFeature"
-      ]
-    },
-    "@migaia/storage-plugin-archive": {
-      ".": [
-        "ArchiveErrorCode",
-        "ERROR_SOURCE",
-        "archivePlugin"
-      ]
-    },
-    "@migaia/storage-plugin-cache": {
-      ".": [
-        "CacheErrorCode",
-        "CacheWriteMode",
-        "ERROR_SOURCE",
-        "cacheBackendKind",
-        "cacheKey",
-        "cachePlugin"
-      ],
-      "./features/semantic": [
-        "semanticCacheFeature"
-      ]
-    },
-    "@migaia/storage-plugin-object": {
-      ".": [
-        "ERROR_SOURCE",
-        "ObjectDriverKind",
-        "ObjectErrorCode",
-        "objectBackendKind",
-        "objectBackendPlugin"
-      ],
-      "./fs": [
-        "fsObjectDriver"
-      ],
-      "./s3": [
-        "s3ObjectDriver"
-      ],
-      "./features/presign": [
-        "objectPresignFeature"
-      ]
-    },
-    "@migaia/storage-plugin-postgres": {
-      ".": [
-        "PostgresErrorCode",
-        "postgresBackendKind",
-        "postgresBackendPlugin"
-      ],
-      "./pg": [
-        "pgDriver"
-      ],
-      "./postgres-js": [
-        "postgresJsDriver"
-      ],
-      "./bun": [
-        "bunSqlDriver"
-      ],
-      "./features/quantized": [
-        "pgQuantizedFeature"
-      ],
-      "./features/pgvector": [
-        "pgvectorFeature"
-      ],
-      "./features/listen": [
-        "pgListenFeature"
-      ],
-      "./features/copy": [
-        "pgCopyFeature"
-      ],
-      "./features/logical-replication": [
-        "pgLogicalReplicationFeature"
-      ]
-    },
-    "@migaia/storage-plugin-qdrant": {
-      ".": [
-        "ERROR_SOURCE",
-        "QdrantErrorCode",
-        "qdrantBackendKind",
-        "qdrantBackendPlugin"
-      ],
-      "./http": [
-        "fetchHttp"
-      ],
-      "./client": [
-        "qdrantClientHttp"
-      ],
-      "./features/hybrid": [
-        "qdrantHybridFeature"
-      ],
-      "./features/recommend": [
-        "qdrantRecommendFeature"
-      ],
-      "./features/group-by": [
-        "qdrantGroupByFeature"
-      ],
-      "./features/management": [
-        "qdrantManagementFeature"
-      ],
-      "./features/rescore": [
-        "qdrantRescoreFeature"
-      ]
-    },
-    "@migaia/storage-plugin-redis": {
-      ".": [
-        "ERROR_SOURCE",
-        "RedisErrorCode",
-        "redisBackendKind",
-        "redisBackendPlugin"
-      ],
-      "./ioredis": [
-        "ioredisDriver"
-      ],
-      "./node-redis": [
-        "nodeRedisDriver"
-      ],
-      "./bun": [
-        "bunRedisDriver"
-      ],
-      "./features/streams": [
-        "redisStreamsFeature"
-      ],
-      "./features/pubsub": [
-        "redisPubSubFeature"
-      ],
-      "./features/sorted-sets": [
-        "redisSortedSetsFeature"
-      ],
-      "./features/rate-limit": [
-        "redisRateLimitFeature"
-      ],
-      "./features/change-stream": [
-        "redisChangeStreamFeature"
-      ],
-      "./features/search": [
-        "rediSearchVectorFeature"
-      ]
-    },
-    "@migaia/storage-plugin-sparql": {
-      ".": [
-        "ERROR_SOURCE",
-        "SparqlErrorCode",
-        "sparqlBackendKind",
-        "sparqlBackendPlugin"
-      ],
-      "./http": [
-        "httpEndpoint"
-      ],
-      "./oxigraph": [
-        "oxigraphEndpoint"
-      ],
-      "./features/graph-store": [
-        "graphStoreFeature"
-      ],
-      "./features/ontology": [
-        "ontologyFeature"
-      ]
-    },
-    "@migaia/storage-plugin-sqlite": {
-      ".": [
-        "SqliteErrorCode",
-        "sqliteBackendKind",
-        "sqliteBackendPlugin"
-      ],
-      "./node": [
-        "nodeSqliteDriver"
-      ],
-      "./bun": [
-        "bunSqliteDriver"
-      ],
-      "./features/maintenance": [
-        "sqliteMaintenanceFeature"
+        "snapshotStorageKey",
+        "snapshotSyncWriteOptions"
       ]
     },
     "@migaia/storage-web": {
@@ -1521,21 +1047,30 @@
         "StorageErrorText",
         "lengthPrefixedNamespaceCodec"
       ],
+      "./memory": [
+        "memoryStorageHost"
+      ],
       "./local-storage": [
-        "localStorageBackendKind",
-        "localStorageBackendPlugin"
+        "localStorageHost"
       ],
       "./session-storage": [
-        "sessionStorageBackendKind",
-        "sessionStorageBackendPlugin"
+        "sessionStorageHost"
       ],
       "./cookies": [
-        "cookieBackendKind",
-        "cookieBackendPlugin"
+        "cookiesHost"
       ],
       "./indexed-db": [
-        "indexedDbBackendKind",
-        "indexedDbBackendPlugin"
+        "indexedDbHost"
+      ],
+      "./host": [
+        "StorageHostFacade",
+        "assertStorageBackendId",
+        "createStorageHost",
+        "defineFeature",
+        "definePlugin"
+      ],
+      "./plugins/memory": [
+        "memoryBackendPlugin"
       ],
       "./plugins/local-storage": [
         "localStorageBackendPlugin"
@@ -1547,34 +1082,47 @@
         "cookieBackendPlugin"
       ],
       "./plugins/indexed-db": [
-        "indexedDbBackendPlugin"
+        "indexedDbBackendPlugin",
+        "prepareIndexedDbStore"
       ],
-      "./features/reactive": [
-        "reactiveFeature"
+      "./entity": [
+        "defineEntity"
       ],
-      "./features/blobs": [
-        "indexedDbBlobFeature"
+      "./schema": [
+        "fromStandardSchema",
+        "passthrough",
+        "runMigrations"
       ],
-      "./features/indexed-db-ttl": [
-        "indexedDbTtlFeature"
+      "./serialize": [
+        "binaryCodec",
+        "jsonCodec",
+        "selectCodec",
+        "structuredCodec"
       ],
-      "./features/indexed-db-batch": [
-        "indexedDbBatchFeature"
+      "./reactive-adapter": [
+        "defineReactiveAdapterFeature"
       ],
-      "./features/indexed-db-journal": [
-        "indexedDbJournalFeature"
+      "./plugins/reactive": [
+        "cookiesReactive",
+        "indexedDbReactive",
+        "localStorageReactive",
+        "memoryReactive",
+        "sessionStorageReactive"
       ],
-      "./features/indexed-db-notifications": [
-        "indexedDbNotificationsFeature"
+      "./plugins/reactive/memory": [
+        "memoryReactive"
       ],
-      "./features/indexed-db-change-feed": [
-        "indexedDbChangeFeedFeature"
+      "./plugins/reactive/local-storage": [
+        "localStorageReactive"
       ],
-      "./features/indexed-db-indexes": [
-        "indexedDbIndexesFeature"
+      "./plugins/reactive/session-storage": [
+        "sessionStorageReactive"
       ],
-      "./features/indexed-db-keyset": [
-        "indexedDbKeysetFeature"
+      "./plugins/reactive/cookies": [
+        "cookiesReactive"
+      ],
+      "./plugins/reactive/indexed-db": [
+        "indexedDbReactive"
       ]
     },
     "@migaia/store-devtools": {
@@ -1704,15 +1252,16 @@
     "@migaia/store-persist": {
       ".": [
         "PersistCodecOutput",
+        "PersistEnvelopeError",
         "PersistState",
         "STORE_PERSIST_SOURCE",
         "StorePersistErrorCode",
+        "assertEnvelope",
         "createStorePersistAbortError",
         "createStorePersistAggregateError",
         "createStorePersistError",
         "createStorePersistTypeError",
         "defaultJsonCodec",
-        "persistTransaction",
         "persistUnit",
         "readEnvelope",
         "removeEnvelope",
@@ -1918,8 +1467,11 @@
         "CONFIG_DELETE",
         "ConfigOwner",
         "ConfigProfile",
+        "ElectronProcessType",
+        "GlobalScopeKind",
         "IdentifyError",
         "MAX_NATIVE_RECURSION_DEPTH",
+        "ServerRuntime",
         "ThenableProbeKind",
         "UTILS_SOURCE",
         "UtilsAbortError",
@@ -1947,6 +1499,8 @@
         "deferTask",
         "deferred",
         "deserializeErrorChain",
+        "detectElectronProcessType",
+        "detectGlobalScope",
         "detectServerRuntime",
         "diagnosticSnapshot",
         "encodeUtf8",
@@ -1966,19 +1520,15 @@
         "isBlankString",
         "isEmptyValue",
         "isNativeErrorValue",
-        "isNone",
         "isNullish",
         "isPlainObject",
         "isPrimitive",
         "isSafeIntegerValue",
-        "isSome",
         "isUint8Array",
         "isUrlObject",
         "isUtilsAbortError",
         "isUtilsError",
         "isUtilsTimeoutError",
-        "jitter",
-        "mapMaybe",
         "noop",
         "normalizeSerializedErrorChain",
         "observeThenableRejection",
@@ -2017,10 +1567,8 @@
         "timeSliceReduce",
         "toError",
         "toPromise",
-        "toUndefined",
         "tryReadProperty",
         "tryString",
-        "unwrapOr",
         "utf8ByteLength",
         "walkErrorCauses",
         "withTimeout",
@@ -2155,8 +1703,7 @@
         "formatCurrency",
         "formatInteger",
         "formatNumber",
-        "formatPercent",
-        "jitter"
+        "formatPercent"
       ],
       "./testing": [
         "createManualScheduler"

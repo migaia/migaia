@@ -157,7 +157,7 @@ Every signature, boundary behaviour and error code is in [USEGUIDE.en.md](./USEG
 7. **Clearing caches is not releasing nodes.** `splitDef(...).prune(store)` and `familyDef(...).forget()` / `clear()` only clear definition caches and leave nodes already created in a store alone; release those with `store.release()` or `store.dispose()`. After `forget`, the same key gives a new definition whose state is unrelated to the old one.
 8. **Families need `WeakRef` and `FinalizationRegistry`.** Without them, calling `familyDef` / `derivedFamilyDef` throws `ENV_UNSUPPORTED` instead of degrading silently.
 9. **Keys are compared with SameValueZero**, as in `Map` / `Set`: `-0` and `+0` are the same key, and `NaN` equals itself.
-10. **Error identity.** Errors produced by this package carry `source === STORE_KEYED_SOURCE` (`@migaia/store-keyed`) and a `code` from `StoreKeyedErrorCode`; errors from other packages that already have an identity keep it. Branch on `source` / `code`, never on the message.
+10. **Error identity.** Errors produced by this package carry `source === STORE_KEYED_SOURCE` (`store.keyed`) and a `code` from `StoreKeyedErrorCode`; errors from other packages that already have an identity keep it. Branch on `source` / `code`, never on the message.
 
 **Breaking migration**: the ten advanced optics primitives are exported only from `@migaia/store-keyed/optics`, and `assertNotThenable` only from `@migaia/store-keyed/atom/definition`; the root entry keeps no compatibility alias.
 

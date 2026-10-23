@@ -28,6 +28,179 @@ const RUNTIME_STREAM_PREFIX: &str = "migaia.remote.runtime.stream.";
 /// Whitelist refusal keeps the production core source/code/text contract.
 const METHOD_UNAVAILABLE: &str = "Runtime method is not provided by this peer";
 
+/// Optional method metadata uses the same closed schema vocabulary as the TS directory owner.
+const SCHEMA_FIELDS: [&str; 3] = ["input", "output", "yield"];
+const SCHEMA_KEYS: [&str; 9] = [
+    "type",
+    "properties",
+    "required",
+    "items",
+    "enum",
+    "const",
+    "anyOf",
+    "$defs",
+    "$ref",
+];
+const SCHEMA_TYPES: [&str; 7] = [
+    "null", "boolean", "object", "array", "number", "integer", "string",
+];
+
+/// Schema values retain the portable recursion limit and finite JSON scalar domain.
+fn runtime_schema_data(value: &Value, depth: usize) -> bool {
+    if depth > 64 {
+        return false;
+    }
+    match value {
+        Value::Null | Value::Bool(_) | Value::String(_) => true,
+        Value::Number(number) => number.parse::<f64>().is_ok_and(f64::is_finite),
+        Value::SurrogateString(_) => false,
+        Value::Array(items) => items
+            .iter()
+            .all(|item| runtime_schema_data(item, depth + 1)),
+        Value::Object(fields) => fields
+            .iter()
+            .all(|(_, item)| runtime_schema_data(item, depth + 1)),
+    }
+}
+
+/// Enum equality ignores object insertion order and compares numeric spellings by JSON value.
+fn runtime_schema_equal(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Number(left), Value::Number(right)) => {
+            left.parse::<f64>().ok() == right.parse::<f64>().ok()
+        }
+        (Value::Array(left), Value::Array(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(a, b)| runtime_schema_equal(a, b))
+        }
+        (Value::Object(left), Value::Object(right)) => {
+            left.len() == right.len()
+                && left.iter().all(|(key, value)| {
+                    right
+                        .iter()
+                        .find(|(name, _)| name == key)
+                        .is_some_and(|(_, other)| runtime_schema_equal(value, other))
+                })
+        }
+        _ => left == right,
+    }
+}
+
+/// Validate actual schema positions; references never follow network, file, or recursive targets.
+fn valid_runtime_schema(value: &Value) -> bool {
+    fn visit<'a>(
+        value: &'a Value,
+        path: &str,
+        nodes: &mut std::collections::HashSet<String>,
+        references: &mut Vec<&'a str>,
+    ) -> bool {
+        let Value::Object(fields) = value else {
+            return false;
+        };
+        nodes.insert(path.to_owned());
+        for (key, child) in fields {
+            if !SCHEMA_KEYS.contains(&key.as_str()) {
+                return false;
+            }
+            match key.as_str() {
+                "type" | "required" => {
+                    let values = if key == "type" && !matches!(child, Value::Array(_)) {
+                        std::slice::from_ref(child)
+                    } else if let Some(values) = child.as_array() {
+                        values
+                    } else {
+                        return false;
+                    };
+                    if key == "type" && values.is_empty() {
+                        return false;
+                    }
+                    let mut seen = std::collections::HashSet::new();
+                    for member in values {
+                        let Value::String(text) = member else {
+                            return false;
+                        };
+                        if !seen.insert(text)
+                            || key == "type" && !SCHEMA_TYPES.contains(&text.as_str())
+                        {
+                            return false;
+                        }
+                    }
+                }
+                "properties" | "$defs" => {
+                    let Value::Object(members) = child else {
+                        return false;
+                    };
+                    for (name, member) in members {
+                        let pointer = name.replace('~', "~0").replace('/', "~1");
+                        if !visit(
+                            member,
+                            &format!("{path}/{key}/{pointer}"),
+                            nodes,
+                            references,
+                        ) {
+                            return false;
+                        }
+                    }
+                }
+                "items" => {
+                    if !visit(child, &format!("{path}/items"), nodes, references) {
+                        return false;
+                    }
+                }
+                "enum" | "anyOf" => {
+                    let Some(members) = child.as_array() else {
+                        return false;
+                    };
+                    if members.is_empty() {
+                        return false;
+                    }
+                    for (index, member) in members.iter().enumerate() {
+                        if key == "anyOf"
+                            && !visit(member, &format!("{path}/anyOf/{index}"), nodes, references)
+                        {
+                            return false;
+                        }
+                        if key == "enum"
+                            && members[..index]
+                                .iter()
+                                .any(|other| runtime_schema_equal(member, other))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                "$ref" => {
+                    let Value::String(pointer) = child else {
+                        return false;
+                    };
+                    if !pointer.starts_with("#/$defs/") {
+                        return false;
+                    }
+                    let mut characters = pointer.chars();
+                    while let Some(character) = characters.next() {
+                        if character == '~' && !matches!(characters.next(), Some('0' | '1')) {
+                            return false;
+                        }
+                    }
+                    references.push(&pointer[1..]);
+                }
+                _ => {}
+            }
+        }
+        true
+    }
+    if !runtime_schema_data(value, 0) {
+        return false;
+    }
+    let mut nodes = std::collections::HashSet::new();
+    let mut references = Vec::new();
+    visit(value, "", &mut nodes, &mut references)
+        && references.iter().all(|pointer| nodes.contains(*pointer))
+}
+
 /// Require the new baseline at the real session boundary without altering pure negotiation vectors.
 fn baseline_agreed(agreement: &Value) -> bool {
     agreement.get("major").and_then(Value::as_u64) == Some(1)
@@ -108,6 +281,14 @@ fn valid_runtime_description(value: &Value, remote_id: &str) -> bool {
         };
         if fields.iter().any(|(key, _)| {
             !["name", "supportedModes", "modeSource", "idempotent"].contains(&key.as_str())
+                && !SCHEMA_FIELDS.contains(&key.as_str())
+        }) {
+            return false;
+        }
+        if SCHEMA_FIELDS.iter().any(|key| {
+            method
+                .get(key)
+                .is_some_and(|schema| !valid_runtime_schema(schema))
         }) {
             return false;
         }
@@ -149,7 +330,8 @@ fn valid_runtime_description(value: &Value, remote_id: &str) -> bool {
             return false;
         }
     }
-    true
+    // Method schemas consume the complete directory's existing portable nesting budget.
+    runtime_schema_data(value, 0)
 }
 
 /// Decode the native physical batch without changing individual member admission or correlation.

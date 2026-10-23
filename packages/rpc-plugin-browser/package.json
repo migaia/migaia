@@ -1,0 +1,100 @@
+{
+  "name": "@migaia/rpc-plugin-browser",
+  "version": "0.0.11",
+  "private": true,
+  "description": "RPC browser owner.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-plugin-browser"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./adapters/window": {
+      "types": "./dist/browser/adapters/window.d.ts",
+      "default": "./dist/browser/adapters/window.js"
+    },
+    "./adapters/shared-worker": {
+      "types": "./dist/browser/adapters/shared-worker.d.ts",
+      "default": "./dist/browser/adapters/shared-worker.js"
+    },
+    "./adapters/service-worker": {
+      "types": "./dist/browser/adapters/service-worker.d.ts",
+      "default": "./dist/browser/adapters/service-worker.js"
+    },
+    "./adapters/broadcast-channel": {
+      "types": "./dist/browser/adapters/broadcast-channel.d.ts",
+      "default": "./dist/browser/adapters/broadcast-channel.js"
+    },
+    "./adapters/web-transport": {
+      "types": "./dist/browser/adapters/web-transport.d.ts",
+      "default": "./dist/browser/adapters/web-transport.js"
+    },
+    "./adapters/rtc-data-channel": {
+      "types": "./dist/browser/adapters/rtc-data-channel.d.ts",
+      "default": "./dist/browser/adapters/rtc-data-channel.js"
+    },
+    "./adapters/message-port": {
+      "types": "./dist/browser/adapters/message-port.d.ts",
+      "default": "./dist/browser/adapters/message-port.js"
+    },
+    "./adapters/web-worker": {
+      "types": "./dist/browser/adapters/web-worker.d.ts",
+      "default": "./dist/browser/adapters/web-worker.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run --coverage",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "typecheck:e2e": "bun check -p tsconfig.e2e.json"
+  },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-host": "workspace:*",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "24.13.2",
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "^7.0.2",
+    "vite": "8.1.1",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-host": "workspace:*"
+  },
+  "peerDependenciesMeta": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

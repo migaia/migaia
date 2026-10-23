@@ -4,8 +4,8 @@ export const ERROR_SOURCE = 'store.worker'
 /**
  * Declares the public error codes for `store.worker` in one place.
  *
- * Locally constructed errors use source 'store.worker'. RPC and application failures retain
- * their owning identities and original chains. Throw sites use these constants instead of inline
+ * Locally constructed errors use source 'store.worker'. RPC and application failures retain their
+ * owning identities and original chains. Throw sites use these constants instead of inline
  * literals.
  *
  * Code values are public API. Renaming a code is a breaking change.

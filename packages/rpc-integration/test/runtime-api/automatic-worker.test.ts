@@ -1,4 +1,4 @@
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
@@ -6,9 +6,9 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '@migaia/rpc-threads'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 
 /** A native Worker runs independently from Vitest and loads the built package. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-worker.mjs', import.meta.url))

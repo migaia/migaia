@@ -4,8 +4,8 @@ export const ERROR_SOURCE = 'store.react'
 /**
  * Declares the public error codes for `store.react` in one place.
  *
- * Pair these codes with source `store.react`; complete upstream error identities retain
- * their actual package owner. Throw sites use these constants instead of inline literals.
+ * Pair these codes with source `store.react`; complete upstream error identities retain their
+ * actual package owner. Throw sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

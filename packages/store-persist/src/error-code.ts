@@ -4,8 +4,8 @@ export const ERROR_SOURCE = 'store.persist'
 /**
  * Declares the public error codes for `store.persist` in one place.
  *
- * Locally constructed errors use source `'store.persist'`. Codec, unit and adapter failures
- * may instead retain their owning boundary's identity. Throw sites use these constants instead of
+ * Locally constructed errors use source `'store.persist'`. Codec, unit and adapter failures may
+ * instead retain their owning boundary's identity. Throw sites use these constants instead of
  * inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.

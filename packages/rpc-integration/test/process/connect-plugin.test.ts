@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
-import { createConnectProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { RpcProcessErrorCode } from '@migaia/rpc-process'
+import { RpcPlatform } from '@migaia/rpc-host/plugin'
+import { createConnectProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
 import { byteProcessPipeline } from '../fixtures/process-diagnostics.js'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
-import type { IRemoteChannel } from '@migaia/rpc-core/remote'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 
 /** An external process stays outside the lifetime of this owned local socket. */
 describe('process plugin connect binding', () => {

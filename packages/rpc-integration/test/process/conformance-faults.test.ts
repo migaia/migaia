@@ -10,25 +10,23 @@ import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import { type IProcessPluginOptions } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createRemoteHost } from '../../../rpc-host/dist/remote/host.js'
 import {
-  createProcessPlugin,
-  createProcessResilience,
-  createProcessTransport,
-  type IProcessByteChannel,
-  type IProcessPluginOptions
-} from '@migaia/rpc-process'
-import {
-  createRemoteHost,
   createRemoteRetryPort,
   type IRemoteRetryPort,
   type IRemoteServeEndpoint,
   type IRemoteContract
-} from '@migaia/rpc-core/remote'
+} from '@migaia/rpc-host/plugin'
 import {
   createSpawnProcessBinding,
   createConnectProcessBinding,
   type IProcessPluginBinding
-} from '../../../rpc-process/dist/process/plugin/binding.js'
+} from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame,
@@ -36,7 +34,7 @@ import {
 } from '@migaia/rpc-contract/framing/stream'
 import { encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
 import { endpointFor, bridgeEndpointFor } from './peers/ts/runtime.js'
-import { RemoteMethodName } from '@migaia/rpc-core/remote'
+import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import {
   peers,
   expected,
@@ -829,7 +827,10 @@ describe('real owned terminal guards', () => {
             })
           await expect(
             active.feature.generator([])[Symbol.asyncIterator]().next()
-          ).rejects.toMatchObject({ source: 'rpc.transport.process', code: 'PROCESS_TERMINAL_CALL' })
+          ).rejects.toMatchObject({
+            source: 'rpc.transport.process',
+            code: 'PROCESS_TERMINAL_CALL'
+          })
           if (active.facade) {
             await expect(active.facade.use('p')).rejects.toMatchObject({
               source: 'rpc.transport.process',

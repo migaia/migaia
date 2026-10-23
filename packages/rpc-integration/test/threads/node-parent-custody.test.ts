@@ -14,13 +14,14 @@ describe('Node child-port lazy replay ownership', () => {
       parentPort: port1
     }))
     try {
-      await import('@migaia/rpc-threads/adapters/node')
+      await import('@migaia/rpc-plugin-thread/adapters/node')
       expect(port1.listenerCount('close')).toBe(0)
       expect(port1.listenerCount('message')).toBe(0)
       /** The real canonical channel consumes the adapter's private lazy registration. */
-      const { createNodeThreadChannel } = await import('@migaia/rpc-threads')
+      const { createNodeThreadChannel } =
+        await import('../../../rpc-plugin-thread/dist/threads/channel.js')
       const { claimNativeReplayTransport } =
-        await import('../../../rpc-core/dist/core/internal/native-replay.js')
+        await import('../../../rpc-host/dist/core/internal/native-replay.js')
       /** Opens the canonical child channel and consumes lazy provenance exactly once. */
       const channel = createNodeThreadChannel(port1, 'custody-parent', {
         scheduler: createManualScheduler()

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 /** Final package roots own their independent platform-neutral type proof configs. */
 const packageRoots = {
   contract: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-contract'),
-  core: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
+  core: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-host')
 } as const
 /**
  * Files the core type proof must include after the source move, spelled as `tsc --showConfig` lists

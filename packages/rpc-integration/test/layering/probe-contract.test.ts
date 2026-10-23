@@ -4,9 +4,9 @@ import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Probe definitions remain independent of host and carrier implementations. */
-const probeRoot = join(import.meta.dirname, '../../../rpc-core/src/core/probe')
+const probeRoot = join(import.meta.dirname, '../../../rpc-host/src/core/probe')
 /** Devtools contracts may consume only the two public inward-facing RPC owners. */
-const devtoolsRoot = join(import.meta.dirname, '../../../rpc-devtools/src')
+const devtoolsRoot = join(import.meta.dirname, '../../../rpc-plugin-devtools/src')
 
 /** Enumerate maintained TypeScript files for the contract dependency assertions. */
 function sourceFiles(directory: string): string[] {
@@ -44,7 +44,7 @@ describe('rpc-devtools layer-1 dependency direction', () => {
     for (const path of sourceFiles(probeRoot))
       for (const specifier of imports(path))
         expect(specifier, path).not.toMatch(
-          /^(?:node:|bun:|@migaia\/rpc-(?:process|threads|browser|bridge-jsonrpc|devtools)(?:\/|$))/u
+          /^(?:node:|bun:|@migaia\/rpc-(?:plugin-(?:process|thread|browser|devtools)|bridge-jsonrpc)(?:\/|$))/u
         )
   })
 
@@ -55,7 +55,7 @@ describe('rpc-devtools layer-1 dependency direction', () => {
         // The runtime-neutral scheduler is the only foundation import: one clock for snapshots.
         else
           expect(specifier, path).toMatch(
-            /^(?:@migaia\/rpc-(?:core|contract)(?:\/|$)|@migaia\/utils\/scheduler$)/u
+            /^(?:@migaia\/rpc-(?:host|contract)(?:\/|$)|@migaia\/utils\/scheduler$)/u
           )
       }
   })

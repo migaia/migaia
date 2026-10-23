@@ -1,16 +1,20 @@
-import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
-import { readEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
-import { createEndpoint } from '@migaia/rpc-core'
+import { createWebTransportDatagramTransport } from '@migaia/rpc-plugin-browser/adapters/web-transport'
+import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
+import { createEndpoint } from '../../../../rpc-host/dist/core/index.js'
 import { createBinaryFramer } from '@migaia/rpc-contract/framing'
 import { messageFramer } from '@migaia/rpc-contract/framing/v1'
 import { defineCBORCodec } from '@migaia/serialize/codecs/cbor'
-import { connect } from '@migaia/rpc-core'
-import { authentication } from '@migaia/rpc-core'
-import { timeout } from '@migaia/rpc-core'
-import { abort } from '@migaia/rpc-core'
-import { ping } from '@migaia/rpc-core'
-import { contract } from '@migaia/rpc-core'
-import type { IRpcContractConfig, IRpcEndpoint, IRpcProvider } from '@migaia/rpc-core'
+import { connect } from '../../../../rpc-host/dist/core/index.js'
+import { authentication } from '../../../../rpc-host/dist/core/index.js'
+import { timeout } from '../../../../rpc-host/dist/core/index.js'
+import { abort } from '../../../../rpc-host/dist/core/index.js'
+import { ping } from '../../../../rpc-host/dist/core/index.js'
+import { contract } from '../../../../rpc-host/dist/core/index.js'
+import {
+  type IRpcContractConfig,
+  type IRpcEndpoint,
+  type IRpcProvider
+} from '../../../../rpc-host/dist/core/index.js'
 import { installErrorGuards, terminalProviders } from './rpc.js'
 
 const errors = installErrorGuards()

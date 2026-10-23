@@ -1,23 +1,23 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, RpcStreamEvent } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../../rpc-core/dist/core/adapters/memory.js'
-import { createComposedEndpoint } from '../../../rpc-core/dist/core/composed.js'
-import { createClientEndpoint } from '../../../rpc-core/dist/core/client.js'
-import { createEndpointKernel } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import { prepareEndpoint } from '../../../rpc-core/dist/core/internal/endpoint-bootstrap.js'
-import { RpcOutboundAttachment } from '../../../rpc-core/dist/core/internal/outbound-attachment.js'
-import { RpcOutboundSender } from '../../../rpc-core/dist/core/internal/outbound-sender.js'
-import { RpcPortName } from '../../../rpc-core/dist/core/internal/plugin-shared-keys.js'
-import { connect } from '../../../rpc-core/dist/core/middleware/connect.js'
-import { abort } from '../../../rpc-core/dist/core/middleware/abort.js'
-import { createFirstPartyRoots } from '../../../rpc-core/dist/core/internal/first-party-roots.js'
+import { createMemoryTransportPair } from '../../../rpc-host/dist/core/adapters/memory.js'
+import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
+import { createClientEndpoint } from '../../../rpc-host/dist/core/client.js'
+import { createEndpointKernel } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import { prepareEndpoint } from '../../../rpc-host/dist/core/internal/endpoint-bootstrap.js'
+import { RpcOutboundAttachment } from '../../../rpc-host/dist/core/internal/outbound-attachment.js'
+import { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/outbound-sender.js'
+import { RpcPortName } from '../../../rpc-host/dist/core/internal/plugin-shared-keys.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { createFirstPartyRoots } from '../../../rpc-host/dist/core/internal/first-party-roots.js'
 import {
   installOutboundGate,
   registerOutboundGate,
   rollbackOutboundGate
-} from '../../../rpc-core/dist/core/internal/outbound-gate.js'
-import type { IRpcTransport } from '../../../rpc-core/dist/core/transport.js'
+} from '../../../rpc-host/dist/core/internal/outbound-gate.js'
+import type { IRpcTransport } from '../../../rpc-host/dist/core/transport.js'
 import runtimeVectors from '../../schema/vectors/runtime-api.json'
 import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
 import { RpcRuntimeKind, RpcRuntimeOperation } from '@migaia/rpc-contract/wire'
@@ -25,7 +25,7 @@ import { RpcRuntimeKind, RpcRuntimeOperation } from '@migaia/rpc-contract/wire'
 /** Loads the new deep entry only inside an oracle so the base suite itself can execute. */
 async function queueModule() {
   try {
-    return await import('@migaia/rpc-core/plugins/send-queue')
+    return await import('../../../rpc-host/dist/core/plugins/send-queue.js')
   } catch {
     return null
   }
@@ -34,7 +34,7 @@ async function queueModule() {
 /** Loads the companion reporting entry without turning a missing base module into a load error. */
 async function logModule() {
   try {
-    return await import('@migaia/rpc-core/plugins/log')
+    return await import('../../../rpc-host/dist/core/plugins/log.js')
   } catch {
     return null
   }

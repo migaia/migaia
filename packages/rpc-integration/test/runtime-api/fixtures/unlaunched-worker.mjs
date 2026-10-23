@@ -1,5 +1,5 @@
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
 
 /** Ordinary local Feature execution succeeds inside the actual plain Worker. */
 const host = defineHost({

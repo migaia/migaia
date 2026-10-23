@@ -6,9 +6,9 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { threadWebPort } from '../../../rpc-threads/dist/threads/channel.js'
-import type { IThreadWebPort } from '@migaia/rpc-threads'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import { threadWebPort } from '../../../rpc-plugin-thread/dist/threads/channel.js'
+import type { IThreadWebPort } from '../../../rpc-plugin-thread/dist/threads/types.js'
 
 /** The genuine Worker reports native bytes through its own parentPort. */
 const entry = fileURLToPath(new URL('./fixtures/transfer-echo-worker.mjs', import.meta.url))

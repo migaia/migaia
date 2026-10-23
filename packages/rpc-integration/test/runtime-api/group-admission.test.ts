@@ -2,29 +2,29 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
-import { createProcessResilience } from '@migaia/rpc-process'
-import { RpcProcessErrorCode } from '../../../rpc-process/dist/process/error-code.js'
-import { createProcessError } from '../../../rpc-process/dist/process/error.js'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { createProcessTransport } from '@migaia/rpc-process'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { RpcProcessErrorCode } from '../../../rpc-plugin-process/dist/process/error-code.js'
+import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
 import {
   createRuntimePeer,
   type IRuntimePeer
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   readRuntimePeerConnection,
   readRuntimePeerSessions
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
 
 it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
   'real native group %s preserves exact original quota ownership',

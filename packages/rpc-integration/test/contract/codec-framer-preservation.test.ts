@@ -9,7 +9,7 @@ import { assertRpcPhysicalFrameSize } from '@migaia/rpc-contract/framing'
 import {
   wrapAuthenticationEnvelope,
   readAuthenticationEnvelope
-} from '../../../rpc-core/dist/core/middleware/authentication-envelope.js'
+} from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import * as bytes from '@migaia/utils/bytes'
 
 /** Installs the unchanged binary/profile portion; the original chunk oracle is retained. */

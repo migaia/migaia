@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { ElectronProcessType, GlobalScopeKind, ServerRuntime } from '@migaia/utils'
 import { attachErrorIdentity, isUtilsError, UtilsErrorCode } from '../src/error.js'
 import { decodeUtf8, splitUtf8, streamBase64Chunks } from '../src/bytes.js'
 import { inspectThenable, observeThenableRejection, onceAsync } from '../src/function.js'
@@ -15,6 +16,17 @@ import {
 } from '../src/promise.js'
 
 describe('utils audited public contracts', () => {
+  it('exports the exact runtime detection domains from the package entry', () => {
+    expect(ServerRuntime).toEqual({ deno: 'deno', bun: 'bun', node: 'node' })
+    expect(ElectronProcessType).toEqual({ main: 'main', renderer: 'renderer', utility: 'utility' })
+    expect(GlobalScopeKind).toEqual({
+      window: 'window',
+      'dedicated-worker': 'dedicated-worker',
+      'shared-worker': 'shared-worker',
+      'service-worker': 'service-worker'
+    })
+  })
+
   it('accepts PromiseLike callbacks and preserves the one native Promise identity', async () => {
     /** The public signature must match the existing captured-then assimilation contract. */
     const load = onceAsync((): PromiseLike<number> => Promise.resolve(7))

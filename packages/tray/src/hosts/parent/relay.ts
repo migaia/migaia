@@ -1,5 +1,5 @@
 import { defineFeature, definePlugin, type IPluginConstraint } from '@migaia/plugin-host'
-import type { IRpcContext } from '@migaia/rpc-core'
+import type { IRpcContext } from '@migaia/rpc-host'
 import { TrayInternal, TrayCallKind } from '../constants.js'
 import { createTrayError } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'

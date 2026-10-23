@@ -9,16 +9,14 @@ import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError, createRpcHello } from '@migaia/rpc-contract'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import {
-  createNativeProcessOffer,
-  createProcessTransport,
-  createProcessResilience,
-  RpcProcessErrorCode
-} from '@migaia/rpc-process'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
 import {
   client,
   peers,
@@ -31,10 +29,10 @@ import { PluginHost } from '@migaia/plugin-host'
 import {
   adoptHostRegistration,
   type IAdoptedHostRegistration
-} from '../../../rpc-process/dist/process/host/registration.js'
+} from '../../../rpc-plugin-process/test/protocol.ts'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createProcessPlugin } from '@migaia/rpc-process'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
 import { endpointFor } from './peers/ts/runtime.js'
 
 /** Observe actual child descriptors; lsof is never used as a simulated admission counter. */

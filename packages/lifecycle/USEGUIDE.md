@@ -1410,7 +1410,7 @@ Leaf entry 提供更小的按需边界。只有五个名称不在根入口：`@m
 - **`GenerationController.begin()` 抛 `GENERATION_DISPOSED`**：控制器已 `dispose()`，不可复用，需新建一个。
 - **`commitTo()` 抛 `PROVISIONAL_PARENT_CLOSED`**：目标 parent 已进入 `closing`/`terminal`；已转移的资源留在 parent 名下，未转移的部分已被自动释放，不需要再手动 `rollback()`。
 - **`enqueue()` 抛 `QUEUE_SELF_DEPENDENCY`**：同一 `owner` 在自身运行期间又提交并同步等待了新任务，FIFO 队列必然死锁；拆分成两次独立的顶层调用。
-- **`systemScheduler` 抛 `ENV_UNSUPPORTED`**（`source: 'foundation.utils'`）：宿主缺 `performance.now`/`setTimeout`/`clearTimeout`；注入自实现的 `IScheduler`，或改在具备这些能力的运行时里运行。
+- **`systemScheduler` 抛 `ENV_UNSUPPORTED`**（`source: '@migaia/utils'`）：宿主缺 `performance.now`/`setTimeout`/`clearTimeout`；注入自实现的 `IScheduler`，或改在具备这些能力的运行时里运行。
 - **需要事件总线/当前值订阅/依赖图拓扑**：`@migaia/lifecycle` 刻意不提供，应分别参考 `@migaia/event-subscriber`、`@migaia/reactive`、`@migaia/capability/graph`。
 
 ```bash

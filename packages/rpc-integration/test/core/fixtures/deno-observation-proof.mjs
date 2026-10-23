@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { snapshot } from '../../../bench/observe.mjs'
 
 /** Real Deno file loading must precede the observation assertions, without a source overlay. */
-const api = await import('@migaia/rpc-threads')
-assert.equal(typeof api.createThreadPeer, 'function')
+const api = await import('@migaia/rpc-plugin-thread')
+assert.equal(typeof api.threadPlugin, 'function')
 /** Compatibility zeroes cannot be reported as measured native thread or event-loop fields. */
 const observed = snapshot()
 assert.ok(observed.loaded.length > 0)

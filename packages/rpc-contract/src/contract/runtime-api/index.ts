@@ -17,3 +17,12 @@ export {
 
 /** The standard byte launch grammar does not grant decoded metadata any resource authority. */
 export { rpcByteRuntimeBootstrap, type IRpcByteRuntimeBootstrap } from './byte-bootstrap.js'
+
+export * from './directory-constants.js'
+export { checkRuntimeDescription } from './description.js'
+export type {
+  IRuntimePeerIdentity,
+  IRuntimeMethodDescription,
+  IRuntimePeerDescription,
+  IRuntimeDirectoryDiff
+} from './description.js'

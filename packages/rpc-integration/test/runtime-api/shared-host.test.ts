@@ -2,21 +2,21 @@ import assert from 'node:assert/strict'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import {
   createRuntimePeer,
   type IRuntimePeer
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   prepareRuntimePeerEndpoint,
   readRuntimePeerConnection
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
-import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
+import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it('default custom factory retains ordinary Host calls without declaring unavailable shared ordering', async () => {
   /** The fixture joins both actual default source contexts rather than supplying stronger tags. */

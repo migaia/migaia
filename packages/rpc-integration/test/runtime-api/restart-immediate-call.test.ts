@@ -3,18 +3,19 @@ import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPlugin, createProcessTransport } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import {
   createNodeThreadChannelFactory,
   createNodeThreadLauncher
-} from '@migaia/rpc-threads/adapters/node'
-import type { ISpawnProcessPluginDeployment } from '../../../rpc-process/dist/process/plugin/types.js'
-import { RuntimeEventName } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
-import type { IRuntimeEvent } from '../../../rpc-core/dist/remote/runtime-api/events.js'
-import type { IRuntimeOutlet } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { ISpawnProcessPluginDeployment } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
+import { RuntimeEventName } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import type { IRuntimeEvent } from '../../../rpc-host/dist/remote/runtime-api/events.js'
+import type { IRuntimeOutlet } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 /** The existing child installs exposed Features through automatic process/thread discovery. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-plugin.mjs', import.meta.url))

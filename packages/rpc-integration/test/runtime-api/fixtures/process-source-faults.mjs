@@ -1,4 +1,4 @@
-import { createProcessPeer } from '@migaia/rpc-process'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
 
 /** A genuine process observes publication and callback counts independently from returned labels. */
 let publications = 0

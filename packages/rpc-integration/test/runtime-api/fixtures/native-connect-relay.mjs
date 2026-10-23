@@ -3,25 +3,23 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { defineHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
 import {
-  createProcessPeer,
-  createProcessPlugin,
-  createProcessTransport,
-  createNativeProcessOffer
-} from '@migaia/rpc-process'
-import {
-  createThreadPlugin,
-  createWebThreadLauncher,
-  createWebThreadChannelFactory
-} from '@migaia/rpc-threads'
-import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'
-import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
+import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
 
 import {
   listenProcessByteChannel,
   dialProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-core/dist/remote/runtime-api/constants.js'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
 
 /** This entire graph runs in the requested runtime, including its actual native child. */
 const runtime = process.argv[2]

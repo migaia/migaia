@@ -2,50 +2,56 @@
 
 [中文](./README.md)
 
-The integration test workspace for the RPC packages. It is private (`private: true`): it is not published to npm and exports no runtime API.
+Private integration-test workspace for eight RPC owners: `rpc-contract`, `rpc-host`, `rpc-plugin-process`, `rpc-plugin-thread`, `rpc-plugin-browser`, `rpc-plugin-coroutines`, `rpc-plugin-pool`, and `rpc-plugin-devtools`. It is not published and exports no runtime API.
 
-The package tests of `@migaia/rpc-contract`, `@migaia/rpc-core`, `@migaia/rpc-process`, `@migaia/rpc-threads` and `@migaia/rpc-browser` each check only their own package. This workspace checks how they behave together: real child processes, real Workers, interoperability across runtimes, wire-format vectors, the direction of dependencies between layers, and the packed public entries.
-
-## Why a separate package
-
-- **It tests the real public entries.** Tests here import the `@migaia/rpc-*` package names and run each package's built `dist`, not its source. A change that passes a package's own unit tests but breaks an export path or a build output fails here.
-- **Cross-package dependencies live in one place.** Cross-package scenarios need several RPC packages at once. Putting them in any one RPC package would give that package a reverse dependency.
-- **Heavy scenarios are managed together.** Real child processes, large frames and foreign-language peers take time and resources. Keeping them here lets them run serially when needed without slowing down each package's own tests.
+Application construction uses one `createRpcHost` with one transport plugin and optional features. This workspace verifies the combined public behavior, native processes and Workers, foreign protocol interoperability, dependency direction, and packed consumers. Lower-level protocol baselines may import the exact built canonical owner; they do not copy its implementation or restore a retired public factory.
 
 ## What it covers
 
-| Directory | What it checks |
-| --- | --- |
-| `test/runtime-api` | Connecting, calling and closing through the public API on each runtime (Node, Bun, Deno, browsers) |
-| `test/process` | Real child processes: health checks, reverse registration, whole-process replacement, failure recovery |
-| `test/threads` | Real Worker threads: authentication, which side owns `serve` teardown, lazy replay on child ports |
-| `test/bridge` | The JSON-RPC bridge: physical frame boundaries, object port contracts, real process health |
-| `test/control`, `test/error-format`, `test/streaming`, `test/serialize` | The wire protocol: control messages, error format, streaming and codec interoperability, checked against the vectors in `schema/vectors` |
-| `test/layering`, `test/merge` | Architecture rules: who owns error text, naming boundaries, dependency direction between layers, tree-shaking cost of the root entries |
-| `test/core`, `test/devtools`, `test/plugins`, `test/remote`, `test/replay-window` | Core capabilities combined with the surrounding packages |
-| `test/typing` | Public types (`*.test-d.ts`) |
-| `test/e2e/fixtures` | Browser-side fixtures loaded by the e2e tests of `@migaia/rpc-browser` |
+| Directory                                                                         | Responsibility                                                                                                                                     |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test/host`                                                                       | Public Host/plugin examples, ordinary Host installation, direct targeting, forwarding, pool scalar calls, collector correlation, and final exports |
+| `test/runtime-api`, `test/process`, `test/threads`                                | Native sessions, generations, cancellation, replacement, ownership, and cross-runtime preservation                                                 |
+| `test/bridge`                                                                     | JSON-RPC framing, object ports, and real process interoperability                                                                                  |
+| `test/control`, `test/error-format`, `test/streaming`, `test/serialize`           | Language-neutral protocol and codec vectors, including `schema/vectors`                                                                            |
+| `test/layering`, `test/merge`                                                     | Package ownership, error vocabulary, dependency direction, and public boundary convergence                                                         |
+| `test/core`, `test/devtools`, `test/plugins`, `test/remote`, `test/replay-window` | Canonical kernel and feature combinations                                                                                                          |
+| `test/typing`                                                                     | Public static contracts                                                                                                                            |
+| `test/e2e/fixtures`                                                               | Browser fixtures also consumed by `rpc-plugin-browser` e2e                                                                                         |
 
-`schema/vectors` holds language-neutral wire-format vectors (JSON); implementations in other languages can use them for their own tests.
+Package-local acceptance stays with its owner. Coroutine lifecycle and ordinary-plugin baselines moved to `rpc-plugin-coroutines/test/coroutine`; they are not duplicated here. Browser carrier acceptance belongs to `rpc-plugin-browser`.
 
 ## Running
 
-Build the RPC packages under test first. At startup the tests check that each dependency's `dist` matches its source; if not, they fail immediately and list the packages to rebuild.
+Tests consume fresh built dependencies and reject stale `dist`. The real package scripts are:
+
+| Script                        | Purpose                                                         |
+| ----------------------------- | --------------------------------------------------------------- |
+| `test`                        | Default integration suite                                       |
+| `test:conformance`            | Native/foreign interoperability suite                           |
+| `test:suite-parity`           | Existing cross-suite parity cases                               |
+| `test:packed`                 | Bounded build of the eight RPC owners, then packed export smoke |
+| `test:coverage:family`        | Shared family coverage, including moved/new owners              |
+| `typecheck`, `typecheck:test` | The owning test TypeScript project                              |
+
+Build only the selected dependency graph with bounded concurrency, and run heavy commands inside the shared window. From the repository root:
 
 ```bash
-pnpm --filter "@migaia/rpc-integration..." --workspace-concurrency=2 run build
-pnpm --filter @migaia/rpc-integration run test
+node "$(git rev-parse --path-format=absolute --git-common-dir)/../scripts/exclusive-window.mjs" run --window rpc-build --wait 2700 -- pnpm -r --filter "@migaia/rpc-integration..." --workspace-concurrency=2 run build
+node "$(git rev-parse --path-format=absolute --git-common-dir)/../scripts/exclusive-window.mjs" run --window rpc-integration --wait 2700 -- pnpm --dir packages/rpc-integration run test
 ```
 
-Do not run a full build from the repository root. See the [USEGUIDE](./USEGUIDE.en.md) for every script and how to run each kind of test.
+There is no integration runtime build entry of its own; the recursive filter builds matching dependencies that have a build script. Do not run an unbounded repository build. Bench scripts remain separate from delivery gates. See the [USEGUIDE](./USEGUIDE.en.md) for fixture setup and exact script usage.
 
-## Related packages
+## Related owners
 
-| Package | Relationship |
-| --- | --- |
-| [`@migaia/rpc-contract`](../rpc-contract/README.en.md) | Contracts and schemas |
-| [`@migaia/rpc-core`](../rpc-core/README.en.md) | Runtime core and transport toolkit |
-| [`@migaia/rpc-process`](../rpc-process/README.en.md) | Child-process transport |
-| [`@migaia/rpc-threads`](../rpc-threads/README.en.md) | Worker-thread transport |
-| [`@migaia/rpc-browser`](../rpc-browser/README.en.md) | Browser transports; its e2e tests use the fixtures here |
-| [`@migaia/rpc-devtools`](../rpc-devtools/README.en.md) | Debugging and observation |
+| Package                                                          | Responsibility                                                    |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`rpc-contract`](../rpc-contract/README.en.md)                   | Pure contracts, schemas, framing, and errors                      |
+| [`rpc-host`](../rpc-host/README.en.md)                           | The single `createRpcHost` entry, author SDK, and common features |
+| [`rpc-plugin-process`](../rpc-plugin-process/README.en.md)       | Child-process and socket transport                                |
+| [`rpc-plugin-thread`](../rpc-plugin-thread/README.en.md)         | Native Node/Bun/Deno thread transport                             |
+| [`rpc-plugin-browser`](../rpc-plugin-browser/README.en.md)       | Browser carrier plugins                                           |
+| [`rpc-plugin-coroutines`](../rpc-plugin-coroutines/README.en.md) | Supervised tasks and opaque parent connection                     |
+| [`rpc-plugin-pool`](../rpc-plugin-pool/README.en.md)             | One logical pool target and original member scheduling            |
+| [`rpc-plugin-devtools`](../rpc-plugin-devtools/README.en.md)     | Feature installation and collector records                        |

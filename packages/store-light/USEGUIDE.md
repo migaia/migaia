@@ -776,7 +776,7 @@ StoreResource 用创建时捕获的 Runtime 做空闲清理和诊断，用准入
 
 StoreLight 现在只适配一个 `@migaia/resource` 实例。它保留实际值的身份、渲染 capture、资源与版本租约以及值的释放，删除了自己重复的请求/数据控制器和请求协调器。`StoreResourceDataKind` 及其类型已删除；需要原生 Resource 状态时用 `ResourceStatus` / `ResourceFetchStatus`。`StoreResourceKind` 仍是门面内部的词汇；`readSnapshot()` 仍返回 `value`/`version`/`token`，没有公开的 kind 属性。
 
-加载中的重复读取抛出的是同一个 Promise，它以原始值完成。`retry()` 或强制取消会让被取代的 Promise 立即以原生 `AbortError` 失败，`source` 为 `resource`，`code` 为 `REQUEST_ABORTED`；以前，忽略中止信号的加载函数会让这个 Promise 一直挂起，直到它自己完成。手动驱动重试时要处理旧 Promise 的拒绝。迟到的返回值只释放一次。刷新失败时恢复旧数据；旧版本的租约会把它的释放推迟到租约释放之后。等待时钟结算的已加载值仍归资源所有，结算失败时也会被释放。临时 capture 的定时器准入失败时，已建立的部分 capture 和定时器会被释放，并作为释放过程的附带问题上报；已经加载成功的值仍可读，并会通知订阅者。不引入任何异步上下文机制。
+加载中的重复读取抛出的是同一个 Promise，它以原始值完成。`retry()` 或强制取消会让被取代的 Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`；以前，忽略中止信号的加载函数会让这个 Promise 一直挂起，直到它自己完成。手动驱动重试时要处理旧 Promise 的拒绝。迟到的返回值只释放一次。刷新失败时恢复旧数据；旧版本的租约会把它的释放推迟到租约释放之后。等待时钟结算的已加载值仍归资源所有，结算失败时也会被释放。临时 capture 的定时器准入失败时，已建立的部分 capture 和定时器会被释放，并作为释放过程的附带问题上报；已经加载成功的值仍可读，并会通知订阅者。不引入任何异步上下文机制。
 
 ### 迁移说明：公开 API 收敛
 

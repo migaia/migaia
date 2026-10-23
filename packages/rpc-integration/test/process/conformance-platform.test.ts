@@ -5,21 +5,23 @@ import { describe, expect, it, vi } from 'vitest'
 import { configDefaults } from 'vitest/config'
 import { StandardCapability } from '@migaia/supervision'
 import { ProcessCapability } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'
-import { createWindowsJobProcessLauncher } from '@migaia/rpc-process/adapters/windows-job'
-import { createElectronUtilityProcessLauncher } from '@migaia/rpc-process/adapters/electron-utility-process'
-import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
-import { createWebThreadLauncher } from '@migaia/rpc-threads'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { createWindowsJobProcessLauncher } from '@migaia/rpc-plugin-process/adapters/windows-job'
+import { createElectronUtilityProcessLauncher } from '@migaia/rpc-plugin-process/adapters/electron-utility-process'
+import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { createAdapterWebThreadLauncher as createWebThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
 /** The same unpackaged admission gate runs before the real business and performance runners. */
 const admission = await import(
-  new URL('../../../rpc-process/test/process/fixtures/conformance-toolchains.mjs', import.meta.url)
-    .href
+  new URL(
+    '../../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs',
+    import.meta.url
+  ).href
 )
 /** Vitest loads configuration outside the source/test TypeScript project. */
 const { default: defaultConfig } = await import(
-  new URL('../../../rpc-process/vitest.config.ts', import.meta.url).href
+  new URL('../../../rpc-plugin-process/vitest.config.ts', import.meta.url).href
 )
 
 /** Produce exact tool version output without launching, installing or downloading a tool. */
@@ -197,10 +199,10 @@ describe('conformance toolchain and platform evidence boundaries', () => {
      * PASS.
      */
     for (const path of [
-      '../../../rpc-threads/test/threads/platform-capabilities.test.ts',
-      '../../../rpc-threads/test/threads/fixtures/web-runtime-parent.mjs',
-      '../../../rpc-process/test/process/platform-capabilities.test.ts',
-      '../../../rpc-process/test/process/platform-cleanup.test.ts'
+      '../../../rpc-plugin-thread/test/threads/platform-capabilities.test.ts',
+      '../../../rpc-plugin-thread/test/threads/fixtures/web-runtime-parent.mjs',
+      '../../../rpc-plugin-process/test/process/platform-capabilities.test.ts',
+      '../../../rpc-plugin-process/test/process/platform-cleanup.test.ts'
     ])
       expect(existsSync(new URL(path, import.meta.url))).toBe(true)
   })

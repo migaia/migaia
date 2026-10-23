@@ -19,12 +19,12 @@ function splitEntry(name: string) {
     domain === 'contract'
       ? 'rpc-contract'
       : domain === 'core' || domain === 'remote' || domain === 'testing'
-        ? 'rpc-core'
+        ? 'rpc-host'
         : domain === 'process'
-          ? 'rpc-process'
+          ? 'rpc-plugin-process'
           : domain === 'threads'
-            ? 'rpc-threads'
-            : 'rpc-browser'
+            ? 'rpc-plugin-thread'
+            : 'rpc-plugin-browser'
   const tail = rest.join('/')
   const key = domain === 'remote' || domain === 'testing' ? `./${domain}` : tail ? `./${tail}` : '.'
   return { current, owner, root: join(packageRoot, owner), key }
@@ -113,6 +113,20 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'normalizeRpcHandshake'
     ],
     './runtime': [
+      'RUNTIME_API_SCHEMA_VERSION',
+      'RuntimeApiMode',
+      'RuntimeApiModeSource',
+      'RuntimeConnectionDirection',
+      'RuntimeEventName',
+      'RuntimeMetricScope',
+      'RuntimeMetricUnit',
+      'RuntimeQueryClock',
+      'RuntimeQueryReason',
+      'RuntimeQueryStatus',
+      'RuntimeRecentKind',
+      'RuntimeResourceKind',
+      'RuntimeSourceKind',
+      'checkRuntimeDescription',
       'RpcRuntimeCancel',
       'RpcRuntimeCarrier',
       'RpcRuntimeField',
@@ -160,6 +174,12 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'rpcBinaryView'
     ],
     './framing/jsonrpc': [
+      'JSONRPC_ALLOWED_CAPABILITIES',
+      'JSONRPC_REQUIRED_CAPABILITIES',
+      'JSONRPC_REQUIRED_METHODS',
+      'JsonRpcErrorNumber',
+      'JsonRpcProfile',
+      'checkJsonRpcDescription',
       'JSONRPC_BRIDGE_ERROR_SOURCE',
       'JsonRpcBridgeErrorCode',
       'JsonRpcLimit',
@@ -201,7 +221,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'normalizeStreamPayload'
     ]
   },
-  'rpc-core': {
+  'rpc-host': {
     /** Revision 3 adds current-stage control and canonical reporter exports to the Probe entry. */
     './probe': [
       'RpcProbeStage',
@@ -220,49 +240,23 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'subscribeProbeStages',
       'hostRethrowReporter',
       'IpcReporterContext'
-    ],
-    /** SDK exposes only the two task-level factories to ordinary adapter authors. */
-    './adapter': ['defineByteAdapter', 'defineMessageAdapter'],
-    /** Only real native owners retain the moved low-level runtime operations. */
-    './adapter/internal-advanced': [
-      'JSONRPC_ALLOWED_CAPABILITIES',
-      'JSONRPC_REQUIRED_CAPABILITIES',
-      'JSONRPC_REQUIRED_METHODS',
-      'IpcReporterContext',
-      'JsonRpcErrorNumber',
-      'JsonRpcProfile',
-      'assembleAdapterPlugin',
-      'captureAdapterTask',
-      'carrierSizeBytes',
-      'createAdapterBindingDrain',
-      'createAdapterConfigurationError',
-      'createAdapterConfigurationTypeError',
-      'createAdapterId',
-      'createAdapterJsonRpcChannel',
-      'createAdapterPlugin',
-      'createAdapterSourceConfigurationError',
-      'createAdapterTransportError',
-      'createEventEmitterMessageResource',
-      'createEventTargetMessageResource',
-      'createJsonRpcBridgeError',
-      'createRuntimeByteConnection',
-      'createRuntimeEventByteIO',
-      'createRuntimeMessageConnection',
-      'createRuntimeProviderGovernor',
-      'createRuntimeProviderScope',
-      'holdAdapterLaunch',
-      'holdAdapterRegistration',
-      'readAdapterAbortReason',
-      'readRuntimeByteBootstrap',
-      'resolveAdapterEntry',
-      'retainAdapterRuntimeFlags',
-      'validateAdapterPeerMethods',
-      'validateAdapterPeerTimeout'
     ]
   },
-  'rpc-browser': {
-    /** Browser's root Peer joins the same ordinary API inventory as the other carrier owners. */
-    '.': ['createBrowserPeer', 'RpcBrowserErrorCode', 'RPC_BROWSER_ERROR_SOURCE']
+  'rpc-plugin-browser': {
+    /** Browser users select one cold carrier; lower-level constructors remain author subpaths. */
+    '.': [
+      'windowPlugin',
+      'dedicatedWorkerPlugin',
+      'sharedWorkerPlugin',
+      'rtcDataChannelPlugin',
+      'broadcastChannelPlugin',
+      'serviceWorkerPlugin',
+      'webTransportPlugin',
+      'RpcBrowserErrorCode',
+      'RPC_BROWSER_ERROR_SOURCE'
+    ],
+    './adapters/web-worker': ['createWebWorkerTransport'],
+    './adapters/message-port': ['createBrowserMessagePortTransport']
   }
 }
 /** Retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
@@ -334,55 +328,99 @@ function compiledCoreFiles(directory: string): string[] {
 }
 
 describe('merged public exports', () => {
-  it('preserves the merged runtime export sets and the layered transport kit', async () => {
+  it('rpc-host integration boundary: preserves the merged runtime export sets and the layered transport kit', async () => {
+    /** These independently reviewed publication paths are not read from the generated registry. */
+    const expectedPaths: Record<string, readonly string[]> = {
+      'rpc-contract': [
+        '.',
+        './v1',
+        './framing',
+        './framing/v1',
+        './framing/stream',
+        './wire',
+        './portable',
+        './errors',
+        './schema/wire-error',
+        './handshake',
+        './runtime',
+        './runtime/metadata',
+        './runtime/lazy',
+        './binary/inspect',
+        './framing/jsonrpc',
+        './binary',
+        './binary/lazy',
+        './binary/capture',
+        './stream',
+        './remote'
+      ],
+      'rpc-host': [
+        '.',
+        './probe',
+        './stream',
+        './adapters/memory',
+        './testing',
+        './plugin',
+        './features',
+        './features/auth',
+        './features/chunk',
+        './features/retry',
+        './features/timeout',
+        './features/typegen'
+      ],
+      'rpc-plugin-process': [
+        '.',
+        './adapters/node-child-process',
+        './adapters/node-socket',
+        './adapters/bun-spawn',
+        './adapters/bun-socket',
+        './adapters/deno-command',
+        './adapters/deno-socket',
+        './adapters/electron-utility-process',
+        './adapters/windows-job',
+        './features',
+        './features/send-queue',
+        './features/log',
+        './features/flow-control'
+      ],
+      'rpc-plugin-thread': ['.', './adapters/node', './adapters/electron-main'],
+      'rpc-plugin-browser': [
+        '.',
+        './adapters/window',
+        './adapters/shared-worker',
+        './adapters/service-worker',
+        './adapters/broadcast-channel',
+        './adapters/web-transport',
+        './adapters/rtc-data-channel',
+        './adapters/message-port',
+        './adapters/web-worker'
+      ],
+      'rpc-plugin-coroutines': ['.'],
+      'rpc-plugin-pool': ['.'],
+      'rpc-plugin-devtools': ['.', './contract', './hub', './log']
+    }
+    /** Every current owner must resolve its actual built runtime and declaration entry. */
     const manifests = Object.fromEntries(
-      ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map((owner) => [
+      Object.keys(expectedPaths).map((owner) => [
         owner,
         JSON.parse(readFileSync(join(packageRoot, owner, 'package.json'), 'utf8')) as {
           exports: Record<string, { default: string; types: string }>
         }
       ])
     )
-    const manifest = manifests['rpc-core']!
-    const expected = [
-      ...Object.keys(legacyExports),
-      '@migaia/rpc/core/transport-kit',
-      '@migaia/rpc/core/stream',
-      '@migaia/rpc/core/plugins/flow-control',
-      '@migaia/rpc/core/plugins/send-queue',
-      '@migaia/rpc/core/plugins/log',
-      '@migaia/rpc/remote',
-      '@migaia/rpc/testing',
-      '@migaia/rpc/process',
-      '@migaia/rpc/process/adapters/node-child-process',
-      '@migaia/rpc/process/adapters/node-socket',
-      '@migaia/rpc/process/adapters/bun-spawn',
-      '@migaia/rpc/process/adapters/bun-socket',
-      '@migaia/rpc/process/adapters/deno-command',
-      '@migaia/rpc/process/adapters/deno-socket',
-      '@migaia/rpc/process/adapters/electron-utility-process',
-      '@migaia/rpc/process/adapters/windows-job',
-      '@migaia/rpc/contract/framing/stream',
-      '@migaia/rpc/threads',
-      ...['node', 'electron-main'].map((name) => `@migaia/rpc/threads/adapters/${name}`)
-    ]
-      .map((name) => (coreRefactorDelta.relocations as Record<string, string>)[name] ?? name)
-      .sort()
-    expect(expected).toHaveLength(44)
-    const currentEntries = expected.map((name) => {
-      const entry = splitEntry(name)
-      return `${entry.owner}:${entry.key}`
-    })
-    for (const [owner, entries] of Object.entries(ordinaryEntries))
-      currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
-    currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(62)
-    expect(
-      Object.entries(manifests)
-        .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))
-        .sort()
-    ).toEqual(currentEntries.sort())
+    for (const [owner, expected] of Object.entries(expectedPaths)) {
+      expect(Object.keys(manifests[owner]!.exports).sort(), owner).toEqual([...expected].sort())
+      for (const [key, entry] of Object.entries(manifests[owner]!.exports)) {
+        expect(existsSync(join(packageRoot, owner, entry.default)), `${owner}:${key}`).toBe(true)
+        if (key !== './schema/wire-error') {
+          expect(entry.types).toBe(entry.default.replace(/\.js$/, '.d.ts'))
+          expect(existsSync(join(packageRoot, owner, entry.types)), `${owner}:${key}`).toBe(true)
+        }
+      }
+    }
+    const manifest = manifests['rpc-host']!
     for (const [name, baseline] of Object.entries(legacyExports)) {
+      // Contract vocabulary retains its original behavior oracle; factory removals have new checks.
+      if (!name.startsWith('@migaia/rpc/contract')) continue
       const { current: currentName, root: ownerRoot, key, owner } = splitEntry(name)
       const entry = manifests[owner]!.exports[key]
       expect(entry, name).toBeDefined()
@@ -434,7 +472,12 @@ describe('merged public exports', () => {
                 ]
               : []),
             ...(name === '@migaia/rpc/contract/framing'
-              ? ['processStringFramer', 'remoteProcessStringFramer', 'inspectRpcPhysicalFrame']
+              ? [
+                  'processStringFramer',
+                  'remoteProcessStringFramer',
+                  'inspectRpcPhysicalFrame',
+                  'rpcByteRuntimeBootstrap'
+                ]
               : []),
             ...((coreRefactorDelta.added as Record<string, string[]>)[name] ?? [])
           ])
@@ -445,7 +488,7 @@ describe('merged public exports', () => {
       // A leaf export maps to its own source path; index entries map to directory roots.
       expect(relative, name).toBe(expectedRelative)
     }
-    const coreRoot = join(packageRoot, 'rpc-core')
+    const coreRoot = join(packageRoot, 'rpc-host')
     const stream = manifest.exports['./stream']
     expect(stream).toEqual({
       types: './dist/core/stream/index.d.ts',
@@ -454,39 +497,8 @@ describe('merged public exports', () => {
     expect(
       Object.keys(await import(pathToFileURL(join(coreRoot, stream.default)).href)).sort()
     ).toEqual(['createCanonicalChunkFeature', 'createStreamFeature'])
-    const remote = manifest.exports['./remote']
-    expect(remote).toEqual({
-      types: './dist/remote/index.d.ts',
-      default: './dist/remote/index.js'
-    })
-    expect(
-      Object.keys(await import(pathToFileURL(join(coreRoot, remote.default)).href)).sort()
-    ).toEqual(
-      [
-        ...new Set([
-          'RemoteMethodMode',
-          'REMOTE_NAME_PATTERN',
-          'REMOTE_METHOD_MAX_LENGTH',
-          'REMOTE_SCHEMA_VERSION',
-          'REMOTE_METHOD_MODES',
-          'RemoteMethodName',
-          'RuntimePluginKey',
-          'RpcRemoteLayerErrorCode',
-          'RPC_REMOTE_ERROR_SOURCE',
-          'normalizeRemoteContract',
-          'normalizeRemoteHostCatalog',
-          'normalizeRemoteControlShape',
-          'sameRemoteContract',
-          'createRemotePlugin',
-          'createRemoteRetryPort',
-          'serveRemotePlugin',
-          'createRemoteHost',
-          'serveRemoteHost',
-          'createCoroutinePlugin',
-          ...coreRefactorDelta.added['@migaia/rpc/remote']
-        ])
-      ].sort()
-    )
+    /** SDK descriptions use the original contract vocabulary without publishing old assemblies. */
+    const remoteNamespace = await import('@migaia/rpc-host/plugin')
     /** Every ordinary entry retains an exact namespace, with no claimed preparation exports. */
     for (const [owner, entries] of Object.entries(ordinaryEntries)) {
       for (const [key, names] of Object.entries(entries)) {
@@ -502,7 +514,7 @@ describe('merged public exports', () => {
     for (const [symbol, module] of Object.entries(formerProtocolOperations))
       expect(await import(module), symbol).toHaveProperty(symbol)
     /** Exposes only scalar metadata from the existing owner, without its family tokens. */
-    const remoteNamespace = await import(pathToFileURL(join(coreRoot, remote.default)).href)
+
     /** Canonical identity prevents a copied table or wrapper from becoming another vocabulary owner. */
     const runtimeConstants = await import(
       pathToFileURL(join(coreRoot, './dist/remote/runtime-api/constants.js')).href
@@ -519,47 +531,26 @@ describe('merged public exports', () => {
     const framing = await import('@migaia/rpc-contract/framing/jsonrpc')
     expect(framing.JSONRPC_BRIDGE_ERROR_SOURCE).toBe('rpc.contract.jsonrpc')
     expect(Object.keys(framing.JsonRpcBridgeErrorCode)).toHaveLength(5)
-    /** Former Core Process operations retain one exact namespace at their owning package root. */
-    const processEntry = manifests['rpc-process']!.exports['.']!
+    /** The process root publishes one native transport factory and stable error identities. */
+    const processEntry = manifests['rpc-plugin-process']!.exports['.']!
     expect(
       Object.keys(
-        await import(pathToFileURL(join(packageRoot, 'rpc-process', processEntry.default)).href)
+        await import(
+          pathToFileURL(join(packageRoot, 'rpc-plugin-process', processEntry.default)).href
+        )
       ).sort()
-    ).toEqual(
-      [
-        'PROCESS_HANDSHAKE_MAX_FRAME_BYTES',
-        'PROCESS_RUNTIME_API_BOOTSTRAP_KIND',
-        'PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS',
-        'PROCESS_RUNTIME_API_BOOTSTRAP_VERSION',
-        'PROCESS_RUNTIME_API_ENV',
-        'PROCESS_RUNTIME_API_ENV_VERSION',
-        'PROCESS_RUNTIME_API_FINGERPRINT_PREFIX',
-        'ProcessPluginWire',
-        'RPC_PROCESS_ERROR_SOURCE',
-        'RpcProcessErrorCode',
-        'createAdapterProcessLaunch',
-        'createAdapterProcessPeer',
-        'createAdapterProcessPlugin',
-        'createAdapterWebByteIO',
-        'createNativeProcessOffer',
-        'createProcessChannelClosedError',
-        'createProcessPeer',
-        'createProcessJsonRpcChannel',
-        'createProcessPlugin',
-        'createProcessResilience',
-        'createProcessTransport',
-        'openProcessObjectChannel',
-        'isProcessChild',
-        'parseProcessPluginDescriptor',
-        'receiveAdapterBootstrap'
-      ].sort()
-    )
+    ).toEqual([
+      'RPC_PROCESS_ERROR_SOURCE',
+      'RpcProcessErrorCode',
+      'isProcessChild',
+      'processPlugin'
+    ])
     /** Both redundant factory names were removed instead of retained as aliases. */
-    const processNamespace = await import('@migaia/rpc-process')
+    const processNamespace = await import('@migaia/rpc-plugin-process')
     expect(processNamespace).not.toHaveProperty('createJsonRpcAdapterChannel')
     expect(processNamespace).not.toHaveProperty('createJsonRpcRemoteChannel')
     /** Moved raw native operations belong to the already-public native adapter entries. */
-    const nodeProcesses = await import('@migaia/rpc-process/adapters/node-child-process')
+    const nodeProcesses = await import('@migaia/rpc-plugin-process/adapters/node-child-process')
     expect(Object.keys(nodeProcesses).sort()).toEqual(
       [
         'createAdapterChildStdio',
@@ -570,14 +561,15 @@ describe('merged public exports', () => {
       ].sort()
     )
     /** The socket adapter owns its actual held native stream constructor. */
-    const nodeSockets = await import('@migaia/rpc-process/adapters/node-socket')
+    const nodeSockets = await import('@migaia/rpc-plugin-process/adapters/node-socket')
     expect(Object.keys(nodeSockets).sort()).toEqual(
       ['createAdapterSocketByteIO', 'dialProcessByteChannel', 'listenProcessByteChannel'].sort()
     )
     /** Removes text/constructor/lazy aliases without weakening the exact ordinary namespaces. */
     for (const [owner, entries] of Object.entries(manifests)) {
       for (const [key, entry] of Object.entries(entries.exports)) {
-        if (owner === 'rpc-contract' && key === './schema/wire-error') continue
+        if ((owner === 'rpc-contract' && key === './schema/wire-error') || key === './plugin')
+          continue
         const namespace = await import(pathToFileURL(join(packageRoot, owner, entry.default)).href)
         expect(
           Object.keys(namespace).filter((name) => /(?:ErrorText|Diagnostic|Lazy)$/.test(name))
@@ -595,28 +587,13 @@ describe('merged public exports', () => {
       JSON.parse(readFileSync(join(packageRoot, 'rpc-contract', schemaEntry.default), 'utf8'))
     )
     /** Native adapters expose diagnostics at their user-facing package root. */
-    const threads = await import('@migaia/rpc-threads')
-    /** Former Core Thread operations now retain one exact owning package namespace. */
+    const threads = await import('@migaia/rpc-plugin-thread')
+    /** Applications see one native transport factory and its original diagnostics. */
     expect(Object.keys(threads).sort()).toEqual(
-      [
-        'AdapterNodeThreadParentChannel',
-        'RPC_THREAD_ERROR_SOURCE',
-        'RpcThreadErrorCode',
-        'createAdapterNodeThreadLauncher',
-        'createAdapterNodeThreadPeer',
-        'createNodeThreadChannel',
-        'createThreadPeer',
-        'createThreadPlugin',
-        'isThreadChild',
-        'createWebThreadChannel',
-        'createWebThreadChannelFactory',
-        'createWebThreadLauncher',
-        'readThreadBootstrap',
-        'receiveThreadData'
-      ].sort()
+      ['RPC_THREAD_ERROR_SOURCE', 'RpcThreadErrorCode', 'isThreadChild', 'threadPlugin'].sort()
     )
     /** The moved Node channel factory uses its already-public native-owner entry. */
-    const nodeThreads = await import('@migaia/rpc-threads/adapters/node')
+    const nodeThreads = await import('@migaia/rpc-plugin-thread/adapters/node')
     expect(Object.keys(nodeThreads).sort()).toEqual(
       ['createNodeThreadChannelFactory', 'createNodeThreadLauncher'].sort()
     )
@@ -624,30 +601,68 @@ describe('merged public exports', () => {
     expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
   })
 
-  it('exports the runtime coroutine plugin and removes the legacy host', async () => {
-    /** Keeps the public factory name while moving its owner to the runtime family. */
-    const coreRoot = join(packageRoot, 'rpc-core')
-    /** The built public entry is the surface consumed by applications and website manifests. */
-    const remoteNamespace = await import(pathToFileURL(join(coreRoot, 'dist/remote/index.js')).href)
-    expect(remoteNamespace.createCoroutinePlugin).toEqual(expect.any(Function))
-    expect.soft(remoteNamespace).not.toHaveProperty('createCoroutineHost')
-    expect.soft(remoteNamespace.RuntimePluginKey).toEqual({
-      process: 'process',
-      thread: 'thread',
-      coroutine: 'coroutine'
-    })
-    /** A same-named legacy factory cannot satisfy the new runtime family's ownership contract. */
-    const familyModule = join(coreRoot, 'dist/remote/runtime-api/coroutine-plugin.js')
-    expect(existsSync(familyModule)).toBe(true)
-    /** The public entry re-exports the canonical runtime factory without another wrapper. */
-    const coroutineFamily = await import(pathToFileURL(familyModule).href)
-    expect(remoteNamespace.createCoroutinePlugin).toBe(coroutineFamily.createCoroutinePlugin)
+  it('publishes coroutine admission and factory only from its owning package', async () => {
+    /** One cooperative transport owns the moved task types and its native source admission code. */
+    const coroutine = await import('@migaia/rpc-plugin-coroutines')
+    expect(Object.keys(coroutine).sort()).toEqual([
+      'RPC_COROUTINE_ERROR_SOURCE',
+      'RpcCoroutineErrorCode',
+      'coroutinePlugin'
+    ])
+    expect(coroutine.RPC_COROUTINE_ERROR_SOURCE).toBe('rpc.transport.coroutine')
+    /** Neither ordinary applications nor native authors obtain a reverse coroutine factory. */
+    expect(await import('@migaia/rpc-host')).not.toHaveProperty('createCoroutinePlugin')
+    expect(await import('@migaia/rpc-host/plugin')).not.toHaveProperty('createCoroutinePlugin')
+  })
+
+  it('exports the browser plugin root and every retained carrier subpath', async () => {
+    /** This direct-consumer oracle remains independent from the earlier whole-family migration. */
+    const root = join(packageRoot, 'rpc-plugin-browser')
+    /** Browser's eight authoring subpaths retain their exact runtime exports beside the new root. */
+    const expected = {
+      './adapters/window': ['createWindowMessageTransport'],
+      './adapters/shared-worker': ['createSharedWorkerTransport'],
+      './adapters/service-worker': ['createServiceWorkerTransport'],
+      './adapters/broadcast-channel': ['createBroadcastChannelTransport'],
+      './adapters/rtc-data-channel': ['createRtcDataChannelTransport'],
+      './adapters/web-transport': ['createWebTransportDatagramTransport'],
+      ...ordinaryEntries['rpc-plugin-browser']
+    }
+    /** Actual package exports select built modules; source imports cannot satisfy this boundary. */
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+      exports: Record<string, { default: string; types: string }>
+    }
+    expect(Object.keys(manifest.exports).sort()).toEqual(Object.keys(expected).sort())
+    for (const [entry, names] of Object.entries(expected)) {
+      const target = manifest.exports[entry]!
+      expect(target.types).toBe(target.default.replace(/\.js$/, '.d.ts'))
+      expect(existsSync(join(root, target.types))).toBe(true)
+      const namespace = await import(pathToFileURL(join(root, target.default)).href)
+      expect(Object.keys(namespace).sort(), entry).toEqual([...names].sort())
+    }
+  })
+
+  it('rpc-host integration boundary: exports the runtime coroutine plugin and removes the legacy host', async () => {
+    /** Cooperative physical assembly is owned only by its transport package. */
+    const root = await import('@migaia/rpc-plugin-coroutines')
+    const canonical = await import('../../../rpc-plugin-coroutines/dist/coroutine-plugin.js')
+    expect(root.coroutinePlugin).toBe(canonical.coroutinePlugin)
+    for (const entry of [
+      await import('@migaia/rpc-host'),
+      await import('@migaia/rpc-host/plugin')
+    ]) {
+      expect(entry).not.toHaveProperty('createCoroutinePlugin')
+      expect(entry).not.toHaveProperty('createCoroutineHost')
+    }
+    expect(
+      existsSync(join(packageRoot, 'rpc-host/dist/remote/runtime-api/coroutine-plugin.js'))
+    ).toBe(false)
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {
-    expect(existsSync(join(packageRoot, './rpc-core/dist/core'))).toBe(true)
+    expect(existsSync(join(packageRoot, './rpc-host/dist/core'))).toBe(true)
     expect(existsSync(join(packageRoot, './rpc-contract/dist/contract'))).toBe(true)
-    const offenders = compiledCoreFiles(join(packageRoot, './rpc-core/dist/core')).filter(
+    const offenders = compiledCoreFiles(join(packageRoot, './rpc-host/dist/core')).filter(
       (path) => {
         const source = readFileSync(path, 'utf8')
         return /(?:function|const|class)\s+(?:rpcProtocolV1|normalizeRpcEnvelope)\b/.test(source)

@@ -3,14 +3,15 @@ import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer, type INodeThreadHandle } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 
 /** A genuine Worker replacement changes the installed method set and one actual route mode. */
 const entry = fileURLToPath(new URL('./fixtures/directory-worker.mjs', import.meta.url))

@@ -55,9 +55,10 @@
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "@migaia/rpc-contract": "workspace:^",
-    "@migaia/rpc-core": "workspace:^",
-    "@migaia/rpc-process": "workspace:^",
-    "@migaia/rpc-threads": "workspace:^",
+    "@migaia/rpc-host": "workspace:^",
+    "@migaia/rpc-plugin-coroutines": "workspace:*",
+    "@migaia/rpc-plugin-process": "workspace:^",
+    "@migaia/rpc-plugin-thread": "workspace:^",
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

@@ -1,8 +1,9 @@
 import { PassThrough, Writable } from 'node:stream'
 import { expect, it } from 'vitest'
-import { createRuntimeEventByteIO } from '@migaia/rpc-core/adapter/internal-advanced'
-import { RpcProbeDirection, type IRpcCarrierProbe } from '@migaia/rpc-core/probe'
-import { createNativeProcessOffer, createProcessTransport } from '@migaia/rpc-process'
+import { createRuntimeEventByteIO } from '@migaia/rpc-host/plugin'
+import { RpcProbeDirection, type IRpcCarrierProbe } from '@migaia/rpc-host/probe'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { RpcBatchPhysical } from '@migaia/rpc-contract'
 import { bridgeFixture, flush, request } from '../bridge/fixture.js'
 

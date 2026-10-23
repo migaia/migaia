@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
-import { listenProcessRegistrations } from '../../../rpc-process/dist/process/resilience/rendezvous.js'
-import { createProcessSessionManager } from '../../../rpc-process/dist/process/resilience/session.js'
-import type { IProcessSessionLease } from '@migaia/rpc-process'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { listenProcessRegistrations } from '../../../rpc-plugin-process/dist/process/resilience/rendezvous.js'
+import { createProcessSessionManager } from '../../../rpc-plugin-process/dist/process/resilience/session.js'
+import type { IProcessSessionLease } from '../../../rpc-plugin-process/dist/process/resilience/types.js'
 
 /** Each transport carries a distinct physical-session identity. */
 function ipc(id: string) {

@@ -1,6 +1,6 @@
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 
 /** Saturate stderr before reading bootstrap; the launcher must already drain it. */
 await new Promise((resolve) => process.stderr.write(Buffer.alloc(1024 * 1024, 88), resolve))

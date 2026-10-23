@@ -9,15 +9,13 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import {
-  createProcessJsonRpcChannel,
-  type IProcessJsonRpcChannelOptions
-} from '@migaia/rpc-process'
-import type { IProcessPluginEstablish } from '@migaia/rpc-process'
-import { nodeByteStream } from '../../../../rpc-process/dist/process/node-byte-stream.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
-import type { IIpcLogRecord } from '@migaia/rpc-core/plugins/flow-control'
+import { createProcessJsonRpcChannel } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
+import type { IProcessJsonRpcChannelOptions } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
+import type { IProcessPluginEstablish } from '../../../../rpc-plugin-process/dist/process/plugin/types.js'
+import { nodeByteStream } from '../../../../rpc-plugin-process/dist/process/node-byte-stream.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
+import type { IIpcLogRecord } from '@migaia/rpc-host/plugin'
 import { BRIDGE_CONTRACT, bridgeFixture } from '../fixture.js'
 
 /** A short dedicated-fd peer tests actual Node pipes without changing the native launcher. */

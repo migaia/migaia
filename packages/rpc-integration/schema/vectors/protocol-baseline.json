@@ -1,9 +1,6 @@
 {
   "profile": "migaia.rpc.runtime-baseline/2",
-  "requiredCapabilities": [
-    "runtime-api@1",
-    "batch@1"
-  ],
+  "requiredCapabilities": ["runtime-api@1", "batch@1"],
   "descriptionMethod": "migaia.remote.runtime.describe",
   "selftestVectors": [
     "handshake.json",
@@ -13,10 +10,7 @@
     "error-chain.json",
     "stream-framing.json"
   ],
-  "contractVectors": [
-    "runtime-description.json",
-    "batch.json"
-  ],
+  "contractVectors": ["runtime-description.json", "batch.json", "description-schema.json"],
   "handshake": [
     {
       "id": "runtime-v2-batch-baseline",
@@ -30,9 +24,7 @@
             "minor": 1
           }
         ],
-        "codecs": [
-          "json"
-        ],
+        "codecs": ["json"],
         "capabilities": [
           "runtime-api@1",
           "batch@1",
@@ -60,9 +52,7 @@
             "minor": 0
           }
         ],
-        "codecs": [
-          "json"
-        ],
+        "codecs": ["json"],
         "capabilities": [
           "runtime-api@1",
           "batch@1",
@@ -91,16 +81,8 @@
             "minor": 1
           }
         ],
-        "codecs": [
-          "json"
-        ],
-        "capabilities": [
-          "batch@1",
-          "ping@1",
-          "close@1",
-          "wire-error@1",
-          "stream@1"
-        ],
+        "codecs": ["json"],
+        "capabilities": ["batch@1", "ping@1", "close@1", "wire-error@1", "stream@1"],
         "peer": {
           "id": "u36-caller",
           "runtime": "python"
@@ -121,16 +103,8 @@
             "minor": 1
           }
         ],
-        "codecs": [
-          "json"
-        ],
-        "capabilities": [
-          "runtime-api@1",
-          "ping@1",
-          "close@1",
-          "wire-error@1",
-          "stream@1"
-        ],
+        "codecs": ["json"],
+        "capabilities": ["runtime-api@1", "ping@1", "close@1", "wire-error@1", "stream@1"],
         "peer": {
           "id": "u36-caller",
           "runtime": "python"

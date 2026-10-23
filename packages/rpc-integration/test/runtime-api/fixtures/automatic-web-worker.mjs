@@ -1,4 +1,4 @@
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
 
 /** Capture genuine worker bootstrap before the module's first top-level await. */
 let initialized

@@ -3,22 +3,25 @@ import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { createFullEndpoint, createFullOneWayEndpoint } from '@migaia/rpc-core/full'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { codec } from '@migaia/rpc-core'
-import { framer } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
+import {
+  createFullEndpoint,
+  createFullOneWayEndpoint
+} from '../../../../rpc-host/dist/core/full.js'
+import { createMemoryTransportPair } from '../../../../rpc-host/dist/core/adapters/memory.js'
+import { codec } from '../../../../rpc-host/dist/core/index.js'
+import { framer } from '../../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../../rpc-host/dist/core/index.js'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { RpcOutboundAttachment } from '../../../../rpc-core/dist/core/internal/outbound-attachment.js'
-import { RpcProviderAttachment } from '../../../../rpc-core/dist/core/internal/provider-attachment.js'
-import { RpcCoreErrorText } from '../../../../rpc-core/dist/core/error-text.js'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import { RpcOutboundAttachment } from '../../../../rpc-host/dist/core/internal/outbound-attachment.js'
+import { RpcProviderAttachment } from '../../../../rpc-host/dist/core/internal/provider-attachment.js'
+import { RpcCoreErrorText } from '../../../../rpc-host/dist/core/error-text.js'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import {
   createNodeProcessLauncher,
   openProcessStdioChannel
-} from '@migaia/rpc-process/adapters/node-child-process'
+} from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 /** Inspector roots belong only to this fixture; production objects are never changed. */
 globalThis.replayInvestigationPrototypes = [

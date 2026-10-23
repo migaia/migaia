@@ -1,13 +1,13 @@
 import { SupervisorState } from '@migaia/supervision'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
-import { defaultRpcReporter } from '@migaia/rpc-core'
-import type { IRpcProbe } from '@migaia/rpc-core/probe'
+import { defaultRpcReporter } from '@migaia/rpc-host'
+import type { IRpcProbe } from '@migaia/rpc-host/probe'
 import {
   RuntimeEventName,
   type IRuntimeEvent,
   type IRuntimeConnectionDetail
-} from '@migaia/rpc-core/remote'
+} from '@migaia/rpc-host/plugin'
 import { createTrayError, TRAY_SOURCE } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'
 import {
@@ -350,7 +350,10 @@ export function createTrayRuntime<
   /** Coroutine settlement maps only here; parent state handling is runtime-independent. */
   async function coroutineTask(
     record: ITrayRecord,
-    context: { connect: import('@migaia/rpc-core/remote').ICoroutineConnect; signal: IAbortSignal }
+    context: {
+      connect: import('@migaia/rpc-plugin-coroutines').ICoroutineConnect
+      signal: IAbortSignal
+    }
   ): Promise<void> {
     const child = await serveChild(
       record.definition,

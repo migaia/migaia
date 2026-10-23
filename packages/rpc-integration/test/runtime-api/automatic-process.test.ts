@@ -1,12 +1,12 @@
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createProcessPeer } from '@migaia/rpc-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
 
 /** A genuine child loads built public owners independently from the source parent. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-process.mjs', import.meta.url))

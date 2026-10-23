@@ -3,18 +3,18 @@ import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimeEvent } from '../../../rpc-core/dist/remote/runtime-api/events.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimeEvent } from '../../../rpc-host/dist/remote/runtime-api/events.js'
 import {
   RuntimeQueryClock,
   RuntimeQueryReason,
   type RuntimeEventName
-} from '../../../rpc-core/dist/remote/runtime-api/constants.js'
+} from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { coroutineFailure, coroutineService, coroutineTestHost } from './fixtures/coroutine.js'
 
 /** Real Worker entry establishes the first connection and throws before the second connects. */
@@ -83,11 +83,11 @@ for (const family of ['thread', 'coroutine'] as const) {
         )
       } else {
         await host.use(
-          createCoroutinePlugin({
+          coroutinePlugin({
             name: 'terminal-unit',
             report: (error) => reports.push(error),
             supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
-            task: (context) => {
+            spawn: (context) => {
               launches += 1
               if (launches === 2) return Promise.reject(relaunch)
               return service.task(context)

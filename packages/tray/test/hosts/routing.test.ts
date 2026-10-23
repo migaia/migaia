@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineProbe } from '@migaia/rpc-core/probe'
+import { defineProbe } from '@migaia/rpc-host/probe'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fixture, until } from './helper.js'
 

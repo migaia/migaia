@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parseProcessPluginDescriptor } from '@migaia/rpc-process'
+import { parseProcessPluginDescriptor } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
 import { acceptsSchema, type ISchemaRule } from '../fixtures/schema-accepts.js'
 
 /** The published schema is the independent structure check for instance mode. */
@@ -9,7 +9,7 @@ const schema = JSON.parse(
   readFileSync(
     resolve(
       import.meta.dirname,
-      '../../../rpc-process/schema/process-plugin-descriptor.schema.json'
+      '../../../rpc-plugin-process/schema/process-plugin-descriptor.schema.json'
     ),
     'utf8'
   )

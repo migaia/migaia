@@ -1,27 +1,27 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import type { IRpcEndpoint } from '@migaia/rpc-core'
+import { type IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
 import { createMutationQueue } from '@migaia/lifecycle'
 import { catalog, hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import * as processPeerModule from '../../../rpc-process/dist/process/peer.js'
-import { RemoteMethodName } from '@migaia/rpc-core/remote'
-import { RuntimeEventName } from '@migaia/rpc-core/remote'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { createSpawnProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
-import { createProcessResilience } from '@migaia/rpc-process'
-import { createRemoteHost } from '@migaia/rpc-core/remote'
-import { remoteDescription } from '../../../rpc-core/test/remote/fixture.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import * as runtimePeerModule from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RemoteMethodName } from '@migaia/rpc-host/plugin'
+import { RuntimeEventName } from '@migaia/rpc-host/plugin'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { createSpawnProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { createRemoteHost } from '../../../rpc-host/dist/remote/host.js'
+import { remoteDescription } from '../../../rpc-host/test/remote/fixture.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createPrewarmPool } from '@migaia/supervision/process'
-import { parseProcessPluginDescriptor } from '@migaia/rpc-process'
+import { parseProcessPluginDescriptor } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
 import { readFileSync } from 'node:fs'
-import { createProcessError } from '../../../rpc-process/dist/process/error.js'
-import { RpcProcessErrorCode } from '@migaia/rpc-process'
-import { DEFAULT_DRAIN_MS } from '@migaia/rpc-core/remote'
+import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import { DEFAULT_DRAIN_MS } from '@migaia/rpc-host/plugin'
 
 /** Flush candidate cancellation and queued mutation continuations without changing time budgets. */
 async function settle(): Promise<void> {
@@ -33,14 +33,14 @@ describe('process Host replacement publication', () => {
     /** The neutral native ports retain their actual supervisor and true Host install owner. */
     const fixture = runtimeHostFixture()
     /** Retain the genuine factory before observing the second prepared candidate only. */
-    const original = processPeerModule.createAdapterProcessPeer
+    const original = runtimePeerModule.createRuntimePeer
     /** Both calls construct genuine public Peers; no candidate state is held by this observer. */
     let constructions = 0
     /** Join the original Host release Promise instead of polling or constructing a close facade. */
     let releasing: ReturnType<typeof fixture.close> | undefined
     /** Release occurs after actual directory readiness, before the install continuation publishes. */
     const observer = vi
-      .spyOn(processPeerModule, 'createAdapterProcessPeer')
+      .spyOn(runtimePeerModule, 'createRuntimePeer')
       .mockImplementation((options, runtime) => {
         const preparing = original(options, runtime)
         if (++constructions !== 2) return preparing
@@ -141,7 +141,7 @@ describe('process Host replacement publication', () => {
       /** Real child exits prove the failed candidate cannot retain a process or budget lease. */
       const fixture = nativeHostFixture('old')
       /** Call-through observes the genuine factory readiness Promise, not a fixture ready facade. */
-      const preparing = vi.spyOn(processPeerModule, 'createAdapterProcessPeer')
+      const preparing = vi.spyOn(runtimePeerModule, 'createRuntimePeer')
       const original = fixture.options.endpointFactory
       const primary = createProcessError(RpcProcessErrorCode.hostInvalidOption)
       let endpoints = 0

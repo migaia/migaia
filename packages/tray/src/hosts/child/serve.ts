@@ -1,6 +1,6 @@
 import { defineHost } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
-import type { ICoroutineConnect } from '@migaia/rpc-core/remote'
+import type { ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
 import { createChildDispatcher } from './dispatch.js'
 import { readHost } from '../define-host.js'
 import {

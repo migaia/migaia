@@ -1,15 +1,17 @@
 import {
-  createCoroutinePlugin,
-  type ICoroutineConnect,
-  type ICoroutineUserTask,
   type IRuntimeEvent,
   type IRuntimeConnectionDetail,
   type IRuntimeCallOptions
-} from '@migaia/rpc-core/remote'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+} from '@migaia/rpc-host/plugin'
+import {
+  coroutinePlugin,
+  type ICoroutineConnect,
+  type ICoroutineUserTask
+} from '@migaia/rpc-plugin-coroutines'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import type { IPluginConstraint, IHostHandle } from '@migaia/plugin-host'
-import type { IRpcProbe } from '@migaia/rpc-core/probe'
+import type { IRpcProbe } from '@migaia/rpc-host/probe'
 import { TrayInternal, TrayRuntime, TrayRuntimeMode } from './constants.js'
 import type { IAnyTrayHost } from './typing.js'
 
@@ -69,13 +71,13 @@ export function runtimePlugin(
     ...(options.probe === undefined ? {} : { probe: options.probe })
   }
   if (definition.runtime === TrayRuntime.coroutine)
-    return createCoroutinePlugin(
+    return coroutinePlugin(
       mode === TrayRuntimeMode.parent
-        ? { ...common, task: options.task!, supervisor: definition.supervisor }
-        : { ...common, connect: options.connect! }
+        ? { ...common, spawn: options.task!, supervisor: definition.supervisor }
+        : { ...common, connectToParent: options.connect! }
     ) as IPluginConstraint<any>
   if (definition.runtime === TrayRuntime.thread)
-    return createThreadPlugin(
+    return threadPlugin(
       mode === TrayRuntimeMode.parent
         ? {
             ...common,
@@ -85,9 +87,9 @@ export function runtimePlugin(
               supervisor: definition.supervisor
             }
           }
-        : common
+        : { ...common, connectToParent: true }
     ) as IPluginConstraint<any>
-  return createProcessPlugin(
+  return processPlugin(
     mode === TrayRuntimeMode.parent
       ? {
           ...common,
@@ -97,7 +99,7 @@ export function runtimePlugin(
             ...(definition.sandbox ? { wrap: definition.sandbox.wrap } : {})
           }
         }
-      : common
+      : { ...common, connectToParent: true }
   ) as IPluginConstraint<any>
 }
 /** Read the current family object on each operation; RPC can recreate it after the last removal. */

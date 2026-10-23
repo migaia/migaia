@@ -144,9 +144,7 @@ describe('store-light audit regressions', () => {
           operation === 'retain'
             ? resource.retainVersion(snapshot.token)
             : resource.commitCapture(resource.captureVersion(snapshot.version))
-        ).toThrow(
-          expect.objectContaining({ source: 'store.light', code: 'UNKNOWN_VERSION' })
-        )
+        ).toThrow(expect.objectContaining({ source: 'store.light', code: 'UNKNOWN_VERSION' }))
       } finally {
         resource.forceDispose()
         await resource.whenTerminal()

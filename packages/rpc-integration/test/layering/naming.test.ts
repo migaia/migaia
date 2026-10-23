@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import * as core from '@migaia/rpc-core'
+import * as core from '../../../rpc-host/dist/core/index.js'
 import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'
 
 /** Runtime-facing symbol table, including exports whose names changed in the layering rename. */

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
-import { describeRemoteMethods } from '../../../../rpc-core/dist/remote/serve-methods.js'
+import { describeRemoteMethods } from '../../../../rpc-host/dist/remote/serve-methods.js'
 import { serializeRpcError } from '@migaia/rpc-contract'
 
 /** The parent sends the secret through a dedicated fd, never argv, environment or RPC stdin. */

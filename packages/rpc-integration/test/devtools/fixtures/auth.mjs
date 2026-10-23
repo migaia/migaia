@@ -7,7 +7,7 @@ import {
   timingSafeEqual
 } from 'node:crypto'
 import { encode, decode } from 'cborg'
-import { RpcTransportEncoding } from '@migaia/rpc-core/transport-constants'
+import { RpcTransportEncoding } from '@migaia/rpc-host/plugin'
 
 /** Test-only material belongs to this fixture and is never returned or printed by either host. */
 const fixtureKey = Buffer.alloc(32, 41)
@@ -25,7 +25,7 @@ const AuthText = {
  * Process native transport carries strings; CBOR plus Base64 supplies that actual wire category
  * while restoring the original string, byte or structured frame on decryption.
  *
- * @returns {import('@migaia/rpc-core').IRpcAuthenticationConfig} Paired protection transforms.
+ * @returns {import('@migaia/rpc-host').IRpcAuthenticationConfig} Paired protection transforms.
  * @throws {TypeError} When a received fixture signature is not authentic.
  */
 export function fixtureAuthentication() {

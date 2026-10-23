@@ -1,9 +1,9 @@
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 /** Native cause and AggregateError membership must retain the exact original fixture error. */
 function reaches(value: unknown, expected: Error): boolean {

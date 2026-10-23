@@ -2,7 +2,7 @@ import { createTrayError } from '../errors.js'
 import { TrayErrorCode } from '../error-code.js'
 import { toWire } from './portable.js'
 import type { IAnyTrayHost, ITrayRemote, ITrayRoutedRemote, ITrayCallOptions } from './typing.js'
-import type { IRuntimeCallOptions } from '@migaia/rpc-core/remote'
+import type { IRuntimeCallOptions } from '@migaia/rpc-host/plugin'
 /** Dispatcher payload omits absent data; application objects are validated unchanged. */
 export type ITrayInvocation = Readonly<{ path: string; payload?: unknown }>
 /** One callable remote forwards each operation through its admission-bound sender. */

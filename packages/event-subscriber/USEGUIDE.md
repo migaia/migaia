@@ -253,7 +253,7 @@ tasks.clear()
 
 根入口 `@migaia/event-subscriber` 提供 channel、Hub、调用工具、常量与公开类型。子入口 `@migaia/event-subscriber/subscriber` 提供 `subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` 和对应订阅类型。运行时只依赖 `@migaia/utils`，不依赖 DOM 或 Node；包标记为 `sideEffects: false`。
 
-channel（事件通道）只分发当前发布的事件，不保存当前值，也不重放历史。registration（订阅登记）是一次订阅及其取消句柄。snapshot（快照）是一次发布开始时固定的目标列表。需要当前值或派生依赖时使用 `@migaia/reactive`；需要前一步结果传给下一步的中间件时使用 `@migaia/middleware-pipeline`；资源释放、队列和背压由 `@migaia/lifecycle` 或 `@migaia/resource` 负责；跨 Worker、窗口或网络的消息由 `@migaia/rpc-core` 负责。
+channel（事件通道）只分发当前发布的事件，不保存当前值，也不重放历史。registration（订阅登记）是一次订阅及其取消句柄。snapshot（快照）是一次发布开始时固定的目标列表。需要当前值或派生依赖时使用 `@migaia/reactive`；需要前一步结果传给下一步的中间件时使用 `@migaia/middleware-pipeline`；资源释放、队列和背压由 `@migaia/lifecycle` 或 `@migaia/resource` 负责；跨 Worker、窗口或网络的消息由 `@migaia/rpc-host` 加传输 plugin 负责。
 
 ## 创建 channel 与完整参数
 

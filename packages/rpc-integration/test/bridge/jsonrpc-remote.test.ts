@@ -1,9 +1,9 @@
 import { PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it } from 'vitest'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
-import { createRemotePlugin } from '@migaia/rpc-core/remote'
-import { createRemoteHost } from '@migaia/rpc-core/remote'
-import { remoteHarness, remoteDescription } from '../../../rpc-core/test/remote/fixture.js'
+import { createRemotePlugin } from '../../../rpc-host/dist/remote/plugin.js'
+import { createRemoteHost } from '../../../rpc-host/dist/remote/host.js'
+import { remoteHarness, remoteDescription } from '../../../rpc-host/test/remote/fixture.js'
 import {
   BRIDGE_CONTRACT,
   BRIDGE_METHODS,

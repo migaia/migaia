@@ -108,28 +108,28 @@ A supervised unit (one started coroutine, thread or child process) goes through 
 6. **Stop.** `stop()`, `replace()` and `dispose()` end the unit within the three stop phases.
 7. **Release the slot.** The slot returns to the budget only after the unit has really exited.
 
-| Term | Meaning |
-| --- | --- |
-| unit | One started execution unit: a coroutine, a thread or a child process. |
-| launcher | The code that actually creates a unit. Node, Bun, Deno and Electron create processes differently, so the application or an adapter package supplies it; this package handles everything after launch. |
-| budget | Slots shared by a group of units: how many may run at once, how many may start per second, how long a request may queue. |
-| spec | What a unit needs to start, such as a coroutine's task function or a process's command and arguments. |
-| generation | The number of each start attempt. After a successful start it identifies the unit currently serving. |
-| `ready` | Your readiness check, answering "can this unit be used now?". |
-| `report` | Receives errors that are not thrown to a caller: entering terminal, cleanup failures, late failures and capability degradation. |
+| Term       | Meaning                                                                                                                                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| unit       | One started execution unit: a coroutine, a thread or a child process.                                                                                                                                 |
+| launcher   | The code that actually creates a unit. Node, Bun, Deno and Electron create processes differently, so the application or an adapter package supplies it; this package handles everything after launch. |
+| budget     | Slots shared by a group of units: how many may run at once, how many may start per second, how long a request may queue.                                                                              |
+| spec       | What a unit needs to start, such as a coroutine's task function or a process's command and arguments.                                                                                                 |
+| generation | The number of each start attempt. After a successful start it identifies the unit currently serving.                                                                                                  |
+| `ready`    | Your readiness check, answering "can this unit be used now?".                                                                                                                                         |
+| `report`   | Receives errors that are not thrown to a caller: entering terminal, cleanup failures, late failures and capability degradation.                                                                       |
 
 ## Typical scenarios
 
-| Scenario | Building blocks | Details |
-| --- | --- | --- |
-| Recover a crashed indexing or transcoding child process | `createProcessSupervisor` + the Node launcher from `@migaia/rpc-process` | [Supervise a real child process](./USEGUIDE.en.md#supervise-a-real-child-process) |
-| Stop a crash loop caused by bad configuration | `restart.maxRestarts` + `report` | [Stop after too many crashes](./USEGUIDE.en.md#stop-after-too-many-crashes) |
-| Restart a background scan that got stuck | Coroutine `heartbeat` | [Detect a stuck task with heartbeats](./USEGUIDE.en.md#detect-a-stuck-task-with-heartbeats) |
-| Limit concurrent jobs during a bulk export | `createUnitBudget({ maxUnits })` | [Limit how many run at once](./USEGUIDE.en.md#limit-how-many-run-at-once) |
-| Ship a new version without downtime | `replace({ strategy: 'start-then-switch' })` | [Replace a unit without downtime](./USEGUIDE.en.md#replace-a-unit-without-downtime) |
-| Keep application shutdown from hanging | The three `stop` deadlines | [Bounded stop and slot release](./USEGUIDE.en.md#bounded-stop-and-slot-release) |
-| Let children clean up when the parent dies; reclaim leftovers on the next start | `createParentLossGuard`, `reclaimOrphanProcesses` | [Parent loss and leftover processes](./USEGUIDE.en.md#parent-loss-and-leftover-processes) |
-| Cut cold-start latency | `createPrewarmPool` | [Prewarm processes](./USEGUIDE.en.md#prewarm-processes) |
+| Scenario                                                                        | Building blocks                                                                                             | Details                                                                                     |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Recover a crashed indexing or transcoding child process                         | `createProcessSupervisor` + the Node launcher from `@migaia/rpc-plugin-process/adapters/node-child-process` | [Supervise a real child process](./USEGUIDE.en.md#supervise-a-real-child-process)           |
+| Stop a crash loop caused by bad configuration                                   | `restart.maxRestarts` + `report`                                                                            | [Stop after too many crashes](./USEGUIDE.en.md#stop-after-too-many-crashes)                 |
+| Restart a background scan that got stuck                                        | Coroutine `heartbeat`                                                                                       | [Detect a stuck task with heartbeats](./USEGUIDE.en.md#detect-a-stuck-task-with-heartbeats) |
+| Limit concurrent jobs during a bulk export                                      | `createUnitBudget({ maxUnits })`                                                                            | [Limit how many run at once](./USEGUIDE.en.md#limit-how-many-run-at-once)                   |
+| Ship a new version without downtime                                             | `replace({ strategy: 'start-then-switch' })`                                                                | [Replace a unit without downtime](./USEGUIDE.en.md#replace-a-unit-without-downtime)         |
+| Keep application shutdown from hanging                                          | The three `stop` deadlines                                                                                  | [Bounded stop and slot release](./USEGUIDE.en.md#bounded-stop-and-slot-release)             |
+| Let children clean up when the parent dies; reclaim leftovers on the next start | `createParentLossGuard`, `reclaimOrphanProcesses`                                                           | [Parent loss and leftover processes](./USEGUIDE.en.md#parent-loss-and-leftover-processes)   |
+| Cut cold-start latency                                                          | `createPrewarmPool`                                                                                         | [Prewarm processes](./USEGUIDE.en.md#prewarm-processes)                                     |
 
 ## Install
 
@@ -139,14 +139,14 @@ pnpm add @migaia/supervision
 
 ## Essential API
 
-| API | Purpose |
-| --- | --- |
-| `createUnitBudget()` | Creates slots shared by a group of units. |
-| `createCoroutineSupervisor()` | Supervises a cancellable task on the current event loop. |
-| `createProcessSupervisor()` | Supervises a child process created by a launcher. |
-| `createThreadSupervisor()` | Supervises a worker thread created by a launcher. |
-| `start()` / `stop()` / `replace()` / `dispose()` | Start, stop, replace and permanently close. |
-| `subscribe()` / `inspect()` | Observe state changes; read the current state and the last exit reason. |
+| API                                              | Purpose                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `createUnitBudget()`                             | Creates slots shared by a group of units.                               |
+| `createCoroutineSupervisor()`                    | Supervises a cancellable task on the current event loop.                |
+| `createProcessSupervisor()`                      | Supervises a child process created by a launcher.                       |
+| `createThreadSupervisor()`                       | Supervises a worker thread created by a launcher.                       |
+| `start()` / `stop()` / `replace()` / `dispose()` | Start, stop, replace and permanently close.                             |
+| `subscribe()` / `inspect()`                      | Observe state changes; read the current state and the last exit reason. |
 
 See [USEGUIDE.en.md](./USEGUIDE.en.md) for complete usage.
 

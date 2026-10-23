@@ -2,24 +2,24 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { createProcessTransport } from '@migaia/rpc-process'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
 import {
   createRuntimePeer,
   type IRuntimePeer
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   readRuntimePeerConnection,
   readRuntimePeerSessions
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
 
 it('the real authenticated process listener injects one logical provider scope across accepted sockets', async () => {
   /** Source offers are independent of defaults until all runtime-api ports are implemented. */

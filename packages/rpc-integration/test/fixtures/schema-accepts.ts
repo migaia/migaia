@@ -69,6 +69,13 @@ export function acceptsSchema(
     if (typeof rule.exclusiveMinimum === 'number' && value <= rule.exclusiveMinimum) return false
   }
   if (Array.isArray(value)) {
+    if (
+      rule.uniqueItems === true &&
+      value.some((entry, index) =>
+        value.slice(0, index).some((previous) => isDeepStrictEqual(previous, entry))
+      )
+    )
+      return false
     if (typeof rule.minItems === 'number' && value.length < rule.minItems) return false
     if (typeof rule.maxItems === 'number' && value.length > rule.maxItems) return false
     if (Array.isArray(rule.prefixItems)) {

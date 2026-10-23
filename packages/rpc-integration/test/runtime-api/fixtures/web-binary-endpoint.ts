@@ -1,4 +1,4 @@
-import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
+import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import {
   codec,
   framer,
@@ -8,9 +8,9 @@ import {
   hooks,
   authentication,
   type IRpcEndpoint
-} from '@migaia/rpc-core'
+} from '../../../../rpc-host/dist/core/index.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import type { IRemoteChannelResources } from '../../../../rpc-core/dist/remote/types.js'
+import type { IRemoteChannelResources } from '../../../../rpc-host/dist/remote/types.js'
 import fixture from './managed-binary-key.json'
 
 /** This fixture's verifier owns its failure; production authentication supplies Core's wrapper. */

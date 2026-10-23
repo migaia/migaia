@@ -6,16 +6,16 @@ For what the package is for, its highlights and its mental model, see the [READM
 
 ## Find by scenario
 
-| Your problem | Read this section |
-| --- | --- |
-| The request keeps running after the timeout | [Time out a slow request and actually stop it](#time-out-a-slow-request-and-actually-stop-it) |
-| An operation that ignores `signal` fails after the deadline | [Where a failure after the deadline goes](#where-a-failure-after-the-deadline-goes) |
-| 404s are retried too, and retries have no total limit | [Retry only what is worth retrying](#retry-only-what-is-worth-retrying) |
+| Your problem                                                                  | Read this section                                                                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| The request keeps running after the timeout                                   | [Time out a slow request and actually stop it](#time-out-a-slow-request-and-actually-stop-it)                             |
+| An operation that ignores `signal` fails after the deadline                   | [Where a failure after the deadline goes](#where-a-failure-after-the-deadline-goes)                                       |
+| 404s are retried too, and retries have no total limit                         | [Retry only what is worth retrying](#retry-only-what-is-worth-retrying)                                                   |
 | Too many requests at once; queued requests keep running after the user leaves | [Limit a batch and cancel queued tasks when the user leaves](#limit-a-batch-and-cancel-queued-tasks-when-the-user-leaves) |
-| Concurrent initialization opened several connections | [Run a concurrent initialization only once](#run-a-concurrent-initialization-only-once) |
-| A hand-written spread update mutated the original | [Update a deep field without mutating](#update-a-deep-field-without-mutating) |
-| A caller changed the config after handing it over | [Stop callers from changing config after handing it over](#stop-callers-from-changing-config-after-handing-it-over) |
-| After wrapping, the only way to tell the cause is message text | [Recognize the underlying cause after wrapping](#recognize-the-underlying-cause-after-wrapping) |
+| Concurrent initialization opened several connections                          | [Run a concurrent initialization only once](#run-a-concurrent-initialization-only-once)                                   |
+| A hand-written spread update mutated the original                             | [Update a deep field without mutating](#update-a-deep-field-without-mutating)                                             |
+| A caller changed the config after handing it over                             | [Stop callers from changing config after handing it over](#stop-callers-from-changing-config-after-handing-it-over)       |
+| After wrapping, the only way to tell the cause is message text                | [Recognize the underlying cause after wrapping](#recognize-the-underlying-cause-after-wrapping)                           |
 
 ## Time out a slow request and actually stop it
 
@@ -114,16 +114,19 @@ async function readStock(signal: AbortSignal): Promise<number> {
   return 42
 }
 
-const stock = await retry(({ attempt, signal }) => {
-  console.log(`attempt ${attempt}`)
-  return readStock(signal)
-}, {
-  maxAttempts: 5,
-  // Retry only 5xx; a bad request (4xx) will not succeed on retry, so it is thrown.
-  shouldRetry: (error) => (error as { status?: number }).status! >= 500,
-  delay: (_error, { attempt }) => 100 * 2 ** (attempt - 1), // 100ms, 200ms, ...
-  totalTimeoutMs: 2_000 // at most 2 seconds in total, waits included
-})
+const stock = await retry(
+  ({ attempt, signal }) => {
+    console.log(`attempt ${attempt}`)
+    return readStock(signal)
+  },
+  {
+    maxAttempts: 5,
+    // Retry only 5xx; a bad request (4xx) will not succeed on retry, so it is thrown.
+    shouldRetry: (error) => (error as { status?: number }).status! >= 500,
+    delay: (_error, { attempt }) => 100 * 2 ** (attempt - 1), // 100ms, 200ms, ...
+    totalTimeoutMs: 2_000 // at most 2 seconds in total, waits included
+  }
+)
 console.log('stock:', stock)
 ```
 
@@ -151,13 +154,16 @@ import { retry } from '@migaia/utils/promise'
 
 let calls = 0
 try {
-  await retry(() => {
-    calls += 1
-    throw Object.assign(new Error('order not found'), { status: 404 })
-  }, {
-    maxAttempts: 5,
-    shouldRetry: (error) => (error as { status?: number }).status! >= 500
-  })
+  await retry(
+    () => {
+      calls += 1
+      throw Object.assign(new Error('order not found'), { status: 404 })
+    },
+    {
+      maxAttempts: 5,
+      shouldRetry: (error) => (error as { status?: number }).status! >= 500
+    }
+  )
 } catch (error) {
   console.log('calls:', calls, 'error:', (error as Error).message)
 }
@@ -226,10 +232,13 @@ const page = new AbortController() // cancelled when the user leaves the page
 
 const thumbnails = [1, 2, 3].map((id) =>
   limiter
-    .run(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50))
-      return `thumbnail ${id} done`
-    }, { signal: page.signal })
+    .run(
+      async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return `thumbnail ${id} done`
+      },
+      { signal: page.signal }
+    )
     .catch((reason) => `thumbnail ${id} cancelled: ${reason}`)
 )
 
@@ -383,12 +392,22 @@ const view = readonlyConfig(config) // read-only view handed to plugins
 try {
   view.retry.attempts = 0
 } catch (error) {
-  console.log('read-only view refused the write:', (error as Error).name, (error as { code?: string }).code)
+  console.log(
+    'read-only view refused the write:',
+    (error as Error).name,
+    (error as { code?: string }).code
+  )
 }
 
 // New config: change endpoint, delete debug; the untouched retry is reused
 const next = patchConfig(config, { endpoint: 'https://staging.example.com', debug: CONFIG_DELETE })
-console.log(next.endpoint, '| debug present:', 'debug' in next, '| retry reused:', next.retry === config.retry)
+console.log(
+  next.endpoint,
+  '| debug present:',
+  'debug' in next,
+  '| retry reused:',
+  next.retry === config.retry
+)
 ```
 
 Output:
@@ -453,6 +472,7 @@ Prints `failed to load the order | lost connection underneath: true`: the outer 
 
 ## Contents
 
+- [Root runtime detection](#runtime-detection)
 - [`/promise` module](#promise-module)
 - [`/error` module](#error-module)
 - [`/bytes` module](#bytes-module)
@@ -466,6 +486,48 @@ Prints `failed to load the order | lost connection underneath: true`: the outer 
 
 ---
 
+<a id="runtime-detection"></a>
+
+## Root entry: runtime and global-scope detection
+
+Import these functions and their constant/type domains from `@migaia/utils`. They take no arguments and return the current classification or `undefined`:
+
+```ts
+declare function detectServerRuntime(): ServerRuntime | undefined
+declare function detectElectronProcessType(): ElectronProcessType | undefined
+declare function detectGlobalScope(): GlobalScopeKind | undefined
+```
+
+| Domain                | Values                                                          |
+| --------------------- | --------------------------------------------------------------- |
+| `ServerRuntime`       | `deno`, `bun`, `node`                                           |
+| `ElectronProcessType` | `main`, `renderer`, `utility`                                   |
+| `GlobalScopeKind`     | `window`, `dedicated-worker`, `shared-worker`, `service-worker` |
+
+`detectServerRuntime()` checks Deno before Bun before Node. Deno requires a nonempty `Deno.version.deno`, even when a Node compatibility process global exists. Bun accepts its global object or a nonempty `process.versions.bun`; Node is the final nonempty `process.versions.node` fallback.
+
+`detectElectronProcessType()` first requires `process.versions.electron`. Electron's historical `process.type === 'browser'` maps to main; renderer and utility keep those names. A plain Node process or an unknown Electron type returns `undefined`.
+
+`detectGlobalScope()` first excludes any recognized server runtime. It then checks the actual global instance against Window, DedicatedWorkerGlobalScope, SharedWorkerGlobalScope, and ServiceWorkerGlobalScope in that order. A constructor's existence alone does not identify the scope. Unrecognized scopes return `undefined`.
+
+Every call reads current globals afresh. Importing the module does not cache a host classification, launch a unit, create a connection, or schedule a timer. The functions load no native host modules and require no Node/DOM declarations in the public types. Classification does not grant a carrier or permission; the adapter that uses a native API still owns its capability admission.
+
+```ts
+import {
+  detectServerRuntime,
+  detectElectronProcessType,
+  detectGlobalScope,
+  ServerRuntime,
+  ElectronProcessType,
+  GlobalScopeKind
+} from '@migaia/utils'
+
+console.log(detectServerRuntime(), detectElectronProcessType(), detectGlobalScope())
+console.log(ServerRuntime.node, ElectronProcessType.main, GlobalScopeKind.window)
+```
+
+The first line depends on the actual host; no browser scope is reported merely because Node exposes compatibility constructors. The second line prints the stable domain values `node main window`.
+
 <a id="promise-module"></a>
 
 ## `/promise` module
@@ -477,21 +539,21 @@ Deadlines, cooperative cancellation, retries and concurrency limits. Every cance
 The scheduler contract and its implementations are exported only from `@migaia/utils/scheduler` (and the root entry `@migaia/utils`). `sleep`, `withTimeout`, `retry` and `createAbortTimeoutSignal` in this module use it as the type and default of their `scheduler` option.
 
 ```ts
-import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler';
-import { createManualScheduler } from '@migaia/utils/testing';
+import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 // /scheduler exports IScheduledTask, IScheduler and IWallClock; /testing exports IManualScheduler.
 
-type IScheduledTask = { cancel(): void; unref?(): void };
+type IScheduledTask = { cancel(): void; unref?(): void }
 type IScheduler = {
-  now(): number;
-  schedule(callback: () => void, delayMs: number): IScheduledTask;
-  defer?(callback: () => void): void;
-};
+  now(): number
+  schedule(callback: () => void, delayMs: number): IScheduledTask
+  defer?(callback: () => void): void
+}
 type IManualScheduler = IScheduler & {
-  advance(ms: number): void;
-  readonly pendingCount: number;
-};
-type IWallClock = { timestamp(): number };
+  advance(ms: number): void
+  readonly pendingCount: number
+}
+type IWallClock = { timestamp(): number }
 ```
 
 - `IScheduler`: the only scheduler contract. `now()` is a monotonic, non-decreasing number of milliseconds (two calls in a row may be equal). Use it only for differences and local deadlines, never as an epoch time. The `delayMs` of `schedule()` must be finite and non-negative; the callback runs at most once and never synchronously inside the `schedule()` call.
@@ -499,8 +561,8 @@ type IWallClock = { timestamp(): number };
 - `IWallClock`: produces diagnostic timestamps only (epoch milliseconds as a safe integer). Never use it for deadlines, expiry or replay windows.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-export const systemScheduler: IScheduler;
-export const systemWallClock: IWallClock;
+export const systemScheduler: IScheduler
+export const systemWallClock: IWallClock
 ```
 
 `systemScheduler` uses `performance.now()` as its monotonic clock and the host `setTimeout` / `clearTimeout` for timers, reading those capabilities through `globalThis` on every call. When the host has no `performance.now`, it returns a non-finite value, or the timer functions are missing, it throws a native error with `ENV_UNSUPPORTED`; an error thrown by `performance.now` itself propagates unchanged. A `delayMs` that is not a number throws `TypeError`, and a non-finite or negative one throws `RangeError`; both carry `INVALID_ARGUMENT` and create no timer. Delays above `2_147_483_647` are waited out in segments; `unref()` uses the native timer as its receiver and keeps applying to later segments; `cancel()` is idempotent.
@@ -508,7 +570,7 @@ export const systemWallClock: IWallClock;
 `systemWallClock.timestamp()` returns `Date.now()`. Use it when you need an epoch timestamp. Code that accepts an `IScheduler` for timeouts, retries or scheduling must pair `scheduler.now()` with `scheduler.schedule()`; never subtract or compare wall-clock values with `now()`.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function createManualScheduler(): IManualScheduler;
+function createManualScheduler(): IManualScheduler
 ```
 
 > For this repository's tests only: it serves unit tests and adapter checks in this repository and is not meant for application code. Other projects should prefer the fake timers of their test framework; production code uses `systemScheduler` or the default scheduler.
@@ -516,21 +578,21 @@ function createManualScheduler(): IManualScheduler;
 Creates a first-in-first-out virtual-clock scheduler: `schedule()` orders tasks by due time, then by registration order. `advance(ms)` runs every due callback in one go; tasks that callbacks schedule along the way also run in the same `advance` as long as they are due at or before the target time. One `advance` that loops more than 10000 times throws `RangeError` / `SCHEDULER_RUNAWAY`, which stops callbacks that keep scheduling each other forever. `delayMs` / `ms` must be finite and non-negative (a non-number throws `TypeError`, anything else invalid throws `RangeError`); a due time or target time that overflows to a non-finite value also throws `RangeError`. All of these carry `INVALID_ARGUMENT` and leave the clock and queue unchanged. Calling `advance()` again inside a callback throws `TypeError` / `REENTRANT_CALL`, and the outer `advance` still completes.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const scheduler = createManualScheduler();
-const task = scheduler.schedule(() => console.log('fired'), 100);
-scheduler.advance(50); // not fired yet
-scheduler.advance(50); // fires and prints 'fired'
+const scheduler = createManualScheduler()
+const task = scheduler.schedule(() => console.log('fired'), 100)
+scheduler.advance(50) // not fired yet
+scheduler.advance(50) // fires and prints 'fired'
 ```
 
 ### `deferred`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IDeferred<T> = {
-  readonly promise: Promise<T>;
-  readonly resolve: (value: T | PromiseLike<T>) => void;
-  readonly reject: (reason?: unknown) => void;
-};
-function deferred<T>(): IDeferred<T>;
+  readonly promise: Promise<T>
+  readonly resolve: (value: T | PromiseLike<T>) => void
+  readonly reject: (reason?: unknown) => void
+}
+function deferred<T>(): IDeferred<T>
 ```
 
 Creates a native Promise that you settle from outside. It helps turn a callback API into a Promise, or lets a test decide exactly when an async operation finishes or fails.
@@ -538,32 +600,32 @@ Creates a native Promise that you settle from outside. It helps turn a callback 
 New code should prefer the platform's `Promise.withResolvers()`. `deferred()` mainly serves older runtimes that lack it, or project boundaries that must depend on the `IDeferred<T>` type:
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const { promise, resolve, reject } = Promise.withResolvers<number>();
-resolve(42);
+const { promise, resolve, reject } = Promise.withResolvers<number>()
+resolve(42)
 ```
 
 For older runtimes:
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const { promise, resolve } = deferred<number>();
-setTimeout(() => resolve(42), 0);
-await promise; // 42
+const { promise, resolve } = deferred<number>()
+setTimeout(() => resolve(42), 0)
+await promise // 42
 ```
 
 ### `toPromise`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function toPromise<T>(run: () => T): Promise<Awaited<T>>;
+function toPromise<T>(run: () => T): Promise<Awaited<T>>
 ```
 
 Calls `run` synchronously, exactly once, and adopts its return value with native Promise rules. If `run` throws synchronously, the call site does not throw; it returns a Promise rejected with that exact reason. It only turns a synchronous computation into a Promise and creates no timer, scheduler, retry or cancellation state.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const found = await toPromise(() => cache.get('key'));
+const found = await toPromise(() => cache.get('key'))
 const pending = toPromise(() => {
-  throw new Error('read failed');
-});
-await pending; // the rejection is observed asynchronously
+  throw new Error('read failed')
+})
+await pending // the rejection is observed asynchronously
 ```
 
 Compared with `Promise.resolve().then(() => run())`:
@@ -577,44 +639,44 @@ Use `toPromise` when work must start synchronously but always return a Promise; 
 ### `sleep`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;
+function sleep(delayMs: number, options?: IAsyncControls): Promise<void>
 ```
 
 Resolves after the scheduler delay. If the given `signal` / `signals` abort while waiting, it rejects with `UtilsAbortError`. `delayMs` must be finite and non-negative. It always cleans up its timer and abort listeners; if that cleanup itself throws, the failure goes to `hostRethrowReporter` (`sleep` takes no custom reporter) instead of being swallowed.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IAsyncControls = {
-  readonly signal?: IAbortSignal;
-  readonly signals?: readonly IAbortSignal[];
-  readonly scheduler?: IScheduler;
-  readonly unref?: boolean;
-};
+  readonly signal?: IAbortSignal
+  readonly signals?: readonly IAbortSignal[]
+  readonly scheduler?: IScheduler
+  readonly unref?: boolean
+}
 ```
 
 `signal` and `signals` are **mutually exclusive**; passing both rejects with a `TypeError`. `unref: true` tries to call `unref()` on the underlying timer handle, so in Node the timer does not keep the process alive.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const controller = new AbortController();
-const p = sleep(1000, { signal: controller.signal as any });
-controller.abort('cancelled');
-await p; // throws UtilsAbortError whose cause is 'cancelled'
+const controller = new AbortController()
+const p = sleep(1000, { signal: controller.signal as any })
+controller.abort('cancelled')
+await p // throws UtilsAbortError whose cause is 'cancelled'
 ```
 
 ### `createAbortTimeoutSignal`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IAbortTimeoutSignalOptions = {
-  readonly signal?: IAbortSignal;
-  readonly timeoutMs?: number;
-  readonly scheduler?: IScheduler;
-  readonly timeoutReason?: () => unknown;
-  readonly report?: IUtilsReporter;
-};
+  readonly signal?: IAbortSignal
+  readonly timeoutMs?: number
+  readonly scheduler?: IScheduler
+  readonly timeoutReason?: () => unknown
+  readonly report?: IUtilsReporter
+}
 type IAbortTimeoutSignal = {
-  readonly signal: IAbortSignal | undefined;
-  readonly dispose: () => void;
-};
-function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;
+  readonly signal: IAbortSignal | undefined
+  readonly dispose: () => void
+}
+function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal
 ```
 
 Creates one operation signal that several underlying requests can share, without creating, racing or settling any application Promise. When the outside signal aborts first, its original reason is kept; when the deadline comes first, the signal uses the return value of `timeoutReason()`. An error thrown by that reason factory becomes the signal reason and never escapes from the timer callback. Without `timeoutMs`, the outside signal is passed through as the same object. `dispose()` is idempotent and cancels the timer and removes the listener; cleanup failures go to `report` with `operation: 'abort-timeout-signal'`.
@@ -624,11 +686,11 @@ const merged = createAbortTimeoutSignal({
   signal: controller.signal as any,
   timeoutMs: 500,
   timeoutReason: () => new Error('deadline')
-});
+})
 try {
-  await Promise.all([requestA(merged.signal), requestB(merged.signal)]);
+  await Promise.all([requestA(merged.signal), requestB(merged.signal)])
 } finally {
-  merged.dispose();
+  merged.dispose()
 }
 ```
 
@@ -637,21 +699,24 @@ The callbacks of `withTimeout` / `raceWithAbort` can also hand one cooperative s
 ### `withTimeout`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>;
-type IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;
+type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>
+type IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>
 
 type IWithTimeoutOptions = IAsyncControls & {
-  readonly timeoutMs: number;
-  readonly report?: IUtilsReporter;
-  readonly zeroTimeoutBehavior?: 'skip' | 'start';
-  readonly cooperativeCancellation?: boolean;
-};
+  readonly timeoutMs: number
+  readonly report?: IUtilsReporter
+  readonly zeroTimeoutBehavior?: 'skip' | 'start'
+  readonly cooperativeCancellation?: boolean
+}
 
 function withTimeout<T>(
   operation: ITimeoutOperation<T>,
   options: IWithTimeoutOptions & { readonly cooperativeCancellation?: true }
-): Promise<T>;
-function withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTimeoutOptions): Promise<T>;
+): Promise<T>
+function withTimeout<T>(
+  operation: IDeadlineOnlyOperation<T>,
+  options: IWithTimeoutOptions
+): Promise<T>
 ```
 
 `INativeAbortSignal` is the type of the signal this package creates with a native `AbortController` and hands to the operation. It resolves against the consumer's own global types: with `lib.dom`, `@types/node`, Deno or Bun types it is the host `AbortSignal`, so `fetch(url, { signal })` works directly; without host types it falls back to the structural `IAbortSignal`, so the published declarations need no host library. Every input still accepts the structural `IAbortSignal`.
@@ -664,72 +729,72 @@ Wraps a lazy operation in a deadline. The `signal` the `operation` receives is a
 - When cleanup (cancelling the timer, removing listeners) fails, the cleanup errors and the original error are rejected together as an `AggregateError`.
 
 ```ts
-import { sleep, withTimeout } from '@migaia/utils/promise';
+import { sleep, withTimeout } from '@migaia/utils/promise'
 
 await withTimeout(
   async ({ signal }) => {
     while (!signal.aborted) {
       // After each small batch of synchronous work, yield the event loop so the deadline can run.
-      await sleep(10);
+      await sleep(10)
     }
-    throw signal.reason;
+    throw signal.reason
   },
   { timeoutMs: 500 }
-); // rejects with UtilsTimeoutError('operation', 500) after 500 ms
+) // rejects with UtilsTimeoutError('operation', 500) after 500 ms
 ```
 
 ### `raceWithAbort`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-type IAbortOperation<T> = ITimeoutOperation<T>;
+type IAbortOperation<T> = ITimeoutOperation<T>
 
 function raceWithAbort<T>(
   operation: IAbortOperation<T>,
   options?: Pick<IAsyncControls, 'signal' | 'signals'> & {
-    readonly report?: IUtilsReporter;
-    readonly cleanupPolicy?: 'reject' | 'report';
+    readonly report?: IUtilsReporter
+    readonly cleanupPolicy?: 'reject' | 'report'
   }
-): Promise<T>;
+): Promise<T>
 ```
 
 Same semantics as `withTimeout`, but **without a deadline timer**: the operation fails early only when an outside `signal(s)` aborts. `cleanupPolicy: 'report'` (default `'reject'`) reports a listener cleanup failure as a diagnostic instead of rejecting the final Promise.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const controller = new AbortController();
+const controller = new AbortController()
 const result = raceWithAbort(({ signal }) => fetchSomething({ signal }), {
   signal: controller.signal as any
-});
+})
 ```
 
 ### `retry`
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IRetryContext = {
-  readonly attempt: number;
-  readonly signal: INativeAbortSignal;
-  readonly remainingMs?: number;
-};
-type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };
+  readonly attempt: number
+  readonly signal: INativeAbortSignal
+  readonly remainingMs?: number
+}
+type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number }
 
 function retry<T>(
   operation: (context: IRetryContext) => T | PromiseLike<T>,
   options: {
-    readonly maxAttempts: number;
+    readonly maxAttempts: number
     readonly shouldRetry: (
       error: unknown,
       context: IRetryFailureContext
-    ) => boolean | PromiseLike<boolean>;
-    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);
-    readonly totalTimeoutMs?: number;
-    readonly attemptTimeoutMs?: number;
-    readonly signal?: IAbortSignal;
-    readonly signals?: readonly IAbortSignal[];
-    readonly zeroTimeoutBehavior?: 'skip' | 'start';
-    readonly report?: IUtilsReporter;
-    readonly unref?: boolean;
-    readonly scheduler?: IScheduler;
+    ) => boolean | PromiseLike<boolean>
+    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number)
+    readonly totalTimeoutMs?: number
+    readonly attemptTimeoutMs?: number
+    readonly signal?: IAbortSignal
+    readonly signals?: readonly IAbortSignal[]
+    readonly zeroTimeoutBehavior?: 'skip' | 'start'
+    readonly report?: IUtilsReporter
+    readonly unref?: boolean
+    readonly scheduler?: IScheduler
   }
-): Promise<T>;
+): Promise<T>
 ```
 
 Serial retries with three layers of limits:
@@ -744,11 +809,11 @@ Serial retries with three layers of limits:
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 await retry(
   async ({ attempt }) => {
-    if (attempt < 3) throw new Error('boom');
-    return 'ok';
+    if (attempt < 3) throw new Error('boom')
+    return 'ok'
   },
   { maxAttempts: 5, shouldRetry: () => true, delay: (_, { attempt }) => attempt * 100 }
-); // 'ok' after 3 attempts, with backoff waits of about 100 ms and 200 ms
+) // 'ok' after 3 attempts, with backoff waits of about 100 ms and 200 ms
 ```
 
 ### `hostRethrowReporter` and `IUtilsReporter`
@@ -757,12 +822,13 @@ await retry(
 type IUtilsReporter = (
   error: unknown,
   context: {
-    readonly operation: 'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter';
-    readonly phase: 'late-rejection' | 'cleanup' | 'reporter';
-    readonly attempt?: number;
+    readonly operation:
+      'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter'
+    readonly phase: 'late-rejection' | 'cleanup' | 'reporter'
+    readonly attempt?: number
   }
-) => void;
-const hostRethrowReporter: IUtilsReporter;
+) => void
+const hostRethrowReporter: IUtilsReporter
 ```
 
 `hostRethrowReporter` is the default diagnostic reporter: it rethrows the error with `queueMicrotask` (or synchronously where `queueMicrotask` is missing), so it becomes an uncaught exception that the host's global error handling records instead of being silently swallowed. Replace it through the `report` option with logging, telemetry or similar. In Node an uncaught exception exits the process by default, so pass your own `report` when an operation ignores the `signal` and may fail after the deadline. A rejection with the `signal.reason` the operation received is an acknowledgement of the cancellation, and `withTimeout`, `raceWithAbort` and `retry` never report it.
@@ -774,17 +840,17 @@ type IConcurrencyLimiter = {
   run<T>(
     task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,
     options?: { readonly signal?: IAbortSignal }
-  ): Promise<T>;
-  readonly activeCount: number;
-  readonly pendingCount: number;
-  whenIdle(): Promise<void>;
-  close(reason?: unknown): void;
-  dispose(reason?: unknown): Promise<void>;
-};
+  ): Promise<T>
+  readonly activeCount: number
+  readonly pendingCount: number
+  whenIdle(): Promise<void>
+  close(reason?: unknown): void
+  dispose(reason?: unknown): Promise<void>
+}
 function createConcurrencyLimiter(options: {
-  readonly concurrency: number;
-  readonly report?: IUtilsReporter;
-}): IConcurrencyLimiter;
+  readonly concurrency: number
+  readonly report?: IUtilsReporter
+}): IConcurrencyLimiter
 ```
 
 The **only primitive in this package with a lifetime across calls**: a first-in-first-out task queue with a concurrency cap.
@@ -798,9 +864,9 @@ The **only primitive in this package with a lifetime across calls**: a first-in-
 `concurrency` must be a positive safe integer; otherwise the constructor throws `RangeError`.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-const limiter = createConcurrencyLimiter({ concurrency: 2 });
-const results = await Promise.all([1, 2, 3, 4].map((n) => limiter.run(() => fetchPage(n))));
-await limiter.dispose(); // close after the remaining tasks finish
+const limiter = createConcurrencyLimiter({ concurrency: 2 })
+const results = await Promise.all([1, 2, 3, 4].map((n) => limiter.run(() => fetchPage(n))))
+await limiter.dispose() // close after the remaining tasks finish
 ```
 
 ---
@@ -813,9 +879,11 @@ One set of tools for error identity, wrapping and walking cause chains.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IPropertyRead<T> =
-  | { readonly threw: false; readonly value: T }
-  | { readonly threw: true; readonly error: unknown };
-function tryReadProperty<T extends object, K extends keyof T>(target: T, key: K): IPropertyRead<T[K]>;
+  { readonly threw: false; readonly value: T } | { readonly threw: true; readonly error: unknown }
+function tryReadProperty<T extends object, K extends keyof T>(
+  target: T,
+  key: K
+): IPropertyRead<T[K]>
 ```
 
 Reads one property exactly once and keeps the getter's receiver. When the read throws, the original thrown value goes into `error`; it is not wrapped and not reported. The caller checks the target object and decides what a failure means. New code that needs a guarded read of a single property should reuse this primitive.
@@ -823,27 +891,27 @@ Reads one property exactly once and keeps the getter's receiver. When the read t
 The reason of an outside abort signal is read through the same entry:
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const read = tryReadProperty(signal, 'reason');
-if (read.threw) report(read.error);
-else handleAbort(read.value);
+const read = tryReadProperty(signal, 'reason')
+if (read.threw) report(read.error)
+else handleAbort(read.value)
 ```
 
 Whether a failure is rethrown, wrapped, reported or used as the abort reason depends on the caller's own contract; this primitive only returns the read result.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 abstract class UtilsError extends Error {
-  readonly source = 'foundation.utils';
-  readonly code: IUtilsErrorCode;
+  readonly source = 'foundation.utils'
+  readonly code: IUtilsErrorCode
 }
 class UtilsAbortError extends UtilsError {
-  readonly name = 'AbortError';
-  constructor(reason?: unknown);
+  readonly name = 'AbortError'
+  constructor(reason?: unknown)
 }
 class UtilsTimeoutError extends UtilsError {
-  readonly name = 'TimeoutError';
-  readonly scope: 'operation' | 'attempt' | 'total';
-  readonly timeoutMs: number;
-  constructor(scope: 'operation' | 'attempt' | 'total', timeoutMs: number);
+  readonly name = 'TimeoutError'
+  readonly scope: 'operation' | 'attempt' | 'total'
+  readonly timeoutMs: number
+  constructor(scope: 'operation' | 'attempt' | 'total', timeoutMs: number)
 }
 ```
 
@@ -853,30 +921,40 @@ class UtilsTimeoutError extends UtilsError {
 function attachErrorIdentity<T extends object>(
   error: T,
   identity: {
-    readonly source: string;
-    readonly code: string;
-    readonly phase?: string;
-    readonly detail?: Readonly<Record<string, unknown>>;
+    readonly source: string
+    readonly code: string
+    readonly phase?: string
+    readonly detail?: Readonly<Record<string, unknown>>
   },
   hooks?: {
     // On a field conflict the caller picks a replacement target; without it a conflict throws TypeError
-    readonly onConflict?: (context: { target: T; key: string; existing: unknown; incoming: unknown }) => T;
+    readonly onConflict?: (context: {
+      target: T
+      key: string
+      existing: unknown
+      incoming: unknown
+    }) => T
     // When a field cannot be defined (for example a frozen object) the caller picks a replacement target; without it the error is rethrown as is
-    readonly onFailure?: (context: { target: T; key: string; incoming: unknown; cause: unknown }) => T;
+    readonly onFailure?: (context: {
+      target: T
+      key: string
+      incoming: unknown
+      cause: unknown
+    }) => T
   }
-): T;
+): T
 ```
 
 Adds non-writable identity fields (`source` / `code` / `phase` / `detail`) to an existing error object in place. It **does not** replace or wrap the error. If a field already exists with a different value, it throws `TypeError` so it never silently overwrites identity written by other code; the same value counts as idempotent and the error is returned unchanged.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const error = new Error('boom');
-attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' });
-(error as Error & { readonly code?: string }).code; // 'FETCH_FAILED' (the return type is still T and does not add code)
+const error = new Error('boom')
+attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' })
+;(error as Error & { readonly code?: string }).code // 'FETCH_FAILED' (the return type is still T and does not add code)
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function toError(value: unknown, options?: { readonly message?: string }): Error;
+function toError(value: unknown, options?: { readonly message?: string }): Error
 ```
 
 Turns any thrown value into an error you can diagnose. A native `Error`, or a cross-realm / structured error shape with string `name`, `message` and `stack`, is returned as is; the latter is not guaranteed to be `instanceof` the local `Error`. Any other value is wrapped in an internal error type with `cause: value`. Its message is `options.message` when given, otherwise the thrown value itself when it is a string, otherwise a fixed fallback text.
@@ -885,29 +963,29 @@ Turns any thrown value into an error you can diagnose. A native `Error`, or a cr
 function walkErrorCauses(
   error: unknown,
   options?: { readonly maxDepth?: number }
-): readonly unknown[];
+): readonly unknown[]
 ```
 
 Walks the `cause` chain and `AggregateError.errors` and returns every node visited, starting with `error` itself. A `Set` deduplicates identical values so cycles end. `maxDepth` (default 32) limits the depth; past it, that branch is not followed further. An error created with `cause: undefined` contributes an `undefined` entry, so read fields with optional chaining (`item?.code`).
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 try {
-  throw new Error('outer', { cause: new Error('inner') });
+  throw new Error('outer', { cause: new Error('inner') })
 } catch (error) {
-  walkErrorCauses(error); // [outerError, innerError]
+  walkErrorCauses(error) // [outerError, innerError]
 }
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;
+function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined
 ```
 
 Combines zero, one or many errors: zero gives `undefined`; one is returned as is (normalized with `toError`); several are wrapped in `AggregateError(errors, message)`. If iterating `errors` itself throws, the errors collected so far and that iteration failure are packed into an `AggregateError` and thrown.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function isUtilsError(value: unknown): value is UtilsError;
-function isUtilsAbortError(value: unknown): value is UtilsAbortError;
-function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;
+function isUtilsError(value: unknown): value is UtilsError
+function isUtilsAbortError(value: unknown): value is UtilsAbortError
+function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError
 ```
 
 Diagnostic shape guards: they check an error-like `name` / `message` / `stack`, `source` equal to `foundation.utils`, and a `code` that belongs to `UtilsErrorCode`; the abort and timeout guards also check the matching code. They need no `instanceof` against local constructors and are not meant to authenticate where an error came from.
@@ -937,7 +1015,7 @@ const UtilsErrorCode = {
   formatInvalid: 'FORMAT_INVALID',
   formatValueMissing: 'FORMAT_VALUE_MISSING',
   numberFormatInvalid: 'NUMBER_FORMAT_INVALID'
-} as const;
+} as const
 ```
 
 The stable semantic codes used across the whole package; `IUtilsErrorCode` is the union of their values. Besides the `UtilsError` subclasses, native `TypeError` / `RangeError` thrown by modules such as `base64ToBytes`, object paths and config also get the matching `code` (and `source: 'foundation.utils'`) through `Object.defineProperty`, so the same checks recognize them.
@@ -982,8 +1060,8 @@ Byte and text encoding without Node `Buffer` or the DOM, in plain ECMAScript.
 - A plain `ArrayBuffer` may become detached after it is transferred to a Worker. `SharedArrayBuffer` is memory shared between threads, with different ownership and synchronization rules, so `isArrayBuffer()` rejects it explicitly.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function isUint8Array(value: unknown): value is Uint8Array;
-function isArrayBuffer(value: unknown): value is ArrayBuffer;
+function isUint8Array(value: unknown): value is Uint8Array
+function isArrayBuffer(value: unknown): value is ArrayBuffer
 ```
 
 Both guards determine the real brand through the engine's `%TypedArray%.prototype[Symbol.toStringTag]` and the internal-slot getter `ArrayBuffer.prototype.byteLength`. They recognize valid instances and subclasses from other iframe / Worker realms, and reject forged `constructor.name`, prototypes or `Symbol.toStringTag`, other TypedArrays, `DataView`, `SharedArrayBuffer` and Proxy objects. The check reads no user properties of the candidate.
@@ -991,21 +1069,21 @@ Both guards determine the real brand through the engine's `%TypedArray%.prototyp
 A detached `Uint8Array` / `ArrayBuffer` still returns `true`: detaching does not change the object's brand, but it does affect whether bytes can be read, so callers that consume bytes must handle the detached state separately.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function bytesToBase64(value: Uint8Array): string;
+function bytesToBase64(value: Uint8Array): string
 ```
 
 Encodes to standard (not URL-safe) Base64 with `=` padding, using the canonical RFC 4648 alphabet.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-function base64ToBytes(value: string, target?: Uint8Array): Uint8Array; // target must be exactly the decoded length; it is reused instead of allocating
+function base64ToBytes(value: string, target?: Uint8Array): Uint8Array // target must be exactly the decoded length; it is reused instead of allocating
 ```
 
 **Only canonical input is accepted**: the standard alphabet, a length that is a multiple of 4 and correct `=` padding. Anything else (URL-safe variants, missing padding, stray whitespace and so on) is rejected with a `TypeError` carrying `code: 'INVALID_ENCODING'`. Decoding checks directly that the unused padding bits are zero, without re-encoding, and rejects input whose bits do not line up.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'
-base64ToBytes('AQID'); // Uint8Array [1, 2, 3]
-base64ToBytes('AQID-_'); // throws TypeError (URL-safe characters are not accepted)
+bytesToBase64(new Uint8Array([1, 2, 3])) // 'AQID'
+base64ToBytes('AQID') // Uint8Array [1, 2, 3]
+base64ToBytes('AQID-_') // throws TypeError (URL-safe characters are not accepted)
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
@@ -1015,26 +1093,26 @@ function* streamBase64Chunks(value: Uint8Array, maxChunkBytes?: number): Iterabl
 Splits a large byte array into Base64 chunks that are **each valid on their own**: every chunk is cut on a 3-byte boundary, so each one decodes correctly without being joined first. `maxChunkBytes` defaults to `32763` and must be a safe integer `>= 3`; the actual chunk width is rounded down to a multiple of 3.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function utf8ByteLength(value: string): number;
+function utf8ByteLength(value: string): number
 ```
 
 Counts the bytes of a string encoded as UTF-8 without allocating a buffer. Surrogate pairs are handled correctly, and a lone surrogate counts as 3 bytes, the width of U+FFFD.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function encodeUtf8(value: string): Uint8Array;
-function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean }): string;
+function encodeUtf8(value: string): Uint8Array
+function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean }): string
 ```
 
 `encodeUtf8` encodes into a newly allocated UTF-8 byte array. `decodeUtf8` decodes: with `fatal: false` (the default) an invalid byte sequence becomes U+FFFD and decoding skips one byte and continues; with `fatal: true` it throws an encoding error that includes the byte offset (code `INVALID_ENCODING`; the message names UTF-8 and the offset).
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function splitUtf8(value: string, maxBytes: number): readonly string[];
+function splitUtf8(value: string, maxBytes: number): readonly string[]
 ```
 
 Splits a string on code point boundaries so that each piece encodes to at most `maxBytes` bytes; it never cuts a code point in half. `maxBytes` must be a safe integer `>= 4` (4 is the largest UTF-8 width of one code point). An empty string returns `['']`.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-splitUtf8('你好世界', 6); // each Chinese character is 3 bytes → ['你好', '世界']
+splitUtf8('你好世界', 6) // each Chinese character is 3 bytes → ['你好', '世界']
 ```
 
 ---
@@ -1048,7 +1126,7 @@ splitUtf8('你好世界', 6); // each Chinese character is 3 bytes → ['你好'
 ### Snapshots and probes
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;
+function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>
 ```
 
 Returns true for a non-array object whose prototype is `null`, or whose prototype's own prototype is `null`. So it also accepts `Object.create(Object.create(null))` rather than only comparing with this realm's `Object.prototype`; ordinary class instances and built-ins such as `Date` / `Map` return false. If reading the prototype chain fails (a proxy trap throws), it also returns `false` instead of throwing.
@@ -1057,46 +1135,46 @@ Returns true for a non-array object whose prototype is `null`, or whose prototyp
 type IProbePropertyResult<T> =
   | { readonly kind: 'missing' }
   | { readonly kind: 'value'; readonly value: T }
-  | { readonly kind: 'failed'; readonly error: unknown };
-function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>;
+  | { readonly kind: 'failed'; readonly error: unknown }
+function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>
 ```
 
 Reads one property exactly once, so a getter with side effects is not called twice: a missing property gives `missing`; a read (including a getter) that throws gives `failed` with the original error; otherwise it gives `value`.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const profileUnavailable = new Error('profile unavailable');
-let profileReads = 0;
+const profileUnavailable = new Error('profile unavailable')
+let profileReads = 0
 const user = {
   name: 'Ada',
   get profile(): never {
-    profileReads += 1;
-    throw profileUnavailable;
-  }
-};
-
-function readLabel(value: object, key: PropertyKey): string {
-  const result = probeProperty<string>(value, key);
-  switch (result.kind) {
-    case 'value':
-      return result.value;
-    case 'missing':
-      return 'Anonymous';
-    case 'failed':
-      console.error('property read failed', result.error);
-      return 'Unavailable';
+    profileReads += 1
+    throw profileUnavailable
   }
 }
 
-readLabel(user, 'name'); // 'Ada'
-readLabel(user, 'email'); // 'Anonymous'
-readLabel(user, 'profile'); // 'Unavailable'
-profileReads; // 1: the getter was read only once
+function readLabel(value: object, key: PropertyKey): string {
+  const result = probeProperty<string>(value, key)
+  switch (result.kind) {
+    case 'value':
+      return result.value
+    case 'missing':
+      return 'Anonymous'
+    case 'failed':
+      console.error('property read failed', result.error)
+      return 'Unavailable'
+  }
+}
+
+readLabel(user, 'name') // 'Ada'
+readLabel(user, 'email') // 'Anonymous'
+readLabel(user, 'profile') // 'Unavailable'
+profileReads // 1: the getter was read only once
 ```
 
 The first argument can be a plain object, a class instance or any other object with readable properties; the second accepts a string, number or Symbol key. Missing fields and failed reads are separate branches, so a `try/catch` cannot accidentally fall back to a default value; with `failed`, the error is not rebuilt, and `error` is exactly the instance the getter threw.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function immutableSnapshot<T>(value: T): T;
+function immutableSnapshot<T>(value: T): T
 ```
 
 Calls the host's native `globalThis.structuredClone(value)` directly, not JSON serialization or a hand-written recursion. It copies the whole object graph at once and keeps cycles, shared references and the data types structured clone supports, such as `Date`, `Map`, `Set`, `ArrayBuffer` and TypedArrays. This API takes no transfer list, so an `ArrayBuffer` is copied, never transferred.
@@ -1104,33 +1182,33 @@ Calls the host's native `globalThis.structuredClone(value)` directly, not JSON s
 Structured clone does not keep custom class prototype methods, getters / setters or property descriptors; functions, `WeakMap` and other unsupported members make the whole clone fail. "Immutable" means the snapshot no longer shares references with the source, not that the result went through `Object.freeze()`; freeze it or make it read-only yourself when you need that at runtime. A host without `structuredClone` throws a `TypeError` with `code: 'ENV_UNSUPPORTED'`; a value that cannot be cloned throws a `TypeError` with `code: 'CLONE_UNSUPPORTED'`.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const shared = { count: 1 };
+const shared = { count: 1 }
 const source = {
   primary: shared,
   alias: shared,
   createdAt: new Date('2026-01-01T00:00:00Z')
-};
-const copy = immutableSnapshot(source);
+}
+const copy = immutableSnapshot(source)
 
-source.primary.count = 2;
-copy.primary.count; // 1
-copy.primary === copy.alias; // true
-copy.createdAt instanceof Date; // true
-Object.isFrozen(copy); // false
+source.primary.count = 2
+copy.primary.count // 1
+copy.primary === copy.alias // true
+copy.createdAt instanceof Date // true
+Object.isFrozen(copy) // false
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type ISnapshotDiagnostic = {
-  readonly path: readonly PropertyKey[];
-  readonly reason: 'accessor' | 'read-failed' | 'unsupported';
-  readonly cause: unknown;
-};
+  readonly path: readonly PropertyKey[]
+  readonly reason: 'accessor' | 'read-failed' | 'unsupported'
+  readonly cause: unknown
+}
 type IDiagnosticSnapshot<T> = {
-  readonly value: T;
-  readonly diagnostics: readonly ISnapshotDiagnostic[];
-};
-function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
-function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
+  readonly value: T
+  readonly diagnostics: readonly ISnapshotDiagnostic[]
+}
+function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>
+function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>
 ```
 
 The key difference from native `structuredClone` / `immutableSnapshot` is how failure is handled: those two are all-or-nothing for the whole graph, and any unsupported member makes the call throw; `diagnosticSnapshot` always tries to return `{ value, diagnostics }`. It copies plain objects and arrays recursively and calls `structuredClone` separately on each cloneable built-in subtree; functions, class instances and other unsupported types **keep their original reference** and are recorded as `unsupported`. An accessor is read once, turned into a plain value and recorded as `accessor`; a failed read or reflection is recorded as `read-failed`. A `WeakMap` keeps cycles safe.
@@ -1140,7 +1218,7 @@ So the result of `diagnosticSnapshot` may be only partly isolated: when `diagnos
 `structuredDiagnosticSnapshot` combines the two strategies: it first tries native `structuredClone`, and on success `diagnostics` is empty; if the host lacks it or the clone fails, it falls back to the best-effort snapshot above and adds an `unsupported` diagnostic, or a `read-failed` one carrying the original cause, at the root path. Prefer it at telemetry boundaries that want "a full clone when possible, otherwise an observable degraded result".
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function identitySnapshot<T>(value: T): T;
+function identitySnapshot<T>(value: T): T
 ```
 
 Returns its argument unchanged. Called alone it has no runtime benefit; it is the zero-copy branch for configurable strategy slots such as `snapshot` / `clone`, and states explicitly that the caller accepts a shared reference whose later changes both sides will see. This repository's clone policy uses it for its `opaque` branch, which serves trusted in-process data that is identity-sensitive or not cloneable and may be shared. Do not use it where outside input must be isolated, for history snapshots or when crossing a boundary; choose `immutableSnapshot` there.
@@ -1155,57 +1233,54 @@ Object paths come in two forms:
 Both forms share the same safety limits: at most 512 characters per segment, at most 256 segments, and at most 4096 characters for a whole string path; `__proto__` / `prototype` / `constructor` are always rejected, which prevents prototype pollution.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple;
+function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple
 ```
 
 Parses a string path into a normalized `readonly` tuple of segments (numeric indexes become `number`), or validates and freezes a given tuple path. Any out-of-range or dangerous segment throws a `TypeError` with `code: 'OBJECT_PATH_INVALID'`.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IPathValueProbe<T, P extends IObjectPathInput<T>> = {
-  readonly kind: 'value';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly value: IObjectPathValue<T, P>;
-};
+  readonly kind: 'value'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly value: IObjectPathValue<T, P>
+}
 type IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
-  readonly kind: 'missing';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly failedAt: number;
-  readonly failedKey: IObjectPathSegment;
-  readonly resolvedPath: IObjectPathTuple;
-  readonly parent: unknown;
-};
+  readonly kind: 'missing'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly failedAt: number
+  readonly failedKey: IObjectPathSegment
+  readonly resolvedPath: IObjectPathTuple
+  readonly parent: unknown
+}
 type IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
-  readonly kind: 'blocked';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly failedAt: number;
-  readonly failedKey: IObjectPathSegment;
-  readonly resolvedPath: IObjectPathTuple;
-  readonly parent: unknown;
-};
+  readonly kind: 'blocked'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly failedAt: number
+  readonly failedKey: IObjectPathSegment
+  readonly resolvedPath: IObjectPathTuple
+  readonly parent: unknown
+}
 type IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
-  readonly kind: 'failed';
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly failedAt: number;
-  readonly failedKey: IObjectPathSegment;
-  readonly resolvedPath: IObjectPathTuple;
-  readonly parent: unknown;
-  readonly error: unknown;
-};
+  readonly kind: 'failed'
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly failedAt: number
+  readonly failedKey: IObjectPathSegment
+  readonly resolvedPath: IObjectPathTuple
+  readonly parent: unknown
+  readonly error: unknown
+}
 type IPathProbe<T, P extends IObjectPathInput<T>> =
-  | IPathValueProbe<T, P>
-  | IPathMissingProbe<P>
-  | IPathBlockedProbe<P>
-  | IPathFailedProbe<P>;
+  IPathValueProbe<T, P> | IPathMissingProbe<P> | IPathBlockedProbe<P> | IPathFailedProbe<P>
 
-function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;
+function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>
 function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
   object: T,
   segments: P
-): IPathProbe<T, P>;
+): IPathProbe<T, P>
 ```
 
 Probes the path segment by segment, reading each segment once. The four results mean: **a value was found** (`value`, carrying `value`); **a property on the path does not exist** (`missing`); **a parent value on the path is not an object or function, so the probe cannot go deeper** (`blocked`, for example the path is `a.b.c` but `a.b` is `null` or a string); and **reading a segment threw** (`failed`, for example a throwing getter, carrying `error`).
@@ -1218,16 +1293,16 @@ All four results share `originKey` (the `path` exactly as passed) and `segments`
 function get<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P
-): IObjectPathValue<T, P> | undefined;
+): IObjectPathValue<T, P> | undefined
 ```
 
 A simplified read on top of `probeObjectPath`: `missing` / `blocked` both return `undefined`; `failed` (the read itself threw) **rethrows** that error instead of swallowing it. This differs from "the path does not exist", so callers handle the two separately.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const data = { user: { name: 'Ada' } };
-get(data, 'user.name'); // 'Ada'
-get(data, 'user.missing'); // undefined (missing)
-get(data, 'user.name.x'); // undefined (blocked: 'Ada' is a string, so .x cannot be reached)
+const data = { user: { name: 'Ada' } }
+get(data, 'user.name') // 'Ada'
+get(data, 'user.missing') // undefined (missing)
+get(data, 'user.name.x') // undefined (blocked: 'Ada' is a string, so .x cannot be reached)
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
@@ -1235,52 +1310,52 @@ function set<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P,
   nextValue: IObjectPathWriteValue<T, P>
-): T;
+): T
 ```
 
 An immutable path write: every `set()` that really changes a value returns a new root object and leaves the input unchanged. Only nodes on the path are shallow-copied (structural sharing: untouched sibling nodes keep the same reference). "Immutable" describes how the update happens; it does not mean the result was deep-copied or frozen, and the returned object can still be modified. Missing containers on the way are created from the type of the next key (a number key creates `[]`, anything else `{}`). If the path runs into a non-empty primitive (a string, number and so on) that cannot be entered, it throws a `TypeError` with `code: 'OBJECT_PATH_INVALID'`. If the new value is `Object.is`-equal to the old one, no update happens and the original object is reused without copying.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const before = { user: { name: 'Ada', tags: ['a'] } };
-const after = set(before, 'user.name', 'Grace');
-after.user.name; // 'Grace'
-after !== before; // true (an update returns a new root)
-after.user !== before.user; // true (nodes on the updated path are copied)
-after.user.tags === before.user.tags; // true (untouched branches keep their reference)
-before.user.name; // 'Ada' (the original was not modified)
-Object.isFrozen(after); // false (an immutable update is not a freeze)
+const before = { user: { name: 'Ada', tags: ['a'] } }
+const after = set(before, 'user.name', 'Grace')
+after.user.name // 'Grace'
+after !== before // true (an update returns a new root)
+after.user !== before.user // true (nodes on the updated path are copied)
+after.user.tags === before.user.tags // true (untouched branches keep their reference)
+before.user.name // 'Ada' (the original was not modified)
+Object.isFrozen(after) // false (an immutable update is not a freeze)
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly probe: IPathValueProbe<T, P>;
-  readonly value: IObjectPathValue<T, P>;
-  replace(value: IObjectPathValue<T, P>): void;
-};
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly probe: IPathValueProbe<T, P>
+  readonly value: IObjectPathValue<T, P>
+  replace(value: IObjectPathValue<T, P>): void
+}
 type IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
-  readonly originKey: P;
-  readonly segments: IObjectPathTuple;
-  readonly probe: IPathValueProbe<T, P>;
-  readonly value: IObjectPathWriteValue<T, P>;
-  replace(value: IObjectPathWriteValue<T, P>): void;
-};
+  readonly originKey: P
+  readonly segments: IObjectPathTuple
+  readonly probe: IPathValueProbe<T, P>
+  readonly value: IObjectPathWriteValue<T, P>
+  replace(value: IObjectPathWriteValue<T, P>): void
+}
 type IPathAccessorOptions<T> = {
-  readonly ifMissing?: (probe: IPathMissingProbe) => void;
-  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;
-  readonly ifFailed?: (probe: IPathFailedProbe) => void;
-  readonly onGet?: (event: IPathGetEvent<T>) => void;
-  readonly onSet?: (event: IPathSetEvent<T>) => void;
-};
+  readonly ifMissing?: (probe: IPathMissingProbe) => void
+  readonly ifBlocked?: (probe: IPathBlockedProbe) => void
+  readonly ifFailed?: (probe: IPathFailedProbe) => void
+  readonly onGet?: (event: IPathGetEvent<T>) => void
+  readonly onSet?: (event: IPathSetEvent<T>) => void
+}
 type IPathAccessor<T> = {
-  readonly value: T;
-  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;
-  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;
-  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;
-  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;
-};
-function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;
+  readonly value: T
+  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined
+  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T
+  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>
+  parsePath(path: string | IObjectPathTuple): IObjectPathTuple
+}
+function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>
 ```
 
 Wraps a stateful accessor that **holds the current root internally**: after each successful `set()`, `accessor.value` moves to the new root, and later `get` / `set` calls work on the latest root. `ifMissing` / `ifBlocked` / `ifFailed` are called when the matching probe result occurs, as central diagnostic hooks.
@@ -1291,9 +1366,9 @@ Wraps a stateful accessor that **holds the current root internally**: after each
 const accessor = createPathAccessor(
   { count: 0 },
   { onSet: (event) => console.log('write', event.originKey, event.value) }
-);
-accessor.set('count', 5); // prints write count 5
-accessor.value; // { count: 5 }
+)
+accessor.set('count', 5) // prints write count 5
+accessor.value // { count: 5 }
 ```
 
 The matching type tools, which give callers path completion and value types at compile time: `IObjectPathSegment`, `IObjectPathTuple`, `IObjectPath<T>` (string paths, at most 8 levels deep), `IObjectPathTupleFor<T>` (tuple paths), `IObjectPathInput<T>` (the union of both), `IObjectPathValue<T, P>` (the type the path points to) and `IObjectPathWriteValue<T, P>` (the type accepted when writing; literal types are widened to their base type, for example a union of literals becomes `string` / `number` / `boolean` / `bigint`).
@@ -1320,8 +1395,8 @@ It does two things:
 ```ts
 /** Groups a union by one top-level discriminant field whose value is a PropertyKey. */
 type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = {
-  [K in T[F]]: Extract<T, Record<F, K>>;
-};
+  [K in T[F]]: Extract<T, Record<F, K>>
+}
 ```
 
 - Type parameter `F extends PropertyKey`: the discriminant field name (`string` / `number` / `symbol`).
@@ -1331,8 +1406,8 @@ type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKe
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 /** Groups a union by a string or tuple object path, parsed exactly like IObjectPath in /object. */
 type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
-  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;
-};
+  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>
+}
 ```
 
 - Type parameter `T`: the union itself.
@@ -1345,28 +1420,28 @@ type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IEvent =
   | {
-      readonly type: 'created';
-      readonly meta: { readonly category: 'write' };
-      readonly payload: { readonly userId: string };
+      readonly type: 'created'
+      readonly meta: { readonly category: 'write' }
+      readonly payload: { readonly userId: string }
     }
   | {
-      readonly type: 'deleted';
-      readonly meta: { readonly category: 'write' };
-      readonly payload: { readonly reason: string };
+      readonly type: 'deleted'
+      readonly meta: { readonly category: 'write' }
+      readonly payload: { readonly reason: string }
     }
   | {
-      readonly type: 'read';
-      readonly meta: { readonly category: 'read' };
-      readonly payload: { readonly cache: boolean };
-    };
+      readonly type: 'read'
+      readonly meta: { readonly category: 'read' }
+      readonly payload: { readonly cache: boolean }
+    }
 
-type IByType = IDiscriminatedByField<'type', IEvent>;
+type IByType = IDiscriminatedByField<'type', IEvent>
 // { created: Extract<IEvent, { type: 'created' }>; deleted: ...; read: ... }
 
-type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;
+type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>
 // { write: the union of the 'created' and 'deleted' branches; read: the 'read' branch }
 
-type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>;
+type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>
 // identical to IByCategory: string paths and tuple paths are two spellings of the same parsing
 ```
 
@@ -1374,11 +1449,11 @@ type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 // @ts-expect-error no branch has this path, which violates the IObjectPathInput constraint
-type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>;
+type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>
 
-type INotPropertyKey = { readonly discriminator: { readonly nested: true } };
+type INotPropertyKey = { readonly discriminator: { readonly nested: true } }
 // @ts-expect-error the discriminant is an object, not a PropertyKey, so it cannot key a mapped type
-type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>;
+type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>
 ```
 
 ---
@@ -1390,14 +1465,14 @@ type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>;
 Config objects with **ownership**: only objects accepted by `ownConfig` can go through `readonlyConfig` / `patchConfig` / `readConfigPath` / `combineConfig`. A runtime `WeakMap` of metadata, not a field that could be forged, marks "this is a config root managed by this package".
 
 ```ts
-const ConfigProfile = { data: 'data', richRuntime: 'richRuntime' } as const;
-type IConfigProfile = 'data' | 'richRuntime';
+const ConfigProfile = { data: 'data', richRuntime: 'richRuntime' } as const
+type IConfigProfile = 'data' | 'richRuntime'
 ```
 
 `data` (the default) accepts only portable plain data: plain objects, arrays and built-ins such as `Date` / `RegExp` / `Map` / `Set`; **functions are rejected**. `richRuntime` also accepts functions and constructable classes (deep-copied together with their own properties and `prototype`), for configs that really need to carry callbacks or factories.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const CONFIG_DELETE: unique symbol;
+const CONFIG_DELETE: unique symbol
 ```
 
 In a `patchConfig` / `combineConfig` patch, setting a key to this symbol means "delete this key" rather than "set it to `undefined`".
@@ -1406,7 +1481,7 @@ In a `patchConfig` / `combineConfig` patch, setting a key to this symbol means "
 function ownConfig<T extends IConfigRecord>(
   value: T,
   options?: { readonly profile?: IConfigProfile; readonly limits?: Partial<IConfigLimits> }
-): IOwnedConfig<T>;
+): IOwnedConfig<T>
 ```
 
 Deep-copies `value` into an independent graph that this package's metadata marks as "owned". The root must be a plain object (not an array) without `symbol` keys. While copying:
@@ -1422,18 +1497,18 @@ With the result in hand, the caller has three clear paths: keep using it interna
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IConfigLimits = {
-  readonly maxDepth: number; // default 256
-  readonly maxNodes: number; // default 100_000
-  readonly maxKeys: number; // default 1_000_000
-  readonly maxPathLength: number; // default 4096
-  readonly maxSegmentLength: number; // default 512
-};
+  readonly maxDepth: number // default 256
+  readonly maxNodes: number // default 100_000
+  readonly maxKeys: number // default 1_000_000
+  readonly maxPathLength: number // default 4096
+  readonly maxSegmentLength: number // default 512
+}
 ```
 
 `limits` may not exceed the package defaults. `patchConfig` may only tighten the limits of its base; widening them throws `CONFIG_CONFLICT`. `combineConfig` takes the field-by-field minimum of all inputs and the requested limits, so a widening request is tightened automatically and does not throw `CONFIG_CONFLICT`.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;
+function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T
 ```
 
 Returns a **cached read-only object** that intercepts changes with a `Proxy`; calling it again with the same input returns the same read-only object. Reads still go to the original config, and no second copy of the data is made. Every write (`set` / `defineProperty` / `deleteProperty` / `setPrototypeOf` / `preventExtensions`, and mutating methods on `Map` / `Set` / `Date` such as `.set()` / `.add()` / `.setFullYear()`) throws a `TypeError` with `code: 'CONFIG_READONLY'`. Nested objects, `Map`, `Set` and function fields get the same write protection. `value` must come from `ownConfig`, otherwise it throws `code: 'CONFIG_UNSUPPORTED'`.
@@ -1443,38 +1518,38 @@ function patchConfig<T extends IConfigRecord>(
   base: IOwnedConfig<T>,
   patch: IConfigPatch<T>,
   options?: {
-    readonly profile?: IConfigProfile;
-    readonly limits?: Partial<IConfigLimits>;
-    readonly reuseUnchangedRoot?: boolean;
+    readonly profile?: IConfigProfile
+    readonly limits?: Partial<IConfigLimits>
+    readonly reuseUnchangedRoot?: boolean
   }
-): IOwnedConfig<T>;
+): IOwnedConfig<T>
 ```
 
 A copy-on-write overlay at the **root**: each key in `patch` either gets a new value (deep-copied recursively and brought under ownership) or `CONFIG_DELETE`, which deletes it. Only nodes on changed paths are copied; untouched subtrees are shared by reference. With an empty `patch` and `reuseUnchangedRoot` (default `true`), `base` itself is returned without copying. `patch` must be a plain object without `symbol` keys or accessor properties, otherwise it throws `code: 'CONFIG_UNSUPPORTED'`; a key named `__proto__` / `prototype` / `constructor` throws `code: 'CONFIG_PATH_INVALID'`. **Note**: `patchConfig` applies the patch at the root only. To change a nested field, compute the new nested subtree in your code with `get` / `set` (`/object`) and put it into `patch` as a whole value.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true });
-const next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE });
-next.retries; // 3
-'debug' in next; // false
+const base = ownConfig({ endpoint: '/v1', retries: 2, debug: true })
+const next = patchConfig(base, { retries: 3, debug: CONFIG_DELETE })
+next.retries // 3
+'debug' in next // false
 ```
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 function parseConfigPath(
   path: string,
   limits?: Pick<IConfigLimits, 'maxPathLength' | 'maxSegmentLength'>
-): readonly string[];
+): readonly string[]
 ```
 
 Builds on `parseObjectPath` from `/object` and adds config-specific limits (customizable lengths, defaulting to the package defaults). Every segment becomes a string: numeric index shorthand is not treated specially in config paths.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IConfigReadResult =
-  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown };
+  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown }
 function readConfigPath(
   config: IOwnedConfig<IConfigRecord>,
   path: string | readonly string[]
-): IConfigReadResult;
+): IConfigReadResult
 ```
 
 Reads one path inside a config and tells "the key does not exist" (`missing`) from "the value is `undefined`" (`value: undefined`). Object or function values are wrapped in the same read-only Proxy as `readonlyConfig`, so nested values read this way cannot be changed from outside either. `config` must come from `ownConfig`.
@@ -1483,41 +1558,41 @@ Reads one path inside a config and tells "the key does not exist" (`missing`) fr
 function combineConfig(
   sources: readonly IOwnedConfig<IConfigRecord>[],
   options?: {
-    readonly profile?: IConfigProfile;
-    readonly limits?: Partial<IConfigLimits>;
-    readonly strategies?: Partial<IConfigMergeStrategies>;
-    readonly pathRules?: readonly IConfigPathRule[];
-    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;
+    readonly profile?: IConfigProfile
+    readonly limits?: Partial<IConfigLimits>
+    readonly strategies?: Partial<IConfigMergeStrategies>
+    readonly pathRules?: readonly IConfigPathRule[]
+    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision
   }
-): IOwnedConfig<IConfigRecord>;
+): IOwnedConfig<IConfigRecord>
 ```
 
 Merges several owned config roots in the order of `sources` (later ones override earlier ones). With a single source and no merge options, that source is returned and its root identity is kept; every other case produces a new owned config. All sources must share one `profile`, otherwise it throws `code: 'CONFIG_CONFLICT'`.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IConfigMergeStrategies = {
-  readonly record: 'merge' | 'replace'; // default 'merge': plain objects merge recursively; 'replace': overwrite as a whole
-  readonly array: 'replace' | 'concat' | 'mergeByIndex'; // default 'replace'
-  readonly map: 'replace' | 'merge'; // default 'replace'
-  readonly set: 'replace' | 'union'; // default 'replace'
-  readonly undefined: 'ignore' | 'assign'; // default 'ignore': an explicit undefined on the right does not override the left
-};
+  readonly record: 'merge' | 'replace' // default 'merge': plain objects merge recursively; 'replace': overwrite as a whole
+  readonly array: 'replace' | 'concat' | 'mergeByIndex' // default 'replace'
+  readonly map: 'replace' | 'merge' // default 'replace'
+  readonly set: 'replace' | 'union' // default 'replace'
+  readonly undefined: 'ignore' | 'assign' // default 'ignore': an explicit undefined on the right does not override the left
+}
 
 type IConfigPathRule = {
-  readonly prefix: readonly PropertyKey[];
-  readonly strategies: Partial<IConfigMergeStrategies>;
-};
+  readonly prefix: readonly PropertyKey[]
+  readonly strategies: Partial<IConfigMergeStrategies>
+}
 
 type IConfigConflictContext = {
-  readonly path: readonly PropertyKey[];
-  readonly left: unknown;
-  readonly right: unknown;
-};
+  readonly path: readonly PropertyKey[]
+  readonly left: unknown
+  readonly right: unknown
+}
 type IConfigConflictDecision =
   | { readonly kind: 'left' }
   | { readonly kind: 'right' }
   | { readonly kind: 'delete' }
-  | { readonly kind: 'value'; readonly value: unknown };
+  | { readonly kind: 'value'; readonly value: unknown }
 ```
 
 `strategies` are the global defaults; `pathRules` is a list of `{ prefix, strategies }` matched by `prefix` (a key path from the root) against the key path currently being merged. The rule with the longer (more specific) `prefix` wins, and a matching rule is merged with the global `strategies` (fields the rule declares override the global ones; fields it does not declare keep the global values).
@@ -1528,20 +1603,20 @@ When a key exists on both sides and falls outside every automatic merge case (fo
 const defaults = ownConfig({
   retries: 1,
   tags: ['default'],
-  transport: { timeoutMs: 1_000, keepAlive: true },
-});
+  transport: { timeoutMs: 1_000, keepAlive: true }
+})
 const override = ownConfig({
   retries: 3,
   tags: ['custom'],
-  transport: { timeoutMs: 2_500 },
-});
+  transport: { timeoutMs: 2_500 }
+})
 
 const merged = combineConfig([defaults, override], {
-  strategies: { record: 'merge', array: 'concat' },
-});
+  strategies: { record: 'merge', array: 'concat' }
+})
 
 // merged is a new config; neither defaults nor override is modified.
-merged;
+merged
 // {
 //   retries: 3,
 //   tags: ['default', 'custom'],
@@ -1552,8 +1627,8 @@ merged;
 const diff = {
   retries: { before: defaults.retries, after: merged.retries },
   tags: { before: defaults.tags, after: merged.tags },
-  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },
-};
+  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }
+}
 ```
 
 ---
@@ -1563,13 +1638,13 @@ const diff = {
 ## `/function` module
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-const noop: () => undefined;
+const noop: () => undefined
 ```
 
 An empty function that always returns `undefined`, used as a default callback.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function once<T extends (...args: never[]) => unknown>(functionValue: T): T;
+function once<T extends (...args: never[]) => unknown>(functionValue: T): T
 ```
 
 Memoizes a **synchronous** function: it really runs only on the first call, and later calls return the first result directly (or rethrow the first exception; exceptions are cached too, so the body does not run again on the second call). If the wrapped function is called again **while the first call is still running** (the body calls the wrapped function itself), it throws a `TypeError` with `code: 'REENTRANT_CALL'`, which stops accidental recursion from bypassing the cache.
@@ -1577,13 +1652,13 @@ Memoizes a **synchronous** function: it really runs only on the first call, and 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 // runtime.ts: the module creates and exports exactly one wrapped function.
 export const getRuntime = once(() => {
-  const registry = buildCommandRegistry();
-  return { registry, startedAt: Date.now() };
-});
+  const registry = buildCommandRegistry()
+  return { registry, startedAt: Date.now() }
+})
 
-const first = getRuntime(); // creates the registry
-const second = getRuntime(); // returns first directly
-first === second; // true
+const first = getRuntime() // creates the registry
+const second = getRuntime() // returns first directly
+first === second // true
 ```
 
 It suits expensive, deterministic synchronous initialization inside a module, such as building a read-only registry, compiling a schema or detecting a runtime capability once. The first exception is cached forever, so do not use it when you need retry, reset, hot reload or per-request isolation.
@@ -1593,7 +1668,7 @@ Be precise about its scope: every call to `once(fn)` creates a new wrapper with 
 A `Proxy` can turn the first property access into lazy initialization or restrict access, but it provides no uniqueness by itself. Whether something is a singleton still depends on where the instance behind the Proxy is stored and how many owners it has, so there is no need to wrap the result of `once` in a Proxy to get a "real singleton".
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>;
+function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>
 ```
 
 Memoizes one **asynchronous** call: the first call starts `functionValue()`, and the wrapper keeps and returns that same Promise; every later call, whether the Promise is pending, fulfilled or rejected, gets this Promise. `functionValue()` may return a native `Promise` or a valid PromiseLike; any other value makes the shared Promise reject with a `TypeError` carrying `code: 'INVALID_ARGUMENT'`.
@@ -1601,15 +1676,12 @@ Memoizes one **asynchronous** call: the first call starts `functionValue()`, and
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 // app-config.ts: routing and telemetry both read the startup config, but the request may run only once.
 export const loadAppConfig = onceAsync(async () => {
-  const response = await fetch('/config');
-  if (!response.ok) throw new Error(`config request failed: ${response.status}`);
-  return response.json() as Promise<{ apiBaseUrl: string }>;
-});
+  const response = await fetch('/config')
+  if (!response.ok) throw new Error(`config request failed: ${response.status}`)
+  return response.json() as Promise<{ apiBaseUrl: string }>
+})
 
-const [routerConfig, telemetryConfig] = await Promise.all([
-  loadAppConfig(),
-  loadAppConfig()
-]); // both share one request
+const [routerConfig, telemetryConfig] = await Promise.all([loadAppConfig(), loadAppConfig()]) // both share one request
 ```
 
 It suits async initialization that should run only once in the life of a page or process, such as loading a startup config that never refreshes, initializing a shared SDK client, or importing and compiling the same WASM module. It solves both "do not start twice under concurrency" and "keep reusing the result afterwards".
@@ -1629,29 +1701,28 @@ The Collector is a lazy, array-only query pipeline from the package root entry:
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 // Internal composition type, not exported; import ICollector or IFieldCollector instead.
 type ICollectorActions<T, Self> = {
-  readonly result: readonly T[];
+  readonly result: readonly T[]
   fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(
     ...paths: P
-  ): IFieldCollector<T, P[number]>;
-  where(predicate: (source: T) => boolean): Self;
-  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;
-  skip(count: number): Self;
-  take(count: number): Self;
-};
+  ): IFieldCollector<T, P[number]>
+  where(predicate: (source: T) => boolean): Self
+  distinctBy<P extends IObjectPathInput<T>>(path: P): Self
+  skip(count: number): Self
+  take(count: number): Self
+}
 
 interface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}
 
-interface IFieldCollector<T, P extends IObjectPathInput<T>>
-  extends ICollectorActions<T, IFieldCollector<T, P>> {
-  like(query: string): IFieldCollector<T, P>;
-  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;
-  oneOf(
-    value: IObjectPathValue<T, P>,
-    ...values: IObjectPathValue<T, P>[]
-  ): IFieldCollector<T, P>;
+interface IFieldCollector<T, P extends IObjectPathInput<T>> extends ICollectorActions<
+  T,
+  IFieldCollector<T, P>
+> {
+  like(query: string): IFieldCollector<T, P>
+  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>
+  oneOf(value: IObjectPathValue<T, P>, ...values: IObjectPathValue<T, P>[]): IFieldCollector<T, P>
 }
 
-function collect<T>(dataSource: readonly T[]): ICollector<T>;
+function collect<T>(dataSource: readonly T[]): ICollector<T>
 ```
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
@@ -1660,9 +1731,9 @@ const collector = collect(users)
   .like(' World ')
   .distinctBy('id')
   .skip(10)
-  .take(20);
+  .take(20)
 
-const result = collector.result;
+const result = collector.result
 ```
 
 Evaluation and caching:
@@ -1691,29 +1762,29 @@ The caller keeps the input array and nested sources read-only. The Collector doe
 > This combination is for verification in this repository's tests, not an example of production code. Outside tests should prefer their test framework's fake timers.
 
 ```ts
-import { retry, withTimeout } from '@migaia/utils/promise';
-import { createManualScheduler } from '@migaia/utils/testing';
-import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
+import { retry, withTimeout } from '@migaia/utils/promise'
+import { createManualScheduler } from '@migaia/utils/testing'
+import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'
 
-const scheduler = createManualScheduler();
-const initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });
-const next = patchConfig(initial, { debug: CONFIG_DELETE });
-const publicConfig = readonlyConfig(next);
+const scheduler = createManualScheduler()
+const initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true })
+const next = patchConfig(initial, { debug: CONFIG_DELETE })
+const publicConfig = readonlyConfig(next)
 
 const request = withTimeout(
   ({ signal }) =>
     retry(
       async () => {
-        if (signal.aborted) throw signal.reason;
-        return publicConfig.endpoint;
+        if (signal.aborted) throw signal.reason
+        return publicConfig.endpoint
       },
       { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }
     ),
   { timeoutMs: 100, scheduler }
-);
+)
 
-scheduler.advance(100);
-await request.catch(() => undefined);
+scheduler.advance(100)
+await request.catch(() => undefined)
 ```
 
 `createManualScheduler()` makes time deterministic, so unit tests can assert timeout and retry behavior precisely. Timeout cancellation is cooperative: `retry` and application code must read the `signal` they are given to stop early. `ownConfig` copies and registers its input; `readonlyConfig` returns a cached object that can be read but not changed; `patchConfig` returns a new managed config, and `CONFIG_DELETE` only works in root-level patches.
@@ -1721,10 +1792,10 @@ await request.catch(() => undefined);
 ### Concurrency limit + retry + combined errors: fetch a batch and tolerate partial failure
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-import { createConcurrencyLimiter, retry } from '@migaia/utils/promise';
-import { combineErrors } from '@migaia/utils/error';
+import { createConcurrencyLimiter, retry } from '@migaia/utils/promise'
+import { combineErrors } from '@migaia/utils/error'
 
-const limiter = createConcurrencyLimiter({ concurrency: 4 });
+const limiter = createConcurrencyLimiter({ concurrency: 4 })
 const outcomes = await Promise.allSettled(
   urls.map((url) =>
     limiter.run(() =>
@@ -1734,14 +1805,14 @@ const outcomes = await Promise.allSettled(
       })
     )
   )
-);
-await limiter.dispose();
+)
+await limiter.dispose()
 
 const failed = combineErrors(
   outcomes.filter((o) => o.status === 'rejected').map((o) => (o as PromiseRejectedResult).reason),
   'some URLs failed'
-);
-if (failed) throw failed;
+)
+if (failed) throw failed
 ```
 
 `combineErrors` returns `undefined` when nothing failed, the failure itself when exactly one failed, and an `AggregateError` when several failed.
@@ -1749,28 +1820,28 @@ if (failed) throw failed;
 ### Object paths + config: write a changed nested structure back to the config root
 
 ```ts
-import { get, set } from '@migaia/utils/object';
-import { ownConfig, patchConfig } from '@migaia/utils/config';
+import { get, set } from '@migaia/utils/object'
+import { ownConfig, patchConfig } from '@migaia/utils/config'
 
-const config = ownConfig({ server: { host: 'localhost', port: 8080 } });
+const config = ownConfig({ server: { host: 'localhost', port: 8080 } })
 // patchConfig works only at the root: compute the new subtree with set() first, then patch it in as a whole
-const nextServer = set(get(config, 'server')!, 'port', 9090);
-const next = patchConfig(config, { server: nextServer });
+const nextServer = set(get(config, 'server')!, 'port', 9090)
+const next = patchConfig(config, { server: nextServer })
 ```
 
 ### One-time initialization + error identity: give an initialization failure a recognizable code
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-import { once } from '@migaia/utils/function';
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { once } from '@migaia/utils/function'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 const initOnce = once(() => {
   try {
-    return dangerousInit();
+    return dangerousInit()
   } catch (error) {
-    throw attachErrorIdentity(error as Error, { source: 'my-package', code: 'INIT_FAILED' });
+    throw attachErrorIdentity(error as Error, { source: 'my-package', code: 'INIT_FAILED' })
   }
-});
+})
 ```
 
 `once` remembers the first thrown error; every later call throws that same error object and does not initialize again.
@@ -1802,11 +1873,11 @@ console.log(jitter(60_000, 0.2, () => 0.5)) // 54000, never above the original 6
 `tryString(value)` from `/string` passes strings through unchanged and runs native `String(value)` exactly once on anything else. It returns `{ threw: false, value: string }` or `{ threw: true, error: unknown }`; a failure keeps the exact thrown value, with no fallback, no reporter call and no new error. The caller decides at its own boundary whether to report, fall back or rethrow:
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-import { tryString } from '@migaia/utils/string';
+import { tryString } from '@migaia/utils/string'
 
-const converted = tryString(value);
-if (converted.threw) throw converted.error;
-const text = converted.value;
+const converted = tryString(value)
+if (converted.threw) throw converted.error
+const text = converted.value
 ```
 
 `isNullish` recognizes only `null | undefined`; `isBlankString` only strings that are empty after `trim`. `isEmptyValue` combines the two and also treats `NaN` as empty; `0`, `0n`, `false`, arrays and objects stay real values. `isPrimitive` covers all seven JavaScript primitive types without creating an extra type tag.
@@ -1816,15 +1887,15 @@ const text = converted.value;
 `formatNumber`, `formatCurrency`, `formatPercent`, `formatInteger` and `formatCompactNumber` share one bounded cache of 64 `Intl.NumberFormat` instances. Hot loops such as tables, market data or inventory should use `createNumberFormatter(options)` so options are not parsed for every item. The caller explicitly owns every locale, currency, precision and rounding rule.
 
 ```ts
-import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';
+import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils'
 
-isEmptyValue('  '); // true; 0, false and 0n are all false
-isPrimitive(Symbol('id')); // true
-format('Stock {stock}, amount {money}', { stock: 0, money: '$12.00' });
+isEmptyValue('  ') // true; 0, false and 0n are all false
+isPrimitive(Symbol('id')) // true
+format('Stock {stock}, amount {money}', { stock: 0, money: '$12.00' })
 formatCurrency(1234.5, 'USD', {
   locales: 'en-US',
   format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-});
+})
 ```
 
 ---
@@ -1862,17 +1933,17 @@ An `IScheduler` may also provide `defer(callback): void` for jobs that should ru
 A callback or method that is not a function throws a native `TypeError` with `@migaia/utils` / `INVALID_ARGUMENT`; when reading the `defer` method itself fails, the original error is kept on `cause`. With the default `systemScheduler` and no `queueMicrotask` on the host it throws `ENV_UNSUPPORTED`; an explicitly passed manual or host clock does not need that global. Copying `systemScheduler` with spread syntax also copies its `defer`, so override `defer` too when you change how deferred jobs are delivered.
 
 ```ts
-import { deferTask } from '@migaia/utils/scheduler';
-import { createManualScheduler } from '@migaia/utils/testing';
+import { deferTask } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 
-const clock = createManualScheduler();
-let delivered = false;
+const clock = createManualScheduler()
+let delivered = false
 deferTask(clock, () => {
-  delivered = true;
-});
-console.log(delivered); // false
-clock.advance(0);
-console.log(delivered); // true
+  delivered = true
+})
+console.log(delivered) // false
+clock.advance(0)
+console.log(delivered) // true
 ```
 
 A fatal UTF-8 decoding failure uses `INVALID_ENCODING` and names UTF-8 and the byte offset in its message; Base64 failures still name Base64.
@@ -2067,3 +2138,6 @@ console.log(unwrapOr(mapped, 0), toUndefined(missing))
 // true true
 // 6 undefined
 ```
+| `detectServerRuntime` / `ServerRuntime`             | `@migaia/utils`           | Current Deno/Bun/Node classification and its constant/type domain.                                                                                                    |
+| `detectElectronProcessType` / `ElectronProcessType` | `@migaia/utils`           | Current Electron main/renderer/utility role and its domain.                                                                                                           |
+| `detectGlobalScope` / `GlobalScopeKind`             | `@migaia/utils`           | Actual browser global scope outside server runtimes and its domain.                                                                                                   |

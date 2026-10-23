@@ -1,0 +1,114 @@
+{
+  "name": "@migaia/rpc-host",
+  "version": "0.0.11",
+  "private": true,
+  "description": "RPC host with transport and feature plugins.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-host"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./probe": {
+      "types": "./dist/core/probe/index.d.ts",
+      "default": "./dist/core/probe/index.js"
+    },
+    "./stream": {
+      "types": "./dist/core/stream/index.d.ts",
+      "default": "./dist/core/stream/index.js"
+    },
+    "./adapters/memory": {
+      "types": "./dist/core/adapters/memory.d.ts",
+      "default": "./dist/core/adapters/memory.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "default": "./dist/plugin/index.js"
+    },
+    "./features": {
+      "types": "./dist/features/index.d.ts",
+      "default": "./dist/features/index.js"
+    },
+    "./features/auth": {
+      "types": "./dist/features/auth.d.ts",
+      "default": "./dist/features/auth.js"
+    },
+    "./features/chunk": {
+      "types": "./dist/features/chunk.d.ts",
+      "default": "./dist/features/chunk.js"
+    },
+    "./features/retry": {
+      "types": "./dist/features/retry.d.ts",
+      "default": "./dist/features/retry.js"
+    },
+    "./features/timeout": {
+      "types": "./dist/features/timeout.d.ts",
+      "default": "./dist/features/timeout.js"
+    },
+    "./features/typegen": {
+      "types": "./dist/features/typegen.d.ts",
+      "default": "./dist/features/typegen.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run --coverage",
+    "typecheck:core": "bun check -p tsconfig.core.json"
+  },
+  "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/supervision": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/capability": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
+    "@types/node": "24.13.2",
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*"
+  },
+  "peerDependenciesMeta": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

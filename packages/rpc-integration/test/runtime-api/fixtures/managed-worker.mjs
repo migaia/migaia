@@ -1,4 +1,5 @@
-import { createThreadPeer, readThreadBootstrap } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 import { workerData } from 'node:worker_threads'
 
 /** The original launcher nests business data inside its validated bootstrap envelope. */

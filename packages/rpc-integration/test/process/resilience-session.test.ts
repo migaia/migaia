@@ -3,14 +3,17 @@ import { createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { serveProcessSessions } from '../../../rpc-process/dist/process/plugin/serve.js'
-import { createProcessResilience } from '@migaia/rpc-process'
-import type { IProcessServeChildIngress, IProcessServeListenerIngress } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { createProcessSessionManager } from '../../../rpc-process/dist/process/resilience/session.js'
-import type { IProcessMessageChannel } from '@migaia/rpc-process'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
+import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import type {
+  IProcessServeChildIngress,
+  IProcessServeListenerIngress
+} from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessSessionManager } from '../../../rpc-plugin-process/dist/process/resilience/session.js'
+import type { IProcessMessageChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 describe('process resilience session ownership', () => {

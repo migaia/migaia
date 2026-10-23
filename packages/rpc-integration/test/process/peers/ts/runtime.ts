@@ -1,13 +1,23 @@
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { abort, codec, connect, framer, ping, type IRpcEndpoint } from '@migaia/rpc-core'
-import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'
-import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
-import { createProviderFeature } from '@migaia/rpc-core/features/provider'
-import { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'
-import { createControlFeature } from '@migaia/rpc-core/features/control'
-import { createOneWayFeature } from '@migaia/rpc-core/features/one-way'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
-import type { IRpcStreamCapabilityPort } from '@migaia/rpc-core/stream'
+import { createComposedEndpoint } from '../../../../../rpc-host/dist/core/composed.js'
+import {
+  abort,
+  codec,
+  connect,
+  framer,
+  ping,
+  type IRpcEndpoint
+} from '../../../../../rpc-host/dist/core/index.js'
+import {
+  createCanonicalChunkFeature,
+  createStreamFeature
+} from '../../../../../rpc-host/dist/core/stream/index.js'
+import { createOutboundFeature } from '../../../../../rpc-host/dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../../../rpc-host/dist/core/features/provider.js'
+import { createDiscoveryFeature } from '../../../../../rpc-host/dist/core/features/discovery.js'
+import { createControlFeature } from '../../../../../rpc-host/dist/core/features/control.js'
+import { createOneWayFeature } from '../../../../../rpc-host/dist/core/features/one-way.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
+import { type IRpcStreamCapabilityPort } from '../../../../../rpc-host/dist/core/stream/index.js'
 
 /** Build a graph entirely from public factories; contract and resource ownership stay in production. */
 export function streamRoots(capability?: IRpcStreamCapabilityPort) {
@@ -31,7 +41,7 @@ export function streamRoots(capability?: IRpcStreamCapabilityPort) {
 export async function endpointFor(
   channel: IRemoteChannel,
   id: string,
-  providerLimits?: import('@migaia/rpc-core').IRpcProviderLimits
+  providerLimits?: import('@migaia/rpc-host').IRpcProviderLimits
 ): Promise<IRemoteServeEndpoint> {
   /** Core stream and request paths share the same token graph. */
   const roots = streamRoots({ supports: () => channel.agreement.capabilities.includes('stream@1') })

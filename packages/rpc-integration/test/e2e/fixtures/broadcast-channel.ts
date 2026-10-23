@@ -1,5 +1,5 @@
-import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
-import { readEndpointDebugSnapshot } from '../../../../rpc-core/dist/core/internal/test-observer.js'
+import { createBroadcastChannelTransport } from '@migaia/rpc-plugin-browser/adapters/broadcast-channel'
+import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, installErrorGuards, terminalProviders } from './rpc.js'
 
 const errors = installErrorGuards()

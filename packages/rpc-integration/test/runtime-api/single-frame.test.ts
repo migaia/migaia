@@ -10,13 +10,13 @@ import {
 import { messageFramerV1, createStringFramer } from '@migaia/rpc-contract/framing'
 import * as framing from '@migaia/rpc-contract/framing'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
-import { RpcOutboundSender } from '../../../rpc-core/dist/core/internal/outbound-sender.js'
-import type { IRpcSelectedComponents } from '../../../rpc-core/dist/core/internal/endpoint-options.js'
+import { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/outbound-sender.js'
+import type { IRpcSelectedComponents } from '../../../rpc-host/dist/core/internal/endpoint-options.js'
 import { wrapRuntimeCarrier } from '@migaia/rpc-contract/runtime'
 import { measureRpcPhysicalFrame } from '@migaia/rpc-contract/framing'
 import { bridgeFixture } from '../bridge/fixture.js'
 import { objectFixtureEndpoint } from '../bridge/json-object-fixture.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
 
 it.each([false, true])(
   'actual JSON-RPC bridge fallback=%s refuses group without a JSON-RPC batch or member send',

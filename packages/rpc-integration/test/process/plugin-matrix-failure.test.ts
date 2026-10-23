@@ -1,19 +1,19 @@
 import { PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { serveProcessSessions } from '../../../rpc-process/dist/process/plugin/serve.js'
-import { serveRemotePlugin } from '@migaia/rpc-core/remote'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
+import { serveRemotePlugin } from '../../../rpc-host/dist/remote/serve-plugin.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import type { IProcessPendingByteConnection } from '@migaia/rpc-process'
-import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
-import { createProcessResilience } from '@migaia/rpc-process'
-import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter/internal-advanced'
-import { processSessionManager } from '../../../rpc-process/dist/process/resilience/index.js'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import type { IProcessPendingByteConnection } from '../../../rpc-plugin-process/dist/process/types.js'
+import type { IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import type { IRuntimeByteConnection } from '@migaia/rpc-host/plugin'
+import { processSessionManager } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import {
   matrixEndpoint,
   matrixFixture,
@@ -303,7 +303,8 @@ describe('real failure and rollback matrix', () => {
       let raw: Awaited<ReturnType<typeof dialProcessByteChannel>> | undefined
       try {
         raw = await dialProcessByteChannel({ address: `${test.directory}/late.sock` })
-        const { createProcessTransport } = await import('@migaia/rpc-process')
+        const { createProcessTransport } =
+          await import('../../../rpc-plugin-process/dist/process/handshake.js')
         await createProcessTransport(raw, {
           role: 'initiator',
           offer: createNativeProcessOffer({

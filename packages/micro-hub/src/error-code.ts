@@ -122,5 +122,5 @@ export const MicroHubErrorCode = {
   invalidOption: 'INVALID_OPTION'
 } as const
 
-/** Union of every `micro-frontend.hub` error code value. */
+/** Union of every `@migaia/micro-hub` error code value. */
 export type IMicroHubErrorCode = (typeof MicroHubErrorCode)[keyof typeof MicroHubErrorCode]

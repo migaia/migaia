@@ -1,11 +1,11 @@
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { createEndpoint } from '@migaia/rpc-core'
-import { codec } from '@migaia/rpc-core'
-import { framer } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
-import { abort } from '@migaia/rpc-core'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createFullEndpoint as createEndpoint } from '../../../../rpc-host/dist/core/full.js'
+import { codec } from '../../../../rpc-host/dist/core/index.js'
+import { framer } from '../../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../../rpc-host/dist/core/index.js'
+import { abort } from '../../../../rpc-host/dist/core/index.js'
 
 /** A real child endpoint serves the same middleware pipeline as its parent. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })

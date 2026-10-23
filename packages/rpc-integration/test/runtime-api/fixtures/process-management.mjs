@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import process from 'node:process'
 import { createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'
-import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
 
 /** Each invocation uses the selected runtime's original launcher and real native children. */
 const runtime = process.argv[2]

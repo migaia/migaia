@@ -9,13 +9,13 @@ import {
   isInboundNormalizedPayload,
   normalizeInboundRpcEnvelope,
   normalizeInboundRuntimeEnvelope
-} from '../../../../rpc-core/dist/core/internal/inbound-normalization.js'
+} from '../../../../rpc-host/dist/core/internal/inbound-normalization.js'
 import {
   createForwardOptions,
   isForwardedPayload,
   retainForwardOptions
-} from '../../../../rpc-core/dist/core/internal/outbound-envelope.js'
-import type { IRpcContext } from '../../../../rpc-core/dist/core/typing.js'
+} from '../../../../rpc-host/dist/core/internal/outbound-envelope.js'
+import type { IRpcContext } from '../../../../rpc-host/dist/core/typing.js'
 
 /** Original legacy grammar drives the concrete receiver operation rather than a record-mint seam. */
 function request() {

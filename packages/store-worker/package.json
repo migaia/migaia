@@ -42,7 +42,8 @@
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/rpc-contract": "workspace:*",
-    "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-host": "workspace:*",
+    "@migaia/rpc-plugin-browser": "workspace:*",
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

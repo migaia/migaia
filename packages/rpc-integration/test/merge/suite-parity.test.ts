@@ -9,13 +9,16 @@ import { parseSourceTree, type ISourceTree } from '../fixtures/source-tree.ts'
 
 /** Root used by migrated Vitest suite and source-literal scan. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-/** All six runtime owners and the private integration owner participate in the same oracle. */
+/** All eight runtime owners and the private integration owner participate in the same oracle. */
 const testOwners = [
   'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-browser',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools',
   'rpc-integration'
 ] as const
 /** Exact file ownership from the package migration; CI never depends on ignored local scratch files. */
@@ -28,161 +31,161 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-contract/test/contract/error-identity.test.ts',
   'packages/rpc-contract/test/types.test.ts': 'packages/rpc-contract/test/contract/types.test.ts',
   'packages/web-rpc/test/adapters/broadcast-channel.test.ts':
-    'packages/rpc-browser/test/browser/adapters/broadcast-channel.test.ts',
+    'packages/rpc-plugin-browser/test/browser/adapters/broadcast-channel.test.ts',
   'packages/web-rpc/test/adapters/memory.test.ts':
-    'packages/rpc-core/test/core/adapters/memory.test.ts',
+    'packages/rpc-host/test/core/adapters/memory.test.ts',
   'packages/web-rpc/test/adapters/message-port.test.ts':
-    'packages/rpc-core/test/core/adapters/message-port.test.ts',
+    'packages/rpc-host/test/core/adapters/message-port.test.ts',
   'packages/web-rpc/test/adapters/rtc-data-channel.test.ts':
-    'packages/rpc-browser/test/browser/adapters/rtc-data-channel.test.ts',
+    'packages/rpc-plugin-browser/test/browser/adapters/rtc-data-channel.test.ts',
   'packages/web-rpc/test/adapters/web-transport.test.ts':
-    'packages/rpc-browser/test/browser/adapters/web-transport.test.ts',
+    'packages/rpc-plugin-browser/test/browser/adapters/web-transport.test.ts',
   'packages/web-rpc/test/adapters/window-source-proof.test.ts':
-    'packages/rpc-browser/test/browser/adapters/window-source-proof.test.ts',
+    'packages/rpc-plugin-browser/test/browser/adapters/window-source-proof.test.ts',
   'packages/web-rpc/test/adapters/worker-lifecycle.test.ts':
-    'packages/rpc-browser/test/browser/adapters/worker-lifecycle.test.ts',
+    'packages/rpc-plugin-browser/test/browser/adapters/worker-lifecycle.test.ts',
   'packages/web-rpc/test/adapters/worker-metadata.test.ts':
-    'packages/rpc-browser/test/browser/adapters/worker-metadata.test.ts',
-  'packages/web-rpc/test/architecture.test.ts': 'packages/rpc-core/test/core/architecture.test.ts',
+    'packages/rpc-plugin-browser/test/browser/adapters/worker-metadata.test.ts',
+  'packages/web-rpc/test/architecture.test.ts': 'packages/rpc-host/test/core/architecture.test.ts',
   'packages/web-rpc/test/attachment-normalization.test.ts':
-    'packages/rpc-core/test/core/attachment-normalization.test.ts',
+    'packages/rpc-host/test/core/attachment-normalization.test.ts',
   'packages/web-rpc/test/authentication.integration.test.ts':
-    'packages/rpc-core/test/core/authentication.integration.test.ts',
+    'packages/rpc-host/test/core/authentication.integration.test.ts',
   'packages/web-rpc/test/composed-fanout-contract.test.ts':
-    'packages/rpc-core/test/core/composed-fanout-contract.test.ts',
+    'packages/rpc-host/test/core/composed-fanout-contract.test.ts',
   'packages/web-rpc/test/composed-ping-parity.test.ts':
-    'packages/rpc-core/test/core/composed-ping-parity.test.ts',
+    'packages/rpc-host/test/core/composed-ping-parity.test.ts',
   'packages/web-rpc/test/composed-receiver-identity.test.ts':
-    'packages/rpc-core/test/core/composed-receiver-identity.test.ts',
+    'packages/rpc-host/test/core/composed-receiver-identity.test.ts',
   'packages/web-rpc/test/composed-remote-cancellation.test.ts':
-    'packages/rpc-core/test/core/composed-remote-cancellation.test.ts',
+    'packages/rpc-host/test/core/composed-remote-cancellation.test.ts',
   'packages/web-rpc/test/composed-variation-capability.test.ts':
-    'packages/rpc-core/test/core/composed-variation-capability.test.ts',
+    'packages/rpc-host/test/core/composed-variation-capability.test.ts',
   'packages/web-rpc/test/construction-hooks.test.ts':
-    'packages/rpc-core/test/core/construction-hooks.test.ts',
+    'packages/rpc-host/test/core/construction-hooks.test.ts',
   'packages/web-rpc/test/contract-endpoint.test.ts':
-    'packages/rpc-core/test/core/contract-endpoint.test.ts',
+    'packages/rpc-host/test/core/contract-endpoint.test.ts',
   'packages/web-rpc/test/custom-feature.test.ts':
-    'packages/rpc-core/test/core/custom-feature.test.ts',
+    'packages/rpc-host/test/core/custom-feature.test.ts',
   'packages/web-rpc/test/discovery-attachment-boundaries.test.ts':
-    'packages/rpc-core/test/core/discovery-attachment-boundaries.test.ts',
+    'packages/rpc-host/test/core/discovery-attachment-boundaries.test.ts',
   'packages/web-rpc/test/discovery-semantic-coverage.test.ts':
-    'packages/rpc-core/test/core/discovery-semantic-coverage.test.ts',
+    'packages/rpc-host/test/core/discovery-semantic-coverage.test.ts',
   'packages/web-rpc/test/duplicate-owner-contract.test.ts':
-    'packages/rpc-core/test/core/duplicate-owner-contract.test.ts',
+    'packages/rpc-host/test/core/duplicate-owner-contract.test.ts',
   'packages/web-rpc/test/endpoint-kernel.test.ts':
-    'packages/rpc-core/test/core/endpoint-kernel.test.ts',
+    'packages/rpc-host/test/core/endpoint-kernel.test.ts',
   'packages/web-rpc/test/endpoint.observer.test.ts':
-    'packages/rpc-core/test/core/endpoint.observer.test.ts',
-  'packages/web-rpc/test/errors.test.ts': 'packages/rpc-core/test/core/errors.test.ts',
+    'packages/rpc-host/test/core/endpoint.observer.test.ts',
+  'packages/web-rpc/test/errors.test.ts': 'packages/rpc-host/test/core/errors.test.ts',
   'packages/web-rpc/test/event-subscriber-compat.test.ts':
-    'packages/rpc-core/test/core/event-subscriber-compat.test.ts',
+    'packages/rpc-host/test/core/event-subscriber-compat.test.ts',
   'packages/web-rpc/test/hardening-regressions.spec.ts':
-    'packages/rpc-core/test/core/hardening-regressions.spec.ts',
+    'packages/rpc-host/test/core/hardening-regressions.spec.ts',
   'packages/web-rpc/test/internal-ownership-boundaries.test.ts':
-    'packages/rpc-core/test/core/internal-ownership-boundaries.test.ts',
+    'packages/rpc-host/test/core/internal-ownership-boundaries.test.ts',
   'packages/web-rpc/test/internal/async-control.test.ts':
-    'packages/rpc-core/test/core/internal/async-control.test.ts',
+    'packages/rpc-host/test/core/internal/async-control.test.ts',
   'packages/web-rpc/test/internal/chunk.test.ts':
-    'packages/rpc-core/test/core/internal/chunk.test.ts',
+    'packages/rpc-host/test/core/internal/chunk.test.ts',
   'packages/web-rpc/test/internal/contract.test.ts':
-    'packages/rpc-core/test/core/internal/contract.test.ts',
+    'packages/rpc-host/test/core/internal/contract.test.ts',
   'packages/web-rpc/test/internal/discovery-registry.test.ts':
-    'packages/rpc-core/test/core/internal/discovery-registry.test.ts',
+    'packages/rpc-host/test/core/internal/discovery-registry.test.ts',
   'packages/web-rpc/test/internal/hooks.test.ts':
-    'packages/rpc-core/test/core/internal/hooks.test.ts',
-  'packages/web-rpc/test/internal/id.test.ts': 'packages/rpc-core/test/core/internal/id.test.ts',
+    'packages/rpc-host/test/core/internal/hooks.test.ts',
+  'packages/web-rpc/test/internal/id.test.ts': 'packages/rpc-host/test/core/internal/id.test.ts',
   'packages/web-rpc/test/internal/identity.test.ts':
-    'packages/rpc-core/test/core/internal/identity.test.ts',
+    'packages/rpc-host/test/core/internal/identity.test.ts',
   'packages/web-rpc/test/internal/listener-safety.test.ts':
-    'packages/rpc-core/test/core/internal/listener-safety.test.ts',
+    'packages/rpc-host/test/core/internal/listener-safety.test.ts',
   'packages/web-rpc/test/internal/message-listener-hub.test.ts':
-    'packages/rpc-core/test/core/internal/message-listener-hub.test.ts',
+    'packages/rpc-host/test/core/internal/message-listener-hub.test.ts',
   'packages/web-rpc/test/internal/operation-scope.test.ts':
-    'packages/rpc-core/test/core/internal/operation-scope.test.ts',
+    'packages/rpc-host/test/core/internal/operation-scope.test.ts',
   'packages/web-rpc/test/internal/outbound-sender.test.ts':
-    'packages/rpc-core/test/core/internal/outbound-sender.test.ts',
+    'packages/rpc-host/test/core/internal/outbound-sender.test.ts',
   'packages/web-rpc/test/internal/peers.test.ts':
-    'packages/rpc-core/test/core/internal/peers.test.ts',
+    'packages/rpc-host/test/core/internal/peers.test.ts',
   'packages/web-rpc/test/internal/pending.test.ts':
-    'packages/rpc-core/test/core/internal/pending.test.ts',
+    'packages/rpc-host/test/core/internal/pending.test.ts',
   'packages/web-rpc/test/internal/provider-admission.test.ts':
-    'packages/rpc-core/test/core/internal/provider-admission.test.ts',
+    'packages/rpc-host/test/core/internal/provider-admission.test.ts',
   'packages/web-rpc/test/internal/provider-executor-result.test.ts':
-    'packages/rpc-core/test/core/internal/provider-executor-result.test.ts',
+    'packages/rpc-host/test/core/internal/provider-executor-result.test.ts',
   'packages/web-rpc/test/internal/provider.test.ts':
-    'packages/rpc-core/test/core/internal/provider.test.ts',
+    'packages/rpc-host/test/core/internal/provider.test.ts',
   'packages/web-rpc/test/internal/replay.test.ts':
-    'packages/rpc-core/test/core/internal/replay.test.ts',
+    'packages/rpc-host/test/core/internal/replay.test.ts',
   'packages/web-rpc/test/internal/request-replay-ledger.test.ts':
-    'packages/rpc-core/test/core/internal/request-replay-ledger.test.ts',
+    'packages/rpc-host/test/core/internal/request-replay-ledger.test.ts',
   'packages/web-rpc/test/internal/resource-scope.test.ts':
-    'packages/rpc-core/test/core/internal/resource-scope.test.ts',
+    'packages/rpc-host/test/core/internal/resource-scope.test.ts',
   'packages/web-rpc/test/internal/safe-value.test.ts':
-    'packages/rpc-core/test/core/internal/safe-value.test.ts',
+    'packages/rpc-host/test/core/internal/safe-value.test.ts',
   'packages/web-rpc/test/internal/settlement.test.ts':
-    'packages/rpc-core/test/core/internal/settlement.test.ts',
+    'packages/rpc-host/test/core/internal/settlement.test.ts',
   'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts':
-    'packages/rpc-core/test/core/internal/web-rpc-plugin-host.test.ts',
+    'packages/rpc-host/test/core/internal/web-rpc-plugin-host.test.ts',
   'packages/web-rpc/test/middleware-ports.test.ts':
-    'packages/rpc-core/test/core/middleware-ports.test.ts',
+    'packages/rpc-host/test/core/middleware-ports.test.ts',
   'packages/web-rpc/test/middleware/abort.test.ts':
-    'packages/rpc-core/test/core/middleware/abort.test.ts',
+    'packages/rpc-host/test/core/middleware/abort.test.ts',
   'packages/web-rpc/test/middleware/authentication.test.ts':
-    'packages/rpc-core/test/core/middleware/authentication.test.ts',
+    'packages/rpc-host/test/core/middleware/authentication.test.ts',
   'packages/web-rpc/test/middleware/chunk.test.ts':
-    'packages/rpc-core/test/core/middleware/chunk.test.ts',
+    'packages/rpc-host/test/core/middleware/chunk.test.ts',
   'packages/web-rpc/test/middleware/connect.test.ts':
-    'packages/rpc-core/test/core/middleware/connect.test.ts',
+    'packages/rpc-host/test/core/middleware/connect.test.ts',
   'packages/web-rpc/test/middleware/contract.test.ts':
-    'packages/rpc-core/test/core/middleware/contract.test.ts',
+    'packages/rpc-host/test/core/middleware/contract.test.ts',
   'packages/web-rpc/test/middleware/feature.test.ts':
-    'packages/rpc-core/test/core/middleware/feature.test.ts',
+    'packages/rpc-host/test/core/middleware/feature.test.ts',
   'packages/web-rpc/test/middleware/hooks.test.ts':
-    'packages/rpc-core/test/core/middleware/hooks.test.ts',
+    'packages/rpc-host/test/core/middleware/hooks.test.ts',
   'packages/web-rpc/test/middleware/middleware.test.ts':
-    'packages/rpc-core/test/core/middleware/middleware.test.ts',
+    'packages/rpc-host/test/core/middleware/middleware.test.ts',
   'packages/web-rpc/test/middleware/ping.test.ts':
-    'packages/rpc-core/test/core/middleware/ping.test.ts',
+    'packages/rpc-host/test/core/middleware/ping.test.ts',
   'packages/web-rpc/test/middleware/protocol.test.ts':
-    'packages/rpc-core/test/core/middleware/protocol.test.ts',
+    'packages/rpc-host/test/core/middleware/protocol.test.ts',
   'packages/web-rpc/test/middleware/timeout.test.ts':
-    'packages/rpc-core/test/core/middleware/timeout.test.ts',
+    'packages/rpc-host/test/core/middleware/timeout.test.ts',
   'packages/web-rpc/test/middleware/uuid.test.ts':
-    'packages/rpc-core/test/core/middleware/uuid.test.ts',
+    'packages/rpc-host/test/core/middleware/uuid.test.ts',
   'packages/web-rpc/test/plugin-host/projection.test.ts':
-    'packages/rpc-core/test/core/plugin-host/projection.test.ts',
+    'packages/rpc-host/test/core/plugin-host/projection.test.ts',
   'packages/web-rpc/test/plugin-host/topology-adapter.test.ts':
-    'packages/rpc-core/test/core/plugin-host/topology-adapter.test.ts',
-  'packages/web-rpc/test/property.test.ts': 'packages/rpc-core/test/core/property.test.ts',
+    'packages/rpc-host/test/core/plugin-host/topology-adapter.test.ts',
+  'packages/web-rpc/test/property.test.ts': 'packages/rpc-host/test/core/property.test.ts',
   'packages/web-rpc/test/provider-event-delegate.test.ts':
-    'packages/rpc-core/test/core/provider-event-delegate.test.ts',
+    'packages/rpc-host/test/core/provider-event-delegate.test.ts',
   'packages/web-rpc/test/provider-production-seam.test.ts':
-    'packages/rpc-core/test/core/provider-production-seam.test.ts',
+    'packages/rpc-host/test/core/provider-production-seam.test.ts',
   'packages/web-rpc/test/root-disposal.test.ts':
-    'packages/rpc-core/test/core/root-disposal.test.ts',
+    'packages/rpc-host/test/core/root-disposal.test.ts',
   'packages/web-rpc/test/storage-v2-t53-event-trace.test.ts':
-    'packages/rpc-core/test/core/storage-v2-event-trace.test.ts',
-  'packages/web-rpc/test/time-port.test.ts': 'packages/rpc-core/test/core/time-port.test.ts',
+    'packages/rpc-host/test/core/storage-v2-event-trace.test.ts',
+  'packages/web-rpc/test/time-port.test.ts': 'packages/rpc-host/test/core/time-port.test.ts',
   'packages/web-rpc/test/topology-rollback.test.ts':
-    'packages/rpc-core/test/core/topology-rollback.test.ts',
+    'packages/rpc-host/test/core/topology-rollback.test.ts',
   'packages/web-rpc/test/transaction-contract.test.ts':
-    'packages/rpc-core/test/core/transaction-contract.test.ts',
+    'packages/rpc-host/test/core/transaction-contract.test.ts',
   'packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts':
-    'packages/rpc-core/test/core/tree-shaking/continuation-retained-graph.test.ts',
+    'packages/rpc-host/test/core/tree-shaking/continuation-retained-graph.test.ts',
   'packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts':
-    'packages/rpc-core/test/core/tree-shaking/core-retained-causal.test.ts',
+    'packages/rpc-host/test/core/tree-shaking/core-retained-causal.test.ts',
   'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts':
-    'packages/rpc-core/test/core/tree-shaking/retained-allocation-attribution.test.ts',
+    'packages/rpc-host/test/core/tree-shaking/retained-allocation-attribution.test.ts',
   'packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts':
-    'packages/rpc-core/test/core/tree-shaking/slim-attachment-hardening.test.ts',
+    'packages/rpc-host/test/core/tree-shaking/slim-attachment-hardening.test.ts',
   'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts':
-    'packages/rpc-core/test/core/tree-shaking/static-composition-contracts.test.ts',
+    'packages/rpc-host/test/core/tree-shaking/static-composition-contracts.test.ts',
   'packages/web-rpc/test/type-contract.test.ts':
-    'packages/rpc-core/test/core/type-contract.test.ts',
-  'packages/web-rpc/test/wire.test.ts': 'packages/rpc-core/test/core/wire.test.ts',
+    'packages/rpc-host/test/core/type-contract.test.ts',
+  'packages/web-rpc/test/wire.test.ts': 'packages/rpc-host/test/core/wire.test.ts',
   'packages/web-rpc/test/worker-deterministic.test.ts':
-    'packages/rpc-core/test/core/worker-deterministic.test.ts'
+    'packages/rpc-host/test/core/worker-deterministic.test.ts'
 }
 /** Repository-relative result names distinguish matching titles in different package owners. */
 const repositoryRoot = resolve(packageRoot, '../..')
@@ -404,7 +407,7 @@ describe('migrated suite parity', () => {
       )
     )
     for (const title of expected) expect(actual.get(title), title).toBe('passed')
-    // The single child collects exact current legacy files across all seven owners; package gates remain separate.
+    // The single child collects exact current legacy files across all nine owners; package gates remain separate.
   }, 300_000)
 
   it('contains no stale source or export-key literals in migrated tests', () => {

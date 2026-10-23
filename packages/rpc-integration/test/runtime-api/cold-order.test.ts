@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { deferRuntimeByteReceive as deferProcessByteReceive } from '../../../rpc-core/dist/runtime-adapter/byte/carrier.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { deferRuntimeByteReceive as deferProcessByteReceive } from '../../../rpc-host/dist/runtime-adapter/byte/carrier.js'
 import {
   createRuntimePeer,
   type IRuntimePeer
-} from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import type { IProcessByteChannel } from '../../../rpc-process/dist/process/types.js'
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 
 /** A controlled physical byte pair exposes delivery independently from write drain. */
 function bytePair(holdAccept: boolean) {

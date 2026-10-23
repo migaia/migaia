@@ -4,34 +4,40 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { serveRemotePlugin } from '@migaia/rpc-core/remote'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { RUNTIME_API_BASE_CAPABILITIES } from '../../../../rpc-core/dist/remote/runtime-api/constants.js'
-import { RpcProcessErrorCode } from '@migaia/rpc-process'
-import { createProcessError } from '../../../../rpc-process/dist/process/error.js'
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { createFirstPartyRoots } from '../../../../rpc-core/dist/core/internal/first-party-roots.js'
-import { createStreamFeature } from '@migaia/rpc-core/stream'
-import { codec } from '@migaia/rpc-core'
-import { framer } from '@migaia/rpc-core'
-import { abort } from '@migaia/rpc-core'
-import { connect } from '@migaia/rpc-core'
-import { ping } from '@migaia/rpc-core'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { serveRemotePlugin } from '../../../../rpc-host/dist/remote/serve-plugin.js'
+import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import { createProcessError } from '../../../../rpc-plugin-process/dist/process/error.js'
+import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
+import { createFirstPartyRoots } from '../../../../rpc-host/dist/core/internal/first-party-roots.js'
+import { createStreamFeature } from '../../../../rpc-host/dist/core/stream/index.js'
+import { codec } from '../../../../rpc-host/dist/core/index.js'
+import { framer } from '../../../../rpc-host/dist/core/index.js'
+import { abort } from '../../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../../rpc-host/dist/core/index.js'
+import { ping } from '../../../../rpc-host/dist/core/index.js'
 
 /** One canonical catalog fixture is shared with the real stdio and Unix clients. */
 const catalog = JSON.parse(
   readFileSync(
-    new URL('../../../../rpc-process/test/process/fixtures/host-catalog.json', import.meta.url),
+    new URL(
+      '../../../../rpc-plugin-process/test/process/fixtures/host-catalog.json',
+      import.meta.url
+    ),
     'utf8'
   )
 )
 /** The native caller observes true Host commit separately from early protocol directory readiness. */
 const readyText = JSON.parse(
   readFileSync(
-    new URL('../../../../rpc-process/test/process/fixtures/host-ready.json', import.meta.url),
+    new URL(
+      '../../../../rpc-plugin-process/test/process/fixtures/host-ready.json',
+      import.meta.url
+    ),
     'utf8'
   )
 )

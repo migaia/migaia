@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { MessageChannel } from 'node:worker_threads'
 import { encode } from 'cborg'
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import {
-  createRuntimeApiEndpoint,
   codec,
   framer,
   authentication,
@@ -12,24 +12,25 @@ import {
   hooks,
   ping,
   connect
-} from '@migaia/rpc-core'
-import { RpcProbeStageName } from '@migaia/rpc-core/probe'
-import { createNativeProcessOffer, createProcessTransport } from '@migaia/rpc-process'
+} from '../../../../rpc-host/dist/core/index.js'
+import { RpcProbeStageName } from '@migaia/rpc-host/probe'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   listenProcessByteChannel,
   dialProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
 import {
   CapabilityLevel,
   StandardCapability,
   SupervisionErrorCode,
   SUPERVISION_SOURCE
 } from '@migaia/supervision'
-import { createNodeThreadChannel } from '@migaia/rpc-threads'
+import { createNodeThreadChannel } from '../../../../rpc-plugin-thread/dist/threads/channel.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createRpcDevtools } from '@migaia/rpc-devtools'
-import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
-import { decodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'
+import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
+import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'
+import { decodeRpcDevtoolsRecord } from '@migaia/rpc-plugin-devtools/contract'
 import { fixtureAuthentication, reportFailure } from './auth.mjs'
 import { FixtureMethod, FixtureTrace, fixtureServiceId, fixtureServiceClientId } from './text.mjs'
 
@@ -71,14 +72,14 @@ export async function observedCore() {
   /** Diagnostic traffic uses its own unprobed endpoints, avoiding collector self-observation. */
   const diagnostic = new MessageChannel()
   /** One actual collector observes both direct Core endpoints in this one host. */
-  const collector = createRpcDevtools({
+  const collector = devtoolsPlugin({
     stages: RpcProbeStageName,
     capture: ['envelope', 'encoded', 'frame', 'protected', 'carrier'],
     exposeContent: false,
     maxEvents: 4096,
     maxContentBytes: 1_048_576,
     onError: reportFailure
-  })
+  }).collector
   /** Hub creates no connections; it receives only the application's actual service client. */
   const hub = createRpcDevtoolsHub({ onError: reportFailure })
   /** Successfully opened Peers retain their original close operations for final cleanup. */
@@ -295,28 +296,29 @@ export function createFixtureReporter(host) {
  * Capture every stage on an actual host while allowing its service to expose physical content.
  *
  * @param {(error: unknown) => void} report Host's original strict diagnostic reporter.
- * @returns {import('@migaia/rpc-devtools').IRpcDevtools} Independent genuine collector/probe.
+ * @returns {import('@migaia/rpc-plugin-devtools').IRpcDevtools} Independent genuine
+ *   collector/probe.
  * @throws {Error} Original public collector configuration failure.
  */
 export function createTraceCollector(report) {
-  return createRpcDevtools({
+  return devtoolsPlugin({
     stages: RpcProbeStageName,
     capture: RpcProbeStageName,
     exposeContent: true,
     maxEvents: 4096,
     maxContentBytes: 1_048_576,
     onError: report
-  })
+  }).collector
 }
 
 /**
  * Retain the real public Endpoint for explicit caller-owned trace sends on an existing Peer.
  *
  * @param {string} id Exact configured self.instanceId of this outgoing Peer.
- * @param {(endpoint: import('@migaia/rpc-core').IRpcEndpoint, peerId: string) => void} ready
+ * @param {(endpoint: import('@migaia/rpc-host').IRpcEndpoint, peerId: string) => void} ready
  *   Receives the actual completed endpoint and channel peer address.
  * @param {(error: unknown) => void} report Original host diagnostic reporter.
- * @returns {NonNullable<import('@migaia/rpc-core/remote').IRuntimePeerOptions['endpointFactory']>}
+ * @returns {NonNullable<import('@migaia/rpc-host/plugin').IRuntimePeerOptions['endpointFactory']>}
  *   Public custom assembly callback.
  * @throws {Error} Original canonical endpoint construction or readiness failure.
  */
@@ -346,7 +348,7 @@ export function traceEndpointFactory(id, ready, report) {
     await endpoint.ready
     ready(endpoint, channel.peerId)
     return {
-      endpoint: /** @type {import('@migaia/rpc-core').IRpcEndpoint} */ (
+      endpoint: /** @type {import('@migaia/rpc-host').IRpcEndpoint} */ (
         /** @type {unknown} */ (endpoint)
       ),
       oneWay: endpoint,
@@ -358,8 +360,8 @@ export function traceEndpointFactory(id, ready, report) {
 /**
  * Expose one actual collector through separate unprobed socket Peers in its native host.
  *
- * @param {import('@migaia/rpc-devtools').IRpcDevtools} collector Collector whose original service
- *   is mounted unchanged.
+ * @param {import('@migaia/rpc-plugin-devtools').IRpcDevtools} collector Collector whose original
+ *   service is mounted unchanged.
  * @param {string} host Canonical parent, child or worker name.
  * @param {(error: unknown) => void} report Original strict host reporter.
  * @returns {Promise<{ address: string; id: string; close(): Promise<void> }>} Bound listener
@@ -397,7 +399,7 @@ export async function startFixtureService(collector, host, report) {
     /**
      * Construct one genuine service Peer over this accepted native socket resource.
      *
-     * @param {import('@migaia/rpc-process').IProcessPendingByteConnection} pending Original
+     * @param {import('@migaia/rpc-plugin-process').IProcessPendingByteConnection} pending Original
      *   listener-owned pending connection.
      * @returns {Promise<void>} Resolves after the accepted Core directory is ready.
      * @throws {Error} Original authenticated accept, endpoint or directory failure.
@@ -412,9 +414,9 @@ export async function startFixtureService(collector, host, report) {
         /**
          * Use Core's source offer on the original pending socket, without a prepared-context copy.
          *
-         * @param {import('@migaia/rpc-core/remote').IRuntimePeerSourceContext} context Original
+         * @param {import('@migaia/rpc-host/plugin').IRuntimePeerSourceContext} context Original
          *   local Core proposal.
-         * @returns {Promise<import('@migaia/rpc-core/remote').IRuntimePeerSourceResult>} Actual
+         * @returns {Promise<import('@migaia/rpc-host/plugin').IRuntimePeerSourceResult>} Actual
          *   accepted channel.
          * @throws {Error} Original native authenticated handshake failure.
          */
@@ -464,7 +466,7 @@ export async function startFixtureService(collector, host, report) {
  * @param {{ address: string; id: string }} target Descriptor returned by the original listener.
  * @param {string} host Target's canonical fixture name.
  * @param {(error: unknown) => void} report Original strict parent reporter.
- * @returns {Promise<import('@migaia/rpc-core/remote').IRuntimePeer>} Actual Core Peer over the
+ * @returns {Promise<import('@migaia/rpc-host/plugin').IRuntimePeer>} Actual Core Peer over the
  *   public Process socket channel.
  * @throws {Error} Original dial, handshake, directory or endpoint failure.
  */
@@ -478,9 +480,9 @@ export async function connectFixtureService(target, host, report) {
     /**
      * Dial the published actual address and negotiate Core's original source offer.
      *
-     * @param {import('@migaia/rpc-core/remote').IRuntimePeerSourceContext} context Original local
+     * @param {import('@migaia/rpc-host/plugin').IRuntimePeerSourceContext} context Original local
      *   source identity and capabilities.
-     * @returns {Promise<import('@migaia/rpc-core/remote').IRuntimePeerSourceResult>} Actual
+     * @returns {Promise<import('@migaia/rpc-host/plugin').IRuntimePeerSourceResult>} Actual
      *   initiated Process channel.
      * @throws {Error} Original native socket or authenticated handshake failure.
      */
@@ -507,7 +509,8 @@ export async function connectFixtureService(target, host, report) {
 /**
  * Prove self-filtering with actual service traffic on an additional local observed endpoint.
  *
- * @param {import('@migaia/rpc-devtools').IRpcDevtools} collector Parent's original collector.
+ * @param {import('@migaia/rpc-plugin-devtools').IRpcDevtools} collector Parent's original
+ *   collector.
  * @param {(error: unknown) => void} report Original strict parent reporter.
  * @returns {Promise<boolean>} True only after real service traffic is absent by actual endpoint
  *   identity.
@@ -571,7 +574,7 @@ export async function proveFixtureSelfFilter(collector, report) {
 /**
  * Inspect the real live targets after their catch-up queries complete, without guessed delays.
  *
- * @param {readonly { host: string; peer: import('@migaia/rpc-core/remote').IRuntimePeer }[]} services
+ * @param {readonly { host: string; peer: import('@migaia/rpc-host/plugin').IRuntimePeer }[]} services
  *   Connected unprobed service clients.
  * @param {string} recording Parent's actual service-exported recording text.
  * @param {(error: unknown) => void} report Original strict parent reporter.

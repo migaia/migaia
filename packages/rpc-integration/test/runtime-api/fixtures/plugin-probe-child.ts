@@ -1,10 +1,10 @@
 import { parentPort } from 'node:worker_threads'
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { defineProbe, RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-core/probe'
-import type { IRpcContext } from '@migaia/rpc-core'
-import type { IRuntimeTestRegistry } from '../../../../rpc-core/test/runtime-api/fixture.js'
+import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
+import { defineProbe, RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-host/probe'
+import type { IRpcContext } from '@migaia/rpc-host'
+import type { IRuntimeTestRegistry } from '../../../../rpc-host/test/runtime-api/fixture.js'
 
 /** Native fixture diagnostics retain every error layer rather than reducing cancellation to a code. */
 function fixtureFailure(error: unknown): unknown {

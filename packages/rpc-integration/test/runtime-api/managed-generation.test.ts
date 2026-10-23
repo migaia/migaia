@@ -1,22 +1,24 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer, createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 /** Both public routes use the same genuine child fixture and original native owners. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))

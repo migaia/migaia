@@ -1190,7 +1190,7 @@ fn check_runtime_baseline(counts: &mut Counts) {
 
 /// Restored vectors call the actual initiator and physical owners; v1 describe/catalog stays retired.
 fn check_entry_vectors(root: &Path, counts: &mut Counts) {
-    use crate::json::{number, object, string};
+    use crate::json::number;
     if let Some(schema) = load(
         root,
         "../../../rpc-contract/schema/remote-contract.schema.json",
@@ -1203,55 +1203,27 @@ fn check_entry_vectors(root: &Path, counts: &mut Counts) {
     if let Some(vector) = load(root, "runtime-description.json", counts) {
         for section in ["valid", "invalid"] {
             for (index, value) in items(field(&vector, section)).iter().enumerate() {
-                let remote_id = text(field(value, "self"), "instanceId");
-                let mut accepted = crate::accept(&object(&[
-                    ("major", number(1)),
-                    ("minor", number(1)),
-                    (
-                        "capabilities",
-                        Value::Array(vec![
-                            string("runtime-api@1"),
-                            string("batch@1"),
-                            string("close@1"),
-                        ]),
-                    ),
-                ]));
-                if let Value::Object(fields) = &mut accepted {
-                    fields
-                        .iter_mut()
-                        .find(|(name, _)| name == "peer")
-                        .unwrap()
-                        .1 = object(&[("id", string(remote_id)), ("runtime", string("rust"))]);
-                }
-                let mut input = Vec::new();
-                let mut output = Vec::new();
-                let _ = write_frame(&mut input, &accepted);
-                let _ = write_frame(
-                    &mut input,
-                    &object(&[
-                        ("kind", string("response")),
-                        ("id", string("rust-describe-1")),
-                        ("ok", Value::Bool(true)),
-                        ("data", object(&[("payload", value.clone())])),
-                    ]),
-                );
-                let _ = write_frame(
-                    &mut input,
-                    &object(&[
-                        ("kind", string("response")),
-                        ("id", string("rust-echo-1")),
-                        ("ok", Value::Bool(true)),
-                        ("data", field(&crate::request(remote_id), "data").clone()),
-                    ]),
-                );
-                counts.case(
+                check_description_case(
+                    counts,
+                    value,
+                    section == "valid",
                     "runtime-description.json",
                     section,
-                    &object(&[("id", string(&index.to_string()))]),
-                    crate::initiate(&mut &input[..], &mut output, None).is_ok()
-                        == (section == "valid"),
+                    &index.to_string(),
                 );
             }
+        }
+    }
+    if let Some(vector) = load(root, "description-schema.json", counts) {
+        for case in items(field(&vector, "cases")) {
+            check_description_case(
+                counts,
+                field(case, "value"),
+                field(case, "valid") == &Value::Bool(true),
+                "description-schema.json",
+                "cases",
+                text(case, "id"),
+            );
         }
     }
     if let Some(vector) = load(root, "batch.json", counts) {
@@ -1279,6 +1251,65 @@ fn check_entry_vectors(root: &Path, counts: &mut Counts) {
             }
         }
     }
+}
+
+/// Shared directory cases traverse the actual framed initiator instead of a second schema oracle.
+fn check_description_case(
+    counts: &mut Counts,
+    value: &Value,
+    valid: bool,
+    file: &str,
+    section: &str,
+    id: &str,
+) {
+    use crate::json::{number, object, string};
+    let remote_id = text(field(value, "self"), "instanceId");
+    let mut accepted = crate::accept(&object(&[
+        ("major", number(1)),
+        ("minor", number(1)),
+        (
+            "capabilities",
+            Value::Array(vec![
+                string("runtime-api@1"),
+                string("batch@1"),
+                string("close@1"),
+            ]),
+        ),
+    ]));
+    if let Value::Object(fields) = &mut accepted {
+        fields
+            .iter_mut()
+            .find(|(name, _)| name == "peer")
+            .unwrap()
+            .1 = object(&[("id", string(remote_id)), ("runtime", string("rust"))]);
+    }
+    let mut input = Vec::new();
+    let mut output = Vec::new();
+    let _ = write_frame(&mut input, &accepted);
+    let _ = write_frame(
+        &mut input,
+        &object(&[
+            ("kind", string("response")),
+            ("id", string("rust-describe-1")),
+            ("ok", Value::Bool(true)),
+            ("data", object(&[("payload", value.clone())])),
+        ]),
+    );
+    let _ = write_frame(
+        &mut input,
+        &object(&[
+            ("kind", string("response")),
+            ("id", string("rust-echo-1")),
+            ("ok", Value::Bool(true)),
+            ("data", field(&crate::request(remote_id), "data").clone()),
+        ]),
+    );
+    counts.case(
+        file,
+        section,
+        &object(&[("id", string(id))]),
+        crate::initiate(&mut &input[..], &mut output, None).is_ok() == valid,
+    );
 }
 
 pub fn run(root: &Path) -> io::Result<()> {

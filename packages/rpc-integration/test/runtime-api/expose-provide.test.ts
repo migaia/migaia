@@ -1,21 +1,21 @@
-import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import type { IRuntimeThreadPluginOptions } from '../../../rpc-threads/dist/threads/plugin.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import type { IThreadProtocolOptions as IRuntimeThreadPluginOptions } from './fixtures/thread-protocol.js'
 import {
   runtimeSources,
   RUNTIME_API_FIXTURE_BASE_CAPABILITIES
-} from '../../../rpc-core/test/runtime-api/fixture.js'
+} from '../../../rpc-host/test/runtime-api/fixture.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { PluginHostErrorCode } from '@migaia/plugin-host'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import type { RequestReplayLedger } from '../../../rpc-core/dist/core/internal/request-replay-ledger.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
-import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import type { RequestReplayLedger } from '../../../rpc-host/dist/core/internal/request-replay-ledger.js'
+import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
 import { vi } from 'vitest'
 
 /** Each acceptance uses the original Host mutation and disposal scopes. */

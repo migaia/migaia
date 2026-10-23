@@ -4,27 +4,25 @@ import { createHmac } from 'node:crypto'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import {
-  createAdapterBindingDrain,
-  createAdapterId
-} from '@migaia/rpc-core/adapter/internal-advanced'
+import { createAdapterBindingDrain, createAdapterId } from '@migaia/rpc-host/plugin'
 import {
   createThreadSupervisor,
   type IThreadHandle,
   type IThreadSpec
 } from '@migaia/supervision/threads'
-import { type IRuntimeThreadSpawn, type INodeThreadHandle } from '@migaia/rpc-threads'
-import type { IRemoteBinding } from '@migaia/rpc-core/remote'
+import { type IRuntimeThreadSpawn } from '../../../rpc-plugin-thread/dist/threads/runtime-peer.js'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
+import type { IRemoteBinding } from '@migaia/rpc-host/plugin'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { createManagedRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/managed-peer.js'
-import { createRuntimeApiEndpoint } from '../../../rpc-core/dist/core/runtime-api-endpoint.js'
-import { createRemoteRetryPort } from '../../../rpc-core/dist/remote/retry.js'
-import type { IRemoteRetryPort } from '../../../rpc-core/dist/remote/types.js'
-import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { RUNTIME_API_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import { createManagedRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
+import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { createRemoteRetryPort } from '../../../rpc-host/dist/remote/retry.js'
+import type { IRemoteRetryPort } from '../../../rpc-host/dist/remote/types.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import {
   codec,
   framer,
@@ -34,7 +32,7 @@ import {
   authentication,
   type IRpcEndpoint,
   RpcCoreErrorCode
-} from '../../../rpc-core/dist/core/index.js'
+} from '../../../rpc-host/dist/core/index.js'
 import fixture from './fixtures/managed-binary-key.json'
 
 /** Native data/auth profile is actually configured on both independent Worker endpoint owners. */

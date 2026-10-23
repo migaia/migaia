@@ -1,6 +1,6 @@
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/bun-spawn'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 
 /** Bun's Node-compatible stdin/stdout carry the same framed channel contract. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })

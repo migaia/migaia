@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest'
 import familyConfig from '../../vitest.family.config.js'
 
 /** The package manifest is checked as a shipped consumer would resolve it. */
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-process')
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-plugin-process')
 /** The common process directory must remain free of platform imports. */
 const processSource = join(packageRoot, 'src/process')
 /** Generic resource operations stay in Core after Process-specific policy moves to its owner. */
-const sharedProcessSource = resolve(packageRoot, '../rpc-core/src/runtime-adapter')
+const sharedProcessSource = resolve(packageRoot, '../rpc-host/src/runtime-adapter')
 /** Only this file owns the physical IPC gate construction. */
 const ipcOwner = join(sharedProcessSource, 'byte/ipc-connection.ts')
 
@@ -43,27 +43,26 @@ describe('process package layering and exports', () => {
     }
     expect(manifest.exports['./process']).toBeUndefined()
     expect(manifest.exports['./contract/framing/stream']).toBeUndefined()
-    const common = await import('@migaia/rpc-process')
+    const common = await import('@migaia/rpc-plugin-process')
     const framing = await import('@migaia/rpc-contract/framing/stream')
-    expect(common.createProcessTransport).toBeTypeOf('function')
-    expect(common.createNativeProcessOffer).toBeTypeOf('function')
-    expect(common.createProcessPlugin).toBeTypeOf('function')
-    expect(common.createProcessPeer).toBeTypeOf('function')
-    expect(common.parseProcessPluginDescriptor).toBeTypeOf('function')
-    expect(common.ProcessPluginWire).toEqual({ native: 'native', jsonrpc: 'jsonrpc' })
+    expect(Object.keys(common).sort()).toEqual([
+      'RPC_PROCESS_ERROR_SOURCE',
+      'RpcProcessErrorCode',
+      'isProcessChild',
+      'processPlugin'
+    ])
     expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
   })
 
-  it('ships four symmetric factories without any retired factory alias', async () => {
+  it('ships the single process transport factory without any retired factory alias', async () => {
     /** Built subpaths are the consumer boundary; internal imports cannot hide a leaked alias. */
-    const process = await import('@migaia/rpc-process')
-    const thread = await import('@migaia/rpc-threads')
+    const process = await import('@migaia/rpc-plugin-process')
+    const thread = await import('@migaia/rpc-plugin-thread')
     for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeProcessPlugin'])
       expect(Object.hasOwn(process, name), 'retired process factory must be absent').toBe(false)
     for (const name of ['createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
       expect(Object.hasOwn(thread, name), 'retired thread factory must be absent').toBe(false)
-    expect(thread.createThreadPeer).toBeTypeOf('function')
-    expect(thread.createThreadPlugin).toBeTypeOf('function')
+    expect(process.processPlugin).toBeTypeOf('function')
   })
 
   it('keeps platform peers optional and physical IPC construction singular', () => {
@@ -79,11 +78,11 @@ describe('process package layering and exports', () => {
     expect(manifest.dependencies).toHaveProperty('@migaia/supervision')
     expect(Object.keys(manifest.peerDependencies).sort()).toEqual([
       '@migaia/rpc-contract',
-      '@migaia/rpc-core',
+      '@migaia/rpc-host',
       'electron',
       'koffi'
     ])
-    for (const peer of ['@migaia/rpc-contract', '@migaia/rpc-core']) {
+    for (const peer of ['@migaia/rpc-contract', '@migaia/rpc-host']) {
       /**
        * Source uses the workspace protocol; the packed smoke test checks the exact lockstep
        * version.
@@ -115,14 +114,20 @@ describe('process package layering and exports', () => {
       [
         '../rpc-contract/src/**/*.{ts,tsx}',
         '../rpc-contract/dist/**/*.js',
-        '../rpc-core/src/**/*.{ts,tsx}',
-        '../rpc-core/dist/**/*.js',
-        '../rpc-process/src/**/*.{ts,tsx}',
-        '../rpc-process/dist/**/*.js',
-        '../rpc-threads/src/**/*.{ts,tsx}',
-        '../rpc-threads/dist/**/*.js',
-        '../rpc-browser/src/**/*.{ts,tsx}',
-        '../rpc-browser/dist/**/*.js'
+        '../rpc-host/src/**/*.{ts,tsx}',
+        '../rpc-host/dist/**/*.js',
+        '../rpc-plugin-process/src/**/*.{ts,tsx}',
+        '../rpc-plugin-process/dist/**/*.js',
+        '../rpc-plugin-thread/src/**/*.{ts,tsx}',
+        '../rpc-plugin-thread/dist/**/*.js',
+        '../rpc-plugin-browser/src/**/*.{ts,tsx}',
+        '../rpc-plugin-browser/dist/**/*.js',
+        '../rpc-plugin-coroutines/src/**/*.{ts,tsx}',
+        '../rpc-plugin-coroutines/dist/**/*.js',
+        '../rpc-plugin-pool/src/**/*.{ts,tsx}',
+        '../rpc-plugin-pool/dist/**/*.js',
+        '../rpc-plugin-devtools/src/**/*.{ts,tsx}',
+        '../rpc-plugin-devtools/dist/**/*.js'
       ].map((pattern) => resolve(packageRoot, '../rpc-integration', pattern))
     )
   })

@@ -1,6 +1,6 @@
-import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/deno-command'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/deno-command'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 
 /** A Deno child consumes native stdio streams and a framed bootstrap. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })

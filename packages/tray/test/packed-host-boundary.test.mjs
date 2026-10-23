@@ -32,9 +32,10 @@ const packageSources = [
   ['serialize', resolve(packageDirectory, '../serialize')],
   ['supervision', resolve(packageDirectory, '../supervision')],
   ['rpc-contract', resolve(packageDirectory, '../rpc-contract')],
-  ['rpc-core', resolve(packageDirectory, '../rpc-core')],
-  ['rpc-process', resolve(packageDirectory, '../rpc-process')],
-  ['rpc-threads', resolve(packageDirectory, '../rpc-threads')],
+  ['rpc-host', resolve(packageDirectory, '../rpc-host')],
+  ['rpc-plugin-process', resolve(packageDirectory, '../rpc-plugin-process')],
+  ['rpc-plugin-thread', resolve(packageDirectory, '../rpc-plugin-thread')],
+  ['rpc-plugin-coroutines', resolve(packageDirectory, '../rpc-plugin-coroutines')],
   ['node-types', resolve(nodeTypesManifest, '..')],
   ['undici-types', resolve(undiciTypesManifest, '..')]
 ]

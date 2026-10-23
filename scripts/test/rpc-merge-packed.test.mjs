@@ -13,9 +13,19 @@ const baseline = JSON.parse(
   readFileSync(join(root, 'scripts/fixtures/public-exports.baseline.json'), 'utf8')
 ).packages
 /** Runtime artifacts after removal of the forwarding bridge package. */
-const owners = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
+const owners = [
+  'rpc-contract',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools'
+]
 const checks = [
   'five-packed-artifacts',
+  'host-entry',
   'runtime-peer-pair',
   'subpath-imports',
   'obsolete-subpaths',
@@ -39,7 +49,17 @@ const obsolete = [
   './wire',
   './middleware/protocol',
   './middleware/chunk',
-  './features/chunk',
+  './composed',
+  './client',
+  './provider',
+  './full',
+  './features/outbound',
+  './features/one-way',
+  './features/provider',
+  './features/discovery',
+  './features/control',
+  './adapters/message-port',
+  './adapters/web-worker',
   './internal/chunk-attachment'
 ]
 
@@ -63,7 +83,7 @@ function obsoleteProbe(script) {
   assert.fail('obsoleteSubpaths literal probe is missing')
 }
 
-test('packed consumer runs every preserved check against the current five owners', () => {
+test('packed consumer runs every preserved check against all current RPC owners', () => {
   const script = readFileSync(
     join(root, 'packages/rpc-integration/test/core/packed-export-smoke.mjs'),
     'utf8'
@@ -85,7 +105,7 @@ test('packed consumer runs every preserved check against the current five owners
   const subpaths = new Map(
     lines.flatMap((line) => {
       const match =
-        /^SUBPATH (@migaia\/rpc(?:-contract|-core|-process|-threads|-browser)(?:\/\S+)?) (\d+)$/.exec(
+        /^SUBPATH (@migaia\/rpc(?:-contract|-host|-plugin-process|-plugin-thread|-plugin-browser|-plugin-coroutines|-plugin-pool|-plugin-devtools)(?:\/\S+)?) (\d+)$/.exec(
           line.trim()
         )
       return match ? [[match[1], Number(match[2])]] : []
@@ -103,7 +123,8 @@ test('packed consumer runs every preserved check against the current five owners
   for (const [name, count] of expected) assert.equal(subpaths.get(name), count, name)
   assert.equal(subpaths.has('@migaia/rpc-bridge-jsonrpc'), false)
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
-  assert.ok(script.includes('@migaia/rpc-core/composed'))
+  assert.ok(script.includes('const publicRoot'))
+  assert.ok(script.includes('publicRoot.createRpcHost'))
   assert.ok(script.includes('dist/contract/'))
-  assert.ok(script.includes('@migaia/rpc-core'))
+  assert.ok(script.includes('@migaia/rpc-host'))
 })

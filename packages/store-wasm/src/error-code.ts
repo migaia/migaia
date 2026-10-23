@@ -2,8 +2,8 @@
 export const ERROR_SOURCE = 'store.wasm'
 
 /**
- * Package-owned failures paired with source `store.wasm`. Native WASM loading/trap errors
- * and complete foreign identities retain their original behavior. Code values are public API.
+ * Package-owned failures paired with source `store.wasm`. Native WASM loading/trap errors and
+ * complete foreign identities retain their original behavior. Code values are public API.
  */
 export const StoreWasmErrorCode = {
   /**

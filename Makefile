@@ -6,7 +6,7 @@ export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 
 # Publish foundations before every consumer. scripts/release-plan.mjs verifies
 # that this remains a closed, dependency-topological release set.
-RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host supervision rpc-contract rpc-core rpc-process rpc-threads tray rpc-pool rpc-browser rpc-devtools logger storage-host storage-plugin-sqlite storage-web
+RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host supervision rpc-contract rpc-host rpc-plugin-process rpc-plugin-thread rpc-plugin-coroutines tray rpc-plugin-pool rpc-plugin-browser rpc-plugin-devtools logger storage-host storage-plugin-sqlite storage-web
 # Store packages release independently from the foundation ship. `wasm` is the
 # package-owned prerequisite for store-wasm and therefore leads this plan.
 STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm micro-hub
@@ -184,7 +184,7 @@ long-test:
 	@echo "==> manual sustained RPC cell ($(LONG_MODE), $(LONG_RATE) RPS, $(LONG_SECONDS)s)"
 	@test -n "$(LONG_OUTPUT)" || { echo "Set LONG_OUTPUT to a fresh raw directory" >&2; exit 2; }
 	@test "$(LONG_SECONDS)" -ge 400 || { echo "LONG_SECONDS must be at least 400" >&2; exit 2; }
-	@node packages/rpc-browser/test/replay-window/native-long.mjs \
+	@node packages/rpc-plugin-browser/test/replay-window/native-long.mjs \
 		"$(LONG_MODE)" "$(LONG_RATE)" "$(LONG_SECONDS)" "$(LONG_OUTPUT)"
 
 ship-preflight:

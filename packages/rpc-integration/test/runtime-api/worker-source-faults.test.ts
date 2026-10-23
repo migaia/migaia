@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
-import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
-import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
+import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { nativeWorkerFor } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 /** Built public entry imports execute in a real native Worker, independently from source Vitest. */
 const entry = fileURLToPath(new URL('./fixtures/worker-source-faults.mjs', import.meta.url))

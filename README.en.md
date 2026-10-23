@@ -91,14 +91,14 @@ For a complete graceful shutdown (stop accepting requests, wait for in-flight re
 
 Not sure where to start? Begin with the problem you have:
 
-| The problem                                                                                   | Start here                                           |
-| --------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| A deploy cuts off running requests and half-written data is lost                              | [`lifecycle`](./packages/lifecycle/README.en.md)     |
-| A search box shows stale results because a slow earlier request arrived last                  | [`resource`](./packages/resource/README.en.md)       |
-| A crashing background task restarts in a tight loop and one bad config takes the machine down | [`supervision`](./packages/supervision/README.en.md) |
-| Moving work into a Worker broke cancellation and timeouts                                     | [`rpc-threads`](./packages/rpc-threads/README.en.md) |
-| A plugin fails halfway through install and nothing rolls back the ones before it              | [`plugin-host`](./packages/plugin-host/README.en.md) |
-| Several micro-frontends on one page write the same state                                      | [`micro-hub`](./packages/micro-hub/README.en.md)     |
+| The problem                                                                                   | Start here                                                       |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A deploy cuts off running requests and half-written data is lost                              | [`lifecycle`](./packages/lifecycle/README.en.md)                 |
+| A search box shows stale results because a slow earlier request arrived last                  | [`resource`](./packages/resource/README.en.md)                   |
+| A crashing background task restarts in a tight loop and one bad config takes the machine down | [`supervision`](./packages/supervision/README.en.md)             |
+| Moving work into a Worker broke cancellation and timeouts                                     | [`rpc-plugin-thread`](./packages/rpc-plugin-thread/README.en.md) |
+| A plugin fails halfway through install and nothing rolls back the ones before it              | [`plugin-host`](./packages/plugin-host/README.en.md)             |
+| Several micro-frontends on one page write the same state                                      | [`micro-hub`](./packages/micro-hub/README.en.md)                 |
 
 <details open>
 <summary><strong>Shutdown, cancellation and error tracing</strong></summary>
@@ -163,15 +163,18 @@ Not sure where to start? Begin with the problem you have:
 
 RPC (remote procedure call) lets you call a function in another thread, process or page as if it were local, while keeping timeouts, cancellation and error details.
 
-| Package                                                | What it does                                                                                                             |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| [`rpc-contract`](./packages/rpc-contract/README.en.md) | Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol. |
-| [`rpc-core`](./packages/rpc-core/README.en.md)         | Call remote functions across runtimes with timeouts, cancellation, and streaming results.                                |
-| [`rpc-threads`](./packages/rpc-threads/README.en.md)   | Move heavy computation into Workers and call, manage, and restart threads through RPC.                                   |
-| [`rpc-process`](./packages/rpc-process/README.en.md)   | Run isolated work in child processes or local services and call and manage them through RPC.                             |
-| [`rpc-pool`](./packages/rpc-pool/README.en.md)         | Distribute RPC calls across thread or process pools and queue requests within bounded limits when busy.                  |
-| [`rpc-browser`](./packages/rpc-browser/README.en.md)   | Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.                     |
-| [`rpc-devtools`](./packages/rpc-devtools/README.en.md) | Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.                          |
+Create one host with `createRpcHost`, select one transport plugin, and add optional features. That host owns connections, calls, streams, and cleanup.
+
+| Package                                                                  | What it does                                                                                                             |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| [`rpc-contract`](./packages/rpc-contract/README.en.md)                   | Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol. |
+| [`rpc-host`](./packages/rpc-host/README.en.md)                           | Call remote functions across runtimes with timeouts, cancellation, and streaming results.                                |
+| [`rpc-plugin-thread`](./packages/rpc-plugin-thread/README.en.md)         | Move heavy computation into Workers and call, manage, and restart threads through RPC.                                   |
+| [`rpc-plugin-process`](./packages/rpc-plugin-process/README.en.md)       | Run isolated work in child processes or local services and call and manage them through RPC.                             |
+| [`rpc-plugin-pool`](./packages/rpc-plugin-pool/README.en.md)             | Distribute RPC calls across thread or process pools and queue requests within bounded limits when busy.                  |
+| [`rpc-plugin-browser`](./packages/rpc-plugin-browser/README.en.md)       | Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.                     |
+| [`rpc-plugin-coroutines`](./packages/rpc-plugin-coroutines/README.en.md) | Supervise coroutine tasks in the same runtime and call them through the same host.                                       |
+| [`rpc-plugin-devtools`](./packages/rpc-plugin-devtools/README.en.md)     | Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.                          |
 
 </details>
 
@@ -191,7 +194,7 @@ The packages form layers. A higher layer may depend on a lower one, never the ot
 ```text
 Integration            micro-hub   tray
 State and storage      store-*     storage-web
-RPC                    rpc-core → rpc-threads · rpc-process · rpc-browser → rpc-pool
+RPC                    rpc-host + rpc-plugin-{process,thread,browser,coroutines,pool,devtools}
 Plugins and switches   plugin-host   capability
 Shared foundations     reactive   resource   serialize   storage-contract   supervision
                        lifecycle   event-subscriber   middleware-pipeline
@@ -204,7 +207,7 @@ Bottom                 utils   wasm
 
 | Environment   | Requirement                                                                                                                  |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Node.js       | 18 or later; `rpc-pool` needs 24 or later                                                                                    |
+| Node.js       | 18 or later; `rpc-plugin-pool` needs 24 or later                                                                             |
 | Bun, Deno     | Current stable release                                                                                                       |
 | Browsers      | Current versions of major browsers. Package READMEs list extra needs, such as cross-origin isolation for `SharedArrayBuffer` |
 | Module format | ESM only; load with `import`                                                                                                 |

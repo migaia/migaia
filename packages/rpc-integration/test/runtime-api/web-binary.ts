@@ -1,12 +1,12 @@
 import { serializeRpcError } from '@migaia/rpc-contract'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { type IThreadChannelFactory } from '../../../rpc-plugin-thread/dist/threads/types.js'
 import {
-  createThreadPeer,
-  type IThreadChannelFactory,
   type IWebThreadHandle,
   type IWebThreadLauncherOptions
-} from '@migaia/rpc-threads'
-import type { IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
-import { RUNTIME_API_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
+} from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
+import type { IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
 

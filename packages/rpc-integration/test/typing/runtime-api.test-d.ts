@@ -1,13 +1,13 @@
-import { createProcessPlugin } from '@migaia/rpc-process'
-import type { IRuntimeExpose } from '@migaia/rpc-core/remote'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import type { IRuntimeExpose } from '@migaia/rpc-host/plugin'
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { threadProtocolDefinition as createThreadPlugin } from '../runtime-api/fixtures/thread-protocol.js'
 import {
-  createThreadPeer,
-  createThreadPlugin,
   type IRuntimeSurface,
   type IRuntimeDynamicSurface,
   type IRuntimeTypedPeer
-} from '@migaia/rpc-threads'
+} from '@migaia/rpc-host/plugin'
 
 /** Real Feature output signatures supply the local, type-only exposure inventory. */
 const math = definePlugin({
@@ -170,11 +170,11 @@ const nonCallable: IRuntimeExpose<readonly [typeof math]> = 'math.version'
 void nonCallable
 
 /** Object and text overloads remain independent of the remote callable surface. */
-const overview: Promise<import('@migaia/rpc-core/remote').IRuntimeOverview> = hostA.thread!.list()
+const overview: Promise<import('@migaia/rpc-host/plugin').IRuntimeOverview> = hostA.thread!.list()
 /** A selected format returns text, rather than an erased union or application description. */
 const overviewText: Promise<string> = hostA.thread!.list({ format: 'toml' })
 /** Local Peer identity and remote connection details are typed without widening methods. */
-const detail: Promise<import('@migaia/rpc-core/remote').IRuntimeDetail> = peer.describe()
+const detail: Promise<import('@migaia/rpc-host/plugin').IRuntimeDetail> = peer.describe()
 /** All three supported formats use the same cold query surface. */
 const detailText: Promise<string> = peer.describe({ format: 'yaml' })
 // @ts-expect-error an unknown format cannot silently select a supported emitter.
@@ -187,8 +187,8 @@ void detailText
 /** Process and thread factories retain platform-specific ownership options purely in types. */
 const binaryProvide = { echo: (payload: ArrayBuffer) => payload }
 /** These declarations exercise public factories; no runtime fixture or extra provider is emitted. */
-const processBinary = import('@migaia/rpc-process').then(({ createProcessPeer }) =>
-  createProcessPeer<typeof binaryProvide>({ report: () => undefined })
+const processBinary = import('../../../rpc-plugin-process/test/protocol.ts').then(
+  ({ createProcessPeer }) => createProcessPeer<typeof binaryProvide>({ report: () => undefined })
 )
 processBinary.then((peer) => {
   // @ts-expect-error process rejects an own transfer field, including an empty list.
@@ -231,7 +231,7 @@ threadBinary.then((peer) => {
 })
 
 /** Pair inference is crossed without supplying a remote generic or any runtime type table. */
-const typedPair = import('@migaia/rpc-core/testing').then(({ createPeerPair }) =>
+const typedPair = import('../../../rpc-host/dist/testing/index.js').then(({ createPeerPair }) =>
   createPeerPair({
     a: { provide: { left: (value: string) => value.length } },
     b: { provide: { right: (value: number) => String(value) } }

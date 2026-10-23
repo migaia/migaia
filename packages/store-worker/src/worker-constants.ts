@@ -39,6 +39,9 @@ export const WorkerRpcIdentity = {
   cancel: '__worker_cancel'
 } as const
 
+/** This internal feature captures the actual Host before its borrowed Worker starts handshaking. */
+export const WorkerRpcBridgeFeatureName = 'store-worker-bridge'
+
 /** Public fallback diagnostic values declared by WorkerDiagnosticType. */
 export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType]
 /** Public copy/transfer policy values; requesting transfer is not proof that a send detached input. */

@@ -15,6 +15,12 @@ mkdirSync(join(output, 'node_modules/@migaia'), { recursive: true })
 for (const name of ['runtime.ts', 'text.ts', 'peer.mts']) {
   /** Type erasure changes no protocol behavior and requires no compiler dependency. */
   const contents = stripTypeScriptTypes(readFileSync(join(source, name), 'utf8'))
+  /** Private built owners remain anchored to the source fixture after its copy moves to tmp. */
+  const compiled = contents.replace(
+    /(\bfrom\s+)(['"])(\.\.\/[^'"]+\/dist\/[^'"]+)\2/g,
+    (_match, from, _quote, specifier) =>
+      `${from}${JSON.stringify(new URL(specifier, pathToFileURL(join(source, name))).href)}`
+  )
   /** Emitted peers retain their source-owned vector root when launched directly by fixtures. */
   const prefix =
     name === 'peer.mts'
@@ -22,15 +28,15 @@ for (const name of ['runtime.ts', 'text.ts', 'peer.mts']) {
       : ''
   writeFileSync(
     join(output, name.replace(/\.mts$/, '.mjs').replace(/\.ts$/, '.js')),
-    prefix + contents
+    prefix + compiled
   )
 }
 for (const name of [
   'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-browser',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
   'plugin-host',
   // The peer attaches its own diagnostic identity through this ordinary public dependency.
   'utils'

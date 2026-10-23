@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '@migaia/rpc-process'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
+import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '../../../rpc-plugin-process/dist/process/bootstrap.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 
 vi.mock('@migaia/utils/promise', async (original) => ({
   ...(await original<typeof import('@migaia/utils/promise')>()),

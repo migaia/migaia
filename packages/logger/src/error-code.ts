@@ -4,8 +4,8 @@ export const ERROR_SOURCE = 'logging'
 /**
  * The single declaration site for `logging` error codes.
  *
- * The pair `(source, code)` identifies package-owned failures with source `'logging'`. Throw
- * sites use these constants instead of inline values.
+ * The pair `(source, code)` identifies package-owned failures with source `'logging'`. Throw sites
+ * use these constants instead of inline values.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

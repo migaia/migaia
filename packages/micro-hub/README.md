@@ -23,7 +23,7 @@
 
 **不适用**：
 
-- iframe、Worker、跨标签页：这些是不同的 realm，用 [`@migaia/rpc-browser`](../rpc-browser/README.md)。
+- iframe、Worker、跨标签页：这些是不同的 realm，用 [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.md)。
 - 页面内单个应用自己的状态：直接用 [`@migaia/store-keyed`](../store-keyed/README.md) 或 [`@migaia/store-light`](../store-light/README.md)。
 
 ## 安装
@@ -158,7 +158,7 @@ class CheckoutElement extends HTMLElement {
 
 ## 错误
 
-所有错误带 `source: 'micro-frontend.hub'` 和 `code`（`MicroHubErrorCode`）：`HUB_ALREADY_CREATED`、`HUB_NOT_CREATED`、`APP_ALREADY_CONNECTED`、`APP_DISCONNECTED`、`PLUGIN_MISSING`、`CONTRACT_VERSION_MISMATCH`、`CONTRACT_OWNED`、`WRITE_DENIED`、`EMIT_DENIED`、`COMMAND_ASYNC`、`HANDLER_DUPLICATED`、`OWNER_ABSENT`、`OWNER_TIMEOUT`、`OWNER_GONE`、`INVALID_OPTION`。每个码的触发条件与处理方式见 [USEGUIDE](./USEGUIDE.md#错误码)。
+所有错误带 `source: '@migaia/micro-hub'` 和 `code`（`MicroHubErrorCode`）：`HUB_ALREADY_CREATED`、`HUB_NOT_CREATED`、`APP_ALREADY_CONNECTED`、`APP_DISCONNECTED`、`PLUGIN_MISSING`、`CONTRACT_VERSION_MISMATCH`、`CONTRACT_OWNED`、`WRITE_DENIED`、`EMIT_DENIED`、`COMMAND_ASYNC`、`HANDLER_DUPLICATED`、`OWNER_ABSENT`、`OWNER_TIMEOUT`、`OWNER_GONE`、`INVALID_OPTION`。每个码的触发条件与处理方式见 [USEGUIDE](./USEGUIDE.md#错误码)。
 
 需要按错误分支时，比较 `error.source === MICRO_HUB_SOURCE` 和 `error.code`，不要匹配消息文字。`MicroHubErrorText` 导出全部消息文字，测试或日志需要核对原文时引用它。
 
@@ -172,4 +172,4 @@ listener 和订阅回调抛出的错误不会打断其它 listener，也不会�
 | [`@migaia/event-subscriber`](../event-subscriber/README.md) | 事件通道与请求 handler 选择 |
 | [`@migaia/plugin-host`](../plugin-host/README.md) | 能力插件与每个应用的安装、卸载 |
 | [`@migaia/store-persist`](../store-persist/README.md) | 持久化防抖、版本与 hydrate 竞态 |
-| [`@migaia/rpc-browser`](../rpc-browser/README.md) | iframe / Worker 等跨 realm 通信 |
+| [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.md) | iframe / Worker 等跨 realm 通信 |

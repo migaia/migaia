@@ -1,8 +1,8 @@
-import { readThreadBootstrap } from '@migaia/rpc-threads'
+import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 /** Concrete ESM fixture mirrors web-binary-worker.ts for runtimes requiring emitted sources. */
-import { createEventTargetMessageResource } from '@migaia/rpc-core/adapter/internal-advanced'
+import { createEventTargetMessageResource } from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { webBinaryEndpoint } from './web-binary-endpoint-esm.mjs'
 

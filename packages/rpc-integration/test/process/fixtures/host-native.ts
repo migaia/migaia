@@ -1,33 +1,36 @@
-import type { IRemoteChannel } from '@migaia/rpc-core/remote'
+import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../../rpc-process/dist/process/offer.js'
-import { createProcessPeer } from '@migaia/rpc-process'
-import { RUNTIME_API_BASE_CAPABILITIES } from '../../../../rpc-core/dist/remote/runtime-api/constants.js'
-import type { IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
-import type { IRemoteHostCatalog } from '@migaia/rpc-core/remote'
-import type { IRemoteEndpointFactory } from '@migaia/rpc-core/remote'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { dialProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
+import type { IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
+import type { IRemoteHostCatalog } from '@migaia/rpc-host/plugin'
+import type { IRemoteEndpointFactory } from '@migaia/rpc-host/plugin'
 import { nativeEndpoint } from './native-runtime.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import type { IRuntimeProcessPluginOptions } from '@migaia/rpc-process'
-import { runtimeTestHost } from '../../../../rpc-core/test/runtime-api/fixture.js'
-import { createProcessError } from '../../../../rpc-process/dist/process/error.js'
-import { RpcProcessErrorCode } from '@migaia/rpc-process'
+import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { type IRuntimeProcessPluginOptions } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { runtimeTestHost } from '../../../../rpc-host/test/runtime-api/fixture.js'
+import { createProcessError } from '../../../../rpc-plugin-process/dist/process/error.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
 import {
   readRuntimeLaunchContext,
   withRuntimeLaunchContext
-} from '../../../../rpc-core/dist/remote/runtime-api/launch-context.js'
+} from '../../../../rpc-host/dist/remote/runtime-api/launch-context.js'
 
 /** The real peer's contract is frozen in one data fixture rather than duplicated per transport. */
 export const nativeHostCatalog = JSON.parse(
   readFileSync(
-    new URL('../../../../rpc-process/test/process/fixtures/host-catalog.json', import.meta.url),
+    new URL(
+      '../../../../rpc-plugin-process/test/process/fixtures/host-catalog.json',
+      import.meta.url
+    ),
     'utf8'
   )
 ) as IRemoteHostCatalog
@@ -43,7 +46,10 @@ export const nativeHostToken = 'host-fixture-secret'
 /** Actual child Host commit is independent of its earlier bidirectional directory response. */
 const readyText = JSON.parse(
   readFileSync(
-    new URL('../../../../rpc-process/test/process/fixtures/host-ready.json', import.meta.url),
+    new URL(
+      '../../../../rpc-plugin-process/test/process/fixtures/host-ready.json',
+      import.meta.url
+    ),
     'utf8'
   )
 ) as { committed: string }

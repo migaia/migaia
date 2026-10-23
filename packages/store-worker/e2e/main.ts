@@ -4,7 +4,9 @@ declare global {
   interface Window {
     runStoreWorkerScenario(): Promise<number>
     runStoreWorkerTimeoutScenario(): Promise<unknown>
-    runStoreWorkerTransferScenario(): Promise<readonly number[]>
+    runStoreWorkerTransferScenario(): Promise<
+      readonly [string | undefined, string | undefined, number]
+    >
     runStoreWorkerAbortScenario(): Promise<unknown>
     runStoreWorkerErrorScenario(): Promise<readonly IWorkerErrorSummary[]>
     runStoreWorkerRequestOptionsScenario(): Promise<readonly number[]>
@@ -51,8 +53,16 @@ window.runStoreWorkerTransferScenario = async () => {
   const adapter = new WorkerAdapter(worker)
   const buffer = new Uint8Array([1, 2, 3, 4]).buffer
   try {
-    const size = await adapter.request<ArrayBuffer, number>(buffer, { transfer: [buffer] })
-    return [size, buffer.byteLength]
+    /** Explicit unsigned transfer is rejected by the canonical capability owner before detachment. */
+    let failure: unknown
+    try {
+      await adapter.request<ArrayBuffer, number>(buffer, { transfer: [buffer] })
+    } catch (error) {
+      failure = error
+    }
+    /** The browser projects the same actual native rejection without serializing Error instances. */
+    const identity = failure as { source?: string; code?: string } | undefined
+    return [identity?.source, identity?.code, buffer.byteLength] as const
   } finally {
     await adapter.dispose()
     worker.terminate()

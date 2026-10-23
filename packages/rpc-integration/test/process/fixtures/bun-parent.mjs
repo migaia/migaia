@@ -1,10 +1,10 @@
-import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
+import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/bun-socket'
+} from '@migaia/rpc-plugin-process/adapters/bun-socket'
 
 /** This executable probe runs both Bun's child and loopback socket paths. */
 const token = 'bun-bootstrap-token'

@@ -1,15 +1,13 @@
-import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
+import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import {
-  createProcessPeer,
-  createProcessTransport,
-  createNativeProcessOffer
-} from '@migaia/rpc-process'
-import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 it('Deno explicit source does not require or prompt for discovery env permission', () => {
   /** Actual Deno executes without allow-env; imported modules and local Feature business run first. */

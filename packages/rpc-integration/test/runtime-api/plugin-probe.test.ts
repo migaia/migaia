@@ -5,16 +5,17 @@ import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { deferred } from '@migaia/utils/promise'
-import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
-import { defineProbe, RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-core/probe'
-import { createProcessPlugin, createProcessTransport } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+import { defineProbe, RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-host/probe'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import type { ISpawnProcessPluginDeployment } from '../../../rpc-process/dist/process/plugin/types.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import type { ISpawnProcessPluginDeployment } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { coroutineAbort, coroutineTestHost } from './fixtures/coroutine.js'
 
 /** Native fixtures load public built entries independently from the parent test realm. */
@@ -148,9 +149,9 @@ for (const family of ['process', 'thread', 'coroutine'] as const) {
           await host.use(createProcessPlugin({ ...common, spawn }))
         } else {
           await host.use(
-            createCoroutinePlugin({
+            coroutinePlugin({
               ...common,
-              task: async (context) => {
+              spawn: async (context) => {
                 /** Each task owns an independent connected Host, matching native child construction. */
                 const child = coroutineTestHost()
                 /** Child probe counters use a distinct observer even though the realm is shared. */
@@ -186,9 +187,9 @@ for (const family of ['process', 'thread', 'coroutine'] as const) {
                     })
                   )
                   await child.use(
-                    createCoroutinePlugin({
+                    coroutinePlugin({
                       name: 'bridge',
-                      connect: context.connect,
+                      connectToParent: context.connect,
                       expose: ['service'],
                       probe: childProbe,
                       report: () => undefined

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import * as runtimeOutlet from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import * as runtimeOutlet from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it('one original outlet publisher snapshots listeners and closes bounded watch iterators', async () => {
   /** Real Host registrations mint the publisher; structural facades cannot replace its ownership. */

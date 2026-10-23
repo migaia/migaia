@@ -186,3 +186,6 @@ export function createJsonRpcFrameDecoder(): IJsonRpcFrameDecoder {
     }
   }
 }
+
+export * from './jsonrpc-profile.js'
+export { checkJsonRpcDescription } from './jsonrpc-description.js'

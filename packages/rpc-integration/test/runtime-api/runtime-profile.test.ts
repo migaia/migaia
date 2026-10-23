@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { it } from 'vitest'
 import * as contract from '@migaia/rpc-contract/runtime'
-import { RpcError, RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
+import { RpcError, RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 import { serializeRpcError } from '@migaia/rpc-contract'
-import { RpcCoreErrorText } from '../../../rpc-core/dist/core/error-text.js'
+import { RpcCoreErrorText } from '../../../rpc-host/dist/core/error-text.js'
 
 it('failed read-only lookup returns an exact same-task terminal error without fabricating an outcome', () => {
   /** The original error chain is serialized by the existing package boundary owner. */

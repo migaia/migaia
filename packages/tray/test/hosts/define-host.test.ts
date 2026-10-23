@@ -39,9 +39,7 @@ describe('instance definitions', () => {
   ])('rejects invalid host input %# with the Tray classification', (override) => {
     expect(() =>
       defineTrayHost({ name: 'bad', plugins, exposes: [], ...override } as never)
-    ).toThrowError(
-      expect.objectContaining({ source: 'tray', code: TrayErrorCode.hostInvalid })
-    )
+    ).toThrowError(expect.objectContaining({ source: 'tray', code: TrayErrorCode.hostInvalid }))
   })
 
   it.each(['trayChild', 'trayClient', 'trayRelay'])('rejects reserved expose %s', (name) => {

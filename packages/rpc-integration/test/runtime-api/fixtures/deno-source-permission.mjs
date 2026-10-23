@@ -1,11 +1,11 @@
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPeer } from '@migaia/rpc-process'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createMemoryTransportPair } from '../../../../rpc-host/dist/core/adapters/memory.js'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { registerBatchAgreement } from '../../../../rpc-core/dist/core/internal/batch-frame.js'
+import { registerBatchAgreement } from '../../../../rpc-host/dist/core/internal/batch-frame.js'
 
 /** Ordinary managed Feature business runs before the actual no-env source admission check. */
 const host = defineHost({

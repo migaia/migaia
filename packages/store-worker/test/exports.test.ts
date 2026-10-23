@@ -1,8 +1,14 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it } from 'vitest'
+import { MessageChannel } from 'node:worker_threads'
+import {
+  readRuntimeCarrier,
+  RpcRuntimeKind,
+  rpcMessageCapabilityControl,
+  type IRpcRuntimeEnvelope
+} from '@migaia/rpc-contract/runtime'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import { isRpcRemoteError, type IRpcEndpoint } from '@migaia/rpc-core'
 import { WorkerAdapter, createWorkerHandler, workerComputed } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
@@ -80,8 +86,7 @@ function installLinkedSerializeWorkerHandler(
 }
 
 /** Minimal endpoint double — `toManagedRpcHandler` only ever calls `.dispose()`. */
-const mockEndpoint = (dispose: () => Promise<void>): IRpcEndpoint<'worker', 'automatic', false> =>
-  ({ dispose }) as unknown as IRpcEndpoint<'worker', 'automatic', false>
+const mockEndpoint = (dispose: () => Promise<void>) => ({ dispose })
 
 describe('store-worker exports', () => {
   it('exports only the canonical byte ownership vocabulary', () => {
@@ -115,25 +120,14 @@ describe('store-worker exports', () => {
       ).resolves.toEqual(['reply:two', 'reply:three'])
       const received = await adapter.request('failure').catch((error: unknown) => error)
       expect(received).toBeInstanceOf(Error)
-      expect(isRpcRemoteError(received)).toBe(true)
       expect(received).toMatchObject({
-        name: 'RpcRemoteError',
-        message: 'Provider failed',
-        source: 'rpc.endpoint',
-        code: 'INTERNAL',
-        cause: expect.any(Error)
-      })
-      expect((received as Error).stack).not.toHaveLength(0)
-      /** Preserves the reconstructed native single failure beneath the canonical remote outer. */
-      const cause = (received as Error & { cause?: unknown }).cause
-      expect(cause).toBeInstanceOf(Error)
-      expect(cause).toMatchObject({
         name: providerFailure.name,
         message: providerFailure.message,
         source: 'unknown',
         code: 'UNKNOWN'
       })
-      expect((cause as Error).stack).toBe(providerFailure.stack)
+      expect((received as Error).stack).not.toHaveLength(0)
+      expect((received as Error).stack).toBe(providerFailure.stack)
     } finally {
       await adapter.dispose()
     }
@@ -149,28 +143,17 @@ describe('store-worker exports', () => {
     const adapter = new WorkerAdapter(port)
     try {
       const received = await adapter.request('nested-error').catch((error: unknown) => error)
-      expect(received).toBeInstanceOf(Error)
-      expect(isRpcRemoteError(received)).toBe(true)
+      expect(received).toBeInstanceOf(TypeError)
       expect(received).toMatchObject({
-        name: 'RpcRemoteError',
-        message: 'Provider failed',
-        source: 'rpc.endpoint',
-        code: 'INTERNAL',
-        cause: expect.any(TypeError)
-      })
-      expect((received as Error).stack).not.toHaveLength(0)
-      /** Preserves the reconstructed primary native failure beneath the canonical remote outer. */
-      const cause = (received as Error & { cause?: unknown }).cause
-      expect(cause).toBeInstanceOf(TypeError)
-      expect(cause).toMatchObject({
         name: primary.name,
         message: primary.message,
         source: 'unknown',
         code: 'UNKNOWN'
       })
-      expect((cause as Error).stack).toBe(primary.stack)
-      /** Preserves the second native failure in the reconstructed nested causal chain. */
-      const nestedCause = (cause as Error & { cause?: unknown }).cause
+      expect((received as Error).stack).not.toHaveLength(0)
+      expect((received as Error).stack).toBe(primary.stack)
+      /** Native runtime completion retains the original primary directly and its complete cause. */
+      const nestedCause = (received as Error & { cause?: unknown }).cause
       expect(nestedCause).toBeInstanceOf(RangeError)
       expect(nestedCause).toMatchObject({
         name: nested.name,
@@ -219,55 +202,108 @@ describe('store-worker exports', () => {
     await adapter.dispose()
   })
 
-  it('completes one-way worker notification after synchronous transfer delivery and preserves send failures', async () => {
-    type IListener = (event: MessageEvent<unknown>) => void
-    const clientListeners = new Set<IListener>()
-    const workerListeners = new Set<IListener>()
-    const transfers: Array<readonly Transferable[] | undefined> = []
+  it('rejects unsigned transfer without detaching and preserves native one-way completion and send failure', async () => {
+    /** Native ports retain real structured-clone and physical-send behavior. */
+    const channel = new MessageChannel()
+    /** Actual client posts distinguish rejected admission from any physical business emission. */
+    const clientPosts: unknown[] = []
+    /** A successful one-way provider must emit no response through its actual native port. */
+    const workerPosts: unknown[] = []
+    /** The original native failure must remain the direct cause of the physical send rejection. */
     let postFailure: Error | undefined
+    /** Only the native post is decorated; listener and transfer ownership stay with these ports. */
     const clientPort = {
       postMessage(message: unknown, transfer?: readonly Transferable[]): void {
         if (postFailure) throw postFailure
-        transfers.push(transfer)
-        for (const listener of workerListeners) listener({ data: message } as MessageEvent<unknown>)
+        clientPosts.push(message)
+        channel.port1.postMessage(
+          message,
+          transfer as Parameters<typeof channel.port1.postMessage>[1]
+        )
       },
-      addEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
-        if (type === 'message') clientListeners.add(listener)
+      addEventListener(type: string, listener: EventListener): void {
+        channel.port1.addEventListener(type, listener)
       },
-      removeEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
-        if (type === 'message') clientListeners.delete(listener)
+      removeEventListener(type: string, listener: EventListener): void {
+        channel.port1.removeEventListener(type, listener)
       }
     }
+    /** The provider uses its own real native port, rather than a synchronous message simulation. */
     const workerPort = {
-      postMessage(message: unknown): void {
-        for (const listener of clientListeners) listener({ data: message } as MessageEvent<unknown>)
+      postMessage(message: unknown, transfer?: readonly Transferable[]): void {
+        workerPosts.push(message)
+        channel.port2.postMessage(
+          message,
+          transfer as Parameters<typeof channel.port2.postMessage>[1]
+        )
       },
-      addEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
-        if (type === 'message') workerListeners.add(listener)
+      addEventListener(type: string, listener: EventListener): void {
+        channel.port2.addEventListener(type, listener)
       },
-      removeEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
-        if (type === 'message') workerListeners.delete(listener)
+      removeEventListener(type: string, listener: EventListener): void {
+        channel.port2.removeEventListener(type, listener)
       }
     }
-    const worker = await createWorkerContractEndpoint(workerPort, {
-      id: 'worker',
-      targetId: 'main'
+    channel.port1.start()
+    channel.port2.start()
+    /** Holding business completion must not hold the notification's physical send Promise. */
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
     })
+    /** Native delivery is observed independently from the caller's physical completion. */
+    let entered!: () => void
+    const entering = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    /** Provider input is the observable business boundary for both rejection and actual delivery. */
     const received: unknown[] = []
-    worker.onRequest('notice', (payload) => {
-      received.push(payload)
-    })
-    const client = await createWorkerContractEndpoint(clientPort)
+    /** Both original handshake sides start together with providers registered in local setup. */
+    const [client, worker] = await Promise.all([
+      createWorkerContractEndpoint(clientPort),
+      createWorkerContractEndpoint(workerPort, { id: 'worker', targetId: 'main' }, (endpoint) => {
+        endpoint.onRequest('call', (payload) => payload)
+        return endpoint
+      })
+    ])
     const transferred = new ArrayBuffer(8)
     try {
-      await client.notify({ transferred }, 'notice', { transfer: [transferred] })
-      expect(received).toEqual([{ transferred: expect.any(ArrayBuffer) }])
-      expect(transfers.some((transfer) => transfer?.[0] === transferred)).toBe(true)
+      /** This actual round trip completes negotiation before physical-send accounting begins. */
+      await expect(client.request('ready')).resolves.toBe('ready')
+      /** Later registrations extend the same real Host provider rather than a second endpoint. */
+      worker.onRequest('notice', async (payload) => {
+        received.push(payload)
+        entered()
+        await held
+      })
+      const sentBeforeTransfer = clientPosts.length
+      await expect(
+        client.notify({ transferred }, 'notice', { transfer: [transferred] })
+      ).rejects.toMatchObject({
+        source: 'rpc.endpoint',
+        code: 'CAPABILITY_UNSUPPORTED'
+      })
+      expect(transferred.byteLength).toBe(8)
+      expect(received).toEqual([])
+      expect(clientPosts).toHaveLength(sentBeforeTransfer)
+      const workerPostsBeforeNotice = workerPosts.length
+      await client.notify('sent', 'notice')
+      await entering
+      expect(received).toEqual(['sent'])
+      expect(workerPosts).toHaveLength(workerPostsBeforeNotice)
+      release()
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      expect(workerPosts).toHaveLength(workerPostsBeforeNotice)
       postFailure = new Error('worker post failure')
       const failure = await client.notify('fails', 'notice').catch((error: unknown) => error)
       expect(failure).toMatchObject({ cause: postFailure })
+      expect((failure as { cause?: unknown }).cause).toBe(postFailure)
     } finally {
+      release()
+      postFailure = undefined
       await Promise.all([client.close(), worker.close()])
+      channel.port1.close()
+      channel.port2.close()
     }
   })
 
@@ -355,11 +391,17 @@ describe('store-worker exports', () => {
   })
 
   it('settles a close-before-ready stream without sending a worker frame', async () => {
+    /** Initial negotiation is distinct from the original zero-business-send guarantee. */
+    const frames: unknown[] = []
     let sends = 0
     const worker = workerParser({
       worker: {
-        postMessage: () => {
-          sends++
+        postMessage: (message) => {
+          frames.push(message)
+          /** Only actual business invocation carriers count as the cancelled worker request. */
+          const selected = readRuntimeCarrier(message)
+          if (selected && (selected.frame as IRpcRuntimeEnvelope).kind === RpcRuntimeKind.call)
+            sends++
         },
         addEventListener: () => undefined,
         removeEventListener: () => undefined
@@ -376,6 +418,7 @@ describe('store-worker exports', () => {
     await expect(pending).rejects.toMatchObject({ name: 'RpcLifecycleError' })
     await firstDispose
     expect(sends).toBe(0)
+    expect(frames).toEqual([{ kind: rpcMessageCapabilityControl.ready }])
   })
   it('rejects null options at worker entry points with a tagged configuration error', () => {
     expect(() => new WorkerAdapter(fakePort(), null as never)).toThrow(
@@ -482,7 +525,7 @@ describe('store-worker exports', () => {
   it('close() marks disposed and blocks new messages without disposing the endpoint', async () => {
     let disposeCalls = 0
     const delivered: unknown[] = []
-    const handler = toManagedRpcHandler<'worker'>(
+    const handler = toManagedRpcHandler(
       Promise.resolve(
         mockEndpoint(async () => {
           disposeCalls += 1
@@ -499,7 +542,7 @@ describe('store-worker exports', () => {
 
   it('dispose() closes first, awaits endpoint.dispose(), and reuses the same Promise', async () => {
     let disposeCalls = 0
-    const handler = toManagedRpcHandler<'worker'>(
+    const handler = toManagedRpcHandler(
       Promise.resolve(
         mockEndpoint(async () => {
           disposeCalls += 1
@@ -517,7 +560,7 @@ describe('store-worker exports', () => {
 
   it('dispose() propagates endpoint cleanup errors instead of swallowing them', async () => {
     const cleanupError = new Error('endpoint dispose failed')
-    const handler = toManagedRpcHandler<'worker'>(
+    const handler = toManagedRpcHandler(
       Promise.resolve(
         mockEndpoint(async () => {
           throw cleanupError
@@ -530,12 +573,12 @@ describe('store-worker exports', () => {
   })
 
   it('close rejects late messages while an already-admitted dispatch drains', async () => {
-    let resolveEndpoint!: (endpoint: IRpcEndpoint<'worker', 'automatic', false>) => void
-    const endpoint = new Promise<IRpcEndpoint<'worker', 'automatic', false>>((resolve) => {
+    let resolveEndpoint!: (endpoint: ReturnType<typeof mockEndpoint>) => void
+    const endpoint = new Promise<ReturnType<typeof mockEndpoint>>((resolve) => {
       resolveEndpoint = resolve
     })
     const delivered: unknown[] = []
-    const handler = toManagedRpcHandler<'worker'>(endpoint, (message) => delivered.push(message))
+    const handler = toManagedRpcHandler(endpoint, (message) => delivered.push(message))
     const admitted = handler('admitted')
     expect(handler.pendingCount).toBe(1)
 
@@ -550,13 +593,13 @@ describe('store-worker exports', () => {
   })
 
   it('dispose races an admitted dispatch without duplicate cleanup or leaked pending count', async () => {
-    let resolveEndpoint!: (endpoint: IRpcEndpoint<'worker', 'automatic', false>) => void
-    const endpoint = new Promise<IRpcEndpoint<'worker', 'automatic', false>>((resolve) => {
+    let resolveEndpoint!: (endpoint: ReturnType<typeof mockEndpoint>) => void
+    const endpoint = new Promise<ReturnType<typeof mockEndpoint>>((resolve) => {
       resolveEndpoint = resolve
     })
     let disposeCalls = 0
     const delivered: unknown[] = []
-    const handler = toManagedRpcHandler<'worker'>(endpoint, (message) => delivered.push(message))
+    const handler = toManagedRpcHandler(endpoint, (message) => delivered.push(message))
     const admitted = handler('admitted')
     const firstDispose = handler.dispose()
     expect(handler.dispose()).toBe(firstDispose)

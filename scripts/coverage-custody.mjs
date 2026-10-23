@@ -70,10 +70,13 @@ export const RPC_COVERAGE_FAMILY = Object.freeze({
   deletedOwners: Object.freeze(['rpc']),
   runtimeOwners: Object.freeze([
     'rpc-contract',
-    'rpc-core',
-    'rpc-process',
-    'rpc-threads',
-    'rpc-browser'
+    'rpc-host',
+    'rpc-plugin-process',
+    'rpc-plugin-thread',
+    'rpc-plugin-browser',
+    'rpc-plugin-coroutines',
+    'rpc-plugin-pool',
+    'rpc-plugin-devtools'
   ])
 })
 

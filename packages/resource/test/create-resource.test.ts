@@ -111,9 +111,7 @@ describe('createResource', () => {
         },
         { runtime: createRuntime() }
       )
-    ).toThrowError(
-      expect.objectContaining({ code: 'RESOURCE_SETUP_INVALID', source: 'resource' })
-    )
+    ).toThrowError(expect.objectContaining({ code: 'RESOURCE_SETUP_INVALID', source: 'resource' }))
     expect(cleanup).toHaveBeenCalledOnce()
   })
 

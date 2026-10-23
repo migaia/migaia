@@ -4,13 +4,13 @@ import { normalizeRpcEnvelope, RpcRouteProfile } from '@migaia/rpc-contract'
 import {
   abort,
   connect,
-  createEndpoint,
   hooks,
   ping,
   type IRpcHookEvent,
   type IRpcTransport
-} from '@migaia/rpc-core'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+} from '../../../../../rpc-host/dist/core/index.js'
+import { createFullEndpoint as createEndpoint } from '../../../../../rpc-host/dist/core/full.js'
+import { createMemoryTransportPair } from '../../../../../rpc-host/dist/core/adapters/memory.js'
 
 /** Published controls drive production variation dispatch, never a local action-name switch oracle. */
 type IControlVector = { id: string; variation: string; payload: unknown; action: string }

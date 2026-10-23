@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { randomUUID } from 'node:crypto'
 import { it } from 'vitest'
-import { connected } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { readRuntimePeerEndpoint } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import type { ProviderRegistry } from '../../../rpc-core/dist/core/internal/provider.js'
-import { RpcSerializationError } from '../../../rpc-core/dist/core/errors.js'
+import { connected } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimePeerEndpoint } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import type { ProviderRegistry } from '../../../rpc-host/dist/core/internal/provider.js'
+import { RpcSerializationError } from '../../../rpc-host/dist/core/errors.js'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import vectors from '../../schema/vectors/runtime-api.json'
 import {
@@ -20,7 +20,7 @@ import {
   createRuntimeRequestOutboundEnvelope,
   isRuntimeOutboundEnvelope,
   isOutboundEnvelope
-} from '../../../rpc-core/dist/core/internal/outbound-envelope.js'
+} from '../../../rpc-host/dist/core/internal/outbound-envelope.js'
 
 /** Independent native execution counts delivered facades without mocking canonical dispatch. */
 const execute = promisify(execFile)

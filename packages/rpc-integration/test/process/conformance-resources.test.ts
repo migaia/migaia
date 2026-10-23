@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { describe, expect, it, beforeAll, vi } from 'vitest'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor, ProcessCapability } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 import { client, peers, evidence } from './fixtures/conformance-business.js'
 
 /** Match the production default rate (budget.ts); resource acceptance never disables admission. */
@@ -25,7 +25,7 @@ const resourceReportDeadlineMs = 1000
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(
     new URL(
-      '../../../rpc-process/test/process/fixtures/conformance-toolchains.mjs',
+      '../../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs',
       import.meta.url
     ).href
   )
@@ -201,7 +201,7 @@ describe('actual language process resource ownership', () => {
         process.execPath,
         [
           new URL(
-            '../../../rpc-process/test/process/fixtures/conformance-parent.mjs',
+            '../../../rpc-plugin-process/test/process/fixtures/conformance-parent.mjs',
             import.meta.url
           ).pathname,
           JSON.stringify(peer)

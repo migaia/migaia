@@ -21,9 +21,18 @@ import { parseSync } from 'oxc-parser'
 const integrationDirectory = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const repositoryRoot = resolve(integrationDirectory, '../..')
 /** Canonical Core assertions and digest-pinned fixtures remain with their physical owner. */
-const packageDirectory = join(repositoryRoot, 'packages/rpc-core')
-/** Five lockstep artifacts are installed without an umbrella package. */
-const rpcOwners = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
+const packageDirectory = join(repositoryRoot, 'packages/rpc-host')
+/** All final lockstep artifacts are installed without an umbrella package. */
+const rpcOwners = [
+  'rpc-contract',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools'
+]
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-rpc-packed-'))
 const extractDirectory = join(smokeDirectory, 'extract')
 const consumerDirectory = join(smokeDirectory, 'consumer')
@@ -37,7 +46,7 @@ const packageDependencies = [
   'supervision',
   'utils'
 ]
-/** Resolve every declared public path from all five real packed manifests. */
+/** Resolve every declared public path from the final real packed manifests. */
 const publicSubpaths = rpcOwners.flatMap((owner) => {
   const manifest = JSON.parse(
     readFileSync(join(repositoryRoot, 'packages', owner, 'package.json'), 'utf8')
@@ -53,7 +62,17 @@ const obsoleteSubpaths = [
   './wire',
   './middleware/protocol',
   './middleware/chunk',
-  './features/chunk',
+  './composed',
+  './client',
+  './provider',
+  './full',
+  './features/outbound',
+  './features/one-way',
+  './features/provider',
+  './features/discovery',
+  './features/control',
+  './adapters/message-port',
+  './adapters/web-worker',
   './internal/chunk-attachment'
 ]
 /**
@@ -75,7 +94,7 @@ async function main() {
     const packedPackages = Object.fromEntries(
       rpcOwners.map((owner) => [owner, join(dependencyDirectory, owner)])
     )
-    const packedPackage = packedPackages['rpc-core']
+    const packedPackage = packedPackages['rpc-host']
     assertPackedOwnerManifests(packedPackages)
     console.log('CHECK five-packed-artifacts PASS')
     assertIdentityObserverDeclarationsHidden(packedPackage)
@@ -128,10 +147,16 @@ async function main() {
           skipLibCheck: true,
           noEmit: true
         },
-        include: ['type-contract.ts']
+        include: ['type-contract.ts', 'kernel-type-contract.ts']
       }),
       'utf8'
     )
+    /** Original low-level type assertions remain on the same private packed kernel owners. */
+    const kernelTypeContract = readFileSync(
+      resolve(integrationDirectory, 'test/core/fixtures/packed/kernel-type-contract.ts'),
+      'utf8'
+    ).replace(/(?:\.\.\/)+(rpc-[a-z-]+)\/dist\//gu, './node_modules/@migaia/$1/dist/')
+    writeFileSync(join(consumerDirectory, 'kernel-type-contract.ts'), kernelTypeContract, 'utf8')
     execFileSync(resolve(repositoryRoot, 'node_modules/.bin/tsc'), ['-p', typeConfig], {
       cwd: consumerDirectory,
       stdio: 'inherit'
@@ -144,13 +169,13 @@ async function main() {
   }
 }
 
-/** Ensures the public `./core` subpath never leaks the unchecked composition implementation. */
+/** The preserved private composition owner still hides its unchecked implementation. */
 function assertPackedCoreRuntimeHidden(consumerDirectory) {
   const probe = join(consumerDirectory, 'core-runtime-hidden.mjs')
   writeFileSync(
     probe,
     [
-      "import * as core from '@migaia/rpc-core/composed'",
+      "import * as core from './node_modules/@migaia/rpc-host/dist/core/composed.js'",
       "if ('createComposedEndpointRuntime' in core)",
       "  throw new Error('packed core exposed unchecked composition runtime')"
     ].join('\n'),
@@ -424,9 +449,9 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
     writeFileSync(
       probe,
       [
-        "import { createClientEndpoint } from '@migaia/rpc-core/client'",
-        "import { connect, protocol, codec } from '@migaia/rpc-core'",
-        "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'",
+        "import { createClientEndpoint } from './node_modules/@migaia/rpc-host/dist/core/client.js'",
+        "import { connect, protocol, codec } from './node_modules/@migaia/rpc-host/dist/core/index.js'",
+        "import { createMemoryTransportPair } from './node_modules/@migaia/rpc-host/dist/core/adapters/memory.js'",
         "import { createStringFramer } from '@migaia/rpc-contract/framing'",
         "import { defineJsonCodec } from '@migaia/serialize/codecs/json'",
         'const [transport] = createMemoryTransportPair()',
@@ -490,7 +515,7 @@ async function assertPackedSelectiveBrowserImport(
   writeFileSync(
     browserEntry,
     [
-      "import { isRpcError } from '@migaia/rpc-core'",
+      "import { isRpcError } from '@migaia/rpc-host'",
       "globalThis.__migaiaSelectiveImport = isRpcError({ code: 'SELECTIVE_BROWSER_PROBE' })"
     ].join('\n'),
     'utf8'
@@ -908,7 +933,7 @@ function createSmokeModule() {
     "process.stdout.write('CHECK subpath-imports PASS\\n');"
   ].join('\n')
   const obsoleteImports = obsoleteSubpaths
-    .map((subpath) => `await expectNotExported('@migaia/rpc-core${subpath.slice(1)}');`)
+    .map((subpath) => `await expectNotExported('@migaia/rpc-host${subpath.slice(1)}');`)
     .join('\n')
   return `
 const capabilityTopology = await import('@migaia/capability/graph/topology');
@@ -923,7 +948,7 @@ const packedTopology = capabilityTopology.buildCapabilityTopology(
 if (packedTopology.ordered[0]?.id !== 'packed-topology')
   throw new Error('Packed capability topology execution failed');
 
-const obsoleteSpecifiers = new Set(${JSON.stringify(obsoleteSubpaths.map((subpath) => `@migaia/rpc-core${subpath.slice(1)}`))});
+const obsoleteSpecifiers = new Set(${JSON.stringify(obsoleteSubpaths.map((subpath) => `@migaia/rpc-host${subpath.slice(1)}`))});
 
 async function expectNotExported(specifier) {
   if (!obsoleteSpecifiers.has(specifier))
@@ -948,7 +973,7 @@ try {
 }
 
 const assert = (await import('node:assert/strict')).default;
-const { createPeerPair } = await import('@migaia/rpc-core/testing');
+const { createPeerPair } = await import('./node_modules/@migaia/rpc-host/dist/testing/index.js');
 const pairReports = [];
 let pairEffects = 0;
 const pair = await createPeerPair({
@@ -981,25 +1006,66 @@ try {
 }
 process.stdout.write('CHECK runtime-peer-pair PASS\\n');
 try {
-  await expectNotExported('@migaia/rpc-core/not-a-legacy-subpath');
+  await expectNotExported('@migaia/rpc-host/not-a-legacy-subpath');
   throw new Error('Unrelated import failure was accepted as a legacy subpath');
 } catch (error) {
-  if (error?.message !== 'Unexpected removed-subpath probe: @migaia/rpc-core/not-a-legacy-subpath')
+  if (error?.message !== 'Unexpected removed-subpath probe: @migaia/rpc-host/not-a-legacy-subpath')
     throw error;
 }
 
-const processExports = await import('@migaia/rpc-process');
-const threadExports = await import('@migaia/rpc-threads');
+const processExports = await import('@migaia/rpc-plugin-process');
+const threadExports = await import('@migaia/rpc-plugin-thread');
 for (const name of ['createProcessPeer', 'createProcessPlugin'])
-  assert.equal(typeof processExports[name], 'function', 'packed process factory');
+  assert.equal(name in processExports, false, 'retired packed process factory: ' + name);
 for (const name of ['createThreadPeer', 'createThreadPlugin'])
-  assert.equal(typeof threadExports[name], 'function', 'packed thread factory');
+  assert.equal(name in threadExports, false, 'retired packed thread factory: ' + name);
+assert.equal(typeof processExports.processPlugin, 'function', 'packed process plugin');
+assert.equal(typeof threadExports.threadPlugin, 'function', 'packed thread plugin');
 for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeProcessPlugin', 'createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
   assert.equal(name in processExports || name in threadExports, false, 'retired factory absent: ' + name);
-const root = await import('@migaia/rpc-core');
-const clientPreset = await import('@migaia/rpc-core/client');
-const providerPreset = await import('@migaia/rpc-core/provider');
-const memory = await import('@migaia/rpc-core/adapters/memory');
+/** Only the real installed user root can establish the final public factory contract. */
+const publicRoot = await import('@migaia/rpc-host');
+/** Author SDK inspection is independent of the lower-level private kernel probes below. */
+const publicSdk = await import('@migaia/rpc-host/plugin');
+assert.equal(typeof publicRoot.createRpcHost, 'function', 'packed Host factory');
+for (const name of ['createEndpoint', 'createFullEndpoint', 'createFullOneWayEndpoint', 'createRuntimeApiEndpoint'])
+  assert.equal(name in publicRoot, false, 'retired packed Host factory: ' + name);
+for (const name of ['createRuntimePeer', 'createManagedRuntimePeer', 'createRuntimePlugin', 'createRemoteHost', 'createRemotePlugin', 'serveRemoteHost', 'serveRemotePlugin', 'captureAdapterTask', 'assembleAdapterPlugin'])
+  assert.equal(name in publicSdk, false, 'retired packed SDK factory: ' + name);
+/** Cooperative transport construction must resolve from the real new package root. */
+const coroutineExports = await import('@migaia/rpc-plugin-coroutines');
+assert.equal(typeof coroutineExports.coroutinePlugin, 'function', 'packed coroutine plugin');
+/** The task publishes its actual child Host after the same native message handshake. */
+let resolveChild;
+/** This receipt observes only the genuine child creation, without a second readiness owner. */
+const childReady = new Promise((resolve) => { resolveChild = resolve; });
+/** The public Host opens one genuine managed coroutine and owns its original cleanup. */
+const packedHost = await publicRoot.createRpcHost({
+  plugins: [coroutineExports.coroutinePlugin({
+    spawn: async ({ connect, signal }) => {
+      /** The opaque task connection is the exact child source issued by the transport owner. */
+      const child = await publicRoot.createRpcHost({
+        plugins: [coroutineExports.coroutinePlugin({ connectToParent: connect })],
+        provide: { echo: (value) => value }
+      });
+      resolveChild(child);
+      try {
+        await new Promise((resolve) => {
+          if (signal.aborted) resolve();
+          else signal.addEventListener('abort', () => resolve(), { once: true });
+        });
+      } finally { await child.close(); }
+    }
+  })]
+});
+await childReady;
+try { assert.equal(await packedHost.request('echo', 42), 42); }
+finally { await packedHost.close(); }
+process.stdout.write('CHECK host-entry PASS\\n');
+const root = await import('./node_modules/@migaia/rpc-host/dist/core/index.js');
+const clientPreset = await import('./node_modules/@migaia/rpc-host/dist/core/client.js');
+const providerPreset = await import('./node_modules/@migaia/rpc-host/dist/core/provider.js');
+const memory = await import('./node_modules/@migaia/rpc-host/dist/core/adapters/memory.js');
 const [clientTransport] = memory.createMemoryTransportPair();
 const [providerTransport] = memory.createMemoryTransportPair();
 const [fullTransport] = memory.createMemoryTransportPair();
@@ -1069,10 +1135,13 @@ function packDependency(packageDirectory, dependency) {
 function assertPackedOwnerManifests(packedPackages) {
   const expectedPeers = {
     'rpc-contract': [],
-    'rpc-core': ['@migaia/rpc-contract'],
-    'rpc-process': ['@migaia/rpc-contract', '@migaia/rpc-core'],
-    'rpc-threads': ['@migaia/rpc-contract', '@migaia/rpc-core'],
-    'rpc-browser': ['@migaia/rpc-core']
+    'rpc-host': ['@migaia/rpc-contract'],
+    'rpc-plugin-process': ['@migaia/rpc-contract', '@migaia/rpc-host'],
+    'rpc-plugin-thread': ['@migaia/rpc-contract', '@migaia/rpc-host'],
+    'rpc-plugin-browser': ['@migaia/rpc-host'],
+    'rpc-plugin-coroutines': ['@migaia/rpc-contract', '@migaia/rpc-host'],
+    'rpc-plugin-pool': ['@migaia/rpc-host'],
+    'rpc-plugin-devtools': ['@migaia/rpc-contract', '@migaia/rpc-host']
   }
   for (const [owner, directory] of Object.entries(packedPackages)) {
     const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))

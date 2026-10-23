@@ -1,0 +1,709 @@
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
+import type {
+  IAdapterListenerPreparation,
+  IAdapterListenerSession,
+  IAdapterDeploymentAccept,
+  IAdapterDeploymentAcceptedSession
+} from '@migaia/rpc-host/plugin'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
+import { createParentLossGuard } from '@migaia/supervision/process'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
+
+import { RpcProcessErrorText } from '../error-text.js'
+import type { IRuntimePeerSourceResult } from '@migaia/rpc-host/plugin'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
+import type { IProcessByteChannel, IProcessByteListener, IProcessMessageChannel } from '../types.js'
+import { createAdapterId as defaultRpcId } from '@migaia/rpc-host/plugin'
+import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-host/plugin'
+import {
+  createProcessSessionManager,
+  type IProcessConnectionLease,
+  type IProcessSessionManager
+} from '../resilience/session.js'
+import { createProcessProviderAdmission } from '../resilience/provider-admission.js'
+import type { IProcessInstanceFallback } from '../resilience/fallback.js'
+import { processSessionManager } from '../resilience/index.js'
+import type { IProcessResilience } from '../resilience/types.js'
+import { RpcCapability } from '@migaia/rpc-contract'
+import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
+import type { IRpcProviderLimits } from '@migaia/rpc-host'
+import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-host/plugin'
+import type { IProcessSessionIdentity } from '../resilience/types.js'
+import { invalidOption, reportSafely } from './binding.js'
+import { ProcessPluginChannelKind } from './constants.js'
+import type { IProcessServeChildIngress } from './types.js'
+
+/** Native sessions retain the accepted member's original close operation. */
+type IProcessSessionServiceHandle = Pick<IAdapterDeploymentAcceptedSession['peer'], 'close'>
+
+/** The canonical public drain operation determines this internal held-resource shape. */
+type IRemoteBindingDrain = ReturnType<typeof createRemoteBindingDrain>
+
+/** A ready session is independently owned by its remote service registration and channel. */
+type IProcessServeSession = Readonly<{
+  channel: IRemoteChannel
+  service: IProcessSessionServiceHandle
+  /** Read the original close Promise rather than copying a ready/closing state. */
+  active(): boolean
+  close(): Promise<void>
+}>
+
+/** Runtime publication follows the same authenticated candidate, commit and shutdown ownership. */
+type IProcessRuntimeSessionPublication = Readonly<{
+  signal?: IAbortSignal
+  initialSignal?: IAbortSignal
+  own?(close: () => Promise<void>): void
+  publish?(service: IProcessSessionServiceHandle): () => void
+  /** Original close retains owned governor cleanup failures alongside session cleanup failures. */
+  release?(): Promise<void>
+  /** The selected core policy is merged by the original connection admission owner. */
+  providerLimits?: IRpcProviderLimits
+  /** The SDK budget reaches the same pending byte handshake owner. */
+  handshakeTimeoutMs?: number
+}>
+
+/** Runtime assembly receives the exact original service manager; the public factory stays unchanged. */
+type IProcessSessionEndpointFactory = (
+  ...args: [...Parameters<IProcessServeEndpointFactory>, IProcessSessionManager]
+) => Promise<IRemoteServeEndpoint>
+
+/** Private service reads use the original session Set, without another listener registry. */
+export type IProcessSessionsHandle = Readonly<{
+  close(): Promise<void>
+  /** Read original closure state without a separate listener availability flag. */
+  closed(): boolean
+  services(): readonly IProcessSessionServiceHandle[]
+  current(): IProcessSessionServiceHandle | null | undefined
+}>
+
+/** Preserves every cleanup failure under one registered process code. */
+function cleanupFailure(errors: readonly unknown[]): AggregateError {
+  return attachErrorIdentity(new AggregateError(errors, RpcProcessErrorText.channelClosed), {
+    source: ERROR_SOURCE,
+    code: RpcProcessErrorCode.channelClosed
+  })
+}
+
+/** Close one service before its physical channel, retaining both cleanup failures. */
+function createSession(
+  channel: IRemoteChannel,
+  service: IProcessSessionServiceHandle,
+  sessions: Set<IProcessServeSession>,
+  report: (error: unknown) => void,
+  drain: IRemoteBindingDrain,
+  lease: IProcessConnectionLease,
+  closeAdmission: () => void,
+  identity: IProcessSessionIdentity,
+  fallback?: IProcessInstanceFallback,
+  publication?: IProcessRuntimeSessionPublication
+): IProcessServeSession {
+  /** Repeated EOF, listener close, and explicit close share one cleanup outcome. */
+  let closePromise: Promise<void> | undefined
+  /** A live transport error denotes terminal connection loss for this session. */
+  let unsubscribe: (() => void) | undefined
+  /** The fault owner retains only sessions that still own a live endpoint. */
+  let unregisterFallback: (() => void) | undefined
+  /** Only this committed session may withdraw its ready contribution. */
+  let withdraw: (() => void) | undefined
+  const session: IProcessServeSession = {
+    channel,
+    service,
+    active: () => closePromise === undefined,
+    close: () =>
+      (closePromise ??= (async () => {
+        withdraw?.()
+        unsubscribe?.()
+        closeAdmission()
+        const errors: unknown[] = []
+        await drain.drainCurrent()
+        try {
+          await service.close()
+        } catch (error) {
+          errors.push(error)
+        }
+        try {
+          await channel.close()
+        } catch (error) {
+          errors.push(error)
+        }
+        lease.release()
+        sessions.delete(session)
+        unregisterFallback?.()
+        if (errors.length > 0) throw cleanupFailure(errors)
+      })())
+  }
+  sessions.add(session)
+  unsubscribe = channel.transport.onTransportError?.(() => {
+    void session.close().catch((error: unknown) => reportSafely(report, error))
+  })
+  unregisterFallback = fallback?.add({ connectionId: identity.connectionId, close: session.close })
+  try {
+    withdraw = publication?.publish?.(service)
+  } catch (error) {
+    reportSafely(report, error)
+    void session.close().catch((cleanup: unknown) => reportSafely(report, cleanup))
+  }
+  return session
+}
+
+/** Invoking the service callback transfers endpoint ownership, including failed-startup rollback. */
+export type IProcessReadySession = Readonly<{
+  channel: IRemoteChannel
+  endpoint: IRemoteServeEndpoint
+  identity: IProcessSessionIdentity
+  signal: INativeAbortSignal
+  /** Genuine Core runtime operation retains its prepared endpoint and Peer internally. */
+  runtime?: IAdapterListenerSession
+  /** New native hosts borrow the accepted session of their one existing endpoint. */
+  accepted?: IAdapterDeploymentAcceptedSession
+}>
+
+/** Native service endpoints must support the control capability their peer will probe. */
+function validateServiceEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): void {
+  if (
+    channel.agreement.capabilities.includes(RpcCapability.ping) &&
+    typeof endpoint.endpoint.ping !== 'function'
+  )
+    throw ((originalDetail: Readonly<Record<string, unknown>> | undefined) =>
+      attachErrorIdentity(new TypeError(RpcProcessErrorText.resilienceInvalidOption), {
+        source: RPC_PROCESS_ERROR_SOURCE,
+        code: RpcProcessErrorCode.resilienceInvalidOption,
+        ...(originalDetail ? { detail: originalDetail } : {})
+      }))({
+      field: 'endpointFactory'
+    })
+}
+
+/** Own one accept/parent-loss loop for Plugin and Host services, with canonical session quotas. */
+export async function serveProcessSessions(
+  ingress: IProcessServeChildIngress | IProcessServeListenerIngress,
+  endpointFactory: IProcessSessionEndpointFactory | undefined,
+  onReadySession: (session: IProcessReadySession) => Promise<IProcessSessionServiceHandle>,
+  resilience: IProcessResilience,
+  report: (error: unknown) => void,
+  fallback?: IProcessInstanceFallback,
+  scheduler: IScheduler = ingress.kind === 'listener'
+    ? (ingress.scheduler ?? systemScheduler)
+    : systemScheduler,
+  publication?: IProcessRuntimeSessionPublication,
+  runtime?: IAdapterListenerPreparation,
+  adopt?: IAdapterDeploymentAccept
+): Promise<IProcessSessionsHandle> {
+  if (ingress.kind === 'listener' && typeof ingress.verify !== 'function')
+    invalidOption('ingress.verify')
+  if (ingress.kind === 'child' && typeof ingress.parentLoss?.exit !== 'function')
+    invalidOption('ingress.parentLoss.exit')
+  /** Both facades borrow the exact manager held by their one service governor. */
+  const borrowedManager = processSessionManager(resilience)
+  /** Structural custom governors retain their own sessionOptions and use default admission quotas. */
+  const manager =
+    borrowedManager ??
+    createProcessSessionManager({
+      scheduler,
+      report
+    })
+  const controller = new AbortController()
+  /** A service owns only sessions accepted through this invocation. */
+  const sessions = new Set<IProcessServeSession>()
+  /** Pending accepts must settle before close snapshots the accepted sessions. */
+  const accepting = new Set<Promise<void>>()
+  /** The listener is separate from accepted channels and closes first. */
+  let listener: IProcessByteListener | undefined
+  /** Child EOF is observed through the one supervision-owned parent-loss guard. */
+  let removeParentClose: (() => void) | undefined
+  /** The optional parent probe is owned by this serve handle. */
+  let removeProbe: (() => void) | undefined
+  /**
+   * The original close Promise stops candidate publication while accepted sessions retain their
+   * drain signal.
+   */
+  let closePromise: Promise<void> | undefined
+  /** The original external lifecycle is detached when this service scope closes. */
+  const onAbort = (): void => {
+    void close().catch((error: unknown) => reportSafely(report, error))
+  }
+  const close = (): Promise<void> =>
+    (closePromise ??= (async () => {
+      /** Detach parent-loss observers before abort synchronously closes this owned channel. */
+      removeParentClose?.()
+      removeProbe?.()
+      publication?.signal?.removeEventListener('abort', onAbort)
+      publication?.initialSignal?.removeEventListener('abort', onAbort)
+      const fallbackClose = fallback?.close()
+      const errors: unknown[] = []
+      try {
+        await listener?.close()
+      } catch (error) {
+        errors.push(error)
+      }
+      await Promise.allSettled(accepting)
+      for (const session of sessions) {
+        try {
+          await session.close()
+        } catch (error) {
+          errors.push(error)
+        }
+      }
+
+      /** Pending candidates are closed above; live carriers abort only after their native drain. */
+      controller.abort(
+        publication?.initialSignal?.aborted
+          ? resolveAbortReason(publication.initialSignal)
+          : publication?.signal?.aborted
+            ? resolveAbortReason(publication.signal)
+            : undefined
+      )
+      await fallbackClose
+      if (!borrowedManager) manager.close()
+      try {
+        await publication?.release?.()
+      } catch (error) {
+        errors.push(error)
+      }
+      if (errors.length > 0) throw cleanupFailure(errors)
+    })())
+
+  publication?.own?.(close)
+  publication?.signal?.addEventListener('abort', onAbort, { once: true })
+  publication?.initialSignal?.addEventListener('abort', onAbort, { once: true })
+  if (publication?.signal?.aborted || publication?.initialSignal?.aborted) onAbort()
+  /**
+   * Actual active sessions alone are projected; closing resource records remain owned until
+   * settled.
+   */
+  const services = (): readonly IProcessSessionServiceHandle[] =>
+    [...sessions].filter((session) => session.active()).map((session) => session.service)
+  /** One implicit Peer target is safe only when this original owner has one active session. */
+  const current = (): IProcessSessionServiceHandle | null | undefined => {
+    /** No second index or availability flag is maintained for this private selection. */
+    let selected: IProcessSessionServiceHandle | undefined
+    for (const session of sessions) {
+      if (!session.active()) continue
+      if (selected) return null
+      selected = session.service
+    }
+    return selected
+  }
+
+  if (ingress.kind === 'listener') {
+    const listenerIngress = ingress
+    try {
+      listener = await listenerIngress.listen({
+        address: listenerIngress.address,
+        signal: controller.signal,
+        auth: { mode: 'required', verify: listenerIngress.verify },
+        report: report,
+        onConnection(pending) {
+          /** The listener may invoke callbacks without awaiting their Promise. */
+          const acceptingOne = (async () => {
+            /** Ownership transfers only after pending.accept fulfills. */
+            let channel: IRemoteChannel | undefined
+            /** A failed candidate returns its physical capacity before reporting the error. */
+            let lease: IProcessConnectionLease | undefined
+            /** The frame observer is removed on either candidate rollback or session close. */
+            let closeAdmission: (() => void) | undefined
+            let candidateEndpoint: IRemoteServeEndpoint | undefined
+            /** A returned service remains a candidate until recovery and cancellation checks pass. */
+            let candidateService: IProcessSessionServiceHandle | undefined
+            try {
+              if (controller.signal.aborted || closePromise !== undefined) {
+                await pending.close()
+                return
+              }
+              lease = manager.claimConnection()
+              const context = listenerIngress.createConnectionContext(pending)
+              const accepted = await pending.accept({
+                offer: listenerIngress.offer,
+                peerId: context.peerId,
+                ipc: context.ipc,
+                scheduler: listenerIngress.scheduler,
+                signal: controller.signal,
+                report: report,
+                handshakeTimeoutMs: publication?.handshakeTimeoutMs
+              })
+              channel = accepted.channel
+              if (controller.signal.aborted || closePromise !== undefined)
+                throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.channelClosed
+                })
+              const identity: IProcessSessionIdentity = Object.freeze({
+                connectionId: context.ipc.connectionId,
+                sessionId: context.ipc.sessionId,
+                principalId: accepted.principalId,
+                ...(context.ipc.processId ? { processId: context.ipc.processId } : {})
+              })
+              await fallback?.ready()
+              if (controller.signal.aborted || closePromise !== undefined)
+                throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.channelClosed
+                })
+              const fallbackVersion = fallback?.version
+              const sessionOptions = borrowedManager
+                ? manager.connectionOptions(channel, identity)
+                : resilience.sessionOptions(identity)
+              const drain = createRemoteBindingDrain(
+                channel.scheduler,
+                (error) => reportSafely(report, error),
+                manager.options.drainMs
+              )
+              /** A policy violation closes only this accepted connection. */
+              let publishedSession: IProcessServeSession | undefined
+              const admission = createProcessProviderAdmission(
+                channel,
+                manager.options,
+                channel.scheduler,
+                () => publishedSession?.close() ?? Promise.resolve(),
+                (error) => reportSafely(report, error)
+              )
+              closeAdmission = admission.close
+              /** Numeric policy is merged before the original endpoint constructor observes it. */
+              const limits = admission.limits(sessionOptions.limits, publication?.providerLimits)
+              /** Actual Core resource assembly preserves Host and authenticated scope provenance. */
+              const runtimeSession = !adopt
+                ? runtime?.session(
+                    channel,
+                    controller.signal,
+                    manager.coreScope,
+                    limits,
+                    borrowedManager ? undefined : sessionOptions.idempotency
+                  )
+                : undefined
+              /** Native admission and cleanup remain here; Host borrows this exact policy. */
+              const acceptedSession = adopt
+                ? await adopt(channel as IRuntimePeerSourceResult, {
+                    policy: { idempotency: sessionOptions.idempotency, providerLimits: limits },
+                    execution: {
+                      providerAdmission: manager.runtimeAdmission,
+                      limits,
+                      idempotency: sessionOptions.idempotency,
+                      provider: admission.core.provider,
+                      enterStream: admission.core.enterStream
+                    },
+                    wrapEndpoint: (endpoint, onExecution) =>
+                      drain.wrap(channel!, endpoint, onExecution)
+                  })
+                : undefined
+              const builtEndpoint = (candidateEndpoint =
+                acceptedSession?.endpoint ??
+                (runtimeSession
+                  ? await runtimeSession.prepare()
+                  : await endpointFactory!(
+                      channel,
+                      controller.signal,
+                      { identity, ...sessionOptions, limits },
+                      manager
+                    )))
+              validateServiceEndpoint(channel, builtEndpoint)
+              const endpoint = acceptedSession
+                ? builtEndpoint
+                : runtimeSession
+                  ? runtimeSession.attach(drain, admission.core)
+                  : admission.wrap(drain.wrap(channel, builtEndpoint))
+              if (controller.signal.aborted || closePromise !== undefined) {
+                candidateEndpoint = undefined
+                try {
+                  await endpoint.endpoint.dispose()
+                } catch (cleanupError) {
+                  reportSafely(report, cleanupError)
+                }
+                throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.channelClosed
+                })
+              }
+              candidateEndpoint = undefined
+              const service = (candidateService = await onReadySession({
+                channel,
+                endpoint,
+                identity,
+                signal: controller.signal,
+                ...(runtimeSession ? { runtime: runtimeSession } : {}),
+                ...(acceptedSession ? { accepted: acceptedSession } : {})
+              }))
+              ;(channel as IRuntimePeerSourceResult).activateReceive?.()
+              if (controller.signal.aborted || closePromise !== undefined)
+                throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.channelClosed
+                })
+              await fallback?.ready()
+              if (controller.signal.aborted || closePromise !== undefined)
+                throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.channelClosed
+                })
+              if (fallback?.version !== fallbackVersion)
+                throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.channelClosed
+                })
+              publishedSession = createSession(
+                channel,
+                service,
+                sessions,
+                report,
+                drain,
+                lease,
+                admission.close,
+                identity,
+                fallback,
+                publication
+              )
+              candidateService = undefined
+              lease = undefined
+              closeAdmission = undefined
+            } catch (error) {
+              closeAdmission?.()
+              if (candidateService) {
+                try {
+                  await candidateService.close()
+                } catch (cleanupError) {
+                  reportSafely(report, cleanupError)
+                }
+              }
+              if (candidateEndpoint) {
+                try {
+                  await candidateEndpoint.endpoint.dispose()
+                } catch (cleanupError) {
+                  reportSafely(report, cleanupError)
+                }
+              }
+              lease?.release()
+              if (!channel) {
+                try {
+                  await pending.close()
+                } catch (cleanupError) {
+                  reportSafely(report, cleanupError)
+                }
+              }
+              try {
+                await channel?.close()
+              } catch (cleanupError) {
+                reportSafely(report, cleanupError)
+              }
+              reportSafely(report, error)
+            }
+          })()
+          accepting.add(acceptingOne)
+          void acceptingOne.then(
+            () => accepting.delete(acceptingOne),
+            () => accepting.delete(acceptingOne)
+          )
+          return acceptingOne
+        }
+      })
+      publication?.initialSignal?.removeEventListener('abort', onAbort)
+      if (controller.signal.aborted || closePromise !== undefined) {
+        await listener.close()
+        throw ((originalCause: unknown) =>
+          attachErrorIdentity(
+            new Error(
+              RpcProcessErrorText.channelClosed,
+              originalCause === undefined ? undefined : { cause: originalCause }
+            ),
+            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
+          ))(resolveAbortReason(controller.signal))
+      }
+    } catch (error) {
+      try {
+        await fallback?.close()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+      throw error
+    }
+    return Object.freeze({ close, closed: () => closePromise !== undefined, services, current })
+  }
+
+  const guard = createParentLossGuard({
+    shutdown: () => close(),
+    exit: ingress.parentLoss.exit,
+    graceMs: ingress.parentLoss.graceMs,
+    /** The session owner supplies the same clock for shutdown and its original grace deadline. */
+    scheduler,
+    report: report
+  })
+  removeProbe = ingress.parentLoss.probe?.((reason) => guard.trigger(reason))
+  let raw: IProcessByteChannel | IProcessMessageChannel | undefined
+  let channel: IRemoteChannel | undefined
+  /** A failed child startup must return the one physical connection lease. */
+  let lease: IProcessConnectionLease | undefined
+  /** A failed child setup removes its own frame observer. */
+  let closeAdmission: (() => void) | undefined
+  let candidateEndpoint: IRemoteServeEndpoint | undefined
+  /** A returned child service is rolled back if readiness fails before publication. */
+  let candidateService: IProcessSessionServiceHandle | undefined
+  try {
+    lease = manager.claimConnection()
+    const sessionInfo = Object.freeze({ connectionId: defaultRpcId(), sessionId: defaultRpcId() })
+    const opened = await ingress.openRaw(controller.signal)
+    if (ingress.channelKind === ProcessPluginChannelKind.byte) {
+      if (!('raw' in opened) || !('bootstrap' in opened)) {
+        raw = opened
+        invalidOption('ingress.bootstrap')
+      }
+      raw = opened.raw
+      if (typeof ingress.createVerifier !== 'function') invalidOption('ingress.createVerifier')
+      const verify = ingress.createVerifier(opened.bootstrap)
+      if (typeof verify !== 'function') invalidOption('ingress.createVerifier')
+      channel = await ingress.establish(raw, {
+        signal: controller.signal,
+        role: 'responder',
+        session: sessionInfo,
+        scheduler,
+        verify
+      })
+    } else {
+      if ('raw' in opened) {
+        raw = opened.raw
+        invalidOption('ingress.channelKind')
+      }
+      raw = opened
+      channel = await ingress.establish(raw, {
+        signal: controller.signal,
+        role: 'responder',
+        session: sessionInfo,
+        scheduler
+      })
+    }
+    const identity: IProcessSessionIdentity = Object.freeze({
+      ...sessionInfo,
+      principalId: sessionInfo.connectionId
+    })
+    await fallback?.ready()
+    if (controller.signal.aborted || closePromise !== undefined)
+      throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+        source: RPC_PROCESS_ERROR_SOURCE,
+        code: RpcProcessErrorCode.channelClosed
+      })
+    const fallbackVersion = fallback?.version
+    const sessionOptions = borrowedManager
+      ? manager.connectionOptions(channel, identity)
+      : resilience.sessionOptions(identity)
+    const drain = createRemoteBindingDrain(
+      channel.scheduler,
+      (error) => reportSafely(report, error),
+      manager.options.drainMs
+    )
+    /** Child ingress uses the same bounded admission path as listener sessions. */
+    let publishedSession: IProcessServeSession | undefined
+    const admission = createProcessProviderAdmission(
+      channel,
+      manager.options,
+      channel.scheduler,
+      () => publishedSession?.close() ?? Promise.resolve(),
+      (error) => reportSafely(report, error)
+    )
+    closeAdmission = admission.close
+
+    /** Child sessions use the same original policy-before-endpoint ordering. */
+    const limits = admission.limits(sessionOptions.limits, publication?.providerLimits)
+    const runtimeSession = runtime?.session(
+      channel,
+      controller.signal,
+      manager.coreScope,
+      limits,
+      borrowedManager ? undefined : sessionOptions.idempotency
+    )
+    const builtEndpoint = (candidateEndpoint = runtimeSession
+      ? await runtimeSession.prepare()
+      : await endpointFactory!(
+          channel,
+          controller.signal,
+          { identity, ...sessionOptions, limits },
+          manager
+        ))
+    validateServiceEndpoint(channel, builtEndpoint)
+    const endpoint: IRemoteServeEndpoint = runtimeSession
+      ? runtimeSession.attach(drain, admission.core)
+      : admission.wrap(drain.wrap(channel, builtEndpoint))
+    if (controller.signal.aborted || closePromise !== undefined) {
+      candidateEndpoint = undefined
+      try {
+        await endpoint.endpoint.dispose()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+      throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+        source: RPC_PROCESS_ERROR_SOURCE,
+        code: RpcProcessErrorCode.channelClosed
+      })
+    }
+    candidateEndpoint = undefined
+    const service = (candidateService = await onReadySession({
+      channel,
+      endpoint,
+      identity,
+      signal: controller.signal,
+      ...(runtimeSession ? { runtime: runtimeSession } : {})
+    }))
+    ;(channel as IRuntimePeerSourceResult).activateReceive?.()
+    if (controller.signal.aborted || closePromise !== undefined)
+      throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+        source: RPC_PROCESS_ERROR_SOURCE,
+        code: RpcProcessErrorCode.channelClosed
+      })
+    await fallback?.ready()
+    if (controller.signal.aborted || closePromise !== undefined)
+      throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+        source: RPC_PROCESS_ERROR_SOURCE,
+        code: RpcProcessErrorCode.channelClosed
+      })
+    if (fallback?.version !== fallbackVersion)
+      throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+        source: RPC_PROCESS_ERROR_SOURCE,
+        code: RpcProcessErrorCode.channelClosed
+      })
+    publishedSession = createSession(
+      channel,
+      service,
+      sessions,
+      report,
+      drain,
+      lease,
+      admission.close,
+      identity,
+      fallback,
+      publication
+    )
+    candidateService = undefined
+    lease = undefined
+    closeAdmission = undefined
+    removeParentClose = raw.onClose((reason) => guard.trigger(reason))
+    return Object.freeze({ close, closed: () => closePromise !== undefined, services, current })
+  } catch (error) {
+    closeAdmission?.()
+    if (candidateService) {
+      try {
+        await candidateService.close()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+    }
+    if (candidateEndpoint) {
+      try {
+        await candidateEndpoint.endpoint.dispose()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+    }
+    lease?.release()
+    try {
+      await channel?.close()
+      if (!channel) await raw?.close()
+    } catch (cleanupError) {
+      reportSafely(report, cleanupError)
+    }
+    try {
+      await fallback?.close()
+    } catch (cleanupError) {
+      reportSafely(report, cleanupError)
+    }
+    guard.trigger(error)
+    throw error
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RemoteMethodName } from '@migaia/rpc-core/remote'
+import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'

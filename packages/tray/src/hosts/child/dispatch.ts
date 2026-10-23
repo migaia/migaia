@@ -4,7 +4,7 @@ import {
   type IPluginHandle,
   type IPluginConstraint
 } from '@migaia/plugin-host'
-import type { IRpcContext } from '@migaia/rpc-core'
+import type { IRpcContext } from '@migaia/rpc-host'
 import { DependencyAction, DependencyPolicy } from '@migaia/capability/graph/dependency'
 import { withTimeout } from '@migaia/utils/promise'
 import { createTrayError } from '../../errors.js'

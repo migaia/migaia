@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { checkRuntimeDescription } from '@migaia/rpc-contract/runtime'
 import {
   acceptRpcHandshake,
   completeRpcHandshake,
@@ -39,6 +40,15 @@ function envelopeFailure(value: unknown): {
 }
 
 describe('current protocol schemas and baseline vectors', () => {
+  it('executes every shared schema-extension vector with stable case IDs', () => {
+    /** Foreign peers read the same complete descriptions and expected accept/reject decisions. */
+    const vectors = readJson(join(vectorRoot, 'description-schema.json')) as {
+      cases: { id: string; valid: boolean; value: unknown }[]
+    }
+    for (const vector of vectors.cases)
+      expect(checkRuntimeDescription(vector.value).ok, vector.id).toBe(vector.valid)
+    expect(vectors.cases.length).toBe(37)
+  })
   it('keeps the schema field rows, route keys, validation order and wire limits aligned', () => {
     const schema = readJson(join(schemaRoot, 'envelope.schema.json'))
     expect(schema['x-migaia-limits']).toEqual(RpcWireLimit)

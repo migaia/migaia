@@ -9,9 +9,9 @@ import {
   RpcStreamViolation
 } from '@migaia/rpc-contract'
 import { normalizeStreamPayload } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { connect } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '../../../../../rpc-host/dist/core/adapters/memory.js'
+import { createComposedEndpoint } from '../../../../../rpc-host/dist/core/composed.js'
+import { connect } from '../../../../../rpc-host/dist/core/index.js'
 import { streamRoots } from './runtime.js'
 
 /** Language-neutral sequence cases are executed against the actual consumer or producer owner. */

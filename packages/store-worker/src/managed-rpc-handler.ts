@@ -1,5 +1,3 @@
-import type { IRpcEndpoint } from '@migaia/rpc-core'
-
 /**
  * Defines a managed RPC message handler for the worker side.
  *
@@ -29,13 +27,12 @@ export type IManagedRpcHandler = {
   readonly disposed: boolean
 }
 
-type IManagedEndpoint<TTargetId extends string = string> = Pick<
-  IRpcEndpoint<TTargetId, 'automatic', false>,
-  'dispose'
->
+/** Managed callback disposal needs only this actual cleanup operation, never an endpoint contract. */
+type IManagedEndpoint = Readonly<{ dispose(): Promise<void> }>
 
-export function toManagedRpcHandler<TTargetId extends string = string>(
-  endpointPromise: Promise<IManagedEndpoint<TTargetId>>,
+/** Preserve terminal admission and Promise identity while the actual bridge owns connection setup. */
+export function toManagedRpcHandler(
+  endpointPromise: Promise<IManagedEndpoint>,
   deliver: (message: unknown) => void
 ): IManagedRpcHandler {
   let pendingCount = 0

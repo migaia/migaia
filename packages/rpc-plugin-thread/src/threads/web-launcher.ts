@@ -1,0 +1,316 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
+import { attachSecondaryErrors } from '@migaia/utils/error'
+import { createDisposeTransaction, DisposeTransactionKind } from '@migaia/lifecycle'
+import { identifyRpcBoundaryFailure } from '@migaia/rpc-host/plugin'
+import { RpcCoreErrorCode } from '@migaia/rpc-host'
+import { createAdapterTransportError } from '@migaia/rpc-host/plugin'
+import { type IRuntimePeerSourceResult } from '@migaia/rpc-host/plugin'
+import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
+import {
+  awaitThreadPreparation,
+  constructWebThreadChannel,
+  openThreadMessageResource
+} from './channel.js'
+import { createThreadRuntimeBootstrap, intersectThreadCapabilities } from './bootstrap.js'
+import {
+  createEventTargetMessageResource,
+  holdAdapterLaunch,
+  type IAdapterMessageResource
+} from '@migaia/rpc-host/plugin'
+import { type IRuntimePeerSourceContext } from '@migaia/rpc-host/plugin'
+
+import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from './constants.js'
+import { absoluteThreadEntry, portableThreadSpec } from './error.js'
+import { readAdapterAbortReason } from '@migaia/rpc-host/plugin'
+
+import { ThreadErrorText } from './error-text.js'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { IpcReporterContext } from '@migaia/rpc-host/plugin'
+import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
+
+/** Web handles expose preparation; only Bun's native close event settles an actual-exit receipt. */
+export type IWebThreadHandle = IThreadHandle &
+  Readonly<{
+    /** Actual EventTarget message port; outside Bun it does not supply an actual-exit receipt. */
+    port: IThreadWebPort
+    /** Original readiness/control Promise; resolves only after the corresponding child ACK. */
+    prepared: Promise<void | readonly string[]>
+  }>
+/** Whole opening retains the original public prepared Promise without exposing receive handoff. */
+export type IAdapterWebThreadHandle = IWebThreadHandle &
+  Readonly<{
+    /** Await this handle's preparation and open its channel under the current cancellation signal. */
+    open(signal: IAbortSignal, options: IThreadChannelOptions): Promise<IRuntimePeerSourceResult>
+  }>
+
+/** Cold receive owners belong only to exact handles constructed here, never copied shape fields. */
+const webPreparations = new WeakMap<
+  IWebThreadHandle,
+  Readonly<{
+    resource: IAdapterMessageResource
+    offer: readonly string[]
+  }>
+>()
+
+/** Structural constructors admit actual runtime Workers and controlled adapter fixtures. */
+export type IWebThreadWorker = IThreadWebPort & {
+  /** Request termination; only Bun follows it with a `close` event carrying the exit code. */
+  terminate(): void
+}
+/** Platform runtime injection does not strengthen unsupported lifecycle capabilities. */
+export type IWebThreadLauncherOptions = Readonly<{
+  /** Optional actual Worker constructor; omission reads the host's global Worker when launch starts. */
+  Worker?: new (entry: string | URL, options: { type: 'module'; name?: string }) => IWebThreadWorker
+  /** Required native error sink; reporter failures remain observable through the host route. */
+  report(error: unknown): void
+  /** Optional explicit runtime bootstrap, overridden by an actual held supervisor launch proposal. */
+  runtimeApi?: IRuntimePeerSourceContext
+}>
+/** Local fingerprint distinguishes Web workers without a numeric runtime identifier. */
+let sequence = 0
+
+/**
+ * Create a module-Worker launcher with required report and optional constructor/runtime context. It
+ * validates portable data/absolute URL before acquisition and waits for child preparation when
+ * opening a channel. On Bun, the Worker emits a nonstandard `close` event with the exit code once
+ * the thread has stopped; Bun's own worker_threads `exit` is derived from the same event, so
+ * termination and exit-observation are enforced there and exited settles from it. Elsewhere both
+ * remain unsupported: terminate() is not an exit receipt, exited stays pending, and supervision may
+ * retain an abandoned lease. heap-limit is unsupported on every host. Failure after acquisition
+ * attempts every owned listener/resource/Worker cleanup and retains the original primary together
+ * with secondary cleanup errors.
+ */
+export function createAdapterWebThreadLauncher(
+  options: IWebThreadLauncherOptions
+): IThreadLauncher<IAdapterWebThreadHandle> {
+  /** Bun is the only Web Worker host whose close event reports an actual thread exit. */
+  const exitObservable = detectServerRuntime() === ServerRuntime.bun
+  /** Capability level shared by termination and exit-observation for this host. */
+  const exitLevel = exitObservable ? 'enforced' : 'unsupported'
+  return {
+    capabilities: Object.freeze({
+      termination: exitLevel,
+      'exit-observation': exitLevel,
+      'heap-limit': 'unsupported'
+    }),
+    async launch(input, context) {
+      /** The exact original request carries each independent parent's compiled bootstrap offer. */
+      const runtimeApi = holdAdapterLaunch(context).proposal ?? options.runtimeApi
+      if (context.signal.aborted) throw readAdapterAbortReason(context.signal)
+      /** Portable data admission precedes all runtime side effects. */
+      const spec = portableThreadSpec(input)
+      /** Adapter entry is absolute rather than relative to this module. */
+      const entry = absoluteThreadEntry(spec.entry, false)
+      /** Runtime constructors are read only when an admitted launch actually starts. */
+      const Constructor =
+        options.Worker ??
+        (Reflect.get(globalThis, 'Worker') as NonNullable<IWebThreadLauncherOptions['Worker']>)
+      /** The service receives the exact peerId used by the client channel factory. */
+      const fingerprint = `${THREAD_FINGERPRINT_PREFIX}web-${++sequence}`
+      /** The shared bootstrap owner admits safe metadata before native Worker construction. */
+      const bootstrap = runtimeApi
+        ? createThreadRuntimeBootstrap(spec.name || fingerprint, fingerprint, runtimeApi)
+        : undefined
+      /** Worker lifecycle hooks attach synchronously before the host can deliver events. */
+      const worker = new Constructor(entry, { type: 'module', name: spec.name })
+      /** A terminate request never settles exited; only the native close event does on Bun. */
+      let terminating = false
+      /** Only the opt-in protocol transfers a bounded cold receive owner to core. */
+      let resource: IAdapterMessageResource | undefined
+      /** Bootstrap listener is released on acknowledgement or explicit termination. */
+      let receive: ((event: { data: unknown }) => void) | undefined
+      /** Pending bootstrap rejects when cancellation reclaims its candidate Worker. */
+      let rejectPrepared: ((error: unknown) => void) | undefined
+      /** Remove only launcher-owned private listeners; transport listeners belong to core. */
+      const removeBootstrap = (): void => {
+        if (receive) worker.removeEventListener(ThreadEvent.message, receive)
+        receive = undefined
+      }
+      /** Reclaim the candidate once without inventing actual-exit evidence. */
+      const terminate = (): void => {
+        if (terminating) return
+        terminating = true
+        removeBootstrap()
+        worker.removeEventListener(ThreadEvent.error, onError)
+        void resource?.close()
+        rejectPrepared?.(readAdapterAbortReason(context.signal))
+        rejectPrepared = undefined
+        worker.terminate()
+      }
+      /** Last native failure, attached to the exit status as the node launcher does. */
+      let failure: unknown
+      /**
+       * Bun settles from its native close event; other hosts keep the never-settled Promise because
+       * they offer no actual-exit observation.
+       */
+      const exited = exitObservable
+        ? new Promise<{ code: number; error?: unknown }>((resolve) => {
+            /** Bun emits close exactly once per Worker, after the thread has stopped. */
+            worker.addEventListener(ThreadEvent.close, (event: { code?: number }) =>
+              resolve({
+                code: event.code ?? 0,
+                ...(failure === undefined ? {} : { error: failure })
+              })
+            )
+          })
+        : new Promise<never>(() => undefined)
+      /** The same raw launch message enters Worker I/O and Core's held-resource control operation. */
+      const initialMessage = {
+        kind: ThreadBootstrap.data,
+        peerId: fingerprint,
+        ...(bootstrap ? { runtimeApi: bootstrap } : {}),
+        ...(spec.data === undefined ? {} : { data: spec.data })
+      }
+      /** The original native error callback has an identity that rollback and terminate can remove. */
+      const onError = (event: { preventDefault(): void; error?: unknown }): void => {
+        event.preventDefault()
+        failure = event.error ?? event
+        /** Core already settled runtime control with this same observed native cause. */
+        if (!bootstrap)
+          rejectPrepared?.(
+            createAdapterTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
+          )
+        rejectPrepared = undefined
+        try {
+          options.report(event.error ?? event)
+        } catch (reporterError) {
+          hostRethrowReporter(reporterError, IpcReporterContext)
+        }
+        terminate()
+      }
+      try {
+        /** Runtime capture attaches before the original native failure reporter and initial write. */
+        if (bootstrap)
+          resource = createEventTargetMessageResource(worker, { exited, terminate, initialMessage })
+        worker.addEventListener(ThreadEvent.error, onError)
+        /**
+         * Public runtime readiness is Core's exact original Promise, with no adapter agreement
+         * input.
+         */
+        const prepared: Promise<void | readonly string[]> = bootstrap
+          ? resource!.prepareControl(bootstrap.capabilities)
+          : new Promise<void>((resolve, reject) => {
+              rejectPrepared = reject
+              receive = (event) => {
+                if (
+                  event.data === null ||
+                  typeof event.data !== 'object' ||
+                  !('kind' in event.data) ||
+                  event.data.kind !== ThreadBootstrap.acknowledged
+                )
+                  return
+                removeBootstrap()
+                rejectPrepared = undefined
+                resolve()
+              }
+              worker.addEventListener(ThreadEvent.message, receive)
+            })
+        /**
+         * The preparation consumer rethrows; this observer only prevents a late unhandled
+         * rejection.
+         */
+        void prepared.catch(() => undefined)
+        worker.postMessage(initialMessage, undefined)
+        /** Retain startup internally and expose only complete resource operations. */
+        const handle: IAdapterWebThreadHandle = {
+          identity: Object.freeze({ fingerprint }),
+          port: worker,
+          prepared,
+          exited,
+          terminate,
+          open: (signal, channelOptions) => openWebThreadHandle(handle, signal, channelOptions)
+        }
+        if (resource && bootstrap)
+          webPreparations.set(handle, { resource, offer: bootstrap.capabilities })
+        return handle
+      } catch (error) {
+        /** The launcher's rollback keeps the original native primary and every cleanup failure. */
+        const primary = identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          ThreadErrorText.bootstrapFailed
+        )
+        terminating = true
+        rejectPrepared?.(primary)
+        rejectPrepared = undefined
+        /**
+         * Lifecycle attempts all acquired-resource releases; no second cleanup state machine
+         * exists.
+         */
+        const failures = await createDisposeTransaction(
+          { kind: DisposeTransactionKind.plan },
+          { errorPolicy: 'collect' }
+        ).run(
+          [
+            removeBootstrap,
+            () => worker.removeEventListener(ThreadEvent.error, onError),
+            () => resource?.close(),
+            () => worker.terminate()
+          ].map((force, index) => ({
+            source: String(index),
+            descriptor: { force }
+          }))
+        )
+        throw identifyRpcBoundaryFailure(
+          attachSecondaryErrors(
+            primary,
+            failures.map(({ error }) => error)
+          ),
+          RpcCoreErrorCode.transport,
+          ThreadErrorText.bootstrapFailed
+        )
+      }
+    }
+  }
+}
+
+/** Await the original preparation and transfer only this exact constructed handle's receiver. */
+async function openWebThreadHandle(
+  handle: IWebThreadHandle,
+  signal: IAbortSignal,
+  options: IThreadChannelOptions
+): Promise<IRuntimePeerSourceResult> {
+  /** Only this actual launcher retains Core's original raw control resource. */
+  const preparation = webPreparations.get(handle)
+  try {
+    if (signal.aborted) throw readAdapterAbortReason(signal)
+    await awaitThreadPreparation(handle.prepared, signal)
+    if (preparation) {
+      /** Caller policy only narrows the launcher's real offer; Core retains the peer's actual ACK. */
+      const offer =
+        options.capabilities === undefined
+          ? preparation.offer
+          : intersectThreadCapabilities(preparation.offer, options.capabilities)
+      return await openThreadMessageResource(
+        preparation.resource,
+        handle.identity.fingerprint,
+        { ...options, capabilities: offer },
+        signal
+      )
+    }
+    return await constructWebThreadChannel(handle.port, handle.identity.fingerprint, options)
+  } catch (error) {
+    void preparation?.resource.close()
+    throw error
+  }
+}
+
+/**
+ * Build the matching Web factory using a required shared scheduler and optional capability policy.
+ * open waits for the handle's original preparation, rejects cancellation with its original reason,
+ * and opens the actual launcher resource when present; a copied/raw handle gains no private trust.
+ * Worker termination remains owned by its supervisor rather than borrowed transport close.
+ */
+export function createAdapterWebThreadChannelFactory(
+  options: IThreadChannelOptions
+): IThreadChannelFactory<IWebThreadHandle> {
+  return {
+    open: (handle, signal, timeoutMs) =>
+      openWebThreadHandle(
+        handle,
+        signal,
+        timeoutMs === undefined ? options : { ...options, timeoutMs }
+      )
+  }
+}
+import { detectServerRuntime, ServerRuntime } from '@migaia/utils'

@@ -162,7 +162,7 @@ The constructor option `autoStart` defaults to `true`: the first request starts 
 
 ### Error identity
 
-Errors produced by `Resource` itself carry `source === RESOURCE_SOURCE` (`@migaia/resource`) and a `code` from `ResourceErrorCode`. Foreign errors that already have a full `source`/`code` stay as they are; an unclassified load failure receives `FETCH_FAILED` once retrying ends, native errors keep their type, and immutable errors remain on the `cause` chain. A failing retry policy receives `INVALID_OPTION`, and the load error that triggered it stays reachable on the error chain. Errors produced by cancellation and disposal are native `DOMException`s (`name === 'AbortError'`), so checking `error.name` is enough.
+Errors produced by `Resource` itself carry `source === RESOURCE_SOURCE` (`resource`) and a `code` from `ResourceErrorCode`. Foreign errors that already have a full `source`/`code` stay as they are; an unclassified load failure receives `FETCH_FAILED` once retrying ends, native errors keep their type, and immutable errors remain on the `cause` chain. A failing retry policy receives `INVALID_OPTION`, and the load error that triggered it stays reachable on the error chain. Errors produced by cancellation and disposal are native `DOMException`s (`name === 'AbortError'`), so checking `error.name` is enough.
 
 ### Suspense
 

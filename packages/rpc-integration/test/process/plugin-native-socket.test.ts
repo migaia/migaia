@@ -2,21 +2,21 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
-import { RUNTIME_API_BASE_CAPABILITIES } from '../../../rpc-core/dist/remote/runtime-api/constants.js'
-import { prepareRuntimePeerEndpoint } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import type { IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { prepareRuntimePeerEndpoint } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
 import { describe, expect, it } from 'vitest'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-process/adapters/node-socket'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import type { IProcessByteListener } from '@migaia/rpc-process'
-import type { IRemoteContract } from '@migaia/rpc-core/remote'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
+} from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import type { IProcessByteListener } from '../../../rpc-plugin-process/dist/process/types.js'
+import type { IRemoteContract } from '@migaia/rpc-host/plugin'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
 
 /** A real Unix socket keeps the external listener alive across client unUse. */
 const contract: IRemoteContract = {

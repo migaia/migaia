@@ -2,20 +2,21 @@ import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import type { IRpcEndpoint } from '@migaia/rpc-core'
-import type { IRemoteChannel } from '@migaia/rpc-core/remote'
-import {
-  createProcessSessionService,
-  serveProcessSessions
-} from '../../../rpc-process/dist/process/plugin/serve.js'
-import { serveRemotePlugin } from '@migaia/rpc-core/remote'
-import { createProcessResilience } from '@migaia/rpc-process'
-import { createProcessInstanceFallback } from '../../../rpc-process/dist/process/resilience/fallback.js'
-import type { IProcessServeChildIngress, IProcessServeListenerIngress } from '@migaia/rpc-process'
-import type { IProcessServeEndpointFactory } from '@migaia/rpc-process'
-import type { IProcessPendingByteConnection } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
-import type { IProcessSessionIdentity } from '@migaia/rpc-process'
+import { type IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
+import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
+import { createProcessSessionService } from '../../../rpc-plugin-process/test/protocol.ts'
+import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
+import { serveRemotePlugin } from '../../../rpc-host/dist/remote/serve-plugin.js'
+import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { createProcessInstanceFallback } from '../../../rpc-plugin-process/dist/process/resilience/fallback.js'
+import type {
+  IProcessServeChildIngress,
+  IProcessServeListenerIngress
+} from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+import type { IProcessServeEndpointFactory } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
+import type { IProcessPendingByteConnection } from '../../../rpc-plugin-process/dist/process/types.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import type { IProcessSessionIdentity } from '../../../rpc-plugin-process/dist/process/resilience/types.js'
 import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 /** A single request contract lets the test observe per-connection service ownership. */

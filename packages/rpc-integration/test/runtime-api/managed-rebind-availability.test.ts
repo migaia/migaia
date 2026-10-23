@@ -1,16 +1,17 @@
-import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
+import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
+import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import * as runtimeEndpoint from '@migaia/rpc-core'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import * as runtimeEndpoint from '../../../rpc-host/dist/core/index.js'
 
 /** Every case restarts the same genuine Worker used by the original generation acceptance. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))

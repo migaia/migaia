@@ -1,16 +1,22 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import type { IRpcContext, IRpcEndpoint, IRpcProvider, IRpcProviderResult } from '@migaia/rpc-core'
-import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
-import { createProcessProviderAdmission } from '../../../rpc-process/dist/process/resilience/provider-admission.js'
-import { createProcessSessionManager } from '../../../rpc-process/dist/process/resilience/session.js'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
+import { type IRpcContext } from '@migaia/rpc-host'
+import {
+  type IRpcEndpoint,
+  type IRpcProvider,
+  type IRpcProviderResult
+} from '../../../rpc-host/dist/core/index.js'
+import type { IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
+import { createProcessProviderAdmission } from '../../../rpc-plugin-process/dist/process/resilience/provider-admission.js'
+import { createProcessSessionManager } from '../../../rpc-plugin-process/dist/process/resilience/session.js'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'
-import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE, deserializeRpcError } from '@migaia/rpc-core'
-import { createRpcTimeoutError, RpcTimeoutError } from '../../../rpc-core/dist/core/errors.js'
+import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host'
+import { deserializeRpcError } from '../../../rpc-host/dist/core/index.js'
+import { createRpcTimeoutError, RpcTimeoutError } from '../../../rpc-host/dist/core/errors.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { createListenerFailure } from '@migaia/rpc-core/transport-kit'
+import { createListenerFailure } from '@migaia/rpc-host/plugin'
 import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 /** Flush continuations of actual native frames without advancing the deadline clock. */
@@ -198,7 +204,7 @@ describe('process session provider admission', () => {
     const client = await nativeEndpoint(clientChannel, 'client')
     /** Pending providers deliberately ignore signal yet allow deterministic cleanup afterward. */
     const providers: {
-      signal: import('@migaia/rpc-core').IRpcContext['signal']
+      signal: import('@migaia/rpc-host').IRpcContext['signal']
       resolve: (result: IRpcProviderResult) => void
       success: () => IRpcProviderResult
     }[] = []

@@ -50,7 +50,7 @@ export async function runIpcSide(unit, side, options = {}) {
   }
   /** The exact shared admission stops preparation before starting a peer or a measured window. */
   const { admitConformanceToolchains } =
-    await import('../../rpc-process/test/process/fixtures/conformance-toolchains.mjs')
+    await import('../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs')
   const admission = admitConformanceToolchains()
   if (!admission.accepted) throw new Error(JSON.stringify(admission))
   /** Portable business bytes are fixed by the selected unit, independent of the side. */

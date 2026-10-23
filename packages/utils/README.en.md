@@ -43,13 +43,15 @@ const body = await retry(
   async ({ attempt, signal }) => {
     console.log(`request ${attempt}`)
     const response = await fetch(`http://localhost:${port}/orders`, { signal })
-    if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
+    if (!response.ok)
+      throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
     return response.text()
   },
   {
     maxAttempts: 4,
     attemptTimeoutMs: 300, // wait at most 300 ms per request, then cancel that fetch
-    shouldRetry: (error) => isUtilsTimeoutError(error) || (error as { status?: number }).status! >= 500,
+    shouldRetry: (error) =>
+      isUtilsTimeoutError(error) || (error as { status?: number }).status! >= 500,
     delay: 100 // wait 100 ms between requests
   }
 )
@@ -115,16 +117,16 @@ A few terms used across the package:
 
 ## Typical scenarios
 
-| Scenario | How to combine | Details |
-| --- | --- | --- |
-| Time out a slow request and actually stop it | `withTimeout`, passing `signal` to `fetch` | [Usage guide](./USEGUIDE.en.md#time-out-a-slow-request-and-actually-stop-it) |
-| An operation that ignores `signal` fails after the deadline | `report` of `withTimeout` | [Usage guide](./USEGUIDE.en.md#where-a-failure-after-the-deadline-goes) |
-| Retry only 5xx, with backoff and a total limit | `shouldRetry`, `delay` and `totalTimeoutMs` of `retry` | [Usage guide](./USEGUIDE.en.md#retry-only-what-is-worth-retrying) |
+| Scenario                                                            | How to combine                                          | Details                                                                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Time out a slow request and actually stop it                        | `withTimeout`, passing `signal` to `fetch`              | [Usage guide](./USEGUIDE.en.md#time-out-a-slow-request-and-actually-stop-it)               |
+| An operation that ignores `signal` fails after the deadline         | `report` of `withTimeout`                               | [Usage guide](./USEGUIDE.en.md#where-a-failure-after-the-deadline-goes)                    |
+| Retry only 5xx, with backoff and a total limit                      | `shouldRetry`, `delay` and `totalTimeoutMs` of `retry`  | [Usage guide](./USEGUIDE.en.md#retry-only-what-is-worth-retrying)                          |
 | Limit a batch download and cancel queued tasks when the user leaves | `createConcurrencyLimiter` with `run(task, { signal })` | [Usage guide](./USEGUIDE.en.md#limit-a-batch-and-cancel-queued-tasks-when-the-user-leaves) |
-| Several modules initialize at once but open one connection | `onceAsync` | [Usage guide](./USEGUIDE.en.md#run-a-concurrent-initialization-only-once) |
-| Update a deep field without mutating | `set`, `get` | [Usage guide](./USEGUIDE.en.md#update-a-deep-field-without-mutating) |
-| Stop callers from changing config after handing it over | `ownConfig`, `readonlyConfig`, `patchConfig` | [Usage guide](./USEGUIDE.en.md#stop-callers-from-changing-config-after-handing-it-over) |
-| Recognize errors by code after wrapping | `attachErrorIdentity`, `walkErrorCauses` | [Usage guide](./USEGUIDE.en.md#recognize-the-underlying-cause-after-wrapping) |
+| Several modules initialize at once but open one connection          | `onceAsync`                                             | [Usage guide](./USEGUIDE.en.md#run-a-concurrent-initialization-only-once)                  |
+| Update a deep field without mutating                                | `set`, `get`                                            | [Usage guide](./USEGUIDE.en.md#update-a-deep-field-without-mutating)                       |
+| Stop callers from changing config after handing it over             | `ownConfig`, `readonlyConfig`, `patchConfig`            | [Usage guide](./USEGUIDE.en.md#stop-callers-from-changing-config-after-handing-it-over)    |
+| Recognize errors by code after wrapping                             | `attachErrorIdentity`, `walkErrorCauses`                | [Usage guide](./USEGUIDE.en.md#recognize-the-underlying-cause-after-wrapping)              |
 
 ## Installation
 
@@ -134,14 +136,15 @@ pnpm add @migaia/utils
 
 ## Common APIs
 
-| API | Subpath | What it does |
-| --- | --- | --- |
-| `withTimeout` | `/promise` | Gives an operation a deadline; at the deadline it aborts the operation's `signal`, then rejects with `DEADLINE_EXCEEDED`. |
-| `retry` | `/promise` | Retries serially by `shouldRetry`, with backoff, a per-attempt limit and a total limit. |
-| `createConcurrencyLimiter` | `/promise` | Caps how many tasks run at once; the rest queue in submission order and can be cancelled while queued. |
-| `onceAsync` | `/function` | Stores the Promise on the first call; every later call, including concurrent ones, gets it. |
-| `attachErrorIdentity` / `walkErrorCauses` | `/error` | Adds `source` and `code` to the original error; finds it again along `cause` and `AggregateError.errors`. |
-| `ownConfig` / `patchConfig` | `/config` | Copies config on the way in; creates a new config that reuses the unchanged parts. |
+| API                                                                       | Subpath     | What it does                                                                                                              |
+| ------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `withTimeout`                                                             | `/promise`  | Gives an operation a deadline; at the deadline it aborts the operation's `signal`, then rejects with `DEADLINE_EXCEEDED`. |
+| `retry`                                                                   | `/promise`  | Retries serially by `shouldRetry`, with backoff, a per-attempt limit and a total limit.                                   |
+| `createConcurrencyLimiter`                                                | `/promise`  | Caps how many tasks run at once; the rest queue in submission order and can be cancelled while queued.                    |
+| `onceAsync`                                                               | `/function` | Stores the Promise on the first call; every later call, including concurrent ones, gets it.                               |
+| `attachErrorIdentity` / `walkErrorCauses`                                 | `/error`    | Adds `source` and `code` to the original error; finds it again along `cause` and `AggregateError.errors`.                 |
+| `ownConfig` / `patchConfig`                                               | `/config`   | Copies config on the way in; creates a new config that reuses the unchanged parts.                                        |
+| `detectServerRuntime` / `detectElectronProcessType` / `detectGlobalScope` | Root        | Read the current server runtime, Electron role, and browser scope.                                                        |
 
 ## Contract details
 
@@ -154,6 +157,22 @@ The [usage guide](./USEGUIDE.en.md) holds every API's signature, options, defaul
 - [`/config`](./USEGUIDE.en.md#config-module): config ownership, read-only views, patches and merge strategies
 - [`/function`](./USEGUIDE.en.md#function-module): where `once` and `onceAsync` fit
 - [Collector](./USEGUIDE.en.md#collector), [troubleshooting](./USEGUIDE.en.md#troubleshooting-and-build-gates) and the [public entry index](./USEGUIDE.en.md#public-entry-index)
+
+### Root entry: current runtime and global scope
+
+The root `@migaia/utils` entry exports `detectServerRuntime`, `detectElectronProcessType`, and `detectGlobalScope`, plus their value/type domains `ServerRuntime`, `ElectronProcessType`, and `GlobalScopeKind`.
+
+- `detectServerRuntime()` selects Deno before Bun before Node. Deno needs its nonempty `Deno.version.deno`; Bun accepts its global object or a nonempty process-version marker. It returns `undefined` when no supported server marker exists.
+- `detectElectronProcessType()` requires Electron's version marker. Electron's historical `process.type === 'browser'` becomes `ElectronProcessType.main`; renderer and utility retain those names. Unknown process types return `undefined`.
+- `detectGlobalScope()` returns a Window, dedicated-worker, shared-worker, or service-worker scope only outside recognized server runtimes. The current global must be an instance of its corresponding constructor; a constructor's mere presence is insufficient.
+
+Every call reads current globals again; no import-time classification is cached. These helpers load no host modules and introduce no Node or DOM declaration dependency.
+
+```ts
+import { detectServerRuntime, detectElectronProcessType, detectGlobalScope } from '@migaia/utils'
+
+console.log(detectServerRuntime(), detectElectronProcessType(), detectGlobalScope())
+```
 
 ### `/promise`: when work starts and when a Promise is shared
 
@@ -201,7 +220,7 @@ With an injected scheduler, calculate deadlines with `scheduler.now()` and sched
 
 ### `/error`: use codes to decide how to handle a failure
 
-An error's `source` identifies its owner, and `code` identifies the failure within that owner. These are the keys and values of `UtilsErrorCode`. Attaching a code preserves native types such as `TypeError` and `RangeError`; do not depend on message wording.
+An error's `source` identifies its owner, and `code` identifies the failure within that owner. This package's stable domain is `UTILS_SOURCE === 'foundation.utils'`; npm import specifiers stay `@migaia/utils` and its published subpaths. These are the keys and values of `UtilsErrorCode`. Attaching a code preserves native types such as `TypeError` and `RangeError`; do not depend on message wording.
 
 - `invalidArgument` / `INVALID_ARGUMENT`: an argument has the wrong type or range; correct it before calling again.
 - `nonErrorValue` / `NON_ERROR_VALUE`: `toError()` wrapped a thrown value that was not an error; its original value is on `cause`.

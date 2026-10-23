@@ -9,10 +9,10 @@ import {
   RpcStreamViolation
 } from '@migaia/rpc-contract'
 import { normalizeStreamPayload } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../../rpc-core/dist/core/adapters/memory.js'
-import { createComposedEndpoint } from '../../../rpc-core/dist/core/composed.js'
-import { connect } from '../../../rpc-core/dist/core/middleware/connect.js'
-import { streamRoots } from '../../../rpc-core/test/streaming/fixture.js'
+import { createMemoryTransportPair } from '../../../rpc-host/dist/core/adapters/memory.js'
+import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { streamRoots } from '../../../rpc-host/test/streaming/fixture.js'
 
 /** Language-neutral sequence cases are executed against the actual consumer or producer owner. */
 type ISequenceVector = {

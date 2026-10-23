@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
-import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
+import {
+  createAdapterWebThreadLauncher as createWebThreadLauncher,
+  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+} from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 import { runWebBinaryQualification } from '../web-binary-esm.mjs'
 
 /** Actual Deno Workers execute the same canonical/native business path as the Web qualification. */

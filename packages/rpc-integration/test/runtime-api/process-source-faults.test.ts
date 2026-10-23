@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { PROCESS_RUNTIME_API_ENV } from '../../../rpc-process/dist/process/constants.js'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { PROCESS_RUNTIME_API_ENV } from '../../../rpc-plugin-process/dist/process/constants.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 
 /** The genuine child imports built public factories, independently from Vitest's source loader. */

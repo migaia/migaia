@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { nativeSession } from './native-harness.mjs'
-import { NativeReplayReceipt } from '../../../rpc-core/dist/core/internal/native-replay.js'
+import { NativeReplayReceipt } from '../../../rpc-host/dist/core/internal/native-replay.js'
 
 /** Diagnostic-only mutant isolates the previously missing parent terminal observation. */
 if (process.env.RPC_REPLAY_LOCAL_MUTANT === 'missing-terminal-checkpoint')

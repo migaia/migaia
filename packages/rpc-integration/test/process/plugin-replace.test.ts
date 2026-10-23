@@ -1,13 +1,13 @@
 import { PluginHost, isDefinedPlugin } from '@migaia/plugin-host'
 import { CapabilityLevel, createUnitBudget, ReplaceStrategy } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
-import type { IRemotePluginDefinition } from '@migaia/rpc-core/remote'
+import type { IRemotePluginDefinition } from '../../../rpc-host/dist/remote/plugin.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createProcessPlugin } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '@migaia/rpc-process'
-import type { IProcessPluginOptions } from '@migaia/rpc-process'
-import type { IProcessByteChannel } from '@migaia/rpc-process'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
+import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import { type IProcessPluginOptions } from '../../../rpc-plugin-process/test/protocol.ts'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 
 /** All replacement specs retain the same bootstrap secret while changing the launched command. */
 function spec(command: string, token: string): IProcessSpec {

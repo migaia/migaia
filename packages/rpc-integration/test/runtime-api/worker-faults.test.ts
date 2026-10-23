@@ -6,8 +6,8 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
+} from '@migaia/rpc-plugin-thread/adapters/node'
+import { nativeWorkerFor } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 /** The original native fixture observer exposes termination without a production diagnostic port. */
 const entry = fileURLToPath(new URL('./fixtures/worker-faults.mjs', import.meta.url))

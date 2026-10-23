@@ -38,22 +38,23 @@
     },
     "method": {
       "type": "object",
-      "required": [
-        "mode",
-        "idempotent"
-      ],
+      "required": ["mode", "idempotent"],
       "additionalProperties": false,
       "properties": {
         "mode": {
-          "enum": [
-            "request",
-            "one-way",
-            "generator",
-            "async-generator"
-          ]
+          "enum": ["request", "one-way", "generator", "async-generator"]
         },
         "idempotent": {
           "type": "boolean"
+        },
+        "input": {
+          "$ref": "#/$defs/methodSchema"
+        },
+        "output": {
+          "$ref": "#/$defs/methodSchema"
+        },
+        "yield": {
+          "$ref": "#/$defs/methodSchema"
         }
       },
       "if": {
@@ -75,9 +76,7 @@
     },
     "feature": {
       "type": "object",
-      "required": [
-        "methods"
-      ],
+      "required": ["methods"],
       "additionalProperties": false,
       "properties": {
         "methods": {
@@ -97,11 +96,7 @@
     },
     "contract": {
       "type": "object",
-      "required": [
-        "schemaVersion",
-        "plugin",
-        "features"
-      ],
+      "required": ["schemaVersion", "plugin", "features"],
       "additionalProperties": false,
       "properties": {
         "schemaVersion": {
@@ -145,10 +140,7 @@
     },
     "describeHost": {
       "type": "object",
-      "required": [
-        "schemaVersion",
-        "catalog"
-      ],
+      "required": ["schemaVersion", "catalog"],
       "additionalProperties": false,
       "properties": {
         "schemaVersion": {
@@ -188,22 +180,14 @@
     },
     "hostUseResult": {
       "type": "object",
-      "required": [
-        "name",
-        "state",
-        "revision",
-        "features"
-      ],
+      "required": ["name", "state", "revision", "features"],
       "additionalProperties": false,
       "properties": {
         "name": {
           "$ref": "#/$defs/name"
         },
         "state": {
-          "enum": [
-            "enabled",
-            "disabled"
-          ]
+          "enum": ["enabled", "disabled"]
         },
         "revision": {
           "type": "integer",
@@ -240,10 +224,7 @@
               "additionalProperties": false,
               "properties": {
                 "policy": {
-                  "enum": [
-                    "reject",
-                    "suspend"
-                  ]
+                  "enum": ["reject", "suspend"]
                 },
                 "dryRun": {
                   "type": "boolean"
@@ -260,9 +241,7 @@
       "oneOf": [
         {
           "type": "object",
-          "required": [
-            "ok"
-          ],
+          "required": ["ok"],
           "additionalProperties": false,
           "properties": {
             "ok": {
@@ -272,10 +251,7 @@
         },
         {
           "type": "object",
-          "required": [
-            "ok",
-            "errors"
-          ],
+          "required": ["ok", "errors"],
           "additionalProperties": false,
           "properties": {
             "ok": {
@@ -291,23 +267,14 @@
         },
         {
           "type": "object",
-          "required": [
-            "dryRun",
-            "policy",
-            "order",
-            "steps",
-            "edges"
-          ],
+          "required": ["dryRun", "policy", "order", "steps", "edges"],
           "additionalProperties": false,
           "properties": {
             "dryRun": {
               "const": true
             },
             "policy": {
-              "enum": [
-                "reject",
-                "suspend"
-              ]
+              "enum": ["reject", "suspend"]
             },
             "order": {
               "type": "array",
@@ -337,10 +304,7 @@
     },
     "hostInspectResult": {
       "type": "object",
-      "required": [
-        "revision",
-        "plugins"
-      ],
+      "required": ["revision", "plugins"],
       "additionalProperties": false,
       "properties": {
         "revision": {
@@ -351,22 +315,14 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name",
-              "state",
-              "revision",
-              "features"
-            ],
+            "required": ["name", "state", "revision", "features"],
             "additionalProperties": false,
             "properties": {
               "name": {
                 "$ref": "#/$defs/name"
               },
               "state": {
-                "enum": [
-                  "enabled",
-                  "disabled"
-                ]
+                "enum": ["enabled", "disabled"]
               },
               "revision": {
                 "type": "integer",
@@ -380,6 +336,71 @@
               }
             }
           }
+        }
+      }
+    },
+    "methodSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "enum": ["null", "boolean", "object", "array", "number", "integer", "string"]
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["null", "boolean", "object", "array", "number", "integer", "string"]
+              }
+            }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/methodSchema"
+          }
+        },
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "$ref": "#/$defs/methodSchema"
+        },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/portable"
+          }
+        },
+        "const": {
+          "$ref": "#/$defs/portable"
+        },
+        "anyOf": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/methodSchema"
+          }
+        },
+        "$defs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/methodSchema"
+          }
+        },
+        "$ref": {
+          "type": "string",
+          "pattern": "^#/[\\$]defs/"
         }
       }
     }

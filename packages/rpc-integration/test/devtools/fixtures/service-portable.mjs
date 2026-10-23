@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
-import { createRpcDevtools } from '@migaia/rpc-devtools'
-import { decodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { isProcessChild } from '@migaia/rpc-plugin-process'
+import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
+import { decodeRpcDevtoolsRecord } from '@migaia/rpc-plugin-devtools/contract'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import {
   RpcProbeDirection,
   RpcProbeKind,
   RpcProbeOutcome,
   RpcProbeStage
-} from '@migaia/rpc-core/probe'
+} from '@migaia/rpc-host/probe'
 import {
   CapabilityLevel,
   StandardCapability,
@@ -140,7 +141,7 @@ function codedError() {
  * @param {number} stage Canonical numeric message or encoded stage.
  * @param {unknown} content Original captured application reference.
  * @param {Error | undefined} error Native error for the failed logical completion.
- * @returns {import('@migaia/rpc-core/probe').IRpcProbeEventView} Complete public event view.
+ * @returns {import('@migaia/rpc-host/probe').IRpcProbeEventView} Complete public event view.
  * @throws {Error} No intentional failure; allocation failures retain their native identity.
  */
 function view(seq, stage, content, error = undefined) {
@@ -177,7 +178,8 @@ function view(seq, stage, content, error = undefined) {
 /**
  * Ingest native errors, both byte brands, and a class/function reference without converting them.
  *
- * @param {import('@migaia/rpc-devtools').IRpcDevtools} collector Actual independent collector.
+ * @param {import('@migaia/rpc-plugin-devtools').IRpcDevtools} collector Actual independent
+ *   collector.
  * @param {number} start First sequence of this four-event fixture batch.
  * @returns {number} Number of events synchronously ingested through the public collector.
  * @throws {Error} Original collector or native construction failure.
@@ -217,8 +219,8 @@ function assertError(wire) {
 /**
  * Assert the real service's wire representation without serializing or repairing its output.
  *
- * @param {readonly import('@migaia/rpc-devtools/contract').IRpcDevtoolsWireEvent[]} events Received
- *   query/watch rows.
+ * @param {readonly import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWireEvent[]} events
+ *   Received query/watch rows.
  * @param {boolean} exposed Whether the producing collector enables remote content.
  * @returns {void} Completes metadata, error and captured-content assertions.
  * @throws {Error} Concrete assertion or public error-deserializer failure.
@@ -249,12 +251,12 @@ function assertWireEvents(events, exposed) {
  */
 async function serve(exposed) {
   /** Collector input is independent from the unprobed service endpoint's transport traffic. */
-  const collector = createRpcDevtools({
+  const collector = devtoolsPlugin({
     stages: ['message', 'encoded'],
     capture: ['encoded'],
     exposeContent: exposed,
     onError: reportFailure
-  })
+  }).collector
   emitBatch(collector, 1)
   /** Readiness resolves only when Core actually calls the original service iterator's next method. */
   let started
@@ -266,26 +268,35 @@ async function serve(exposed) {
     started = resolve
   })
   /** The public service object stays mutable while its own methods remain the conversion owner. */
-  const service = /** @type {import('@migaia/rpc-devtools/contract').IRpcDevtoolsServiceApi} */ (
-    collector.service
-  )
+  const service =
+    /** @type {import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsServiceApi} */ (
+      collector.service
+    )
   /** Runtime invocation supplies the original serving context as the second provider argument. */
   const originalWatch = /**
    * @type {(
-   *   input?: Omit<import('@migaia/rpc-devtools/contract').IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,
-   *   context?: import('@migaia/rpc-core').IRpcContext
-   * ) => AsyncGenerator<import('@migaia/rpc-devtools/contract').IRpcDevtoolsWatchBatch>}
+   *   input?: Omit<
+   *     import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsQuery,
+   *     'afterSeq' | 'limit'
+   *   >,
+   *   context?: import('@migaia/rpc-host').IRpcContext
+   * ) => AsyncGenerator<import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWatchBatch>}
    */ (service.watch)
   /**
    * Observe readiness while returning the exact service-owned iterator and forwarding its context.
    *
-   * @param {Omit<import('@migaia/rpc-devtools/contract').IRpcDevtoolsQuery, 'afterSeq' | 'limit'>
+   * @param {Omit<
+   *       import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsQuery,
+   *       'afterSeq' | 'limit'
+   *     >
    *   | undefined} input
    *   Original watch filter.
-   * @param {import('@migaia/rpc-core').IRpcContext | undefined} context Original serving provider
+   * @param {import('@migaia/rpc-host').IRpcContext | undefined} context Original serving provider
    *   context.
-   * @returns {AsyncGenerator<import('@migaia/rpc-devtools/contract').IRpcDevtoolsWatchBatch>} Exact
-   *   original service iterator.
+   * @returns {AsyncGenerator<
+   *   import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWatchBatch
+   * >}
+   *   Exact original service iterator.
    * @throws {Error} Original synchronous service setup failure.
    */
   service.watch = (input, context) => {
@@ -298,7 +309,7 @@ async function serve(exposed) {
      *
      * @param {unknown} value Original optional generator input.
      * @returns {Promise<
-     *   IteratorResult<import('@migaia/rpc-devtools/contract').IRpcDevtoolsWatchBatch>
+     *   IteratorResult<import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWatchBatch>
      * >}
      *   Exact native next Promise.
      * @throws {Error} Original synchronous next invocation failure.

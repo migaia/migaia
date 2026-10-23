@@ -6,27 +6,27 @@
 
 ## 按场景查找
 
-| 你遇到的问题 | 看这一节 |
-| --- | --- |
-| 子进程崩溃后要自动重启 | [监督一个真实的子进程](#监督一个真实的子进程) |
-| 配置错误导致反复崩溃，想及时停下并看到原因 | [崩溃太多次就停下](#崩溃太多次就停下) |
-| 后台任务卡住了，但没有退出 | [用心跳发现卡住的任务](#用心跳发现卡住的任务) |
-| 一次起太多任务，机器扛不住 | [限制同时运行的数量](#限制同时运行的数量) |
-| 发布新版本时不想中断服务 | [不中断地替换实例](#不中断地替换实例) |
-| 关闭应用时被不肯退出的任务卡住 | [限时停止与名额归还](#限时停止与名额归还) |
+| 你遇到的问题                                 | 看这一节                                      |
+| -------------------------------------------- | --------------------------------------------- |
+| 子进程崩溃后要自动重启                       | [监督一个真实的子进程](#监督一个真实的子进程) |
+| 配置错误导致反复崩溃，想及时停下并看到原因   | [崩溃太多次就停下](#崩溃太多次就停下)         |
+| 后台任务卡住了，但没有退出                   | [用心跳发现卡住的任务](#用心跳发现卡住的任务) |
+| 一次起太多任务，机器扛不住                   | [限制同时运行的数量](#限制同时运行的数量)     |
+| 发布新版本时不想中断服务                     | [不中断地替换实例](#不中断地替换实例)         |
+| 关闭应用时被不肯退出的任务卡住               | [限时停止与名额归还](#限时停止与名额归还)     |
 | 父进程被结束后，子进程还在；下次启动又起一批 | [父进程退出与遗留进程](#父进程退出与遗留进程) |
-| 每次都现起进程，等待太久 | [预热进程](#预热进程) |
+| 每次都现起进程，等待太久                     | [预热进程](#预热进程)                         |
 
 ## 监督一个真实的子进程
 
-本包只定义“启动器”接口，不直接调用操作系统 API，这样同一套策略可以用在 Node、Bun、Deno 和 Electron 上。`@migaia/rpc-process` 提供了现成的启动器，Node 用 `createNodeProcessLauncher()`。
+本包只定义“启动器”接口，不直接调用操作系统 API，这样同一套策略可以用在 Node、Bun、Deno 和 Electron 上。`@migaia/rpc-plugin-process` 提供了现成的启动器，Node 用 `createNodeProcessLauncher()`。
 
 下面的子进程每次启动 200 毫秒后都以退出码 3 崩溃，模拟一个读错配置的索引服务。监督器每次崩溃后间隔一段时间重启，重启 2 次后仍然失败，就进入 `terminal` 并停止尝试。
 
 ```ts doc-test=run
 import { createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
 const indexer = createProcessSupervisor({
@@ -334,7 +334,11 @@ stop() 已返回，占用名额: 1
 
 ```ts doc-test=run
 import { createParentLossGuard, reclaimOrphanProcesses } from '@migaia/supervision/process'
-import type { IProcessLauncher, IProcessRecord, IProcessRegistry } from '@migaia/supervision/process'
+import type {
+  IProcessLauncher,
+  IProcessRecord,
+  IProcessRegistry
+} from '@migaia/supervision/process'
 
 // 子进程这一侧：父进程断开后，在 1 秒内收尾并退出。
 const guard = createParentLossGuard({
@@ -351,13 +355,30 @@ await new Promise((resolve) => setTimeout(resolve, 100))
 
 // 父进程这一侧：这里用内存模拟持久存储，真实程序里应该写到文件或数据库。
 const records = new Map<string, IProcessRecord>([
-  ['a', { id: 'a', namespace: 'indexer', identity: { fingerprint: 'boot-1:4101', pid: 4101 }, launchedAt: 0 }],
-  ['b', { id: 'b', namespace: 'indexer', identity: { fingerprint: 'boot-1:4102', pid: 4102 }, launchedAt: 0 }]
+  [
+    'a',
+    {
+      id: 'a',
+      namespace: 'indexer',
+      identity: { fingerprint: 'boot-1:4101', pid: 4101 },
+      launchedAt: 0
+    }
+  ],
+  [
+    'b',
+    {
+      id: 'b',
+      namespace: 'indexer',
+      identity: { fingerprint: 'boot-1:4102', pid: 4102 },
+      launchedAt: 0
+    }
+  ]
 ])
 const registry: IProcessRegistry = {
   add: async (record) => void records.set(record.id, record),
   remove: async (id) => void records.delete(id),
-  list: async (namespace) => [...records.values()].filter((record) => record.namespace === namespace)
+  list: async (namespace) =>
+    [...records.values()].filter((record) => record.namespace === namespace)
 }
 // 回收需要启动器能够探测和结束记录里的进程；这里只模拟这两步。
 const launcher: IProcessLauncher = {
@@ -366,7 +387,12 @@ const launcher: IProcessLauncher = {
   probe: async (record) => (record.identity.pid === 4101 ? 'alive' : 'reused'),
   terminateRecord: async (record) => console.log('结束遗留进程', record.identity.pid)
 }
-const result = await reclaimOrphanProcesses({ registry, namespace: 'indexer', launcher, report: console.error })
+const result = await reclaimOrphanProcesses({
+  registry,
+  namespace: 'indexer',
+  launcher,
+  report: console.error
+})
 console.log('已结束:', result.terminated, '| 已删除记录:', result.removed)
 ```
 
@@ -389,7 +415,7 @@ console.log('已结束:', result.terminated, '| 已删除记录:', result.remove
 import { createUnitBudget } from '@migaia/supervision'
 import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const launcher = createNodeProcessLauncher()
 const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })
@@ -399,7 +425,14 @@ const spec: IProcessSpec = {
   env: { inherit: [], set: {} },
   stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }
 }
-const options = { id: 'renderer', launcher, budget, spec, isolation: 'best-effort' as const, report: () => undefined }
+const options = {
+  id: 'renderer',
+  launcher,
+  budget,
+  spec,
+  isolation: 'best-effort' as const,
+  report: () => undefined
+}
 const pool = createPrewarmPool({ ...options, size: 1 })
 await new Promise((resolve) => setTimeout(resolve, 300))
 console.log('空闲进程:', pool.idle)

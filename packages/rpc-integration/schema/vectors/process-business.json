@@ -1,35 +1,15 @@
 {
   "schema": "migaia.rpc.process-business/1",
-  "hostProfiles": [
-    false,
-    true
-  ],
+  "hostProfiles": [false, true],
   "cases": [
     {
       "id": "native-public-facades",
       "producer": "independent-language-peer",
-      "consumer": [
-        "createProcessPlugin",
-        "createProcessPeer"
-      ],
-      "runtimes": [
-        "python",
-        "rust",
-        "go",
-        "node",
-        "bun"
-      ],
-      "deployments": [
-        "owned-stdio",
-        "borrowed-unix"
-      ],
+      "consumer": ["createProcessPlugin", "createProcessPeer"],
+      "runtimes": ["python", "rust", "go", "node", "bun"],
+      "deployments": ["owned-stdio", "borrowed-unix"],
       "businessOracle": "test/process/peers/ts/public-behavior.json",
-      "methods": [
-        "request",
-        "oneWay",
-        "generator",
-        "asyncGenerator"
-      ]
+      "methods": ["request", "oneWay", "generator", "asyncGenerator"]
     },
     {
       "id": "response-receiver-binding",
@@ -54,16 +34,8 @@
     },
     {
       "id": "native-core-trace-isolation",
-      "concurrent": [
-        "h-trace-one",
-        "h-trace-two",
-        null
-      ],
-      "providerObserved": [
-        "h-trace-one",
-        "h-trace-two",
-        null
-      ],
+      "concurrent": ["h-trace-one", "h-trace-two", null],
+      "providerObserved": ["h-trace-one", "h-trace-two", null],
       "facadeTrace": null
     },
     {
@@ -74,26 +46,11 @@
     {
       "id": "jsonrpc-public-facades",
       "producer": "independent-language-peer",
-      "runtimes": [
-        "python",
-        "rust",
-        "go"
-      ],
-      "requiredBlocked": [
-        "typescript-public-responder"
-      ],
-      "consumer": [
-        "createProcessPlugin",
-        "createProcessPeer"
-      ],
-      "deployments": [
-        "owned-stdio-caller-fd-launcher",
-        "borrowed-unix-explicit-custom-health"
-      ],
-      "methods": [
-        "request",
-        "oneWay"
-      ],
+      "runtimes": ["python", "rust", "go"],
+      "requiredBlocked": ["typescript-public-responder"],
+      "consumer": ["createProcessPlugin", "createProcessPeer"],
+      "deployments": ["owned-stdio-caller-fd-launcher", "borrowed-unix-explicit-custom-health"],
+      "methods": ["request", "oneWay"],
       "firstStdinByte": 67,
       "notification": {
         "id": "absent",
@@ -125,25 +82,10 @@
     },
     {
       "id": "jsonrpc-bare-physical-echo",
-      "runtimes": [
-        "python",
-        "rust",
-        "go"
-      ],
-      "parentRuntimes": [
-        "node",
-        "bun"
-      ],
-      "deployments": [
-        "stdio-content-length",
-        "socket-content-length"
-      ],
-      "payloadBytes": [
-        64,
-        1024,
-        65536,
-        1048576
-      ],
+      "runtimes": ["python", "rust", "go"],
+      "parentRuntimes": ["node", "bun"],
+      "deployments": ["stdio-content-length", "socket-content-length"],
+      "payloadBytes": [64, 1024, 65536, 1048576],
       "bare": "exact-body-bytes-no-json-or-business-dispatch",
       "rpc": "public-bridge-p.f.request",
       "bootstrap": "dedicated-fd-both-sides",
@@ -152,12 +94,7 @@
     },
     {
       "id": "native-physical-fault-hooks",
-      "runtimes": [
-        "python",
-        "go",
-        "rust",
-        "node"
-      ],
+      "runtimes": ["python", "go", "rust", "node"],
       "deployment": "stdio",
       "methods": {
         "peer.busy": "ACK-then-real-infinite-CPU",
@@ -167,12 +104,7 @@
     },
     {
       "id": "actual-descendant-parent-kill9",
-      "runtimes": [
-        "python",
-        "go",
-        "rust",
-        "node"
-      ],
+      "runtimes": ["python", "go", "rust", "node"],
       "parent": "public-processPeer",
       "descendant": "sleep-600-no-protocol-fds",
       "before": "native-PID-list-child-present",
@@ -187,12 +119,7 @@
     },
     {
       "id": "native-missing-stream-capability",
-      "runtimes": [
-        "python",
-        "go",
-        "rust",
-        "node"
-      ],
+      "runtimes": ["python", "go", "rust", "node"],
       "offer": "public-native-stream-false",
       "negotiatedStream": false,
       "consumer": "public-composed-stream-owner",
@@ -204,13 +131,7 @@
     },
     {
       "id": "native-declared-non-idempotent-request",
-      "runtimes": [
-        "python",
-        "rust",
-        "go",
-        "node",
-        "bun"
-      ],
+      "runtimes": ["python", "rust", "go", "node", "bun"],
       "argument": "--contract caller-owned-remote-contract.json",
       "contractPath": "contracts[0].value.features.f.methods.request.idempotent",
       "declaration": false,

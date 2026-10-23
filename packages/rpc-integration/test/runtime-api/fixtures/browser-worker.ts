@@ -1,8 +1,8 @@
-import type { IRuntimeDynamicSurface } from '../../../../rpc-core/dist/remote/runtime-api/typing.js'
-import { createThreadPeer } from '@migaia/rpc-threads'
-import { RpcError, RpcCoreErrorCode } from '../../../../rpc-core/dist/core/errors.js'
-import { RpcCoreErrorText } from '../../../../rpc-core/dist/core/error-text.js'
-import type { IRpcContext } from '../../../../rpc-core/dist/core/typing.js'
+import type { IRuntimeDynamicSurface } from '../../../../rpc-host/dist/remote/runtime-api/typing.js'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { RpcError, RpcCoreErrorCode } from '../../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorText } from '../../../../rpc-host/dist/core/error-text.js'
+import type { IRpcContext } from '../../../../rpc-host/dist/core/typing.js'
 
 /** These counts belong to actual Worker business, independent of browser caller in-flight state. */
 let executions = 0

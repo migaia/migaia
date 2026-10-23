@@ -4,9 +4,9 @@ export const ERROR_SOURCE = 'store.shared'
 /**
  * Declares the public error codes for `store.shared` in one place.
  *
- * Package-owned failures use the pair `(source, code)`, with source `store.shared`.
- * Complete foreign updater identities retain their original owner instead of being relabeled. Throw
- * sites use these constants instead of inline literals.
+ * Package-owned failures use the pair `(source, code)`, with source `store.shared`. Complete
+ * foreign updater identities retain their original owner instead of being relabeled. Throw sites
+ * use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

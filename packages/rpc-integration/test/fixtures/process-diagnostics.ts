@@ -1,27 +1,30 @@
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import type { IRpcTransport } from '@migaia/rpc-core'
-import type { IProcessCommonOptions } from '@migaia/rpc-process'
-import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
+import { type IRpcTransport } from '../../../rpc-host/dist/core/index.js'
+import type { IProcessCommonOptions } from '../../../rpc-plugin-process/dist/process/types.js'
+import { RpcPlatform } from '@migaia/rpc-host/plugin'
 import {
   createRuntimeMessageConnection,
   type IRuntimeByteDiagnostics
-} from '@migaia/rpc-core/adapter/internal-advanced'
-import { captureProcessTask } from '../../../rpc-process/dist/process/adapter.js'
-import type { IRuntimeMessageIO } from '../../../rpc-core/dist/runtime-adapter/byte/types.js'
-import type { IRuntimePeerOptions } from '@migaia/rpc-core/remote'
-import { createProcessListenerPeer } from '../../../rpc-process/dist/process/runtime-listener.js'
+} from '@migaia/rpc-host/plugin'
+import { captureProcessTask } from '../../../rpc-plugin-process/test/protocol.ts'
+import type { IRuntimeMessageIO } from '../../../rpc-host/dist/runtime-adapter/byte/types.js'
+import type { IRuntimePeerOptions } from '@migaia/rpc-host/plugin'
+import { createProcessListenerPeer } from '../../../rpc-plugin-process/test/protocol.ts'
 import {
   bindRuntimeByteWire,
   bindRuntimeMessageTransport
-} from '../../../rpc-core/dist/runtime-adapter/byte/carrier.js'
-import { attachIpcConnection as attachGenericIpcConnection } from '../../../rpc-core/dist/runtime-adapter/byte/ipc-connection.js'
+} from '../../../rpc-host/dist/runtime-adapter/byte/carrier.js'
+import { attachIpcConnection as attachGenericIpcConnection } from '../../../rpc-host/dist/runtime-adapter/byte/ipc-connection.js'
 import {
   createRuntimeBytePipeline,
   runtimeMessagePipeline
-} from '../../../rpc-core/dist/runtime-adapter/byte/pipeline.js'
-import { ERROR_SOURCE, RpcProcessErrorCode } from '../../../rpc-process/dist/process/error-code.js'
-import { RpcProcessErrorText } from '../../../rpc-process/dist/process/error-text.js'
-import { attachIpcStderr } from '../../../rpc-process/dist/process/stderr.js'
+} from '../../../rpc-host/dist/runtime-adapter/byte/pipeline.js'
+import {
+  ERROR_SOURCE,
+  RpcProcessErrorCode
+} from '../../../rpc-plugin-process/dist/process/error-code.js'
+import { RpcProcessErrorText } from '../../../rpc-plugin-process/dist/process/error-text.js'
+import { attachIpcStderr } from '../../../rpc-plugin-process/dist/process/stderr.js'
 
 /** Historical redaction fixture checks that native stderr payloads stay out of reported records. */
 export const CHILD_STDERR_REDACTED = '[child stderr redacted]'

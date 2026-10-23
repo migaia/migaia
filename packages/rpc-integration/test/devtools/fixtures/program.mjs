@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { isProcessChild } from '@migaia/rpc-plugin-process'
+import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
 import { fixtureAuthentication } from './auth.mjs'
 import {
   observedCore,
@@ -57,7 +58,7 @@ if (childMode) {
        * Cascading business explicitly passes the original caller trace to the real Worker Endpoint.
        *
        * @param {number} value Parent's real business payload.
-       * @param {import('@migaia/rpc-core').IRpcContext} context Original admitted caller context
+       * @param {import('@migaia/rpc-host').IRpcContext} context Original admitted caller context
        *   and explicit trace.
        * @returns {Promise<{
        *   value: number

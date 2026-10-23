@@ -5,9 +5,10 @@ import { setImmediate as nextTurn } from 'node:timers/promises'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, it } from 'vitest'
-import { createNodeThreadChannel } from '@migaia/rpc-threads'
-import { createEndpoint, authentication, connect } from '@migaia/rpc-core'
-import { readAuthenticationEnvelope } from '../../../rpc-core/dist/core/middleware/authentication-envelope.js'
+import { createNodeThreadChannel } from '../../../rpc-plugin-thread/dist/threads/channel.js'
+import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
+import { authentication, connect } from '../../../rpc-host/dist/core/index.js'
+import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 
 /** A public fixture key proves whole-frame coverage without using or recording any credential. */
 function signature(value: unknown): string {
