@@ -150,3 +150,8 @@ Repeated explicit `dispose()` calls return one cached Promise. Symbolic
 cleanup uses a separate cached Promise, reports failure and completes; both
 perform native cleanup once. Dispose the store/host before its caller-owned
 connection. A disposed store stays terminal even when cleanup fails.
+
+The standard `sql` token exposes the same native tag as `storage.use(sql).sql`.
+Inside transactions, `tx.use(sql).sql` binds the current short view through the original owner.
+Native results, exact root row types and SQLite's required `lastInsertRowid` remain intact;
+there is no second budget or compiler.

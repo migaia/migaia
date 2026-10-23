@@ -9,7 +9,7 @@ import { deferred } from '@migaia/utils/promise'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { persistTransaction } from '@migaia/store-persist'
-import { kv, records, lockKey, type ISqlExecutor } from '@migaia/storage-contract'
+import { kv, records, sql, lockKey, type ISqlExecutor } from '@migaia/storage-contract'
 import {
   sqliteBackendPlugin,
   sqliteBackendKind,
@@ -28,11 +28,15 @@ function countRows(executor: ISqlExecutor<ISqliteValue, ISqliteRunResult>) {
 }
 /** Persist and SQL share the actual native transaction, including concrete scope extensions. */
 it('commits persistence and native SQL through one original transaction', async () => {
+  /** Standard capability projection must not duplicate the native SQL execution or observations. */
+  const operations: string[] = []
   const connection = nodeSqliteDriver(':memory:')
   const host = await createStorageHost({
+    hooks: { beforeStorageOperation: ({ operation }) => operations.push(operation) },
     plugins: [sqliteBackendPlugin({ driver: connection })] as const
   })
   const storage = host.backend('sqlite')
+  expect(storage.use(sql).sql).toBe(storage.sql)
   const state = createStore({ count: 0 })
   const handle = persist(state, { key: 'counter', storage, version: 1 })
   onTestFinished(async () => {
@@ -58,6 +62,22 @@ it('commits persistence and native SQL through one original transaction', async 
     state: { count: 1 }
   })
   expect(await countRows(storage)).toMatchObject({ count: 1 })
+  const capabilityCount = await storage.use(sql)
+    .sql<ICountRow>`SELECT count(*) AS count FROM consumer_rows`.get()
+  expectTypeOf(capabilityCount).toEqualTypeOf<ICountRow | undefined>()
+  expect(capabilityCount).toMatchObject({ count: 1 })
+  /** The standard projection borrows a fresh native view while retaining the original SQL budget. */
+  let saved!: () => Promise<unknown>
+  const beforeCapability = operations.length
+  await storage.transaction(async (tx) => {
+    const query = tx.use(sql).sql`SELECT count(*) AS count FROM consumer_rows`
+    saved = () => query.get()
+    expect(await saved()).toMatchObject({ count: 1 })
+    await tx.use(sql).sql`INSERT INTO consumer_rows VALUES(${3})`.run()
+  })
+  expect(operations.slice(beforeCapability)).toEqual(['sql', 'sql'])
+  await expect(saved()).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+  expect(await countRows(storage)).toMatchObject({ count: 2 })
   const failure = new Error('consumer rollback')
   await expect(
     persistTransaction(storage, [handle], async (tx) => {
@@ -66,7 +86,7 @@ it('commits persistence and native SQL through one original transaction', async 
     })
   ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: failure })
   await handle.flush()
-  expect(await countRows(storage)).toMatchObject({ count: 1 })
+  expect(await countRows(storage)).toMatchObject({ count: 2 })
 })
 
 /** A real dependent plugin borrows the original provider without acquiring close authority. */

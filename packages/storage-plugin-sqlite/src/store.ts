@@ -27,6 +27,7 @@ import {
   implement,
   kv,
   records,
+  sql,
   createRecordQuery,
   type IStorageKey,
   type IStorageBatchKey,
@@ -2605,12 +2606,24 @@ export function createSqliteStore<TValue>(
           )
       }) satisfies ITransactionRecordsApi<TValue>
   })
+  /** The standard SQL capability borrows the exact native tag and existing operation owner. */
+  const sqlImplementation = implement(
+    sql,
+    { sql: base.sql },
+    {
+      forTransaction: (scope) => ({ sql: (scope as ISqliteTransactionScope<TValue>).sql })
+    }
+  )
   try {
-    store = provideCapabilities(base, [kvImplementation, recordImplementation] as const, {
-      onInstaller: (value) => {
-        installer = value
+    store = provideCapabilities(
+      base,
+      [kvImplementation, recordImplementation, sqlImplementation] as const,
+      {
+        onInstaller: (value) => {
+          installer = value
+        }
       }
-    })
+    )
     stages = core.stageBindings
     operationStages = stages.operationStages(store)
     sqlStages = stages.sqlStages(store)
