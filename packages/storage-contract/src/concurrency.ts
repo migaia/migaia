@@ -499,6 +499,7 @@ export type IConcurrencyAttempt<TResult> =
     }
 /** Each backend attempt borrows the same operation signal and records only real admission waits. */
 export type IConcurrencyAttemptContext = ITransactionOptions & {
+  readonly attempt: number
   readonly admission: 'try' | 'wait'
   readonly locking: IConcurrencyPolicy['locking']
   readonly waitTimeoutMs?: number
@@ -891,6 +892,7 @@ export async function runWithConcurrency<TResult>(
         signal: budget.cancellation.signal,
         lock: locks?.map((entry) => snapshotLockKey(entry.key, backend)),
         concurrency: capturedOverride,
+        attempt: budget.conflicts + 1,
         admission,
         locking: policy.locking,
         waitTimeoutMs:
