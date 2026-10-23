@@ -1750,6 +1750,25 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: 'console.log(QueryOperation.where, QueryOperation.select) // where select'
     },
+    snapshotStorageWhere: {
+      role: 'operation',
+      purpose: t(
+        'Capture the original immutable canonical query AST for native translation; reuse the same single-read parser, field validation and INVALID_ARGUMENT cause.',
+        '捕获原不可变规范查询 AST 供原生翻译；复用同一单读 parser、字段校验及 INVALID_ARGUMENT 原因。'
+      ),
+      params: {
+        where: t(
+          'Declarative IWhere input; field accessors are captured once.',
+          '声明式 IWhere 输入，字段访问器只读取一次。'
+        )
+      },
+      returns: t(
+        'The same frozen IQueryCondition domain supplied to native source callbacks; no I/O, compiler or owner is created.',
+        '与原生 source 回调相同的冻结 IQueryCondition 值域；不创建 I/O、compiler 或 owner。'
+      ),
+      example: storageContractCases.snapshotStorageWhere![0]!.example,
+      cases: storageContractCases.snapshotStorageWhere
+    },
     compileStorageQueryCondition: {
       role: 'operation',
       purpose: t(

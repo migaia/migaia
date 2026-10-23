@@ -231,7 +231,7 @@ function snapshotQueryField(
   return Object.freeze({ kind: QueryConditionKind.field, path, operator, value: captured })
 }
 /** Captures the single canonical AST, distinguishing field operators from recursive nested records. */
-function snapshotStorageWhere(where: unknown): IQueryCondition {
+export function snapshotStorageWhere(where: unknown): IQueryCondition {
   /**
    * Only currently active container ancestors reject cycles; independent shared siblings remain
    * legal.

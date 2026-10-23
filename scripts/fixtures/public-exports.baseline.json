@@ -1132,6 +1132,7 @@
         "snapshotStorageVectorFilter",
         "snapshotStorageVectorSearch",
         "snapshotStorageVectorUpsert",
+        "snapshotStorageWhere",
         "snapshotSyncWriteOptions",
         "term",
         "ttl",

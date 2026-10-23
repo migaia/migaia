@@ -846,6 +846,24 @@ async function pages(source: IRecordQuerySource) {
       )
     }
   ],
+  snapshotStorageWhere: [
+    {
+      title: t('Share a canonical native filter input', '共享规范原生过滤输入'),
+      problem: t(
+        'A native backend must translate the same query AST without repeating operator or getter rules.',
+        '原生后端须翻译相同查询 AST，不能重复操作符或 getter 规则。'
+      ),
+      example: `import { snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
+const condition = snapshotStorageWhere({ total: { gte: 2 } })
+const matches = compileStorageQueryCondition<{ total: number }>(condition)
+console.log(matches({ total: 3 }), matches({ total: 1 }))
+// true false`,
+      result: t(
+        'One immutable AST serves native translation and the original predicate compiler.',
+        '一个不可变 AST 同时供原生翻译与原谓词 compiler 使用。'
+      )
+    }
+  ],
   compileStorageQueryCondition: [
     {
       title: t(
