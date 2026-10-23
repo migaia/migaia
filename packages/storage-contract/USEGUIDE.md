@@ -718,3 +718,18 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
 ```
 
 声明 transactions 的 base/Feature 必须为已提供的 kv、records 提供真实 forTransaction，provider 在发布或修改 base 前检查；binder 只绑定当前原生视图，不得返回根 API。查询构造保持纯函数，后端 source 必须把真实 iterator 登记到该 scope 的原 owner。ITransactionScope 的第二泛型与 ITransactionCapabilityView 保留能力集合的反变约束；provider 重新投影原 transaction/tx 的 use 类型，同时保留原生附加成员、options、builder 增强和 Awaited 结果。其它标准事务投影与根 KV 批量面待对应后续实现，不由此处宣称完成。
+
+## 规范键前缀
+
+`snapshotStorageKeyPrefix(prefix, backend)` 从原键域制作一次独立快照，返回 `{ key, lower, upper, matches }`。string 按 UTF-16 内容前缀匹配，ArrayBuffer 按字节前缀匹配；array 按完整的领先子键序列匹配，不把末尾子键也当成部分前缀；number 与 Date 只匹配精确规范身份，-0 与 0 相同。空 string/buffer 合法，空 array 仍由原键域拒绝。
+
+原 encoder 的同一 writer 仅省略最外层变长键的终止符，保留子键全部边界与类型 tag。lower 为包含端，upper 是必有的严格字节后继、不包含端；完整 encodeOrderedStorageKey 输出不变。有序原生结构按这个范围定位；逻辑键 IndexedDB cursor 可从 key 做 lowerBound，遇第一个 matches=false 即停止，最多多读一条边界。文本 Web 的 origin 枚举例外也复用同一 prepared matches。函数不创建索引、不扫描存量；返回 key/bounds 的修改不影响捕获的私有 matcher，调用方应保持其用于查询的边界值不变。
+
+```ts
+import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.
+```

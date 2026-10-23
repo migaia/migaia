@@ -591,3 +591,18 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
 ```
 
 A base/Feature declaring transactions must provide real forTransaction bindings for supplied kv and records. The provider checks before publication or base mutation. Binders use the current native view and must not return root APIs. Query construction remains pure, and the backend source must register its actual iterator with that scope's original owner. The second ITransactionScope generic and ITransactionCapabilityView preserve capability-set contravariance. Provider type projection replaces transaction/tx use while retaining native extensions, options, builder augmentation and Awaited results. Other standard transaction projections and the root KV batch surface remain for later implementations.
+
+## Canonical key prefixes
+
+`snapshotStorageKeyPrefix(prefix, backend)` captures the original key domain once and returns `{ key, lower, upper, matches }`. Strings match UTF-16 content prefixes and ArrayBuffers match byte prefixes. Arrays match complete leading child-key sequences, without treating their final child as a partial prefix. Numbers and Dates match exact canonical identities; -0 equals 0. Empty strings/buffers remain valid, while the original key domain still rejects empty arrays.
+
+The original encoder's writer omits only the outer variable key terminator and retains every child boundary and type tag. lower is inclusive and upper is its guaranteed strict byte successor, exclusive. Complete encodeOrderedStorageKey output is unchanged. Native ordered structures locate that range. A logical-key IndexedDB cursor may start at key via lowerBound and stop on the first matches=false, reading at most one extra boundary row. The text Web origin-enumeration exception also reuses this prepared matcher. No index or stored-data scan is created by the helper. Mutating exposed key/bounds does not change the captured private matcher; callers should keep the boundaries they use for queries unchanged.
+
+```ts
+import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.
+```

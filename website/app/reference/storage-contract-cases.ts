@@ -33,6 +33,33 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  snapshotStorageKeyPrefix: [
+    {
+      title: t('Locate one typed canonical prefix', '定位一个 typed 规范前缀'),
+      problem: t(
+        'Backends need identical prefix rules and ordered bounds without copying validators or scanning unrelated data.',
+        '后端需要一致前缀规则与有序边界，不能复制验证器或扫描无关数据。'
+      ),
+      example: t(
+        `import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.`,
+        `import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
+const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
+const included = prefix.matches(['cache', 'users', 1])
+const excluded = prefix.matches(['cache', 'users-extra'])
+// included === true; excluded === false
+// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.`
+      ),
+      result: t(
+        'The complete child sequence matches the extended tuple but excludes a different last child. lower/upper bound the same canonical byte range; the matcher is independent of exposed mutable copies.',
+        '完整子键序列匹配扩展 tuple，排除不同末子键；lower/upper 定位同一规范字节范围，matcher 独立于外露可变副本。'
+      )
+    }
+  ],
   useTransactionCapability: [
     {
       title: t(

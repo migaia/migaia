@@ -1085,6 +1085,7 @@
         "snapshotStorageBaseDetailed",
         "snapshotStorageCapabilities",
         "snapshotStorageKey",
+        "snapshotStorageKeyPrefix",
         "snapshotSyncWriteOptions",
         "sqlFragment",
         "unprefixStorageOrgKey",

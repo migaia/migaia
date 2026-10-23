@@ -686,6 +686,29 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    snapshotStorageKeyPrefix: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot one typed prefix through the canonical key validator/writer and produce native ordered bounds.',
+        '通过规范键 validator/writer 快照一个 typed 前缀，生成原生有序边界。'
+      ),
+      params: {
+        prefix: t(
+          'Existing key domain: string/buffer content prefix, complete array-child prefix, or exact number/Date identity.',
+          '现有键域：string/buffer 内容前缀、完整 array 子键前缀，或精确 number/Date 身份。'
+        ),
+        backend: t(
+          'Actual backend diagnostic or undefined when no store exists.',
+          '真实后端诊断；无 store 时为 undefined。'
+        )
+      },
+      returns: t(
+        'IStorageKeyPrefix with detached logical key, inclusive lower, exclusive upper and private canonical matches. No store scan, index or authority.',
+        'IStorageKeyPrefix：独立逻辑键、包含 lower、不包含 upper 和私有规范 matches；无存量扫描、索引或权限。'
+      ),
+      example: storageContractCases.snapshotStorageKeyPrefix![0]!.example,
+      cases: storageContractCases.snapshotStorageKeyPrefix
+    },
     useTransactionCapability: {
       role: 'operation',
       purpose: t(
@@ -2537,6 +2560,35 @@ console.log(candidate.name, candidate.output)`
     IConcurrencyStageObserver: {
       summary: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。'),
       members: {}
+    },
+    IStorageKeyPrefix: {
+      summary: t(
+        'Prepared canonical prefix data and matching, independent of any store or internal index.',
+        'Prepared 规范前缀数据与判定，独立于任何 store 或内部索引。'
+      ),
+      members: {
+        key: {
+          summary: t(
+            'Detached logical key suitable for native lowerBound cursors.',
+            '适合原生 lowerBound cursor 的独立逻辑键。'
+          )
+        },
+        lower: {
+          summary: t('Inclusive typed encoded prefix bytes.', '包含端 typed 编码前缀字节。')
+        },
+        upper: {
+          summary: t(
+            'Guaranteed strict byte successor, exclusive.',
+            '必有的严格字节后继，不包含端。'
+          )
+        },
+        matches: {
+          summary: t(
+            'Validate and encode one candidate through the same owner, using the captured private prefix.',
+            '通过同一 owner 验证与编码一个候选，并使用捕获的私有前缀判定。'
+          )
+        }
+      }
     },
     ITransactionCapabilityView: {
       summary: t(
